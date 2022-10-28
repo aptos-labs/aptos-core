@@ -48,6 +48,24 @@ error codes here are a bit richer than HTTP codes.
 
 
 
+<details>
+<summary>Show all the modules that "error" depends on directly or indirectly</summary>
+
+
+![](img/error_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "error" directly or indirectly</summary>
+
+
+![](img/error_backward_dep.svg)
+
+
+</details>
+
 <a name="@Constants_0"></a>
 
 ## Constants
@@ -208,6 +226,24 @@ Construct a canonical error code from a category and a reason.
 
 </details>
 
+<details>
+<summary>Show all the functions that "canonical" calls</summary>
+
+
+![](img/error_canonical_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "canonical"</summary>
+
+
+![](img/error_canonical_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_error_invalid_argument"></a>
 
 ## Function `invalid_argument`
@@ -227,6 +263,24 @@ Functions to construct a canonical error code of the given category.
 <pre><code><b>public</b> <b>fun</b> <a href="error.md#0x1_error_invalid_argument">invalid_argument</a>(r: u64): u64 {  <a href="error.md#0x1_error_canonical">canonical</a>(<a href="error.md#0x1_error_INVALID_ARGUMENT">INVALID_ARGUMENT</a>, r) }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "invalid_argument" calls</summary>
+
+
+![](img/error_invalid_argument_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "invalid_argument"</summary>
+
+
+![](img/error_invalid_argument_backward_call_graph.svg)
 
 
 </details>
@@ -253,6 +307,24 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
+<details>
+<summary>Show all the functions that "out_of_range" calls</summary>
+
+
+![](img/error_out_of_range_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "out_of_range"</summary>
+
+
+![](img/error_out_of_range_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_error_invalid_state"></a>
 
 ## Function `invalid_state`
@@ -271,6 +343,24 @@ Functions to construct a canonical error code of the given category.
 <pre><code><b>public</b> <b>fun</b> <a href="error.md#0x1_error_invalid_state">invalid_state</a>(r: u64): u64 {  <a href="error.md#0x1_error_canonical">canonical</a>(<a href="error.md#0x1_error_INVALID_STATE">INVALID_STATE</a>, r) }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "invalid_state" calls</summary>
+
+
+![](img/error_invalid_state_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "invalid_state"</summary>
+
+
+![](img/error_invalid_state_backward_call_graph.svg)
 
 
 </details>
@@ -297,6 +387,24 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
+<details>
+<summary>Show all the functions that "unauthenticated" calls</summary>
+
+
+![](img/error_unauthenticated_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "unauthenticated"</summary>
+
+
+![](img/error_unauthenticated_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_error_permission_denied"></a>
 
 ## Function `permission_denied`
@@ -315,6 +423,24 @@ Functions to construct a canonical error code of the given category.
 <pre><code><b>public</b> <b>fun</b> <a href="error.md#0x1_error_permission_denied">permission_denied</a>(r: u64): u64 { <a href="error.md#0x1_error_canonical">canonical</a>(<a href="error.md#0x1_error_PERMISSION_DENIED">PERMISSION_DENIED</a>, r) }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "permission_denied" calls</summary>
+
+
+![](img/error_permission_denied_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "permission_denied"</summary>
+
+
+![](img/error_permission_denied_backward_call_graph.svg)
 
 
 </details>
@@ -341,6 +467,24 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
+<details>
+<summary>Show all the functions that "not_found" calls</summary>
+
+
+![](img/error_not_found_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "not_found"</summary>
+
+
+![](img/error_not_found_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_error_aborted"></a>
 
 ## Function `aborted`
@@ -359,6 +503,24 @@ Functions to construct a canonical error code of the given category.
 <pre><code><b>public</b> <b>fun</b> <a href="error.md#0x1_error_aborted">aborted</a>(r: u64): u64 { <a href="error.md#0x1_error_canonical">canonical</a>(<a href="error.md#0x1_error_ABORTED">ABORTED</a>, r) }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "aborted" calls</summary>
+
+
+![](img/error_aborted_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "aborted"</summary>
+
+
+![](img/error_aborted_backward_call_graph.svg)
 
 
 </details>
@@ -385,6 +547,24 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
+<details>
+<summary>Show all the functions that "already_exists" calls</summary>
+
+
+![](img/error_already_exists_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "already_exists"</summary>
+
+
+![](img/error_already_exists_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_error_resource_exhausted"></a>
 
 ## Function `resource_exhausted`
@@ -403,6 +583,24 @@ Functions to construct a canonical error code of the given category.
 <pre><code><b>public</b> <b>fun</b> <a href="error.md#0x1_error_resource_exhausted">resource_exhausted</a>(r: u64): u64 {  <a href="error.md#0x1_error_canonical">canonical</a>(<a href="error.md#0x1_error_RESOURCE_EXHAUSTED">RESOURCE_EXHAUSTED</a>, r) }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "resource_exhausted" calls</summary>
+
+
+![](img/error_resource_exhausted_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "resource_exhausted"</summary>
+
+
+![](img/error_resource_exhausted_backward_call_graph.svg)
 
 
 </details>
@@ -429,6 +627,24 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
+<details>
+<summary>Show all the functions that "internal" calls</summary>
+
+
+![](img/error_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "internal"</summary>
+
+
+![](img/error_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_error_not_implemented"></a>
 
 ## Function `not_implemented`
@@ -451,6 +667,24 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
+<details>
+<summary>Show all the functions that "not_implemented" calls</summary>
+
+
+![](img/error_not_implemented_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "not_implemented"</summary>
+
+
+![](img/error_not_implemented_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_error_unavailable"></a>
 
 ## Function `unavailable`
@@ -469,6 +703,24 @@ Functions to construct a canonical error code of the given category.
 <pre><code><b>public</b> <b>fun</b> <a href="error.md#0x1_error_unavailable">unavailable</a>(r: u64): u64 { <a href="error.md#0x1_error_canonical">canonical</a>(<a href="error.md#0x1_error_UNAVAILABLE">UNAVAILABLE</a>, r) }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "unavailable" calls</summary>
+
+
+![](img/error_unavailable_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "unavailable"</summary>
+
+
+![](img/error_unavailable_backward_call_graph.svg)
 
 
 </details>

@@ -44,6 +44,24 @@ This module defines a struct storing the metadata of the block and new block eve
 
 
 
+<details>
+<summary>Show all the modules that "block" depends on directly or indirectly</summary>
+
+
+![](img/block_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "block" directly or indirectly</summary>
+
+
+![](img/block_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_block_BlockResource"></a>
 
 ## Resource `BlockResource`
@@ -274,6 +292,24 @@ This can only be called during Genesis.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/block_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/block_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_block_update_epoch_interval_microsecs"></a>
 
 ## Function `update_epoch_interval_microsecs`
@@ -313,6 +349,24 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
+<details>
+<summary>Show all the functions that "update_epoch_interval_microsecs" calls</summary>
+
+
+![](img/block_update_epoch_interval_microsecs_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_epoch_interval_microsecs"</summary>
+
+
+![](img/block_update_epoch_interval_microsecs_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_block_get_epoch_interval_secs"></a>
 
 ## Function `get_epoch_interval_secs`
@@ -334,6 +388,24 @@ Return epoch interval in seconds.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_epoch_interval_secs" calls</summary>
+
+
+![](img/block_get_epoch_interval_secs_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_epoch_interval_secs"</summary>
+
+
+![](img/block_get_epoch_interval_secs_backward_call_graph.svg)
 
 
 </details>
@@ -418,6 +490,24 @@ The runtime always runs this before executing the transactions in a block.
 
 </details>
 
+<details>
+<summary>Show all the functions that "block_prologue" calls</summary>
+
+
+![](img/block_block_prologue_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "block_prologue"</summary>
+
+
+![](img/block_block_prologue_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_block_get_current_block_height"></a>
 
 ## Function `get_current_block_height`
@@ -439,6 +529,24 @@ Get the current block height
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_current_block_height" calls</summary>
+
+
+![](img/block_get_current_block_height_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_current_block_height"</summary>
+
+
+![](img/block_get_current_block_height_backward_call_graph.svg)
 
 
 </details>
@@ -469,6 +577,24 @@ Emit the event and update height and global timestamp
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "emit_new_block_event" calls</summary>
+
+
+![](img/block_emit_new_block_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_new_block_event"</summary>
+
+
+![](img/block_emit_new_block_event_backward_call_graph.svg)
 
 
 </details>
@@ -514,6 +640,24 @@ reconfiguration event.
 
 </details>
 
+<details>
+<summary>Show all the functions that "emit_genesis_block_event" calls</summary>
+
+
+![](img/block_emit_genesis_block_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_genesis_block_event"</summary>
+
+
+![](img/block_emit_genesis_block_event_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_block_emit_writeset_block_event"></a>
 
 ## Function `emit_writeset_block_event`
@@ -552,6 +696,24 @@ new block event for WriteSetPayload.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "emit_writeset_block_event" calls</summary>
+
+
+![](img/block_emit_writeset_block_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_writeset_block_event"</summary>
+
+
+![](img/block_emit_writeset_block_event_backward_call_graph.svg)
 
 
 </details>

@@ -17,6 +17,24 @@ details on BCS.
 
 
 
+<details>
+<summary>Show all the modules that "bcs" depends on directly or indirectly</summary>
+
+
+![](img/bcs_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "bcs" directly or indirectly</summary>
+
+
+![](img/bcs_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_bcs_to_bytes"></a>
 
 ## Function `to_bytes`
@@ -36,6 +54,24 @@ Return the binary representation of <code>v</code> in BCS (Binary Canonical Seri
 <pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_to_bytes">to_bytes</a>&lt;MoveValue&gt;(v: &MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "to_bytes" calls</summary>
+
+
+![](img/bcs_to_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "to_bytes"</summary>
+
+
+![](img/bcs_to_bytes_backward_call_graph.svg)
 
 
 </details>

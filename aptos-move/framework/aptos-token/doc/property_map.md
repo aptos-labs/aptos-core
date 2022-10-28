@@ -44,6 +44,24 @@ It also supports deserializing property value to it original type.
 
 
 
+<details>
+<summary>Show all the modules that "property_map" depends on directly or indirectly</summary>
+
+
+![](img/property_map_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "property_map" directly or indirectly</summary>
+
+
+![](img/property_map_backward_dep.svg)
+
+
+</details>
+
 <a name="0x3_property_map_PropertyMap"></a>
 
 ## Struct `PropertyMap`
@@ -244,6 +262,24 @@ The maximal number of property that can be stored in property map
 
 </details>
 
+<details>
+<summary>Show all the functions that "new" calls</summary>
+
+
+![](img/property_map_new_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new"</summary>
+
+
+![](img/property_map_new_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_property_map_new_with_key_and_property_value"></a>
 
 ## Function `new_with_key_and_property_value`
@@ -286,6 +322,24 @@ Create property map directly from key and property value
 
 </details>
 
+<details>
+<summary>Show all the functions that "new_with_key_and_property_value" calls</summary>
+
+
+![](img/property_map_new_with_key_and_property_value_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_with_key_and_property_value"</summary>
+
+
+![](img/property_map_new_with_key_and_property_value_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_property_map_empty"></a>
 
 ## Function `empty`
@@ -312,6 +366,24 @@ Create property map directly from key and property value
 
 </details>
 
+<details>
+<summary>Show all the functions that "empty" calls</summary>
+
+
+![](img/property_map_empty_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "empty"</summary>
+
+
+![](img/property_map_empty_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_property_map_contains_key"></a>
 
 ## Function `contains_key`
@@ -332,6 +404,24 @@ Create property map directly from key and property value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "contains_key" calls</summary>
+
+
+![](img/property_map_contains_key_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "contains_key"</summary>
+
+
+![](img/property_map_contains_key_backward_call_graph.svg)
 
 
 </details>
@@ -362,6 +452,24 @@ Create property map directly from key and property value
 
 </details>
 
+<details>
+<summary>Show all the functions that "add" calls</summary>
+
+
+![](img/property_map_add_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add"</summary>
+
+
+![](img/property_map_add_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_property_map_length"></a>
 
 ## Function `length`
@@ -382,6 +490,24 @@ Create property map directly from key and property value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "length" calls</summary>
+
+
+![](img/property_map_length_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "length"</summary>
+
+
+![](img/property_map_length_backward_call_graph.svg)
 
 
 </details>
@@ -412,6 +538,24 @@ Create property map directly from key and property value
 
 </details>
 
+<details>
+<summary>Show all the functions that "borrow" calls</summary>
+
+
+![](img/property_map_borrow_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "borrow"</summary>
+
+
+![](img/property_map_borrow_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_property_map_read_string"></a>
 
 ## Function `read_string`
@@ -434,6 +578,24 @@ Create property map directly from key and property value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "read_string" calls</summary>
+
+
+![](img/property_map_read_string_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "read_string"</summary>
+
+
+![](img/property_map_read_string_backward_call_graph.svg)
 
 
 </details>
@@ -464,6 +626,24 @@ Create property map directly from key and property value
 
 </details>
 
+<details>
+<summary>Show all the functions that "read_u8" calls</summary>
+
+
+![](img/property_map_read_u8_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "read_u8"</summary>
+
+
+![](img/property_map_read_u8_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_property_map_read_u64"></a>
 
 ## Function `read_u64`
@@ -486,6 +666,24 @@ Create property map directly from key and property value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "read_u64" calls</summary>
+
+
+![](img/property_map_read_u64_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "read_u64"</summary>
+
+
+![](img/property_map_read_u64_backward_call_graph.svg)
 
 
 </details>
@@ -516,6 +714,24 @@ Create property map directly from key and property value
 
 </details>
 
+<details>
+<summary>Show all the functions that "read_address" calls</summary>
+
+
+![](img/property_map_read_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "read_address"</summary>
+
+
+![](img/property_map_read_address_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_property_map_read_u128"></a>
 
 ## Function `read_u128`
@@ -538,6 +754,24 @@ Create property map directly from key and property value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "read_u128" calls</summary>
+
+
+![](img/property_map_read_u128_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "read_u128"</summary>
+
+
+![](img/property_map_read_u128_backward_call_graph.svg)
 
 
 </details>
@@ -568,6 +802,24 @@ Create property map directly from key and property value
 
 </details>
 
+<details>
+<summary>Show all the functions that "read_bool" calls</summary>
+
+
+![](img/property_map_read_bool_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "read_bool"</summary>
+
+
+![](img/property_map_read_bool_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_property_map_borrow_value"></a>
 
 ## Function `borrow_value`
@@ -592,6 +844,24 @@ Create property map directly from key and property value
 
 </details>
 
+<details>
+<summary>Show all the functions that "borrow_value" calls</summary>
+
+
+![](img/property_map_borrow_value_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "borrow_value"</summary>
+
+
+![](img/property_map_borrow_value_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_property_map_borrow_type"></a>
 
 ## Function `borrow_type`
@@ -612,6 +882,24 @@ Create property map directly from key and property value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "borrow_type" calls</summary>
+
+
+![](img/property_map_borrow_type_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "borrow_type"</summary>
+
+
+![](img/property_map_borrow_type_backward_call_graph.svg)
 
 
 </details>
@@ -641,6 +929,24 @@ Create property map directly from key and property value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "remove" calls</summary>
+
+
+![](img/property_map_remove_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "remove"</summary>
+
+
+![](img/property_map_remove_backward_call_graph.svg)
 
 
 </details>
@@ -695,6 +1001,24 @@ Allow updating existing keys' value and add new key-value pairs
 
 </details>
 
+<details>
+<summary>Show all the functions that "update_property_map" calls</summary>
+
+
+![](img/property_map_update_property_map_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_property_map"</summary>
+
+
+![](img/property_map_update_property_map_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_property_map_update_property_value"></a>
 
 ## Function `update_property_value`
@@ -720,6 +1044,24 @@ Allow updating existing keys' value and add new key-value pairs
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "update_property_value" calls</summary>
+
+
+![](img/property_map_update_property_value_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_property_value"</summary>
+
+
+![](img/property_map_update_property_value_backward_call_graph.svg)
 
 
 </details>
@@ -750,6 +1092,24 @@ Allow updating existing keys' value and add new key-value pairs
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_property_value_raw" calls</summary>
+
+
+![](img/property_map_create_property_value_raw_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_property_value_raw"</summary>
+
+
+![](img/property_map_create_property_value_raw_backward_call_graph.svg)
 
 
 </details>
@@ -787,6 +1147,24 @@ create a property value from generic type data
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_property_value" calls</summary>
+
+
+![](img/property_map_create_property_value_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_property_value"</summary>
+
+
+![](img/property_map_create_property_value_backward_call_graph.svg)
 
 
 </details>

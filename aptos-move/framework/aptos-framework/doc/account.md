@@ -82,6 +82,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "account" depends on directly or indirectly</summary>
+
+
+![](img/account_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "account" directly or indirectly</summary>
+
+
+![](img/account_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_account_Account"></a>
 
 ## Resource `Account`
@@ -708,6 +726,24 @@ Scheme identifier for MultiEd25519 signatures used to derive authentication keys
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_signer" calls</summary>
+
+
+![](img/account_create_signer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_signer"</summary>
+
+
+![](img/account_create_signer_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_initialize"></a>
 
 ## Function `initialize`
@@ -732,6 +768,24 @@ Only called during genesis to initialize system resources for this module.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/account_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/account_initialize_backward_call_graph.svg)
 
 
 </details>
@@ -768,6 +822,24 @@ is returned. This way, the caller of this function can publish additional resour
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_account" calls</summary>
+
+
+![](img/account_create_account_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_account"</summary>
+
+
+![](img/account_create_account_backward_call_graph.svg)
 
 
 </details>
@@ -824,6 +896,24 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_account_unchecked" calls</summary>
+
+
+![](img/account_create_account_unchecked_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_account_unchecked"</summary>
+
+
+![](img/account_create_account_unchecked_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_exists_at"></a>
 
 ## Function `exists_at`
@@ -844,6 +934,24 @@ is returned. This way, the caller of this function can publish additional resour
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "exists_at" calls</summary>
+
+
+![](img/account_exists_at_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "exists_at"</summary>
+
+
+![](img/account_exists_at_backward_call_graph.svg)
 
 
 </details>
@@ -872,6 +980,24 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
+<details>
+<summary>Show all the functions that "get_guid_next_creation_num" calls</summary>
+
+
+![](img/account_get_guid_next_creation_num_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_guid_next_creation_num"</summary>
+
+
+![](img/account_get_guid_next_creation_num_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_get_sequence_number"></a>
 
 ## Function `get_sequence_number`
@@ -892,6 +1018,24 @@ is returned. This way, the caller of this function can publish additional resour
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_sequence_number" calls</summary>
+
+
+![](img/account_get_sequence_number_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_sequence_number"</summary>
+
+
+![](img/account_get_sequence_number_backward_call_graph.svg)
 
 
 </details>
@@ -927,6 +1071,24 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
+<details>
+<summary>Show all the functions that "increment_sequence_number" calls</summary>
+
+
+![](img/account_increment_sequence_number_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "increment_sequence_number"</summary>
+
+
+![](img/account_increment_sequence_number_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_get_authentication_key"></a>
 
 ## Function `get_authentication_key`
@@ -947,6 +1109,24 @@ is returned. This way, the caller of this function can publish additional resour
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_authentication_key" calls</summary>
+
+
+![](img/account_get_authentication_key_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_authentication_key"</summary>
+
+
+![](img/account_get_authentication_key_backward_call_graph.svg)
 
 
 </details>
@@ -978,6 +1158,24 @@ is returned. This way, the caller of this function can publish additional resour
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "rotate_authentication_key_internal" calls</summary>
+
+
+![](img/account_rotate_authentication_key_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "rotate_authentication_key_internal"</summary>
+
+
+![](img/account_rotate_authentication_key_internal_backward_call_graph.svg)
 
 
 </details>
@@ -1014,6 +1212,24 @@ is returned. This way, the caller of this function can publish additional resour
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "assert_valid_signature_and_get_auth_key" calls</summary>
+
+
+![](img/account_assert_valid_signature_and_get_auth_key_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_valid_signature_and_get_auth_key"</summary>
+
+
+![](img/account_assert_valid_signature_and_get_auth_key_backward_call_graph.svg)
 
 
 </details>
@@ -1116,6 +1332,24 @@ A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519
 
 </details>
 
+<details>
+<summary>Show all the functions that "rotate_authentication_key" calls</summary>
+
+
+![](img/account_rotate_authentication_key_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "rotate_authentication_key"</summary>
+
+
+![](img/account_rotate_authentication_key_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_offer_signer_capability"></a>
 
 ## Function `offer_signer_capability`
@@ -1187,6 +1421,24 @@ to the account owner's signer capability).
 
 </details>
 
+<details>
+<summary>Show all the functions that "offer_signer_capability" calls</summary>
+
+
+![](img/account_offer_signer_capability_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "offer_signer_capability"</summary>
+
+
+![](img/account_offer_signer_capability_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_revoke_signer_capability"></a>
 
 ## Function `revoke_signer_capability`
@@ -1213,6 +1465,24 @@ has a signer capability offer from <code><a href="account.md#0x1_account">accoun
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "revoke_signer_capability" calls</summary>
+
+
+![](img/account_revoke_signer_capability_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "revoke_signer_capability"</summary>
+
+
+![](img/account_revoke_signer_capability_backward_call_graph.svg)
 
 
 </details>
@@ -1250,6 +1520,24 @@ at the offerer's address.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_authorized_signer" calls</summary>
+
+
+![](img/account_create_authorized_signer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_authorized_signer"</summary>
+
+
+![](img/account_create_authorized_signer_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_create_resource_address"></a>
 
 ## Function `create_resource_address`
@@ -1276,6 +1564,24 @@ involves the use of a cryptographic hash operation and should be use thoughtfull
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_resource_address" calls</summary>
+
+
+![](img/account_create_resource_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_resource_address"</summary>
+
+
+![](img/account_create_resource_address_backward_call_graph.svg)
 
 
 </details>
@@ -1337,6 +1643,24 @@ than <code>(1/2)^(256)</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_resource_account" calls</summary>
+
+
+![](img/account_create_resource_account_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_resource_account"</summary>
+
+
+![](img/account_create_resource_account_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_create_framework_reserved_account"></a>
 
 ## Function `create_framework_reserved_account`
@@ -1377,6 +1701,24 @@ create the account for system reserved addresses
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_framework_reserved_account" calls</summary>
+
+
+![](img/account_create_framework_reserved_account_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_framework_reserved_account"</summary>
+
+
+![](img/account_create_framework_reserved_account_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_create_guid"></a>
 
 ## Function `create_guid`
@@ -1404,6 +1746,24 @@ GUID management methods.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_guid" calls</summary>
+
+
+![](img/account_create_guid_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_guid"</summary>
+
+
+![](img/account_create_guid_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_new_event_handle"></a>
 
 ## Function `new_event_handle`
@@ -1425,6 +1785,24 @@ GUID management methods.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "new_event_handle" calls</summary>
+
+
+![](img/account_new_event_handle_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_event_handle"</summary>
+
+
+![](img/account_new_event_handle_backward_call_graph.svg)
 
 
 </details>
@@ -1460,6 +1838,24 @@ Coin management methods.
 
 </details>
 
+<details>
+<summary>Show all the functions that "register_coin" calls</summary>
+
+
+![](img/account_register_coin_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "register_coin"</summary>
+
+
+![](img/account_register_coin_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_create_signer_with_capability"></a>
 
 ## Function `create_signer_with_capability`
@@ -1486,6 +1882,24 @@ Capability based functions for efficient use.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_signer_with_capability" calls</summary>
+
+
+![](img/account_create_signer_with_capability_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_signer_with_capability"</summary>
+
+
+![](img/account_create_signer_with_capability_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_account_get_signer_capability_address"></a>
 
 ## Function `get_signer_capability_address`
@@ -1506,6 +1920,24 @@ Capability based functions for efficient use.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_signer_capability_address" calls</summary>
+
+
+![](img/account_get_signer_capability_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_signer_capability_address"</summary>
+
+
+![](img/account_get_signer_capability_address_backward_call_graph.svg)
 
 
 </details>

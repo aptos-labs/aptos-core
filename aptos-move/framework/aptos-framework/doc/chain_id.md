@@ -21,6 +21,24 @@ This code provides a container for storing a chain id and functions to initializ
 
 
 
+<details>
+<summary>Show all the modules that "chain_id" depends on directly or indirectly</summary>
+
+
+![](img/chain_id_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "chain_id" directly or indirectly</summary>
+
+
+![](img/chain_id_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_chain_id_ChainId"></a>
 
 ## Resource `ChainId`
@@ -75,6 +93,24 @@ Publish the chain ID <code>id</code> of this instance under the SystemAddresses 
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/chain_id_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/chain_id_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_chain_id_get"></a>
 
 ## Function `get`
@@ -96,6 +132,24 @@ Return the chain ID of this instance.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get" calls</summary>
+
+
+![](img/chain_id_get_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get"</summary>
+
+
+![](img/chain_id_get_backward_call_graph.svg)
 
 
 </details>

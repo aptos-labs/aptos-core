@@ -31,6 +31,24 @@ can be enabled for the public.
 
 
 
+<details>
+<summary>Show all the modules that "aggregator_factory" depends on directly or indirectly</summary>
+
+
+![](img/aggregator_factory_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "aggregator_factory" directly or indirectly</summary>
+
+
+![](img/aggregator_factory_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_aggregator_factory_AggregatorFactory"></a>
 
 ## Resource `AggregatorFactory`
@@ -105,6 +123,24 @@ Creates a new factory for aggregators. Can only be called during genesis.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize_aggregator_factory" calls</summary>
+
+
+![](img/aggregator_factory_initialize_aggregator_factory_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_aggregator_factory"</summary>
+
+
+![](img/aggregator_factory_initialize_aggregator_factory_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aggregator_factory_create_aggregator_internal"></a>
 
 ## Function `create_aggregator_internal`
@@ -132,6 +168,24 @@ Creates a new aggregator instance which overflows on exceeding a <code>limit</co
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_aggregator_internal" calls</summary>
+
+
+![](img/aggregator_factory_create_aggregator_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_aggregator_internal"</summary>
+
+
+![](img/aggregator_factory_create_aggregator_internal_backward_call_graph.svg)
 
 
 </details>
@@ -164,6 +218,24 @@ to allow any signer to call.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_aggregator" calls</summary>
+
+
+![](img/aggregator_factory_create_aggregator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_aggregator"</summary>
+
+
+![](img/aggregator_factory_create_aggregator_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aggregator_factory_new_aggregator"></a>
 
 ## Function `new_aggregator`
@@ -183,6 +255,24 @@ Returns a new aggregator.
 <pre><code><b>native</b> <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_new_aggregator">new_aggregator</a>(<a href="aggregator_factory.md#0x1_aggregator_factory">aggregator_factory</a>: &<b>mut</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>, limit: u128): Aggregator;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "new_aggregator" calls</summary>
+
+
+![](img/aggregator_factory_new_aggregator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_aggregator"</summary>
+
+
+![](img/aggregator_factory_new_aggregator_backward_call_graph.svg)
 
 
 </details>

@@ -25,6 +25,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "copyable_any" depends on directly or indirectly</summary>
+
+
+![](img/copyable_any_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "copyable_any" directly or indirectly</summary>
+
+
+![](img/copyable_any_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_copyable_any_Any"></a>
 
 ## Struct `Any`
@@ -103,6 +121,24 @@ also required from <code>T</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "pack" calls</summary>
+
+
+![](img/copyable_any_pack_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "pack"</summary>
+
+
+![](img/copyable_any_pack_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_copyable_any_unpack"></a>
 
 ## Function `unpack`
@@ -129,6 +165,24 @@ Unpack a value from the <code><a href="copyable_any.md#0x1_copyable_any_Any">Any
 
 </details>
 
+<details>
+<summary>Show all the functions that "unpack" calls</summary>
+
+
+![](img/copyable_any_unpack_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "unpack"</summary>
+
+
+![](img/copyable_any_unpack_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_copyable_any_type_name"></a>
 
 ## Function `type_name`
@@ -150,6 +204,24 @@ Returns the type name of this Any
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "type_name" calls</summary>
+
+
+![](img/copyable_any_type_name_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "type_name"</summary>
+
+
+![](img/copyable_any_type_name_backward_call_graph.svg)
 
 
 </details>

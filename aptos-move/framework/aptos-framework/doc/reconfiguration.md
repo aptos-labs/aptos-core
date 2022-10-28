@@ -44,6 +44,24 @@ to synchronize configuration changes for the validators.
 
 
 
+<details>
+<summary>Show all the modules that "reconfiguration" depends on directly or indirectly</summary>
+
+
+![](img/reconfiguration_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "reconfiguration" directly or indirectly</summary>
+
+
+![](img/reconfiguration_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_reconfiguration_NewEpochEvent"></a>
 
 ## Struct `NewEpochEvent`
@@ -235,6 +253,24 @@ Publishes <code><a href="reconfiguration.md#0x1_reconfiguration_Configuration">C
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/reconfiguration_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/reconfiguration_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_reconfiguration_disable_reconfiguration"></a>
 
 ## Function `disable_reconfiguration`
@@ -259,6 +295,24 @@ This function should only be used for offline WriteSet generation purpose and sh
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "disable_reconfiguration" calls</summary>
+
+
+![](img/reconfiguration_disable_reconfiguration_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "disable_reconfiguration"</summary>
+
+
+![](img/reconfiguration_disable_reconfiguration_backward_call_graph.svg)
 
 
 </details>
@@ -292,6 +346,24 @@ This function should only be used for offline WriteSet generation purpose and sh
 
 </details>
 
+<details>
+<summary>Show all the functions that "enable_reconfiguration" calls</summary>
+
+
+![](img/reconfiguration_enable_reconfiguration_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "enable_reconfiguration"</summary>
+
+
+![](img/reconfiguration_enable_reconfiguration_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_reconfiguration_reconfiguration_enabled"></a>
 
 ## Function `reconfiguration_enabled`
@@ -312,6 +384,24 @@ This function should only be used for offline WriteSet generation purpose and sh
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "reconfiguration_enabled" calls</summary>
+
+
+![](img/reconfiguration_reconfiguration_enabled_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "reconfiguration_enabled"</summary>
+
+
+![](img/reconfiguration_reconfiguration_enabled_backward_call_graph.svg)
 
 
 </details>
@@ -395,6 +485,24 @@ Signal validators to start using new configuration. Must be called from friend c
 
 </details>
 
+<details>
+<summary>Show all the functions that "reconfigure" calls</summary>
+
+
+![](img/reconfiguration_reconfigure_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "reconfigure"</summary>
+
+
+![](img/reconfiguration_reconfigure_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_reconfiguration_last_reconfiguration_time"></a>
 
 ## Function `last_reconfiguration_time`
@@ -419,6 +527,24 @@ Signal validators to start using new configuration. Must be called from friend c
 
 </details>
 
+<details>
+<summary>Show all the functions that "last_reconfiguration_time" calls</summary>
+
+
+![](img/reconfiguration_last_reconfiguration_time_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "last_reconfiguration_time"</summary>
+
+
+![](img/reconfiguration_last_reconfiguration_time_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_reconfiguration_current_epoch"></a>
 
 ## Function `current_epoch`
@@ -439,6 +565,24 @@ Signal validators to start using new configuration. Must be called from friend c
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "current_epoch" calls</summary>
+
+
+![](img/reconfiguration_current_epoch_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "current_epoch"</summary>
+
+
+![](img/reconfiguration_current_epoch_backward_call_graph.svg)
 
 
 </details>
@@ -474,6 +618,24 @@ reconfiguration event.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "emit_genesis_reconfiguration_event" calls</summary>
+
+
+![](img/reconfiguration_emit_genesis_reconfiguration_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_genesis_reconfiguration_event"</summary>
+
+
+![](img/reconfiguration_emit_genesis_reconfiguration_event_backward_call_graph.svg)
 
 
 </details>

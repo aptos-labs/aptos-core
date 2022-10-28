@@ -45,6 +45,24 @@ Non-cryptograhic hashes:
 
 
 
+<details>
+<summary>Show all the modules that "aptos_hash" depends on directly or indirectly</summary>
+
+
+![](img/aptos_hash_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "aptos_hash" directly or indirectly</summary>
+
+
+![](img/aptos_hash_backward_dep.svg)
+
+
+</details>
+
 <a name="@Constants_0"></a>
 
 ## Constants
@@ -83,6 +101,24 @@ Returns the (non-cryptographic) SipHash of <code>bytes</code>. See https://en.wi
 
 </details>
 
+<details>
+<summary>Show all the functions that "sip_hash" calls</summary>
+
+
+![](img/aptos_hash_sip_hash_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "sip_hash"</summary>
+
+
+![](img/aptos_hash_sip_hash_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_hash_sip_hash_from_value"></a>
 
 ## Function `sip_hash_from_value`
@@ -110,6 +146,24 @@ Returns the (non-cryptographic) SipHash of the BCS serialization of <code>v</cod
 
 </details>
 
+<details>
+<summary>Show all the functions that "sip_hash_from_value" calls</summary>
+
+
+![](img/aptos_hash_sip_hash_from_value_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "sip_hash_from_value"</summary>
+
+
+![](img/aptos_hash_sip_hash_from_value_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_hash_keccak256"></a>
 
 ## Function `keccak256`
@@ -129,6 +183,24 @@ Returns the Keccak-256 hash of <code>bytes</code>.
 <pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_keccak256">keccak256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "keccak256" calls</summary>
+
+
+![](img/aptos_hash_keccak256_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "keccak256"</summary>
+
+
+![](img/aptos_hash_keccak256_backward_call_graph.svg)
 
 
 </details>
@@ -162,6 +234,24 @@ Returns the SHA2-512 hash of <code>bytes</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "sha2_512" calls</summary>
+
+
+![](img/aptos_hash_sha2_512_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "sha2_512"</summary>
+
+
+![](img/aptos_hash_sha2_512_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_hash_sha3_512"></a>
 
 ## Function `sha3_512`
@@ -187,6 +277,24 @@ Returns the SHA3-512 hash of <code>bytes</code>.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "sha3_512" calls</summary>
+
+
+![](img/aptos_hash_sha3_512_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "sha3_512"</summary>
+
+
+![](img/aptos_hash_sha3_512_backward_call_graph.svg)
 
 
 </details>
@@ -223,6 +331,24 @@ hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD
 
 </details>
 
+<details>
+<summary>Show all the functions that "ripemd160" calls</summary>
+
+
+![](img/aptos_hash_ripemd160_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "ripemd160"</summary>
+
+
+![](img/aptos_hash_ripemd160_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_hash_blake2b_256"></a>
 
 ## Function `blake2b_256`
@@ -252,6 +378,24 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "blake2b_256" calls</summary>
+
+
+![](img/aptos_hash_blake2b_256_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "blake2b_256"</summary>
+
+
+![](img/aptos_hash_blake2b_256_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_hash_sha2_512_internal"></a>
 
 ## Function `sha2_512_internal`
@@ -275,6 +419,24 @@ Returns the SHA2-512 hash of <code>bytes</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "sha2_512_internal" calls</summary>
+
+
+![](img/aptos_hash_sha2_512_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "sha2_512_internal"</summary>
+
+
+![](img/aptos_hash_sha2_512_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_hash_sha3_512_internal"></a>
 
 ## Function `sha3_512_internal`
@@ -294,6 +456,24 @@ Returns the SHA3-512 hash of <code>bytes</code>.
 <pre><code><b>native</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sha3_512_internal">sha3_512_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "sha3_512_internal" calls</summary>
+
+
+![](img/aptos_hash_sha3_512_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "sha3_512_internal"</summary>
+
+
+![](img/aptos_hash_sha3_512_internal_backward_call_graph.svg)
 
 
 </details>
@@ -324,6 +504,24 @@ hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD
 
 </details>
 
+<details>
+<summary>Show all the functions that "ripemd160_internal" calls</summary>
+
+
+![](img/aptos_hash_ripemd160_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "ripemd160_internal"</summary>
+
+
+![](img/aptos_hash_ripemd160_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_hash_blake2b_256_internal"></a>
 
 ## Function `blake2b_256_internal`
@@ -343,6 +541,24 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 <pre><code><b>native</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256_internal">blake2b_256_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "blake2b_256_internal" calls</summary>
+
+
+![](img/aptos_hash_blake2b_256_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "blake2b_256_internal"</summary>
+
+
+![](img/aptos_hash_blake2b_256_internal_backward_call_graph.svg)
 
 
 </details>

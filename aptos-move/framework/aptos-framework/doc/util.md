@@ -16,6 +16,24 @@ Utility functions used by the framework modules.
 
 
 
+<details>
+<summary>Show all the modules that "util" depends on directly or indirectly</summary>
+
+
+![](img/util_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "util" directly or indirectly</summary>
+
+
+![](img/util_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_util_from_bytes"></a>
 
 ## Function `from_bytes`
@@ -43,6 +61,24 @@ owned.
 
 </details>
 
+<details>
+<summary>Show all the functions that "from_bytes" calls</summary>
+
+
+![](img/util_from_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "from_bytes"</summary>
+
+
+![](img/util_from_bytes_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_util_address_from_bytes"></a>
 
 ## Function `address_from_bytes`
@@ -63,6 +99,24 @@ owned.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "address_from_bytes" calls</summary>
+
+
+![](img/util_address_from_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "address_from_bytes"</summary>
+
+
+![](img/util_address_from_bytes_backward_call_graph.svg)
 
 
 </details>

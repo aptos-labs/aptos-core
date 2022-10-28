@@ -91,7 +91,7 @@ impl DocgenOptions {
                 .unwrap_or_else(Vec::new),
             references_file: self.references_file.clone(),
             include_dep_diagrams: self.include_dep_diagram,
-            include_call_diagrams: false,
+            include_call_diagrams: true,
             compile_relative_to_output_dir: false,
         };
         let output = move_docgen::Docgen::new(model, &options).gen();

@@ -33,6 +33,24 @@ This module provides the foundation for transferring of Tokens
 
 
 
+<details>
+<summary>Show all the modules that "token_transfers" depends on directly or indirectly</summary>
+
+
+![](img/token_transfers_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "token_transfers" directly or indirectly</summary>
+
+
+![](img/token_transfers_backward_dep.svg)
+
+
+</details>
+
 <a name="0x3_token_transfers_PendingClaims"></a>
 
 ## Resource `PendingClaims`
@@ -275,6 +293,24 @@ Token offer doesn't exist
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize_token_transfers" calls</summary>
+
+
+![](img/token_transfers_initialize_token_transfers_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_token_transfers"</summary>
+
+
+![](img/token_transfers_initialize_token_transfers_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_transfers_create_token_offer_id"></a>
 
 ## Function `create_token_offer_id`
@@ -298,6 +334,24 @@ Token offer doesn't exist
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_token_offer_id" calls</summary>
+
+
+![](img/token_transfers_create_token_offer_id_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_token_offer_id"</summary>
+
+
+![](img/token_transfers_create_token_offer_id_backward_call_graph.svg)
 
 
 </details>
@@ -331,6 +385,24 @@ Token offer doesn't exist
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "offer_script" calls</summary>
+
+
+![](img/token_transfers_offer_script_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "offer_script"</summary>
+
+
+![](img/token_transfers_offer_script_backward_call_graph.svg)
 
 
 </details>
@@ -387,6 +459,24 @@ Token offer doesn't exist
 
 </details>
 
+<details>
+<summary>Show all the functions that "offer" calls</summary>
+
+
+![](img/token_transfers_offer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "offer"</summary>
+
+
+![](img/token_transfers_offer_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_transfers_claim_script"></a>
 
 ## Function `claim_script`
@@ -415,6 +505,24 @@ Token offer doesn't exist
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "claim_script" calls</summary>
+
+
+![](img/token_transfers_claim_script_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "claim_script"</summary>
+
+
+![](img/token_transfers_claim_script_backward_call_graph.svg)
 
 
 </details>
@@ -462,6 +570,24 @@ Token offer doesn't exist
 
 </details>
 
+<details>
+<summary>Show all the functions that "claim" calls</summary>
+
+
+![](img/token_transfers_claim_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "claim"</summary>
+
+
+![](img/token_transfers_claim_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_transfers_cancel_offer_script"></a>
 
 ## Function `cancel_offer_script`
@@ -490,6 +616,24 @@ Token offer doesn't exist
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "cancel_offer_script" calls</summary>
+
+
+![](img/token_transfers_cancel_offer_script_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "cancel_offer_script"</summary>
+
+
+![](img/token_transfers_cancel_offer_script_backward_call_graph.svg)
 
 
 </details>
@@ -533,6 +677,24 @@ Token offer doesn't exist
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "cancel_offer" calls</summary>
+
+
+![](img/token_transfers_cancel_offer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "cancel_offer"</summary>
+
+
+![](img/token_transfers_cancel_offer_backward_call_graph.svg)
 
 
 </details>

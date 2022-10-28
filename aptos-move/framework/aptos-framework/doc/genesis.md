@@ -58,6 +58,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "genesis" depends on directly or indirectly</summary>
+
+
+![](img/genesis_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "genesis" directly or indirectly</summary>
+
+
+![](img/genesis_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_genesis_AccountMap"></a>
 
 ## Struct `AccountMap`
@@ -361,6 +379,24 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/genesis_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/genesis_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_genesis_initialize_aptos_coin"></a>
 
 ## Function `initialize_aptos_coin`
@@ -386,6 +422,24 @@ Genesis step 2: Initialize Aptos coin.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "initialize_aptos_coin" calls</summary>
+
+
+![](img/genesis_initialize_aptos_coin_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_aptos_coin"</summary>
+
+
+![](img/genesis_initialize_aptos_coin_backward_call_graph.svg)
 
 
 </details>
@@ -422,6 +476,24 @@ Only called for testnets and e2e tests.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "initialize_core_resources_and_aptos_coin" calls</summary>
+
+
+![](img/genesis_initialize_core_resources_and_aptos_coin_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_core_resources_and_aptos_coin"</summary>
+
+
+![](img/genesis_initialize_core_resources_and_aptos_coin_backward_call_graph.svg)
 
 
 </details>
@@ -469,6 +541,24 @@ Only called for testnets and e2e tests.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_accounts" calls</summary>
+
+
+![](img/genesis_create_accounts_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_accounts"</summary>
+
+
+![](img/genesis_create_accounts_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_genesis_create_account"></a>
 
 ## Function `create_account`
@@ -498,6 +588,24 @@ If it exists, it just returns the signer.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_account" calls</summary>
+
+
+![](img/genesis_create_account_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_account"</summary>
+
+
+![](img/genesis_create_account_backward_call_graph.svg)
 
 
 </details>
@@ -612,6 +720,24 @@ If it exists, it just returns the signer.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_employee_validators" calls</summary>
+
+
+![](img/genesis_create_employee_validators_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_employee_validators"</summary>
+
+
+![](img/genesis_create_employee_validators_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_genesis_create_initialize_validators_with_commission"></a>
 
 ## Function `create_initialize_validators_with_commission`
@@ -649,6 +775,24 @@ If it exists, it just returns the signer.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_initialize_validators_with_commission" calls</summary>
+
+
+![](img/genesis_create_initialize_validators_with_commission_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_initialize_validators_with_commission"</summary>
+
+
+![](img/genesis_create_initialize_validators_with_commission_backward_call_graph.svg)
 
 
 </details>
@@ -699,6 +843,24 @@ encoded in a single BCS byte array.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_initialize_validators" calls</summary>
+
+
+![](img/genesis_create_initialize_validators_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_initialize_validators"</summary>
+
+
+![](img/genesis_create_initialize_validators_backward_call_graph.svg)
 
 
 </details>
@@ -760,6 +922,24 @@ encoded in a single BCS byte array.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_initialize_validator" calls</summary>
+
+
+![](img/genesis_create_initialize_validator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_initialize_validator"</summary>
+
+
+![](img/genesis_create_initialize_validator_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_genesis_initialize_validator"></a>
 
 ## Function `initialize_validator`
@@ -798,6 +978,24 @@ encoded in a single BCS byte array.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize_validator" calls</summary>
+
+
+![](img/genesis_initialize_validator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_validator"</summary>
+
+
+![](img/genesis_initialize_validator_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_genesis_set_genesis_end"></a>
 
 ## Function `set_genesis_end`
@@ -823,6 +1021,24 @@ The last step of genesis.
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_genesis_end" calls</summary>
+
+
+![](img/genesis_set_genesis_end_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_genesis_end"</summary>
+
+
+![](img/genesis_set_genesis_end_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_genesis_create_signer"></a>
 
 ## Function `create_signer`
@@ -841,6 +1057,24 @@ The last step of genesis.
 <pre><code><b>native</b> <b>fun</b> <a href="genesis.md#0x1_genesis_create_signer">create_signer</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_signer" calls</summary>
+
+
+![](img/genesis_create_signer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_signer"</summary>
+
+
+![](img/genesis_create_signer_backward_call_graph.svg)
 
 
 </details>
@@ -912,6 +1146,24 @@ The last step of genesis.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "initialize_for_verification" calls</summary>
+
+
+![](img/genesis_initialize_for_verification_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_for_verification"</summary>
+
+
+![](img/genesis_initialize_for_verification_backward_call_graph.svg)
 
 
 </details>

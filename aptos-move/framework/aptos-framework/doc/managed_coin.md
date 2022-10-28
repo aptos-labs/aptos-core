@@ -24,6 +24,24 @@ By utilizing this current module, a developer can create his own coin and care l
 
 
 
+<details>
+<summary>Show all the modules that "managed_coin" depends on directly or indirectly</summary>
+
+
+![](img/managed_coin_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "managed_coin" directly or indirectly</summary>
+
+
+![](img/managed_coin_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_managed_coin_Capabilities"></a>
 
 ## Resource `Capabilities`
@@ -118,6 +136,24 @@ Withdraw an <code>amount</code> of coin <code>CoinType</code> from <code><a href
 
 </details>
 
+<details>
+<summary>Show all the functions that "burn" calls</summary>
+
+
+![](img/managed_coin_burn_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "burn"</summary>
+
+
+![](img/managed_coin_burn_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_managed_coin_initialize"></a>
 
 ## Function `initialize`
@@ -162,6 +198,24 @@ Mint and Burn Capabilities will be stored under <code><a href="account.md#0x1_ac
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/managed_coin_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/managed_coin_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_managed_coin_mint"></a>
 
 ## Function `mint`
@@ -200,6 +254,24 @@ Create new coins <code>CoinType</code> and deposit them into dst_addr's account.
 
 </details>
 
+<details>
+<summary>Show all the functions that "mint" calls</summary>
+
+
+![](img/managed_coin_mint_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "mint"</summary>
+
+
+![](img/managed_coin_mint_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_managed_coin_register"></a>
 
 ## Function `register`
@@ -222,6 +294,24 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "register" calls</summary>
+
+
+![](img/managed_coin_register_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "register"</summary>
+
+
+![](img/managed_coin_register_backward_call_graph.svg)
 
 
 </details>

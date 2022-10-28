@@ -25,6 +25,24 @@ This module implements ECDSA signatures based on the prime-order secp256k1 ellpt
 
 
 
+<details>
+<summary>Show all the modules that "secp256k1" depends on directly or indirectly</summary>
+
+
+![](img/secp256k1_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "secp256k1" directly or indirectly</summary>
+
+
+![](img/secp256k1_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_secp256k1_ECDSARawPublicKey"></a>
 
 ## Struct `ECDSARawPublicKey`
@@ -142,6 +160,24 @@ Constructs an ECDSASignature struct from the given 64 bytes.
 
 </details>
 
+<details>
+<summary>Show all the functions that "ecdsa_signature_from_bytes" calls</summary>
+
+
+![](img/secp256k1_ecdsa_signature_from_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "ecdsa_signature_from_bytes"</summary>
+
+
+![](img/secp256k1_ecdsa_signature_from_bytes_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_secp256k1_ecdsa_raw_public_key_from_64_bytes"></a>
 
 ## Function `ecdsa_raw_public_key_from_64_bytes`
@@ -164,6 +200,24 @@ Constructs an ECDSARawPublicKey struct, given a 64-byte raw representation.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "ecdsa_raw_public_key_from_64_bytes" calls</summary>
+
+
+![](img/secp256k1_ecdsa_raw_public_key_from_64_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "ecdsa_raw_public_key_from_64_bytes"</summary>
+
+
+![](img/secp256k1_ecdsa_raw_public_key_from_64_bytes_backward_call_graph.svg)
 
 
 </details>
@@ -193,6 +247,24 @@ Serializes an ECDSARawPublicKey struct to 64-bytes.
 
 </details>
 
+<details>
+<summary>Show all the functions that "ecdsa_raw_public_key_to_bytes" calls</summary>
+
+
+![](img/secp256k1_ecdsa_raw_public_key_to_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "ecdsa_raw_public_key_to_bytes"</summary>
+
+
+![](img/secp256k1_ecdsa_raw_public_key_to_bytes_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_secp256k1_ecdsa_signature_to_bytes"></a>
 
 ## Function `ecdsa_signature_to_bytes`
@@ -214,6 +286,24 @@ Serializes an ECDSASignature struct to 64-bytes.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "ecdsa_signature_to_bytes" calls</summary>
+
+
+![](img/secp256k1_ecdsa_signature_to_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "ecdsa_signature_to_bytes"</summary>
+
+
+![](img/secp256k1_ecdsa_signature_to_bytes_backward_call_graph.svg)
 
 
 </details>
@@ -257,6 +347,24 @@ public key (or its hash) is known beforehand.
 
 </details>
 
+<details>
+<summary>Show all the functions that "ecdsa_recover" calls</summary>
+
+
+![](img/secp256k1_ecdsa_recover_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "ecdsa_recover"</summary>
+
+
+![](img/secp256k1_ecdsa_recover_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_secp256k1_ecdsa_recover_internal"></a>
 
 ## Function `ecdsa_recover_internal`
@@ -281,6 +389,24 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 ): (<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bool);
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "ecdsa_recover_internal" calls</summary>
+
+
+![](img/secp256k1_ecdsa_recover_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "ecdsa_recover_internal"</summary>
+
+
+![](img/secp256k1_ecdsa_recover_internal_backward_call_graph.svg)
 
 
 </details>

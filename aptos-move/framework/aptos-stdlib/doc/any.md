@@ -25,6 +25,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "any" depends on directly or indirectly</summary>
+
+
+![](img/any_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "any" directly or indirectly</summary>
+
+
+![](img/any_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_any_Any"></a>
 
 ## Struct `Any`
@@ -113,6 +131,24 @@ also required from <code>T</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "pack" calls</summary>
+
+
+![](img/any_pack_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "pack"</summary>
+
+
+![](img/any_pack_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_any_unpack"></a>
 
 ## Function `unpack`
@@ -139,6 +175,24 @@ Unpack a value from the <code><a href="any.md#0x1_any_Any">Any</a></code> repres
 
 </details>
 
+<details>
+<summary>Show all the functions that "unpack" calls</summary>
+
+
+![](img/any_unpack_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "unpack"</summary>
+
+
+![](img/any_unpack_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_any_type_name"></a>
 
 ## Function `type_name`
@@ -160,6 +214,24 @@ Returns the type name of this Any
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "type_name" calls</summary>
+
+
+![](img/any_type_name_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "type_name"</summary>
+
+
+![](img/any_type_name_backward_call_graph.svg)
 
 
 </details>

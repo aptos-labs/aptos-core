@@ -30,6 +30,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "type_info" depends on directly or indirectly</summary>
+
+
+![](img/type_info_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "type_info" directly or indirectly</summary>
+
+
+![](img/type_info_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_type_info_TypeInfo"></a>
 
 ## Struct `TypeInfo`
@@ -107,6 +125,24 @@
 
 </details>
 
+<details>
+<summary>Show all the functions that "account_address" calls</summary>
+
+
+![](img/type_info_account_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "account_address"</summary>
+
+
+![](img/type_info_account_address_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_type_info_module_name"></a>
 
 ## Function `module_name`
@@ -131,6 +167,24 @@
 
 </details>
 
+<details>
+<summary>Show all the functions that "module_name" calls</summary>
+
+
+![](img/type_info_module_name_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "module_name"</summary>
+
+
+![](img/type_info_module_name_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_type_info_struct_name"></a>
 
 ## Function `struct_name`
@@ -151,6 +205,24 @@
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "struct_name" calls</summary>
+
+
+![](img/type_info_struct_name_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "struct_name"</summary>
+
+
+![](img/type_info_struct_name_backward_call_graph.svg)
 
 
 </details>
@@ -186,6 +258,24 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 
 </details>
 
+<details>
+<summary>Show all the functions that "chain_id" calls</summary>
+
+
+![](img/type_info_chain_id_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "chain_id"</summary>
+
+
+![](img/type_info_chain_id_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_type_info_type_of"></a>
 
 ## Function `type_of`
@@ -204,6 +294,24 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 <pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;(): <a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "type_of" calls</summary>
+
+
+![](img/type_info_type_of_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "type_of"</summary>
+
+
+![](img/type_info_type_of_backward_call_graph.svg)
 
 
 </details>
@@ -230,6 +338,24 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 
 </details>
 
+<details>
+<summary>Show all the functions that "type_name" calls</summary>
+
+
+![](img/type_info_type_name_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "type_name"</summary>
+
+
+![](img/type_info_type_name_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_type_info_chain_id_internal"></a>
 
 ## Function `chain_id_internal`
@@ -248,6 +374,24 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 <pre><code><b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>(): u8;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "chain_id_internal" calls</summary>
+
+
+![](img/type_info_chain_id_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "chain_id_internal"</summary>
+
+
+![](img/type_info_chain_id_internal_backward_call_graph.svg)
 
 
 </details>
@@ -284,6 +428,24 @@ analysis of vector size dynamism.
 
 </details>
 
+<details>
+<summary>Show all the functions that "size_of_val" calls</summary>
+
+
+![](img/type_info_size_of_val_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "size_of_val"</summary>
+
+
+![](img/type_info_size_of_val_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_type_info_verify_type_of"></a>
 
 ## Function `verify_type_of`
@@ -316,6 +478,24 @@ analysis of vector size dynamism.
 
 </details>
 
+<details>
+<summary>Show all the functions that "verify_type_of" calls</summary>
+
+
+![](img/type_info_verify_type_of_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "verify_type_of"</summary>
+
+
+![](img/type_info_verify_type_of_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_type_info_verify_type_of_generic"></a>
 
 ## Function `verify_type_of_generic`
@@ -344,6 +524,24 @@ analysis of vector size dynamism.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "verify_type_of_generic" calls</summary>
+
+
+![](img/type_info_verify_type_of_generic_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "verify_type_of_generic"</summary>
+
+
+![](img/type_info_verify_type_of_generic_backward_call_graph.svg)
 
 
 </details>

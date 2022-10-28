@@ -45,6 +45,24 @@ This module supports functionality related to code management.
 
 
 
+<details>
+<summary>Show all the modules that "code" depends on directly or indirectly</summary>
+
+
+![](img/code_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "code" directly or indirectly</summary>
+
+
+![](img/code_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_code_PackageRegistry"></a>
 
 ## Resource `PackageRegistry`
@@ -402,6 +420,24 @@ stored on chain.
 
 </details>
 
+<details>
+<summary>Show all the functions that "upgrade_policy_arbitrary" calls</summary>
+
+
+![](img/code_upgrade_policy_arbitrary_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "upgrade_policy_arbitrary"</summary>
+
+
+![](img/code_upgrade_policy_arbitrary_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_code_upgrade_policy_compat"></a>
 
 ## Function `upgrade_policy_compat`
@@ -424,6 +460,24 @@ a new module has (a) the same public functions (b) for existing resources, no la
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "upgrade_policy_compat" calls</summary>
+
+
+![](img/code_upgrade_policy_compat_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "upgrade_policy_compat"</summary>
+
+
+![](img/code_upgrade_policy_compat_backward_call_graph.svg)
 
 
 </details>
@@ -453,6 +507,24 @@ Whether the modules in the package are immutable and cannot be upgraded.
 
 </details>
 
+<details>
+<summary>Show all the functions that "upgrade_policy_immutable" calls</summary>
+
+
+![](img/code_upgrade_policy_immutable_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "upgrade_policy_immutable"</summary>
+
+
+![](img/code_upgrade_policy_immutable_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_code_can_change_upgrade_policy_to"></a>
 
 ## Function `can_change_upgrade_policy_to`
@@ -475,6 +547,24 @@ strengthened but not weakened.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "can_change_upgrade_policy_to" calls</summary>
+
+
+![](img/code_can_change_upgrade_policy_to_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "can_change_upgrade_policy_to"</summary>
+
+
+![](img/code_can_change_upgrade_policy_to_backward_call_graph.svg)
 
 
 </details>
@@ -507,6 +597,24 @@ Initialize package metadata for Genesis.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/code_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/code_initialize_backward_call_graph.svg)
 
 
 </details>
@@ -587,6 +695,24 @@ package.
 
 </details>
 
+<details>
+<summary>Show all the functions that "publish_package" calls</summary>
+
+
+![](img/code_publish_package_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "publish_package"</summary>
+
+
+![](img/code_publish_package_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_code_publish_package_txn"></a>
 
 ## Function `publish_package_txn`
@@ -610,6 +736,24 @@ of current restrictions for txn parameters, the metadata needs to be passed in s
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "publish_package_txn" calls</summary>
+
+
+![](img/code_publish_package_txn_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "publish_package_txn"</summary>
+
+
+![](img/code_publish_package_txn_backward_call_graph.svg)
 
 
 </details>
@@ -652,6 +796,24 @@ Checks whether the given package is upgradable, and returns true if a compatibil
 
 </details>
 
+<details>
+<summary>Show all the functions that "check_upgradability" calls</summary>
+
+
+![](img/code_check_upgradability_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "check_upgradability"</summary>
+
+
+![](img/code_check_upgradability_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_code_check_coexistence"></a>
 
 ## Function `check_coexistence`
@@ -684,6 +846,24 @@ Checks whether a new package with given names can co-exist with old package.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "check_coexistence" calls</summary>
+
+
+![](img/code_check_coexistence_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "check_coexistence"</summary>
+
+
+![](img/code_check_coexistence_backward_call_graph.svg)
 
 
 </details>
@@ -766,6 +946,24 @@ is passed on to the native layer to verify that bytecode dependencies are actual
 
 </details>
 
+<details>
+<summary>Show all the functions that "check_dependencies" calls</summary>
+
+
+![](img/code_check_dependencies_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "check_dependencies"</summary>
+
+
+![](img/code_check_dependencies_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_code_is_policy_exempted_address"></a>
 
 ## Function `is_policy_exempted_address`
@@ -790,6 +988,24 @@ requires to be upgradable for maintenance and evolution, and is configured to be
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_policy_exempted_address" calls</summary>
+
+
+![](img/code_is_policy_exempted_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_policy_exempted_address"</summary>
+
+
+![](img/code_is_policy_exempted_address_backward_call_graph.svg)
 
 
 </details>
@@ -825,6 +1041,24 @@ Get the names of the modules in a package.
 
 </details>
 
+<details>
+<summary>Show all the functions that "get_module_names" calls</summary>
+
+
+![](img/code_get_module_names_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_module_names"</summary>
+
+
+![](img/code_get_module_names_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_code_request_publish"></a>
 
 ## Function `request_publish`
@@ -849,6 +1083,24 @@ Native function to initiate module loading
 );
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "request_publish" calls</summary>
+
+
+![](img/code_request_publish_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "request_publish"</summary>
+
+
+![](img/code_request_publish_backward_call_graph.svg)
 
 
 </details>
@@ -878,6 +1130,24 @@ Native function to initiate module loading, including a list of allowed dependen
 );
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "request_publish_with_allowed_deps" calls</summary>
+
+
+![](img/code_request_publish_with_allowed_deps_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "request_publish_with_allowed_deps"</summary>
+
+
+![](img/code_request_publish_with_allowed_deps_backward_call_graph.svg)
 
 
 </details>

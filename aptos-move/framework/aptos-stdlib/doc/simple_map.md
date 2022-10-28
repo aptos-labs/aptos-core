@@ -43,6 +43,24 @@ This module provides a solution for sorted maps, that is it has the properties t
 
 
 
+<details>
+<summary>Show all the modules that "simple_map" depends on directly or indirectly</summary>
+
+
+![](img/simple_map_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "simple_map" directly or indirectly</summary>
+
+
+![](img/simple_map_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_simple_map_SimpleMap"></a>
 
 ## Struct `SimpleMap`
@@ -152,6 +170,24 @@ Map key is not found
 
 </details>
 
+<details>
+<summary>Show all the functions that "length" calls</summary>
+
+
+![](img/simple_map_length_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "length"</summary>
+
+
+![](img/simple_map_length_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_simple_map_create"></a>
 
 ## Function `create`
@@ -174,6 +210,24 @@ Map key is not found
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create" calls</summary>
+
+
+![](img/simple_map_create_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create"</summary>
+
+
+![](img/simple_map_create_backward_call_graph.svg)
 
 
 </details>
@@ -208,6 +262,24 @@ Map key is not found
 
 </details>
 
+<details>
+<summary>Show all the functions that "borrow" calls</summary>
+
+
+![](img/simple_map_borrow_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "borrow"</summary>
+
+
+![](img/simple_map_borrow_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_simple_map_borrow_mut"></a>
 
 ## Function `borrow_mut`
@@ -234,6 +306,24 @@ Map key is not found
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "borrow_mut" calls</summary>
+
+
+![](img/simple_map_borrow_mut_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "borrow_mut"</summary>
+
+
+![](img/simple_map_borrow_mut_backward_call_graph.svg)
 
 
 </details>
@@ -266,6 +356,24 @@ Map key is not found
 
 </details>
 
+<details>
+<summary>Show all the functions that "contains_key" calls</summary>
+
+
+![](img/simple_map_contains_key_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "contains_key"</summary>
+
+
+![](img/simple_map_contains_key_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_simple_map_destroy_empty"></a>
 
 ## Function `destroy_empty`
@@ -287,6 +395,24 @@ Map key is not found
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "destroy_empty" calls</summary>
+
+
+![](img/simple_map_destroy_empty_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_empty"</summary>
+
+
+![](img/simple_map_destroy_empty_backward_call_graph.svg)
 
 
 </details>
@@ -322,6 +448,24 @@ Map key is not found
 
 </details>
 
+<details>
+<summary>Show all the functions that "add" calls</summary>
+
+
+![](img/simple_map_add_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add"</summary>
+
+
+![](img/simple_map_add_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_simple_map_remove"></a>
 
 ## Function `remove`
@@ -349,6 +493,24 @@ Map key is not found
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "remove" calls</summary>
+
+
+![](img/simple_map_remove_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "remove"</summary>
+
+
+![](img/simple_map_remove_backward_call_graph.svg)
 
 
 </details>
@@ -385,6 +547,24 @@ Map key is not found
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "find" calls</summary>
+
+
+![](img/simple_map_find_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "find"</summary>
+
+
+![](img/simple_map_find_backward_call_graph.svg)
 
 
 </details>

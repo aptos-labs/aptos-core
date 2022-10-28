@@ -31,6 +31,24 @@ it costs to execute Move on the network.
 
 
 
+<details>
+<summary>Show all the modules that "gas_schedule" depends on directly or indirectly</summary>
+
+
+![](img/gas_schedule_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "gas_schedule" directly or indirectly</summary>
+
+
+![](img/gas_schedule_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_gas_schedule_GasEntry"></a>
 
 ## Struct `GasEntry`
@@ -178,6 +196,24 @@ Only called during genesis.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/gas_schedule_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/gas_schedule_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_gas_schedule_set_gas_schedule"></a>
 
 ## Function `set_gas_schedule`
@@ -224,6 +260,24 @@ This can be called by on-chain governance to update the gas schedule.
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_gas_schedule" calls</summary>
+
+
+![](img/gas_schedule_set_gas_schedule_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_gas_schedule"</summary>
+
+
+![](img/gas_schedule_set_gas_schedule_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_gas_schedule_set_storage_gas_config"></a>
 
 ## Function `set_storage_gas_config`
@@ -247,6 +301,24 @@ This can be called by on-chain governance to update the gas schedule.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "set_storage_gas_config" calls</summary>
+
+
+![](img/gas_schedule_set_storage_gas_config_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_storage_gas_config"</summary>
+
+
+![](img/gas_schedule_set_storage_gas_config_backward_call_graph.svg)
 
 
 </details>

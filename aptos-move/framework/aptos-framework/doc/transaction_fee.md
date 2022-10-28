@@ -33,6 +33,24 @@ This module provides an interface to burn or collect and redistribute transactio
 
 
 
+<details>
+<summary>Show all the modules that "transaction_fee" depends on directly or indirectly</summary>
+
+
+![](img/transaction_fee_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "transaction_fee" directly or indirectly</summary>
+
+
+![](img/transaction_fee_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_transaction_fee_AptosCoinCapabilities"></a>
 
 ## Resource `AptosCoinCapabilities`
@@ -170,6 +188,24 @@ distribution. Should be called by on-chain governance.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize_fee_collection_and_distribution" calls</summary>
+
+
+![](img/transaction_fee_initialize_fee_collection_and_distribution_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_fee_collection_and_distribution"</summary>
+
+
+![](img/transaction_fee_initialize_fee_collection_and_distribution_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_transaction_fee_is_fees_collection_enabled"></a>
 
 ## Function `is_fees_collection_enabled`
@@ -190,6 +226,24 @@ distribution. Should be called by on-chain governance.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_fees_collection_enabled" calls</summary>
+
+
+![](img/transaction_fee_is_fees_collection_enabled_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_fees_collection_enabled"</summary>
+
+
+![](img/transaction_fee_is_fees_collection_enabled_backward_call_graph.svg)
 
 
 </details>
@@ -226,6 +280,24 @@ Sets the burn percentage for collected fees to a new value. Should be called by 
 
 </details>
 
+<details>
+<summary>Show all the functions that "upgrade_burn_percentage" calls</summary>
+
+
+![](img/transaction_fee_upgrade_burn_percentage_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "upgrade_burn_percentage"</summary>
+
+
+![](img/transaction_fee_upgrade_burn_percentage_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_transaction_fee_register_proposer_for_fee_collection"></a>
 
 ## Function `register_proposer_for_fee_collection`
@@ -251,6 +323,24 @@ can only be called at the beginning of the block.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "register_proposer_for_fee_collection" calls</summary>
+
+
+![](img/transaction_fee_register_proposer_for_fee_collection_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "register_proposer_for_fee_collection"</summary>
+
+
+![](img/transaction_fee_register_proposer_for_fee_collection_backward_call_graph.svg)
 
 
 </details>
@@ -286,6 +376,24 @@ Burns a specified fraction of the coin.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "burn_coin_fraction" calls</summary>
+
+
+![](img/transaction_fee_burn_coin_fraction_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "burn_coin_fraction"</summary>
+
+
+![](img/transaction_fee_burn_coin_fraction_backward_call_graph.svg)
 
 
 </details>
@@ -354,6 +462,24 @@ at the beginning of the block or during reconfiguration.
 
 </details>
 
+<details>
+<summary>Show all the functions that "process_collected_fees" calls</summary>
+
+
+![](img/transaction_fee_process_collected_fees_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "process_collected_fees"</summary>
+
+
+![](img/transaction_fee_process_collected_fees_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_transaction_fee_burn_fee"></a>
 
 ## Function `burn_fee`
@@ -379,6 +505,24 @@ Burn transaction fees in epilogue.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "burn_fee" calls</summary>
+
+
+![](img/transaction_fee_burn_fee_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "burn_fee"</summary>
+
+
+![](img/transaction_fee_burn_fee_backward_call_graph.svg)
 
 
 </details>
@@ -414,6 +558,24 @@ Collect transaction fees in epilogue.
 
 </details>
 
+<details>
+<summary>Show all the functions that "collect_fee" calls</summary>
+
+
+![](img/transaction_fee_collect_fee_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "collect_fee"</summary>
+
+
+![](img/transaction_fee_collect_fee_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_transaction_fee_store_aptos_coin_burn_cap"></a>
 
 ## Function `store_aptos_coin_burn_cap`
@@ -436,6 +598,24 @@ Only called during genesis.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "store_aptos_coin_burn_cap" calls</summary>
+
+
+![](img/transaction_fee_store_aptos_coin_burn_cap_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "store_aptos_coin_burn_cap"</summary>
+
+
+![](img/transaction_fee_store_aptos_coin_burn_cap_backward_call_graph.svg)
 
 
 </details>

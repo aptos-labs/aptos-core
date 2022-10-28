@@ -30,6 +30,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "system_addresses" depends on directly or indirectly</summary>
+
+
+![](img/system_addresses_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "system_addresses" directly or indirectly</summary>
+
+
+![](img/system_addresses_backward_dep.svg)
+
+
+</details>
+
 <a name="@Constants_0"></a>
 
 ## Constants
@@ -99,6 +117,24 @@ The operation can only be performed by the VM
 
 </details>
 
+<details>
+<summary>Show all the functions that "assert_core_resource" calls</summary>
+
+
+![](img/system_addresses_assert_core_resource_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_core_resource"</summary>
+
+
+![](img/system_addresses_assert_core_resource_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_system_addresses_assert_core_resource_address"></a>
 
 ## Function `assert_core_resource_address`
@@ -123,6 +159,24 @@ The operation can only be performed by the VM
 
 </details>
 
+<details>
+<summary>Show all the functions that "assert_core_resource_address" calls</summary>
+
+
+![](img/system_addresses_assert_core_resource_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_core_resource_address"</summary>
+
+
+![](img/system_addresses_assert_core_resource_address_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_system_addresses_is_core_resource_address"></a>
 
 ## Function `is_core_resource_address`
@@ -143,6 +197,24 @@ The operation can only be performed by the VM
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_core_resource_address" calls</summary>
+
+
+![](img/system_addresses_is_core_resource_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_core_resource_address"</summary>
+
+
+![](img/system_addresses_is_core_resource_address_backward_call_graph.svg)
 
 
 </details>
@@ -174,6 +246,24 @@ The operation can only be performed by the VM
 
 </details>
 
+<details>
+<summary>Show all the functions that "assert_aptos_framework" calls</summary>
+
+
+![](img/system_addresses_assert_aptos_framework_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_aptos_framework"</summary>
+
+
+![](img/system_addresses_assert_aptos_framework_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_system_addresses_assert_framework_reserved_address"></a>
 
 ## Function `assert_framework_reserved_address`
@@ -197,6 +287,24 @@ The operation can only be performed by the VM
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "assert_framework_reserved_address" calls</summary>
+
+
+![](img/system_addresses_assert_framework_reserved_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_framework_reserved_address"</summary>
+
+
+![](img/system_addresses_assert_framework_reserved_address_backward_call_graph.svg)
 
 
 </details>
@@ -235,6 +343,24 @@ Return true if <code>addr</code> is 0x0 or under the on chain governance's contr
 
 </details>
 
+<details>
+<summary>Show all the functions that "is_framework_reserved_address" calls</summary>
+
+
+![](img/system_addresses_is_framework_reserved_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_framework_reserved_address"</summary>
+
+
+![](img/system_addresses_is_framework_reserved_address_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_system_addresses_is_aptos_framework_address"></a>
 
 ## Function `is_aptos_framework_address`
@@ -256,6 +382,24 @@ Return true if <code>addr</code> is 0x1.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_aptos_framework_address" calls</summary>
+
+
+![](img/system_addresses_is_aptos_framework_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_aptos_framework_address"</summary>
+
+
+![](img/system_addresses_is_aptos_framework_address_backward_call_graph.svg)
 
 
 </details>
@@ -285,6 +429,24 @@ Assert that the signer has the VM reserved address.
 
 </details>
 
+<details>
+<summary>Show all the functions that "assert_vm" calls</summary>
+
+
+![](img/system_addresses_assert_vm_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_vm"</summary>
+
+
+![](img/system_addresses_assert_vm_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_system_addresses_is_vm"></a>
 
 ## Function `is_vm`
@@ -306,6 +468,24 @@ Return true if <code>addr</code> is a reserved address for the VM to call system
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_vm" calls</summary>
+
+
+![](img/system_addresses_is_vm_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_vm"</summary>
+
+
+![](img/system_addresses_is_vm_backward_call_graph.svg)
 
 
 </details>
@@ -335,6 +515,24 @@ Return true if <code>addr</code> is a reserved address for the VM to call system
 
 </details>
 
+<details>
+<summary>Show all the functions that "is_vm_address" calls</summary>
+
+
+![](img/system_addresses_is_vm_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_vm_address"</summary>
+
+
+![](img/system_addresses_is_vm_address_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_system_addresses_is_reserved_address"></a>
 
 ## Function `is_reserved_address`
@@ -356,6 +554,24 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_reserved_address" calls</summary>
+
+
+![](img/system_addresses_is_reserved_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_reserved_address"</summary>
+
+
+![](img/system_addresses_is_reserved_address_backward_call_graph.svg)
 
 
 </details>

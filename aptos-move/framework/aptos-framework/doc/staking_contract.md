@@ -87,6 +87,24 @@ pool.
 
 
 
+<details>
+<summary>Show all the modules that "staking_contract" depends on directly or indirectly</summary>
+
+
+![](img/staking_contract_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "staking_contract" directly or indirectly</summary>
+
+
+![](img/staking_contract_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_staking_contract_StakingContract"></a>
 
 ## Struct `StakingContract`
@@ -736,6 +754,24 @@ Maximum number of distributions a stake pool can support.
 
 </details>
 
+<details>
+<summary>Show all the functions that "stake_pool_address" calls</summary>
+
+
+![](img/staking_contract_stake_pool_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "stake_pool_address"</summary>
+
+
+![](img/staking_contract_stake_pool_address_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_contract_last_recorded_principal"></a>
 
 ## Function `last_recorded_principal`
@@ -762,6 +798,24 @@ Maximum number of distributions a stake pool can support.
 
 </details>
 
+<details>
+<summary>Show all the functions that "last_recorded_principal" calls</summary>
+
+
+![](img/staking_contract_last_recorded_principal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "last_recorded_principal"</summary>
+
+
+![](img/staking_contract_last_recorded_principal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_contract_commission_percentage"></a>
 
 ## Function `commission_percentage`
@@ -784,6 +838,24 @@ Maximum number of distributions a stake pool can support.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "commission_percentage" calls</summary>
+
+
+![](img/staking_contract_commission_percentage_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "commission_percentage"</summary>
+
+
+![](img/staking_contract_commission_percentage_backward_call_graph.svg)
 
 
 </details>
@@ -815,6 +887,24 @@ Maximum number of distributions a stake pool can support.
 
 </details>
 
+<details>
+<summary>Show all the functions that "staking_contract_amounts" calls</summary>
+
+
+![](img/staking_contract_staking_contract_amounts_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "staking_contract_amounts"</summary>
+
+
+![](img/staking_contract_staking_contract_amounts_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_contract_pending_distribution_counts"></a>
 
 ## Function `pending_distribution_counts`
@@ -837,6 +927,24 @@ Maximum number of distributions a stake pool can support.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "pending_distribution_counts" calls</summary>
+
+
+![](img/staking_contract_pending_distribution_counts_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "pending_distribution_counts"</summary>
+
+
+![](img/staking_contract_pending_distribution_counts_backward_call_graph.svg)
 
 
 </details>
@@ -866,6 +974,24 @@ Maximum number of distributions a stake pool can support.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "staking_contract_exists" calls</summary>
+
+
+![](img/staking_contract_staking_contract_exists_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "staking_contract_exists"</summary>
+
+
+![](img/staking_contract_staking_contract_exists_backward_call_graph.svg)
 
 
 </details>
@@ -901,6 +1027,24 @@ Staker can call this function to create a simple staking contract with a specifi
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_staking_contract" calls</summary>
+
+
+![](img/staking_contract_create_staking_contract_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_staking_contract"</summary>
+
+
+![](img/staking_contract_create_staking_contract_backward_call_graph.svg)
 
 
 </details>
@@ -988,6 +1132,24 @@ Staker can call this function to create a simple staking contract with a specifi
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_staking_contract_with_coins" calls</summary>
+
+
+![](img/staking_contract_create_staking_contract_with_coins_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_staking_contract_with_coins"</summary>
+
+
+![](img/staking_contract_create_staking_contract_with_coins_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_contract_add_stake"></a>
 
 ## Function `add_stake`
@@ -1024,6 +1186,24 @@ Add more stake to an existing staking contract.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "add_stake" calls</summary>
+
+
+![](img/staking_contract_add_stake_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add_stake"</summary>
+
+
+![](img/staking_contract_add_stake_backward_call_graph.svg)
 
 
 </details>
@@ -1065,6 +1245,24 @@ Convenient function to allow the staker to update the voter address in a staking
 
 </details>
 
+<details>
+<summary>Show all the functions that "update_voter" calls</summary>
+
+
+![](img/staking_contract_update_voter_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_voter"</summary>
+
+
+![](img/staking_contract_update_voter_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_contract_reset_lockup"></a>
 
 ## Function `reset_lockup`
@@ -1094,6 +1292,24 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "reset_lockup" calls</summary>
+
+
+![](img/staking_contract_reset_lockup_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "reset_lockup"</summary>
+
+
+![](img/staking_contract_reset_lockup_backward_call_graph.svg)
 
 
 </details>
@@ -1141,6 +1357,24 @@ Only staker or operator can call this.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "request_commission" calls</summary>
+
+
+![](img/staking_contract_request_commission_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "request_commission"</summary>
+
+
+![](img/staking_contract_request_commission_backward_call_graph.svg)
 
 
 </details>
@@ -1193,6 +1427,24 @@ Only staker or operator can call this.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "request_commission_internal" calls</summary>
+
+
+![](img/staking_contract_request_commission_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "request_commission_internal"</summary>
+
+
+![](img/staking_contract_request_commission_internal_backward_call_graph.svg)
 
 
 </details>
@@ -1264,6 +1516,24 @@ This also triggers paying commission to the operator for accounting simplicity.
 
 </details>
 
+<details>
+<summary>Show all the functions that "unlock_stake" calls</summary>
+
+
+![](img/staking_contract_unlock_stake_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "unlock_stake"</summary>
+
+
+![](img/staking_contract_unlock_stake_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_contract_unlock_rewards"></a>
 
 ## Function `unlock_rewards`
@@ -1291,6 +1561,24 @@ Unlock all accumulated rewards since the last recorded principals.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "unlock_rewards" calls</summary>
+
+
+![](img/staking_contract_unlock_rewards_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "unlock_rewards"</summary>
+
+
+![](img/staking_contract_unlock_rewards_backward_call_graph.svg)
 
 
 </details>
@@ -1324,6 +1612,24 @@ Allows staker to switch operator without going through the lenghthy process to u
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "switch_operator_with_same_commission" calls</summary>
+
+
+![](img/staking_contract_switch_operator_with_same_commission_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "switch_operator_with_same_commission"</summary>
+
+
+![](img/staking_contract_switch_operator_with_same_commission_backward_call_graph.svg)
 
 
 </details>
@@ -1391,6 +1697,24 @@ Allows staker to switch operator without going through the lenghthy process to u
 
 </details>
 
+<details>
+<summary>Show all the functions that "switch_operator" calls</summary>
+
+
+![](img/staking_contract_switch_operator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "switch_operator"</summary>
+
+
+![](img/staking_contract_switch_operator_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_contract_distribute"></a>
 
 ## Function `distribute`
@@ -1416,6 +1740,24 @@ not need to be restricted to just the staker or operator.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "distribute" calls</summary>
+
+
+![](img/staking_contract_distribute_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "distribute"</summary>
+
+
+![](img/staking_contract_distribute_backward_call_graph.svg)
 
 
 </details>
@@ -1484,6 +1826,24 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 
 </details>
 
+<details>
+<summary>Show all the functions that "distribute_internal" calls</summary>
+
+
+![](img/staking_contract_distribute_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "distribute_internal"</summary>
+
+
+![](img/staking_contract_distribute_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_contract_assert_staking_contract_exists"></a>
 
 ## Function `assert_staking_contract_exists`
@@ -1509,6 +1869,24 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "assert_staking_contract_exists" calls</summary>
+
+
+![](img/staking_contract_assert_staking_contract_exists_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_staking_contract_exists"</summary>
+
+
+![](img/staking_contract_assert_staking_contract_exists_backward_call_graph.svg)
 
 
 </details>
@@ -1553,6 +1931,24 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 
 </details>
 
+<details>
+<summary>Show all the functions that "add_distribution" calls</summary>
+
+
+![](img/staking_contract_add_distribution_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add_distribution"</summary>
+
+
+![](img/staking_contract_add_distribution_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_contract_get_staking_contract_amounts_internal"></a>
 
 ## Function `get_staking_contract_amounts_internal`
@@ -1582,6 +1978,24 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_staking_contract_amounts_internal" calls</summary>
+
+
+![](img/staking_contract_get_staking_contract_amounts_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_staking_contract_amounts_internal"</summary>
+
+
+![](img/staking_contract_get_staking_contract_amounts_internal_backward_call_graph.svg)
 
 
 </details>
@@ -1628,6 +2042,24 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_stake_pool" calls</summary>
+
+
+![](img/staking_contract_create_stake_pool_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_stake_pool"</summary>
+
+
+![](img/staking_contract_create_stake_pool_backward_call_graph.svg)
 
 
 </details>
@@ -1689,6 +2121,24 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 
 </details>
 
+<details>
+<summary>Show all the functions that "update_distribution_pool" calls</summary>
+
+
+![](img/staking_contract_update_distribution_pool_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_distribution_pool"</summary>
+
+
+![](img/staking_contract_update_distribution_pool_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_contract_new_staking_contracts_holder"></a>
 
 ## Function `new_staking_contracts_holder`
@@ -1721,6 +2171,24 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "new_staking_contracts_holder" calls</summary>
+
+
+![](img/staking_contract_new_staking_contracts_holder_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_staking_contracts_holder"</summary>
+
+
+![](img/staking_contract_new_staking_contracts_holder_backward_call_graph.svg)
 
 
 </details>

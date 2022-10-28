@@ -23,6 +23,24 @@ Reconfiguration, and may be updated by root.
 
 
 
+<details>
+<summary>Show all the modules that "consensus_config" depends on directly or indirectly</summary>
+
+
+![](img/consensus_config_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "consensus_config" directly or indirectly</summary>
+
+
+![](img/consensus_config_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_consensus_config_ConsensusConfig"></a>
 
 ## Resource `ConsensusConfig`
@@ -92,6 +110,24 @@ Publishes the ConsensusConfig config.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/consensus_config_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/consensus_config_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_consensus_config_set"></a>
 
 ## Function `set`
@@ -120,6 +156,24 @@ This can be called by on-chain governance to update on-chain consensus configs.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "set" calls</summary>
+
+
+![](img/consensus_config_set_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set"</summary>
+
+
+![](img/consensus_config_set_backward_call_graph.svg)
 
 
 </details>

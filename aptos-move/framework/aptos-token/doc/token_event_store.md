@@ -39,6 +39,24 @@ This module provides utils to add and emit new token events that are not in toke
 
 
 
+<details>
+<summary>Show all the modules that "token_event_store" depends on directly or indirectly</summary>
+
+
+![](img/token_event_store_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "token_event_store" directly or indirectly</summary>
+
+
+![](img/token_event_store_backward_dep.svg)
+
+
+</details>
+
 <a name="0x3_token_event_store_CollectionDescriptionMutateEvent"></a>
 
 ## Struct `CollectionDescriptionMutateEvent`
@@ -613,6 +631,24 @@ Event emitted when the token maximum is mutated
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize_token_event_store" calls</summary>
+
+
+![](img/token_event_store_initialize_token_event_store_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_token_event_store"</summary>
+
+
+![](img/token_event_store_initialize_token_event_store_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_event_store_emit_collection_uri_mutate_event"></a>
 
 ## Function `emit_collection_uri_mutate_event`
@@ -645,6 +681,24 @@ Emit the collection uri mutation event
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "emit_collection_uri_mutate_event" calls</summary>
+
+
+![](img/token_event_store_emit_collection_uri_mutate_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_collection_uri_mutate_event"</summary>
+
+
+![](img/token_event_store_emit_collection_uri_mutate_event_backward_call_graph.svg)
 
 
 </details>
@@ -685,6 +739,24 @@ Emit the collection description mutation event
 
 </details>
 
+<details>
+<summary>Show all the functions that "emit_collection_description_mutate_event" calls</summary>
+
+
+![](img/token_event_store_emit_collection_description_mutate_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_collection_description_mutate_event"</summary>
+
+
+![](img/token_event_store_emit_collection_description_mutate_event_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_event_store_emit_collection_maximum_mutate_event"></a>
 
 ## Function `emit_collection_maximum_mutate_event`
@@ -721,6 +793,24 @@ Emit the collection maximum mutation event
 
 </details>
 
+<details>
+<summary>Show all the functions that "emit_collection_maximum_mutate_event" calls</summary>
+
+
+![](img/token_event_store_emit_collection_maximum_mutate_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_collection_maximum_mutate_event"</summary>
+
+
+![](img/token_event_store_emit_collection_maximum_mutate_event_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_event_store_emit_token_opt_in_event"></a>
 
 ## Function `emit_token_opt_in_event`
@@ -750,6 +840,24 @@ Emit the direct opt-in event
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "emit_token_opt_in_event" calls</summary>
+
+
+![](img/token_event_store_emit_token_opt_in_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_token_opt_in_event"</summary>
+
+
+![](img/token_event_store_emit_token_opt_in_event_backward_call_graph.svg)
 
 
 </details>
@@ -796,6 +904,24 @@ Emit URI mutation event
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "emit_token_uri_mutate_event" calls</summary>
+
+
+![](img/token_event_store_emit_token_uri_mutate_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_token_uri_mutate_event"</summary>
+
+
+![](img/token_event_store_emit_token_uri_mutate_event_backward_call_graph.svg)
 
 
 </details>
@@ -848,6 +974,24 @@ Emit tokendata property map mutation event
 
 </details>
 
+<details>
+<summary>Show all the functions that "emit_default_property_mutate_event" calls</summary>
+
+
+![](img/token_event_store_emit_default_property_mutate_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_default_property_mutate_event"</summary>
+
+
+![](img/token_event_store_emit_default_property_mutate_event_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_event_store_emit_token_descrition_mutate_event"></a>
 
 ## Function `emit_token_descrition_mutate_event`
@@ -890,6 +1034,24 @@ Emit description mutation event
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "emit_token_descrition_mutate_event" calls</summary>
+
+
+![](img/token_event_store_emit_token_descrition_mutate_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_token_descrition_mutate_event"</summary>
+
+
+![](img/token_event_store_emit_token_descrition_mutate_event_backward_call_graph.svg)
 
 
 </details>
@@ -947,6 +1109,24 @@ Emit royalty mutation event
 
 </details>
 
+<details>
+<summary>Show all the functions that "emit_token_royalty_mutate_event" calls</summary>
+
+
+![](img/token_event_store_emit_token_royalty_mutate_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_token_royalty_mutate_event"</summary>
+
+
+![](img/token_event_store_emit_token_royalty_mutate_event_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_event_store_emit_token_maximum_mutate_event"></a>
 
 ## Function `emit_token_maximum_mutate_event`
@@ -989,6 +1169,24 @@ Emit maximum mutation event
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "emit_token_maximum_mutate_event" calls</summary>
+
+
+![](img/token_event_store_emit_token_maximum_mutate_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_token_maximum_mutate_event"</summary>
+
+
+![](img/token_event_store_emit_token_maximum_mutate_event_backward_call_graph.svg)
 
 
 </details>

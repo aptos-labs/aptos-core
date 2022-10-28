@@ -96,6 +96,24 @@ module.resource_signer_cap = option::some(resource_signer_cap);
 
 
 
+<details>
+<summary>Show all the modules that "resource_account" depends on directly or indirectly</summary>
+
+
+![](img/resource_account_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "resource_account" directly or indirectly</summary>
+
+
+![](img/resource_account_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_resource_account_Container"></a>
 
 ## Resource `Container`
@@ -194,6 +212,24 @@ or the source accounts current auth key.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_resource_account" calls</summary>
+
+
+![](img/resource_account_create_resource_account_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_resource_account"</summary>
+
+
+![](img/resource_account_create_resource_account_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_resource_account_create_resource_account_and_fund"></a>
 
 ## Function `create_resource_account_and_fund`
@@ -236,6 +272,24 @@ used for resource accounts that need access to Coin<AptosCoin>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_resource_account_and_fund" calls</summary>
+
+
+![](img/resource_account_create_resource_account_and_fund_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_resource_account_and_fund"</summary>
+
+
+![](img/resource_account_create_resource_account_and_fund_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_resource_account_create_resource_account_and_publish_package"></a>
 
 ## Function `create_resource_account_and_publish_package`
@@ -270,6 +324,24 @@ this account and leaves the signer cap readily available for pickup.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_resource_account_and_publish_package" calls</summary>
+
+
+![](img/resource_account_create_resource_account_and_publish_package_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_resource_account_and_publish_package"</summary>
+
+
+![](img/resource_account_create_resource_account_and_publish_package_backward_call_graph.svg)
 
 
 </details>
@@ -317,6 +389,24 @@ this account and leaves the signer cap readily available for pickup.
 
 </details>
 
+<details>
+<summary>Show all the functions that "rotate_account_authentication_key_and_store_capability" calls</summary>
+
+
+![](img/resource_account_rotate_account_authentication_key_and_store_capability_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "rotate_account_authentication_key_and_store_capability"</summary>
+
+
+![](img/resource_account_rotate_account_authentication_key_and_store_capability_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_resource_account_retrieve_resource_account_cap"></a>
 
 ## Function `retrieve_resource_account_cap`
@@ -360,6 +450,24 @@ the SignerCapability.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "retrieve_resource_account_cap" calls</summary>
+
+
+![](img/resource_account_retrieve_resource_account_cap_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "retrieve_resource_account_cap"</summary>
+
+
+![](img/resource_account_retrieve_resource_account_cap_backward_call_graph.svg)
 
 
 </details>

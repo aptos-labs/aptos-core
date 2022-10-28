@@ -35,6 +35,24 @@ at the moment.**
 
 
 
+<details>
+<summary>Show all the modules that "aggregator" depends on directly or indirectly</summary>
+
+
+![](img/aggregator_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "aggregator" directly or indirectly</summary>
+
+
+![](img/aggregator_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_aggregator_Aggregator"></a>
 
 ## Struct `Aggregator`
@@ -136,6 +154,24 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 
 </details>
 
+<details>
+<summary>Show all the functions that "limit" calls</summary>
+
+
+![](img/aggregator_limit_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "limit"</summary>
+
+
+![](img/aggregator_limit_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aggregator_add"></a>
 
 ## Function `add`
@@ -155,6 +191,24 @@ Adds <code>value</code> to aggregator. Aborts on overflowing the limit.
 <pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, value: u128);
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "add" calls</summary>
+
+
+![](img/aggregator_add_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add"</summary>
+
+
+![](img/aggregator_add_backward_call_graph.svg)
 
 
 </details>
@@ -182,6 +236,24 @@ Subtracts <code>value</code> from aggregator. Aborts on going below zero.
 
 </details>
 
+<details>
+<summary>Show all the functions that "sub" calls</summary>
+
+
+![](img/aggregator_sub_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "sub"</summary>
+
+
+![](img/aggregator_sub_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aggregator_read"></a>
 
 ## Function `read`
@@ -205,6 +277,24 @@ Returns a value stored in this aggregator.
 
 </details>
 
+<details>
+<summary>Show all the functions that "read" calls</summary>
+
+
+![](img/aggregator_read_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "read"</summary>
+
+
+![](img/aggregator_read_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aggregator_destroy"></a>
 
 ## Function `destroy`
@@ -224,6 +314,24 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 <pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_destroy">destroy</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>);
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "destroy" calls</summary>
+
+
+![](img/aggregator_destroy_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy"</summary>
+
+
+![](img/aggregator_destroy_backward_call_graph.svg)
 
 
 </details>

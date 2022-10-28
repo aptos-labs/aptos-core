@@ -26,6 +26,24 @@ a 32-bit fractional part.
 
 
 
+<details>
+<summary>Show all the modules that "fixed_point32" depends on directly or indirectly</summary>
+
+
+![](img/fixed_point32_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "fixed_point32" directly or indirectly</summary>
+
+
+![](img/fixed_point32_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_fixed_point32_FixedPoint32"></a>
 
 ## Struct `FixedPoint32`
@@ -163,6 +181,24 @@ overflows.
 
 </details>
 
+<details>
+<summary>Show all the functions that "multiply_u64" calls</summary>
+
+
+![](img/fixed_point32_multiply_u64_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "multiply_u64"</summary>
+
+
+![](img/fixed_point32_multiply_u64_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_fixed_point32_divide_u64"></a>
 
 ## Function `divide_u64`
@@ -196,6 +232,24 @@ is zero or if the quotient overflows.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "divide_u64" calls</summary>
+
+
+![](img/fixed_point32_divide_u64_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "divide_u64"</summary>
+
+
+![](img/fixed_point32_divide_u64_backward_call_graph.svg)
 
 
 </details>
@@ -246,6 +300,24 @@ rounding, e.g., 0.0125 will round down to 0.012 instead of up to 0.013.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_from_rational" calls</summary>
+
+
+![](img/fixed_point32_create_from_rational_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_from_rational"</summary>
+
+
+![](img/fixed_point32_create_from_rational_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_fixed_point32_create_from_raw_value"></a>
 
 ## Function `create_from_raw_value`
@@ -267,6 +339,24 @@ Create a fixedpoint value from a raw value.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_from_raw_value" calls</summary>
+
+
+![](img/fixed_point32_create_from_raw_value_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_from_raw_value"</summary>
+
+
+![](img/fixed_point32_create_from_raw_value_backward_call_graph.svg)
 
 
 </details>
@@ -298,6 +388,24 @@ values directly.
 
 </details>
 
+<details>
+<summary>Show all the functions that "get_raw_value" calls</summary>
+
+
+![](img/fixed_point32_get_raw_value_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_raw_value"</summary>
+
+
+![](img/fixed_point32_get_raw_value_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_fixed_point32_is_zero"></a>
 
 ## Function `is_zero`
@@ -319,6 +427,24 @@ Returns true if the ratio is zero.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_zero" calls</summary>
+
+
+![](img/fixed_point32_is_zero_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_zero"</summary>
+
+
+![](img/fixed_point32_is_zero_backward_call_graph.svg)
 
 
 </details>

@@ -24,6 +24,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "staking_proxy" depends on directly or indirectly</summary>
+
+
+![](img/staking_proxy_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "staking_proxy" directly or indirectly</summary>
+
+
+![](img/staking_proxy_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_staking_proxy_set_operator"></a>
 
 ## Function `set_operator`
@@ -50,6 +68,24 @@
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_operator" calls</summary>
+
+
+![](img/staking_proxy_set_operator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_operator"</summary>
+
+
+![](img/staking_proxy_set_operator_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_proxy_set_voter"></a>
 
 ## Function `set_voter`
@@ -72,6 +108,24 @@
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "set_voter" calls</summary>
+
+
+![](img/staking_proxy_set_voter_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_voter"</summary>
+
+
+![](img/staking_proxy_set_voter_backward_call_graph.svg)
 
 
 </details>
@@ -111,6 +165,24 @@
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_vesting_contract_operator" calls</summary>
+
+
+![](img/staking_proxy_set_vesting_contract_operator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_vesting_contract_operator"</summary>
+
+
+![](img/staking_proxy_set_vesting_contract_operator_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_proxy_set_staking_contract_operator"></a>
 
 ## Function `set_staking_contract_operator`
@@ -139,6 +211,24 @@
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_staking_contract_operator" calls</summary>
+
+
+![](img/staking_proxy_set_staking_contract_operator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_staking_contract_operator"</summary>
+
+
+![](img/staking_proxy_set_staking_contract_operator_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_proxy_set_stake_pool_operator"></a>
 
 ## Function `set_stake_pool_operator`
@@ -162,6 +252,24 @@
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "set_stake_pool_operator" calls</summary>
+
+
+![](img/staking_proxy_set_stake_pool_operator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_stake_pool_operator"</summary>
+
+
+![](img/staking_proxy_set_stake_pool_operator_backward_call_graph.svg)
 
 
 </details>
@@ -200,6 +308,24 @@
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_vesting_contract_voter" calls</summary>
+
+
+![](img/staking_proxy_set_vesting_contract_voter_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_vesting_contract_voter"</summary>
+
+
+![](img/staking_proxy_set_vesting_contract_voter_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_proxy_set_staking_contract_voter"></a>
 
 ## Function `set_staking_contract_voter`
@@ -227,6 +353,24 @@
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_staking_contract_voter" calls</summary>
+
+
+![](img/staking_proxy_set_staking_contract_voter_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_staking_contract_voter"</summary>
+
+
+![](img/staking_proxy_set_staking_contract_voter_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_proxy_set_stake_pool_voter"></a>
 
 ## Function `set_stake_pool_voter`
@@ -249,6 +393,24 @@
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "set_stake_pool_voter" calls</summary>
+
+
+![](img/staking_proxy_set_stake_pool_voter_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_stake_pool_voter"</summary>
+
+
+![](img/staking_proxy_set_stake_pool_voter_backward_call_graph.svg)
 
 
 </details>

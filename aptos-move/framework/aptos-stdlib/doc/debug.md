@@ -17,6 +17,24 @@ Module providing debug functionality.
 
 
 
+<details>
+<summary>Show all the modules that "debug" depends on directly or indirectly</summary>
+
+
+![](img/debug_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "debug" directly or indirectly</summary>
+
+
+![](img/debug_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_debug_print"></a>
 
 ## Function `print`
@@ -39,6 +57,24 @@ Module providing debug functionality.
 
 </details>
 
+<details>
+<summary>Show all the functions that "print" calls</summary>
+
+
+![](img/debug_print_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "print"</summary>
+
+
+![](img/debug_print_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_debug_print_stack_trace"></a>
 
 ## Function `print_stack_trace`
@@ -57,6 +93,24 @@ Module providing debug functionality.
 <pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="debug.md#0x1_debug_print_stack_trace">print_stack_trace</a>();
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "print_stack_trace" calls</summary>
+
+
+![](img/debug_print_stack_trace_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "print_stack_trace"</summary>
+
+
+![](img/debug_print_stack_trace_backward_call_graph.svg)
 
 
 </details>

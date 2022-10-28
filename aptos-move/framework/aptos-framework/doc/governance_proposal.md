@@ -17,6 +17,24 @@ This is separate from the AptosGovernance module to avoid circular dependency be
 
 
 
+<details>
+<summary>Show all the modules that "governance_proposal" depends on directly or indirectly</summary>
+
+
+![](img/governance_proposal_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "governance_proposal" directly or indirectly</summary>
+
+
+![](img/governance_proposal_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_governance_proposal_GovernanceProposal"></a>
 
 ## Struct `GovernanceProposal`
@@ -69,6 +87,24 @@ Create and return a GovernanceProposal resource. Can only be called by AptosGove
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_proposal" calls</summary>
+
+
+![](img/governance_proposal_create_proposal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_proposal"</summary>
+
+
+![](img/governance_proposal_create_proposal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_governance_proposal_create_empty_proposal"></a>
 
 ## Function `create_empty_proposal`
@@ -90,6 +126,24 @@ Useful for AptosGovernance to create an empty proposal as proof.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_empty_proposal" calls</summary>
+
+
+![](img/governance_proposal_create_empty_proposal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_empty_proposal"</summary>
+
+
+![](img/governance_proposal_create_empty_proposal_backward_call_graph.svg)
 
 
 </details>

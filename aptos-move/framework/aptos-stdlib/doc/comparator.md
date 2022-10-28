@@ -20,6 +20,24 @@ Provides a framework for comparing two elements
 
 
 
+<details>
+<summary>Show all the modules that "comparator" depends on directly or indirectly</summary>
+
+
+![](img/comparator_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "comparator" directly or indirectly</summary>
+
+
+![](img/comparator_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_comparator_Result"></a>
 
 ## Struct `Result`
@@ -103,6 +121,24 @@ Provides a framework for comparing two elements
 
 </details>
 
+<details>
+<summary>Show all the functions that "is_equal" calls</summary>
+
+
+![](img/comparator_is_equal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_equal"</summary>
+
+
+![](img/comparator_is_equal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_comparator_is_smaller_than"></a>
 
 ## Function `is_smaller_than`
@@ -123,6 +159,24 @@ Provides a framework for comparing two elements
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_smaller_than" calls</summary>
+
+
+![](img/comparator_is_smaller_than_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_smaller_than"</summary>
+
+
+![](img/comparator_is_smaller_than_backward_call_graph.svg)
 
 
 </details>
@@ -151,6 +205,24 @@ Provides a framework for comparing two elements
 
 </details>
 
+<details>
+<summary>Show all the functions that "is_greater_than" calls</summary>
+
+
+![](img/comparator_is_greater_than_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_greater_than"</summary>
+
+
+![](img/comparator_is_greater_than_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_comparator_compare"></a>
 
 ## Function `compare`
@@ -174,6 +246,24 @@ Provides a framework for comparing two elements
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "compare" calls</summary>
+
+
+![](img/comparator_compare_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "compare"</summary>
+
+
+![](img/comparator_compare_backward_call_graph.svg)
 
 
 </details>
@@ -221,6 +311,24 @@ Provides a framework for comparing two elements
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "compare_u8_vector" calls</summary>
+
+
+![](img/comparator_compare_u8_vector_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "compare_u8_vector"</summary>
+
+
+![](img/comparator_compare_u8_vector_backward_call_graph.svg)
 
 
 </details>

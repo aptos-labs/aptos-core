@@ -117,6 +117,24 @@ is_valid_delegate_for_feature(d);
 
 
 
+<details>
+<summary>Show all the modules that "capability" depends on directly or indirectly</summary>
+
+
+![](img/capability_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "capability" directly or indirectly</summary>
+
+
+![](img/capability_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_capability_Cap"></a>
 
 ## Struct `Cap`
@@ -293,6 +311,24 @@ they own the <code>Feature</code> type parameter.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create" calls</summary>
+
+
+![](img/capability_create_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create"</summary>
+
+
+![](img/capability_create_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_capability_acquire"></a>
 
 ## Function `acquire`
@@ -321,6 +357,24 @@ parameter.
 
 </details>
 
+<details>
+<summary>Show all the functions that "acquire" calls</summary>
+
+
+![](img/capability_acquire_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "acquire"</summary>
+
+
+![](img/capability_acquire_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_capability_acquire_linear"></a>
 
 ## Function `acquire_linear`
@@ -344,6 +398,24 @@ whether to expose a linear or non-linear capability.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "acquire_linear" calls</summary>
+
+
+![](img/capability_acquire_linear_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "acquire_linear"</summary>
+
+
+![](img/capability_acquire_linear_backward_call_graph.svg)
 
 
 </details>
@@ -385,6 +457,24 @@ Helper to validate an acquire. Returns the root address of the capability.
 
 </details>
 
+<details>
+<summary>Show all the functions that "validate_acquire" calls</summary>
+
+
+![](img/capability_validate_acquire_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "validate_acquire"</summary>
+
+
+![](img/capability_validate_acquire_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_capability_root_addr"></a>
 
 ## Function `root_addr`
@@ -411,6 +501,24 @@ of the feature can do this.
 
 </details>
 
+<details>
+<summary>Show all the functions that "root_addr" calls</summary>
+
+
+![](img/capability_root_addr_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "root_addr"</summary>
+
+
+![](img/capability_root_addr_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_capability_linear_root_addr"></a>
 
 ## Function `linear_root_addr`
@@ -432,6 +540,24 @@ Returns the root address associated with the given linear capability token.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "linear_root_addr" calls</summary>
+
+
+![](img/capability_linear_root_addr_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "linear_root_addr"</summary>
+
+
+![](img/capability_linear_root_addr_backward_call_graph.svg)
 
 
 </details>
@@ -466,6 +592,24 @@ nothing.
 
 </details>
 
+<details>
+<summary>Show all the functions that "delegate" calls</summary>
+
+
+![](img/capability_delegate_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "delegate"</summary>
+
+
+![](img/capability_delegate_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_capability_revoke"></a>
 
 ## Function `revoke`
@@ -491,6 +635,24 @@ Revokes a delegation relation. If no relation exists, this function does nothing
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "revoke" calls</summary>
+
+
+![](img/capability_revoke_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "revoke"</summary>
+
+
+![](img/capability_revoke_backward_call_graph.svg)
 
 
 </details>
@@ -523,6 +685,24 @@ Helper to remove an element from a vector.
 
 </details>
 
+<details>
+<summary>Show all the functions that "remove_element" calls</summary>
+
+
+![](img/capability_remove_element_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "remove_element"</summary>
+
+
+![](img/capability_remove_element_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_capability_add_element"></a>
 
 ## Function `add_element`
@@ -546,6 +726,24 @@ Helper to add an element to a vector.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "add_element" calls</summary>
+
+
+![](img/capability_add_element_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add_element"</summary>
+
+
+![](img/capability_add_element_backward_call_graph.svg)
 
 
 </details>

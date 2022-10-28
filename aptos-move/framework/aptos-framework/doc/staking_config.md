@@ -37,6 +37,24 @@ Provides the configuration for staking and rewards
 
 
 
+<details>
+<summary>Show all the modules that "staking_config" depends on directly or indirectly</summary>
+
+
+![](img/staking_config_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "staking_config" directly or indirectly</summary>
+
+
+![](img/staking_config_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_staking_config_StakingConfig"></a>
 
 ## Resource `StakingConfig`
@@ -231,6 +249,24 @@ Only called during genesis.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/staking_config_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/staking_config_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_config_get"></a>
 
 ## Function `get`
@@ -251,6 +287,24 @@ Only called during genesis.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get" calls</summary>
+
+
+![](img/staking_config_get_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get"</summary>
+
+
+![](img/staking_config_get_backward_call_graph.svg)
 
 
 </details>
@@ -280,6 +334,24 @@ Return whether validator set changes are allowed
 
 </details>
 
+<details>
+<summary>Show all the functions that "get_allow_validator_set_change" calls</summary>
+
+
+![](img/staking_config_get_allow_validator_set_change_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_allow_validator_set_change"</summary>
+
+
+![](img/staking_config_get_allow_validator_set_change_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_config_get_required_stake"></a>
 
 ## Function `get_required_stake`
@@ -301,6 +373,24 @@ Return the required min/max stake.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_required_stake" calls</summary>
+
+
+![](img/staking_config_get_required_stake_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_required_stake"</summary>
+
+
+![](img/staking_config_get_required_stake_backward_call_graph.svg)
 
 
 </details>
@@ -331,6 +421,24 @@ withdraw all funds).
 
 </details>
 
+<details>
+<summary>Show all the functions that "get_recurring_lockup_duration" calls</summary>
+
+
+![](img/staking_config_get_recurring_lockup_duration_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_recurring_lockup_duration"</summary>
+
+
+![](img/staking_config_get_recurring_lockup_duration_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_config_get_reward_rate"></a>
 
 ## Function `get_reward_rate`
@@ -356,6 +464,24 @@ Return the reward rate.
 
 </details>
 
+<details>
+<summary>Show all the functions that "get_reward_rate" calls</summary>
+
+
+![](img/staking_config_get_reward_rate_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_reward_rate"</summary>
+
+
+![](img/staking_config_get_reward_rate_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_config_get_voting_power_increase_limit"></a>
 
 ## Function `get_voting_power_increase_limit`
@@ -377,6 +503,24 @@ Return the joining limit %.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_voting_power_increase_limit" calls</summary>
+
+
+![](img/staking_config_get_voting_power_increase_limit_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_voting_power_increase_limit"</summary>
+
+
+![](img/staking_config_get_voting_power_increase_limit_backward_call_graph.svg)
 
 
 </details>
@@ -416,6 +560,24 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
+<details>
+<summary>Show all the functions that "update_required_stake" calls</summary>
+
+
+![](img/staking_config_update_required_stake_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_required_stake"</summary>
+
+
+![](img/staking_config_update_required_stake_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_config_update_recurring_lockup_duration_secs"></a>
 
 ## Function `update_recurring_lockup_duration_secs`
@@ -445,6 +607,24 @@ Can only be called as part of the Aptos governance proposal process established 
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "update_recurring_lockup_duration_secs" calls</summary>
+
+
+![](img/staking_config_update_recurring_lockup_duration_secs_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_recurring_lockup_duration_secs"</summary>
+
+
+![](img/staking_config_update_recurring_lockup_duration_secs_backward_call_graph.svg)
 
 
 </details>
@@ -494,6 +674,24 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
+<details>
+<summary>Show all the functions that "update_rewards_rate" calls</summary>
+
+
+![](img/staking_config_update_rewards_rate_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_rewards_rate"</summary>
+
+
+![](img/staking_config_update_rewards_rate_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_config_update_voting_power_increase_limit"></a>
 
 ## Function `update_voting_power_increase_limit`
@@ -530,6 +728,24 @@ Can only be called as part of the Aptos governance proposal process established 
 
 </details>
 
+<details>
+<summary>Show all the functions that "update_voting_power_increase_limit" calls</summary>
+
+
+![](img/staking_config_update_voting_power_increase_limit_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_voting_power_increase_limit"</summary>
+
+
+![](img/staking_config_update_voting_power_increase_limit_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_staking_config_validate_required_stake"></a>
 
 ## Function `validate_required_stake`
@@ -550,6 +766,24 @@ Can only be called as part of the Aptos governance proposal process established 
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "validate_required_stake" calls</summary>
+
+
+![](img/staking_config_validate_required_stake_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "validate_required_stake"</summary>
+
+
+![](img/staking_config_validate_required_stake_backward_call_graph.svg)
 
 
 </details>

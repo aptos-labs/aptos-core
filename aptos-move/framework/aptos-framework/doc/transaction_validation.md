@@ -36,6 +36,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "transaction_validation" depends on directly or indirectly</summary>
+
+
+![](img/transaction_validation_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "transaction_validation" directly or indirectly</summary>
+
+
+![](img/transaction_validation_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_transaction_validation_TransactionValidation"></a>
 
 ## Resource `TransactionValidation`
@@ -243,6 +261,24 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/transaction_validation_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/transaction_validation_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_transaction_validation_prologue_common"></a>
 
 ## Function `prologue_common`
@@ -312,6 +348,24 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
+<details>
+<summary>Show all the functions that "prologue_common" calls</summary>
+
+
+![](img/transaction_validation_prologue_common_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "prologue_common"</summary>
+
+
+![](img/transaction_validation_prologue_common_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_transaction_validation_module_prologue"></a>
 
 ## Function `module_prologue`
@@ -340,6 +394,24 @@ Only called during genesis to initialize system resources for this module.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "module_prologue" calls</summary>
+
+
+![](img/transaction_validation_module_prologue_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "module_prologue"</summary>
+
+
+![](img/transaction_validation_module_prologue_backward_call_graph.svg)
 
 
 </details>
@@ -373,6 +445,24 @@ Only called during genesis to initialize system resources for this module.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "script_prologue" calls</summary>
+
+
+![](img/transaction_validation_script_prologue_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "script_prologue"</summary>
+
+
+![](img/transaction_validation_script_prologue_backward_call_graph.svg)
 
 
 </details>
@@ -427,6 +517,24 @@ Only called during genesis to initialize system resources for this module.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "multi_agent_script_prologue" calls</summary>
+
+
+![](img/transaction_validation_multi_agent_script_prologue_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "multi_agent_script_prologue"</summary>
+
+
+![](img/transaction_validation_multi_agent_script_prologue_backward_call_graph.svg)
 
 
 </details>
@@ -487,6 +595,24 @@ Called by the Adapter
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "epilogue" calls</summary>
+
+
+![](img/transaction_validation_epilogue_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "epilogue"</summary>
+
+
+![](img/transaction_validation_epilogue_backward_call_graph.svg)
 
 
 </details>

@@ -52,6 +52,24 @@ aggregator (parallelizable) or via normal integers.
 
 
 
+<details>
+<summary>Show all the modules that "optional_aggregator" depends on directly or indirectly</summary>
+
+
+![](img/optional_aggregator_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "optional_aggregator" directly or indirectly</summary>
+
+
+![](img/optional_aggregator_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_optional_aggregator_Integer"></a>
 
 ## Struct `Integer`
@@ -173,6 +191,24 @@ Creates a new integer which overflows on exceeding a <code>limit</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "new_integer" calls</summary>
+
+
+![](img/optional_aggregator_new_integer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_integer"</summary>
+
+
+![](img/optional_aggregator_new_integer_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_optional_aggregator_add_integer"></a>
 
 ## Function `add_integer`
@@ -198,6 +234,24 @@ Adds <code>value</code> to integer. Aborts on overflowing the limit.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "add_integer" calls</summary>
+
+
+![](img/optional_aggregator_add_integer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add_integer"</summary>
+
+
+![](img/optional_aggregator_add_integer_backward_call_graph.svg)
 
 
 </details>
@@ -228,6 +282,24 @@ Subtracts <code>value</code> from integer. Aborts on going below zero.
 
 </details>
 
+<details>
+<summary>Show all the functions that "sub_integer" calls</summary>
+
+
+![](img/optional_aggregator_sub_integer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "sub_integer"</summary>
+
+
+![](img/optional_aggregator_sub_integer_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_optional_aggregator_limit"></a>
 
 ## Function `limit`
@@ -249,6 +321,24 @@ Returns an overflow limit of integer.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "limit" calls</summary>
+
+
+![](img/optional_aggregator_limit_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "limit"</summary>
+
+
+![](img/optional_aggregator_limit_backward_call_graph.svg)
 
 
 </details>
@@ -278,6 +368,24 @@ Returns a value stored in this integer.
 
 </details>
 
+<details>
+<summary>Show all the functions that "read_integer" calls</summary>
+
+
+![](img/optional_aggregator_read_integer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "read_integer"</summary>
+
+
+![](img/optional_aggregator_read_integer_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_optional_aggregator_destroy_integer"></a>
 
 ## Function `destroy_integer`
@@ -299,6 +407,24 @@ Destroys an integer.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "destroy_integer" calls</summary>
+
+
+![](img/optional_aggregator_destroy_integer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_integer"</summary>
+
+
+![](img/optional_aggregator_destroy_integer_backward_call_graph.svg)
 
 
 </details>
@@ -338,6 +464,24 @@ Creates a new optional aggregator.
 
 </details>
 
+<details>
+<summary>Show all the functions that "new" calls</summary>
+
+
+![](img/optional_aggregator_new_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new"</summary>
+
+
+![](img/optional_aggregator_new_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_optional_aggregator_switch"></a>
 
 ## Function `switch`
@@ -361,6 +505,24 @@ Switches between parallelizable and non-parallelizable implementations.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "switch" calls</summary>
+
+
+![](img/optional_aggregator_switch_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "switch"</summary>
+
+
+![](img/optional_aggregator_switch_backward_call_graph.svg)
 
 
 </details>
@@ -391,6 +553,24 @@ the value of the new optional aggregator to zero.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "switch_and_zero_out" calls</summary>
+
+
+![](img/optional_aggregator_switch_and_zero_out_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "switch_and_zero_out"</summary>
+
+
+![](img/optional_aggregator_switch_and_zero_out_backward_call_graph.svg)
 
 
 </details>
@@ -428,6 +608,24 @@ the value.
 
 </details>
 
+<details>
+<summary>Show all the functions that "switch_to_integer_and_zero_out" calls</summary>
+
+
+![](img/optional_aggregator_switch_to_integer_and_zero_out_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "switch_to_integer_and_zero_out"</summary>
+
+
+![](img/optional_aggregator_switch_to_integer_and_zero_out_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_optional_aggregator_switch_to_aggregator_and_zero_out"></a>
 
 ## Function `switch_to_aggregator_and_zero_out`
@@ -461,6 +659,24 @@ the value.
 
 </details>
 
+<details>
+<summary>Show all the functions that "switch_to_aggregator_and_zero_out" calls</summary>
+
+
+![](img/optional_aggregator_switch_to_aggregator_and_zero_out_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "switch_to_aggregator_and_zero_out"</summary>
+
+
+![](img/optional_aggregator_switch_to_aggregator_and_zero_out_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_optional_aggregator_destroy"></a>
 
 ## Function `destroy`
@@ -486,6 +702,24 @@ Destroys optional aggregator.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "destroy" calls</summary>
+
+
+![](img/optional_aggregator_destroy_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy"</summary>
+
+
+![](img/optional_aggregator_destroy_backward_call_graph.svg)
 
 
 </details>
@@ -519,6 +753,24 @@ Destroys parallelizable optional aggregator and returns its limit.
 
 </details>
 
+<details>
+<summary>Show all the functions that "destroy_optional_aggregator" calls</summary>
+
+
+![](img/optional_aggregator_destroy_optional_aggregator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_optional_aggregator"</summary>
+
+
+![](img/optional_aggregator_destroy_optional_aggregator_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_optional_aggregator_destroy_optional_integer"></a>
 
 ## Function `destroy_optional_integer`
@@ -544,6 +796,24 @@ Destroys non-parallelizable optional aggregator and returns its limit.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "destroy_optional_integer" calls</summary>
+
+
+![](img/optional_aggregator_destroy_optional_integer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_optional_integer"</summary>
+
+
+![](img/optional_aggregator_destroy_optional_integer_backward_call_graph.svg)
 
 
 </details>
@@ -579,6 +849,24 @@ Adds <code>value</code> to optional aggregator, aborting on exceeding the <code>
 
 </details>
 
+<details>
+<summary>Show all the functions that "add" calls</summary>
+
+
+![](img/optional_aggregator_add_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add"</summary>
+
+
+![](img/optional_aggregator_add_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_optional_aggregator_sub"></a>
 
 ## Function `sub`
@@ -606,6 +894,24 @@ Subtracts <code>value</code> from optional aggregator, aborting on going below z
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "sub" calls</summary>
+
+
+![](img/optional_aggregator_sub_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "sub"</summary>
+
+
+![](img/optional_aggregator_sub_backward_call_graph.svg)
 
 
 </details>
@@ -641,6 +947,24 @@ Returns the value stored in optional aggregator.
 
 </details>
 
+<details>
+<summary>Show all the functions that "read" calls</summary>
+
+
+![](img/optional_aggregator_read_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "read"</summary>
+
+
+![](img/optional_aggregator_read_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_optional_aggregator_is_parallelizable"></a>
 
 ## Function `is_parallelizable`
@@ -662,6 +986,24 @@ Returns true if optional aggregator uses parallelizable implementation.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_parallelizable" calls</summary>
+
+
+![](img/optional_aggregator_is_parallelizable_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_parallelizable"</summary>
+
+
+![](img/optional_aggregator_is_parallelizable_backward_call_graph.svg)
 
 
 </details>

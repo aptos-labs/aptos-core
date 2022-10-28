@@ -34,6 +34,24 @@ assert!(from_bcs::to_address(bcs::to_bytes(&@0xabcdef)) == @0xabcdef, 0);
 
 
 
+<details>
+<summary>Show all the modules that "from_bcs" depends on directly or indirectly</summary>
+
+
+![](img/from_bcs_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "from_bcs" directly or indirectly</summary>
+
+
+![](img/from_bcs_backward_dep.svg)
+
+
+</details>
+
 <a name="@Constants_0"></a>
 
 ## Constants
@@ -73,6 +91,24 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
+<details>
+<summary>Show all the functions that "to_bool" calls</summary>
+
+
+![](img/from_bcs_to_bool_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "to_bool"</summary>
+
+
+![](img/from_bcs_to_bool_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_from_bcs_to_u8"></a>
 
 ## Function `to_u8`
@@ -93,6 +129,24 @@ UTF8 check failed in conversion from bytes to string
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "to_u8" calls</summary>
+
+
+![](img/from_bcs_to_u8_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "to_u8"</summary>
+
+
+![](img/from_bcs_to_u8_backward_call_graph.svg)
 
 
 </details>
@@ -121,6 +175,24 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
+<details>
+<summary>Show all the functions that "to_u64" calls</summary>
+
+
+![](img/from_bcs_to_u64_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "to_u64"</summary>
+
+
+![](img/from_bcs_to_u64_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_from_bcs_to_u128"></a>
 
 ## Function `to_u128`
@@ -145,6 +217,24 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
+<details>
+<summary>Show all the functions that "to_u128" calls</summary>
+
+
+![](img/from_bcs_to_u128_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "to_u128"</summary>
+
+
+![](img/from_bcs_to_u128_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_from_bcs_to_address"></a>
 
 ## Function `to_address`
@@ -165,6 +255,24 @@ UTF8 check failed in conversion from bytes to string
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "to_address" calls</summary>
+
+
+![](img/from_bcs_to_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "to_address"</summary>
+
+
+![](img/from_bcs_to_address_backward_call_graph.svg)
 
 
 </details>
@@ -196,6 +304,24 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
+<details>
+<summary>Show all the functions that "to_string" calls</summary>
+
+
+![](img/from_bcs_to_string_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "to_string"</summary>
+
+
+![](img/from_bcs_to_string_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_from_bcs_from_bytes"></a>
 
 ## Function `from_bytes`
@@ -219,6 +345,24 @@ owned.
 <pre><code><b>public</b>(<b>friend</b>) <b>native</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "from_bytes" calls</summary>
+
+
+![](img/from_bcs_from_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "from_bytes"</summary>
+
+
+![](img/from_bcs_from_bytes_backward_call_graph.svg)
 
 
 </details>

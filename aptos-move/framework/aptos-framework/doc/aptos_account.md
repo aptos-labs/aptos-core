@@ -35,6 +35,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "aptos_account" depends on directly or indirectly</summary>
+
+
+![](img/aptos_account_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "aptos_account" directly or indirectly</summary>
+
+
+![](img/aptos_account_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_aptos_account_DirectTransferConfig"></a>
 
 ## Resource `DirectTransferConfig`
@@ -180,6 +198,24 @@ Basic account creation methods.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_account" calls</summary>
+
+
+![](img/aptos_account_create_account_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_account"</summary>
+
+
+![](img/aptos_account_create_account_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_account_batch_transfer"></a>
 
 ## Function `batch_transfer`
@@ -217,6 +253,24 @@ Batch version of APT transfer.
 
 </details>
 
+<details>
+<summary>Show all the functions that "batch_transfer" calls</summary>
+
+
+![](img/aptos_account_batch_transfer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "batch_transfer"</summary>
+
+
+![](img/aptos_account_batch_transfer_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_account_transfer"></a>
 
 ## Function `transfer`
@@ -242,6 +296,24 @@ This would create the recipient account first, which also registers it to receiv
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "transfer" calls</summary>
+
+
+![](img/aptos_account_transfer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "transfer"</summary>
+
+
+![](img/aptos_account_transfer_backward_call_graph.svg)
 
 
 </details>
@@ -284,6 +356,24 @@ Batch version of transfer_coins.
 
 </details>
 
+<details>
+<summary>Show all the functions that "batch_transfer_coins" calls</summary>
+
+
+![](img/aptos_account_batch_transfer_coins_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "batch_transfer_coins"</summary>
+
+
+![](img/aptos_account_batch_transfer_coins_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_account_transfer_coins"></a>
 
 ## Function `transfer_coins`
@@ -306,6 +396,24 @@ This would create the recipient account first and register it to receive the Coi
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "transfer_coins" calls</summary>
+
+
+![](img/aptos_account_transfer_coins_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "transfer_coins"</summary>
+
+
+![](img/aptos_account_transfer_coins_backward_call_graph.svg)
 
 
 </details>
@@ -346,6 +454,24 @@ This would create the recipient account first and register it to receive the Coi
 
 </details>
 
+<details>
+<summary>Show all the functions that "deposit_coins" calls</summary>
+
+
+![](img/aptos_account_deposit_coins_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "deposit_coins"</summary>
+
+
+![](img/aptos_account_deposit_coins_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_account_assert_account_exists"></a>
 
 ## Function `assert_account_exists`
@@ -366,6 +492,24 @@ This would create the recipient account first and register it to receive the Coi
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "assert_account_exists" calls</summary>
+
+
+![](img/aptos_account_assert_account_exists_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_account_exists"</summary>
+
+
+![](img/aptos_account_assert_account_exists_backward_call_graph.svg)
 
 
 </details>
@@ -391,6 +535,24 @@ This would create the recipient account first and register it to receive the Coi
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "assert_account_is_registered_for_apt" calls</summary>
+
+
+![](img/aptos_account_assert_account_is_registered_for_apt_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_account_is_registered_for_apt"</summary>
+
+
+![](img/aptos_account_assert_account_is_registered_for_apt_backward_call_graph.svg)
 
 
 </details>
@@ -441,6 +603,24 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_allow_direct_coin_transfers" calls</summary>
+
+
+![](img/aptos_account_set_allow_direct_coin_transfers_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_allow_direct_coin_transfers"</summary>
+
+
+![](img/aptos_account_set_allow_direct_coin_transfers_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_account_can_receive_direct_coin_transfers"></a>
 
 ## Function `can_receive_direct_coin_transfers`
@@ -466,6 +646,24 @@ By default, this returns true if an account has not explicitly set whether the c
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "can_receive_direct_coin_transfers" calls</summary>
+
+
+![](img/aptos_account_can_receive_direct_coin_transfers_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "can_receive_direct_coin_transfers"</summary>
+
+
+![](img/aptos_account_can_receive_direct_coin_transfers_backward_call_graph.svg)
 
 
 </details>

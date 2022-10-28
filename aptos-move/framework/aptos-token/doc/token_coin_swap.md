@@ -34,6 +34,24 @@ Deprecated module
 
 
 
+<details>
+<summary>Show all the modules that "token_coin_swap" depends on directly or indirectly</summary>
+
+
+![](img/token_coin_swap_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "token_coin_swap" directly or indirectly</summary>
+
+
+![](img/token_coin_swap_backward_dep.svg)
+
+
+</details>
+
 <a name="0x3_token_coin_swap_TokenCoinSwap"></a>
 
 ## Struct `TokenCoinSwap`
@@ -384,6 +402,24 @@ Token is not in escrow
 
 </details>
 
+<details>
+<summary>Show all the functions that "does_listing_exist" calls</summary>
+
+
+![](img/token_coin_swap_does_listing_exist_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "does_listing_exist"</summary>
+
+
+![](img/token_coin_swap_does_listing_exist_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_coin_swap_exchange_coin_for_token"></a>
 
 ## Function `exchange_coin_for_token`
@@ -414,6 +450,24 @@ Coin owner withdraw coin to swap with tokens listed for swapping at the token ow
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "exchange_coin_for_token" calls</summary>
+
+
+![](img/token_coin_swap_exchange_coin_for_token_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "exchange_coin_for_token"</summary>
+
+
+![](img/token_coin_swap_exchange_coin_for_token_backward_call_graph.svg)
 
 
 </details>
@@ -452,6 +506,24 @@ Token owner lists their token for swapping
 
 </details>
 
+<details>
+<summary>Show all the functions that "list_token_for_swap" calls</summary>
+
+
+![](img/token_coin_swap_list_token_for_swap_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "list_token_for_swap"</summary>
+
+
+![](img/token_coin_swap_list_token_for_swap_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_coin_swap_initialize_token_listing"></a>
 
 ## Function `initialize_token_listing`
@@ -477,6 +549,24 @@ Initalize the token listing for a token owner
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize_token_listing" calls</summary>
+
+
+![](img/token_coin_swap_initialize_token_listing_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_token_listing"</summary>
+
+
+![](img/token_coin_swap_initialize_token_listing_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_coin_swap_initialize_token_store_escrow"></a>
 
 ## Function `initialize_token_store_escrow`
@@ -498,6 +588,24 @@ Intialize the token escrow
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "initialize_token_store_escrow" calls</summary>
+
+
+![](img/token_coin_swap_initialize_token_store_escrow_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_token_store_escrow"</summary>
+
+
+![](img/token_coin_swap_initialize_token_store_escrow_backward_call_graph.svg)
 
 
 </details>
@@ -532,6 +640,24 @@ Put the token into escrow that cannot be transferred or withdrawed by the owner.
 
 </details>
 
+<details>
+<summary>Show all the functions that "deposit_token_to_escrow" calls</summary>
+
+
+![](img/token_coin_swap_deposit_token_to_escrow_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "deposit_token_to_escrow"</summary>
+
+
+![](img/token_coin_swap_deposit_token_to_escrow_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_coin_swap_withdraw_token_from_escrow_internal"></a>
 
 ## Function `withdraw_token_from_escrow_internal`
@@ -557,6 +683,24 @@ Private function for withdraw tokens from an escrow stored in token owner addres
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "withdraw_token_from_escrow_internal" calls</summary>
+
+
+![](img/token_coin_swap_withdraw_token_from_escrow_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "withdraw_token_from_escrow_internal"</summary>
+
+
+![](img/token_coin_swap_withdraw_token_from_escrow_internal_backward_call_graph.svg)
 
 
 </details>
@@ -590,6 +734,24 @@ Withdraw tokens from the token escrow. It needs a signer to authorize
 
 </details>
 
+<details>
+<summary>Show all the functions that "withdraw_token_from_escrow" calls</summary>
+
+
+![](img/token_coin_swap_withdraw_token_from_escrow_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "withdraw_token_from_escrow"</summary>
+
+
+![](img/token_coin_swap_withdraw_token_from_escrow_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x3_token_coin_swap_cancel_token_listing"></a>
 
 ## Function `cancel_token_listing`
@@ -615,6 +777,24 @@ Cancel token listing for a fixed amount
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "cancel_token_listing" calls</summary>
+
+
+![](img/token_coin_swap_cancel_token_listing_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "cancel_token_listing"</summary>
+
+
+![](img/token_coin_swap_cancel_token_listing_backward_call_graph.svg)
 
 
 </details>

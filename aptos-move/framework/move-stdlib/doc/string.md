@@ -35,6 +35,24 @@ The <code><a href="string.md#0x1_string">string</a></code> module defines the <c
 
 
 
+<details>
+<summary>Show all the modules that "string" depends on directly or indirectly</summary>
+
+
+![](img/string_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "string" directly or indirectly</summary>
+
+
+![](img/string_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_string_String"></a>
 
 ## Struct `String`
@@ -114,6 +132,24 @@ Creates a new string from a sequence of bytes. Aborts if the bytes do not repres
 
 </details>
 
+<details>
+<summary>Show all the functions that "utf8" calls</summary>
+
+
+![](img/string_utf8_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "utf8"</summary>
+
+
+![](img/string_utf8_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_string_try_utf8"></a>
 
 ## Function `try_utf8`
@@ -143,6 +179,24 @@ Tries to create a new string from a sequence of bytes.
 
 </details>
 
+<details>
+<summary>Show all the functions that "try_utf8" calls</summary>
+
+
+![](img/string_try_utf8_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "try_utf8"</summary>
+
+
+![](img/string_try_utf8_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_string_bytes"></a>
 
 ## Function `bytes`
@@ -164,6 +218,24 @@ Returns a reference to the underlying byte vector.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "bytes" calls</summary>
+
+
+![](img/string_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "bytes"</summary>
+
+
+![](img/string_bytes_backward_call_graph.svg)
 
 
 </details>
@@ -193,6 +265,24 @@ Checks whether this string is empty.
 
 </details>
 
+<details>
+<summary>Show all the functions that "is_empty" calls</summary>
+
+
+![](img/string_is_empty_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_empty"</summary>
+
+
+![](img/string_is_empty_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_string_length"></a>
 
 ## Function `length`
@@ -214,6 +304,24 @@ Returns the length of this string, in bytes.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "length" calls</summary>
+
+
+![](img/string_length_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "length"</summary>
+
+
+![](img/string_length_backward_call_graph.svg)
 
 
 </details>
@@ -243,6 +351,24 @@ Appends a string.
 
 </details>
 
+<details>
+<summary>Show all the functions that "append" calls</summary>
+
+
+![](img/string_append_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "append"</summary>
+
+
+![](img/string_append_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_string_append_utf8"></a>
 
 ## Function `append_utf8`
@@ -264,6 +390,24 @@ Appends bytes which must be in valid utf8 format.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "append_utf8" calls</summary>
+
+
+![](img/string_append_utf8_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "append_utf8"</summary>
+
+
+![](img/string_append_utf8_backward_call_graph.svg)
 
 
 </details>
@@ -301,6 +445,24 @@ boundary.
 
 </details>
 
+<details>
+<summary>Show all the functions that "insert" calls</summary>
+
+
+![](img/string_insert_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "insert"</summary>
+
+
+![](img/string_insert_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_string_sub_string"></a>
 
 ## Function `sub_string`
@@ -334,6 +496,24 @@ guaranteeing that the result is valid utf8.
 
 </details>
 
+<details>
+<summary>Show all the functions that "sub_string" calls</summary>
+
+
+![](img/string_sub_string_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "sub_string"</summary>
+
+
+![](img/string_sub_string_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_string_index_of"></a>
 
 ## Function `index_of`
@@ -355,6 +535,24 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "index_of" calls</summary>
+
+
+![](img/string_index_of_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "index_of"</summary>
+
+
+![](img/string_index_of_backward_call_graph.svg)
 
 
 </details>
@@ -381,6 +579,24 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 
 </details>
 
+<details>
+<summary>Show all the functions that "internal_check_utf8" calls</summary>
+
+
+![](img/string_internal_check_utf8_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "internal_check_utf8"</summary>
+
+
+![](img/string_internal_check_utf8_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_string_internal_is_char_boundary"></a>
 
 ## Function `internal_is_char_boundary`
@@ -399,6 +615,24 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 <pre><code><b>native</b> <b>fun</b> <a href="string.md#0x1_string_internal_is_char_boundary">internal_is_char_boundary</a>(v: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, i: u64): bool;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "internal_is_char_boundary" calls</summary>
+
+
+![](img/string_internal_is_char_boundary_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "internal_is_char_boundary"</summary>
+
+
+![](img/string_internal_is_char_boundary_backward_call_graph.svg)
 
 
 </details>
@@ -425,6 +659,24 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 
 </details>
 
+<details>
+<summary>Show all the functions that "internal_sub_string" calls</summary>
+
+
+![](img/string_internal_sub_string_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "internal_sub_string"</summary>
+
+
+![](img/string_internal_sub_string_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_string_internal_index_of"></a>
 
 ## Function `internal_index_of`
@@ -443,6 +695,24 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 <pre><code><b>native</b> <b>fun</b> <a href="string.md#0x1_string_internal_index_of">internal_index_of</a>(v: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, r: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "internal_index_of" calls</summary>
+
+
+![](img/string_internal_index_of_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "internal_index_of"</summary>
+
+
+![](img/string_internal_index_of_backward_call_graph.svg)
 
 
 </details>

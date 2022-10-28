@@ -25,6 +25,24 @@ A module for generating globally unique identifiers
 
 
 
+<details>
+<summary>Show all the modules that "guid" depends on directly or indirectly</summary>
+
+
+![](img/guid_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "guid" directly or indirectly</summary>
+
+
+![](img/guid_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_guid_GUID"></a>
 
 ## Struct `GUID`
@@ -134,6 +152,24 @@ Create and return a new GUID from a trusted module.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create" calls</summary>
+
+
+![](img/guid_create_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create"</summary>
+
+
+![](img/guid_create_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_guid_create_id"></a>
 
 ## Function `create_id`
@@ -155,6 +191,24 @@ Create a non-privileged id from <code>addr</code> and <code>creation_num</code>
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_id" calls</summary>
+
+
+![](img/guid_create_id_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_id"</summary>
+
+
+![](img/guid_create_id_backward_call_graph.svg)
 
 
 </details>
@@ -184,6 +238,24 @@ Get the non-privileged ID associated with a GUID
 
 </details>
 
+<details>
+<summary>Show all the functions that "id" calls</summary>
+
+
+![](img/guid_id_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "id"</summary>
+
+
+![](img/guid_id_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_guid_creator_address"></a>
 
 ## Function `creator_address`
@@ -205,6 +277,24 @@ Return the account address that created the GUID
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "creator_address" calls</summary>
+
+
+![](img/guid_creator_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "creator_address"</summary>
+
+
+![](img/guid_creator_address_backward_call_graph.svg)
 
 
 </details>
@@ -234,6 +324,24 @@ Return the account address that created the guid::ID
 
 </details>
 
+<details>
+<summary>Show all the functions that "id_creator_address" calls</summary>
+
+
+![](img/guid_id_creator_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "id_creator_address"</summary>
+
+
+![](img/guid_id_creator_address_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_guid_creation_num"></a>
 
 ## Function `creation_num`
@@ -255,6 +363,24 @@ Return the creation number associated with the GUID
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "creation_num" calls</summary>
+
+
+![](img/guid_creation_num_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "creation_num"</summary>
+
+
+![](img/guid_creation_num_backward_call_graph.svg)
 
 
 </details>
@@ -284,6 +410,24 @@ Return the creation number associated with the guid::ID
 
 </details>
 
+<details>
+<summary>Show all the functions that "id_creation_num" calls</summary>
+
+
+![](img/guid_id_creation_num_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "id_creation_num"</summary>
+
+
+![](img/guid_id_creation_num_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_guid_eq_id"></a>
 
 ## Function `eq_id`
@@ -305,6 +449,24 @@ Return true if the GUID's ID is <code>id</code>
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "eq_id" calls</summary>
+
+
+![](img/guid_eq_id_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "eq_id"</summary>
+
+
+![](img/guid_eq_id_backward_call_graph.svg)
 
 
 </details>

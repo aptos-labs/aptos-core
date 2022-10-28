@@ -79,6 +79,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "vesting" depends on directly or indirectly</summary>
+
+
+![](img/vesting_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "vesting" directly or indirectly</summary>
+
+
+![](img/vesting_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_vesting_VestingSchedule"></a>
 
 ## Struct `VestingSchedule`
@@ -1068,6 +1086,24 @@ Vesting contract has been terminated and all funds have been released back to th
 
 </details>
 
+<details>
+<summary>Show all the functions that "stake_pool_address" calls</summary>
+
+
+![](img/vesting_stake_pool_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "stake_pool_address"</summary>
+
+
+![](img/vesting_stake_pool_address_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_vesting_start_secs"></a>
 
 ## Function `vesting_start_secs`
@@ -1089,6 +1125,24 @@ Vesting contract has been terminated and all funds have been released back to th
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "vesting_start_secs" calls</summary>
+
+
+![](img/vesting_vesting_start_secs_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "vesting_start_secs"</summary>
+
+
+![](img/vesting_vesting_start_secs_backward_call_graph.svg)
 
 
 </details>
@@ -1118,6 +1172,24 @@ Vesting contract has been terminated and all funds have been released back to th
 
 </details>
 
+<details>
+<summary>Show all the functions that "remaining_grant" calls</summary>
+
+
+![](img/vesting_remaining_grant_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "remaining_grant"</summary>
+
+
+![](img/vesting_remaining_grant_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_beneficiary"></a>
 
 ## Function `beneficiary`
@@ -1143,6 +1215,24 @@ Vesting contract has been terminated and all funds have been released back to th
 
 </details>
 
+<details>
+<summary>Show all the functions that "beneficiary" calls</summary>
+
+
+![](img/vesting_beneficiary_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "beneficiary"</summary>
+
+
+![](img/vesting_beneficiary_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_operator_commission_percentage"></a>
 
 ## Function `operator_commission_percentage`
@@ -1164,6 +1254,24 @@ Vesting contract has been terminated and all funds have been released back to th
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "operator_commission_percentage" calls</summary>
+
+
+![](img/vesting_operator_commission_percentage_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "operator_commission_percentage"</summary>
+
+
+![](img/vesting_operator_commission_percentage_backward_call_graph.svg)
 
 
 </details>
@@ -1196,6 +1304,24 @@ Vesting contract has been terminated and all funds have been released back to th
 
 </details>
 
+<details>
+<summary>Show all the functions that "vesting_contracts" calls</summary>
+
+
+![](img/vesting_vesting_contracts_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "vesting_contracts"</summary>
+
+
+![](img/vesting_vesting_contracts_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_operator"></a>
 
 ## Function `operator`
@@ -1221,6 +1347,24 @@ Vesting contract has been terminated and all funds have been released back to th
 
 </details>
 
+<details>
+<summary>Show all the functions that "operator" calls</summary>
+
+
+![](img/vesting_operator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "operator"</summary>
+
+
+![](img/vesting_operator_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_voter"></a>
 
 ## Function `voter`
@@ -1242,6 +1386,24 @@ Vesting contract has been terminated and all funds have been released back to th
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "voter" calls</summary>
+
+
+![](img/vesting_voter_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "voter"</summary>
+
+
+![](img/vesting_voter_backward_call_graph.svg)
 
 
 </details>
@@ -1283,6 +1445,24 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_vesting_schedule" calls</summary>
+
+
+![](img/vesting_create_vesting_schedule_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_vesting_schedule"</summary>
+
+
+![](img/vesting_create_vesting_schedule_backward_call_graph.svg)
 
 
 </details>
@@ -1411,6 +1591,24 @@ Create a vesting contract with a given configurations.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_vesting_contract" calls</summary>
+
+
+![](img/vesting_create_vesting_contract_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_vesting_contract"</summary>
+
+
+![](img/vesting_create_vesting_contract_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_unlock_rewards"></a>
 
 ## Function `unlock_rewards`
@@ -1436,6 +1634,24 @@ Unlock any accumulated rewards.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "unlock_rewards" calls</summary>
+
+
+![](img/vesting_unlock_rewards_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "unlock_rewards"</summary>
+
+
+![](img/vesting_unlock_rewards_backward_call_graph.svg)
 
 
 </details>
@@ -1513,6 +1729,24 @@ Unlock any vested portion of the grant.
 
 </details>
 
+<details>
+<summary>Show all the functions that "vest" calls</summary>
+
+
+![](img/vesting_vest_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "vest"</summary>
+
+
+![](img/vesting_vest_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_distribute"></a>
 
 ## Function `distribute`
@@ -1578,6 +1812,24 @@ Distribute any withdrawable stake from the stake pool.
 
 </details>
 
+<details>
+<summary>Show all the functions that "distribute" calls</summary>
+
+
+![](img/vesting_distribute_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "distribute"</summary>
+
+
+![](img/vesting_distribute_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_terminate_vesting_contract"></a>
 
 ## Function `terminate_vesting_contract`
@@ -1624,6 +1876,24 @@ Terminate the vesting contract and send all funds back to the withdrawal address
 
 </details>
 
+<details>
+<summary>Show all the functions that "terminate_vesting_contract" calls</summary>
+
+
+![](img/vesting_terminate_vesting_contract_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "terminate_vesting_contract"</summary>
+
+
+![](img/vesting_terminate_vesting_contract_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_admin_withdraw"></a>
 
 ## Function `admin_withdraw`
@@ -1666,6 +1936,24 @@ has already been terminated.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "admin_withdraw" calls</summary>
+
+
+![](img/vesting_admin_withdraw_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "admin_withdraw"</summary>
+
+
+![](img/vesting_admin_withdraw_backward_call_graph.svg)
 
 
 </details>
@@ -1717,6 +2005,24 @@ has already been terminated.
 
 </details>
 
+<details>
+<summary>Show all the functions that "update_operator" calls</summary>
+
+
+![](img/vesting_update_operator_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_operator"</summary>
+
+
+![](img/vesting_update_operator_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_update_operator_with_same_commission"></a>
 
 ## Function `update_operator_with_same_commission`
@@ -1742,6 +2048,24 @@ has already been terminated.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "update_operator_with_same_commission" calls</summary>
+
+
+![](img/vesting_update_operator_with_same_commission_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_operator_with_same_commission"</summary>
+
+
+![](img/vesting_update_operator_with_same_commission_backward_call_graph.svg)
 
 
 </details>
@@ -1790,6 +2114,24 @@ has already been terminated.
 
 </details>
 
+<details>
+<summary>Show all the functions that "update_voter" calls</summary>
+
+
+![](img/vesting_update_voter_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_voter"</summary>
+
+
+![](img/vesting_update_voter_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_reset_lockup"></a>
 
 ## Function `reset_lockup`
@@ -1826,6 +2168,24 @@ has already been terminated.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "reset_lockup" calls</summary>
+
+
+![](img/vesting_reset_lockup_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "reset_lockup"</summary>
+
+
+![](img/vesting_reset_lockup_backward_call_graph.svg)
 
 
 </details>
@@ -1884,6 +2244,24 @@ has already been terminated.
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_beneficiary" calls</summary>
+
+
+![](img/vesting_set_beneficiary_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_beneficiary"</summary>
+
+
+![](img/vesting_set_beneficiary_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_reset_beneficiary"></a>
 
 ## Function `reset_beneficiary`
@@ -1921,6 +2299,24 @@ account.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "reset_beneficiary" calls</summary>
+
+
+![](img/vesting_reset_beneficiary_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "reset_beneficiary"</summary>
+
+
+![](img/vesting_reset_beneficiary_backward_call_graph.svg)
 
 
 </details>
@@ -1968,6 +2364,24 @@ account.
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_management_role" calls</summary>
+
+
+![](img/vesting_set_management_role_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_management_role"</summary>
+
+
+![](img/vesting_set_management_role_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_set_beneficiary_resetter"></a>
 
 ## Function `set_beneficiary_resetter`
@@ -1996,6 +2410,24 @@ account.
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_beneficiary_resetter" calls</summary>
+
+
+![](img/vesting_set_beneficiary_resetter_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_beneficiary_resetter"</summary>
+
+
+![](img/vesting_set_beneficiary_resetter_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_get_role_holder"></a>
 
 ## Function `get_role_holder`
@@ -2019,6 +2451,24 @@ account.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_role_holder" calls</summary>
+
+
+![](img/vesting_get_role_holder_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_role_holder"</summary>
+
+
+![](img/vesting_get_role_holder_backward_call_graph.svg)
 
 
 </details>
@@ -2052,6 +2502,24 @@ staking_contract and stake modules.
 
 </details>
 
+<details>
+<summary>Show all the functions that "get_vesting_account_signer" calls</summary>
+
+
+![](img/vesting_get_vesting_account_signer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_vesting_account_signer"</summary>
+
+
+![](img/vesting_get_vesting_account_signer_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_get_vesting_account_signer_internal"></a>
 
 ## Function `get_vesting_account_signer_internal`
@@ -2072,6 +2540,24 @@ staking_contract and stake modules.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_vesting_account_signer_internal" calls</summary>
+
+
+![](img/vesting_get_vesting_account_signer_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_vesting_account_signer_internal"</summary>
+
+
+![](img/vesting_get_vesting_account_signer_internal_backward_call_graph.svg)
 
 
 </details>
@@ -2118,6 +2604,24 @@ staking_contract and stake modules.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_vesting_contract_account" calls</summary>
+
+
+![](img/vesting_create_vesting_contract_account_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_vesting_contract_account"</summary>
+
+
+![](img/vesting_create_vesting_contract_account_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_verify_admin"></a>
 
 ## Function `verify_admin`
@@ -2142,6 +2646,24 @@ staking_contract and stake modules.
 
 </details>
 
+<details>
+<summary>Show all the functions that "verify_admin" calls</summary>
+
+
+![](img/vesting_verify_admin_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "verify_admin"</summary>
+
+
+![](img/vesting_verify_admin_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_assert_vesting_contract_exists"></a>
 
 ## Function `assert_vesting_contract_exists`
@@ -2162,6 +2684,24 @@ staking_contract and stake modules.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "assert_vesting_contract_exists" calls</summary>
+
+
+![](img/vesting_assert_vesting_contract_exists_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_vesting_contract_exists"</summary>
+
+
+![](img/vesting_assert_vesting_contract_exists_backward_call_graph.svg)
 
 
 </details>
@@ -2192,6 +2732,24 @@ staking_contract and stake modules.
 
 </details>
 
+<details>
+<summary>Show all the functions that "assert_active_vesting_contract" calls</summary>
+
+
+![](img/vesting_assert_active_vesting_contract_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_active_vesting_contract"</summary>
+
+
+![](img/vesting_assert_active_vesting_contract_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_unlock_stake"></a>
 
 ## Function `unlock_stake`
@@ -2213,6 +2771,24 @@ staking_contract and stake modules.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "unlock_stake" calls</summary>
+
+
+![](img/vesting_unlock_stake_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "unlock_stake"</summary>
+
+
+![](img/vesting_unlock_stake_backward_call_graph.svg)
 
 
 </details>
@@ -2246,6 +2822,24 @@ staking_contract and stake modules.
 
 </details>
 
+<details>
+<summary>Show all the functions that "withdraw_stake" calls</summary>
+
+
+![](img/vesting_withdraw_stake_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "withdraw_stake"</summary>
+
+
+![](img/vesting_withdraw_stake_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vesting_get_beneficiary"></a>
 
 ## Function `get_beneficiary`
@@ -2270,6 +2864,24 @@ staking_contract and stake modules.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_beneficiary" calls</summary>
+
+
+![](img/vesting_get_beneficiary_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_beneficiary"</summary>
+
+
+![](img/vesting_get_beneficiary_backward_call_graph.svg)
 
 
 </details>

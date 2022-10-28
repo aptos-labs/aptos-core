@@ -73,6 +73,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "aptos_governance" depends on directly or indirectly</summary>
+
+
+![](img/aptos_governance_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "aptos_governance" directly or indirectly</summary>
+
+
+![](img/aptos_governance_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_GovernanceResponsbility"></a>
 
 ## Resource `GovernanceResponsbility`
@@ -587,6 +605,24 @@ Stores the signer capability for a given address.
 
 </details>
 
+<details>
+<summary>Show all the functions that "store_signer_cap" calls</summary>
+
+
+![](img/aptos_governance_store_signer_cap_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "store_signer_cap"</summary>
+
+
+![](img/aptos_governance_store_signer_cap_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_initialize"></a>
 
 ## Function `initialize`
@@ -637,6 +673,24 @@ This function is private because it's called directly from the vm.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/aptos_governance_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/aptos_governance_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_update_governance_config"></a>
 
 ## Function `update_governance_config`
@@ -683,6 +737,24 @@ AptosGovernance.
 
 </details>
 
+<details>
+<summary>Show all the functions that "update_governance_config" calls</summary>
+
+
+![](img/aptos_governance_update_governance_config_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_governance_config"</summary>
+
+
+![](img/aptos_governance_update_governance_config_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_get_voting_duration_secs"></a>
 
 ## Function `get_voting_duration_secs`
@@ -703,6 +775,24 @@ AptosGovernance.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_voting_duration_secs" calls</summary>
+
+
+![](img/aptos_governance_get_voting_duration_secs_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_voting_duration_secs"</summary>
+
+
+![](img/aptos_governance_get_voting_duration_secs_backward_call_graph.svg)
 
 
 </details>
@@ -731,6 +821,24 @@ AptosGovernance.
 
 </details>
 
+<details>
+<summary>Show all the functions that "get_min_voting_threshold" calls</summary>
+
+
+![](img/aptos_governance_get_min_voting_threshold_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_min_voting_threshold"</summary>
+
+
+![](img/aptos_governance_get_min_voting_threshold_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_get_required_proposer_stake"></a>
 
 ## Function `get_required_proposer_stake`
@@ -751,6 +859,24 @@ AptosGovernance.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_required_proposer_stake" calls</summary>
+
+
+![](img/aptos_governance_get_required_proposer_stake_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_required_proposer_stake"</summary>
+
+
+![](img/aptos_governance_get_required_proposer_stake_backward_call_graph.svg)
 
 
 </details>
@@ -784,6 +910,24 @@ only the exact script with matching hash can be successfully executed.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_proposal" calls</summary>
+
+
+![](img/aptos_governance_create_proposal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_proposal"</summary>
+
+
+![](img/aptos_governance_create_proposal_backward_call_graph.svg)
 
 
 </details>
@@ -878,6 +1022,24 @@ only the exact script with matching hash can be successfully executed.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_proposal_v2" calls</summary>
+
+
+![](img/aptos_governance_create_proposal_v2_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_proposal_v2"</summary>
+
+
+![](img/aptos_governance_create_proposal_v2_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_vote"></a>
 
 ## Function `vote`
@@ -956,6 +1118,24 @@ Vote on proposal with <code>proposal_id</code> and voting power from <code>stake
 
 </details>
 
+<details>
+<summary>Show all the functions that "vote" calls</summary>
+
+
+![](img/aptos_governance_vote_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "vote"</summary>
+
+
+![](img/aptos_governance_vote_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_add_approved_script_hash_script"></a>
 
 ## Function `add_approved_script_hash_script`
@@ -976,6 +1156,24 @@ Vote on proposal with <code>proposal_id</code> and voting power from <code>stake
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "add_approved_script_hash_script" calls</summary>
+
+
+![](img/aptos_governance_add_approved_script_hash_script_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add_approved_script_hash_script"</summary>
+
+
+![](img/aptos_governance_add_approved_script_hash_script_backward_call_graph.svg)
 
 
 </details>
@@ -1022,6 +1220,24 @@ are too large (e.g. module upgrades).
 
 </details>
 
+<details>
+<summary>Show all the functions that "add_approved_script_hash" calls</summary>
+
+
+![](img/aptos_governance_add_approved_script_hash_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add_approved_script_hash"</summary>
+
+
+![](img/aptos_governance_add_approved_script_hash_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_resolve"></a>
 
 ## Function `resolve`
@@ -1046,6 +1262,24 @@ than yes).
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "resolve" calls</summary>
+
+
+![](img/aptos_governance_resolve_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "resolve"</summary>
+
+
+![](img/aptos_governance_resolve_backward_call_graph.svg)
 
 
 </details>
@@ -1086,6 +1320,24 @@ Resolve a successful multi-step proposal. This would fail if the proposal is not
 
 </details>
 
+<details>
+<summary>Show all the functions that "resolve_multi_step_proposal" calls</summary>
+
+
+![](img/aptos_governance_resolve_multi_step_proposal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "resolve_multi_step_proposal"</summary>
+
+
+![](img/aptos_governance_resolve_multi_step_proposal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_remove_approved_hash"></a>
 
 ## Function `remove_approved_hash`
@@ -1119,6 +1371,24 @@ Remove an approved proposal's execution script hash.
 
 </details>
 
+<details>
+<summary>Show all the functions that "remove_approved_hash" calls</summary>
+
+
+![](img/aptos_governance_remove_approved_hash_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "remove_approved_hash"</summary>
+
+
+![](img/aptos_governance_remove_approved_hash_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_reconfigure"></a>
 
 ## Function `reconfigure`
@@ -1141,6 +1411,24 @@ Force reconfigure. To be called at the end of a proposal that alters on-chain co
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "reconfigure" calls</summary>
+
+
+![](img/aptos_governance_reconfigure_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "reconfigure"</summary>
+
+
+![](img/aptos_governance_reconfigure_backward_call_graph.svg)
 
 
 </details>
@@ -1170,6 +1458,24 @@ Only called in testnet where the core resources account exists and has been gran
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_signer_testnet_only" calls</summary>
+
+
+![](img/aptos_governance_get_signer_testnet_only_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_signer_testnet_only"</summary>
+
+
+![](img/aptos_governance_get_signer_testnet_only_backward_call_graph.svg)
 
 
 </details>
@@ -1208,6 +1514,24 @@ Return the voting power a stake pool has with respect to governance proposals.
 
 </details>
 
+<details>
+<summary>Show all the functions that "get_voting_power" calls</summary>
+
+
+![](img/aptos_governance_get_voting_power_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_voting_power"</summary>
+
+
+![](img/aptos_governance_get_voting_power_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_get_signer"></a>
 
 ## Function `get_signer`
@@ -1231,6 +1555,24 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "get_signer" calls</summary>
+
+
+![](img/aptos_governance_get_signer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_signer"</summary>
+
+
+![](img/aptos_governance_get_signer_backward_call_graph.svg)
 
 
 </details>
@@ -1265,6 +1607,24 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 
 </details>
 
+<details>
+<summary>Show all the functions that "create_proposal_metadata" calls</summary>
+
+
+![](img/aptos_governance_create_proposal_metadata_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_proposal_metadata"</summary>
+
+
+![](img/aptos_governance_create_proposal_metadata_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_aptos_governance_initialize_for_verification"></a>
 
 ## Function `initialize_for_verification`
@@ -1290,6 +1650,24 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "initialize_for_verification" calls</summary>
+
+
+![](img/aptos_governance_initialize_for_verification_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_for_verification"</summary>
+
+
+![](img/aptos_governance_initialize_for_verification_backward_call_graph.svg)
 
 
 </details>

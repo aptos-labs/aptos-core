@@ -52,6 +52,24 @@ This module defines the Option type and its methods to represent and handle an o
 
 
 
+<details>
+<summary>Show all the modules that "option" depends on directly or indirectly</summary>
+
+
+![](img/option_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "option" directly or indirectly</summary>
+
+
+![](img/option_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_option_Option"></a>
 
 ## Struct `Option`
@@ -133,6 +151,24 @@ Return an empty <code><a href="option.md#0x1_option_Option">Option</a></code>
 
 </details>
 
+<details>
+<summary>Show all the functions that "none" calls</summary>
+
+
+![](img/option_none_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "none"</summary>
+
+
+![](img/option_none_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_option_some"></a>
 
 ## Function `some`
@@ -154,6 +190,24 @@ Return an <code><a href="option.md#0x1_option_Option">Option</a></code> containi
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "some" calls</summary>
+
+
+![](img/option_some_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "some"</summary>
+
+
+![](img/option_some_backward_call_graph.svg)
 
 
 </details>
@@ -183,6 +237,24 @@ Return true if <code>t</code> does not hold a value
 
 </details>
 
+<details>
+<summary>Show all the functions that "is_none" calls</summary>
+
+
+![](img/option_is_none_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_none"</summary>
+
+
+![](img/option_is_none_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_option_is_some"></a>
 
 ## Function `is_some`
@@ -204,6 +276,24 @@ Return true if <code>t</code> holds a value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_some" calls</summary>
+
+
+![](img/option_is_some_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_some"</summary>
+
+
+![](img/option_is_some_backward_call_graph.svg)
 
 
 </details>
@@ -230,6 +320,24 @@ Always returns <code><b>false</b></code> if <code>t</code> does not hold a value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "contains" calls</summary>
+
+
+![](img/option_contains_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "contains"</summary>
+
+
+![](img/option_contains_backward_call_graph.svg)
 
 
 </details>
@@ -261,6 +369,24 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
+<details>
+<summary>Show all the functions that "borrow" calls</summary>
+
+
+![](img/option_borrow_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "borrow"</summary>
+
+
+![](img/option_borrow_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_option_borrow_with_default"></a>
 
 ## Function `borrow_with_default`
@@ -285,6 +411,24 @@ Return <code>default_ref</code> if <code>t</code> does not hold a value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "borrow_with_default" calls</summary>
+
+
+![](img/option_borrow_with_default_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "borrow_with_default"</summary>
+
+
+![](img/option_borrow_with_default_backward_call_graph.svg)
 
 
 </details>
@@ -320,6 +464,24 @@ Return <code>default</code> if <code>t</code> does not hold a value
 
 </details>
 
+<details>
+<summary>Show all the functions that "get_with_default" calls</summary>
+
+
+![](img/option_get_with_default_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_with_default"</summary>
+
+
+![](img/option_get_with_default_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_option_fill"></a>
 
 ## Function `fill`
@@ -344,6 +506,24 @@ Aborts if <code>t</code> already holds a value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "fill" calls</summary>
+
+
+![](img/option_fill_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "fill"</summary>
+
+
+![](img/option_fill_backward_call_graph.svg)
 
 
 </details>
@@ -375,6 +555,24 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
+<details>
+<summary>Show all the functions that "extract" calls</summary>
+
+
+![](img/option_extract_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "extract"</summary>
+
+
+![](img/option_extract_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_option_borrow_mut"></a>
 
 ## Function `borrow_mut`
@@ -398,6 +596,24 @@ Aborts if <code>t</code> does not hold a value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "borrow_mut" calls</summary>
+
+
+![](img/option_borrow_mut_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "borrow_mut"</summary>
+
+
+![](img/option_borrow_mut_backward_call_graph.svg)
 
 
 </details>
@@ -428,6 +644,24 @@ Aborts if <code>t</code> does not hold a value
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "swap" calls</summary>
+
+
+![](img/option_swap_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "swap"</summary>
+
+
+![](img/option_swap_backward_call_graph.svg)
 
 
 </details>
@@ -463,6 +697,24 @@ Different from swap(), swap_or_fill() allows for <code>t</code> not holding a va
 
 </details>
 
+<details>
+<summary>Show all the functions that "swap_or_fill" calls</summary>
+
+
+![](img/option_swap_or_fill_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "swap_or_fill"</summary>
+
+
+![](img/option_swap_or_fill_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_option_destroy_with_default"></a>
 
 ## Function `destroy_with_default`
@@ -486,6 +738,24 @@ Destroys <code>t.</code> If <code>t</code> holds a value, return it. Returns <co
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "destroy_with_default" calls</summary>
+
+
+![](img/option_destroy_with_default_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_with_default"</summary>
+
+
+![](img/option_destroy_with_default_backward_call_graph.svg)
 
 
 </details>
@@ -520,6 +790,24 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
+<details>
+<summary>Show all the functions that "destroy_some" calls</summary>
+
+
+![](img/option_destroy_some_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_some"</summary>
+
+
+![](img/option_destroy_some_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_option_destroy_none"></a>
 
 ## Function `destroy_none`
@@ -548,6 +836,24 @@ Aborts if <code>t</code> holds a value
 
 </details>
 
+<details>
+<summary>Show all the functions that "destroy_none" calls</summary>
+
+
+![](img/option_destroy_none_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_none"</summary>
+
+
+![](img/option_destroy_none_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_option_to_vec"></a>
 
 ## Function `to_vec`
@@ -571,6 +877,24 @@ and an empty vector otherwise
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "to_vec" calls</summary>
+
+
+![](img/option_to_vec_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "to_vec"</summary>
+
+
+![](img/option_to_vec_backward_call_graph.svg)
 
 
 </details>

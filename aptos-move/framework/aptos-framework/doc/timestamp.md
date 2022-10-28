@@ -25,6 +25,24 @@ It interacts with the other modules in the following ways:
 
 
 
+<details>
+<summary>Show all the modules that "timestamp" depends on directly or indirectly</summary>
+
+
+![](img/timestamp_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "timestamp" directly or indirectly</summary>
+
+
+![](img/timestamp_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_timestamp_CurrentTimeMicroseconds"></a>
 
 ## Resource `CurrentTimeMicroseconds`
@@ -115,6 +133,24 @@ Marks that time has started. This can only be called from genesis and with the a
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_time_has_started" calls</summary>
+
+
+![](img/timestamp_set_time_has_started_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_time_has_started"</summary>
+
+
+![](img/timestamp_set_time_has_started_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_timestamp_update_global_time"></a>
 
 ## Function `update_global_time`
@@ -156,6 +192,24 @@ Updates the wall clock time by consensus. Requires VM privilege and will be invo
 
 </details>
 
+<details>
+<summary>Show all the functions that "update_global_time" calls</summary>
+
+
+![](img/timestamp_update_global_time_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_global_time"</summary>
+
+
+![](img/timestamp_update_global_time_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_timestamp_now_microseconds"></a>
 
 ## Function `now_microseconds`
@@ -181,6 +235,24 @@ Gets the current time in microseconds.
 
 </details>
 
+<details>
+<summary>Show all the functions that "now_microseconds" calls</summary>
+
+
+![](img/timestamp_now_microseconds_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "now_microseconds"</summary>
+
+
+![](img/timestamp_now_microseconds_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_timestamp_now_seconds"></a>
 
 ## Function `now_seconds`
@@ -202,6 +274,24 @@ Gets the current time in seconds.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "now_seconds" calls</summary>
+
+
+![](img/timestamp_now_seconds_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "now_seconds"</summary>
+
+
+![](img/timestamp_now_seconds_backward_call_graph.svg)
 
 
 </details>

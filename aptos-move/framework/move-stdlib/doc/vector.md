@@ -48,6 +48,24 @@ the return on investment didn't seem worth it for these simple functions.
 
 
 
+<details>
+<summary>Show all the modules that "vector" depends on directly or indirectly</summary>
+
+
+![](img/vector_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "vector" directly or indirectly</summary>
+
+
+![](img/vector_backward_dep.svg)
+
+
+</details>
+
 <a name="@Constants_0"></a>
 
 ## Constants
@@ -86,6 +104,24 @@ Create an empty vector.
 
 </details>
 
+<details>
+<summary>Show all the functions that "empty" calls</summary>
+
+
+![](img/vector_empty_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "empty"</summary>
+
+
+![](img/vector_empty_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vector_length"></a>
 
 ## Function `length`
@@ -105,6 +141,24 @@ Return the length of the vector.
 <pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_length">length</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): u64;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "length" calls</summary>
+
+
+![](img/vector_length_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "length"</summary>
+
+
+![](img/vector_length_backward_call_graph.svg)
 
 
 </details>
@@ -133,6 +187,24 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
+<details>
+<summary>Show all the functions that "borrow" calls</summary>
+
+
+![](img/vector_borrow_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "borrow"</summary>
+
+
+![](img/vector_borrow_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vector_push_back"></a>
 
 ## Function `push_back`
@@ -152,6 +224,24 @@ Add element <code>e</code> to the end of the vector <code>v</code>.
 <pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_push_back">push_back</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: Element);
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "push_back" calls</summary>
+
+
+![](img/vector_push_back_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "push_back"</summary>
+
+
+![](img/vector_push_back_backward_call_graph.svg)
 
 
 </details>
@@ -180,6 +270,24 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
+<details>
+<summary>Show all the functions that "borrow_mut" calls</summary>
+
+
+![](img/vector_borrow_mut_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "borrow_mut"</summary>
+
+
+![](img/vector_borrow_mut_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vector_pop_back"></a>
 
 ## Function `pop_back`
@@ -200,6 +308,24 @@ Aborts if <code>v</code> is empty.
 <pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_pop_back">pop_back</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): Element;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "pop_back" calls</summary>
+
+
+![](img/vector_pop_back_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "pop_back"</summary>
+
+
+![](img/vector_pop_back_backward_call_graph.svg)
 
 
 </details>
@@ -228,6 +354,24 @@ Aborts if <code>v</code> is not empty.
 
 </details>
 
+<details>
+<summary>Show all the functions that "destroy_empty" calls</summary>
+
+
+![](img/vector_destroy_empty_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_empty"</summary>
+
+
+![](img/vector_destroy_empty_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vector_swap"></a>
 
 ## Function `swap`
@@ -248,6 +392,24 @@ Aborts if <code>i</code> or <code>j</code> is out of bounds.
 <pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_swap">swap</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, j: u64);
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "swap" calls</summary>
+
+
+![](img/vector_swap_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "swap"</summary>
+
+
+![](img/vector_swap_backward_call_graph.svg)
 
 
 </details>
@@ -275,6 +437,24 @@ Return an vector of size one containing element <code>e</code>.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "singleton" calls</summary>
+
+
+![](img/vector_singleton_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "singleton"</summary>
+
+
+![](img/vector_singleton_backward_call_graph.svg)
 
 
 </details>
@@ -313,6 +493,24 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 </details>
 
+<details>
+<summary>Show all the functions that "reverse" calls</summary>
+
+
+![](img/vector_reverse_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "reverse"</summary>
+
+
+![](img/vector_reverse_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vector_append"></a>
 
 ## Function `append`
@@ -340,6 +538,24 @@ Pushes all of the elements of the <code>other</code> vector into the <code>lhs</
 
 </details>
 
+<details>
+<summary>Show all the functions that "append" calls</summary>
+
+
+![](img/vector_append_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "append"</summary>
+
+
+![](img/vector_append_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vector_is_empty"></a>
 
 ## Function `is_empty`
@@ -361,6 +577,24 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_empty" calls</summary>
+
+
+![](img/vector_is_empty_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_empty"</summary>
+
+
+![](img/vector_is_empty_backward_call_graph.svg)
 
 
 </details>
@@ -396,6 +630,24 @@ Return true if <code>e</code> is in the vector <code>v</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "contains" calls</summary>
+
+
+![](img/vector_contains_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "contains"</summary>
+
+
+![](img/vector_contains_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vector_index_of"></a>
 
 ## Function `index_of`
@@ -424,6 +676,24 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "index_of" calls</summary>
+
+
+![](img/vector_index_of_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "index_of"</summary>
+
+
+![](img/vector_index_of_backward_call_graph.svg)
 
 
 </details>
@@ -461,6 +731,24 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
+<details>
+<summary>Show all the functions that "remove" calls</summary>
+
+
+![](img/vector_remove_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "remove"</summary>
+
+
+![](img/vector_remove_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_vector_swap_remove"></a>
 
 ## Function `swap_remove`
@@ -487,6 +775,24 @@ Aborts if <code>i</code> is out of bounds.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "swap_remove" calls</summary>
+
+
+![](img/vector_swap_remove_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "swap_remove"</summary>
+
+
+![](img/vector_swap_remove_backward_call_graph.svg)
 
 
 </details>

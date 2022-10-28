@@ -26,6 +26,24 @@ Maintains the version number for the blockchain.
 
 
 
+<details>
+<summary>Show all the modules that "version" depends on directly or indirectly</summary>
+
+
+![](img/version_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "version" directly or indirectly</summary>
+
+
+![](img/version_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_version_Version"></a>
 
 ## Resource `Version`
@@ -136,6 +154,24 @@ Publishes the Version config.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/version_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/version_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_version_set_version"></a>
 
 ## Function `set_version`
@@ -171,6 +207,24 @@ This can be called by on chain governance.
 
 </details>
 
+<details>
+<summary>Show all the functions that "set_version" calls</summary>
+
+
+![](img/version_set_version_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set_version"</summary>
+
+
+![](img/version_set_version_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_version_initialize_for_test"></a>
 
 ## Function `initialize_for_test`
@@ -194,6 +248,24 @@ to update the version.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "initialize_for_test" calls</summary>
+
+
+![](img/version_initialize_for_test_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_for_test"</summary>
+
+
+![](img/version_initialize_for_test_backward_call_graph.svg)
 
 
 </details>

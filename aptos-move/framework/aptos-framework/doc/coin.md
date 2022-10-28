@@ -98,6 +98,24 @@ This module provides the foundation for typesafe Coins.
 
 
 
+<details>
+<summary>Show all the modules that "coin" depends on directly or indirectly</summary>
+
+
+![](img/coin_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "coin" directly or indirectly</summary>
+
+
+![](img/coin_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_coin_Coin"></a>
 
 ## Struct `Coin`
@@ -621,6 +639,24 @@ Publishes supply configuration. Initially, upgrading is not allowed.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize_supply_config" calls</summary>
+
+
+![](img/coin_initialize_supply_config_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_supply_config"</summary>
+
+
+![](img/coin_initialize_supply_config_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_allow_supply_upgrades"></a>
 
 ## Function `allow_supply_upgrades`
@@ -644,6 +680,24 @@ This should be called by on-chain governance to update the config and allow
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "allow_supply_upgrades" calls</summary>
+
+
+![](img/coin_allow_supply_upgrades_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "allow_supply_upgrades"</summary>
+
+
+![](img/coin_allow_supply_upgrades_backward_call_graph.svg)
 
 
 </details>
@@ -677,6 +731,24 @@ only be called by Aptos Framework (0x1) account for now becuase of <code>create_
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize_aggregatable_coin" calls</summary>
+
+
+![](img/coin_initialize_aggregatable_coin_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_aggregatable_coin"</summary>
+
+
+![](img/coin_initialize_aggregatable_coin_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_is_aggregatable_coin_zero"></a>
 
 ## Function `is_aggregatable_coin_zero`
@@ -699,6 +771,24 @@ Returns true if the value of aggregatable coin is zero.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_aggregatable_coin_zero" calls</summary>
+
+
+![](img/coin_is_aggregatable_coin_zero_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_aggregatable_coin_zero"</summary>
+
+
+![](img/coin_is_aggregatable_coin_zero_backward_call_graph.svg)
 
 
 </details>
@@ -734,6 +824,24 @@ Drains the aggregatable coin, setting it to zero and returning a standard coin.
 
 </details>
 
+<details>
+<summary>Show all the functions that "drain_aggregatable_coin" calls</summary>
+
+
+![](img/coin_drain_aggregatable_coin_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "drain_aggregatable_coin"</summary>
+
+
+![](img/coin_drain_aggregatable_coin_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_merge_aggregatable_coin"></a>
 
 ## Function `merge_aggregatable_coin`
@@ -757,6 +865,24 @@ Merges <code><a href="coin.md#0x1_coin">coin</a></code> into aggregatable coin (
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "merge_aggregatable_coin" calls</summary>
+
+
+![](img/coin_merge_aggregatable_coin_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "merge_aggregatable_coin"</summary>
+
+
+![](img/coin_merge_aggregatable_coin_backward_call_graph.svg)
 
 
 </details>
@@ -797,6 +923,24 @@ Collects a specified amount of coin form an account into aggregatable coin.
 
 </details>
 
+<details>
+<summary>Show all the functions that "collect_into_aggregatable_coin" calls</summary>
+
+
+![](img/coin_collect_into_aggregatable_coin_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "collect_into_aggregatable_coin"</summary>
+
+
+![](img/coin_collect_into_aggregatable_coin_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_coin_address"></a>
 
 ## Function `coin_address`
@@ -819,6 +963,24 @@ A helper function that returns the address of CoinType.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "coin_address" calls</summary>
+
+
+![](img/coin_coin_address_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "coin_address"</summary>
+
+
+![](img/coin_coin_address_backward_call_graph.svg)
 
 
 </details>
@@ -852,6 +1014,24 @@ Returns the balance of <code>owner</code> for provided <code>CoinType</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "balance" calls</summary>
+
+
+![](img/coin_balance_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "balance"</summary>
+
+
+![](img/coin_balance_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_is_coin_initialized"></a>
 
 ## Function `is_coin_initialized`
@@ -873,6 +1053,24 @@ Returns <code><b>true</b></code> if the type <code>CoinType</code> is an initial
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "is_coin_initialized" calls</summary>
+
+
+![](img/coin_is_coin_initialized_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_coin_initialized"</summary>
+
+
+![](img/coin_is_coin_initialized_backward_call_graph.svg)
 
 
 </details>
@@ -902,6 +1100,24 @@ Returns <code><b>true</b></code> if <code>account_addr</code> is registered to r
 
 </details>
 
+<details>
+<summary>Show all the functions that "is_account_registered" calls</summary>
+
+
+![](img/coin_is_account_registered_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_account_registered"</summary>
+
+
+![](img/coin_is_account_registered_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_name"></a>
 
 ## Function `name`
@@ -923,6 +1139,24 @@ Returns the name of the coin.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "name" calls</summary>
+
+
+![](img/coin_name_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "name"</summary>
+
+
+![](img/coin_name_backward_call_graph.svg)
 
 
 </details>
@@ -952,6 +1186,24 @@ Returns the symbol of the coin, usually a shorter version of the name.
 
 </details>
 
+<details>
+<summary>Show all the functions that "symbol" calls</summary>
+
+
+![](img/coin_symbol_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "symbol"</summary>
+
+
+![](img/coin_symbol_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_decimals"></a>
 
 ## Function `decimals`
@@ -975,6 +1227,24 @@ be displayed to a user as <code>5.05</code> (<code>505 / 10 ** 2</code>).
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "decimals" calls</summary>
+
+
+![](img/coin_decimals_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "decimals"</summary>
+
+
+![](img/coin_decimals_backward_call_graph.svg)
 
 
 </details>
@@ -1008,6 +1278,24 @@ Returns the amount of coin in existence.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "supply" calls</summary>
+
+
+![](img/coin_supply_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "supply"</summary>
+
+
+![](img/coin_supply_backward_call_graph.svg)
 
 
 </details>
@@ -1048,6 +1336,24 @@ The capability <code>_cap</code> should be passed as a reference to <code><a hre
 
 </details>
 
+<details>
+<summary>Show all the functions that "burn" calls</summary>
+
+
+![](img/coin_burn_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "burn"</summary>
+
+
+![](img/coin_burn_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_burn_from"></a>
 
 ## Function `burn_from`
@@ -1084,6 +1390,24 @@ Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be 
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "burn_from" calls</summary>
+
+
+![](img/coin_burn_from_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "burn_from"</summary>
+
+
+![](img/coin_burn_from_backward_call_graph.svg)
 
 
 </details>
@@ -1129,6 +1453,24 @@ Deposit the coin balance into the recipient's account and emit an event.
 
 </details>
 
+<details>
+<summary>Show all the functions that "deposit" calls</summary>
+
+
+![](img/coin_deposit_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "deposit"</summary>
+
+
+![](img/coin_deposit_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_destroy_zero"></a>
 
 ## Function `destroy_zero`
@@ -1153,6 +1495,24 @@ a <code><a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a></code> for 
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "destroy_zero" calls</summary>
+
+
+![](img/coin_destroy_zero_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_zero"</summary>
+
+
+![](img/coin_destroy_zero_backward_call_graph.svg)
 
 
 </details>
@@ -1184,6 +1544,24 @@ Extracts <code>amount</code> from the passed-in <code><a href="coin.md#0x1_coin"
 
 </details>
 
+<details>
+<summary>Show all the functions that "extract" calls</summary>
+
+
+![](img/coin_extract_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "extract"</summary>
+
+
+![](img/coin_extract_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_extract_all"></a>
 
 ## Function `extract_all`
@@ -1207,6 +1585,24 @@ Extracts the entire amount from the passed-in <code><a href="coin.md#0x1_coin">c
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "extract_all" calls</summary>
+
+
+![](img/coin_extract_all_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "extract_all"</summary>
+
+
+![](img/coin_extract_all_backward_call_graph.svg)
 
 
 </details>
@@ -1240,6 +1636,24 @@ Freeze a CoinStore to prevent transfers
 
 </details>
 
+<details>
+<summary>Show all the functions that "freeze_coin_store" calls</summary>
+
+
+![](img/coin_freeze_coin_store_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "freeze_coin_store"</summary>
+
+
+![](img/coin_freeze_coin_store_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_unfreeze_coin_store"></a>
 
 ## Function `unfreeze_coin_store`
@@ -1265,6 +1679,24 @@ Unfreeze a CoinStore to allow transfers
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "unfreeze_coin_store" calls</summary>
+
+
+![](img/coin_unfreeze_coin_store_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "unfreeze_coin_store"</summary>
+
+
+![](img/coin_unfreeze_coin_store_backward_call_graph.svg)
 
 
 </details>
@@ -1317,6 +1749,24 @@ available.
 
 </details>
 
+<details>
+<summary>Show all the functions that "upgrade_supply" calls</summary>
+
+
+![](img/coin_upgrade_supply_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "upgrade_supply"</summary>
+
+
+![](img/coin_upgrade_supply_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_initialize"></a>
 
 ## Function `initialize`
@@ -1350,6 +1800,24 @@ The given signer also becomes the account hosting the information  about the coi
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/coin_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/coin_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_initialize_with_parallelizable_supply"></a>
 
 ## Function `initialize_with_parallelizable_supply`
@@ -1378,6 +1846,24 @@ Same as <code>initialize</code> but supply can be initialized to parallelizable 
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "initialize_with_parallelizable_supply" calls</summary>
+
+
+![](img/coin_initialize_with_parallelizable_supply_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_with_parallelizable_supply"</summary>
+
+
+![](img/coin_initialize_with_parallelizable_supply_backward_call_graph.svg)
 
 
 </details>
@@ -1436,6 +1922,24 @@ Same as <code>initialize</code> but supply can be initialized to parallelizable 
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize_internal" calls</summary>
+
+
+![](img/coin_initialize_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize_internal"</summary>
+
+
+![](img/coin_initialize_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_merge"></a>
 
 ## Function `merge`
@@ -1462,6 +1966,24 @@ to the sum of the two tokens (<code>dst_coin</code> and <code>source_coin</code>
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "merge" calls</summary>
+
+
+![](img/coin_merge_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "merge"</summary>
+
+
+![](img/coin_merge_backward_call_graph.svg)
 
 
 </details>
@@ -1506,6 +2028,24 @@ Returns minted <code><a href="coin.md#0x1_coin_Coin">Coin</a></code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "mint" calls</summary>
+
+
+![](img/coin_mint_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "mint"</summary>
+
+
+![](img/coin_mint_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_register"></a>
 
 ## Function `register`
@@ -1543,6 +2083,24 @@ Returns minted <code><a href="coin.md#0x1_coin_Coin">Coin</a></code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "register" calls</summary>
+
+
+![](img/coin_register_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "register"</summary>
+
+
+![](img/coin_register_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_transfer"></a>
 
 ## Function `transfer`
@@ -1573,6 +2131,24 @@ Transfers <code>amount</code> of coins <code>CoinType</code> from <code>from</co
 
 </details>
 
+<details>
+<summary>Show all the functions that "transfer" calls</summary>
+
+
+![](img/coin_transfer_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "transfer"</summary>
+
+
+![](img/coin_transfer_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_value"></a>
 
 ## Function `value`
@@ -1594,6 +2170,24 @@ Returns the <code>value</code> passed in <code><a href="coin.md#0x1_coin">coin</
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "value" calls</summary>
+
+
+![](img/coin_value_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "value"</summary>
+
+
+![](img/coin_value_backward_call_graph.svg)
 
 
 </details>
@@ -1643,6 +2237,24 @@ Withdraw specifed <code>amount</code> of coin <code>CoinType</code> from the sig
 
 </details>
 
+<details>
+<summary>Show all the functions that "withdraw" calls</summary>
+
+
+![](img/coin_withdraw_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "withdraw"</summary>
+
+
+![](img/coin_withdraw_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_zero"></a>
 
 ## Function `zero`
@@ -1666,6 +2278,24 @@ Create a new <code><a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;</cod
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "zero" calls</summary>
+
+
+![](img/coin_zero_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "zero"</summary>
+
+
+![](img/coin_zero_backward_call_graph.svg)
 
 
 </details>
@@ -1695,6 +2325,24 @@ Destroy a freeze capability. Freeze capability is dangerous and therefore should
 
 </details>
 
+<details>
+<summary>Show all the functions that "destroy_freeze_cap" calls</summary>
+
+
+![](img/coin_destroy_freeze_cap_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_freeze_cap"</summary>
+
+
+![](img/coin_destroy_freeze_cap_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_destroy_mint_cap"></a>
 
 ## Function `destroy_mint_cap`
@@ -1720,6 +2368,24 @@ Destroy a mint capability.
 
 </details>
 
+<details>
+<summary>Show all the functions that "destroy_mint_cap" calls</summary>
+
+
+![](img/coin_destroy_mint_cap_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_mint_cap"</summary>
+
+
+![](img/coin_destroy_mint_cap_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_coin_destroy_burn_cap"></a>
 
 ## Function `destroy_burn_cap`
@@ -1741,6 +2407,24 @@ Destroy a burn capability.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "destroy_burn_cap" calls</summary>
+
+
+![](img/coin_destroy_burn_cap_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_burn_cap"</summary>
+
+
+![](img/coin_destroy_burn_cap_backward_call_graph.svg)
 
 
 </details>

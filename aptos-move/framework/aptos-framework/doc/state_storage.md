@@ -28,6 +28,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "state_storage" depends on directly or indirectly</summary>
+
+
+![](img/state_storage_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "state_storage" directly or indirectly</summary>
+
+
+![](img/state_storage_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_state_storage_Usage"></a>
 
 ## Struct `Usage`
@@ -172,6 +190,24 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
+<details>
+<summary>Show all the functions that "initialize" calls</summary>
+
+
+![](img/state_storage_initialize_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "initialize"</summary>
+
+
+![](img/state_storage_initialize_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_state_storage_on_new_block"></a>
 
 ## Function `on_new_block`
@@ -200,6 +236,24 @@ usage after the last txn of the previous epoch is committed.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "on_new_block" calls</summary>
+
+
+![](img/state_storage_on_new_block_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "on_new_block"</summary>
+
+
+![](img/state_storage_on_new_block_backward_call_graph.svg)
 
 
 </details>
@@ -233,6 +287,24 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
+<details>
+<summary>Show all the functions that "current_items_and_bytes" calls</summary>
+
+
+![](img/state_storage_current_items_and_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "current_items_and_bytes"</summary>
+
+
+![](img/state_storage_current_items_and_bytes_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning"></a>
 
 ## Function `get_state_storage_usage_only_at_epoch_beginning`
@@ -259,6 +331,24 @@ guarantees a fresh state view then.
 
 </details>
 
+<details>
+<summary>Show all the functions that "get_state_storage_usage_only_at_epoch_beginning" calls</summary>
+
+
+![](img/state_storage_get_state_storage_usage_only_at_epoch_beginning_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "get_state_storage_usage_only_at_epoch_beginning"</summary>
+
+
+![](img/state_storage_get_state_storage_usage_only_at_epoch_beginning_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_state_storage_on_reconfig"></a>
 
 ## Function `on_reconfig`
@@ -279,6 +369,24 @@ guarantees a fresh state view then.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "on_reconfig" calls</summary>
+
+
+![](img/state_storage_on_reconfig_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "on_reconfig"</summary>
+
+
+![](img/state_storage_on_reconfig_backward_call_graph.svg)
 
 
 </details>

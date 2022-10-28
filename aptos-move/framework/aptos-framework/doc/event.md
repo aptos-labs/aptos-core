@@ -27,6 +27,24 @@ events emitted to a handle and emit events to the event store.
 
 
 
+<details>
+<summary>Show all the modules that "event" depends on directly or indirectly</summary>
+
+
+![](img/event_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "event" directly or indirectly</summary>
+
+
+![](img/event_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_event_EventHandle"></a>
 
 ## Struct `EventHandle`
@@ -91,6 +109,24 @@ Use EventHandleGenerator to generate a unique event handle for <code>sig</code>
 
 </details>
 
+<details>
+<summary>Show all the functions that "new_event_handle" calls</summary>
+
+
+![](img/event_new_event_handle_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_event_handle"</summary>
+
+
+![](img/event_new_event_handle_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_event_emit_event"></a>
 
 ## Function `emit_event`
@@ -120,6 +156,24 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 
 </details>
 
+<details>
+<summary>Show all the functions that "emit_event" calls</summary>
+
+
+![](img/event_emit_event_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "emit_event"</summary>
+
+
+![](img/event_emit_event_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_event_guid"></a>
 
 ## Function `guid`
@@ -141,6 +195,24 @@ Return the GUID associated with this EventHandle
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "guid" calls</summary>
+
+
+![](img/event_guid_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "guid"</summary>
+
+
+![](img/event_guid_backward_call_graph.svg)
 
 
 </details>
@@ -170,6 +242,24 @@ Return the current counter associated with this EventHandle
 
 </details>
 
+<details>
+<summary>Show all the functions that "counter" calls</summary>
+
+
+![](img/event_counter_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "counter"</summary>
+
+
+![](img/event_counter_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_event_write_to_event_store"></a>
 
 ## Function `write_to_event_store`
@@ -189,6 +279,24 @@ Log <code>msg</code> as the <code>count</code>th event associated with the event
 <pre><code><b>native</b> <b>fun</b> <a href="event.md#0x1_event_write_to_event_store">write_to_event_store</a>&lt;T: drop + store&gt;(<a href="guid.md#0x1_guid">guid</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, count: u64, msg: T);
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "write_to_event_store" calls</summary>
+
+
+![](img/event_write_to_event_store_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "write_to_event_store"</summary>
+
+
+![](img/event_write_to_event_store_backward_call_graph.svg)
 
 
 </details>
@@ -214,6 +322,24 @@ Destroy a unique handle.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "destroy_handle" calls</summary>
+
+
+![](img/event_destroy_handle_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_handle"</summary>
+
+
+![](img/event_destroy_handle_backward_call_graph.svg)
 
 
 </details>

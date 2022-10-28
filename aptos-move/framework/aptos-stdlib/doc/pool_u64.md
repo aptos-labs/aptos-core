@@ -66,6 +66,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "pool_u64" depends on directly or indirectly</summary>
+
+
+![](img/pool_u64_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "pool_u64" directly or indirectly</summary>
+
+
+![](img/pool_u64_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_Pool"></a>
 
 ## Struct `Pool`
@@ -233,6 +251,24 @@ Create a new pool.
 
 </details>
 
+<details>
+<summary>Show all the functions that "create" calls</summary>
+
+
+![](img/pool_u64_create_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create"</summary>
+
+
+![](img/pool_u64_create_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_create_with_scaling_factor"></a>
 
 ## Function `create_with_scaling_factor`
@@ -261,6 +297,24 @@ Create a new pool with custom <code>scaling_factor</code>.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "create_with_scaling_factor" calls</summary>
+
+
+![](img/pool_u64_create_with_scaling_factor_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "create_with_scaling_factor"</summary>
+
+
+![](img/pool_u64_create_with_scaling_factor_backward_call_graph.svg)
 
 
 </details>
@@ -298,6 +352,24 @@ Destroy an empty pool. This will fail if the pool has any balance of coins.
 
 </details>
 
+<details>
+<summary>Show all the functions that "destroy_empty" calls</summary>
+
+
+![](img/pool_u64_destroy_empty_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "destroy_empty"</summary>
+
+
+![](img/pool_u64_destroy_empty_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_total_coins"></a>
 
 ## Function `total_coins`
@@ -319,6 +391,24 @@ Return <code>pool</code>'s total balance of coins.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "total_coins" calls</summary>
+
+
+![](img/pool_u64_total_coins_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "total_coins"</summary>
+
+
+![](img/pool_u64_total_coins_backward_call_graph.svg)
 
 
 </details>
@@ -348,6 +438,24 @@ Return the total number of shares across all shareholders in <code>pool</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "total_shares" calls</summary>
+
+
+![](img/pool_u64_total_shares_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "total_shares"</summary>
+
+
+![](img/pool_u64_total_shares_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_contains"></a>
 
 ## Function `contains`
@@ -369,6 +477,24 @@ Return true if <code>shareholder</code> is in <code>pool</code>.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "contains" calls</summary>
+
+
+![](img/pool_u64_contains_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "contains"</summary>
+
+
+![](img/pool_u64_contains_backward_call_graph.svg)
 
 
 </details>
@@ -402,6 +528,24 @@ Return the number of shares of <code>stakeholder</code> in <code>pool</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "shares" calls</summary>
+
+
+![](img/pool_u64_shares_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "shares"</summary>
+
+
+![](img/pool_u64_shares_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_balance"></a>
 
 ## Function `balance`
@@ -424,6 +568,24 @@ Return the balance in coins of <code>shareholder</code> in <code>pool.</code>
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "balance" calls</summary>
+
+
+![](img/pool_u64_balance_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "balance"</summary>
+
+
+![](img/pool_u64_balance_backward_call_graph.svg)
 
 
 </details>
@@ -453,6 +615,24 @@ Return the list of shareholders in <code>pool</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "shareholders" calls</summary>
+
+
+![](img/pool_u64_shareholders_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "shareholders"</summary>
+
+
+![](img/pool_u64_shareholders_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_shareholders_count"></a>
 
 ## Function `shareholders_count`
@@ -478,6 +658,24 @@ Return the number of shareholders in <code>pool</code>.
 
 </details>
 
+<details>
+<summary>Show all the functions that "shareholders_count" calls</summary>
+
+
+![](img/pool_u64_shareholders_count_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "shareholders_count"</summary>
+
+
+![](img/pool_u64_shareholders_count_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_update_total_coins"></a>
 
 ## Function `update_total_coins`
@@ -499,6 +697,24 @@ Update <code>pool</code>'s total balance of coins.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "update_total_coins" calls</summary>
+
+
+![](img/pool_u64_update_total_coins_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "update_total_coins"</summary>
+
+
+![](img/pool_u64_update_total_coins_backward_call_graph.svg)
 
 
 </details>
@@ -533,6 +749,24 @@ Allow an existing or new shareholder to add their coins to the pool in exchange 
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "buy_in" calls</summary>
+
+
+![](img/pool_u64_buy_in_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "buy_in"</summary>
+
+
+![](img/pool_u64_buy_in_backward_call_graph.svg)
 
 
 </details>
@@ -581,6 +815,24 @@ This would dilute other shareholders if the pool's balance of coins didn't chang
 
 </details>
 
+<details>
+<summary>Show all the functions that "add_shares" calls</summary>
+
+
+![](img/pool_u64_add_shares_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add_shares"</summary>
+
+
+![](img/pool_u64_add_shares_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_redeem_shares"></a>
 
 ## Function `redeem_shares`
@@ -616,6 +868,24 @@ Allow <code>shareholder</code> to redeem their shares in <code>pool</code> for c
 
 </details>
 
+<details>
+<summary>Show all the functions that "redeem_shares" calls</summary>
+
+
+![](img/pool_u64_redeem_shares_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "redeem_shares"</summary>
+
+
+![](img/pool_u64_redeem_shares_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_transfer_shares"></a>
 
 ## Function `transfer_shares`
@@ -647,6 +917,24 @@ Transfer shares from <code>shareholder_1</code> to <code>shareholder_2</code>.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "transfer_shares" calls</summary>
+
+
+![](img/pool_u64_transfer_shares_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "transfer_shares"</summary>
+
+
+![](img/pool_u64_transfer_shares_backward_call_graph.svg)
 
 
 </details>
@@ -690,6 +978,24 @@ Directly deduct <code>shareholder</code>'s number of shares in <code>pool</code>
 
 </details>
 
+<details>
+<summary>Show all the functions that "deduct_shares" calls</summary>
+
+
+![](img/pool_u64_deduct_shares_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "deduct_shares"</summary>
+
+
+![](img/pool_u64_deduct_shares_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_amount_to_shares"></a>
 
 ## Function `amount_to_shares`
@@ -712,6 +1018,24 @@ Return the number of new shares <code>coins_amount</code> can buy in <code>pool<
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "amount_to_shares" calls</summary>
+
+
+![](img/pool_u64_amount_to_shares_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "amount_to_shares"</summary>
+
+
+![](img/pool_u64_amount_to_shares_backward_call_graph.svg)
 
 
 </details>
@@ -752,6 +1076,24 @@ Return the number of new shares <code>coins_amount</code> can buy in <code>pool<
 
 </details>
 
+<details>
+<summary>Show all the functions that "amount_to_shares_with_total_coins" calls</summary>
+
+
+![](img/pool_u64_amount_to_shares_with_total_coins_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "amount_to_shares_with_total_coins"</summary>
+
+
+![](img/pool_u64_amount_to_shares_with_total_coins_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_shares_to_amount"></a>
 
 ## Function `shares_to_amount`
@@ -774,6 +1116,24 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code>.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "shares_to_amount" calls</summary>
+
+
+![](img/pool_u64_shares_to_amount_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "shares_to_amount"</summary>
+
+
+![](img/pool_u64_shares_to_amount_backward_call_graph.svg)
 
 
 </details>
@@ -812,6 +1172,24 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 </details>
 
+<details>
+<summary>Show all the functions that "shares_to_amount_with_total_coins" calls</summary>
+
+
+![](img/pool_u64_shares_to_amount_with_total_coins_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "shares_to_amount_with_total_coins"</summary>
+
+
+![](img/pool_u64_shares_to_amount_with_total_coins_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_multiply_then_divide"></a>
 
 ## Function `multiply_then_divide`
@@ -837,6 +1215,24 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 </details>
 
+<details>
+<summary>Show all the functions that "multiply_then_divide" calls</summary>
+
+
+![](img/pool_u64_multiply_then_divide_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "multiply_then_divide"</summary>
+
+
+![](img/pool_u64_multiply_then_divide_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_pool_u64_to_u128"></a>
 
 ## Function `to_u128`
@@ -857,6 +1253,24 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "to_u128" calls</summary>
+
+
+![](img/pool_u64_to_u128_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "to_u128"</summary>
+
+
+![](img/pool_u64_to_u128_backward_call_graph.svg)
 
 
 </details>

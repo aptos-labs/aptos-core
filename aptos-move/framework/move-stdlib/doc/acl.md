@@ -24,6 +24,24 @@ use a "set" instead when it's available in the language in the future.
 
 
 
+<details>
+<summary>Show all the modules that "acl" depends on directly or indirectly</summary>
+
+
+![](img/acl_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "acl" directly or indirectly</summary>
+
+
+![](img/acl_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_acl_ACL"></a>
 
 ## Struct `ACL`
@@ -101,6 +119,24 @@ Return an empty ACL.
 
 </details>
 
+<details>
+<summary>Show all the functions that "empty" calls</summary>
+
+
+![](img/acl_empty_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "empty"</summary>
+
+
+![](img/acl_empty_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_acl_add"></a>
 
 ## Function `add`
@@ -123,6 +159,24 @@ Add the address to the ACL.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "add" calls</summary>
+
+
+![](img/acl_add_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "add"</summary>
+
+
+![](img/acl_add_backward_call_graph.svg)
 
 
 </details>
@@ -154,6 +208,24 @@ Remove the address from the ACL.
 
 </details>
 
+<details>
+<summary>Show all the functions that "remove" calls</summary>
+
+
+![](img/acl_remove_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "remove"</summary>
+
+
+![](img/acl_remove_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_acl_contains"></a>
 
 ## Function `contains`
@@ -179,6 +251,24 @@ Return true iff the ACL contains the address.
 
 </details>
 
+<details>
+<summary>Show all the functions that "contains" calls</summary>
+
+
+![](img/acl_contains_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "contains"</summary>
+
+
+![](img/acl_contains_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_acl_assert_contains"></a>
 
 ## Function `assert_contains`
@@ -200,6 +290,24 @@ assert! that the ACL has the address.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "assert_contains" calls</summary>
+
+
+![](img/acl_assert_contains_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "assert_contains"</summary>
+
+
+![](img/acl_assert_contains_backward_call_graph.svg)
 
 
 </details>

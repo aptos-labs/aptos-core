@@ -151,6 +151,24 @@ In the future, we might support additional features:
 
 
 
+<details>
+<summary>Show all the modules that "ristretto255" depends on directly or indirectly</summary>
+
+
+![](img/ristretto255_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "ristretto255" directly or indirectly</summary>
+
+
+![](img/ristretto255_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_Scalar"></a>
 
 ## Struct `Scalar`
@@ -530,6 +548,24 @@ Returns the identity point as a CompressedRistretto.
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_identity_compressed" calls</summary>
+
+
+![](img/ristretto255_point_identity_compressed_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_identity_compressed"</summary>
+
+
+![](img/ristretto255_point_identity_compressed_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_identity"></a>
 
 ## Function `point_identity`
@@ -557,6 +593,24 @@ Returns the identity point as a CompressedRistretto.
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_identity" calls</summary>
+
+
+![](img/ristretto255_point_identity_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_identity"</summary>
+
+
+![](img/ristretto255_point_identity_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_basepoint_compressed"></a>
 
 ## Function `basepoint_compressed`
@@ -580,6 +634,24 @@ Returns the basepoint (generator) of the Ristretto255 group as a compressed poin
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "basepoint_compressed" calls</summary>
+
+
+![](img/ristretto255_basepoint_compressed_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "basepoint_compressed"</summary>
+
+
+![](img/ristretto255_basepoint_compressed_backward_call_graph.svg)
 
 
 </details>
@@ -613,6 +685,24 @@ Returns the basepoint (generator) of the Ristretto255 group
 
 </details>
 
+<details>
+<summary>Show all the functions that "basepoint" calls</summary>
+
+
+![](img/ristretto255_basepoint_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "basepoint"</summary>
+
+
+![](img/ristretto255_basepoint_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_basepoint_mul"></a>
 
 ## Function `basepoint_mul`
@@ -637,6 +727,24 @@ This call is much faster than <code><a href="ristretto255.md#0x1_ristretto255_po
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "basepoint_mul" calls</summary>
+
+
+![](img/ristretto255_basepoint_mul_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "basepoint_mul"</summary>
+
+
+![](img/ristretto255_basepoint_mul_backward_call_graph.svg)
 
 
 </details>
@@ -673,6 +781,24 @@ point, returns None.
 
 </details>
 
+<details>
+<summary>Show all the functions that "new_compressed_point_from_bytes" calls</summary>
+
+
+![](img/ristretto255_new_compressed_point_from_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_compressed_point_from_bytes"</summary>
+
+
+![](img/ristretto255_new_compressed_point_from_bytes_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_new_point_from_bytes"></a>
 
 ## Function `new_point_from_bytes`
@@ -704,6 +830,24 @@ returns None.
 
 </details>
 
+<details>
+<summary>Show all the functions that "new_point_from_bytes" calls</summary>
+
+
+![](img/ristretto255_new_point_from_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_point_from_bytes"</summary>
+
+
+![](img/ristretto255_new_point_from_bytes_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_new_point_from_sha512"></a>
 
 ## Function `new_point_from_sha512`
@@ -727,6 +871,24 @@ Hashes the input to a uniformly-at-random RistrettoPoint via SHA512.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "new_point_from_sha512" calls</summary>
+
+
+![](img/ristretto255_new_point_from_sha512_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_point_from_sha512"</summary>
+
+
+![](img/ristretto255_new_point_from_sha512_backward_call_graph.svg)
 
 
 </details>
@@ -763,6 +925,24 @@ can be used to build a collision-resistant hash function that maps 64-byte messa
 
 </details>
 
+<details>
+<summary>Show all the functions that "new_point_from_64_uniform_bytes" calls</summary>
+
+
+![](img/ristretto255_new_point_from_64_uniform_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_point_from_64_uniform_bytes"</summary>
+
+
+![](img/ristretto255_new_point_from_64_uniform_bytes_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_decompress"></a>
 
 ## Function `point_decompress`
@@ -787,6 +967,24 @@ Decompresses a CompressedRistretto from storage into a RistrettoPoint which can 
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "point_decompress" calls</summary>
+
+
+![](img/ristretto255_point_decompress_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_decompress"</summary>
+
+
+![](img/ristretto255_point_decompress_backward_call_graph.svg)
 
 
 </details>
@@ -818,6 +1016,24 @@ Compresses a RistrettoPoint to a CompressedRistretto which can be put in storage
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_compress" calls</summary>
+
+
+![](img/ristretto255_point_compress_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_compress"</summary>
+
+
+![](img/ristretto255_point_compress_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_to_bytes"></a>
 
 ## Function `point_to_bytes`
@@ -841,6 +1057,24 @@ function on <code>c</code>.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "point_to_bytes" calls</summary>
+
+
+![](img/ristretto255_point_to_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_to_bytes"</summary>
+
+
+![](img/ristretto255_point_to_bytes_backward_call_graph.svg)
 
 
 </details>
@@ -872,6 +1106,24 @@ Returns a * point.
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_mul" calls</summary>
+
+
+![](img/ristretto255_point_mul_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_mul"</summary>
+
+
+![](img/ristretto255_point_mul_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_mul_assign"></a>
 
 ## Function `point_mul_assign`
@@ -894,6 +1146,24 @@ Sets a *= point and returns 'a'.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "point_mul_assign" calls</summary>
+
+
+![](img/ristretto255_point_mul_assign_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_mul_assign"</summary>
+
+
+![](img/ristretto255_point_mul_assign_backward_call_graph.svg)
 
 
 </details>
@@ -925,6 +1195,24 @@ Returns (a * some_point + b * base_point), where base_point is the Ristretto bas
 
 </details>
 
+<details>
+<summary>Show all the functions that "basepoint_double_mul" calls</summary>
+
+
+![](img/ristretto255_basepoint_double_mul_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "basepoint_double_mul"</summary>
+
+
+![](img/ristretto255_basepoint_double_mul_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_add"></a>
 
 ## Function `point_add`
@@ -952,6 +1240,24 @@ Returns a + b
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_add" calls</summary>
+
+
+![](img/ristretto255_point_add_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_add"</summary>
+
+
+![](img/ristretto255_point_add_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_add_assign"></a>
 
 ## Function `point_add_assign`
@@ -974,6 +1280,24 @@ Sets a += b and returns 'a'.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "point_add_assign" calls</summary>
+
+
+![](img/ristretto255_point_add_assign_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_add_assign"</summary>
+
+
+![](img/ristretto255_point_add_assign_backward_call_graph.svg)
 
 
 </details>
@@ -1005,6 +1329,24 @@ Returns a - b
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_sub" calls</summary>
+
+
+![](img/ristretto255_point_sub_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_sub"</summary>
+
+
+![](img/ristretto255_point_sub_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_sub_assign"></a>
 
 ## Function `point_sub_assign`
@@ -1027,6 +1369,24 @@ Sets a -= b and returns 'a'.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "point_sub_assign" calls</summary>
+
+
+![](img/ristretto255_point_sub_assign_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_sub_assign"</summary>
+
+
+![](img/ristretto255_point_sub_assign_backward_call_graph.svg)
 
 
 </details>
@@ -1058,6 +1418,24 @@ Returns -a
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_neg" calls</summary>
+
+
+![](img/ristretto255_point_neg_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_neg"</summary>
+
+
+![](img/ristretto255_point_neg_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_neg_assign"></a>
 
 ## Function `point_neg_assign`
@@ -1084,6 +1462,24 @@ Sets a = -a, and returns 'a'.
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_neg_assign" calls</summary>
+
+
+![](img/ristretto255_point_neg_assign_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_neg_assign"</summary>
+
+
+![](img/ristretto255_point_neg_assign_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_equals"></a>
 
 ## Function `point_equals`
@@ -1103,6 +1499,24 @@ Returns true if the two RistrettoPoints are the same points on the elliptic curv
 <pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_equals">point_equals</a>(g: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, h: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): bool;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "point_equals" calls</summary>
+
+
+![](img/ristretto255_point_equals_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_equals"</summary>
+
+
+![](img/ristretto255_point_equals_backward_call_graph.svg)
 
 
 </details>
@@ -1139,6 +1553,24 @@ This function is much faster than computing each a_i p_i using <code>point_mul</
 
 </details>
 
+<details>
+<summary>Show all the functions that "multi_scalar_mul" calls</summary>
+
+
+![](img/ristretto255_multi_scalar_mul_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "multi_scalar_mul"</summary>
+
+
+![](img/ristretto255_multi_scalar_mul_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_new_scalar_from_bytes"></a>
 
 ## Function `new_scalar_from_bytes`
@@ -1171,6 +1603,24 @@ Otherwise, returns None.
 
 </details>
 
+<details>
+<summary>Show all the functions that "new_scalar_from_bytes" calls</summary>
+
+
+![](img/ristretto255_new_scalar_from_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_scalar_from_bytes"</summary>
+
+
+![](img/ristretto255_new_scalar_from_bytes_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_new_scalar_from_sha512"></a>
 
 ## Function `new_scalar_from_sha512`
@@ -1194,6 +1644,24 @@ Hashes the input to a uniformly-at-random Scalar via SHA512
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "new_scalar_from_sha512" calls</summary>
+
+
+![](img/ristretto255_new_scalar_from_sha512_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_scalar_from_sha512"</summary>
+
+
+![](img/ristretto255_new_scalar_from_sha512_backward_call_graph.svg)
 
 
 </details>
@@ -1227,6 +1695,24 @@ Creates a Scalar from an u8.
 
 </details>
 
+<details>
+<summary>Show all the functions that "new_scalar_from_u8" calls</summary>
+
+
+![](img/ristretto255_new_scalar_from_u8_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_scalar_from_u8"</summary>
+
+
+![](img/ristretto255_new_scalar_from_u8_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_new_scalar_from_u64"></a>
 
 ## Function `new_scalar_from_u64`
@@ -1250,6 +1736,24 @@ Creates a Scalar from an u64.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "new_scalar_from_u64" calls</summary>
+
+
+![](img/ristretto255_new_scalar_from_u64_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_scalar_from_u64"</summary>
+
+
+![](img/ristretto255_new_scalar_from_u64_backward_call_graph.svg)
 
 
 </details>
@@ -1281,6 +1785,24 @@ Creates a Scalar from an u128.
 
 </details>
 
+<details>
+<summary>Show all the functions that "new_scalar_from_u128" calls</summary>
+
+
+![](img/ristretto255_new_scalar_from_u128_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_scalar_from_u128"</summary>
+
+
+![](img/ristretto255_new_scalar_from_u128_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_new_scalar_reduced_from_32_bytes"></a>
 
 ## Function `new_scalar_reduced_from_32_bytes`
@@ -1308,6 +1830,24 @@ Creates a Scalar from 32 bytes by reducing the little-endian-encoded number in t
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "new_scalar_reduced_from_32_bytes" calls</summary>
+
+
+![](img/ristretto255_new_scalar_reduced_from_32_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_scalar_reduced_from_32_bytes"</summary>
+
+
+![](img/ristretto255_new_scalar_reduced_from_32_bytes_backward_call_graph.svg)
 
 
 </details>
@@ -1344,6 +1884,24 @@ in those bytes modulo $\ell$.
 
 </details>
 
+<details>
+<summary>Show all the functions that "new_scalar_uniform_from_64_bytes" calls</summary>
+
+
+![](img/ristretto255_new_scalar_uniform_from_64_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_scalar_uniform_from_64_bytes"</summary>
+
+
+![](img/ristretto255_new_scalar_uniform_from_64_bytes_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_zero"></a>
 
 ## Function `scalar_zero`
@@ -1371,6 +1929,24 @@ Returns 0 as a Scalar.
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_zero" calls</summary>
+
+
+![](img/ristretto255_scalar_zero_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_zero"</summary>
+
+
+![](img/ristretto255_scalar_zero_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_is_zero"></a>
 
 ## Function `scalar_is_zero`
@@ -1392,6 +1968,24 @@ Returns true if the given Scalar equals 0.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_is_zero" calls</summary>
+
+
+![](img/ristretto255_scalar_is_zero_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_is_zero"</summary>
+
+
+![](img/ristretto255_scalar_is_zero_backward_call_graph.svg)
 
 
 </details>
@@ -1423,6 +2017,24 @@ Returns 1 as a Scalar.
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_one" calls</summary>
+
+
+![](img/ristretto255_scalar_one_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_one"</summary>
+
+
+![](img/ristretto255_scalar_one_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_is_one"></a>
 
 ## Function `scalar_is_one`
@@ -1448,6 +2060,24 @@ Returns true if the given Scalar equals 1.
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_is_one" calls</summary>
+
+
+![](img/ristretto255_scalar_is_one_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_is_one"</summary>
+
+
+![](img/ristretto255_scalar_is_one_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_equals"></a>
 
 ## Function `scalar_equals`
@@ -1469,6 +2099,24 @@ Returns true if the two scalars are equal.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_equals" calls</summary>
+
+
+![](img/ristretto255_scalar_equals_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_equals"</summary>
+
+
+![](img/ristretto255_scalar_equals_backward_call_graph.svg)
 
 
 </details>
@@ -1505,6 +2153,24 @@ Returns None if s is zero.
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_invert" calls</summary>
+
+
+![](img/ristretto255_scalar_invert_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_invert"</summary>
+
+
+![](img/ristretto255_scalar_invert_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_mul"></a>
 
 ## Function `scalar_mul`
@@ -1528,6 +2194,24 @@ Returns the product of the two scalars.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_mul" calls</summary>
+
+
+![](img/ristretto255_scalar_mul_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_mul"</summary>
+
+
+![](img/ristretto255_scalar_mul_backward_call_graph.svg)
 
 
 </details>
@@ -1559,6 +2243,24 @@ Returns 'a'.
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_mul_assign" calls</summary>
+
+
+![](img/ristretto255_scalar_mul_assign_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_mul_assign"</summary>
+
+
+![](img/ristretto255_scalar_mul_assign_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_add"></a>
 
 ## Function `scalar_add`
@@ -1582,6 +2284,24 @@ Returns the sum of the two scalars.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_add" calls</summary>
+
+
+![](img/ristretto255_scalar_add_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_add"</summary>
+
+
+![](img/ristretto255_scalar_add_backward_call_graph.svg)
 
 
 </details>
@@ -1613,6 +2333,24 @@ Returns 'a'.
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_add_assign" calls</summary>
+
+
+![](img/ristretto255_scalar_add_assign_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_add_assign"</summary>
+
+
+![](img/ristretto255_scalar_add_assign_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_sub"></a>
 
 ## Function `scalar_sub`
@@ -1636,6 +2374,24 @@ Returns the difference of the two scalars.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_sub" calls</summary>
+
+
+![](img/ristretto255_scalar_sub_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_sub"</summary>
+
+
+![](img/ristretto255_scalar_sub_backward_call_graph.svg)
 
 
 </details>
@@ -1667,6 +2423,24 @@ Returns 'a'.
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_sub_assign" calls</summary>
+
+
+![](img/ristretto255_scalar_sub_assign_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_sub_assign"</summary>
+
+
+![](img/ristretto255_scalar_sub_assign_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_neg"></a>
 
 ## Function `scalar_neg`
@@ -1690,6 +2464,24 @@ Returns the negation of 'a': i.e., $(0 - a) \mod \ell$.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_neg" calls</summary>
+
+
+![](img/ristretto255_scalar_neg_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_neg"</summary>
+
+
+![](img/ristretto255_scalar_neg_backward_call_graph.svg)
 
 
 </details>
@@ -1721,6 +2513,24 @@ Returns 'a'.
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_neg_assign" calls</summary>
+
+
+![](img/ristretto255_scalar_neg_assign_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_neg_assign"</summary>
+
+
+![](img/ristretto255_scalar_neg_assign_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_to_bytes"></a>
 
 ## Function `scalar_to_bytes`
@@ -1742,6 +2552,24 @@ Returns the byte-representation of the scalar.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_to_bytes" calls</summary>
+
+
+![](img/ristretto255_scalar_to_bytes_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_to_bytes"</summary>
+
+
+![](img/ristretto255_scalar_to_bytes_backward_call_graph.svg)
 
 
 </details>
@@ -1768,6 +2596,24 @@ Returns the byte-representation of the scalar.
 
 </details>
 
+<details>
+<summary>Show all the functions that "new_point_from_sha512_internal" calls</summary>
+
+
+![](img/ristretto255_new_point_from_sha512_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_point_from_sha512_internal"</summary>
+
+
+![](img/ristretto255_new_point_from_sha512_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_new_point_from_64_uniform_bytes_internal"></a>
 
 ## Function `new_point_from_64_uniform_bytes_internal`
@@ -1786,6 +2632,24 @@ Returns the byte-representation of the scalar.
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_64_uniform_bytes_internal">new_point_from_64_uniform_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "new_point_from_64_uniform_bytes_internal" calls</summary>
+
+
+![](img/ristretto255_new_point_from_64_uniform_bytes_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new_point_from_64_uniform_bytes_internal"</summary>
+
+
+![](img/ristretto255_new_point_from_64_uniform_bytes_internal_backward_call_graph.svg)
 
 
 </details>
@@ -1812,6 +2676,24 @@ Returns the byte-representation of the scalar.
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_is_canonical_internal" calls</summary>
+
+
+![](img/ristretto255_point_is_canonical_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_is_canonical_internal"</summary>
+
+
+![](img/ristretto255_point_is_canonical_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_identity_internal"></a>
 
 ## Function `point_identity_internal`
@@ -1830,6 +2712,24 @@ Returns the byte-representation of the scalar.
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_identity_internal">point_identity_internal</a>(): u64;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "point_identity_internal" calls</summary>
+
+
+![](img/ristretto255_point_identity_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_identity_internal"</summary>
+
+
+![](img/ristretto255_point_identity_internal_backward_call_graph.svg)
 
 
 </details>
@@ -1856,6 +2756,24 @@ Returns the byte-representation of the scalar.
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_decompress_internal" calls</summary>
+
+
+![](img/ristretto255_point_decompress_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_decompress_internal"</summary>
+
+
+![](img/ristretto255_point_decompress_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_compress_internal"></a>
 
 ## Function `point_compress_internal`
@@ -1874,6 +2792,24 @@ Returns the byte-representation of the scalar.
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_compress_internal">point_compress_internal</a>(point: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "point_compress_internal" calls</summary>
+
+
+![](img/ristretto255_point_compress_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_compress_internal"</summary>
+
+
+![](img/ristretto255_point_compress_internal_backward_call_graph.svg)
 
 
 </details>
@@ -1900,6 +2836,24 @@ Returns the byte-representation of the scalar.
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_mul_internal" calls</summary>
+
+
+![](img/ristretto255_point_mul_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_mul_internal"</summary>
+
+
+![](img/ristretto255_point_mul_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_basepoint_mul_internal"></a>
 
 ## Function `basepoint_mul_internal`
@@ -1918,6 +2872,24 @@ Returns the byte-representation of the scalar.
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_basepoint_mul_internal">basepoint_mul_internal</a>(a: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "basepoint_mul_internal" calls</summary>
+
+
+![](img/ristretto255_basepoint_mul_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "basepoint_mul_internal"</summary>
+
+
+![](img/ristretto255_basepoint_mul_internal_backward_call_graph.svg)
 
 
 </details>
@@ -1944,6 +2916,24 @@ Returns the byte-representation of the scalar.
 
 </details>
 
+<details>
+<summary>Show all the functions that "basepoint_double_mul_internal" calls</summary>
+
+
+![](img/ristretto255_basepoint_double_mul_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "basepoint_double_mul_internal"</summary>
+
+
+![](img/ristretto255_basepoint_double_mul_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_add_internal"></a>
 
 ## Function `point_add_internal`
@@ -1962,6 +2952,24 @@ Returns the byte-representation of the scalar.
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_add_internal">point_add_internal</a>(a: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, in_place: bool): u64;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "point_add_internal" calls</summary>
+
+
+![](img/ristretto255_point_add_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_add_internal"</summary>
+
+
+![](img/ristretto255_point_add_internal_backward_call_graph.svg)
 
 
 </details>
@@ -1988,6 +2996,24 @@ Returns the byte-representation of the scalar.
 
 </details>
 
+<details>
+<summary>Show all the functions that "point_sub_internal" calls</summary>
+
+
+![](img/ristretto255_point_sub_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_sub_internal"</summary>
+
+
+![](img/ristretto255_point_sub_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_point_neg_internal"></a>
 
 ## Function `point_neg_internal`
@@ -2006,6 +3032,24 @@ Returns the byte-representation of the scalar.
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_neg_internal">point_neg_internal</a>(a: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, in_place: bool): u64;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "point_neg_internal" calls</summary>
+
+
+![](img/ristretto255_point_neg_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "point_neg_internal"</summary>
+
+
+![](img/ristretto255_point_neg_internal_backward_call_graph.svg)
 
 
 </details>
@@ -2036,6 +3080,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 </details>
 
+<details>
+<summary>Show all the functions that "multi_scalar_mul_internal" calls</summary>
+
+
+![](img/ristretto255_multi_scalar_mul_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "multi_scalar_mul_internal"</summary>
+
+
+![](img/ristretto255_multi_scalar_mul_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_is_canonical_internal"></a>
 
 ## Function `scalar_is_canonical_internal`
@@ -2054,6 +3116,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_canonical_internal">scalar_is_canonical_internal</a>(s: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_is_canonical_internal" calls</summary>
+
+
+![](img/ristretto255_scalar_is_canonical_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_is_canonical_internal"</summary>
+
+
+![](img/ristretto255_scalar_is_canonical_internal_backward_call_graph.svg)
 
 
 </details>
@@ -2080,6 +3160,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_from_u64_internal" calls</summary>
+
+
+![](img/ristretto255_scalar_from_u64_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_from_u64_internal"</summary>
+
+
+![](img/ristretto255_scalar_from_u64_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_from_u128_internal"></a>
 
 ## Function `scalar_from_u128_internal`
@@ -2098,6 +3196,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_from_u128_internal">scalar_from_u128_internal</a>(num: u128): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_from_u128_internal" calls</summary>
+
+
+![](img/ristretto255_scalar_from_u128_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_from_u128_internal"</summary>
+
+
+![](img/ristretto255_scalar_from_u128_internal_backward_call_graph.svg)
 
 
 </details>
@@ -2124,6 +3240,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_reduced_from_32_bytes_internal" calls</summary>
+
+
+![](img/ristretto255_scalar_reduced_from_32_bytes_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_reduced_from_32_bytes_internal"</summary>
+
+
+![](img/ristretto255_scalar_reduced_from_32_bytes_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_uniform_from_64_bytes_internal"></a>
 
 ## Function `scalar_uniform_from_64_bytes_internal`
@@ -2142,6 +3276,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_uniform_from_64_bytes_internal">scalar_uniform_from_64_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_uniform_from_64_bytes_internal" calls</summary>
+
+
+![](img/ristretto255_scalar_uniform_from_64_bytes_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_uniform_from_64_bytes_internal"</summary>
+
+
+![](img/ristretto255_scalar_uniform_from_64_bytes_internal_backward_call_graph.svg)
 
 
 </details>
@@ -2168,6 +3320,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_invert_internal" calls</summary>
+
+
+![](img/ristretto255_scalar_invert_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_invert_internal"</summary>
+
+
+![](img/ristretto255_scalar_invert_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_from_sha512_internal"></a>
 
 ## Function `scalar_from_sha512_internal`
@@ -2186,6 +3356,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_from_sha512_internal">scalar_from_sha512_internal</a>(sha512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_from_sha512_internal" calls</summary>
+
+
+![](img/ristretto255_scalar_from_sha512_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_from_sha512_internal"</summary>
+
+
+![](img/ristretto255_scalar_from_sha512_internal_backward_call_graph.svg)
 
 
 </details>
@@ -2212,6 +3400,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_mul_internal" calls</summary>
+
+
+![](img/ristretto255_scalar_mul_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_mul_internal"</summary>
+
+
+![](img/ristretto255_scalar_mul_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_add_internal"></a>
 
 ## Function `scalar_add_internal`
@@ -2230,6 +3436,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add_internal">scalar_add_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_add_internal" calls</summary>
+
+
+![](img/ristretto255_scalar_add_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_add_internal"</summary>
+
+
+![](img/ristretto255_scalar_add_internal_backward_call_graph.svg)
 
 
 </details>
@@ -2256,6 +3480,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 </details>
 
+<details>
+<summary>Show all the functions that "scalar_sub_internal" calls</summary>
+
+
+![](img/ristretto255_scalar_sub_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_sub_internal"</summary>
+
+
+![](img/ristretto255_scalar_sub_internal_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_ristretto255_scalar_neg_internal"></a>
 
 ## Function `scalar_neg_internal`
@@ -2274,6 +3516,24 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 <pre><code><b>native</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg_internal">scalar_neg_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "scalar_neg_internal" calls</summary>
+
+
+![](img/ristretto255_scalar_neg_internal_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "scalar_neg_internal"</summary>
+
+
+![](img/ristretto255_scalar_neg_internal_backward_call_graph.svg)
 
 
 </details>

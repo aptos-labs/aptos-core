@@ -25,6 +25,24 @@
 
 
 
+<details>
+<summary>Show all the modules that "bit_vector" depends on directly or indirectly</summary>
+
+
+![](img/bit_vector_forward_dep.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the modules that depend on "bit_vector" directly or indirectly</summary>
+
+
+![](img/bit_vector_backward_dep.svg)
+
+
+</details>
+
 <a name="0x1_bit_vector_BitVector"></a>
 
 ## Struct `BitVector`
@@ -146,6 +164,24 @@ The maximum allowed bitvector size
 
 </details>
 
+<details>
+<summary>Show all the functions that "new" calls</summary>
+
+
+![](img/bit_vector_new_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "new"</summary>
+
+
+![](img/bit_vector_new_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_bit_vector_set"></a>
 
 ## Function `set`
@@ -173,6 +209,24 @@ Set the bit at <code>bit_index</code> in the <code>bitvector</code> regardless o
 
 </details>
 
+<details>
+<summary>Show all the functions that "set" calls</summary>
+
+
+![](img/bit_vector_set_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "set"</summary>
+
+
+![](img/bit_vector_set_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_bit_vector_unset"></a>
 
 ## Function `unset`
@@ -196,6 +250,24 @@ Unset the bit at <code>bit_index</code> in the <code>bitvector</code> regardless
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "unset" calls</summary>
+
+
+![](img/bit_vector_unset_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "unset"</summary>
+
+
+![](img/bit_vector_unset_backward_call_graph.svg)
 
 
 </details>
@@ -249,6 +321,24 @@ bitvector's length the bitvector will be zeroed out.
 
 </details>
 
+<details>
+<summary>Show all the functions that "shift_left" calls</summary>
+
+
+![](img/bit_vector_shift_left_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "shift_left"</summary>
+
+
+![](img/bit_vector_shift_left_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_bit_vector_is_index_set"></a>
 
 ## Function `is_index_set`
@@ -276,6 +366,24 @@ represents "1" and <code><b>false</b></code> represents a 0
 
 </details>
 
+<details>
+<summary>Show all the functions that "is_index_set" calls</summary>
+
+
+![](img/bit_vector_is_index_set_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "is_index_set"</summary>
+
+
+![](img/bit_vector_is_index_set_backward_call_graph.svg)
+
+
+</details>
+
 <a name="0x1_bit_vector_length"></a>
 
 ## Function `length`
@@ -297,6 +405,24 @@ Return the length (number of usable bits) of this bitvector
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "length" calls</summary>
+
+
+![](img/bit_vector_length_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "length"</summary>
+
+
+![](img/bit_vector_length_backward_call_graph.svg)
 
 
 </details>
@@ -333,6 +459,24 @@ sequence, then <code>0</code> is returned.
 }
 </code></pre>
 
+
+
+</details>
+
+<details>
+<summary>Show all the functions that "longest_set_sequence_starting_at" calls</summary>
+
+
+![](img/bit_vector_longest_set_sequence_starting_at_forward_call_graph.svg)
+
+
+</details>
+
+<details>
+<summary>Show all the functions that call "longest_set_sequence_starting_at"</summary>
+
+
+![](img/bit_vector_longest_set_sequence_starting_at_backward_call_graph.svg)
 
 
 </details>
