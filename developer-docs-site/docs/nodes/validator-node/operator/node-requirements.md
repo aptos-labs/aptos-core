@@ -38,7 +38,7 @@ For running an Aptos **validator node and validator fullnode** we recommend the 
     - c6i.8xlarge + io1/io2 EBS volume with 40K IOPS.
 - **GCP**
     - n2-standard-16 (if use local SSD)
-    - n2-standard-30 + pd-ssd with 40K IOPS.
+    - n2-standard-32 + pd-ssd with 40K IOPS.
 
 ### Motivations for hardware requirements
 

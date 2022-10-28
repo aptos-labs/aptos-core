@@ -97,7 +97,7 @@ variable "utility_instance_enable_taint" {
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c2-standard-30"
+  default     = "n2-standard-32"
 }
 
 variable "validator_instance_num" {

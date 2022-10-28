@@ -60,7 +60,7 @@
 /dashboards/ @aptos-labs/prod-eng
 
 # Owners for the `/developer-docs-site` directory and all its subdirectories.
-/developer-docs-site/ @davidiw @rajkaramchedu
+/developer-docs-site/ @davidiw @rajkaramchedu @clay-aptos
 
 # Owner for docs tutorials for the token_standard and related tutorials.
 /developer-docs-site/docs/tutorials @areshand
