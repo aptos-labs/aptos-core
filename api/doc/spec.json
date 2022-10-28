@@ -6070,7 +6070,7 @@
           "Transactions"
         ],
         "summary": "Get transactions",
-        "description": "Retrieve on-chain committed transactions. The page size and start can be provided to\nget a specific sequence of transactions.\n\nIf the version has been pruned, then a 410 will be returned",
+        "description": "Retrieve on-chain committed transactions. The page size and start ledger version\ncan provided to get a specific sequence of transactions.\n\nIf the version has been pruned, then a 410 will be returned.\n\nTo retrieve a pending transaction, use /transactions/by_hash.",
         "parameters": [
           {
             "name": "start",
@@ -7640,7 +7640,7 @@
           "Transactions"
         ],
         "summary": "Get transaction by version",
-        "description": "Retrieves a transaction by a given version.  If the version has been pruned, a 410 will\nbe returned.",
+        "description": "Retrieves a transaction by a given version. If the version has been\npruned, a 410 will be returned.",
         "parameters": [
           {
             "name": "txn_version",
@@ -8157,7 +8157,7 @@
           "Transactions"
         ],
         "summary": "Get account transactions",
-        "description": "Retrieves transactions from an account.  If the start version is too far in the past\na 410 will be returned.\n\nIf no start version is given, it will start at 0",
+        "description": "Retrieve on-chain committed transactions from an account. If the start\nversion is too far in the past a 410 will be returned.\n\nIf no start version is given, it will start at version 0.\n\nTo retrieve a pending transaction, use /transactions/by_hash.",
         "parameters": [
           {
             "name": "address",

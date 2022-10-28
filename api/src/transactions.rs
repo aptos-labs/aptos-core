@@ -137,10 +137,12 @@ pub struct TransactionsApi {
 impl TransactionsApi {
     /// Get transactions
     ///
-    /// Retrieve on-chain committed transactions. The page size and start can be provided to
-    /// get a specific sequence of transactions.
+    /// Retrieve on-chain committed transactions. The page size and start ledger version
+    /// can provided to get a specific sequence of transactions.
     ///
-    /// If the version has been pruned, then a 410 will be returned
+    /// If the version has been pruned, then a 410 will be returned.
+    ///
+    /// To retrieve a pending transaction, use /transactions/by_hash.
     #[oai(
         path = "/transactions",
         method = "get",
@@ -206,8 +208,8 @@ impl TransactionsApi {
 
     /// Get transaction by version
     ///
-    /// Retrieves a transaction by a given version.  If the version has been pruned, a 410 will
-    /// be returned.
+    /// Retrieves a transaction by a given version. If the version has been
+    /// pruned, a 410 will be returned.
     #[oai(
         path = "/transactions/by_version/:txn_version",
         method = "get",
@@ -229,10 +231,12 @@ impl TransactionsApi {
 
     /// Get account transactions
     ///
-    /// Retrieves transactions from an account.  If the start version is too far in the past
-    /// a 410 will be returned.
+    /// Retrieve on-chain committed transactions from an account. If the start
+    /// version is too far in the past a 410 will be returned.
     ///
-    /// If no start version is given, it will start at 0
+    /// If no start version is given, it will start at version 0.
+    ///
+    /// To retrieve a pending transaction, use /transactions/by_hash.
     #[oai(
         path = "/accounts/:address/transactions",
         method = "get",
@@ -540,8 +544,6 @@ impl TransactionsApi {
     /// - Decode the hex encoded string in the response to bytes.
     /// - Sign the bytes to create the signature.
     /// - Use that as the signature field in something like Ed25519Signature, which you then use to build a TransactionSignature.
-    //
-    // TODO: Link an example of how to do this. Use externalDoc.
     #[oai(
         path = "/transactions/encode_submission",
         method = "post",
