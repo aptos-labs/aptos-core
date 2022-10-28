@@ -47,6 +47,17 @@ module std::features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
     }
 
+    /// Whether the new `aptos_stdlib::type_info::chain_id()` native for fetching the chain ID is enabled.
+    /// This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const APTOS_STD_CHAIN_ID_NATIVES: u64 = 3;
+
+    public fun get_aptos_stdlib_chain_id_feature(): u64 { APTOS_STD_CHAIN_ID_NATIVES }
+
+    public fun aptos_stdlib_chain_id_enabled(): bool acquires Features {
+        is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
