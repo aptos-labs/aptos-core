@@ -49,7 +49,7 @@ image:
 resources:
   limits:
     cpu: 14
-    memory: 30Gi
+    memory: 26Gi
   requests:
     cpu: 14
     memory: 26Gi
@@ -136,11 +136,11 @@ backup_verify:
   schedule: "@daily"
   resources:
     limits:
-      cpu: 0.5
-      memory: 512Mi
+      cpu: 4
+      memory: 4Gi
     requests:
-      cpu: 0.5
-      memory: 512Mi
+      cpu: 4
+      memory: 4Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}

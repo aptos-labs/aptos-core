@@ -6,8 +6,15 @@ slug: "whats-new-in-docs"
 # Whats New in Docs
 
 This page shows the key updates to the developer documentation on this site.
+## 25 October 2022
 
-## 26 October 2022
+- Replaced the outdated auto-generated Move docs formally located at `aptos-core/tree/framework-docs` with new online versions now found at:
+  * [Aptos tokens](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md)
+  * [Aptos framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md)
+  * [Aptos stdlib](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/doc/overview.md)
+  * [Move stdlib](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/overview.md)
+
+## 17 October 2022
 
 - Added [resource account](/docs/reference/glossary.md#resource-account) definition and details to the Aptos Glossary and noted its use in the developer tutorials, such as [Your First NFT](/docs/tutorials/your-first-nft.md#step-44-creating-a-resource-account).
 

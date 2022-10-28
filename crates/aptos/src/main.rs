@@ -5,6 +5,10 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(unix)]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 use aptos::{move_tool, Tool};
 use clap::Parser;
 use std::process::exit;

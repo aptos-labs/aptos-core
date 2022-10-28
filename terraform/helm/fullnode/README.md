@@ -29,10 +29,10 @@
 | backup.tolerations | list | `[]` |  |
 | backup_verify.affinity | object | `{}` |  |
 | backup_verify.nodeSelector | object | `{}` |  |
-| backup_verify.resources.limits.cpu | float | `0.5` |  |
-| backup_verify.resources.limits.memory | string | `"512Mi"` |  |
-| backup_verify.resources.requests.cpu | float | `0.5` |  |
-| backup_verify.resources.requests.memory | string | `"512Mi"` |  |
+| backup_verify.resources.limits.cpu | float | `4` |  |
+| backup_verify.resources.limits.memory | string | `"4Gi"` |  |
+| backup_verify.resources.requests.cpu | float | `4` |  |
+| backup_verify.resources.requests.memory | string | `"4Gi"` |  |
 | backup_verify.schedule | string | `"@daily"` | The schedule for backup verification |
 | backup_verify.tolerations | list | `[]` |  |
 | chain.era | int | `1` | Bump this number to wipe the underlying storage |
@@ -50,7 +50,7 @@
 | logging.address | string | `nil` | Address for remote logging |
 | nodeSelector | object | `{}` |  |
 | resources.limits.cpu | int | `14` |  |
-| resources.limits.memory | string | `"30Gi"` |  |
+| resources.limits.memory | string | `"26Gi"` |  |
 | resources.requests.cpu | int | `14` |  |
 | resources.requests.memory | string | `"26Gi"` |  |
 | restore.affinity | object | `{}` |  |

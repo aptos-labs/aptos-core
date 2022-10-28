@@ -37,6 +37,10 @@ Checkout our developer doc on our token standard https://aptos.dev/concepts/coin
 -  [Function `burn`](#0x3_token_burn)
 -  [Function `mutate_one_token`](#0x3_token_mutate_one_token)
 -  [Function `create_royalty`](#0x3_token_create_royalty)
+-  [Function `assert_collection_exists`](#0x3_token_assert_collection_exists)
+-  [Function `mutate_collection_description`](#0x3_token_mutate_collection_description)
+-  [Function `mutate_collection_uri`](#0x3_token_mutate_collection_uri)
+-  [Function `mutate_collection_maximum`](#0x3_token_mutate_collection_maximum)
 -  [Function `assert_tokendata_exists`](#0x3_token_assert_tokendata_exists)
 -  [Function `mutate_tokendata_maximum`](#0x3_token_mutate_tokendata_maximum)
 -  [Function `mutate_tokendata_uri`](#0x3_token_mutate_tokendata_uri)
@@ -59,6 +63,9 @@ Checkout our developer doc on our token standard https://aptos.dev/concepts/coin
 -  [Function `check_tokendata_exists`](#0x3_token_check_tokendata_exists)
 -  [Function `create_tokendata`](#0x3_token_create_tokendata)
 -  [Function `get_collection_supply`](#0x3_token_get_collection_supply)
+-  [Function `get_collection_description`](#0x3_token_get_collection_description)
+-  [Function `get_collection_uri`](#0x3_token_get_collection_uri)
+-  [Function `get_collection_maximum`](#0x3_token_get_collection_maximum)
 -  [Function `get_token_supply`](#0x3_token_get_token_supply)
 -  [Function `get_tokendata_largest_property_version`](#0x3_token_get_tokendata_largest_property_version)
 -  [Function `get_token_id`](#0x3_token_get_token_id)
@@ -1123,6 +1130,16 @@ The field is not mutable
 
 
 
+<a name="0x3_token_EINVALID_MAXIMUM"></a>
+
+Collection or tokendata maximum must be larger than supply
+
+
+<pre><code><b>const</b> <a href="token.md#0x3_token_EINVALID_MAXIMUM">EINVALID_MAXIMUM</a>: u64 = 36;
+</code></pre>
+
+
+
 <a name="0x3_token_EINVALID_ROYALTY_NUMERATOR_DENOMINATOR"></a>
 
 Royalty invalid if the numerator is larger than the denominator
@@ -1774,7 +1791,6 @@ The token is owned at address owner
 
     <b>let</b> burn_by_creator_flag = <a href="property_map.md#0x3_property_map_read_bool">property_map::read_bool</a>(&token_data.default_properties, &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="token.md#0x3_token_BURNABLE_BY_CREATOR">BURNABLE_BY_CREATOR</a>));
     <b>assert</b>!(burn_by_creator_flag, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_ECREATOR_CANNOT_BURN_TOKEN">ECREATOR_CANNOT_BURN_TOKEN</a>));
-
     // Burn the tokens.
     <b>let</b> <a href="token.md#0x3_token_Token">Token</a> { id: _, amount: burned_amount, token_properties: _ } = <a href="token.md#0x3_token_withdraw_with_event_internal">withdraw_with_event_internal</a>(owner, token_id, amount);
     <b>let</b> token_store = <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_TokenStore">TokenStore</a>&gt;(owner);
@@ -2028,6 +2044,120 @@ Burn a token by the token owner
 
 </details>
 
+<a name="0x3_token_assert_collection_exists"></a>
+
+## Function `assert_collection_exists`
+
+
+
+<pre><code><b>fun</b> <a href="token.md#0x3_token_assert_collection_exists">assert_collection_exists</a>(creator_address: <b>address</b>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="token.md#0x3_token_assert_collection_exists">assert_collection_exists</a>(creator_address: <b>address</b>, collection_name: String) <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <b>assert</b>!(<b>exists</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ECOLLECTIONS_NOT_PUBLISHED">ECOLLECTIONS_NOT_PUBLISHED</a>));
+    <b>let</b> all_collection_data = &<b>borrow_global</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data;
+    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(all_collection_data, collection_name), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ECOLLECTION_NOT_PUBLISHED">ECOLLECTION_NOT_PUBLISHED</a>));
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_mutate_collection_description"></a>
+
+## Function `mutate_collection_description`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_mutate_collection_description">mutate_collection_description</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_mutate_collection_description">mutate_collection_description</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: String, description: String) <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <b>let</b> creator_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
+    <a href="token.md#0x3_token_assert_collection_exists">assert_collection_exists</a>(creator_address, collection_name);
+    <b>let</b> collection_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data, collection_name);
+    <b>assert</b>!(collection_data.mutability_config.description, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>));
+    collection_data.description = description;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_mutate_collection_uri"></a>
+
+## Function `mutate_collection_uri`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_mutate_collection_uri">mutate_collection_uri</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_mutate_collection_uri">mutate_collection_uri</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: String, uri: String) <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(&uri) &lt;= <a href="token.md#0x3_token_MAX_URI_LENGTH">MAX_URI_LENGTH</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EURI_TOO_LONG">EURI_TOO_LONG</a>));
+    <b>let</b> creator_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
+    <a href="token.md#0x3_token_assert_collection_exists">assert_collection_exists</a>(creator_address, collection_name);
+    <b>let</b> collection_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data, collection_name);
+    <b>assert</b>!(collection_data.mutability_config.uri, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>));
+    collection_data.uri = uri;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_mutate_collection_maximum"></a>
+
+## Function `mutate_collection_maximum`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_mutate_collection_maximum">mutate_collection_maximum</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, maximum: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_mutate_collection_maximum">mutate_collection_maximum</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: String, maximum: u64) <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <b>let</b> creator_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
+    <a href="token.md#0x3_token_assert_collection_exists">assert_collection_exists</a>(creator_address, collection_name);
+    <b>let</b> collection_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data, collection_name);
+    // cannot change maximum from 0 and cannot change maximum <b>to</b> 0
+    <b>assert</b>!(collection_data.maximum != 0 && maximum !=0, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EINVALID_MAXIMUM">EINVALID_MAXIMUM</a>));
+    <b>assert</b>!(maximum &gt;= collection_data.supply, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EINVALID_MAXIMUM">EINVALID_MAXIMUM</a>));
+    <b>assert</b>!(collection_data.mutability_config.maximum, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>));
+    collection_data.maximum = maximum;
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x3_token_assert_tokendata_exists"></a>
 
 ## Function `assert_tokendata_exists`
@@ -2073,9 +2203,9 @@ Burn a token by the token owner
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_mutate_tokendata_maximum">mutate_tokendata_maximum</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token_data_id: <a href="token.md#0x3_token_TokenDataId">TokenDataId</a>, maximum: u64) <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
     <a href="token.md#0x3_token_assert_tokendata_exists">assert_tokendata_exists</a>(creator, token_data_id);
-
     <b>let</b> all_token_data = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(token_data_id.creator).token_data;
     <b>let</b> token_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(all_token_data, token_data_id);
+    <b>assert</b>!(token_data.supply &lt;= maximum, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EINVALID_MAXIMUM">EINVALID_MAXIMUM</a>));
     <b>assert</b>!(token_data.mutability_config.maximum, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>));
     token_data.maximum = maximum;
 }
@@ -2806,16 +2936,92 @@ return the number of distinct token_data_id created under this collection
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_supply">get_collection_supply</a>(creator_address: <b>address</b>, collection_name: String): Option&lt;u64&gt; <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
-    <b>assert</b>!(<b>exists</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ECOLLECTIONS_NOT_PUBLISHED">ECOLLECTIONS_NOT_PUBLISHED</a>));
-    <b>let</b> collections = &<b>borrow_global</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data;
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(collections, collection_name), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ECOLLECTION_NOT_PUBLISHED">ECOLLECTION_NOT_PUBLISHED</a>));
-    <b>let</b> collection_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(collections, collection_name);
+    <a href="token.md#0x3_token_assert_collection_exists">assert_collection_exists</a>(creator_address, collection_name);
+    <b>let</b> collection_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data, collection_name);
 
     <b>if</b> (collection_data.maximum &gt; 0) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(collection_data.supply)
     } <b>else</b> {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_collection_description"></a>
+
+## Function `get_collection_description`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_description">get_collection_description</a>(creator_address: <b>address</b>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_description">get_collection_description</a>(creator_address: <b>address</b>, collection_name: String): String <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <a href="token.md#0x3_token_assert_collection_exists">assert_collection_exists</a>(creator_address, collection_name);
+    <b>let</b> collection_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data, collection_name);
+    collection_data.description
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_collection_uri"></a>
+
+## Function `get_collection_uri`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_uri">get_collection_uri</a>(creator_address: <b>address</b>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_uri">get_collection_uri</a>(creator_address: <b>address</b>, collection_name: String): String <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <a href="token.md#0x3_token_assert_collection_exists">assert_collection_exists</a>(creator_address, collection_name);
+    <b>let</b> collection_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data, collection_name);
+    collection_data.uri
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_collection_maximum"></a>
+
+## Function `get_collection_maximum`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_maximum">get_collection_maximum</a>(creator_address: <b>address</b>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_maximum">get_collection_maximum</a>(creator_address: <b>address</b>, collection_name: String): u64 <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <a href="token.md#0x3_token_assert_collection_exists">assert_collection_exists</a>(creator_address, collection_name);
+    <b>let</b> collection_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data, collection_name);
+    collection_data.maximum
 }
 </code></pre>
 
