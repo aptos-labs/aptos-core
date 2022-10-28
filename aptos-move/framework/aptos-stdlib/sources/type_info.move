@@ -25,30 +25,14 @@ module aptos_std::type_info {
 
     public native fun type_name<T>(): string::String;
 
-    /// Return the size, in bytes, of a `T`, provided an immutable
-    /// reference to a quasi-null instance of fixed-size `T`,
-    /// `fixed_size_type_null_ref`.
+    /// Return the BCS size, in bytes, of value at `val_ref`.
     ///
-    /// Analogous to `sizeof()` in C.
-    ///
-    /// Ideally this function would be implemented as a native function
-    /// of the form `public native fun size_of<T>(): u64;`, such that
-    /// callers do not need to concoct quasi-null instances, e.g.
-    /// `false` for `T` as a `bool`, `0` for `T` as a `u8`, or `@0x0`
-    /// for `T` as an `address`.
-    ///
-    /// Does not actually enfore that `T` is a fixed-size type, which
-    /// would require determining whether or not vectors are nested
-    /// within.
-    ///
-    /// See `test_size_of()` for an analysis of common types and nesting
-    /// patterns, as well as `test_size_of_vectors()` for an analysis of
-    /// vector size dynamism.
-    public fun size_of<T>(
-        fixed_size_type_null_ref: &T
-    ): u64 {
-        // Return vector length of vectorized bytes representation
-        vector::length(&bcs::to_bytes(fixed_size_type_null_ref))
+    /// See `test_size_of_val()` for an analysis of common types and
+    /// nesting patterns, as well as `test_size_of_val_vectors()` for an
+    /// analysis of vector size dynamism.
+    public fun size_of_val<T>(val_ref: &T): u64 {
+        // Return vector length of vectorized BCS representation.
+        vector::length(&bcs::to_bytes(val_ref))
     }
 
     #[test]
@@ -114,23 +98,23 @@ module aptos_std::type_info {
     use std::option;
 
     #[test(account = @0x0)]
-    /// Ensure valid returns across native types and nesting schemas
-    fun test_size_of(
+    /// Ensure valid returns across native types and nesting schemas.
+    fun test_size_of_val(
         account: &signer
     ) {
-        assert!(size_of(&false) == 1, 0); // Bool takes 1 byte
-        assert!(size_of<u8>(&0) == 1, 0); // u8 takes 1 byte
-        assert!(size_of<u64>(&0) == 8, 0); // u64 takes 8 bytes
-        assert!(size_of<u128>(&0) == 16, 0); // u128 takes 16 bytes
-        // Address is stored as a u256
-        assert!(size_of(&@0x0) == 32, 0);
-        assert!(size_of(account) == 32, 0); // Signer is an address
-        // Assert custom type without fields has size 1
-        assert!(size_of(&CustomType{}) == 1, 0);
-        // Declare a simple struct with a 1-byte field
+        assert!(size_of_val(&false) == 1, 0); // Bool takes 1 byte.
+        assert!(size_of_val<u8>(&0) == 1, 0); // u8 takes 1 byte.
+        assert!(size_of_val<u64>(&0) == 8, 0); // u64 takes 8 bytes.
+        assert!(size_of_val<u128>(&0) == 16, 0); // u128 takes 16 bytes.
+        // Address is a u256.
+        assert!(size_of_val(&@0x0) == 32, 0);
+        assert!(size_of_val(account) == 32, 0); // Signer is an address.
+        // Assert custom type without fields has size 1.
+        assert!(size_of_val(&CustomType{}) == 1, 0);
+        // Declare a simple struct with a 1-byte field.
         let simple_struct = SimpleStruct{field: 0};
-        // Assert size is indicated as 1 byte
-        assert!(size_of(&simple_struct) == 1, 0);
+        // Assert size is indicated as 1 byte.
+        assert!(size_of_val(&simple_struct) == 1, 0);
         let complex_struct = ComplexStruct<u128>{
             field_1: false,
             field_2: 0,
@@ -138,34 +122,34 @@ module aptos_std::type_info {
             field_4: 0,
             field_5: simple_struct,
             field_6: 0
-        }; // Declare a complex struct with another nested inside
-        // Assert size is bytewise sum of components
-        assert!(size_of(&complex_struct) == (1 + 1 + 8 + 16 + 1 + 16), 0);
-        // Declare a struct with two boolean values
+        }; // Declare a complex struct with another nested inside.
+        // Assert size is bytewise sum of components.
+        assert!(size_of_val(&complex_struct) == (1 + 1 + 8 + 16 + 1 + 16), 0);
+        // Declare a struct with two boolean values.
         let two_bools = TwoBools{bool_1: false, bool_2: false};
-        // Assert size is two bytes
-        assert!(size_of(&two_bools) == 2, 0);
-        // Declare an empty vector of element type u64
+        // Assert size is two bytes.
+        assert!(size_of_val(&two_bools) == 2, 0);
+        // Declare an empty vector of element type u64.
         let empty_vector_u64 = vector::empty<u64>();
-        // Declare an empty vector of element type u128
+        // Declare an empty vector of element type u128.
         let empty_vector_u128 = vector::empty<u128>();
-        // Assert size is 1 byte regardless of underlying element type
-        assert!(size_of(&empty_vector_u64) == 1, 0);
-        // Assert size is 1 byte regardless of underlying element type
-        assert!(size_of(&empty_vector_u128) == 1, 0);
-        // Declare a bool in a vector
+        // Assert size is 1 byte regardless of underlying element type.
+        assert!(size_of_val(&empty_vector_u64) == 1, 0);
+        // Assert size is 1 byte regardless of underlying element type.
+        assert!(size_of_val(&empty_vector_u128) == 1, 0);
+        // Declare a bool in a vector.
         let bool_vector = vector::singleton(false);
-        // Push back another bool
+        // Push back another bool.
         vector::push_back(&mut bool_vector, false);
-        // Assert size is 3 bytes (1 per element, 1 for the base vector)
-        assert!(size_of(&bool_vector) == 3, 0);
-        // Get a some option, which is implemented as a vector
+        // Assert size is 3 bytes (1 per element, 1 for base vector).
+        assert!(size_of_val(&bool_vector) == 3, 0);
+        // Get a some option, which is implemented as a vector.
         let u64_option = option::some(0);
-        // Assert size is 9 bytes (8 per element, 1 for the base vector)
-        assert!(size_of(&u64_option) == 9, 0);
-        option::extract(&mut u64_option); // Remove the value inside
-        // Assert size reduces to 1 byte
-        assert!(size_of(&u64_option) == 1, 0);
+        // Assert size is 9 bytes (8 per element, 1 for base vector).
+        assert!(size_of_val(&u64_option) == 9, 0);
+        option::extract(&mut u64_option); // Remove the value inside.
+        // Assert size reduces to 1 byte.
+        assert!(size_of_val(&u64_option) == 1, 0);
     }
 
     #[test]
@@ -177,14 +161,14 @@ module aptos_std::type_info {
     /// element in bytes, and b is a "base size" in bytes that varies
     /// with n.
     ///
-    /// The base size is an artifact of how vectors are stored on disk,
-    /// namely, with b leading bytes that declare how many elements are
-    /// in the vector. Each such leading byte has a reserved control bit
-    /// (e.g. is this the last leading byte?), such that 7 bits per
-    /// leading byte remain for the actual element count. Hence for a
-    /// single leading byte, the maximum element count that can be
-    /// described is is (2 ^ 7) - 1, and for b leading bytes, the
-    /// maximum element count that can be described is (2 ^ 7) ^ b - 1:
+    /// The base size is an artifact of vector BCS encoding, namely,
+    /// with b leading bytes that declare how many elements are in the
+    /// vector. Each such leading byte has a reserved control bit (e.g.
+    /// is this the last leading byte?), such that 7 bits per leading
+    /// byte remain for the actual element count. Hence for a single
+    /// leading byte, the maximum element count that can be described is
+    /// (2 ^ 7) - 1, and for b leading bytes, the maximum element count
+    /// that can be described is (2 ^ 7) ^ b - 1:
     ///
     /// * b = 1,                         n < 128
     /// * b = 2,                  128 <= n < 16384
@@ -201,46 +185,47 @@ module aptos_std::type_info {
     /// first place, e.g. U64_MAX.
     ///
     /// In practice b > 2 is unlikely to be encountered.
-    fun test_size_of_vectors() {
-        // Declare vector base sizes
+    fun test_size_of_val_vectors() {
+        // Declare vector base sizes.
         let (base_size_1, base_size_2, base_size_3) = (1, 2, 3);
-        // A base size of 1 applies for 127 or less elements
-        let n_elems_cutoff_1 = 127; // (2 ^ 7) ^ 1 - 1
-        // A base size of 2 applies for 128 < n <= 16384 elements
-        let n_elems_cutoff_2 = 16383; // (2 ^ 7) ^ 2 - 1
-        let vector_u64 = vector::empty<u64>(); // Declare empty vector
-        let null_element = 0; // Declare a null element
-        let element_size = size_of(&null_element); // Get element size
-        // Vector size is 1 byte when length is 0
-        assert!(size_of(&vector_u64) == base_size_1, 0);
-        let i = 0; // Declare loop counter
-        while (i < n_elems_cutoff_1) { // Iterate until first cutoff
-            // Add an element
+        // A base size of 1 applies for 127 or less elements.
+        let n_elems_cutoff_1 = 127; // (2 ^ 7) ^ 1 - 1.
+        // A base size of 2 applies for 128 < n <= 16384 elements.
+        let n_elems_cutoff_2 = 16383; // (2 ^ 7) ^ 2 - 1.
+        let vector_u64 = vector::empty<u64>(); // Declare empty vector.
+        let null_element = 0; // Declare a null element.
+        // Get element size.
+        let element_size = size_of_val(&null_element);
+        // Vector size is 1 byte when length is 0.
+        assert!(size_of_val(&vector_u64) == base_size_1, 0);
+        let i = 0; // Declare loop counter.
+        while (i < n_elems_cutoff_1) { // Iterate until first cutoff:
+            // Add an element.
             vector::push_back(&mut vector_u64, null_element);
-            i = i + 1; // Increment counter
+            i = i + 1; // Increment counter.
         };
-        // Vector base size is still 1 byte
-        assert!(size_of(&vector_u64) - element_size * i == base_size_1, 0);
-        // Add another element, exceeding the cutoff
+        // Vector base size is still 1 byte.
+        assert!(size_of_val(&vector_u64) - element_size * i == base_size_1, 0);
+        // Add another element, exceeding the cutoff.
         vector::push_back(&mut vector_u64, null_element);
-        i = i + 1; // Increment counter
-        // Vector base size is now 2 bytes
-        assert!(size_of(&vector_u64) - element_size * i == base_size_2, 0);
-        while (i < n_elems_cutoff_2) { // Iterate until second cutoff
-            // Add an element
+        i = i + 1; // Increment counter.
+        // Vector base size is now 2 bytes.
+        assert!(size_of_val(&vector_u64) - element_size * i == base_size_2, 0);
+        while (i < n_elems_cutoff_2) { // Iterate until second cutoff:
+            // Add an element.
             vector::push_back(&mut vector_u64, null_element);
-            i = i + 1; // Increment counter
+            i = i + 1; // Increment counter.
         };
-        // Vector base size is still 2 bytes
-        assert!(size_of(&vector_u64) - element_size * i == base_size_2, 0);
-        // Add another element, exceeding the cutoff
+        // Vector base size is still 2 bytes.
+        assert!(size_of_val(&vector_u64) - element_size * i == base_size_2, 0);
+        // Add another element, exceeding the cutoff.
         vector::push_back(&mut vector_u64, null_element);
-        i = i + 1; // Increment counter
-        // Vector base size is now 3 bytes
-        assert!(size_of(&vector_u64) - element_size * i == base_size_3, 0);
-        // Repeat for custom struct
+        i = i + 1; // Increment counter.
+        // Vector base size is now 3 bytes.
+        assert!(size_of_val(&vector_u64) - element_size * i == base_size_3, 0);
+        // Repeat for custom struct.
         let vector_complex = vector::empty<ComplexStruct<address>>();
-        // Declare a null element
+        // Declare a null element.
         let null_element = ComplexStruct{
             field_1: false,
             field_2: 0,
@@ -249,34 +234,34 @@ module aptos_std::type_info {
             field_5: SimpleStruct{field: 0},
             field_6: @0x0
         };
-        element_size = size_of(&null_element); // Get element size
-        // Vector size is 1 byte when length is 0
-        assert!(size_of(&vector_complex) == base_size_1, 0);
-        i = 0; // Re-initialize loop counter
-        while (i < n_elems_cutoff_1) {  // Iterate until first cutoff
-            // Add an element
+        element_size = size_of_val(&null_element); // Get element size.
+        // Vector size is 1 byte when length is 0.
+        assert!(size_of_val(&vector_complex) == base_size_1, 0);
+        i = 0; // Re-initialize loop counter.
+        while (i < n_elems_cutoff_1) { // Iterate until first cutoff:
+            // Add an element.
             vector::push_back(&mut vector_complex, copy null_element);
-            i = i + 1; // Increment counter
+            i = i + 1; // Increment counter.
         };
-        // Vector base size is still 1 byte
-        assert!(size_of(&vector_complex) - element_size * i == base_size_1, 0);
-        // Add another element, exceeding the cutoff
+        assert!( // Vector base size is still 1 byte.
+            size_of_val(&vector_complex) - element_size * i == base_size_1, 0);
+        // Add another element, exceeding the cutoff.
         vector::push_back(&mut vector_complex, null_element);
-        i = i + 1; // Increment counter
-        // Vector base size is now 2 bytes
-        assert!(size_of(&vector_complex) - element_size * i == base_size_2, 0);
-        while (i < n_elems_cutoff_2) { // Iterate until second cutoff
-            // Add an element
+        i = i + 1; // Increment counter.
+        assert!( // Vector base size is now 2 bytes.
+            size_of_val(&vector_complex) - element_size * i == base_size_2, 0);
+        while (i < n_elems_cutoff_2) { // Iterate until second cutoff:
+            // Add an element.
             vector::push_back(&mut vector_complex, copy null_element);
-            i = i + 1; // Increment counter
+            i = i + 1; // Increment counter.
         };
-        // Vector base size is still 2 bytes
-        assert!(size_of(&vector_complex) - element_size * i == base_size_2, 0);
-        // Add another element, exceeding the cutoff
+        assert!( // Vector base size is still 2 bytes.
+            size_of_val(&vector_complex) - element_size * i == base_size_2, 0);
+        // Add another element, exceeding the cutoff.
         vector::push_back(&mut vector_complex, null_element);
-        i = i + 1; // Increment counter
-        // Vector base size is now 3 bytes
-        assert!(size_of(&vector_complex) - element_size * i == base_size_3, 0);
+        i = i + 1; // Increment counter.
+        assert!( // Vector base size is now 3 bytes.
+            size_of_val(&vector_complex) - element_size * i == base_size_3, 0);
     }
 
 }
