@@ -138,6 +138,9 @@ module aptos_token::token {
     /// Royalty payee account does not exist
     const EROYALTY_PAYEE_ACCOUNT_DOES_NOT_EXIST: u64 = 35;
 
+    /// Collection or tokendata maximum must be larger than supply
+    const EINVALID_MAXIMUM: u64 = 36;
+
     //
     // Core data structures for holding tokens
     //
@@ -711,7 +714,45 @@ module aptos_token::token {
     }
 
     //
-    // Functions for mutating tokendata fields
+    // Functions for mutating CollectionData fields
+    //
+
+    fun assert_collection_exists(creator_address: address, collection_name: String) acquires Collections {
+        assert!(exists<Collections>(creator_address), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        let all_collection_data = &borrow_global<Collections>(creator_address).collection_data;
+        assert!(table::contains(all_collection_data, collection_name), error::not_found(ECOLLECTION_NOT_PUBLISHED));
+    }
+
+    public fun mutate_collection_description(creator: &signer, collection_name: String, description: String) acquires Collections {
+        let creator_address = signer::address_of(creator);
+        assert_collection_exists(creator_address, collection_name);
+        let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
+        assert!(collection_data.mutability_config.description, error::permission_denied(EFIELD_NOT_MUTABLE));
+        collection_data.description = description;
+    }
+
+    public fun mutate_collection_uri(creator: &signer, collection_name: String, uri: String) acquires Collections {
+        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
+        let creator_address = signer::address_of(creator);
+        assert_collection_exists(creator_address, collection_name);
+        let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
+        assert!(collection_data.mutability_config.uri, error::permission_denied(EFIELD_NOT_MUTABLE));
+        collection_data.uri = uri;
+    }
+
+    public fun mutate_collection_maximum(creator: &signer, collection_name: String, maximum: u64) acquires Collections {
+        let creator_address = signer::address_of(creator);
+        assert_collection_exists(creator_address, collection_name);
+        let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
+        // cannot change maximum from 0 and cannot change maximum to 0
+        assert!(collection_data.maximum != 0 && maximum != 0, error::invalid_argument(EINVALID_MAXIMUM));
+        assert!(maximum >= collection_data.supply, error::invalid_argument(EINVALID_MAXIMUM));
+        assert!(collection_data.mutability_config.maximum, error::permission_denied(EFIELD_NOT_MUTABLE));
+        collection_data.maximum = maximum;
+    }
+
+    //
+    // Functions for mutating TokenData fields
     //
 
     fun assert_tokendata_exists(creator: &signer, token_data_id: TokenDataId) acquires Collections {
@@ -724,9 +765,9 @@ module aptos_token::token {
 
     public fun mutate_tokendata_maximum(creator: &signer, token_data_id: TokenDataId, maximum: u64) acquires Collections {
         assert_tokendata_exists(creator, token_data_id);
-
         let all_token_data = &mut borrow_global_mut<Collections>(token_data_id.creator).token_data;
         let token_data = table::borrow_mut(all_token_data, token_data_id);
+        assert!(maximum >= token_data.supply, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(token_data.mutability_config.maximum, error::permission_denied(EFIELD_NOT_MUTABLE));
         token_data.maximum = maximum;
     }
@@ -1062,16 +1103,32 @@ module aptos_token::token {
 
     /// return the number of distinct token_data_id created under this collection
     public fun get_collection_supply(creator_address: address, collection_name: String): Option<u64> acquires Collections {
-        assert!(exists<Collections>(creator_address), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
-        let collections = &borrow_global<Collections>(creator_address).collection_data;
-        assert!(table::contains(collections, collection_name), error::not_found(ECOLLECTION_NOT_PUBLISHED));
-        let collection_data = table::borrow(collections, collection_name);
+        assert_collection_exists(creator_address, collection_name);
+        let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
 
         if (collection_data.maximum > 0) {
             option::some(collection_data.supply)
         } else {
             option::none()
         }
+    }
+
+    public fun get_collection_description(creator_address: address, collection_name: String): String acquires Collections {
+        assert_collection_exists(creator_address, collection_name);
+        let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
+        collection_data.description
+    }
+
+    public fun get_collection_uri(creator_address: address, collection_name: String): String acquires Collections {
+        assert_collection_exists(creator_address, collection_name);
+        let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
+        collection_data.uri
+    }
+
+    public fun get_collection_maximum(creator_address: address, collection_name: String): u64 acquires Collections {
+        assert_collection_exists(creator_address, collection_name);
+        let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
+        collection_data.maximum
     }
 
     /// return the number of distinct token_id created under this TokenData
@@ -1491,7 +1548,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0x1)]
-    #[expected_failure] // (abort_code = 5)]
+    #[expected_failure]
     public entry fun test_collection_maximum(creator: signer) acquires Collections, TokenStore {
         use std::bcs;
         account::create_account_for_test(signer::address_of(&creator));
@@ -1510,7 +1567,6 @@ module aptos_token::token {
         let default_vals = vector<vector<u8>>[ bcs::to_bytes<u64>(&10), bcs::to_bytes<u64>(&5) ];
         let default_types = vector<String>[ string::utf8(b"u64"), string::utf8(b"u64") ];
         let mutate_setting = vector<bool>[ false, false, false, false, false, false ];
-
         create_token_script(
             &creator,
             token_id.token_data_id.collection,
@@ -1983,6 +2039,77 @@ module aptos_token::token {
         assert!(!table::contains(&collections.collection_data, token_id.token_data_id.name), 1);
         assert!(!table::contains(&collections.token_data, token_id.token_data_id), 1);
 
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_mutate_collection_description(
+        creator: &signer,
+    ) acquires Collections, TokenStore {
+        let creator_address = signer::address_of(creator);
+        account::create_account_for_test(creator_address);
+        create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[true, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+
+        let description = string::utf8(b"test");
+        let collection_name = get_collection_name();
+        mutate_collection_description(creator, collection_name, description);
+        assert!(get_collection_description(creator_address, collection_name) == description, 1);
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_mutate_collection_uri(
+        creator: &signer,
+    ) acquires Collections, TokenStore {
+        let creator_address = signer::address_of(creator);
+        account::create_account_for_test(creator_address);
+        create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, true, false],
+            vector<bool>[false, false, false, false, false],
+        );
+
+        let uri = string::utf8(b"");
+        let collection_name = get_collection_name();
+        mutate_collection_uri(creator, collection_name, uri);
+        assert!(get_collection_uri(creator_address, collection_name) == uri, 1);
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_mutate_collection_maximum(
+        creator: &signer,
+    ) acquires Collections, TokenStore {
+        let creator_address = signer::address_of(creator);
+        account::create_account_for_test(creator_address);
+        create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, true],
+            vector<bool>[false, false, false, false, false],
+        );
+
+        let collection_name = get_collection_name();
+        mutate_collection_maximum(creator, collection_name, 10);
+        assert!(get_collection_maximum(creator_address, collection_name) == 10, 1);
     }
 
     #[test(creator = @0xcafe, owner = @0x456)]
