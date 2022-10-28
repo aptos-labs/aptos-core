@@ -144,6 +144,24 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
+    /// `Sponsor` can add locked coins for `recipient` with given unlock timestamp (in seconds).
+    /// There's no restriction on unlock timestamp so sponsors could technically add coins for an unlocked time in the
+    /// past, which means the coins are immediately unlocked.
+    LockedCoinsAddLockedCoins {
+        coin_type: TypeTag,
+        recipient: AccountAddress,
+        amount: u64,
+        unlock_time_secs: u64,
+    },
+
+    /// Recipient can claim coins that are fully unlocked (unlock time has passed).
+    /// To claim, `recipient` would need the sponsor's address. In the case where each sponsor always deploys this
+    /// module anew, it'd just be the module's hosted account address.
+    LockedCoinsClaim {
+        coin_type: TypeTag,
+        sponsor: AccountAddress,
+    },
+
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
         coin_type: TypeTag,
@@ -530,6 +548,13 @@ impl EntryFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
+            LockedCoinsAddLockedCoins {
+                coin_type,
+                recipient,
+                amount,
+                unlock_time_secs,
+            } => locked_coins_add_locked_coins(coin_type, recipient, amount, unlock_time_secs),
+            LockedCoinsClaim { coin_type, sponsor } => locked_coins_claim(coin_type, sponsor),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -1039,6 +1064,51 @@ pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("upgrade_supply").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+/// `Sponsor` can add locked coins for `recipient` with given unlock timestamp (in seconds).
+/// There's no restriction on unlock timestamp so sponsors could technically add coins for an unlocked time in the
+/// past, which means the coins are immediately unlocked.
+pub fn locked_coins_add_locked_coins(
+    coin_type: TypeTag,
+    recipient: AccountAddress,
+    amount: u64,
+    unlock_time_secs: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("locked_coins").to_owned(),
+        ),
+        ident_str!("add_locked_coins").to_owned(),
+        vec![coin_type],
+        vec![
+            bcs::to_bytes(&recipient).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+            bcs::to_bytes(&unlock_time_secs).unwrap(),
+        ],
+    ))
+}
+
+/// Recipient can claim coins that are fully unlocked (unlock time has passed).
+/// To claim, `recipient` would need the sponsor's address. In the case where each sponsor always deploys this
+/// module anew, it'd just be the module's hosted account address.
+pub fn locked_coins_claim(coin_type: TypeTag, sponsor: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("locked_coins").to_owned(),
+        ),
+        ident_str!("claim").to_owned(),
+        vec![coin_type],
+        vec![bcs::to_bytes(&sponsor).unwrap()],
     ))
 }
 
@@ -2265,6 +2335,32 @@ mod decoder {
         }
     }
 
+    pub fn locked_coins_add_locked_coins(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::LockedCoinsAddLockedCoins {
+                coin_type: script.ty_args().get(0)?.clone(),
+                recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+                unlock_time_secs: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn locked_coins_claim(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::LockedCoinsClaim {
+                coin_type: script.ty_args().get(0)?.clone(),
+                sponsor: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinBurn {
@@ -2948,6 +3044,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_upgrade_supply".to_string(),
             Box::new(decoder::coin_upgrade_supply),
+        );
+        map.insert(
+            "locked_coins_add_locked_coins".to_string(),
+            Box::new(decoder::locked_coins_add_locked_coins),
+        );
+        map.insert(
+            "locked_coins_claim".to_string(),
+            Box::new(decoder::locked_coins_claim),
         );
         map.insert(
             "managed_coin_burn".to_string(),
