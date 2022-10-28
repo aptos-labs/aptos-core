@@ -63,6 +63,7 @@ pub struct QuorumStoreConfig {
     pub channel_size: usize,
     pub proof_timeout_ms: usize,
     pub batch_request_num_peers: usize,
+    pub mempool_pulling_interval: usize,
     pub end_batch_ms: u128,
     pub max_batch_bytes: usize,
     pub batch_request_timeout_ms: usize,

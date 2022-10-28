@@ -598,11 +598,17 @@ impl EpochManager {
             });
         }
 
+        // TODO: parameter? bring back back-off?
+        let interval = tokio::time::interval(Duration::from_millis(
+            qs_config.mempool_pulling_interval as u64,
+        ));
+
         tokio::spawn(quorum_store_wrapper.start(
             network_sender,
             consensus_to_quorum_store_rx,
             wrapper_shutdown_rx,
             wrapper_quorum_store_msg_rx,
+            interval,
         ));
 
         // _ = spawn_named!(
@@ -830,8 +836,9 @@ impl EpochManager {
                 channel_size: 100,
                 proof_timeout_ms: 10000,
                 batch_request_num_peers: 2,
-                end_batch_ms: 500,
-                max_batch_bytes: 100000,
+                mempool_pulling_interval: 100,
+                end_batch_ms: 1000,
+                max_batch_bytes: 500000,
                 batch_request_timeout_ms: 10000,
                 batch_expiry_round_gap_when_init: 150,
                 batch_expiry_round_gap_behind_latest_certified: 500,

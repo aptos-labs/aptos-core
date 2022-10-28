@@ -37,7 +37,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{sync::mpsc::Sender as TokioSender, sync::oneshot as TokioOneshot, time};
+use tokio::{sync::mpsc::Sender as TokioSender, sync::oneshot as TokioOneshot, time::Interval};
 
 type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
@@ -162,9 +162,8 @@ impl QuorumStoreWrapper {
             counters::PULLED_EMPTY_TXNS_COUNT.inc();
         } else {
             counters::PULLED_TXNS_COUNT.inc();
+            counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
         }
-
-        counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
 
         for txn in pulled_txns {
             if !self.batch_builder.append_transaction(&txn) {
@@ -400,6 +399,7 @@ impl QuorumStoreWrapper {
         mut consensus_receiver: Receiver<WrapperCommand>,
         mut shutdown_rx: Receiver<oneshot::Sender<()>>,
         mut network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
+        mut interval: Interval,
     ) {
         debug!(
             "[QS worker] QuorumStoreWrapper worker for epoch {} starting",
@@ -407,11 +407,6 @@ impl QuorumStoreWrapper {
         );
 
         let mut proofs_in_progress: FuturesUnordered<BoxFuture<'_, _>> = FuturesUnordered::new();
-
-        // TODO: parameter? bring back back-off?
-        let mut interval = time::interval(Duration::from_millis(
-            100, // 50 is currently the end batch timer
-        ));
 
         // this is the flag that records whether there is backpressure during last txn pulling from the mempool
         let mut back_pressure_in_last_pull = false;
