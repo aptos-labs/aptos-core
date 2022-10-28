@@ -127,9 +127,19 @@ pub static NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
 
 /// Counters
 
-/// Count of the pulled txns.
+/// Count of how many times txns are pulled.
 pub static PULLED_TXNS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("quorum_store_pulled_txn_count", "Count of the pulled txns.").unwrap()
+});
+
+/// Histogram for the number of txns are pulled.
+pub static PULLED_TXNS_NUM: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_pulled_txns_num",
+        "Histogram for the number of txns are pulled.",
+        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
 });
 
 /// Count of the pulled empty txns.

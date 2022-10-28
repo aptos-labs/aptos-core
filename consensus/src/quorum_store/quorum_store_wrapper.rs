@@ -164,6 +164,8 @@ impl QuorumStoreWrapper {
             counters::PULLED_TXNS_COUNT.inc();
         }
 
+        counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
+
         for txn in pulled_txns {
             if !self.batch_builder.append_transaction(&txn) {
                 end_batch = true;
