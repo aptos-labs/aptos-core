@@ -178,15 +178,15 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.keccak256, native_keccak256),
         ),
         (
-            "sha2_512",
+            "sha2_512_internal",
             make_native_from_func(gas_params.sha2_512, native_sha2_512),
         ),
         (
-            "sha3_512",
+            "sha3_512_internal",
             make_native_from_func(gas_params.sha3_512, native_sha3_512),
         ),
         (
-            "ripemd160",
+            "ripemd160_internal",
             make_native_from_func(gas_params.ripemd160, native_ripemd160),
         ),
     ];
