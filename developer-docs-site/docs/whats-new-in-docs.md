@@ -7,9 +7,9 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
-## 17 October 2022
+## 26 October 2022
 
-- Added [resource account](/docs/reference/glossary.md#resource-account) definition and details to the Aptos Glossary.
+- Added [resource account](/docs/reference/glossary.md#resource-account) definition and details to the Aptos Glossary and noted its use in the developer tutorials, such as [Your First NFT](/docs/tutorials/your-first-nft.md#step-44-creating-a-resource-account).
 
 ## 13 October 2022
 
