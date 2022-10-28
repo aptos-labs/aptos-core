@@ -6,24 +6,21 @@
 //! This utility is to only be used inside of smoke test.
 
 use aptos_logger::prelude::*;
+use forge::cargo_build_common_args;
 use once_cell::sync::Lazy;
 use std::{env, path::PathBuf, process::Command};
 
 const WORKSPACE_BUILD_ERROR_MSG: &str = r#"
     Unable to build all workspace binaries. Cannot continue running tests.
 
-    Try running 'cargo build --all --bins --exclude aptos-node' yourself.
+    Try running 'cargo build --release --all --bins --exclude aptos-node' yourself.
 "#;
 
 // Global flag indicating if all binaries in the workspace have been built.
 static WORKSPACE_BUILT: Lazy<bool> = Lazy::new(|| {
     info!("Building project binaries");
-    let args = if cfg!(debug_assertions) {
-        // use get_aptos_node_with_failpoints to get aptos-node binary
-        vec!["build", "--all", "--bins", "--exclude", "aptos-node"]
-    } else {
-        vec!["build", "--all", "--bins", "--release"]
-    };
+    let mut args = cargo_build_common_args();
+    args.append(&mut vec!["--all", "--bins", "--exclude", "aptos-node"]);
 
     let cargo_build = Command::new("cargo")
         .current_dir(workspace_root())
@@ -66,6 +63,12 @@ fn build_dir() -> PathBuf {
 
 // Path to a specified binary
 pub fn get_bin<S: AsRef<str>>(bin_name: S) -> PathBuf {
+    assert_ne!(
+        "aptos-node",
+        bin_name.as_ref(),
+        "aptos-node must be built and used via local swarm cargo_build_aptos_node"
+    );
+
     // We have to check to see if the workspace is built first to ensure that the binaries we're
     // testing are up to date.
     if !*WORKSPACE_BUILT {

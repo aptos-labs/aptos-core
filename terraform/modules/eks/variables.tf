@@ -76,7 +76,7 @@ variable "utility_instance_type" {
 
 variable "fullnode_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c5.xlarge"
+  default     = "c6i.8xlarge"
 }
 
 variable "num_fullnodes" {

@@ -1,11 +1,25 @@
 module aptos_std::type_info {
     use std::string;
+    use std::features;
+
+    //
+    // Error codes
+    //
+    const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 1;
+
+    //
+    // Structs
+    //
 
     struct TypeInfo has copy, drop, store {
         account_address: address,
         module_name: vector<u8>,
         struct_name: vector<u8>,
     }
+
+    //
+    // Public functions
+    //
 
     public fun account_address(type_info: &TypeInfo): address {
         type_info.account_address
@@ -23,6 +37,10 @@ module aptos_std::type_info {
     /// functions, where this will always return `4u8` as the chain ID, whereas `aptos_framework::chain_id::get()` will
     /// return whichever ID was passed to `aptos_framework::chain_id::initialize_for_test()`.
     public fun chain_id(): u8 {
+        if (!features::aptos_stdlib_chain_id_enabled()) {
+            abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
+        };
+
         chain_id_internal()
     }
 
@@ -40,8 +58,11 @@ module aptos_std::type_info {
         assert!(struct_name(&type_info) == b"TypeInfo", 2);
     }
 
-    #[test]
-    fun test_chain_id() {
+    #[test(fx = @std)]
+    fun test_chain_id(fx: signer) {
+        // We need to enable the feature in order for the native call to be allowed.
+        features::change_feature_flags(&fx, vector[features::get_aptos_stdlib_chain_id_feature()], vector[]);
+
         // The testing environment chain ID is 4u8.
         assert!(chain_id() == 4u8, 1);
     }
