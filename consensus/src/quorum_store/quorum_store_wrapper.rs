@@ -129,7 +129,7 @@ impl QuorumStoreWrapper {
             "QS: back pressure check remaining_proof_num {} back_pressure_limit {}",
             self.remaining_proof_num, self.back_pressure_limit
         );
-        self.remaining_proof_num > self.back_pressure_limit && self.block_store.back_pressure()
+        self.remaining_proof_num > self.back_pressure_limit || self.block_store.back_pressure()
     }
 
     pub(crate) async fn handle_scheduled_pull(
