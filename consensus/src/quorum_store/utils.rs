@@ -11,7 +11,7 @@ use aptos_logger::debug;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use chrono::Utc;
-use claims::assert_some;
+// use claims::assert_some;
 use consensus_types::common::{Round, TransactionSummary};
 use consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
 use futures::channel::{mpsc::Sender, oneshot};
@@ -242,24 +242,25 @@ impl ProofQueue {
         max_txns: u64,
         max_bytes: u64,
     ) -> (Vec<ProofOfStore>, usize) {
-        let num_expired = self
-            .digest_queue
-            .iter()
-            .take_while(|(_, expiration_time)| *expiration_time < current_time)
-            .count();
-        for (digest, _expiration_time) in self.digest_queue.drain(0..num_expired) {
-            assert_some!(self.digest_proof.remove(&digest));
-            // if expiration_time < current_time && expiration_time.round() < current_time.round() {
-            //     counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
-            //         .observe((current_time.round() - expiration_time.round()) as f64);
-            // }
-        }
-        debug!("QS: num_expired {}", num_expired);
+        // let num_expired = self
+        //     .digest_queue
+        //     .iter()
+        //     .take_while(|(_, expiration_time)| *expiration_time < current_time)
+        //     .count();
+        // for (digest, _expiration_time) in self.digest_queue.drain(0..num_expired) {
+        //     assert_some!(self.digest_proof.remove(&digest));
+        //     // if expiration_time < current_time && expiration_time.round() < current_time.round() {
+        //     //     counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
+        //     //         .observe((current_time.round() - expiration_time.round()) as f64);
+        //     // }
+        // }
+        // debug!("QS: num_expired {}", num_expired);
 
         let mut ret = Vec::new();
+        let mut new_queue = VecDeque::new();
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
-        let mut size = self.digest_queue.len();
+        let mut exceed_limit = false;
         for (digest, expiration) in self.digest_queue.iter() {
             if *expiration >= current_time && !excluded_proofs.contains(digest) {
                 match self
@@ -268,15 +269,17 @@ impl ProofQueue {
                     .expect("Entry for unexpired digest must exist")
                 {
                     Some(proof) => {
-                        cur_bytes = cur_bytes + proof.info().num_bytes;
-                        cur_txns = cur_txns + proof.info().num_txns;
-                        if cur_bytes > max_bytes || cur_txns > max_txns {
-                            counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(size as f64);
-
-                            // Exceeded the limit for requested bytes or number of transactions.
-                            break;
+                        if !exceed_limit {
+                            cur_bytes = cur_bytes + proof.info().num_bytes;
+                            cur_txns = cur_txns + proof.info().num_txns;
+                            if cur_bytes > max_bytes || cur_txns > max_txns {
+                                // Exceeded the limit for requested bytes or number of transactions.
+                                exceed_limit = true;
+                            }
+                            ret.push(proof.clone());
+                        } else {
+                            new_queue.push_back((digest.clone(), expiration.clone()));
                         }
-                        ret.push(proof.clone());
                     }
                     None => {} // Proof was already committed, skip.
                 }
@@ -291,9 +294,9 @@ impl ProofQueue {
                         .observe((current_time.round() - expiration.round()) as f64);
                 }
             }
-            size = size - 1;
         }
-        (ret, size)
+        self.digest_queue = new_queue;
+        (ret, self.digest_queue.len())
     }
 
     //mark in the hashmap committed PoS, but keep them until they expire

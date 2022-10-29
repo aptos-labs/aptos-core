@@ -129,6 +129,7 @@ impl QuorumStoreWrapper {
             "QS: back pressure check remaining_proof_num {} back_pressure_limit {}",
             self.remaining_proof_num, self.back_pressure_limit
         );
+        counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(self.remaining_proof_num as f64);
         self.remaining_proof_num > self.back_pressure_limit || self.block_store.back_pressure()
     }
 
