@@ -848,7 +848,7 @@ impl EpochManager {
                 db_quota: 10000000000,
                 mempool_txn_pull_max_count: 100,
                 mempool_txn_pull_max_bytes: 1000000,
-                num_nodes_per_worker_handles: 2,
+                num_nodes_per_worker_handles: 10,
                 back_pressure_factor: 1, // back pressure limit for QS is back_pressure_factor * num_validator
             };
 
