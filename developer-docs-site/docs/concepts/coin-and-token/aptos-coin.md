@@ -62,7 +62,7 @@ struct CoinInfo<phantom CoinType> has key {
 
 Coin provides the primitives for users creating and managing the coin and the users who use it.
 
-**Creators**
+### Creators
 
 Coin creators and managers can:
 
@@ -71,7 +71,7 @@ Coin creators and managers can:
 - Burning coins from a `CoinStore`.
 - Freezing mobility into and out of a `CoinStore`.
 
-**Users**
+### Users
 
 Coin users can:
 
@@ -79,6 +79,23 @@ Coin users can:
 - Extracting value from a Coin struct into a new Coin struct.
 - Ability to deposit and withdraw from a `CoinStore` and emit events as a result.
 - Allows for users to register a `CoinStore<CoinType>` in their account to handle coin.
+
+### Coin module key struct
+
+##### [`Coin`](https://github.com/aptos-labs/aptos-core/blob/744c2def47cddced878fda9bbd5633022fdb083a/aptos-move/framework/aptos-framework/sources/coin.move#L68)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| value | u64 | Value of the token, eg: 1000000000 |
+
+##### [`CoinInfo`](https://github.com/aptos-labs/aptos-core/blob/744c2def47cddced878fda9bbd5633022fdb083a/aptos-move/framework/aptos-framework/sources/coin.move#L92)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| name | String | Name of the token, eg: Aptos Coin |
+| symbol | String | Symbol for the token, eg: APT |
+| decimals | u8 | Determines how the value of coin is represented; for example APT’s decimal is 8, so a value of 100000000 is represented by 1 APT coin |
+| supply | Option&lt;OptionalAggregator&gt; | option::some(optional_aggregator::new(MAX_U128, parallelizable)) |
 
 ### Creating a new CoinType
 
