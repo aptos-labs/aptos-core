@@ -7,7 +7,10 @@ slug: "index"
 
 Token standards define how digital assets are created and used on their respective blockchains. These standards consist of rules to ensure your coins and tokens are compatible with the Aptos blockchain.
 
-The documentation in this section comprises the Aptos Token Standard.
+The documentation in this section comprises the Aptos Token Standard. See the pages and `.move` files below and also the [Move reference documentation](../../guides/move-guides/index.md#aptos-move-documentation) for the:
+
+  * [Aptos Token Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md)
+  * [Aptos Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md) containing `coin`
 
 For digital assets, Aptos provides two Move modules:
 
@@ -15,7 +18,7 @@ For digital assets, Aptos provides two Move modules:
 
 The [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) is a lightweight standard meant for simple, typesafe, and fungible assets. The coin standard is separated out into its own Move module to ensure that:
   - The coin standard can be used to create a token with an emphasis on simplicity and performance and with minimal metadata. 
-  - The coin module remains a part of the Aptos core framework and be used for currencies, for example the gas currency, thereby enhancing the core functionality of the Aptos framework.
+  - The coin module remains a part of the Aptos core framework and can be used for currencies, for example the gas currency, thereby enhancing the core functionality of the Aptos framework.
 
 See [Aptos Coin >](aptos-coin)
 
