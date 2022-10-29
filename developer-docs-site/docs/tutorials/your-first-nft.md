@@ -13,7 +13,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 This tutorial describes how to create and transfer NFTs on the Aptos blockchain. The Aptos implementation for core NFTs can be found in the [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) Move module.
 
 For reference, also see:
-* [mint_nft](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) Move example
+* [mint_nft](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) Move example on how to airdrop an NFT 
 * [mint_nft.rs](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/e2e-move-tests/src/tests/mint_nft.rs) Rust end-to-end test
 
 ## Step 1: Pick an SDK
@@ -297,12 +297,7 @@ In Aptos, each account must have an on-chain representation in order to receive 
 
 ---
 
-### Step 4.4: Creating a resource account
-
-Create a [resource account](../reference/glossary.md#resource-account) to [initialize](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/resource_account) the `mint_nft` module and retrieve the signer capability from both the resource account and module account. To do so, call `create_resource_account_and_publish_package` to publish the module under the resource account's address and make this example code work. For an example, see: [mint_nft.rs](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/e2e-move-tests/src/tests/mint_nft.rs#L62).
-
-
-### Step 4.5: Creating a collection
+### Step 4.4: Creating a collection
 
 Now begins the process of creating tokens. First, the creator must create a collection to store tokens. A collection can contain zero, one, or many distinct tokens within it. The collection does not restrict the attributes of the tokens, as it is only a container.
 

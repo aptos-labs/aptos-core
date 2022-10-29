@@ -84,6 +84,7 @@ const sidebars = {
         "guides/state-sync",
         "guides/data-pruning",
         "guides/indexing",
+        "guides/resource-accounts",
         "guides/building-your-own-wallet",
         "guides/install-petra-wallet",
         "guides/building-wallet-extension",
