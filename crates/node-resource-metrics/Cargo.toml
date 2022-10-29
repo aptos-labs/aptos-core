@@ -1,14 +1,16 @@
 [package]
 name = "node-resource-metrics"
-version = "0.1.0"
-edition = "2021"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "System resource metrics collector"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 aptos-infallible = { path = "../../crates/aptos-infallible" }
