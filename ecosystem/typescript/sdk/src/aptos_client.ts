@@ -326,7 +326,7 @@ export class AptosClient {
    * @param query Optional query object
    * @param query.start The start sequence number in the EVENT STREAM, defaulting to the latest event.
    * The events are returned in the reverse order of sequence number
-   * @param query.limit The number of events to be returned for the page default is 5
+   * @param query.limit The number of events to be returned. The default is 25.
    * @returns Array of events
    */
   @parseApiError

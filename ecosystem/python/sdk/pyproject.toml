@@ -1,9 +1,16 @@
 [tool.poetry]
 name = "aptos-sdk"
-version = "0.2.0"
 description = "Aptos SDK"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-license = "Apache-2.0"
+version = "0.2.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [tool.poetry.dependencies]
 python = ">=3.7,<4.0"
