@@ -160,7 +160,7 @@ The following tables describe fields at the struct level.
 | `TokenData` | Acts as the main struct for holding the token metadata. Properties is a where users can add their own properties that are not defined in the token data. Users can mint more tokens based on the `TokenData`, and those tokens share the same `TokenData`. |
 | `TokenMutabilityConfig` | Control which fields are mutable. |
 | `TokenDataId` | An ID used for representing and querying `TokenData` on-chain. This ID mainly contains three fields including creator address, collection name and token name. |
-| Royalty | Specifies the denominator and numerator for calculating the royalty fee. It also has the payee account address for depositing the royalty. |
+| `Royalty` | Specifies the denominator and numerator for calculating the royalty fee. It also has the payee account address for depositing the royalty. |
 | `PropertyValue` | Contains both value of a property and type of property. |
 
 #### Resource stored at the owner’s address
@@ -222,9 +222,7 @@ The following tables contain descriptions and examples on each token field.
 | name | String | The collection name, which should be unique among all collections by the creator; the name should also be smaller than 128 characters, eg: “Animal Collection” |
 | uri | String | The URI for the collection; its length should be smaller than 512 characters |
 | supply | u64 | The number of different TokenData entries in this collection |
-| maximum | u64 | If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum
-
-If maximal is 0, Aptos doen’t track the supply of this collection, and there is no limit |
+| maximum | u64 | If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum If maximal is 0, Aptos doen’t track the supply of this collection, and there is no limit |
 | mutability_config | CollectionMutabilityConfig | Specifies which fields are mutable  |
 
 ## Token lifecycle
