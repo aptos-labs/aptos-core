@@ -849,7 +849,7 @@ impl EpochManager {
                 mempool_txn_pull_max_count: 100,
                 mempool_txn_pull_max_bytes: 1000000,
                 num_nodes_per_worker_handles: 10,
-                back_pressure_factor: 1, // back pressure limit for QS is back_pressure_factor * num_validator
+                back_pressure_factor: 3, // back pressure limit for QS is back_pressure_factor * num_validator
             };
 
             // update the number of network_listener workers when start a new round_manager
