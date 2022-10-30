@@ -39,6 +39,7 @@ use crate::{account_address::AccountAddress, state_store::state_key::StateKey};
 use anyhow::{Error, Result};
 use aptos_crypto::hash::HashValue;
 use move_core_types::language_storage::{ModuleId, ResourceKey, StructTag, CODE_TAG, RESOURCE_TAG};
+use num_derive::{FromPrimitive, ToPrimitive};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -58,32 +59,39 @@ pub enum Path {
     Resource(StructTag),
 }
 
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive)]
+pub enum PathTag {
+    Code,
+    Resource,
+}
+
 impl AccessPath {
     pub fn new(address: AccountAddress, path: Vec<u8>) -> Self {
         AccessPath { address, path }
     }
 
-    pub fn resource_access_vec(tag: StructTag) -> Vec<u8> {
+    pub fn resource_path_vec(tag: StructTag) -> Vec<u8> {
         bcs::to_bytes(&Path::Resource(tag)).expect("Unexpected serialization error")
     }
 
     /// Convert Accesses into a byte offset which would be used by the storage layer to resolve
     /// where fields are stored.
     pub fn resource_access_path(key: ResourceKey) -> AccessPath {
-        let path = AccessPath::resource_access_vec(key.type_);
+        let path = AccessPath::resource_path_vec(key.type_);
         AccessPath {
             address: key.address,
             path,
         }
     }
 
-    fn code_access_path_vec(key: ModuleId) -> Vec<u8> {
+    pub fn code_path_vec(key: ModuleId) -> Vec<u8> {
         bcs::to_bytes(&Path::Code(key)).expect("Unexpected serialization error")
     }
 
-    pub fn code_access_path(key: ModuleId) -> AccessPath {
+    pub fn code_access_path(key: ModuleId) -> Self {
         let address = *key.address();
-        let path = AccessPath::code_access_path_vec(key);
+        let path = AccessPath::code_path_vec(key);
         AccessPath { address, path }
     }
 
