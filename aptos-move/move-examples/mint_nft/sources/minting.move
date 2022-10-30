@@ -85,7 +85,8 @@ module mint_nft::minting {
         let expiration_timestamp = 1000000;
 
         // create the resource account that we'll use to create tokens
-        let resource_signer_cap = resource_account::retrieve_resource_account_cap(resource_account, @0xcafe);
+        // change source_addr to the actually account that called `create_resource_account`
+        let resource_signer_cap = resource_account::retrieve_resource_account_cap(resource_account, @source_addr);
         let resource_signer = account::create_signer_with_capability(&resource_signer_cap);
 
         // create the nft collection
