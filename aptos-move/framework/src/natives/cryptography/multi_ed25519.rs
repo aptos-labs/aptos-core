@@ -148,7 +148,6 @@ fn native_sign(
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     let message = pop_arg!(arguments, Vec<u8>);
-    let participant_set = pop_arg!(arguments, Vec<u8>);
     let sk_bytes = pop_arg!(arguments, Vec<u8>);
     let group_sk = MultiEd25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let sig = group_sk.sign_arbitrary_message(message.as_slice());

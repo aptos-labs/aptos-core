@@ -94,17 +94,17 @@ module aptos_std::multi_ed25519 {
     }
 
     #[test_only]
-    public fun multi_sign_arbitrary_bytes(sk: &SecretKey, participant_set: vector<u8>, msg: vector<u8>) : Signature {
+    public fun multi_sign_arbitrary_bytes(sk: &SecretKey, msg: vector<u8>) : Signature {
         Signature {
-            bytes: sign_internal(sk.bytes, participant_set, msg)
+            bytes: sign_internal(sk.bytes, msg)
         }
     }
 
     #[test_only]
-    public fun multi_sign_struct<T:drop>(sk: &SecretKey, participant_set: vector<u8>, data: T) : Signature {
+    public fun multi_sign_struct<T:drop>(sk: &SecretKey, data: T) : Signature {
         let encoded = ed25519::new_signed_message(data);
         Signature {
-            bytes: sign_internal(sk.bytes, participant_set, bcs::to_bytes(&encoded)),
+            bytes: sign_internal(sk.bytes, bcs::to_bytes(&encoded)),
         }
     }
 
@@ -226,7 +226,12 @@ module aptos_std::multi_ed25519 {
     native fun generate_keys_internal(total: u8, threshold: u8): (vector<u8>,vector<u8>);
 
     #[test_only]
-    native fun sign_internal(sk: vector<u8>, participant_set: vector<u8>, message: vector<u8>): vector<u8>;
+    native fun sign_internal(sk: vector<u8>, message: vector<u8>): vector<u8>;
+
+
+
+
+
 
     #[test_only]
     struct TestMessage has copy, drop {
@@ -234,21 +239,25 @@ module aptos_std::multi_ed25519 {
         bar: u64,
     }
 
+    #[test_only]
+    fun pollute_signature(sig: &mut Signature) {
+        let first_sig_byte = vector::borrow_mut(&mut sig.bytes, 0);
+        *first_sig_byte = *first_sig_byte + 1;
+    }
+
     #[test]
     fun test_gen_sign_verify() {
         let (sk,pk) = generate_keys(5, 3);
         let upk = public_key_into_unvalidated(pk);
-        let participant_set1 = vector[1,0,0,1,1,];
         let msg1 = b"Hello Aptos!";
-        let sig1 = multi_sign_arbitrary_bytes(&sk, participant_set1, msg1);
+        let sig1 = multi_sign_arbitrary_bytes(&sk, msg1);
         assert!(signature_verify_strict(&sig1, &upk, msg1), error::invalid_state(1));
 
-        let participant_set_2 = vector[1,1,1,1,0,];
         let obj2 = TestMessage {
             foo: b"Hello Move!",
             bar: 64,
         };
-        let sig2 = multi_sign_struct(&sk, participant_set_2, copy obj2);
+        let sig2 = multi_sign_struct(&sk, copy obj2);
         assert!(signature_verify_strict_t(&sig2, &upk, copy obj2), error::invalid_state(2));
     }
 
@@ -256,17 +265,18 @@ module aptos_std::multi_ed25519 {
     fun test_threshold_not_met_rejection() {
         let (sk,pk) = generate_keys(5, 4);
         let upk = public_key_into_unvalidated(pk);
-        let participant_set1 = vector[1,1,0,1,0,];
         let msg1 = b"Hello Aptos!";
-        let sig1 = multi_sign_arbitrary_bytes(&sk, participant_set1, msg1);
+        let sig1 = multi_sign_arbitrary_bytes(&sk, msg1);
+        pollute_signature(&mut sig1);
         assert!(!signature_verify_strict(&sig1, &upk, msg1), error::invalid_state(3));
 
-        let participant_set_2 = vector[0,0,1,0,1,];
+
         let obj2 = TestMessage {
             foo: b"Hello Move!",
             bar: 64,
         };
-        let sig2 = multi_sign_struct(&sk, participant_set_2, copy obj2);
+        let sig2 = multi_sign_struct(&sk, copy obj2);
+        pollute_signature(&mut sig2);
         assert!(!signature_verify_strict_t(&sig2, &upk, copy obj2), error::invalid_state(4));
     }
 
