@@ -2,17 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    bigquery::BigQueryClient,
     database::new_db_pool,
     indexer::{
         fetcher::TransactionFetcherOptions, processing_result::ProcessingResult, tailer::Tailer,
         transaction_processor::TransactionProcessor,
     },
     processors::{
-        coin_processor::CoinTransactionProcessor, default_processor::DefaultTransactionProcessor,
-        stake_processor::StakeTransactionProcessor, token_processor::TokenTransactionProcessor,
-        Processor,
+        coin_processor::CoinTransactionProcessor, data_ingestion_processor::DataIngestionProcessor,
+        default_processor::DefaultTransactionProcessor, stake_processor::StakeTransactionProcessor,
+        token_processor::TokenTransactionProcessor, Processor,
     },
 };
+use gcloud_sdk::google::cloud::bigquery::storage::v1::big_query_write_client::BigQueryWriteClient;
+use gcloud_sdk::GoogleApi;
 
 use aptos_api::context::Context;
 use aptos_config::config::{IndexerConfig, NodeConfig};
@@ -128,9 +131,25 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         "Created the connection pool... "
     );
 
+    let processor_enum = Processor::from_string(&processor_name);
+
+    let bigquery_client_and_stream: Option<(BigQueryClient, String)> = match processor_enum {
+        Processor::DataIngestionProcessor => {
+            let client = GoogleApi::from_function(
+                BigQueryWriteClient::new,
+                "https://bigquerystorage.googleapis.com",
+                Some("projects/".to_string()),
+            )
+            .await
+            .expect("Client creation succeeds!");
+
+            Some((client, "".to_string()))
+        }
+        _ => None,
+    };
+
     info!(processor_name = processor_name, "Instantiating tailer... ");
 
-    let processor_enum = Processor::from_string(&processor_name);
     let processor: Arc<dyn TransactionProcessor> = match processor_enum {
         Processor::DefaultProcessor => {
             Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
@@ -141,6 +160,13 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         )),
         Processor::CoinProcessor => Arc::new(CoinTransactionProcessor::new(conn_pool.clone())),
         Processor::StakeProcessor => Arc::new(StakeTransactionProcessor::new(conn_pool.clone())),
+        Processor::DataIngestionProcessor => Arc::new(DataIngestionProcessor::new(
+            conn_pool.clone(),
+            bigquery_client_and_stream.unwrap(),
+            config.bigquery_project_id,
+            config.bigquery_dataset_name,
+            config.bigquery_table_name,
+        )),
     };
 
     let options =
