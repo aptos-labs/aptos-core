@@ -526,22 +526,36 @@ module aptos_framework::account {
         let alice = create_account_from_ed25519_public_key(alice_pk);
         let alice_auth = get_authentication_key(signer::address_of(&alice)); // must look like a valid public key
 
-        let eve_pk = x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
-        let eve = create_account_from_ed25519_public_key(eve_pk);
+        let (eve_sk, eve_pk) = ed25519::generate_keys();
+        let eve_pk_bytes = ed25519::validated_public_key_to_bytes(&eve_pk);
+        let eve = create_account_from_ed25519_public_key(eve_pk_bytes);
+        let recipient_address = signer::address_of(&eve);
 
-        let seed = *&eve_pk; // multisig public key
+        let seed = *&eve_pk_bytes; // multisig public key
         vector::push_back(&mut seed, 1); // multisig threshold
         vector::push_back(&mut seed, 1); // signature scheme id
         let (resource, _) = create_resource_account(&alice, seed);
 
-        let signer_capability_sig_bytes = x"587e200320086d8a8d674181f85a8f8b24ee4fd7269870554d18fe830129e7c71f2730a4988c8374c4de5845b52bea4d182640ab6c50c176a3ae90d18002e603";
+        let resource_addr = signer::address_of(&resource);
+        let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global_mut<Account>(resource_addr).sequence_number,
+            source_address: resource_addr,
+            recipient_address,
+        };
+
+        let eve_sig = ed25519::sign_struct(&eve_sk, proof_challenge);
+
+        // Fake a multisig. Here Eve is the only participant.
+        let signer_capability_sig_bytes = x"";
+        vector::append(&mut signer_capability_sig_bytes, ed25519::signature_to_bytes(&eve_sig));
         vector::append(&mut signer_capability_sig_bytes, x"40000000");
-        let account_scheme = MULTI_ED25519_SCHEME;
+
+        // Fake a multisig public key.
         let account_public_key_bytes = alice_auth;
-        vector::append(&mut account_public_key_bytes, *&eve_pk);
+        vector::append(&mut account_public_key_bytes, *&eve_pk_bytes);
         vector::push_back(&mut account_public_key_bytes, 1);
-        let recipient_address = signer::address_of(&eve);
-        offer_signer_capability(&resource, signer_capability_sig_bytes, account_scheme, account_public_key_bytes, recipient_address);
+
+        offer_signer_capability(&resource, signer_capability_sig_bytes, MULTI_ED25519_SCHEME, account_public_key_bytes, recipient_address);
     }
 
     #[test_only]
