@@ -545,7 +545,6 @@ impl TransactionsApi {
     /// - Sign the bytes to create the signature.
     /// - Use that as the signature field in something like Ed25519Signature, which you then use to build a TransactionSignature.
     //
-    // TODO: Link an example of how to do this. Use externalDoc.
     #[oai(
         path = "/transactions/encode_submission",
         method = "post",
