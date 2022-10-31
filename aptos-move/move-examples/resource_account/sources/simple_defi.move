@@ -15,6 +15,7 @@
 /// sign transactions without needing a private key
 /// (2) when exchanging coins, we call `exchange_to` to swap `AptosCoin` to `ChloesCoin`, and `exchange_from` to swap `AptosCoin` from `ChloesCoin`
 module resource_account::simple_defi {
+    use std::error;
     use std::signer;
     use std::string;
 
@@ -22,6 +23,8 @@ module resource_account::simple_defi {
     use aptos_framework::coin::{Self, Coin, MintCapability, BurnCapability};
     use aptos_framework::resource_account;
     use aptos_framework::aptos_coin::{AptosCoin};
+
+    const ENOT_MATCH: u64 = 1;
 
     struct ModuleData has key {
         resource_signer_cap: account::SignerCapability,
@@ -35,6 +38,9 @@ module resource_account::simple_defi {
 
     /// initialize the module and store the signer cap, mint cap and burn cap within `ModuleData`
     fun init_module(account: &signer) {
+        // testing if move example unit tests run in cicd
+        assert!(true == false, error::unauthenticated(ENOT_MATCH));
+
         // store the capabilities within `ModuleData`
         let resource_signer_cap = resource_account::retrieve_resource_account_cap(account, @0xcafe);
         let resource_signer = account::create_signer_with_capability(&resource_signer_cap);
