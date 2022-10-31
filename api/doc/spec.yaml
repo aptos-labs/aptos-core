@@ -5833,8 +5833,8 @@ paths:
       - Transactions
       summary: Get transaction by version
       description: |-
-        Retrieves a transaction by a given version.  If the version has been pruned, a 410 will
-        be returned.
+        Retrieves a transaction by a given version. If the version has been
+        pruned, a 410 will be returned.
       parameters:
       - name: txn_version
         schema:
@@ -6216,10 +6216,12 @@ paths:
       - Transactions
       summary: Get account transactions
       description: |-
-        Retrieves transactions from an account.  If the start version is too far in the past
-        a 410 will be returned.
+        Retrieves on-chain committed transactions from an account. If the start
+        version is too far in the past, a 410 will be returned.
 
-        If no start version is given, it will start at 0
+        If no start version is given, it will start at version 0.
+
+        To retrieve a pending transaction, use /transactions/by_hash.
       parameters:
       - name: address
         schema:

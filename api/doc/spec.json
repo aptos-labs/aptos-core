@@ -7791,7 +7791,7 @@
           "Transactions"
         ],
         "summary": "Get transaction by version",
-        "description": "Retrieves a transaction by a given version.  If the version has been pruned, a 410 will\nbe returned.",
+        "description": "Retrieves a transaction by a given version. If the version has been\npruned, a 410 will be returned.",
         "parameters": [
           {
             "name": "txn_version",
@@ -8315,7 +8315,7 @@
           "Transactions"
         ],
         "summary": "Get account transactions",
-        "description": "Retrieves transactions from an account.  If the start version is too far in the past\na 410 will be returned.\n\nIf no start version is given, it will start at 0",
+        "description": "Retrieves on-chain committed transactions from an account. If the start\nversion is too far in the past, a 410 will be returned.\n\nIf no start version is given, it will start at version 0.\n\nTo retrieve a pending transaction, use /transactions/by_hash.",
         "parameters": [
           {
             "name": "address",
