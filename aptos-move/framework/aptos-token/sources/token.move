@@ -1895,6 +1895,72 @@ module aptos_token::token {
         assert!(pre - aft == 1, 1);
     }
 
+    #[test(creator = @0xcafe)]
+    fun test_burn_by_creator_unlimited_collection_and_limited_token(
+        creator: &signer,
+    ) acquires Collections, TokenStore {
+        // Having unlimited supply for collection and limited
+        // supply one of the tokens is a valid case. This test make sure
+        // the automatic token_data and collection deletion
+        // take both into account.
+        use std::bcs;
+        account::create_account_for_test(signer::address_of(creator));
+
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(
+            creator,
+            1,
+            0,
+            1,
+            vector<String>[string::utf8(BURNABLE_BY_CREATOR)],
+            vector<vector<u8>>[bcs::to_bytes<bool>(&true)],
+            vector<String>[string::utf8(b"bool")],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        // burn the only token.
+        let creator_addr = signer::address_of(creator);
+        burn_by_creator(creator, creator_addr, get_collection_name(), get_token_name(), 0, 1);
+        assert!(balance_of(signer::address_of(creator), token_id) == 0, 1);
+
+        // The corresponding token_data should be deleted, but collection_data should be kept.
+        let collections = borrow_global<Collections>(signer::address_of(creator));
+        assert!(!table::contains(&collections.token_data, token_id.token_data_id), 1);
+        assert!(table::contains(&collections.collection_data, get_collection_name()), 1);
+    }
+
+    #[test(creator = @0xcafe, owner = @0xfeef)]
+    fun test_burn_by_owner_unlimited_collection_and_limited_token(
+        creator: &signer,
+        owner: &signer,
+    ) acquires TokenStore, Collections {
+        use std::bcs;
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(owner));
+        let token_id = create_collection_and_token(
+            creator,
+            3,
+            0,
+            3,
+            vector<String>[string::utf8(BURNABLE_BY_OWNER)],
+            vector<vector<u8>>[bcs::to_bytes<bool>(&true)],
+            vector<String>[string::utf8(b"bool")],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+        opt_in_direct_transfer(owner, true);
+        initialize_token_store(owner);
+        transfer(creator, token_id, signer::address_of(owner), 3);
+        // owner burns all tokens.
+        burn(owner, signer::address_of(creator), get_collection_name(), get_token_name(), 0, 3);
+        assert!(balance_of(signer::address_of(owner), token_id) == 0, 1);
+
+        // The corresponding token_data should be deleted, but collection_data should be kept.
+        let collections = borrow_global<Collections>(signer::address_of(creator));
+        assert!(!table::contains(&collections.token_data, token_id.token_data_id), 1);
+        assert!(table::contains(&collections.collection_data, get_collection_name()), 1);
+    }
+
     #[test(creator = @0xcafe, owner = @0xafe)]
     fun test_mint_token_to_different_address(
         creator: &signer,
@@ -2042,9 +2108,8 @@ module aptos_token::token {
 
         // The corresponding token_data and collection_data should be deleted
         let collections = borrow_global<Collections>(signer::address_of(creator));
-        assert!(!table::contains(&collections.collection_data, token_id.token_data_id.name), 1);
+        assert!(!table::contains(&collections.collection_data, get_collection_name()), 1);
         assert!(!table::contains(&collections.token_data, token_id.token_data_id), 1);
-
     }
 
     #[test(creator = @0xcafe)]
