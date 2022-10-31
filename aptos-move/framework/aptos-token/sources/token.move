@@ -2185,6 +2185,26 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 65572)]
+    fun test_mutate_tokendata_maximum_from_zero(
+        creator: &signer,
+    ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[true, false, false, false, false],
+        );
+        mutate_tokendata_maximum(creator, token_id.token_data_id, 0);
+    }
+
+    #[test(creator = @0xcafe)]
     fun test_mutate_tokendata_uri(
         creator: &signer,
     ) acquires Collections, TokenStore {
