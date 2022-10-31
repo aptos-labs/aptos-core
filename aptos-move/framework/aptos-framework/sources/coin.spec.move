@@ -5,23 +5,21 @@ spec aptos_framework::coin {
 
     spec mint {
         pragma opaque;
-        let addr = spec_coin_address<CoinType>();
+        let addr = type_info::type_of<CoinType>().account_address;
         modifies global<CoinInfo<CoinType>>(addr);
         aborts_if [abstract] false;
         ensures [abstract] result.value == amount;
     }
 
+    /// Get address by reflection.
     spec coin_address<CoinType>(): address {
         pragma opaque;
         aborts_if [abstract] false;
-        ensures [abstract] result == spec_coin_address<CoinType>();
+        ensures [abstract] result == type_info::type_of<CoinType>().account_address;
     }
 
-    spec fun spec_coin_address<CoinType>(): address {
-        // TODO: abstracted due to the lack of support for `type_info` in Prover.
-        @0x0
-    }
-
+    /// Can only be initialized once.
+    /// Can only be published by reserved addresses.
     spec initialize_supply_config(aptos_framework: &signer) {
         let aptos_addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
@@ -30,6 +28,7 @@ spec aptos_framework::coin {
         ensures exists<SupplyConfig>(aptos_addr);
     }
 
+    /// Can only be updated by `@aptos_framework`.
     spec allow_supply_upgrades(aptos_framework: &signer, allowed: bool) {
         modifies global<SupplyConfig>(@aptos_framework);
         let aptos_addr = signer::address_of(aptos_framework);
@@ -49,7 +48,7 @@ spec aptos_framework::coin {
     }
 
     spec schema ExistCoinInfo<CoinType> {
-        let addr = spec_coin_address<CoinType>();
+        let addr = type_info::type_of<CoinType>().account_address;
         aborts_if !exists<CoinInfo<CoinType>>(addr);
     }
 
@@ -77,7 +76,7 @@ spec aptos_framework::coin {
     ) {
         // TODO: complex aborts conditions.
         pragma aborts_if_is_partial;
-        let addr =  spec_coin_address<CoinType>();
+        let addr =  type_info::type_of<CoinType>().account_address;
         modifies global<CoinInfo<CoinType>>(addr);
         include ExistCoinInfo<CoinType>;
         aborts_if coin.value == 0;
@@ -90,11 +89,12 @@ spec aptos_framework::coin {
     ) {
         // TODO: complex aborts conditions.
         pragma aborts_if_is_partial;
-        let addr =  spec_coin_address<CoinType>();
+        let addr =  type_info::type_of<CoinType>().account_address;
         modifies global<CoinInfo<CoinType>>(addr);
         aborts_if amount != 0 && !exists<CoinStore<CoinType>>(account_addr);
     }
 
+    /// `account_addr` is not frozen.
     spec deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) {
         let coin_store = global<CoinStore<CoinType>>(account_addr);
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
@@ -103,6 +103,7 @@ spec aptos_framework::coin {
         ensures global<CoinStore<CoinType>>(account_addr).coin.value == old(global<CoinStore<CoinType>>(account_addr)).coin.value + coin.value;
     }
 
+    /// The value of `zero_coin` must be 0.
     spec destroy_zero<CoinType>(zero_coin: Coin<CoinType>) {
         aborts_if zero_coin.value > 0;
     }
@@ -140,11 +141,13 @@ spec aptos_framework::coin {
         ensures !coin_store.frozen; 
     }
 
+    /// The creator of `CoinType` must be `@aptos_framework`.
+    /// `SupplyConfig` allow upgrade.
     spec upgrade_supply<CoinType>(account: &signer) {
         // TODO: complex aborts conditions.
         pragma aborts_if_is_partial;
         let account_addr = signer::address_of(account);
-        let coin_address = spec_coin_address<CoinType>();
+        let coin_address = type_info::type_of<CoinType>().account_address;
         aborts_if coin_address != account_addr;
         aborts_if !exists<SupplyConfig>(@aptos_framework);
         aborts_if !exists<CoinInfo<CoinType>>(account_addr);
@@ -157,6 +160,7 @@ spec aptos_framework::coin {
         pragma verify = false;
     }
 
+    // `account` must be `@aptos_framework`.
     spec initialize_with_parallelizable_supply<CoinType>(
         account: &signer,
         name: string::String,
@@ -164,6 +168,7 @@ spec aptos_framework::coin {
         decimals: u8,
         monitor_supply: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
+        pragma aborts_if_is_partial;
         let addr = signer::address_of(account);
         aborts_if addr != @aptos_framework;
         include InitializeInternalSchema<CoinType>{
@@ -172,12 +177,14 @@ spec aptos_framework::coin {
         };
     }
 
+    /// Make sure `name` and `symbol` are legal length.
+    /// Only the creator of `CoinType` can initialize.
     spec schema InitializeInternalSchema<CoinType> {
         account: signer;
         name: vector<u8>;
         symbol: vector<u8>;
         let account_addr = signer::address_of(account);
-        let coin_address = spec_coin_address<CoinType>();
+        let coin_address = type_info::type_of<CoinType>().account_address;
         aborts_if coin_address != account_addr;
         aborts_if exists<CoinInfo<CoinType>>(account_addr);
         aborts_if len(name) > MAX_COIN_NAME_LENGTH;
@@ -192,7 +199,7 @@ spec aptos_framework::coin {
         monitor_supply: bool,
         parallelizable: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
-        // TODO: complex aborts conditions.
+        // TODO: complex aborts conditions
         pragma aborts_if_is_partial;
         include InitializeInternalSchema<CoinType>{
             name: name.bytes,
@@ -204,6 +211,8 @@ spec aptos_framework::coin {
         ensures dst_coin.value == old(dst_coin.value) + source_coin.value;
     }
 
+    /// An account can only be registered once.
+    /// Updating `Account.guid_creation_num` will not overflow.
     spec register<CoinType>(account: &signer) {
         let account_addr = signer::address_of(account);
         let acc = global<account::Account>(account_addr);
@@ -213,6 +222,9 @@ spec aptos_framework::coin {
         ensures exists<CoinStore<CoinType>>(account_addr);
     }
 
+    /// `from` and `to` account not frozen.
+    /// `from` and `to` not the same address.
+    /// `from` account sufficient balance.
     spec transfer<CoinType>(
         from: &signer,
         to: address,
@@ -236,6 +248,7 @@ spec aptos_framework::coin {
         ensures account_addr_from == to ==> coin_store_post_from.coin.value == coin_store_from.coin.value;
     }
 
+    /// Account is not frozen and sufficient balance.
     spec withdraw<CoinType>(
         account: &signer,
         amount: u64,

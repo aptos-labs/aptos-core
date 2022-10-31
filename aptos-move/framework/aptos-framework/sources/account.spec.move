@@ -4,12 +4,15 @@ spec aptos_framework::account {
         pragma aborts_if_is_strict;
     }
 
+    /// Convert address to singer and return.
     spec create_signer(addr: address): signer {
         pragma opaque;
         aborts_if [abstract] false;
         ensures [abstract] signer::address_of(result) == addr;
     }
 
+    /// Only the address `@aptos_framework` can call.
+    /// OriginatingAddress does not exist under `@aptos_framework` before the call.
     spec initialize(aptos_framework: &signer) {
         let aptos_addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
@@ -17,12 +20,17 @@ spec aptos_framework::account {
         ensures exists<OriginatingAddress>(aptos_addr);
     }
 
+    /// Check if the bytes of the new address is 32.
+    /// The Account does not exist under the new address before creating the account.
+    /// Limit the new account address is not @vm_reserved / @aptos_framework / @aptos_toke.
     spec create_account(new_address: address): signer {
         include CreateAccount {addr: new_address};
         aborts_if new_address == @vm_reserved || new_address == @aptos_framework || new_address == @aptos_token;
         ensures signer::address_of(result) == new_address;
     }
 
+    /// Check if the bytes of the new address is 32.
+    /// The Account does not exist under the new address before creating the account.
     spec create_account_unchecked(new_address: address): signer {
         include CreateAccount {addr: new_address};
         ensures signer::address_of(result) == new_address;
@@ -45,6 +53,8 @@ spec aptos_framework::account {
         ensures result == global<Account>(addr).sequence_number;
     }
 
+    /// The Account existed under the address.
+    /// The sequence_number of the Account is up to MAX_U64.
     spec increment_sequence_number(addr: address) {
         let sequence_number = global<Account>(addr).sequence_number;
         aborts_if !exists<Account>(addr);
@@ -59,6 +69,8 @@ spec aptos_framework::account {
         ensures result == global<Account>(addr).authentication_key;
     }
 
+    /// The Account existed under the signer before the call.
+    /// The length of new_auth_key is 32.
     spec rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) {
         let addr = signer::address_of(account);
         let post account_resource = global<Account>(addr);
@@ -74,6 +86,8 @@ spec aptos_framework::account {
         aborts_if scheme != ED25519_SCHEME && scheme != MULTI_ED25519_SCHEME;
     }
 
+    /// The Account existed under the signer
+    /// The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     spec rotate_authentication_key(
         account: &signer,
         from_scheme: u8,
@@ -93,6 +107,8 @@ spec aptos_framework::account {
         modifies global<OriginatingAddress>(@aptos_framework);
     }
 
+    /// The Account existed under the signer.
+    /// The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
     spec offer_signer_capability(
         account: &signer,
         signer_capability_sig_bytes: vector<u8>,
@@ -108,6 +124,8 @@ spec aptos_framework::account {
         modifies global<Account>(source_address);
     }
 
+    /// The Account existed under the signer.
+    /// The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address.
     spec revoke_signer_capability(account: &signer, to_be_revoked_address: address) {
         aborts_if !exists<Account>(to_be_revoked_address);
         let addr = signer::address_of(account);
@@ -118,6 +136,8 @@ spec aptos_framework::account {
         ensures exists<Account>(to_be_revoked_address);
     }
 
+    /// The Account existed under the signer.
+    /// The value of signer_capability_offer.for of Account resource under the signer is offerer_address.
     spec create_authorized_signer(account: &signer, offerer_address: address): signer {
         include AccountContainsAddr{
             account: account,
@@ -137,6 +157,8 @@ spec aptos_framework::account {
         aborts_if !option::spec_contains(account_resource.signer_capability_offer.for,addr);
     }
 
+    /// The Account existed under the signer
+    /// The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address
     spec create_resource_address(source: &address, seed: vector<u8>): address {
         pragma verify = false;
     }
@@ -145,6 +167,9 @@ spec aptos_framework::account {
         pragma verify = false;
     }
 
+    /// Check if the bytes of the new address is 32.
+    /// The Account does not exist under the new address before creating the account.
+    /// The system reserved addresses is @0x1 / @0x2 / @0x3 / @0x4 / @0x5  / @0x6 / @0x7 / @0x8 / @0x9 / @0xa.
     spec create_framework_reserved_account(addr: address): (signer, SignerCapability) {
         aborts_if spec_is_framework_address(addr);
         include CreateAccount {addr};
@@ -165,6 +190,8 @@ spec aptos_framework::account {
         addr != @0xa
     }
 
+    /// The Account existed under the signer.
+    /// The guid_creation_num of the ccount resource is up to MAX_U64.
     spec create_guid(account_signer: &signer): guid::GUID {
         let addr = signer::address_of(account_signer);
         let account = global<Account>(addr);
@@ -173,6 +200,8 @@ spec aptos_framework::account {
         modifies global<Account>(addr);
     }
 
+    /// The Account existed under the signer.
+    /// The guid_creation_num of the Account is up to MAX_U64.
     spec new_event_handle<T: drop + store>(account: &signer): EventHandle<T> {
         let addr = signer::address_of(account);
         let account = global<Account>(addr);
