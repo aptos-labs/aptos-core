@@ -32,10 +32,9 @@ paths:
       - Accounts
       summary: Get account
       description: |-
-        Retrieves high level information about an account such as its sequence number and
-        authentication key
-
-        Returns a 404 if the account doesn't exist
+        Return the authentication key and the sequence number for an account
+        address. Optionally, a ledger version can be specified. If the ledger
+        version is not specified in the request, the latest ledger version is used.
       parameters:
       - name: address
         schema:
@@ -4639,10 +4638,12 @@ paths:
       - Transactions
       summary: Get transactions
       description: |-
-        Retrieve on-chain committed transactions. The page size and start can be provided to
-        get a specific sequence of transactions.
+        Retrieve on-chain committed transactions. The page size and start ledger version
+        can be provided to get a specific sequence of transactions.
 
-        If the version has been pruned, then a 410 will be returned
+        If the version has been pruned, then a 410 will be returned.
+
+        To retrieve a pending transaction, use /transactions/by_hash.
       parameters:
       - name: start
         schema:

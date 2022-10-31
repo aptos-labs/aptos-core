@@ -41,10 +41,9 @@ pub struct AccountsApi {
 impl AccountsApi {
     /// Get account
     ///
-    /// Retrieves high level information about an account such as its sequence number and
-    /// authentication key
-    ///
-    /// Returns a 404 if the account doesn't exist
+    /// Return the authentication key and the sequence number for an account 
+    /// address. Optionally, a ledger version can be specified. If the ledger
+    /// version is not specified in the request, the latest ledger version is used.
     #[oai(
         path = "/accounts/:address",
         method = "get",
