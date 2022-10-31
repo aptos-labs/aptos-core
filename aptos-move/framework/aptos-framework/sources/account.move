@@ -548,12 +548,12 @@ module aptos_framework::account {
         // Fake a multisig. Here Eve is the only participant.
         let signer_capability_sig_bytes = x"";
         vector::append(&mut signer_capability_sig_bytes, ed25519::signature_to_bytes(&eve_sig));
-        vector::append(&mut signer_capability_sig_bytes, x"40000000");
+        vector::append(&mut signer_capability_sig_bytes, x"40000000"); // Signers bitmap.
 
         // Fake a multisig public key.
         let account_public_key_bytes = alice_auth;
         vector::append(&mut account_public_key_bytes, *&eve_pk_bytes);
-        vector::push_back(&mut account_public_key_bytes, 1);
+        vector::push_back(&mut account_public_key_bytes, 1); // Multisig verification threshold.
 
         offer_signer_capability(&resource, signer_capability_sig_bytes, MULTI_ED25519_SCHEME, account_public_key_bytes, recipient_address);
     }
