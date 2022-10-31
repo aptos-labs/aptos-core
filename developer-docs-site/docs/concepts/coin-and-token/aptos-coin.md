@@ -82,22 +82,22 @@ Coin users can:
 
 ### Coin module key struct
 
-The following tables describe fields at the struct level. For the definitive list, see the [Move reference documentation](../../guides/move-guides/index.md#aptos-move-documentation) for the [Aptos Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md) containing `coin`.
+The following tables describe fields at the struct level. For the definitive list, see the [Move reference documentation](../../guides/move-guides/index.md#aptos-move-documentation) for the [Aptos Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md) containing [`coin`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/coin.md).
 
 ##### [`Coin`](https://github.com/aptos-labs/aptos-core/blob/744c2def47cddced878fda9bbd5633022fdb083a/aptos-move/framework/aptos-framework/sources/coin.move#L68)
 
 | Field | Type | Description |
 | --- | --- | --- |
-| value | u64 | Value of the token, eg: 1000000000 |
+| `value` | u64 | Value of the token, eg: 1000000000 |
 
 ##### [`CoinInfo`](https://github.com/aptos-labs/aptos-core/blob/744c2def47cddced878fda9bbd5633022fdb083a/aptos-move/framework/aptos-framework/sources/coin.move#L92)
 
 | Field | Type | Description |
 | --- | --- | --- |
-| name | String | Name of the token, eg: Aptos Coin |
-| symbol | String | Symbol for the token, eg: APT |
-| decimals | u8 | Determines how the value of coin is represented; for example APT’s decimal is 8, so a value of 100000000 is represented by 1 APT coin |
-| supply | Option&lt;OptionalAggregator&gt; | option::some(optional_aggregator::new(MAX_U128, parallelizable)) |
+| `name` | String | Name of the token, eg: Aptos Coin |
+| `symbol` | String | Symbol for the token, eg: APT |
+| `decimals` | u8 | Determines how the value of coin is represented; for example APT’s decimal is 8, so a value of 100000000 is represented by 1 APT |
+| `supply` | Option&lt;OptionalAggregator&gt; | option::some(optional_aggregator::new(MAX_U128, parallelizable)) |
 
 ### Creating a new CoinType
 
