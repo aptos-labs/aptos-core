@@ -13,8 +13,8 @@
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc",
-    "fmt": "prettier --write '**/*.(ts|js)'",
-    "lint": "yarn install --frozen-lockfile --silent && prettier --check '**/*.(ts|js)'"
+    "fmt": "prettier --write '**/*.(tsx|ts|js)'",
+    "lint": "yarn install --frozen-lockfile --silent && prettier --check '**/*.(tsx|ts|js)'"
   },
   "dependencies": {
     "@docusaurus/core": "2.1.0",

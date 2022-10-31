@@ -5,7 +5,7 @@
 
 mod log_build_information;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
 use aptos_config::{
@@ -301,9 +301,8 @@ where
         fnn.runtime_threads = Some(1);
         // If a config path was provided, use that as the template
         if let Some(config_path) = config_path {
-            if let Ok(config) = NodeConfig::load_config(config_path) {
-                template = config;
-            }
+            template = NodeConfig::load_config(&config_path)
+                .with_context(|| format!("Failed to load config at path: {:?}", config_path))?;
         }
 
         template.logger.level = Level::Debug;
@@ -890,6 +889,17 @@ pub fn setup_environment(
     })
 }
 
+pub const ERROR_MSG_BAD_FEATURE_FLAGS: &str = r#"
+aptos-node was compiled with feature flags that shouldn't be enabled.
+
+This is caused by cargo's feature unification.
+When you compile two crates with a shared dependency, if one enables a feature flag for the dependency, then it is also enabled for the other crate.
+
+PLEASE RECOMPILE APTOS-NODE SEPARATELY using the following command:
+    cargo build --package aptos-node
+
+"#;
+
 #[cfg(test)]
 mod tests {
     use crate::setup_environment;
@@ -917,6 +927,6 @@ mod tests {
     #[cfg(feature = "check-vm-features")]
     #[test]
     fn test_aptos_vm_does_not_have_test_natives() {
-        aptos_vm::natives::assert_no_test_natives()
+        aptos_vm::natives::assert_no_test_natives(crate::ERROR_MSG_BAD_FEATURE_FLAGS)
     }
 }

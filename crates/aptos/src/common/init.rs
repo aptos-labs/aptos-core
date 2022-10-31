@@ -217,9 +217,9 @@ impl CliCommand<()> for InitTool {
         } else if account_exists {
             eprintln!("Account {} has been already found onchain", address);
         } else if network == Network::Testnet {
-            eprintln!("Account {} does not exist, you will need to create and fun the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account", address);
+            eprintln!("Account {} does not exist, you will need to create and fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account", address);
         } else if network == Network::Mainnet {
-            eprintln!("Account {} does not exist, you will need to create and fun the account through a faucet or by transferring funds from another account", address);
+            eprintln!("Account {} does not exist, you will need to create and fund the account through a faucet or by transferring funds from another account", address);
         } else {
             eprintln!("Account {} has been initialized locally, but you must have coins transferred to it to create the account onchain", address);
         }

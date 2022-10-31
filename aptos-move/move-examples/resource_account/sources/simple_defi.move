@@ -106,7 +106,7 @@ module resource_account::simple_defi {
         init_module(resource_account);
     }
 
-    #[test(origin_account = @0xcafe, resource_account = @0x0b6beee9bc1ad3177403a04efeefb1901c12b7b575ac5124c0205efc0dd2e32a, framework = @aptos_framework)]
+    #[test(origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, framework = @aptos_framework)]
     public entry fun test_exchange_to_and_exchange_from(origin_account: signer, resource_account: signer, framework: signer) acquires ModuleData {
         use aptos_framework::aptos_coin;
 
