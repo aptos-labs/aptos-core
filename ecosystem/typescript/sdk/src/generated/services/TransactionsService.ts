@@ -22,10 +22,12 @@ export class TransactionsService {
 
     /**
      * Get transactions
-     * Retrieve on-chain committed transactions. The page size and start can be provided to
-     * get a specific sequence of transactions.
+     * Retrieve on-chain committed transactions. The page size and start ledger version
+     * can be provided to get a specific sequence of transactions.
      *
-     * If the version has been pruned, then a 410 will be returned
+     * If the version has been pruned, then a 410 will be returned.
+     *
+     * To retrieve a pending transaction, use /transactions/by_hash.
      * @param start Ledger version to start list of transactions
      *
      * If not provided, defaults to showing the latest transactions
