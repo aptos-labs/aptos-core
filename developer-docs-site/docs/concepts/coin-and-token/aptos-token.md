@@ -29,7 +29,7 @@ Additionally, most NFTs are part of a collection or a set of NFTs with a common 
 - `supply`: The total number of NFTs in this collection. 
 - `maximum`: The maximum number of NFTs that this collection can have. If `maximum` is set to 0, then supply is untracked. 
 
-## Token standard
+## Design principles
 
 The [Aptos token standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) is developed with the following principles:
 
@@ -44,7 +44,17 @@ The Aptos token standard supports [mutation of a fungible token to an NFT](#evol
 
 ### Storing customized token properties on-chain
 
-In addition to the standard token attributes, the Aptos token standard provides the [`default_properties`](https://github.com/aptos-labs/aptos-core/blob/e62fd09cb1c916d857fa655b3f174991ef8698b3/aptos-move/framework/aptos-token/sources/token.move#L98) field, a key-value store with the type information to store customized properties on-chain. Use this field to customize the token properties and store them on-chain. These properties can be directly read and written by other smart contracts.
+The Aptos token standard provides an easy way to store properties on-chain. You can define your own properties based on your application. Each token can also have its own property values. These properties can be directly read and written by smart contracts.
+
+#### Default properties
+
+You can add your properties to [`default_properties`](https://github.com/aptos-labs/aptos-core/blob/e62fd09cb1c916d857fa655b3f174991ef8698b3/aptos-move/framework/aptos-token/sources/token.move#L98) in the TokenData. The properties defined here are shared by all tokens by default.
+
+The `default_properties` field is a key-value store with type information. It leverages the PropertyMap module which contain functions for serializing and deserializing different primitive types to the property value.
+
+#### Token properties
+
+You can also use the `token_properties` defined in the token itself for customization on-chain. You can create customized values for a property of this  specific token, thereby allowing a token to have a different property value from its default.
 
 ### Evolving from fungible token to NFT
 
