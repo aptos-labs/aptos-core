@@ -296,7 +296,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
 #[derive(Parser)]
 pub struct TestPackage {
     /// A filter string to determine which unit tests to run
-    #[clap(long)]
+    #[clap(long, short)]
     pub filter: Option<String>,
 
     #[clap(flatten)]
@@ -334,6 +334,7 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestingConfig {
                 filter: self.filter,
                 instruction_execution_bound: Some(self.instruction_execution_bound),
+                report_stacktrace_on_abort: true,
                 ..UnitTestingConfig::default_with_bound(None)
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
