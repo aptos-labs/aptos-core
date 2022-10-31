@@ -228,10 +228,9 @@ module aptos_std::multi_ed25519 {
     #[test_only]
     native fun sign_internal(sk: vector<u8>, message: vector<u8>): vector<u8>;
 
-
-
-
-
+    //
+    // Tests
+    //
 
     #[test_only]
     struct TestMessage has copy, drop {
@@ -240,7 +239,7 @@ module aptos_std::multi_ed25519 {
     }
 
     #[test_only]
-    fun pollute_signature(sig: &mut Signature) {
+    fun pollute_first_signature(sig: &mut Signature) {
         let first_sig_byte = vector::borrow_mut(&mut sig.bytes, 0);
         *first_sig_byte = *first_sig_byte + 1;
     }
@@ -265,18 +264,18 @@ module aptos_std::multi_ed25519 {
     fun test_threshold_not_met_rejection() {
         let (sk,pk) = generate_keys(5, 4);
         let upk = public_key_into_unvalidated(pk);
+
         let msg1 = b"Hello Aptos!";
         let sig1 = multi_sign_arbitrary_bytes(&sk, msg1);
-        pollute_signature(&mut sig1);
+        pollute_first_signature(&mut sig1);
         assert!(!signature_verify_strict(&sig1, &upk, msg1), error::invalid_state(3));
-
 
         let obj2 = TestMessage {
             foo: b"Hello Move!",
             bar: 64,
         };
         let sig2 = multi_sign_struct(&sk, copy obj2);
-        pollute_signature(&mut sig2);
+        pollute_first_signature(&mut sig2);
         assert!(!signature_verify_strict_t(&sig2, &upk, copy obj2), error::invalid_state(4));
     }
 
