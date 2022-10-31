@@ -208,8 +208,8 @@ impl TransactionsApi {
 
     /// Get transaction by version
     ///
-    /// Retrieves a transaction by a given version.  If the version has been pruned, a 410 will
-    /// be returned.
+    /// Retrieves a transaction by a given version. If the version has been
+    /// pruned, a 410 will be returned.
     #[oai(
         path = "/transactions/by_version/:txn_version",
         method = "get",
@@ -231,10 +231,12 @@ impl TransactionsApi {
 
     /// Get account transactions
     ///
-    /// Retrieves transactions from an account.  If the start version is too far in the past
-    /// a 410 will be returned.
+    /// Retrieves on-chain committed transactions from an account. If the start
+    /// version is too far in the past, a 410 will be returned.
     ///
-    /// If no start version is given, it will start at 0
+    /// If no start version is given, it will start at version 0.
+    ///
+    /// To retrieve a pending transaction, use /transactions/by_hash.
     #[oai(
         path = "/accounts/:address/transactions",
         method = "get",
