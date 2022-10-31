@@ -51,7 +51,7 @@
           "Accounts"
         ],
         "summary": "Get account",
-        "description": "Retrieves high level information about an account such as its sequence number and\nauthentication key\n\nReturns a 404 if the account doesn't exist",
+        "description": "Return the authentication key and the sequence number for an account\naddress. Optionally, a ledger version can be specified. If the ledger\nversion is not specified in the request, the latest ledger version is used.",
         "parameters": [
           {
             "name": "address",
@@ -6200,7 +6200,7 @@
           "Transactions"
         ],
         "summary": "Get transactions",
-        "description": "Retrieve on-chain committed transactions. The page size and start can be provided to\nget a specific sequence of transactions.\n\nIf the version has been pruned, then a 410 will be returned",
+        "description": "Retrieve on-chain committed transactions. The page size and start ledger version\ncan be provided to get a specific sequence of transactions.\n\nIf the version has been pruned, then a 410 will be returned.\n\nTo retrieve a pending transaction, use /transactions/by_hash.",
         "parameters": [
           {
             "name": "start",

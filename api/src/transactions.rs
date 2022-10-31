@@ -137,10 +137,12 @@ pub struct TransactionsApi {
 impl TransactionsApi {
     /// Get transactions
     ///
-    /// Retrieve on-chain committed transactions. The page size and start can be provided to
-    /// get a specific sequence of transactions.
+    /// Retrieve on-chain committed transactions. The page size and start ledger version
+    /// can be provided to get a specific sequence of transactions.
     ///
-    /// If the version has been pruned, then a 410 will be returned
+    /// If the version has been pruned, then a 410 will be returned.
+    ///
+    /// To retrieve a pending transaction, use /transactions/by_hash.
     #[oai(
         path = "/transactions",
         method = "get",
