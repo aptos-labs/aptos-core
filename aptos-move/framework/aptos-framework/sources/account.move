@@ -803,10 +803,6 @@ module aptos_framework::account {
     #[test_only]
     const MULTI_ED25519_TO_PK_BYTES: vector<u8> =  x"a63203808ff99ba9ea9133d4e1dafc42109c36ce4de07920ee6cae6136f97719cffa6ecd1582144a41c4388fa20a955339f96834c3901d98e7263ffe455266d1e14e07851e068243e3953bcc3ded766056f7a9586a1bd17fbaefc60c39c8e966a931455983b2b2004101bd7dabab7f5df17fd9281bee392cc7d65bff7f2b7730899c517c0035a971527f9e23d349c5e002e6208465b84a93bbdfb33f670ba4d69ac72f7bae9e577db6480ffef0559839c0317a00cb9cc7577fd18268dbf3b67f68b4f8a1cacd3fbd226e61fa2e849da1ed1f1d131a6b598957a022bdb462254871bd7dc490ac7675b638c1e750b1c7f6f035681abcca48b6b4f96367e4c75c8cd4da5321ec31899cb036469d478e028b5173b78336fc390be06b6a811d8d1022182fb3e8a4a94fd62267be02734b685beb24cf59bd1081216b11404a185df033aa8f546fd2fefd182dc364d48223d462dd8e4e1fa29889b526f67984b4862744ef7282cd606ff2aee79b05c4d366c7280dc92ade0415a3711a09d2d760a00e9f4960dcb1eb71fee22489f54cba68838816e6a0b3e83e85433ee836da1e4738229ec1ca8ad64c675fffbf0bc26022a39ddedae215286427a5bb1b84ca280d83dbe6ecef2dadceef0cd12347393f787e1e5e1b26f7a4fcfbae768e0e4f538141109ca98def3c85a8f7e54fc96e4547626a7a46536710a0c341ca4196676797a8590f";
     #[test_only]
-    const SIG_CAP_ROTATE_KEY_MULTI_TO_MULTI: vector<u8> = x"ddf094fd2039546fe229cc86b5c664aeaa7b40670aec18232e61eb591474ba33bccc63af9a5efe0563d03e11025b87bd820a5d8c72c0ac15ea1ff5632acb160808bb16b4088b9f985a3133c194bf67c2be4c34f788a857b26d5dd6c2ebb69bfcf959f44fbb2a96bd88da0091fe38eb029225ef3239e316372a35e08c5f10c70dc0000000";
-    #[test_only]
-    const SIG_CAP_UPDATE_TABLE_MULTI_TO_MULTI: vector<u8> = x"26dd17b80c92c5a1cbacf79edc1b46ff55dcba108559b14385dc3f91166d6194347ebcff7d1b1bf6864b342865c3a43e88b8203003b9a668b13921abbc6cad071479d0290c3639527d061b71596e0cbab07603f7cc69e6b1fd2ed7215d464c886e81e2bdf750a868180faea77b727b3f001b77b8cd8beb903a1b0a4228f01706870db6464656537e35a0a4584c9838cce37b14f97b81161239b48a1c596c2dc3e0177b3b9882b801a6cec5411346b4309f4ee6ab539ae0ffe0a40c678960f00c28c12fd8404e701115bcee7d07036cf8baae12869c4242a354836c82fa890c2bd396df231609e376d7faf0c31d5f6bb4d3b887a316f08a79b8e1054ed92a860b51c15b6bb53ffe515c22fff0638fc866320d0fce21a53776318b424a9dd2003efa3e8c3c142af50d556ae0c719cb0cca616128068b7b9671b53d7747ed4c870d76e00f8a32595fb04b31590271c34feac567596355ac13ce3bb784c34e81235fa021127e6395c35f3dd67134a1f78105982a923e259319114b04d060b2fdeb07d34bc50ec89f0ba7e749b164970449f95a5b865a3c6cd32e2bfc7f53ae02a3439f5f0259cdfa84eecba7f97302eca29ca33b89e4d8ba328017bbb6450ce1e70f426dcefec406ab7ad64f0ba6c0d8eeb273b1098ea2b2139b5828edfb847a68dadf43b956777c756152fca8d5c14cd66aa2a6e1c9d28d873a2bb118044e35c30cc9d21454821a516691cd301cedfc53a5ebb13310644dcd7ba1ac899cb8c895b8f9fdcd08b5b1096e338a5a92ff379a6395331a0629d97479231d186b418ed406e22974f3e0db1e4c8320427650f5048b7a2ffb6c9c168bf0e268e9915a42e15bb9c659f6fdf130fd2a5a8b841dde53920916b4c3fef07c692b583d41ea75a20cf7d77ab710816adf07a5773b3cd08ff6a95d5ef1ba036909e3c90801ec78b37bca8af036fd712684385a192e535aace4ea5871bfd32433184c48a51ea8491c05380ae41117d3a5b7e8480604087aa23c3f0fce2eda25da006c2ea181ff0efc0097d9bab5c95d6129c63fdb28faea20d76e7c52d74df81ac3009f1107d64dbc0406cc7d3fee03d9b77b06509d1be0a73cee18cbd0fbe9551de100e5eb8831c1e0b122f846de988076d9db22a600225454e877307692d0e8e9eea1341d48a5720163120187a2264d671299fd5a28f52a9bee534008fa4a0390238c9ae426507218f903acedd135708a33092c2e2bddb671237fd2b3cf434a1d08a8596ae215fe02b008fd2932940a2e925e923e04d20e8f8d9a6f40ce0eb550687885fcdecc98ddbd54d6b73217fc212a480841820e0d67894edb84538c2a0d4ae342868194d204fffe0000";
-    #[test_only]
     const ED25519_TO_PK_BYTES : vector<u8> = x"20fdbac9b10b7587bba7b5bc163bce69e796d71e4ed44c10fcb4488689f7a144";
     #[test_only]
     const SIG_CAP_ROTATE_KEY_MULTI_TO_SINGLE: vector<u8> = x"0bc503a99ee09a2bfaeb0039a092abda54cf7493608c01a2e0ac4a0c49958fcbf7eb0521e388ec73b03b978dce79ffda20194aca52cdd13f35c4776de8d27808f0d8c0dbeb14700b46e3c927d848aeba74e0749cdc6429fa1aba1d3e7ef57948bef0810125ccaa2de25a167d13f5725bbc85fcac1b03dff944275d4b4cad3c0ac0000000";
@@ -839,6 +835,7 @@ module aptos_framework::account {
 
         let from_sig = multi_ed25519::multi_sign_struct(&curr_sk, challenge);
         let to_sig = multi_ed25519::multi_sign_struct(&new_sk, challenge);
+
         rotate_authentication_key(
             &alice,
             MULTI_ED25519_SCHEME,
@@ -860,16 +857,41 @@ module aptos_framework::account {
     public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_ed25519(account: signer) acquires Account, OriginatingAddress {
         initialize(&account);
 
-        let curr_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(MULTI_ED25519_SRC_PK_BYTES);
-        let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk);
+        let (curr_sk, curr_pk) = multi_ed25519::generate_keys(3, 2);
+        let curr_pk_unvalidated = multi_ed25519::public_key_to_unvalidated(&curr_pk);
+        let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk_unvalidated);
         let alice_address = from_bcs::to_address(curr_auth_key);
         let alice = create_account_unchecked(alice_address);
 
-        rotate_authentication_key(&alice, MULTI_ED25519_SCHEME, MULTI_ED25519_SRC_PK_BYTES, ED25519_SCHEME, ED25519_TO_PK_BYTES, SIG_CAP_ROTATE_KEY_MULTI_TO_SINGLE, SIG_CAP_UPDATE_TABLE_MULTI_TO_SINGLE);
-        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
-        let new_pk = ed25519::new_unvalidated_public_key_from_bytes(ED25519_TO_PK_BYTES);
-        let new_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&new_pk);
+        let addr = signer::address_of(&alice);
+        let account_resource = borrow_global_mut<Account>(addr);
+
+        let (new_sk, new_pk) = ed25519::generate_keys();
+        let new_pk_unvalidated = ed25519::public_key_to_unvalidated(&new_pk);
+        let new_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&new_pk_unvalidated);
         let new_address = from_bcs::to_address(new_auth_key);
+
+        let challenge = RotationProofChallenge {
+            sequence_number: account_resource.sequence_number,
+            originator: addr,
+            current_auth_key: alice_address,
+            new_public_key: ed25519::unvalidated_public_key_to_bytes(&new_pk_unvalidated),
+        };
+
+        let from_sig = multi_ed25519::multi_sign_struct(&curr_sk, challenge);
+        let to_sig = ed25519::sign_struct(&new_sk, challenge);
+
+        rotate_authentication_key(
+            &alice,
+            MULTI_ED25519_SCHEME,
+            multi_ed25519::unvalidated_public_key_to_bytes(&curr_pk_unvalidated),
+            ED25519_SCHEME,
+            ed25519::unvalidated_public_key_to_bytes(&new_pk_unvalidated),
+            multi_ed25519::signature_to_bytes(&from_sig),
+            ed25519::signature_to_bytes(&to_sig),
+        );
+
+        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
         let expected_originating_address = table::borrow(address_map, new_address);
         assert!(*expected_originating_address == alice_address, 0);
 
