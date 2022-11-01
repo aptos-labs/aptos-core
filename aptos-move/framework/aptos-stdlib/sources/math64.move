@@ -20,12 +20,6 @@ module aptos_std::math64 {
         }
     }
 
-    spec average {
-        pragma opaque;
-        aborts_if false;
-        ensures result == (a + b) / 2;
-    }
-
     /// Return the value of n raised to power e
     public fun pow(n: u64, e: u64): u64 {
         if (e == 0) {

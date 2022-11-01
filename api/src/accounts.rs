@@ -16,7 +16,6 @@ use aptos_api_types::{
 };
 use aptos_types::access_path::AccessPath;
 use aptos_types::account_config::AccountResource;
-use aptos_types::account_state::AccountState;
 use aptos_types::event::EventHandle;
 use aptos_types::event::EventKey;
 use aptos_types::state_store::state_key::StateKey;
@@ -31,6 +30,7 @@ use poem_openapi::{param::Path, OpenApi};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::sync::Arc;
+use storage_interface::MAX_REQUEST_LIMIT;
 
 /// API for accounts, their associated resources, and modules
 pub struct AccountsApi {
@@ -170,29 +170,7 @@ impl Account {
     /// * BCS: Return a BCS encoded version of [`AccountData`]
     pub fn account(self, accept_type: &AcceptType) -> BasicResultWith404<AccountData> {
         // Retrieve the Account resource and convert it accordingly
-        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
-            self.address.into(),
-            AccountResource::struct_tag(),
-        )));
-
-        let state_value = self.context.get_state_value_poem(
-            &state_key,
-            self.ledger_version,
-            &self.latest_ledger_info,
-        )?;
-
-        let state_value = match state_value {
-            Some(state_value) => state_value,
-            None => {
-                // If there's no account info, then it's not found
-                return Err(resource_not_found(
-                    self.address,
-                    &AccountResource::struct_tag(),
-                    self.ledger_version,
-                    &self.latest_ledger_info,
-                ));
-            }
-        };
+        let state_value = self.get_account_resource()?;
 
         // Convert the AccountResource into the summary object AccountData
         let account_resource: AccountResource = bcs::from_bytes(&state_value)
@@ -220,13 +198,47 @@ impl Account {
         }
     }
 
+    pub fn get_account_resource(&self) -> Result<Vec<u8>, BasicErrorWith404> {
+        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
+            self.address.into(),
+            AccountResource::struct_tag(),
+        )));
+
+        let state_value = self.context.get_state_value_poem(
+            &state_key,
+            self.ledger_version,
+            &self.latest_ledger_info,
+        )?;
+
+        state_value.ok_or_else(|| {
+            account_not_found(self.address, self.ledger_version, &self.latest_ledger_info)
+        })
+    }
+
     /// Retrieves the move resources associated with the account
     ///
     /// * JSON: Return a JSON encoded version of [`Vec<MoveResource>`]
     /// * BCS: Return a sorted BCS encoded version of BCS encoded resources [`BTreeMap<StructTag, Vec<u8>>`]
     pub fn resources(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveResource>> {
-        let account_state = self.account_state()?;
-        let resources = account_state.get_resources();
+        // check account exists
+        self.get_account_resource()?;
+        let (resources, next_state_key) = self
+            .context
+            .get_resources_by_pagination(
+                self.address.into(),
+                None,
+                self.ledger_version,
+                MAX_REQUEST_LIMIT,
+            )
+            .context("Failed to get resources from storage")
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &self.latest_ledger_info,
+                )
+            })?;
+        assert_eq!(next_state_key, None);
 
         match accept_type {
             AcceptType::Json => {
@@ -234,7 +246,7 @@ impl Account {
                 let move_resolver = self.context.move_resolver_poem(&self.latest_ledger_info)?;
                 let converted_resources = move_resolver
                     .as_converter(self.context.db.clone())
-                    .try_into_resources(resources)
+                    .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
@@ -252,9 +264,7 @@ impl Account {
             }
             AcceptType::Bcs => {
                 // Put resources in a BTreeMap to ensure they're ordered the same every time
-                let resources: BTreeMap<StructTag, Vec<u8>> = resources
-                    .map(|(key, value)| (key, value.to_vec()))
-                    .collect();
+                let resources: BTreeMap<StructTag, Vec<u8>> = resources.into_iter().collect();
                 BasicResponse::try_from_bcs((
                     resources,
                     &self.latest_ledger_info,
@@ -269,14 +279,33 @@ impl Account {
     /// * JSON: Return a JSON encoded version of [`Vec<MoveModuleBytecode>`] with parsed ABIs
     /// * BCS: Return a sorted BCS encoded version of bytecode [`BTreeMap<MoveModuleId, Vec<u8>>`]
     pub fn modules(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
-        let modules = self.account_state()?.into_modules();
+        // check account exists
+        self.get_account_resource()?;
+        let (modules, next_state_key) = self
+            .context
+            .get_modules_by_pagination(
+                self.address.into(),
+                None,
+                self.ledger_version,
+                MAX_REQUEST_LIMIT,
+            )
+            .context("Failed to get modules from storage")
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &self.latest_ledger_info,
+                )
+            })?;
+        assert_eq!(next_state_key, None);
+
         match accept_type {
             AcceptType::Json => {
                 // Read bytecode and parse ABIs for output
                 let mut converted_modules = Vec::new();
                 for (_, module) in modules {
                     converted_modules.push(
-                        MoveModuleBytecode::new(module)
+                        MoveModuleBytecode::new(module.clone())
                             .try_parse_abi()
                             .context("Failed to parse move module ABI")
                             .map_err(|err| {
@@ -297,7 +326,8 @@ impl Account {
             AcceptType::Bcs => {
                 // Sort modules by name
                 let modules: BTreeMap<MoveModuleId, Vec<u8>> = modules
-                    .map(|(key, value)| (key.into(), value.to_vec()))
+                    .into_iter()
+                    .map(|(key, value)| (key.into(), value))
                     .collect();
                 BasicResponse::try_from_bcs((
                     modules,
@@ -307,23 +337,6 @@ impl Account {
             }
         }
     }
-
-    // Helpers for processing account state.
-
-    /// Retrieves the account state
-    pub fn account_state(&self) -> Result<AccountState, BasicErrorWith404> {
-        self.context
-            .get_account_state(
-                self.address.into(),
-                self.ledger_version,
-                &self.latest_ledger_info,
-            )?
-            .ok_or_else(|| {
-                account_not_found(self.address, self.ledger_version, &self.latest_ledger_info)
-            })
-    }
-
-    // Events specific stuff.
 
     /// Retrieves an event key from a [`MoveStructTag`] and a [`Identifier`] field name
     ///
@@ -392,10 +405,22 @@ impl Account {
         &self,
         struct_tag: &StructTag,
     ) -> Result<Vec<(Identifier, MoveValue)>, BasicErrorWith404> {
-        let account_state = self.account_state()?;
-        let (typ, data) = account_state
-            .get_resources()
-            .find(|(tag, _data)| tag == struct_tag)
+        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
+            self.address.into(),
+            struct_tag.clone(),
+        )));
+        let state_value_bytes = self
+            .context
+            .db
+            .get_state_value_by_version(&state_key, self.ledger_version)
+            .context("Failed to read state value from db")
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &self.latest_ledger_info,
+                )
+            })?
             .ok_or_else(|| {
                 resource_not_found(
                     self.address,
@@ -403,13 +428,14 @@ impl Account {
                     self.ledger_version,
                     &self.latest_ledger_info,
                 )
-            })?;
+            })?
+            .into_bytes();
 
         // Convert to fields in move struct
         let move_resolver = self.context.move_resolver_poem(&self.latest_ledger_info)?;
         move_resolver
             .as_converter(self.context.db.clone())
-            .move_struct_fields(&typ, data)
+            .move_struct_fields(struct_tag, state_value_bytes.as_slice())
             .context("Failed to convert move structs from storage")
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(

@@ -28,7 +28,16 @@ fn update_node_config_restart(validator: &mut LocalNode, mut config: NodeConfig)
 
 async fn wait_for_node(validator: &mut dyn Validator, expected_to_connect: usize) {
     let deadline = Instant::now().checked_add(Duration::from_secs(60)).unwrap();
-    validator.wait_until_healthy(deadline).await.unwrap();
+    validator
+        .wait_until_healthy(deadline)
+        .await
+        .unwrap_or_else(|err| {
+            let lsof_output = Command::new("lsof").arg("-i").output().unwrap();
+            panic!(
+                "wait_until_healthy failed. lsof -i: {:?}: {}",
+                lsof_output, err
+            );
+        });
     info!("Validator restart health check passed");
     validator
         .wait_for_connectivity(expected_to_connect, deadline)
