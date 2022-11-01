@@ -306,13 +306,13 @@ module aptos_token::token {
         amount: u64,
     }
 
-    ///
+    /// burn token event, triggered when owner burn tokens
     struct BurnTokenEvent has drop, store {
         id: TokenId,
         amount: u64,
     }
 
-    ///
+    /// matate token PropertyMap event, triggered when token PropertyMap mutated
     struct MutateTokenPropertyMapEvent has drop, store {
         old_id: TokenId,
         new_id: TokenId,
