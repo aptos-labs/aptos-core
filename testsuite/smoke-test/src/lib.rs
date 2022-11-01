@@ -30,6 +30,8 @@ mod state_sync;
 #[cfg(test)]
 mod storage;
 #[cfg(test)]
+mod test_smoke_tests;
+#[cfg(test)]
 mod transaction;
 #[cfg(test)]
 mod txn_broadcast;

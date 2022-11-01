@@ -395,7 +395,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max_over_time(irate(aptos_consensus_last_committed_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"})[$__range])",
+          "expr": "max_over_time(rate(aptos_consensus_last_committed_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"})[24h])",
           "format": "table",
           "instant": true,
           "intervalFactor": 1,
@@ -480,7 +480,7 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "orange", "value": 80 }
+              { "color": "green", "value": 80 }
             ]
           }
         },
@@ -543,7 +543,7 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
+              { "color": "green", "value": 80 }
             ]
           }
         },
@@ -728,7 +728,7 @@
           "location": "US",
           "project": "analytics-test-345723",
           "rawQuery": true,
-          "rawSql": "select substr(cast(timestamp as string),1,10) ds, count(distinct sender) cnt\nfrom `indexer_mainnet_gcp.user_transactions`\ngroup by 1 order by 1 desc limit 10",
+          "rawSql": "select DATE(timestamp, \"America/Los_Angeles\") as ds,  count(distinct sender) cnt\nfrom `indexer_mainnet_gcp.user_transactions`\ngroup by 1 order by 1 desc limit 10",
           "refId": "A",
           "sql": {
             "columns": [{ "parameters": [], "type": "function" }],
@@ -3110,7 +3110,7 @@
             "scaleDistribution": { "type": "linear" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
           "unit": "short"
         },
         "overrides": [
@@ -3169,7 +3169,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "text" },
+              { "color": "text", "value": null },
               { "color": "text", "value": 0.001 },
               { "color": "yellow", "value": 0.005 },
               { "color": "#ff7300", "value": 0.01 },
@@ -3265,7 +3265,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "dark-red" },
+              { "color": "dark-red", "value": null },
               { "color": "light-red", "value": 95 },
               { "color": "orange", "value": 99 },
               { "color": "yellow", "value": 99.5 },
@@ -3357,7 +3357,13 @@
         "defaults": {
           "color": { "mode": "continuous-GrYlRd" },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
         },
         "overrides": []
       },
@@ -3412,7 +3418,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red" },
+              { "color": "red", "value": null },
               { "color": "orange", "value": 99.95 },
               { "color": "yellow", "value": 99.99 },
               { "color": "green", "value": 100 }
@@ -3467,7 +3473,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "dark-red" },
+              { "color": "dark-red", "value": null },
               { "color": "light-red", "value": 95 },
               { "color": "orange", "value": 99 },
               { "color": "yellow", "value": 99.5 }
@@ -3571,7 +3577,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red" },
+              { "color": "red", "value": null },
               { "color": "orange", "value": 99.95 },
               { "color": "yellow", "value": 99.99 },
               { "color": "green", "value": 100 }
@@ -3626,7 +3632,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "dark-red" },
+              { "color": "dark-red", "value": null },
               { "color": "light-red", "value": 95 },
               { "color": "orange", "value": 99 },
               { "color": "yellow", "value": 99.5 }
@@ -3755,7 +3761,7 @@
       "type": "table"
     }
   ],
-  "refresh": false,
+  "refresh": "1m",
   "schemaVersion": 37,
   "style": "dark",
   "tags": ["aptos-core"],
@@ -3902,6 +3908,6 @@
   "timezone": "",
   "title": "Overview",
   "uid": "overview",
-  "version": 216,
+  "version": 218,
   "weekStart": ""
 }

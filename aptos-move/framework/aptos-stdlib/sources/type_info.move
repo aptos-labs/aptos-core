@@ -57,4 +57,30 @@ module aptos_std::type_info {
             >
         >() == string::utf8(b"0x1::table::Table<0x1::type_info::TypeInfo, 0x1::table::Table<u8, vector<0x1::type_info::TypeInfo>>>"), 10);
     }
+
+    #[verify_only]
+    fun verify_type_of() {
+        let type_info = type_of<TypeInfo>();
+        let account_address = account_address(&type_info);
+        let module_name = module_name(&type_info);
+        let struct_name = struct_name(&type_info);
+        spec {
+            assert account_address == @aptos_std;
+            assert module_name == b"type_info";
+            assert struct_name == b"TypeInfo";
+        };
+    }
+
+    #[verify_only]
+    fun verify_type_of_generic<T>() {
+        let type_info = type_of<T>();
+        let account_address = account_address(&type_info);
+        let module_name = module_name(&type_info);
+        let struct_name = struct_name(&type_info);
+        spec {
+            assert account_address == type_of<T>().account_address;
+            assert module_name == type_of<T>().module_name;
+            assert struct_name == type_of<T>().struct_name;
+        };
+    }
 }

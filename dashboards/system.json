@@ -186,7 +186,7 @@
       "fillGradient": 0,
       "gridPos": { "h": 11, "w": 8, "x": 16, "y": 0 },
       "hiddenSeries": false,
-      "id": 24,
+      "id": 25,
       "isNew": false,
       "legend": {
         "alignAsTable": false,
@@ -217,22 +217,25 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"} / container_spec_memory_limit_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"}",
+          "datasource": { "type": "prometheus", "uid": "MJnqIFmVk" },
+          "editorMode": "code",
+          "expr": "container_memory_rss{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{container}}",
+          "range": true,
           "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Memory Usage %",
+      "title": "RSS Usage",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
-        { "format": "percentunit", "logBase": 1, "min": 0, "show": true },
-        { "format": "decmbytes", "logBase": 1, "show": false }
+        { "$$hashKey": "object:70", "format": "bytes", "logBase": 1, "min": 0, "show": true },
+        { "$$hashKey": "object:71", "format": "decmbytes", "logBase": 1, "show": false }
       ],
       "yaxis": { "align": false }
     },
@@ -378,7 +381,7 @@
       "fillGradient": 0,
       "gridPos": { "h": 11, "w": 8, "x": 16, "y": 11 },
       "hiddenSeries": false,
-      "id": 16,
+      "id": 24,
       "isNew": false,
       "legend": {
         "alignAsTable": false,
@@ -409,25 +412,22 @@
       "steppedLine": false,
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "P968F4F8972F6D74D" },
-          "editorMode": "code",
-          "expr": "rate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval]) + rate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval])",
+          "expr": "container_memory_working_set_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"} / container_spec_memory_limit_bytes{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{pod}}-{{pod}}",
-          "range": true,
+          "legendFormat": "{{pod}}-{{container}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Network Usage",
+      "title": "Memory Usage %",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
-        { "format": "Bps", "logBase": 1, "min": 0, "show": true },
-        { "format": "short", "logBase": 1, "show": false }
+        { "format": "percentunit", "logBase": 1, "min": 0, "show": true },
+        { "format": "decmbytes", "logBase": 1, "show": false }
       ],
       "yaxis": { "align": false }
     },
@@ -490,6 +490,72 @@
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
         { "format": "iops", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": false }
+      ],
+      "yaxis": { "align": false }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": { "h": 11, "w": 8, "x": 16, "y": 22 },
+      "hiddenSeries": false,
+      "id": 16,
+      "isNew": false,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": { "alertThreshold": true },
+      "percentage": false,
+      "pluginVersion": "9.1.1",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "span": 0,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "P968F4F8972F6D74D" },
+          "editorMode": "code",
+          "expr": "rate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval]) + rate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval])",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{pod}}-{{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Network Usage",
+      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
+      "type": "graph",
+      "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
+      "yaxes": [
+        { "format": "Bps", "logBase": 1, "min": 0, "show": true },
         { "format": "short", "logBase": 1, "show": false }
       ],
       "yaxis": { "align": false }
@@ -696,6 +762,6 @@
   "timezone": "",
   "title": "System",
   "uid": "system",
-  "version": 7,
+  "version": 8,
   "weekStart": ""
 }
