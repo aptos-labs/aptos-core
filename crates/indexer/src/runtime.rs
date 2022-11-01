@@ -224,6 +224,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
         for (num_txn, res) in batches {
             let processed_result: ProcessingResult = match res {
+                // When the batch is empty b/c we're caught up, continue to next batch
                 None => continue,
                 Some(Ok(res)) => res,
                 Some(Err(tpe)) => {
