@@ -71,8 +71,8 @@ module aptos_std::multi_ed25519 {
         bytes: vector<u8>
     }
 
-    /// A purported MultiEd25519 multi-signature that can be verified via `verify_signature_strict` or
-    /// `verify_signature_strict_t`. The `bytes` field contains (1) several chunks of `ed25519::SIGNATURE_NUM_BYTES`
+    /// A purported MultiEd25519 multi-signature that can be verified via `signature_verify_strict` or
+    /// `signature_verify_strict_t`. The `bytes` field contains (1) several chunks of `ed25519::SIGNATURE_NUM_BYTES`
     /// bytes, each encoding a Ed25519 signature, and (2) a `BITMAP_NUM_OF_BYTES`-byte bitmap encoding the signer
     /// identities.
     struct Signature has copy, drop, store {
@@ -97,14 +97,14 @@ module aptos_std::multi_ed25519 {
     }
 
     #[test_only]
-    public fun multi_sign_arbitrary_bytes(sk: &SecretKey, msg: vector<u8>) : Signature {
+    public fun sign_arbitrary_bytes(sk: &SecretKey, msg: vector<u8>) : Signature {
         Signature {
             bytes: sign_internal(sk.bytes, msg)
         }
     }
 
     #[test_only]
-    public fun multi_sign_struct<T: drop>(sk: &SecretKey, data: T) : Signature {
+    public fun sign_struct<T: drop>(sk: &SecretKey, data: T) : Signature {
         let encoded = ed25519::new_signed_message(data);
         Signature {
             bytes: sign_internal(sk.bytes, bcs::to_bytes(&encoded)),
@@ -259,15 +259,15 @@ module aptos_std::multi_ed25519 {
             let (sk, pk) = generate_keys(threshold, group_size);
             let upk = public_key_into_unvalidated(pk);
             let msg1 = b"Hello Aptos!";
-            let sig1 = multi_sign_arbitrary_bytes(&sk, msg1);
-            assert!(signature_verify_strict(&sig1, &upk, msg1), error::invalid_state(1));
+            let sig1 = sign_arbitrary_bytes(&sk, msg1);
+            assert!(signature_verify_strict(&sig1, &upk, msg1), 1);
 
             let obj2 = TestMessage {
                 foo: b"Hello Move!",
                 bar: 64,
             };
-            let sig2 = multi_sign_struct(&sk, copy obj2);
-            assert!(signature_verify_strict_t(&sig2, &upk, copy obj2), error::invalid_state(2));
+            let sig2 = sign_struct(&sk, copy obj2);
+            assert!(signature_verify_strict_t(&sig2, &upk, copy obj2), 2);
 
             test_case_idx = test_case_idx + 1;
         }
@@ -279,17 +279,17 @@ module aptos_std::multi_ed25519 {
         let upk = public_key_into_unvalidated(pk);
 
         let msg1 = b"Hello Aptos!";
-        let sig1 = multi_sign_arbitrary_bytes(&sk, msg1);
+        let sig1 = sign_arbitrary_bytes(&sk, msg1);
         maul_first_signature(&mut sig1);
-        assert!(!signature_verify_strict(&sig1, &upk, msg1), error::invalid_state(3));
+        assert!(!signature_verify_strict(&sig1, &upk, msg1), 3);
 
         let obj2 = TestMessage {
             foo: b"Hello Move!",
             bar: 64,
         };
-        let sig2 = multi_sign_struct(&sk, copy obj2);
+        let sig2 = sign_struct(&sk, copy obj2);
         maul_first_signature(&mut sig2);
-        assert!(!signature_verify_strict_t(&sig2, &upk, copy obj2), error::invalid_state(4));
+        assert!(!signature_verify_strict_t(&sig2, &upk, copy obj2), 4);
     }
 
 

@@ -545,19 +545,20 @@ module aptos_framework::account {
 
         let eve_sig = ed25519::sign_struct(&eve_sk, copy proof_challenge);
 
-        // Fake a multisig. Here Eve is the only participant.
-        let signer_capability_sig_bytes = x"";
-        vector::append(&mut signer_capability_sig_bytes, ed25519::signature_to_bytes(&eve_sig));
-        vector::append(&mut signer_capability_sig_bytes, x"40000000"); // Signers bitmap.
-        let fake_sig = multi_ed25519::new_signature_from_bytes(signer_capability_sig_bytes);
-
-        // Fake a multisig public key.
+        // Construct a malicious 1-out-of-2 multisig PK over Alice's authentication key and Eve's Ed25519 PK.
         let account_public_key_bytes = alice_auth;
         vector::append(&mut account_public_key_bytes, *&eve_pk_bytes);
         vector::push_back(&mut account_public_key_bytes, 1); // Multisig verification threshold.
         let fake_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
 
-        assert!(multi_ed25519::signature_verify_strict_t(&fake_sig,&fake_pk, proof_challenge), error::invalid_state(EINVALID_PROOF_OF_KNOWLEDGE));
+        // Construct a multisig for `proof_challenge` as if it is signed by the signers behind `fake_pk`,
+        // Eve being the only participant.
+        let signer_capability_sig_bytes = x"";
+        vector::append(&mut signer_capability_sig_bytes, ed25519::signature_to_bytes(&eve_sig));
+        vector::append(&mut signer_capability_sig_bytes, x"40000000"); // Signers bitmap.
+        let fake_sig = multi_ed25519::new_signature_from_bytes(signer_capability_sig_bytes);
+
+        assert!(multi_ed25519::signature_verify_strict_t(&fake_sig, &fake_pk, proof_challenge), error::invalid_state(EINVALID_PROOF_OF_KNOWLEDGE));
         offer_signer_capability(&resource, signer_capability_sig_bytes, MULTI_ED25519_SCHEME, account_public_key_bytes, recipient_address);
     }
 
@@ -835,8 +836,8 @@ module aptos_framework::account {
             new_public_key: multi_ed25519::unvalidated_public_key_to_bytes(&new_pk_unvalidated),
         };
 
-        let from_sig = multi_ed25519::multi_sign_struct(&curr_sk, challenge);
-        let to_sig = multi_ed25519::multi_sign_struct(&new_sk, challenge);
+        let from_sig = multi_ed25519::sign_struct(&curr_sk, challenge);
+        let to_sig = multi_ed25519::sign_struct(&new_sk, challenge);
 
         rotate_authentication_key(
             &alice,
@@ -877,7 +878,7 @@ module aptos_framework::account {
             new_public_key: ed25519::unvalidated_public_key_to_bytes(&new_pk_unvalidated),
         };
 
-        let from_sig = multi_ed25519::multi_sign_struct(&curr_sk, challenge);
+        let from_sig = multi_ed25519::sign_struct(&curr_sk, challenge);
         let to_sig = ed25519::sign_struct(&new_sk, challenge);
 
         rotate_authentication_key(
