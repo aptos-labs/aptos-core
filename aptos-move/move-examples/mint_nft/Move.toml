@@ -8,3 +8,5 @@ AptosToken = { local = "../../framework/aptos-token" }
 
 [addresses]
 aptos_framework = "0x1"
+# change it to `source_addr = "_" when calling `create-resource-account-and-publish-package` from the cli
+source_addr = "0xcafe"

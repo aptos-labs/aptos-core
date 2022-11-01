@@ -36,7 +36,7 @@ module resource_account::simple_defi {
     /// initialize the module and store the signer cap, mint cap and burn cap within `ModuleData`
     fun init_module(account: &signer) {
         // store the capabilities within `ModuleData`
-        let resource_signer_cap = resource_account::retrieve_resource_account_cap(account, @0xcafe);
+        let resource_signer_cap = resource_account::retrieve_resource_account_cap(account, @source_addr);
         let resource_signer = account::create_signer_with_capability(&resource_signer_cap);
         let (burn_cap, freeze_cap, mint_cap) = coin::initialize<ChloesCoin>(
             &resource_signer,
