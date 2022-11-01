@@ -557,7 +557,7 @@ module aptos_framework::account {
         vector::push_back(&mut account_public_key_bytes, 1); // Multisig verification threshold.
         let fake_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
 
-        assert!(multi_ed25519::signature_verify_strict_t(&fake_sig,&fake_pk, proof_challenge), error::invalid_state(1));
+        assert!(multi_ed25519::signature_verify_strict_t(&fake_sig,&fake_pk, proof_challenge), error::invalid_state(EINVALID_PROOF_OF_KNOWLEDGE));
         offer_signer_capability(&resource, signer_capability_sig_bytes, MULTI_ED25519_SCHEME, account_public_key_bytes, recipient_address);
     }
 
@@ -817,24 +817,23 @@ module aptos_framework::account {
     #[test(account = @aptos_framework)]
     public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_multi_ed25519(account: signer) acquires Account, OriginatingAddress {
         initialize(&account);
-        let (curr_sk, curr_pk) = multi_ed25519::generate_keys(3, 2);
+        let (curr_sk, curr_pk) = multi_ed25519::generate_keys(2, 3);
         let curr_pk_unvalidated = multi_ed25519::public_key_to_unvalidated(&curr_pk);
         let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk_unvalidated);
-        let alice_address = from_bcs::to_address(curr_auth_key);
-        let alice = create_account_unchecked(alice_address);
+        let alice_addr = from_bcs::to_address(curr_auth_key);
+        let alice = create_account_unchecked(alice_addr);
 
-        let addr = signer::address_of(&alice);
-        let account_resource = borrow_global_mut<Account>(addr);
+        let account_resource = borrow_global_mut<Account>(alice_addr);
 
-        let (new_sk, new_pk) = multi_ed25519::generate_keys(5, 4);
+        let (new_sk, new_pk) = multi_ed25519::generate_keys(4, 5);
         let new_pk_unvalidated = multi_ed25519::public_key_to_unvalidated(&new_pk);
         let new_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&new_pk_unvalidated);
         let new_address = from_bcs::to_address(new_auth_key);
 
         let challenge = RotationProofChallenge {
             sequence_number: account_resource.sequence_number,
-            originator: addr,
-            current_auth_key: alice_address,
+            originator: alice_addr,
+            current_auth_key: alice_addr,
             new_public_key: multi_ed25519::unvalidated_public_key_to_bytes(&new_pk_unvalidated),
         };
 
@@ -852,9 +851,9 @@ module aptos_framework::account {
         );
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
         let expected_originating_address = table::borrow(address_map, new_address);
-        assert!(*expected_originating_address == alice_address, 0);
+        assert!(*expected_originating_address == alice_addr, 0);
 
-        let account_resource = borrow_global_mut<Account>(alice_address);
+        let account_resource = borrow_global_mut<Account>(alice_addr);
         assert!(account_resource.authentication_key == new_auth_key, 0);
     }
 
@@ -862,7 +861,7 @@ module aptos_framework::account {
     public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_ed25519(account: signer) acquires Account, OriginatingAddress {
         initialize(&account);
 
-        let (curr_sk, curr_pk) = multi_ed25519::generate_keys(3, 2);
+        let (curr_sk, curr_pk) = multi_ed25519::generate_keys(2, 3);
         let curr_pk_unvalidated = multi_ed25519::public_key_to_unvalidated(&curr_pk);
         let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk_unvalidated);
         let alice_address = from_bcs::to_address(curr_auth_key);

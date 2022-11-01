@@ -117,8 +117,8 @@ fn native_generate_keys(
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let threshold = pop_arg!(arguments, u8);
     let num_parties = pop_arg!(arguments, u8);
+    let threshold = pop_arg!(arguments, u8);
     let key_pairs: Vec<KeyPair<Ed25519PrivateKey, Ed25519PublicKey>> = (0..num_parties)
         .map(|_i| KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut OsRng))
         .collect();

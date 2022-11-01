@@ -82,8 +82,8 @@ module aptos_std::multi_ed25519 {
     //
 
     #[test_only]
-    public fun generate_keys(party_size: u8, threshold: u8): (SecretKey,ValidatedPublicKey) {
-        let (sk_bytes, pk_bytes) = generate_keys_internal(party_size, threshold);
+    public fun generate_keys(threshold: u8, num_parties: u8): (SecretKey,ValidatedPublicKey) {
+        let (sk_bytes, pk_bytes) = generate_keys_internal(threshold, num_parties);
         let sk = SecretKey {
             bytes: sk_bytes
         };
@@ -253,7 +253,7 @@ module aptos_std::multi_ed25519 {
         while (test_case_idx < test_case_count) {
             let threshold = *vector::borrow(&thresholds, test_case_idx);
             let group_size = *vector::borrow(&party_counts, test_case_idx);
-            let (sk, pk) = generate_keys(group_size, threshold);
+            let (sk, pk) = generate_keys(threshold, group_size);
             let upk = public_key_into_unvalidated(pk);
             let msg1 = b"Hello Aptos!";
             let sig1 = multi_sign_arbitrary_bytes(&sk, msg1);
@@ -272,7 +272,7 @@ module aptos_std::multi_ed25519 {
 
     #[test]
     fun test_threshold_not_met_rejection() {
-        let (sk,pk) = generate_keys(5, 4);
+        let (sk,pk) = generate_keys(4, 5);
         let upk = public_key_into_unvalidated(pk);
 
         let msg1 = b"Hello Aptos!";
