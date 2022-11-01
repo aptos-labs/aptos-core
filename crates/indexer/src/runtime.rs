@@ -224,8 +224,9 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
         for (num_txn, res) in batches {
             let processed_result: ProcessingResult = match res {
-                Ok(res) => res,
-                Err(tpe) => {
+                None => continue,
+                Some(Ok(res)) => res,
+                Some(Err(tpe)) => {
                     let (err, start_version, end_version, _) = tpe.inner();
                     error!(
                         processor_name = processor_name,
