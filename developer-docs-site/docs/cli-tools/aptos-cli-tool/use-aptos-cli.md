@@ -807,7 +807,7 @@ Operand Stack:
 In this example, we'll use the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 
 :::important
-As an open source project, the source code as well as compiled code published to the Aptos blockchain is inherently open by default. This means code you upload may be downloaded and even profited by from on-chain data. Even without source access, it is possible to regenerate Move source from Move bytecode. To make this harder and disable source access, publish with the `--included-artifacts none` argument, like so:
+As an open source project, the source code as well as compiled code published to the Aptos blockchain is inherently open by default. This means code you upload may be downloaded from on-chain data. Even without source access, it is possible to regenerate Move source from Move bytecode. To disable source access, publish with the `--included-artifacts none` argument, like so:
 
 ```
 aptos move publish --included-artifacts none
