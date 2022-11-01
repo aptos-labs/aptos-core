@@ -1,3 +1,6 @@
 spec aptos_std::type_info {
-    // Move Prover natively supports `type_of` and `type_name`.
+     spec type_of {
+        pragma opaque;
+        aborts_if [abstract] false; 
+    }
 }
