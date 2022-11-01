@@ -182,6 +182,16 @@ bytes.
 
 
 
+<a name="0x1_multi_ed25519_E_INVALID_THRESHOLD_OR_NUMBER_OF_SIGNERS"></a>
+
+The threshold must be in the range <code>[1, n]</code>, where n is the total number of signers.
+
+
+<pre><code><b>const</b> <a href="multi_ed25519.md#0x1_multi_ed25519_E_INVALID_THRESHOLD_OR_NUMBER_OF_SIGNERS">E_INVALID_THRESHOLD_OR_NUMBER_OF_SIGNERS</a>: u64 = 3;
+</code></pre>
+
+
+
 <a name="0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES"></a>
 
 The size of an individual Ed25519 public key, in bytes.

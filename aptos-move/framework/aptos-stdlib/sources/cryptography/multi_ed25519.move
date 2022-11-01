@@ -18,6 +18,8 @@ module aptos_std::multi_ed25519 {
     /// Wrong number of bytes were given as input when deserializing an Ed25519 signature.
     const E_WRONG_SIGNATURE_SIZE: u64 = 2;
 
+    /// The threshold must be in the range `[1, n]`, where n is the total number of signers.
+    const E_INVALID_THRESHOLD_OR_NUMBER_OF_SIGNERS: u64 = 3;
     //
     // Constants
     //
@@ -82,8 +84,9 @@ module aptos_std::multi_ed25519 {
     //
 
     #[test_only]
-    public fun generate_keys(threshold: u8, num_parties: u8): (SecretKey,ValidatedPublicKey) {
-        let (sk_bytes, pk_bytes) = generate_keys_internal(threshold, num_parties);
+    public fun generate_keys(threshold: u8, n: u8): (SecretKey,ValidatedPublicKey) {
+        assert!(1 <= threshold && threshold <= n, error::invalid_argument(E_INVALID_THRESHOLD_OR_NUMBER_OF_SIGNERS));
+        let (sk_bytes, pk_bytes) = generate_keys_internal(threshold, n);
         let sk = SecretKey {
             bytes: sk_bytes
         };
