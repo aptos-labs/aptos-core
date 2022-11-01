@@ -11,7 +11,7 @@ mod transactional_tests_runner;
 pub use stored_package::*;
 
 use crate::common::types::MoveManifestAccountWrapper;
-use crate::common::types::{ProfileOptions, RestOptions};
+use crate::common::types::{CliConfig, ConfigSearchMode, ProfileOptions, RestOptions};
 use crate::common::utils::{
     create_dir_if_not_exist, dir_default_to_current, prompt_yes_with_override, write_to_file,
 };
@@ -33,7 +33,7 @@ use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
-use aptos_types::account_address::AccountAddress;
+use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_types::transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
@@ -83,6 +83,7 @@ pub enum MoveTool {
     Prove(ProvePackage),
     Document(DocumentPackage),
     TransactionalTest(TransactionalTestOpts),
+    CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
 }
 
 impl MoveTool {
@@ -101,6 +102,9 @@ impl MoveTool {
             MoveTool::Prove(tool) => tool.execute_serialized().await,
             MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
+            MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
+                tool.execute_serialized_success().await
+            }
         }
     }
 }
@@ -575,6 +579,98 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         // Send the compiled module and metadata using the code::publish_package_txn.
         let metadata = package.extract_metadata()?;
         let payload = cached_packages::aptos_stdlib::code_publish_package_txn(
+            bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+            compiled_units,
+        );
+        let size = bcs::serialized_size(&payload)?;
+        println!("package size {} bytes", size);
+        if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+            return Err(CliError::UnexpectedError(format!(
+                "The package is larger than {} bytes ({} bytes)! To lower the size \
+                you may want to include less artifacts via `--included_artifacts`. \
+                You can also override this check with `--override-size-check",
+                MAX_PUBLISH_PACKAGE_SIZE, size
+            )));
+        }
+        txn_options
+            .submit_transaction(payload)
+            .await
+            .map(TransactionSummary::from)
+    }
+}
+
+/// Publishes the modules in a Move package to the Aptos blockchain under a resource account
+#[derive(Parser)]
+pub struct CreateResourceAccountAndPublishPackage {
+    #[clap(long)]
+    pub(crate) seed: String,
+
+    #[clap(long)]
+    pub(crate) address_name: String,
+
+    /// Whether to override the check for maximal size of published data
+    #[clap(long)]
+    pub(crate) override_size_check: bool,
+
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
+    fn command_name(&self) -> &'static str {
+        "ResourceAccountPublishPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let CreateResourceAccountAndPublishPackage {
+            seed,
+            address_name,
+            mut move_options,
+            txn_options,
+            override_size_check,
+            included_artifacts_args,
+        } = self;
+
+        let account = if let Some(Some(account)) = CliConfig::load_profile(
+            txn_options.profile_options.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.account)
+        {
+            account
+        } else {
+            return Err(CliError::CommandArgumentError(
+                "Please provide an account using --profile or run aptos init".to_string(),
+            ));
+        };
+
+        let resource_address =
+            create_resource_address(account, &bcs::to_bytes(&seed.clone()).unwrap());
+        move_options.add_named_address(address_name, resource_address.to_string());
+
+        let package_path = move_options.get_package_path()?;
+        let options = included_artifacts_args
+            .included_artifacts
+            .build_options(move_options.named_addresses());
+        let package = BuiltPackage::build(package_path, options)?;
+        let compiled_units = package.extract_code();
+
+        // Send the compiled module and metadata using the code::publish_package_txn.
+        let metadata = package.extract_metadata()?;
+
+        let message = format!(
+            "Do you want to publish this package under the resource account's address {}?",
+            resource_address
+        );
+        prompt_yes_with_override(&message, txn_options.prompt_options)?;
+
+        let payload = cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
+            bcs::to_bytes(&seed)?,
             bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
             compiled_units,
         );

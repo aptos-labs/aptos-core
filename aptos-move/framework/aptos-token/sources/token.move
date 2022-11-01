@@ -641,9 +641,9 @@ module aptos_token::token {
         types: vector<String>,
     ): TokenId acquires Collections, TokenStore {
         let creator = token_id.token_data_id.creator;
-        assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
+        assert!(signer::address_of(account) == creator, error::permission_denied(ENO_MUTATE_CAPABILITY));
         // validate if the properties is mutable
-        assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
+        assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
         let all_token_data = &mut borrow_global_mut<Collections>(
             creator
         ).token_data;

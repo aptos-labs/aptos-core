@@ -47,6 +47,18 @@ module std::features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
     }
 
+    /// Whether the new SHA2-512, SHA3-512 and RIPEMD-160 hash function natives are enabled.
+    /// This is needed because of the introduction of new native functions.
+    /// Lifetime: transient
+    const SHA_512_AND_RIPEMD_160_NATIVES: u64 = 3;
+
+    public fun get_sha_512_and_ripemd_160_feature(): u64 { SHA_512_AND_RIPEMD_160_NATIVES }
+
+    public fun sha_512_and_ripemd_160_enabled(): bool acquires Features {
+        is_enabled(SHA_512_AND_RIPEMD_160_NATIVES)
+    }
+
+
     // ============================================================================================
     // Feature Flag Implementation
 
