@@ -146,9 +146,7 @@ impl QuorumStoreWrapper {
         exclude_txns.extend(self.batch_builder.summaries().clone());
 
         debug!("QS: excluding txs len: {:?}", exclude_txns.len());
-
-        // hacky way to see if fragment/streaming is necessary or not
-        let mut end_batch = true;
+        let mut end_batch = false;
         // TODO: size and unwrap or not?
         let pulled_txns = self
             .mempool_proxy
