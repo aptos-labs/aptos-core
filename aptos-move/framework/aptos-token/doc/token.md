@@ -1812,10 +1812,12 @@ The token is owned at address owner
                 &<b>mut</b> collections.collection_data,
                 token_id.token_data_id.collection
             );
-            collection_data.supply = collection_data.supply - 1;
-            // delete the collection data <b>if</b> the collection supply equals 0
-            <b>if</b> (collection_data.supply == 0) {
-                <a href="token.md#0x3_token_destroy_collection_data">destroy_collection_data</a>(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> collections.collection_data, collection_data.name));
+            <b>if</b> (collection_data.maximum &gt; 0) {
+                collection_data.supply = collection_data.supply - 1;
+                // delete the collection data <b>if</b> the collection supply equals 0
+                <b>if</b> (collection_data.supply == 0) {
+                    <a href="token.md#0x3_token_destroy_collection_data">destroy_collection_data</a>(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> collections.collection_data, collection_data.name));
+                };
             };
         };
     };
@@ -1904,10 +1906,14 @@ Burn a token by the token owner
                 &<b>mut</b> collections.collection_data,
                 token_id.token_data_id.collection
             );
-            collection_data.supply = collection_data.supply - 1;
-            // delete the collection data <b>if</b> the collection supply equals 0
-            <b>if</b> (collection_data.supply == 0) {
-                <a href="token.md#0x3_token_destroy_collection_data">destroy_collection_data</a>(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> collections.collection_data, collection_data.name));
+
+            // only <b>update</b> and check the supply for unlimited collection
+            <b>if</b> (collection_data.maximum &gt; 0){
+                collection_data.supply = collection_data.supply - 1;
+                // delete the collection data <b>if</b> the collection supply equals 0
+                <b>if</b> (collection_data.supply == 0) {
+                    <a href="token.md#0x3_token_destroy_collection_data">destroy_collection_data</a>(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> collections.collection_data, collection_data.name));
+                };
             };
         };
     };
@@ -1942,9 +1948,9 @@ Burn a token by the token owner
     types: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
 ): <a href="token.md#0x3_token_TokenId">TokenId</a> <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a>, <a href="token.md#0x3_token_TokenStore">TokenStore</a> {
     <b>let</b> creator = token_id.token_data_id.creator;
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>) == creator, <a href="token.md#0x3_token_ENO_MUTATE_CAPABILITY">ENO_MUTATE_CAPABILITY</a>);
+    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>) == creator, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_ENO_MUTATE_CAPABILITY">ENO_MUTATE_CAPABILITY</a>));
     // validate <b>if</b> the properties is mutable
-    <b>assert</b>!(<b>exists</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator), <a href="token.md#0x3_token_ECOLLECTIONS_NOT_PUBLISHED">ECOLLECTIONS_NOT_PUBLISHED</a>);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ECOLLECTIONS_NOT_PUBLISHED">ECOLLECTIONS_NOT_PUBLISHED</a>));
     <b>let</b> all_token_data = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(
         creator
     ).token_data;

@@ -108,8 +108,8 @@ For now, this struct is not used in any verification functions, but it might be 
 
 ## Struct `Signature`
 
-A purported MultiEd25519 multi-signature that can be verified via <code>verify_signature_strict</code> or
-<code>verify_signature_strict_t</code>. The <code>bytes</code> field contains (1) several chunks of <code><a href="ed25519.md#0x1_ed25519_SIGNATURE_NUM_BYTES">ed25519::SIGNATURE_NUM_BYTES</a></code>
+A purported MultiEd25519 multi-signature that can be verified via <code>signature_verify_strict</code> or
+<code>signature_verify_strict_t</code>. The <code>bytes</code> field contains (1) several chunks of <code><a href="ed25519.md#0x1_ed25519_SIGNATURE_NUM_BYTES">ed25519::SIGNATURE_NUM_BYTES</a></code>
 bytes, each encoding a Ed25519 signature, and (2) a <code><a href="multi_ed25519.md#0x1_multi_ed25519_BITMAP_NUM_OF_BYTES">BITMAP_NUM_OF_BYTES</a></code>-byte bitmap encoding the signer
 identities.
 
@@ -178,6 +178,16 @@ bytes.
 
 
 <pre><code><b>const</b> <a href="multi_ed25519.md#0x1_multi_ed25519_BITMAP_NUM_OF_BYTES">BITMAP_NUM_OF_BYTES</a>: u64 = 4;
+</code></pre>
+
+
+
+<a name="0x1_multi_ed25519_E_INVALID_THRESHOLD_OR_NUMBER_OF_SIGNERS"></a>
+
+The threshold must be in the range <code>[1, n]</code>, where n is the total number of signers.
+
+
+<pre><code><b>const</b> <a href="multi_ed25519.md#0x1_multi_ed25519_E_INVALID_THRESHOLD_OR_NUMBER_OF_SIGNERS">E_INVALID_THRESHOLD_OR_NUMBER_OF_SIGNERS</a>: u64 = 3;
 </code></pre>
 
 
