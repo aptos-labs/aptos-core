@@ -216,6 +216,7 @@ async fn handle_mempool_reconfig_event<V>(
         .spawn(tasks::process_config_update(
             config_update,
             smp.validator.clone(),
+            smp.broadcast_within_validator_network.clone(),
         ))
         .await;
 }
@@ -273,8 +274,8 @@ async fn handle_network_event<V>(
                 } => {
                     let smp_clone = smp.clone();
                     let peer = PeerNetworkId::new(network_id, peer_id);
-                    let ineligible_for_broadcast = (!smp.broadcast_within_validator_network()
-                        && smp.network_interface.is_validator())
+                    let ineligible_for_broadcast = (smp.network_interface.is_validator()
+                        && !smp.broadcast_within_validator_network())
                         || smp.network_interface.is_upstream_peer(&peer, None);
                     let timeline_state = if ineligible_for_broadcast {
                         TimelineState::NonQualified
