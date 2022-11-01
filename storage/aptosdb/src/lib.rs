@@ -116,15 +116,11 @@ use crate::stale_node_index::StaleNodeIndexSchema;
 use crate::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema;
 use storage_interface::{
     state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
-    StateSnapshotReceiver,
+    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
-
-// This is last line of defense against large queries slipping through external facing interfaces,
-// like the API and State Sync, etc.
-const MAX_LIMIT: u64 = 10000;
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
@@ -679,7 +675,7 @@ impl AptosDB {
         limit: u64,
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
-        error_if_too_many_requested(limit, MAX_LIMIT)?;
+        error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
         let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
 
         let cursor = if get_latest {
@@ -872,15 +868,20 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_values_by_key_prefix(
+    fn get_prefixed_state_value_iterator(
         &self,
         key_prefix: &StateKeyPrefix,
+        cursor: Option<&StateKey>,
         version: Version,
-    ) -> Result<HashMap<StateKey, StateValue>> {
-        gauged_api("get_state_values_by_key_prefix", || {
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
+        gauged_api("get_prefixed_state_value_iterator", || {
             self.error_if_ledger_pruned("State", version)?;
-            self.state_store
-                .get_values_by_key_prefix(key_prefix, version)
+
+            Ok(Box::new(
+                self.state_store
+                    .get_prefixed_state_value_iterator(key_prefix, cursor, version)?,
+            )
+                as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>>>)
         })
     }
 
@@ -916,7 +917,7 @@ impl DbReader for AptosDB {
         ledger_version: Version,
     ) -> Result<AccountTransactionsWithProof> {
         gauged_api("get_account_transactions", || {
-            error_if_too_many_requested(limit, MAX_LIMIT)?;
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
             let txns_with_proofs = self
                 .transaction_store
@@ -979,7 +980,7 @@ impl DbReader for AptosDB {
         fetch_events: bool,
     ) -> Result<TransactionListWithProof> {
         gauged_api("get_transactions", || {
-            error_if_too_many_requested(limit, MAX_LIMIT)?;
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
             if start_version > ledger_version || limit == 0 {
                 return Ok(TransactionListWithProof::new_empty());
@@ -1088,7 +1089,7 @@ impl DbReader for AptosDB {
         ledger_version: Version,
     ) -> Result<TransactionOutputListWithProof> {
         gauged_api("get_transactions_outputs", || {
-            error_if_too_many_requested(limit, MAX_LIMIT)?;
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
             if start_version > ledger_version || limit == 0 {
                 return Ok(TransactionOutputListWithProof::new_empty());
