@@ -132,6 +132,7 @@ impl Tailer {
             .await;
 
         let num_txns = transactions.len() as u64;
+        // When the batch is empty b/c we're caught up
         if num_txns == 0 {
             return (0, None);
         }

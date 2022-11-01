@@ -432,11 +432,14 @@ impl TransactionFetcher {
 impl TransactionFetcherTrait for TransactionFetcher {
     /// Fetches the next batch based on its internal version counter
     async fn fetch_next_batch(&mut self) -> Vec<Transaction> {
+        // try_next is nonblocking unlike next. It'll try to fetch the next one and return immediately.
         match self.transaction_receiver.try_next() {
             Ok(Some(transactions)) => transactions,
             Ok(None) => {
+                // We never close the channel, so this should never happen
                 panic!("Transaction fetcher channel closed");
             }
+            // The error here is when the channel is empty which we definitely expect.
             Err(_) => vec![],
         }
     }
