@@ -31,10 +31,10 @@ For development purposes, the tutorials here assume you are working in the Aptos
   * `APTOS_FAUCET_URL`
 
 Here are the options for funding by network:
-  * *Testnet* - Use the faucet button in-wallet or use the testnet faucet at: https://aptoslabs.com/testnet-faucet.
-  * *Devnet* - Use the faucet button in-wallet or use the devnet faucet at: https://faucet.devnet.aptoslabs.com
+  * *Testnet* - Use the faucet button [in-wallet](../guides/install-petra-wallet.md) or use the testnet faucet at: https://aptoslabs.com/testnet-faucet.
+  * *Devnet* - Use the faucet button [in-wallet](../guides/install-petra-wallet.md)
 
-As mentioned at the top, these tutorial are not intended to be followed in mainnet, where is no faucet in-wallet; you must get funds from an exchange.
+As mentioned at the top, these tutorials are not intended to be followed in mainnet, where is no faucet in-wallet; you must get funds from an exchange.
 
 For more information on the available Aptos networks, see [Aptos Blockchain Deployments](../nodes/aptos-deployments.md).
 
