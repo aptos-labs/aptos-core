@@ -74,7 +74,7 @@ module aptos_framework::account {
         recipient_address: address,
     }
 
-    struct SignerCapabilityOfferProofChallengeV2 has drop {
+    struct SignerCapabilityOfferProofChallengeV2 has copy, drop {
         sequence_number: u64,
         source_address: address,
         recipient_address: address,
@@ -543,18 +543,21 @@ module aptos_framework::account {
             recipient_address,
         };
 
-        let eve_sig = ed25519::sign_struct(&eve_sk, proof_challenge);
+        let eve_sig = ed25519::sign_struct(&eve_sk, copy proof_challenge);
 
         // Fake a multisig. Here Eve is the only participant.
         let signer_capability_sig_bytes = x"";
         vector::append(&mut signer_capability_sig_bytes, ed25519::signature_to_bytes(&eve_sig));
         vector::append(&mut signer_capability_sig_bytes, x"40000000"); // Signers bitmap.
+        let fake_sig = multi_ed25519::new_signature_from_bytes(signer_capability_sig_bytes);
 
         // Fake a multisig public key.
         let account_public_key_bytes = alice_auth;
         vector::append(&mut account_public_key_bytes, *&eve_pk_bytes);
         vector::push_back(&mut account_public_key_bytes, 1); // Multisig verification threshold.
+        let fake_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
 
+        assert!(multi_ed25519::signature_verify_strict_t(&fake_sig,&fake_pk, proof_challenge), error::invalid_state(1));
         offer_signer_capability(&resource, signer_capability_sig_bytes, MULTI_ED25519_SCHEME, account_public_key_bytes, recipient_address);
     }
 
