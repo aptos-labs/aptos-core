@@ -4,13 +4,13 @@
 import { HexString, MaybeHexString } from "./hex_string";
 import {
   clear,
-  DEFAULT_TXN_EXP_SEC_FROM_NOW,
-  DEFAULT_MAX_GAS_AMOUNT,
   DEFAULT_TXN_TIMEOUT_SEC,
   fixNodeUrl,
   Memoize,
   sleep,
   APTOS_COIN,
+  DEFAULT_TXN_EXP_SEC_FROM_NOW,
+  DEFAULT_MAX_GAS_AMOUNT,
 } from "./utils";
 import { AptosAccount } from "./aptos_account";
 import * as Gen from "./generated/index";
@@ -266,8 +266,7 @@ export class AptosClient {
     }
 
     if (options?.expiration_timestamp_secs) {
-      const timestamp = Number.parseInt(options.expiration_timestamp_secs, 10);
-      config.expSecFromNow = timestamp - Math.floor(Date.now() / 1000);
+      config.expTimestampSec = options?.expiration_timestamp_secs;
     }
 
     const builder = new TransactionBuilderRemoteABI(this, config);
@@ -664,16 +663,22 @@ export class AptosClient {
     payload: TxnBuilderTypes.TransactionPayload,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<TxnBuilderTypes.RawTransaction> {
-    const [{ sequence_number: sequenceNumber }, chainId, { gas_estimate: gasEstimate }] = await Promise.all([
-      this.getAccount(accountFrom),
-      this.getChainId(),
-      extraArgs?.gasUnitPrice ? Promise.resolve({ gas_estimate: extraArgs.gasUnitPrice }) : this.estimateGasPrice(),
-    ]);
+    const [{ sequence_number: sequenceNumber }, chainId, { gas_estimate: gasEstimate }, timestamp, maxGas] =
+      await Promise.all([
+        this.getAccount(accountFrom),
+        this.getChainId(),
+        extraArgs?.gasUnitPrice ? Promise.resolve({ gas_estimate: extraArgs.gasUnitPrice }) : this.estimateGasPrice(),
+        extraArgs?.expireTimestamp ? Promise.resolve(extraArgs.expireTimestamp) : this.getOnChainTimetampMs(),
+        extraArgs?.maxGasAmount ? Promise.resolve(extraArgs.maxGasAmount) : this.estimateMaxGasAmount(accountFrom),
+      ]);
+
+    const expireTimestampSec =
+      extraArgs?.expireTimestamp ?? BigInt(timestamp) / BigInt(1000) + BigInt(DEFAULT_TXN_EXP_SEC_FROM_NOW);
 
     const { maxGasAmount, gasUnitPrice, expireTimestamp } = {
-      maxGasAmount: BigInt(DEFAULT_MAX_GAS_AMOUNT),
+      maxGasAmount: BigInt(maxGas),
       gasUnitPrice: BigInt(gasEstimate),
-      expireTimestamp: BigInt(Math.floor(Date.now() / 1000) + DEFAULT_TXN_EXP_SEC_FROM_NOW),
+      expireTimestamp: expireTimestampSec,
       ...extraArgs,
     };
 
@@ -766,19 +771,30 @@ export class AptosClient {
     return this.client.transactions.estimateGasPrice();
   }
 
+  /**
+   * Returns the maximum available account balance as maxGasAmount. Gas amount required depends on the transaction
+   * itself. A better gas amount estimate can be gained from the simulation API.
+   *
+   * This API prioritizes txns pass rate. Therefore, account balance is used as maxGasAmount.
+   * @param forAccount
+   * @returns
+   */
   @parseApiError
   async estimateMaxGasAmount(forAccount: MaybeHexString): Promise<Uint64> {
     // Only Aptos utility coin is accepted as gas
-    const typeTag = `0x1::coin::CoinStore<${APTOS_COIN}>`;
+    const coinTypeTag = `0x1::coin::CoinStore<${APTOS_COIN}>`;
 
     const [{ gas_estimate: gasUnitPrice }, resources] = await Promise.all([
       this.estimateGasPrice(),
       this.getAccountResources(forAccount),
     ]);
 
-    const accountResource = resources.find((r) => r.type === typeTag);
-    const balance = BigInt((accountResource!.data as any).coin.value);
-    return balance / BigInt(gasUnitPrice);
+    const coinResource = resources.find((r) => r.type === coinTypeTag);
+    const balance = BigInt((coinResource!.data as any).coin.value);
+    const gasAmountFromBalance = balance / BigInt(gasUnitPrice);
+    return gasAmountFromBalance < BigInt(DEFAULT_MAX_GAS_AMOUNT)
+      ? gasAmountFromBalance
+      : BigInt(DEFAULT_MAX_GAS_AMOUNT);
   }
 
   /**
@@ -883,6 +899,20 @@ export class AptosClient {
   @parseApiError
   async getBlockByVersion(version: number, withTransactions?: boolean): Promise<Gen.Block> {
     return this.client.blocks.getBlockByVersion(version, withTransactions);
+  }
+
+  /**
+   * Get on-chain timestamp
+   *
+   * Microseconds can be safely expressed with javascript `number`
+   */
+  @parseApiError
+  async getOnChainTimetampMs(): Promise<number> {
+    const resource = await this.getAccountResource("0x1", "0x1::timestamp::CurrentTimeMicroseconds");
+
+    const { microseconds } = resource.data as any;
+
+    return Number.parseInt(microseconds, 10);
   }
 
   // eslint-disable-next-line class-methods-use-this

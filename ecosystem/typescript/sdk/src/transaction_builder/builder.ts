@@ -24,12 +24,12 @@ import {
   TransactionPayloadScript,
   ModuleId,
 } from "../aptos_types";
-import { bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "../bcs";
+import { AnyNumber, bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "../bcs";
 import { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArgumentABI } from "../aptos_types/abi";
 import { HexString, MaybeHexString } from "../hex_string";
 import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
 import * as Gen from "../generated/index";
-import { DEFAULT_TXN_EXP_SEC_FROM_NOW, DEFAULT_MAX_GAS_AMOUNT, MemoizeExpiring } from "../utils";
+import { DEFAULT_TXN_EXP_SEC_FROM_NOW, MemoizeExpiring } from "../utils";
 
 export { TypeTagParser } from "./builder_utils";
 
@@ -49,20 +49,6 @@ export class TransactionBuilder<F extends SigningFn> {
 
   constructor(signingFunction: F, public readonly rawTxnBuilder?: TransactionBuilderABI) {
     this.signingFunction = signingFunction;
-  }
-
-  /**
-   * Builds a RawTransaction. Relays the call to TransactionBuilderABI.build
-   * @param func
-   * @param ty_tags
-   * @param args
-   */
-  build(func: string, ty_tags: string[], args: any[]): RawTransaction {
-    if (!this.rawTxnBuilder) {
-      throw new Error("this.rawTxnBuilder doesn't exist.");
-    }
-
-    return this.rawTxnBuilder.build(func, ty_tags, args);
   }
 
   /** Generates a Signing Message out of a raw transaction. */
@@ -151,7 +137,7 @@ interface ABIBuilderConfig {
   sequenceNumber: Uint64 | string;
   gasUnitPrice: Uint64 | string;
   maxGasAmount?: Uint64 | string;
-  expSecFromNow?: number | string;
+  expTimestampSec: AnyNumber | string;
   chainId: Uint8 | string;
 }
 
@@ -161,14 +147,11 @@ interface ABIBuilderConfig {
 export class TransactionBuilderABI {
   private readonly abiMap: Map<string, ScriptABI>;
 
-  private readonly builderConfig: Partial<ABIBuilderConfig>;
-
   /**
    * Constructs a TransactionBuilderABI instance
    * @param abis List of binary ABIs.
-   * @param builderConfig Configs for creating a raw transaction.
    */
-  constructor(abis: Bytes[], builderConfig?: ABIBuilderConfig) {
+  constructor(abis: Bytes[]) {
     this.abiMap = new Map<string, ScriptABI>();
 
     abis.forEach((abi) => {
@@ -190,12 +173,6 @@ export class TransactionBuilderABI {
 
       this.abiMap.set(k, scriptABI);
     });
-
-    this.builderConfig = {
-      maxGasAmount: BigInt(DEFAULT_MAX_GAS_AMOUNT),
-      expSecFromNow: DEFAULT_TXN_EXP_SEC_FROM_NOW,
-      ...builderConfig,
-    };
   }
 
   private static toBCSArgs(abiArgs: any[], args: any[]): Bytes[] {
@@ -216,10 +193,6 @@ export class TransactionBuilderABI {
     }
 
     return args.map((arg, i) => argToTransactionArgument(arg, abiArgs[i].type_tag));
-  }
-
-  setSequenceNumber(seqNumber: Uint64 | string) {
-    this.builderConfig.sequenceNumber = BigInt(seqNumber);
   }
 
   /**
@@ -280,15 +253,14 @@ export class TransactionBuilderABI {
    * @param args Function arguments
    * @returns RawTransaction
    */
-  build(func: string, ty_tags: string[], args: any[]): RawTransaction {
-    const { sender, sequenceNumber, gasUnitPrice, maxGasAmount, expSecFromNow, chainId } = this.builderConfig;
+  build(func: string, ty_tags: string[], args: any[], builderConfig: ABIBuilderConfig): RawTransaction {
+    const { sender, sequenceNumber, gasUnitPrice, maxGasAmount, expTimestampSec, chainId } = builderConfig;
 
     if (!gasUnitPrice) {
       throw new Error("No gasUnitPrice provided.");
     }
 
     const senderAccount = sender instanceof AccountAddress ? sender : AccountAddress.fromHex(sender!);
-    const expTimestampSec = BigInt(Math.floor(Date.now() / 1000) + Number(expSecFromNow));
     const payload = this.buildTransactionPayload(func, ty_tags, args);
 
     if (payload) {
@@ -298,7 +270,7 @@ export class TransactionBuilderABI {
         payload,
         BigInt(maxGasAmount!),
         BigInt(gasUnitPrice!),
-        expTimestampSec,
+        BigInt(expTimestampSec!),
         new ChainId(Number(chainId)),
       );
     }
@@ -316,6 +288,8 @@ interface AptosClientInterface {
   getAccount: (accountAddress: MaybeHexString) => Promise<Gen.AccountData>;
   getChainId: () => Promise<number>;
   estimateGasPrice: () => Promise<Gen.GasEstimation>;
+  getOnChainTimetampMs: () => Promise<number>;
+  estimateMaxGasAmount: (forAccount: MaybeHexString) => Promise<Uint64>;
 }
 
 /**
@@ -405,22 +379,30 @@ export class TransactionBuilderRemoteABI {
 
     const senderAddress = sender instanceof AccountAddress ? HexString.fromUint8Array(sender.address) : sender;
 
-    const [{ sequence_number: sequenceNumber }, chainId, { gas_estimate: gasUnitPrice }] = await Promise.all([
-      rest?.sequenceNumber
-        ? Promise.resolve({ sequence_number: rest?.sequenceNumber })
-        : this.aptosClient.getAccount(senderAddress),
-      rest?.chainId ? Promise.resolve(rest?.chainId) : this.aptosClient.getChainId(),
-      rest?.gasUnitPrice ? Promise.resolve({ gas_estimate: rest?.gasUnitPrice }) : this.aptosClient.estimateGasPrice(),
-    ]);
+    const [{ sequence_number: sequenceNumber }, chainId, { gas_estimate: gasUnitPrice }, timestamp, maxGasAmount] =
+      await Promise.all([
+        rest?.sequenceNumber
+          ? Promise.resolve({ sequence_number: rest?.sequenceNumber })
+          : this.aptosClient.getAccount(senderAddress),
+        rest?.chainId ? Promise.resolve(rest.chainId) : this.aptosClient.getChainId(),
+        rest?.gasUnitPrice ? Promise.resolve({ gas_estimate: rest.gasUnitPrice }) : this.aptosClient.estimateGasPrice(),
+        rest?.expTimestampSec ? Promise.resolve(rest.expTimestampSec) : this.aptosClient.getOnChainTimetampMs(),
+        rest?.maxGasAmount ? Promise.resolve(rest.maxGasAmount) : this.aptosClient.estimateMaxGasAmount(senderAddress),
+      ]);
 
-    const builderABI = new TransactionBuilderABI([bcsToBytes(entryFunctionABI)], {
+    const expTimestampSec =
+      rest?.expTimestampSec ?? BigInt(timestamp) / BigInt(1000) + BigInt(DEFAULT_TXN_EXP_SEC_FROM_NOW);
+
+    const builderABI = new TransactionBuilderABI([bcsToBytes(entryFunctionABI)]);
+
+    return builderABI.build(func, ty_tags, args, {
       sender,
       sequenceNumber,
       chainId,
+      expTimestampSec,
       gasUnitPrice: BigInt(gasUnitPrice),
+      maxGasAmount: BigInt(maxGasAmount),
       ...rest,
     });
-
-    return builderABI.build(func, ty_tags, args);
   }
 }
