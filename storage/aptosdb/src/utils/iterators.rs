@@ -3,13 +3,18 @@
 
 use crate::event::EventSchema;
 use crate::ledger_info::LedgerInfoSchema;
+use crate::state_value::StateValueSchema;
 use crate::transaction_by_account::TransactionByAccountSchema;
 use anyhow::{anyhow, ensure, Result};
 use aptos_types::account_address::AccountAddress;
 use aptos_types::contract_event::ContractEvent;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::state_store::state_key::StateKey;
+use aptos_types::state_store::state_key_prefix::StateKeyPrefix;
+use aptos_types::state_store::state_value::StateValue;
 use aptos_types::transaction::Version;
 use schemadb::iterator::SchemaIterator;
+use schemadb::{ReadOptions, DB};
 use std::iter::Peekable;
 use std::marker::PhantomData;
 
@@ -84,6 +89,91 @@ where
                 .ok_or_else(|| anyhow!("Too many items requested"))?,
             _phantom: Default::default(),
         })
+    }
+}
+
+pub struct PrefixedStateValueIterator<'a> {
+    inner: SchemaIterator<'a, StateValueSchema>,
+    key_prefix: StateKeyPrefix,
+    prev_key: Option<StateKey>,
+    desired_version: Version,
+    is_finished: bool,
+}
+
+impl<'a> PrefixedStateValueIterator<'a> {
+    pub fn new(
+        db: &'a DB,
+        key_prefix: StateKeyPrefix,
+        first_key: Option<StateKey>,
+        desired_version: Version,
+    ) -> Result<Self> {
+        let mut read_opts = ReadOptions::default();
+        // Without this, iterators are not guaranteed a total order of all keys, but only keys for the same prefix.
+        // For example,
+        // aptos/abc|2
+        // aptos/abc|1
+        // aptos/abc|0
+        // aptos/abd|1
+        // if we seek('aptos/'), and call next, we may not reach `aptos/abd/1` because the prefix extractor we adopted
+        // here will stick with prefix `aptos/abc` and return `None` or any arbitrary result after visited all the
+        // keys starting with `aptos/abc`.
+        read_opts.set_total_order_seek(true);
+        let mut iter = db.iter::<StateValueSchema>(read_opts)?;
+        if let Some(first_key) = &first_key {
+            iter.seek(&(first_key.clone(), u64::MAX))?;
+        } else {
+            iter.seek(&&key_prefix)?;
+        };
+        Ok(Self {
+            inner: iter,
+            key_prefix,
+            prev_key: None,
+            desired_version,
+            is_finished: false,
+        })
+    }
+
+    fn next_impl(&mut self) -> Result<Option<(StateKey, StateValue)>> {
+        if !self.is_finished {
+            while let Some(((state_key, version), state_value_opt)) =
+                self.inner.next().transpose()?
+            {
+                // In case the previous seek() ends on the same key with version 0.
+                if Some(&state_key) == self.prev_key.as_ref() {
+                    continue;
+                }
+                // Cursor is currently at the first available version of the state key.
+                // Check if the key_prefix is a valid prefix of the state_key we got from DB.
+                if !self.key_prefix.is_prefix(&state_key)? {
+                    // No more keys matching the key_prefix, we can return the result.
+                    self.is_finished = true;
+                    break;
+                }
+
+                if version > self.desired_version {
+                    self.inner
+                        .seek(&(state_key.clone(), self.desired_version))?;
+                    continue;
+                }
+
+                self.prev_key = Some(state_key.clone());
+                // Seek to the next key - this can be done by seeking to the current key with version 0
+                self.inner.seek(&(state_key.clone(), 0))?;
+
+                if let Some(state_value) = state_value_opt {
+                    return Ok(Some((state_key, state_value)));
+                }
+            }
+        }
+        Ok(None)
+    }
+}
+
+impl<'a> Iterator for PrefixedStateValueIterator<'a> {
+    type Item = Result<(StateKey, StateValue)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_impl().transpose()
     }
 }
 

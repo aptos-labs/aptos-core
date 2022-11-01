@@ -9,7 +9,8 @@ use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
-
+use ripemd::Digest as OtherDigest;
+use sha2::Digest;
 use smallvec::smallvec;
 use std::{collections::VecDeque, hash::Hasher};
 use tiny_keccak::{Hasher as KeccakHasher, Keccak};
@@ -75,6 +76,84 @@ fn native_keccak256(
     Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(output)]))
 }
 
+#[derive(Debug, Clone)]
+pub struct Sha2_512HashGasParameters {
+    pub base: InternalGas,
+    pub per_byte: InternalGasPerByte,
+}
+
+fn native_sha2_512(
+    gas_params: &Sha2_512HashGasParameters,
+    _context: &mut NativeContext,
+    mut _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(args.len() == 1);
+
+    let bytes = pop_arg!(args, Vec<u8>);
+
+    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+
+    let mut hasher = sha2::Sha512::new();
+    hasher.update(&bytes);
+    let output = hasher.finalize().to_vec();
+
+    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(output)]))
+}
+
+#[derive(Debug, Clone)]
+pub struct Sha3_512HashGasParameters {
+    pub base: InternalGas,
+    pub per_byte: InternalGasPerByte,
+}
+
+fn native_sha3_512(
+    gas_params: &Sha3_512HashGasParameters,
+    _context: &mut NativeContext,
+    mut _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(args.len() == 1);
+
+    let bytes = pop_arg!(args, Vec<u8>);
+
+    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+
+    let mut hasher = sha3::Sha3_512::new();
+    hasher.update(&bytes);
+    let output = hasher.finalize().to_vec();
+
+    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(output)]))
+}
+
+#[derive(Debug, Clone)]
+pub struct Ripemd160HashGasParameters {
+    pub base: InternalGas,
+    pub per_byte: InternalGasPerByte,
+}
+
+fn native_ripemd160(
+    gas_params: &Ripemd160HashGasParameters,
+    _context: &mut NativeContext,
+    mut _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(args.len() == 1);
+
+    let bytes = pop_arg!(args, Vec<u8>);
+
+    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+
+    let mut hasher = ripemd::Ripemd160::new();
+    hasher.update(&bytes);
+    let output = hasher.finalize().to_vec();
+
+    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(output)]))
+}
+
 /***************************************************************************************************
  * module
  *
@@ -83,6 +162,9 @@ fn native_keccak256(
 pub struct GasParameters {
     pub sip_hash: SipHashGasParameters,
     pub keccak256: Keccak256HashGasParameters,
+    pub sha2_512: Sha2_512HashGasParameters,
+    pub sha3_512: Sha3_512HashGasParameters,
+    pub ripemd160: Ripemd160HashGasParameters,
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
@@ -94,6 +176,18 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "keccak256",
             make_native_from_func(gas_params.keccak256, native_keccak256),
+        ),
+        (
+            "sha2_512_internal",
+            make_native_from_func(gas_params.sha2_512, native_sha2_512),
+        ),
+        (
+            "sha3_512_internal",
+            make_native_from_func(gas_params.sha3_512, native_sha3_512),
+        ),
+        (
+            "ripemd160_internal",
+            make_native_from_func(gas_params.ripemd160, native_ripemd160),
         ),
     ];
 

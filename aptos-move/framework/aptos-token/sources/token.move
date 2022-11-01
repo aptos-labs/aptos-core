@@ -545,10 +545,12 @@ module aptos_token::token {
                     &mut collections.collection_data,
                     token_id.token_data_id.collection
                 );
-                collection_data.supply = collection_data.supply - 1;
-                // delete the collection data if the collection supply equals 0
-                if (collection_data.supply == 0) {
-                    destroy_collection_data(table::remove(&mut collections.collection_data, collection_data.name));
+                if (collection_data.maximum > 0) {
+                    collection_data.supply = collection_data.supply - 1;
+                    // delete the collection data if the collection supply equals 0
+                    if (collection_data.supply == 0) {
+                        destroy_collection_data(table::remove(&mut collections.collection_data, collection_data.name));
+                    };
                 };
             };
         };
@@ -617,10 +619,14 @@ module aptos_token::token {
                     &mut collections.collection_data,
                     token_id.token_data_id.collection
                 );
-                collection_data.supply = collection_data.supply - 1;
-                // delete the collection data if the collection supply equals 0
-                if (collection_data.supply == 0) {
-                    destroy_collection_data(table::remove(&mut collections.collection_data, collection_data.name));
+
+                // only update and check the supply for unlimited collection
+                if (collection_data.maximum > 0){
+                    collection_data.supply = collection_data.supply - 1;
+                    // delete the collection data if the collection supply equals 0
+                    if (collection_data.supply == 0) {
+                        destroy_collection_data(table::remove(&mut collections.collection_data, collection_data.name));
+                    };
                 };
             };
         };
@@ -635,9 +641,9 @@ module aptos_token::token {
         types: vector<String>,
     ): TokenId acquires Collections, TokenStore {
         let creator = token_id.token_data_id.creator;
-        assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
+        assert!(signer::address_of(account) == creator, error::permission_denied(ENO_MUTATE_CAPABILITY));
         // validate if the properties is mutable
-        assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
+        assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
         let all_token_data = &mut borrow_global_mut<Collections>(
             creator
         ).token_data;
