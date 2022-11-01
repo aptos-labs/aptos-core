@@ -172,10 +172,7 @@ pub fn new_epoch_event_key() -> EventKey {
 
 pub fn access_path_for_config(config_id: ConfigID) -> AccessPath {
     let struct_tag = struct_tag_for_config(config_id);
-    AccessPath::new(
-        CORE_CODE_ADDRESS,
-        AccessPath::resource_access_vec(struct_tag),
-    )
+    AccessPath::new(CORE_CODE_ADDRESS, AccessPath::resource_path_vec(struct_tag))
 }
 
 pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {

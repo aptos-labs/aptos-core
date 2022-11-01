@@ -63,27 +63,27 @@ impl AccessPath {
         AccessPath { address, path }
     }
 
-    pub fn resource_access_vec(tag: StructTag) -> Vec<u8> {
+    pub fn resource_path_vec(tag: StructTag) -> Vec<u8> {
         bcs::to_bytes(&Path::Resource(tag)).expect("Unexpected serialization error")
     }
 
     /// Convert Accesses into a byte offset which would be used by the storage layer to resolve
     /// where fields are stored.
     pub fn resource_access_path(key: ResourceKey) -> AccessPath {
-        let path = AccessPath::resource_access_vec(key.type_);
+        let path = AccessPath::resource_path_vec(key.type_);
         AccessPath {
             address: key.address,
             path,
         }
     }
 
-    fn code_access_path_vec(key: ModuleId) -> Vec<u8> {
+    pub fn code_path_vec(key: ModuleId) -> Vec<u8> {
         bcs::to_bytes(&Path::Code(key)).expect("Unexpected serialization error")
     }
 
-    pub fn code_access_path(key: ModuleId) -> AccessPath {
+    pub fn code_access_path(key: ModuleId) -> Self {
         let address = *key.address();
-        let path = AccessPath::code_access_path_vec(key);
+        let path = AccessPath::code_path_vec(key);
         AccessPath { address, path }
     }
 
