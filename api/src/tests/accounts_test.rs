@@ -135,7 +135,7 @@ async fn test_get_account_resources_by_ledger_version() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_account_resources_by_ledger_version_is_too_large() {
+async fn test_get_account_resources_by_too_large_ledger_version() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(404)
