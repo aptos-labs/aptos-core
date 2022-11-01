@@ -226,7 +226,7 @@ module aptos_std::multi_ed25519 {
     ): bool;
 
     #[test_only]
-    native fun generate_keys_internal(total: u8, threshold: u8): (vector<u8>,vector<u8>);
+    native fun generate_keys_internal(threshold: u8, n: u8): (vector<u8>,vector<u8>);
 
     #[test_only]
     native fun sign_internal(sk: vector<u8>, message: vector<u8>): vector<u8>;
