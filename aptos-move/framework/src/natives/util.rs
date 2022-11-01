@@ -16,6 +16,13 @@ use std::{collections::VecDeque, sync::Arc};
 /// Abort code when from_bytes fails (0x01 == INVALID_ARGUMENT)
 const EFROM_BYTES: u64 = 0x01_0001;
 
+/// Wraps a test-only native function inside an Arc<UnboxedNativeFunction>.
+pub fn make_test_only_native_from_func(
+    func: fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>,
+) -> NativeFunction {
+    Arc::new(func)
+}
+
 /// Used to pass gas parameters into native functions.
 pub fn make_native_from_func<T: std::marker::Send + std::marker::Sync + 'static>(
     gas_params: T,

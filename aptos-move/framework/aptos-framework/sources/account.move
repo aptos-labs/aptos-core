@@ -666,77 +666,131 @@ module aptos_framework::account {
     // Tests for offering & revoking signer capabilities
     //
 
-    // NOTE: These test cases were generated using `cargo test -- offer_signer_capability_v2 --nocapture` in `aptos-move/e2e-move-tests/src/tests`
-    #[test_only]
-    const ALICE_PK: vector<u8> = x"550e7e166e01047c9134d7a1c540b865bd984a326e9304e7d4a04d89f0aee747";
-    #[test_only]
-    const ALICE_ADDRESS: vector<u8> = x"47e56cf3958e4c93c72fc0ceccef12c0e05f2fe2b91014eaaa798026b8df754f";
-    #[test_only]
-    const ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE: vector<u8> = x"6591c10ca8485e700d1288a16f8555fdbe0c7dd52c12542dbabb9bd3eb12a27ffe981f2b7516d02cc4a78eee7e9f44490f93aa08100c06c55fb7615bcc66c805";
-
     #[test(bob = @0x345)]
     #[expected_failure(abort_code = 65544)]
     public entry fun test_invalid_offer_signer_capability(bob: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
-        create_account(signer::address_of(&bob));
+        let (_alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let sig = ed25519::sign_struct(&_alice_sk, challenge);
 
         // Maul the signature and make sure the call would fail
-        let invalid_signature = ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE;
-
+        let invalid_signature = ed25519::signature_to_bytes(&sig);
         let first_sig_byte = vector::borrow_mut(&mut invalid_signature, 0);
         *first_sig_byte = *first_sig_byte + 1;
 
-        offer_signer_capability(&alice, invalid_signature, 0, ALICE_PK, signer::address_of(&bob));
+        offer_signer_capability(&alice, invalid_signature, 0, alice_pk_bytes, bob_addr);
     }
 
     #[test(bob = @0x345)]
     public entry fun test_valid_check_signer_capability_and_create_authorized_signer(bob: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
-        assert!(signer::address_of(&alice) == from_bcs::to_address(ALICE_ADDRESS), 0);
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
 
-        create_account(signer::address_of(&bob));
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
 
-        offer_signer_capability(&alice, ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE, 0, ALICE_PK, signer::address_of(&bob));
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
 
-        let alice_account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
-        assert!(option::contains(&alice_account_resource.signer_capability_offer.for, &signer::address_of(&bob)), 0);
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
 
-        let signer = create_authorized_signer(&bob, signer::address_of(&alice));
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+
+        assert!(option::contains(&borrow_global<Account>(alice_addr).signer_capability_offer.for, &bob_addr), 0);
+
+        let signer = create_authorized_signer(&bob, alice_addr);
         assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
     }
 
     #[test(bob = @0x345, charlie = @0x567)]
     #[expected_failure(abort_code = 393230)]
     public entry fun test_invalid_check_signer_capability_and_create_authorized_signer(bob: signer, charlie: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
-        create_account(signer::address_of(&bob));
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
 
-        offer_signer_capability(&alice, ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE, 0, ALICE_PK, signer::address_of(&bob));
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
 
-        let alice_account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
-        assert!(option::contains(&alice_account_resource.signer_capability_offer.for, &signer::address_of(&bob)), 0);
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
 
-        create_authorized_signer(&charlie, signer::address_of(&alice));
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+
+        let alice_account_resource = borrow_global_mut<Account>(alice_addr);
+        assert!(option::contains(&alice_account_resource.signer_capability_offer.for, &bob_addr), 0);
+
+        create_authorized_signer(&charlie, alice_addr);
     }
 
     #[test(bob = @0x345)]
     public entry fun test_valid_revoke_signer_capability(bob: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
-        create_account(signer::address_of(&bob));
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
 
-        offer_signer_capability(&alice, ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE, 0, ALICE_PK, signer::address_of(&bob));
-        revoke_signer_capability(&alice, signer::address_of(&bob));
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+        revoke_signer_capability(&alice, bob_addr);
     }
 
     #[test(bob = @0x345, charlie = @0x567)]
     #[expected_failure(abort_code = 393230)]
     public entry fun test_invalid_revoke_signer_capability(bob: signer, charlie: signer) acquires Account {
-        let alice = create_account_from_ed25519_public_key(ALICE_PK);
-        create_account(signer::address_of(&bob));
-        create_account(signer::address_of(&charlie));
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+        let alice_account_resource = borrow_global<Account>(alice_addr);
 
-        offer_signer_capability(&alice, ALICE_SIGNER_CAPABILITY_OFFER_SIGNATURE, 0, ALICE_PK, signer::address_of(&bob));
-        revoke_signer_capability(&alice, signer::address_of(&charlie));
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let charlie_addr = signer::address_of(&charlie);
+        create_account(charlie_addr);
+
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: alice_account_resource.sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+        revoke_signer_capability(&alice, charlie_addr);
     }
 
     //

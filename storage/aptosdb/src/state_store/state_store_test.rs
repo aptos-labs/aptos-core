@@ -135,6 +135,27 @@ fn test_state_store_reader_writer() {
     verify_value_and_proof(store, key3, Some(&value3), 1, root);
 }
 
+fn traverse_values(
+    store: &StateStore,
+    prefix: &StateKeyPrefix,
+    version: Version,
+) -> HashMap<StateKey, StateValue> {
+    let mut ret = HashMap::new();
+    let mut cursor = None;
+    loop {
+        let mut iter = store
+            .get_prefixed_state_value_iterator(prefix, cursor.as_ref(), version)
+            .unwrap();
+        if let Some((k, v)) = iter.next().transpose().unwrap() {
+            ret.insert(k, v);
+        }
+        cursor = iter.next().transpose().unwrap().map(|(k, _v)| k);
+        if cursor.is_none() {
+            return ret;
+        }
+    }
+}
+
 #[test]
 fn test_get_values_by_key_prefix() {
     let tmp_dir = TempPath::new();
@@ -160,9 +181,7 @@ fn test_get_values_by_key_prefix() {
         None,
     );
 
-    let key_value_map = store
-        .get_values_by_key_prefix(&account_key_prefx, 0)
-        .unwrap();
+    let key_value_map = traverse_values(store, &account_key_prefx, 0);
     assert_eq!(key_value_map.len(), 2);
     assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
     assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
@@ -183,17 +202,13 @@ fn test_get_values_by_key_prefix() {
     );
 
     // Ensure that we still get only values for key1 and key2 for version 0 after the update
-    let key_value_map = store
-        .get_values_by_key_prefix(&account_key_prefx, 0)
-        .unwrap();
+    let key_value_map = traverse_values(store, &account_key_prefx, 0);
     assert_eq!(key_value_map.len(), 2);
     assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
     assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
 
     // Ensure that key value map for version 1 returns value for key1 at version 0.
-    let key_value_map = store
-        .get_values_by_key_prefix(&account_key_prefx, 1)
-        .unwrap();
+    let key_value_map = traverse_values(store, &account_key_prefx, 1);
     assert_eq!(key_value_map.len(), 3);
     assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
     assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v1);
@@ -209,19 +224,13 @@ fn test_get_values_by_key_prefix() {
     put_value_set(store, vec![(key5.clone(), value5_v2.clone())], 2, Some(1));
 
     // address1 did not exist in version 0 and 1.
-    let key_value_map = store
-        .get_values_by_key_prefix(&account1_key_prefx, 0)
-        .unwrap();
+    let key_value_map = traverse_values(store, &account1_key_prefx, 0);
     assert_eq!(key_value_map.len(), 0);
 
-    let key_value_map = store
-        .get_values_by_key_prefix(&account1_key_prefx, 1)
-        .unwrap();
+    let key_value_map = traverse_values(store, &account1_key_prefx, 1);
     assert_eq!(key_value_map.len(), 0);
 
-    let key_value_map = store
-        .get_values_by_key_prefix(&account1_key_prefx, 2)
-        .unwrap();
+    let key_value_map = traverse_values(store, &account1_key_prefx, 2);
     assert_eq!(key_value_map.len(), 1);
     assert_eq!(*key_value_map.get(&key5).unwrap(), value5_v2);
 }

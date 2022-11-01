@@ -120,7 +120,7 @@ variable "fullnode_name" {
 
 variable "machine_type" {
   description = "Machine type for running fullnode"
-  default     = "c2-standard-16"
+  default     = "n2-standard-32"
 }
 
 variable "enable_backup" {

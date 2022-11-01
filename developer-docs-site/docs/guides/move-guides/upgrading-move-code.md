@@ -74,7 +74,7 @@ libraries, which have the `compatible` policy.
 
 As mentioned, even compatible upgrades can lead to hazardous effects for
 contracts depending on that upgraded code. Those effects can come simply
-from bugs but can be also be the result of malicious upgrades. For example, an
+from bugs but can also be the result of malicious upgrades. For example, an
 upgraded dependency can suddenly make all functions
 abort, breaking operation of your contract, or suddenly cost much more
 gas to execute then before the upgrade. Because you cannot control

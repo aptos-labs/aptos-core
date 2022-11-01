@@ -119,7 +119,7 @@ Now see the below walkthrough of the SDK functions used to accomplish the above 
 
 ## Step 4: The SDK in depth
 
-The `transfer-coin` example code uses helper functions to interact with the [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/). This section reviews each of the calls and gives insights into functionality.
+The `transfer-coin` example code uses helper functions to interact with the [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/). This section reviews each of the calls and gives insights into functionality.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
