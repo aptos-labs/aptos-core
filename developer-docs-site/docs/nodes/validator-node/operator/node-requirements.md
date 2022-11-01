@@ -69,6 +69,7 @@ You can configure the port settings on your node using the configuration YAML fi
 For the validator:
 
 - Open the TCP port 6180, to enable the validators to talk to each other.
+- Open the TCP port 6181, to enable validator fullnode to connect.
 - Open the TCP port 9101, to send the validator metrics to validate the health stats.
 - Make sure to keep the TCP port 6186 open for the local backup storage service. 
 
