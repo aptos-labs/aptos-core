@@ -67,6 +67,9 @@ pub fn start_consensus(
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
 
+    // LANDING QS TODO: smoke test and forge test to test on-chain config
+
+    // LANDING QS TODO: combine data manager with dummy data manager
     let data_manager: Arc<dyn DataManager> = if node_config.consensus.use_quorum_store {
         Arc::new(QuorumStoreDataManager::new())
     } else {

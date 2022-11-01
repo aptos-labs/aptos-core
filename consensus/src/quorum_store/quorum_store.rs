@@ -14,6 +14,7 @@ use crate::quorum_store::{
     types::{BatchId, Fragment, SerializedTransaction},
 };
 use crate::round_manager::VerifiedEvent;
+use aptos_config::config::QuorumStoreConfig;
 use aptos_logger::debug;
 // use aptos_logger::spawn_named;
 use aptos_types::{
@@ -57,35 +58,35 @@ pub struct QuorumStore {
     nerwork_listener_tx_vec: Vec<aptos_channel::Sender<PeerId, VerifiedEvent>>,
 }
 
-// TODO: change to appropriately signed integers.
-#[derive(Clone)]
-pub struct QuorumStoreConfig {
-    pub channel_size: usize,
-    pub proof_timeout_ms: usize,
-    pub batch_request_num_peers: usize,
-    pub mempool_pulling_interval: usize,
-    pub end_batch_ms: u128,
-    pub max_batch_bytes: usize,
-    pub batch_request_timeout_ms: usize,
-    /// Used when setting up the expiration time for the batch initation.
-    pub batch_expiry_round_gap_when_init: Round,
-    /// Batches may have expiry set for batch_expiry_rounds_gap rounds after the
-    /// latest committed round, and it will not be cleared from storage for another
-    /// so other batch_expiry_grace_rounds rounds, so the peers on the network
-    /// can still fetch the data they fall behind (later, they would have to state-sync).
-    /// Used when checking the expiration time of the received batch against current logical time to prevent DDoS.
-    pub batch_expiry_round_gap_behind_latest_certified: Round,
-    pub batch_expiry_round_gap_beyond_latest_certified: Round,
-    pub batch_expiry_grace_rounds: Round,
-    pub memory_quota: usize,
-    pub db_quota: usize,
-    pub mempool_txn_pull_max_count: u64,
-    pub mempool_txn_pull_max_bytes: u64,
-    // the number of network_listener workers = # validators/this number
-    pub num_nodes_per_worker_handles: usize,
-    // when the remaining certified batches in the quorum store is > back_pressure_factor * num of validators, backpressure quorum store
-    pub back_pressure_factor: usize,
-}
+// // TODO: change to appropriately signed integers.
+// #[derive(Clone)]
+// pub struct QuorumStoreConfig {
+//     pub channel_size: usize,
+//     pub proof_timeout_ms: usize,
+//     pub batch_request_num_peers: usize,
+//     pub mempool_pulling_interval: usize,
+//     pub end_batch_ms: u128,
+//     pub max_batch_bytes: usize,
+//     pub batch_request_timeout_ms: usize,
+//     /// Used when setting up the expiration time for the batch initation.
+//     pub batch_expiry_round_gap_when_init: Round,
+//     /// Batches may have expiry set for batch_expiry_rounds_gap rounds after the
+//     /// latest committed round, and it will not be cleared from storage for another
+//     /// so other batch_expiry_grace_rounds rounds, so the peers on the network
+//     /// can still fetch the data they fall behind (later, they would have to state-sync).
+//     /// Used when checking the expiration time of the received batch against current logical time to prevent DDoS.
+//     pub batch_expiry_round_gap_behind_latest_certified: Round,
+//     pub batch_expiry_round_gap_beyond_latest_certified: Round,
+//     pub batch_expiry_grace_rounds: Round,
+//     pub memory_quota: usize,
+//     pub db_quota: usize,
+//     pub mempool_txn_pull_max_count: u64,
+//     pub mempool_txn_pull_max_bytes: u64,
+//     // the number of network_listener workers = # validators/this number
+//     pub num_nodes_per_worker_handles: usize,
+//     // when the remaining certified batches in the quorum store is > back_pressure_factor * num of validators, backpressure quorum store
+//     pub back_pressure_factor: usize,
+// }
 
 // use std::future::Future;
 use std::time::Duration;

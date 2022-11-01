@@ -3,7 +3,7 @@
 
 use crate::quorum_store::{
     batch_reader::BatchReader,
-    quorum_store::{QuorumStore, QuorumStoreCommand, QuorumStoreConfig},
+    quorum_store::{QuorumStore, QuorumStoreCommand},
     quorum_store_db::QuorumStoreDB,
     quorum_store_wrapper::QuorumStoreWrapper,
 };
@@ -46,7 +46,7 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, Context};
-use aptos_config::config::{ConsensusConfig, NodeConfig};
+use aptos_config::config::{ConsensusConfig, NodeConfig, QuorumStoreConfig};
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
@@ -832,25 +832,8 @@ impl EpochManager {
         if self.config.use_quorum_store {
             // TODO: grab config.
             // TODO: think about these numbers
-            let config = QuorumStoreConfig {
-                channel_size: 100,
-                proof_timeout_ms: 10000,
-                batch_request_num_peers: 2,
-                mempool_pulling_interval: 100,
-                end_batch_ms: 1000,
-                max_batch_bytes: 500000,
-                batch_request_timeout_ms: 10000,
-                batch_expiry_round_gap_when_init: 300,
-                batch_expiry_round_gap_behind_latest_certified: 1000,
-                batch_expiry_round_gap_beyond_latest_certified: 1000,
-                batch_expiry_grace_rounds: 5,
-                memory_quota: 100000000,
-                db_quota: 10000000000,
-                mempool_txn_pull_max_count: 100,
-                mempool_txn_pull_max_bytes: 1000000,
-                num_nodes_per_worker_handles: 10,
-                back_pressure_factor: 3, // back pressure limit for QS is back_pressure_factor * num_validator
-            };
+            // LANDING QS TODO: move to config file
+            let config = QuorumStoreConfig::default();
 
             // update the number of network_listener workers when start a new round_manager
             self.num_network_workers_for_fragment = usize::max(
