@@ -49,18 +49,18 @@
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="..\../aptos-stdlib\../move-stdlib\doc\bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
+<b>use</b> <a href="..\../aptos-stdlib\doc\from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
+<b>use</b> <a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="..\../aptos-stdlib\doc\simple_map.md#0x1_simple_map">0x1::simple_map</a>;
+<b>use</b> <a href="..\../aptos-stdlib\../move-stdlib\doc\string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="..\../aptos-stdlib\doc\table.md#0x1_table">0x1::table</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">0x1::type_info</a>;
+<b>use</b> <a href="..\../aptos-stdlib\doc\type_info.md#0x1_type_info">0x1::type_info</a>;
 </code></pre>
 
 
@@ -89,14 +89,14 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
  Required. The address of the proposer.
 </dd>
 <dt>
-<code>execution_content: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;ProposalType&gt;</code>
+<code>execution_content: <a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_Option">option::Option</a>&lt;ProposalType&gt;</code>
 </dt>
 <dd>
  Required. Should contain enough information to execute later, for example the required capability.
  This is stored as an option so we can return it to governance when the proposal is resolved.
 </dd>
 <dt>
-<code>metadata: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
+<code>metadata: <a href="..\../aptos-stdlib\doc\simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="..\../aptos-stdlib\../move-stdlib\doc\string.md#0x1_string_String">string::String</a>, <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
  Optional. Extra metadata about the proposal and can be empty.
@@ -109,7 +109,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
  Timestamp when the proposal was created.
 </dd>
 <dt>
-<code>execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>execution_hash: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
  Required. The hash for the execution script module. Only the same exact script module can resolve this
@@ -128,7 +128,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </dd>
 <dt>
-<code>early_resolution_vote_threshold: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;</code>
+<code>early_resolution_vote_threshold: <a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;</code>
 </dt>
 <dd>
  Optional. Early resolution threshold. If specified, the proposal can be resolved early if the total
@@ -183,7 +183,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 <dl>
 <dt>
-<code>proposals: <a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;u64, <a href="voting.md#0x1_voting_Proposal">voting::Proposal</a>&lt;ProposalType&gt;&gt;</code>
+<code>proposals: <a href="..\../aptos-stdlib\doc\table.md#0x1_table_Table">table::Table</a>&lt;u64, <a href="voting.md#0x1_voting_Proposal">voting::Proposal</a>&lt;ProposalType&gt;&gt;</code>
 </dt>
 <dd>
  Use Table for execution optimization instead of Vector for gas cost since Vector is read entirely into memory
@@ -274,13 +274,13 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </dd>
 <dt>
-<code>early_resolution_vote_threshold: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;</code>
+<code>early_resolution_vote_threshold: <a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>execution_hash: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -292,7 +292,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </dd>
 <dt>
-<code>metadata: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
+<code>metadata: <a href="..\../aptos-stdlib\doc\simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="..\../aptos-stdlib\../move-stdlib\doc\string.md#0x1_string_String">string::String</a>, <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
 
@@ -331,7 +331,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </dd>
 <dt>
-<code>proposal_type_info: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a></code>
+<code>proposal_type_info: <a href="..\../aptos-stdlib\doc\type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a></code>
 </dt>
 <dd>
 
@@ -538,7 +538,7 @@ ProposalStateEnum representing proposal state.
 Key used to track the resolvable time in the proposal's metadata.
 
 
-<pre><code><b>const</b> <a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [82, 69, 83, 79, 76, 86, 65, 66, 76, 69, 95, 84, 73, 77, 69, 95, 77, 69, 84, 65, 68, 65, 84, 65, 95, 75, 69, 89];
+<pre><code><b>const</b> <a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt; = [82, 69, 83, 79, 76, 86, 65, 66, 76, 69, 95, 84, 73, 77, 69, 95, 77, 69, 84, 65, 68, 65, 84, 65, 95, 75, 69, 89];
 </code></pre>
 
 
@@ -549,7 +549,7 @@ Key used to track the resolvable time in the proposal's metadata.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_register">register</a>&lt;ProposalType: store&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_register">register</a>&lt;ProposalType: store&gt;(<a href="account.md#0x1_account">account</a>: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -558,13 +558,13 @@ Key used to track the resolvable time in the proposal's metadata.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_register">register</a>&lt;ProposalType: store&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>assert</b>!(!<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="voting.md#0x1_voting_EVOTING_FORUM_ALREADY_REGISTERED">EVOTING_FORUM_ALREADY_REGISTERED</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_register">register</a>&lt;ProposalType: store&gt;(<a href="account.md#0x1_account">account</a>: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>) {
+    <b>let</b> addr = <a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(addr), <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_already_exists">error::already_exists</a>(<a href="voting.md#0x1_voting_EVOTING_FORUM_ALREADY_REGISTERED">EVOTING_FORUM_ALREADY_REGISTERED</a>));
 
     <b>let</b> voting_forum = <a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt; {
         next_proposal_id: 0,
-        proposals: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>&lt;u64, <a href="voting.md#0x1_voting_Proposal">Proposal</a>&lt;ProposalType&gt;&gt;(),
+        proposals: <a href="..\../aptos-stdlib\doc\table.md#0x1_table_new">table::new</a>&lt;u64, <a href="voting.md#0x1_voting_Proposal">Proposal</a>&lt;ProposalType&gt;&gt;(),
         events: <a href="voting.md#0x1_voting_VotingEvents">VotingEvents</a> {
             create_proposal_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="voting.md#0x1_voting_CreateProposalEvent">CreateProposalEvent</a>&gt;(<a href="account.md#0x1_account">account</a>),
             register_forum_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="voting.md#0x1_voting_RegisterForumEvent">RegisterForumEvent</a>&gt;(<a href="account.md#0x1_account">account</a>),
@@ -577,7 +577,7 @@ Key used to track the resolvable time in the proposal's metadata.
         &<b>mut</b> voting_forum.events.register_forum_events,
         <a href="voting.md#0x1_voting_RegisterForumEvent">RegisterForumEvent</a> {
             hosting_account: addr,
-            proposal_type_info: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;ProposalType&gt;(),
+            proposal_type_info: <a href="..\../aptos-stdlib\doc\type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;ProposalType&gt;(),
         },
     );
 
@@ -605,7 +605,7 @@ this proposal.
 @return The proposal id.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_create_proposal">create_proposal</a>&lt;ProposalType: store&gt;(proposer: <b>address</b>, voting_forum_address: <b>address</b>, execution_content: ProposalType, execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, min_vote_threshold: u128, expiration_secs: u64, early_resolution_vote_threshold: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;, metadata: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_create_proposal">create_proposal</a>&lt;ProposalType: store&gt;(proposer: <b>address</b>, voting_forum_address: <b>address</b>, execution_content: ProposalType, execution_hash: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;, min_vote_threshold: u128, expiration_secs: u64, early_resolution_vote_threshold: <a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;, metadata: <a href="..\../aptos-stdlib\doc\simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="..\../aptos-stdlib\../move-stdlib\doc\string.md#0x1_string_String">string::String</a>, <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;): u64
 </code></pre>
 
 
@@ -618,29 +618,29 @@ this proposal.
     proposer: <b>address</b>,
     voting_forum_address: <b>address</b>,
     execution_content: ProposalType,
-    execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    execution_hash: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     min_vote_threshold: u128,
     expiration_secs: u64,
     early_resolution_vote_threshold: Option&lt;u128&gt;,
-    metadata: SimpleMap&lt;String, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+    metadata: SimpleMap&lt;String, <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
 ): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&early_resolution_vote_threshold)) {
+    <b>if</b> (<a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_is_some">option::is_some</a>(&early_resolution_vote_threshold)) {
         <b>assert</b>!(
-            min_vote_threshold &lt;= *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&early_resolution_vote_threshold),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="voting.md#0x1_voting_EINVALID_MIN_VOTE_THRESHOLD">EINVALID_MIN_VOTE_THRESHOLD</a>),
+            min_vote_threshold &lt;= *<a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_borrow">option::borrow</a>(&early_resolution_vote_threshold),
+            <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="voting.md#0x1_voting_EINVALID_MIN_VOTE_THRESHOLD">EINVALID_MIN_VOTE_THRESHOLD</a>),
         );
     };
-    // Make sure the execution <b>script</b>'s <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a> is not empty.
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&execution_hash) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="voting.md#0x1_voting_EPROPOSAL_EMPTY_EXECUTION_HASH">EPROPOSAL_EMPTY_EXECUTION_HASH</a>));
+    // Make sure the execution <b>script</b>'s <a href="..\../aptos-stdlib\doc\hash.md#0x1_hash">hash</a> is not empty.
+    <b>assert</b>!(<a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector_length">vector::length</a>(&execution_hash) &gt; 0, <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="voting.md#0x1_voting_EPROPOSAL_EMPTY_EXECUTION_HASH">EPROPOSAL_EMPTY_EXECUTION_HASH</a>));
 
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>let</b> proposal_id = voting_forum.next_proposal_id;
     voting_forum.next_proposal_id = voting_forum.next_proposal_id + 1;
 
-    <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(&<b>mut</b> voting_forum.proposals, proposal_id, <a href="voting.md#0x1_voting_Proposal">Proposal</a> {
+    <a href="..\../aptos-stdlib\doc\table.md#0x1_table_add">table::add</a>(&<b>mut</b> voting_forum.proposals, proposal_id, <a href="voting.md#0x1_voting_Proposal">Proposal</a> {
         proposer,
         creation_time_secs: <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>(),
-        execution_content: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>&lt;ProposalType&gt;(execution_content),
+        execution_content: <a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_some">option::some</a>&lt;ProposalType&gt;(execution_content),
         execution_hash,
         metadata,
         min_vote_threshold,
@@ -703,14 +703,14 @@ This guarantees that voting eligibility and voting power are controlled by the r
     should_pass: bool,
 ) <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
-    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
+    <b>let</b> proposal = <a href="..\../aptos-stdlib\doc\table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
     // Voting might still be possible after the proposal <b>has</b> enough yes votes <b>to</b> be resolved early. This would only
     // lead <b>to</b> possible proposal resolution failure <b>if</b> the resolve early threshold is not definitive (e.g. &lt; 50% + 1
     // of the total <a href="voting.md#0x1_voting">voting</a> token's supply). In this case, more <a href="voting.md#0x1_voting">voting</a> might actually still be desirable.
     // Governance mechanisms built on this <a href="voting.md#0x1_voting">voting</a> <b>module</b> can <b>apply</b> additional rules on when <a href="voting.md#0x1_voting">voting</a> is closed <b>as</b>
     // appropriate.
-    <b>assert</b>!(!<a href="voting.md#0x1_voting_is_voting_period_over">is_voting_period_over</a>(proposal), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EPROPOSAL_VOTING_ALREADY_ENDED">EPROPOSAL_VOTING_ALREADY_ENDED</a>));
-    <b>assert</b>!(!proposal.is_resolved, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EPROPOSAL_ALREADY_RESOLVED">EPROPOSAL_ALREADY_RESOLVED</a>));
+    <b>assert</b>!(!<a href="voting.md#0x1_voting_is_voting_period_over">is_voting_period_over</a>(proposal), <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EPROPOSAL_VOTING_ALREADY_ENDED">EPROPOSAL_VOTING_ALREADY_ENDED</a>));
+    <b>assert</b>!(!proposal.is_resolved, <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EPROPOSAL_ALREADY_RESOLVED">EPROPOSAL_ALREADY_RESOLVED</a>));
 
     <b>if</b> (should_pass) {
         proposal.yes_votes = proposal.yes_votes + (num_votes <b>as</b> u128);
@@ -721,10 +721,10 @@ This guarantees that voting eligibility and voting power are controlled by the r
     // Record the resolvable time <b>to</b> ensure that resolution <b>has</b> <b>to</b> be done non-atomically.
     <b>let</b> timestamp_secs_bytes = to_bytes(&<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>());
     <b>let</b> key = utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>);
-    <b>if</b> (<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&proposal.metadata, &key)) {
-        *<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow_mut">simple_map::borrow_mut</a>(&<b>mut</b> proposal.metadata, &key) = timestamp_secs_bytes;
+    <b>if</b> (<a href="..\../aptos-stdlib\doc\simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&proposal.metadata, &key)) {
+        *<a href="..\../aptos-stdlib\doc\simple_map.md#0x1_simple_map_borrow_mut">simple_map::borrow_mut</a>(&<b>mut</b> proposal.metadata, &key) = timestamp_secs_bytes;
     } <b>else</b> {
-        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> proposal.metadata, key, timestamp_secs_bytes);
+        <a href="..\../aptos-stdlib\doc\simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> proposal.metadata, key, timestamp_secs_bytes);
     };
 
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="voting.md#0x1_voting_VoteEvent">VoteEvent</a>&gt;(
@@ -763,16 +763,16 @@ there are more yes votes than no. If either of these conditions is not met, this
     proposal_id: u64,
 ): ProposalType <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
     <b>let</b> proposal_state = <a href="voting.md#0x1_voting_get_proposal_state">get_proposal_state</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
-    <b>assert</b>!(proposal_state == <a href="voting.md#0x1_voting_PROPOSAL_STATE_SUCCEEDED">PROPOSAL_STATE_SUCCEEDED</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EPROPOSAL_CANNOT_BE_RESOLVED">EPROPOSAL_CANNOT_BE_RESOLVED</a>));
+    <b>assert</b>!(proposal_state == <a href="voting.md#0x1_voting_PROPOSAL_STATE_SUCCEEDED">PROPOSAL_STATE_SUCCEEDED</a>, <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EPROPOSAL_CANNOT_BE_RESOLVED">EPROPOSAL_CANNOT_BE_RESOLVED</a>));
 
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
-    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
-    <b>assert</b>!(!proposal.is_resolved, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EPROPOSAL_ALREADY_RESOLVED">EPROPOSAL_ALREADY_RESOLVED</a>));
+    <b>let</b> proposal = <a href="..\../aptos-stdlib\doc\table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
+    <b>assert</b>!(!proposal.is_resolved, <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EPROPOSAL_ALREADY_RESOLVED">EPROPOSAL_ALREADY_RESOLVED</a>));
 
     // We need <b>to</b> make sure that the resolution is happening in
-    // a separate transaction from the last vote <b>to</b> guard against <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> potential flashloan attacks.
-    <b>let</b> resolvable_time = to_u64(*<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(&proposal.metadata, &utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>)));
-    <b>assert</b>!(<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; resolvable_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_ERESOLUTION_CANNOT_BE_ATOMIC">ERESOLUTION_CANNOT_BE_ATOMIC</a>));
+    // a separate transaction from the last vote <b>to</b> guard against <a href="..\../aptos-stdlib\doc\any.md#0x1_any">any</a> potential flashloan attacks.
+    <b>let</b> resolvable_time = to_u64(*<a href="..\../aptos-stdlib\doc\simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(&proposal.metadata, &utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>)));
+    <b>assert</b>!(<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; resolvable_time, <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_ERESOLUTION_CANNOT_BE_ATOMIC">ERESOLUTION_CANNOT_BE_ATOMIC</a>));
 
     <b>let</b> resolved_early = <a href="voting.md#0x1_voting_can_be_resolved_early">can_be_resolved_early</a>(proposal);
     proposal.is_resolved = <b>true</b>;
@@ -780,7 +780,7 @@ there are more yes votes than no. If either of these conditions is not met, this
 
     <b>assert</b>!(
         <a href="transaction_context.md#0x1_transaction_context_get_script_hash">transaction_context::get_script_hash</a>() == proposal.execution_hash,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="voting.md#0x1_voting_EPROPOSAL_EXECUTION_HASH_NOT_MATCHING">EPROPOSAL_EXECUTION_HASH_NOT_MATCHING</a>),
+        <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="voting.md#0x1_voting_EPROPOSAL_EXECUTION_HASH_NOT_MATCHING">EPROPOSAL_EXECUTION_HASH_NOT_MATCHING</a>),
     );
 
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="voting.md#0x1_voting_ResolveProposal">ResolveProposal</a>&gt;(
@@ -793,7 +793,7 @@ there are more yes votes than no. If either of these conditions is not met, this
         },
     );
 
-    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> proposal.execution_content)
+    <a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> proposal.execution_content)
 }
 </code></pre>
 
@@ -818,7 +818,7 @@ there are more yes votes than no. If either of these conditions is not met, this
 
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_is_voting_closed">is_voting_closed</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
-    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
+    <b>let</b> proposal = <a href="..\../aptos-stdlib\doc\table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
     <a href="voting.md#0x1_voting_can_be_resolved_early">can_be_resolved_early</a>(proposal) || <a href="voting.md#0x1_voting_is_voting_period_over">is_voting_period_over</a>(proposal)
 }
 </code></pre>
@@ -844,8 +844,8 @@ Return true if the proposal has reached early resolution threshold (if specified
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_can_be_resolved_early">can_be_resolved_early</a>&lt;ProposalType: store&gt;(proposal: &<a href="voting.md#0x1_voting_Proposal">Proposal</a>&lt;ProposalType&gt;): bool {
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&proposal.early_resolution_vote_threshold)) {
-        <b>let</b> early_resolution_threshold = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&proposal.early_resolution_vote_threshold);
+    <b>if</b> (<a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_is_some">option::is_some</a>(&proposal.early_resolution_vote_threshold)) {
+        <b>let</b> early_resolution_threshold = *<a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_borrow">option::borrow</a>(&proposal.early_resolution_vote_threshold);
         <b>if</b> (proposal.yes_votes &gt;= early_resolution_threshold || proposal.no_votes &gt;= early_resolution_threshold) {
             <b>return</b> <b>true</b>
         };
@@ -884,7 +884,7 @@ Return the state of the proposal with given id.
 ): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
     <b>if</b> (<a href="voting.md#0x1_voting_is_voting_closed">is_voting_closed</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id)) {
         <b>let</b> voting_forum = <b>borrow_global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
-        <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&voting_forum.proposals, proposal_id);
+        <b>let</b> proposal = <a href="..\../aptos-stdlib\doc\table.md#0x1_table_borrow">table::borrow</a>(&voting_forum.proposals, proposal_id);
         <b>let</b> yes_votes = proposal.yes_votes;
         <b>let</b> no_votes = proposal.no_votes;
 
@@ -924,7 +924,7 @@ Return the proposal's expiration time.
     proposal_id: u64,
 ): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
-    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
+    <b>let</b> proposal = <a href="..\../aptos-stdlib\doc\table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
     proposal.expiration_secs
 }
 </code></pre>
@@ -940,7 +940,7 @@ Return the proposal's expiration time.
 Return the proposal's execution hash.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_execution_hash">get_execution_hash</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_execution_hash">get_execution_hash</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -952,9 +952,9 @@ Return the proposal's execution hash.
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_execution_hash">get_execution_hash</a>&lt;ProposalType: store&gt;(
     voting_forum_address: <b>address</b>,
     proposal_id: u64,
-): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+): <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
-    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
+    <b>let</b> proposal = <a href="..\../aptos-stdlib\doc\table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
     proposal.execution_hash
 }
 </code></pre>
@@ -984,7 +984,7 @@ Return true if the governance proposal has already been resolved.
     proposal_id: u64,
 ): bool <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
-    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
+    <b>let</b> proposal = <a href="..\../aptos-stdlib\doc\table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
     proposal.is_resolved
 }
 </code></pre>

@@ -19,7 +19,7 @@
     -  [Function `get_state_storage_usage_only_at_epoch_beginning`](#@Specification_1_get_state_storage_usage_only_at_epoch_beginning)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
 
@@ -140,7 +140,7 @@ usage after the last txn of the previous epoch is committed.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_initialize">initialize</a>(aptos_framework: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -149,11 +149,11 @@ usage after the last txn of the previous epoch is committed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_initialize">initialize</a>(aptos_framework: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>assert</b>!(
         !<b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>)
+        <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_already_exists">error::already_exists</a>(<a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>)
     );
     <b>move_to</b>(aptos_framework, <a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a> {
         epoch: 0,
@@ -187,7 +187,7 @@ usage after the last txn of the previous epoch is committed.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_new_block">on_new_block</a>(epoch: u64) <b>acquires</b> <a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a> {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>)
+        <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_not_found">error::not_found</a>(<a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>)
     );
     <b>let</b> usage = <b>borrow_global_mut</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
     <b>if</b> (epoch != usage.epoch) {
@@ -219,7 +219,7 @@ usage after the last txn of the previous epoch is committed.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_current_items_and_bytes">current_items_and_bytes</a>(): (u64, u64) <b>acquires</b> <a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a> {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>)
+        <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_not_found">error::not_found</a>(<a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>)
     );
     <b>let</b> usage = <b>borrow_global</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
     (usage.usage.items, usage.usage.bytes)

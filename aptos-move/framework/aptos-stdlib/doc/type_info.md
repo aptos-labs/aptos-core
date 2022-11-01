@@ -13,9 +13,11 @@
 -  [Function `type_name`](#0x1_type_info_type_name)
 -  [Function `verify_type_of`](#0x1_type_info_verify_type_of)
 -  [Function `verify_type_of_generic`](#0x1_type_info_verify_type_of_generic)
+-  [Specification](#@Specification_0)
+    -  [Function `type_of`](#@Specification_0_type_of)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<pre><code><b>use</b> <a href="..\../move-stdlib\doc\string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
 
@@ -43,13 +45,13 @@
 
 </dd>
 <dt>
-<code>module_name: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>module_name: <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>struct_name: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>struct_name: <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -89,7 +91,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_module_name">module_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_module_name">module_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>): <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -98,7 +100,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_module_name">module_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_module_name">module_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>): <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <a href="type_info.md#0x1_type_info">type_info</a>.module_name
 }
 </code></pre>
@@ -113,7 +115,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>): <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -122,7 +124,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>): <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <a href="type_info.md#0x1_type_info">type_info</a>.struct_name
 }
 </code></pre>
@@ -159,7 +161,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): <a href="..\../move-stdlib\doc\string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -168,7 +170,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): <a href="..\../move-stdlib\doc\string.md#0x1_string_String">string::String</a>;
 </code></pre>
 
 
@@ -238,6 +240,26 @@
 
 
 </details>
+
+<a name="@Specification_0"></a>
+
+## Specification
+
+
+<a name="@Specification_0_type_of"></a>
+
+### Function `type_of`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;(): <a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html

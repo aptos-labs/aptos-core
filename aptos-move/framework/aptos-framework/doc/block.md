@@ -25,9 +25,9 @@ This module defines a struct storing the metadata of the block and new block eve
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="state_storage.md#0x1_state_storage">0x1::state_storage</a>;
@@ -101,7 +101,7 @@ Should be in-sync with NewBlockEvent rust struct in new_block.rs
 
 <dl>
 <dt>
-<code><a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b></code>
+<code><a href="..\../aptos-stdlib\doc\hash.md#0x1_hash">hash</a>: <b>address</b></code>
 </dt>
 <dd>
 
@@ -125,7 +125,7 @@ Should be in-sync with NewBlockEvent rust struct in new_block.rs
 
 </dd>
 <dt>
-<code>previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>previous_block_votes_bitvec: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -137,7 +137,7 @@ Should be in-sync with NewBlockEvent rust struct in new_block.rs
 
 </dd>
 <dt>
-<code>failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
+<code>failed_proposer_indices: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
 </dt>
 <dd>
 
@@ -238,7 +238,7 @@ Epoch interval cannot be 0.
 This can only be called during Genesis.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="block.md#0x1_block_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch_interval_microsecs: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="block.md#0x1_block_initialize">initialize</a>(aptos_framework: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, epoch_interval_microsecs: u64)
 </code></pre>
 
 
@@ -247,9 +247,9 @@ This can only be called during Genesis.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="block.md#0x1_block_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch_interval_microsecs: u64) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="block.md#0x1_block_initialize">initialize</a>(aptos_framework: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, epoch_interval_microsecs: u64) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>assert</b>!(epoch_interval_microsecs &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="block.md#0x1_block_EZERO_EPOCH_INTERVAL">EZERO_EPOCH_INTERVAL</a>));
+    <b>assert</b>!(epoch_interval_microsecs &gt; 0, <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="block.md#0x1_block_EZERO_EPOCH_INTERVAL">EZERO_EPOCH_INTERVAL</a>));
 
     <b>move_to</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(
         aptos_framework,
@@ -275,7 +275,7 @@ Update the epoch interval.
 Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_update_epoch_interval_microsecs">update_epoch_interval_microsecs</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_epoch_interval: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_update_epoch_interval_microsecs">update_epoch_interval_microsecs</a>(aptos_framework: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, new_epoch_interval: u64)
 </code></pre>
 
 
@@ -285,11 +285,11 @@ Can only be called as part of the Aptos governance proposal process established 
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_update_epoch_interval_microsecs">update_epoch_interval_microsecs</a>(
-    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    aptos_framework: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>,
     new_epoch_interval: u64,
 ) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>assert</b>!(new_epoch_interval &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="block.md#0x1_block_EZERO_EPOCH_INTERVAL">EZERO_EPOCH_INTERVAL</a>));
+    <b>assert</b>!(new_epoch_interval &gt; 0, <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="block.md#0x1_block_EZERO_EPOCH_INTERVAL">EZERO_EPOCH_INTERVAL</a>));
 
     <b>let</b> block_resource = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
     <b>let</b> old_epoch_interval = block_resource.epoch_interval;
@@ -339,7 +339,7 @@ Set the metadata for the current block.
 The runtime always runs this before executing the transactions in a block.
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue">block_prologue</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64)
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue">block_prologue</a>(vm: <a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, <a href="..\../aptos-stdlib\doc\hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64)
 </code></pre>
 
 
@@ -349,13 +349,13 @@ The runtime always runs this before executing the transactions in a block.
 
 
 <pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue">block_prologue</a>(
-    vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>,
+    vm: <a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>,
+    <a href="..\../aptos-stdlib\doc\hash.md#0x1_hash">hash</a>: <b>address</b>,
     epoch: u64,
     round: u64,
     proposer: <b>address</b>,
-    failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    failed_proposer_indices: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    previous_block_votes_bitvec: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64
 ) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
     // Operational constraint: can only be invoked by the VM.
@@ -364,19 +364,19 @@ The runtime always runs this before executing the transactions in a block.
     // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
     <b>assert</b>!(
         proposer == @vm_reserved || <a href="stake.md#0x1_stake_is_current_epoch_validator">stake::is_current_epoch_validator</a>(proposer),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="block.md#0x1_block_EINVALID_PROPOSER">EINVALID_PROPOSER</a>),
+        <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="block.md#0x1_block_EINVALID_PROPOSER">EINVALID_PROPOSER</a>),
     );
 
-    <b>let</b> proposer_index = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    <b>let</b> proposer_index = <a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_none">option::none</a>();
     <b>if</b> (proposer != @vm_reserved) {
-        proposer_index = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="stake.md#0x1_stake_get_validator_index">stake::get_validator_index</a>(proposer));
+        proposer_index = <a href="..\../aptos-stdlib\../move-stdlib\doc\option.md#0x1_option_some">option::some</a>(<a href="stake.md#0x1_stake_get_validator_index">stake::get_validator_index</a>(proposer));
     };
 
     <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
     block_metadata_ref.height = <a href="event.md#0x1_event_counter">event::counter</a>(&block_metadata_ref.new_block_events);
 
     <b>let</b> new_block_event = <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
-        <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>,
+        <a href="..\../aptos-stdlib\doc\hash.md#0x1_hash">hash</a>,
         epoch,
         round,
         height: block_metadata_ref.height,
@@ -434,7 +434,7 @@ Get the current block height
 Emit the event and update height and global timestamp
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>)
+<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>)
 </code></pre>
 
 
@@ -443,11 +443,11 @@ Emit the event and update height and global timestamp
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> EventHandle&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>) {
+<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> EventHandle&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>) {
     <a href="timestamp.md#0x1_timestamp_update_global_time">timestamp::update_global_time</a>(vm, new_block_event.proposer, new_block_event.time_microseconds);
     <b>assert</b>!(
         <a href="event.md#0x1_event_counter">event::counter</a>(event_handle) == new_block_event.height,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="block.md#0x1_block_ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT">ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT</a>),
+        <a href="..\../aptos-stdlib\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="block.md#0x1_block_ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT">ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT</a>),
     );
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;(event_handle, new_block_event);
 }
@@ -465,7 +465,7 @@ Emit a <code><a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a></code>
 reconfiguration event.
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_genesis_block_event">emit_genesis_block_event</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_genesis_block_event">emit_genesis_block_event</a>(vm: <a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -474,20 +474,20 @@ reconfiguration event.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_genesis_block_event">emit_genesis_block_event</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
+<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_genesis_block_event">emit_genesis_block_event</a>(vm: <a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
     <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
     <b>let</b> genesis_id = @0x0;
     <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(
         &vm,
         &<b>mut</b> block_metadata_ref.new_block_events,
         <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
-            <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: genesis_id,
+            <a href="..\../aptos-stdlib\doc\hash.md#0x1_hash">hash</a>: genesis_id,
             epoch: 0,
             round: 0,
             height: 0,
-            previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
+            previous_block_votes_bitvec: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector_empty">vector::empty</a>(),
             proposer: @vm_reserved,
-            failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
+            failed_proposer_indices: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector_empty">vector::empty</a>(),
             time_microseconds: 0,
         }
     );
@@ -506,7 +506,7 @@ Emit a <code><a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a></code>
 new block event for WriteSetPayload.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_emit_writeset_block_event">emit_writeset_block_event</a>(vm_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fake_block_hash: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_emit_writeset_block_event">emit_writeset_block_event</a>(vm_signer: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, fake_block_hash: <b>address</b>)
 </code></pre>
 
 
@@ -515,7 +515,7 @@ new block event for WriteSetPayload.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_emit_writeset_block_event">emit_writeset_block_event</a>(vm_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fake_block_hash: <b>address</b>) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_emit_writeset_block_event">emit_writeset_block_event</a>(vm_signer: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, fake_block_hash: <b>address</b>) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm_signer);
     <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
     block_metadata_ref.height = <a href="event.md#0x1_event_counter">event::counter</a>(&block_metadata_ref.new_block_events);
@@ -523,13 +523,13 @@ new block event for WriteSetPayload.
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;(
         &<b>mut</b> block_metadata_ref.new_block_events,
         <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
-            <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: fake_block_hash,
+            <a href="..\../aptos-stdlib\doc\hash.md#0x1_hash">hash</a>: fake_block_hash,
             epoch: <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>(),
             round: <a href="block.md#0x1_block_MAX_U64">MAX_U64</a>,
             height: block_metadata_ref.height,
-            previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
+            previous_block_votes_bitvec: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector_empty">vector::empty</a>(),
             proposer: @vm_reserved,
-            failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
+            failed_proposer_indices: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector_empty">vector::empty</a>(),
             time_microseconds: <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>(),
         }
     );
@@ -556,7 +556,7 @@ new block event for WriteSetPayload.
 ### Function `block_prologue`
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue">block_prologue</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64)
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue">block_prologue</a>(vm: <a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, <a href="..\../aptos-stdlib\doc\hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64)
 </code></pre>
 
 
@@ -578,7 +578,7 @@ new block event for WriteSetPayload.
 ### Function `emit_new_block_event`
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>)
+<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>)
 </code></pre>
 
 
@@ -601,7 +601,7 @@ new block event for WriteSetPayload.
 ### Function `emit_genesis_block_event`
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_genesis_block_event">emit_genesis_block_event</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_genesis_block_event">emit_genesis_block_event</a>(vm: <a href="..\../aptos-stdlib\../move-stdlib\doc\signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 

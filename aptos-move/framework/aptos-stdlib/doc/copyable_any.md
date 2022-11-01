@@ -12,10 +12,10 @@
 -  [Function `type_name`](#0x1_copyable_any_type_name)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
-<b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="..\../move-stdlib\doc\bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="..\../move-stdlib\doc\error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
-<b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="..\../move-stdlib\doc\string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="type_info.md#0x1_type_info">0x1::type_info</a>;
 </code></pre>
 
@@ -39,13 +39,13 @@ The same as <code><a href="any.md#0x1_any_Any">any::Any</a></code> but with the 
 
 <dl>
 <dt>
-<code>type_name: <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+<code>type_name: <a href="..\../move-stdlib\doc\string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>data: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>data: <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -90,7 +90,7 @@ also required from <code>T</code>.
 <pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_pack">pack</a>&lt;T: drop + store + <b>copy</b>&gt;(x: T): <a href="copyable_any.md#0x1_copyable_any_Any">Any</a> {
     <a href="copyable_any.md#0x1_copyable_any_Any">Any</a> {
         type_name: <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;(),
-        data: <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&x)
+        data: <a href="..\../move-stdlib\doc\bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&x)
     }
 }
 </code></pre>
@@ -116,7 +116,7 @@ Unpack a value from the <code><a href="copyable_any.md#0x1_copyable_any_Any">Any
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_unpack">unpack</a>&lt;T&gt;(x: <a href="copyable_any.md#0x1_copyable_any_Any">Any</a>): T {
-    <b>assert</b>!(<a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() == x.type_name, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="copyable_any.md#0x1_copyable_any_ETYPE_MISMATCH">ETYPE_MISMATCH</a>));
+    <b>assert</b>!(<a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() == x.type_name, <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="copyable_any.md#0x1_copyable_any_ETYPE_MISMATCH">ETYPE_MISMATCH</a>));
     from_bytes&lt;T&gt;(x.data)
 }
 </code></pre>
@@ -132,7 +132,7 @@ Unpack a value from the <code><a href="copyable_any.md#0x1_copyable_any_Any">Any
 Returns the type name of this Any
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_type_name">type_name</a>(x: &<a href="copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a>): &<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_type_name">type_name</a>(x: &<a href="copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a>): &<a href="..\../move-stdlib\doc\string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 

@@ -110,9 +110,9 @@ is_valid_delegate_for_feature(d);
 -  [Specification](#@Specification_4)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
-<b>use</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
+<pre><code><b>use</b> <a href="..\../move-stdlib\doc\error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="..\../move-stdlib\doc\signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="..\../move-stdlib\doc\vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
 
@@ -192,7 +192,7 @@ An internal data structure for representing a configured capability.
 
 <dl>
 <dt>
-<code>delegates: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;</code>
+<code>delegates: <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;</code>
 </dt>
 <dd>
 
@@ -273,7 +273,7 @@ Creates a new capability class, owned by the passed signer. A caller must pass a
 they own the <code>Feature</code> type parameter.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_create">create</a>&lt;Feature&gt;(owner: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _feature_witness: &Feature)
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_create">create</a>&lt;Feature&gt;(owner: &<a href="..\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, _feature_witness: &Feature)
 </code></pre>
 
 
@@ -282,10 +282,10 @@ they own the <code>Feature</code> type parameter.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_create">create</a>&lt;Feature&gt;(owner: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _feature_witness: &Feature) {
-    <b>let</b> addr = <a href="../../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
-    <b>assert</b>!(!<b>exists</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(addr), <a href="../../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="capability.md#0x1_capability_ECAPABILITY_ALREADY_EXISTS">ECAPABILITY_ALREADY_EXISTS</a>));
-    <b>move_to</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(owner, <a href="capability.md#0x1_capability_CapState">CapState</a> { delegates: <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>() });
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_create">create</a>&lt;Feature&gt;(owner: &<a href="..\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, _feature_witness: &Feature) {
+    <b>let</b> addr = <a href="..\../move-stdlib\doc\signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(addr), <a href="..\../move-stdlib\doc\error.md#0x1_error_already_exists">error::already_exists</a>(<a href="capability.md#0x1_capability_ECAPABILITY_ALREADY_EXISTS">ECAPABILITY_ALREADY_EXISTS</a>));
+    <b>move_to</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(owner, <a href="capability.md#0x1_capability_CapState">CapState</a> { delegates: <a href="..\../move-stdlib\doc\vector.md#0x1_vector_empty">vector::empty</a>() });
 }
 </code></pre>
 
@@ -302,7 +302,7 @@ can succeed with this operation. A caller must pass a witness that they own the 
 parameter.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_acquire">acquire</a>&lt;Feature&gt;(requester: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _feature_witness: &Feature): <a href="capability.md#0x1_capability_Cap">capability::Cap</a>&lt;Feature&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_acquire">acquire</a>&lt;Feature&gt;(requester: &<a href="..\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, _feature_witness: &Feature): <a href="capability.md#0x1_capability_Cap">capability::Cap</a>&lt;Feature&gt;
 </code></pre>
 
 
@@ -311,7 +311,7 @@ parameter.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_acquire">acquire</a>&lt;Feature&gt;(requester: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _feature_witness: &Feature): <a href="capability.md#0x1_capability_Cap">Cap</a>&lt;Feature&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_acquire">acquire</a>&lt;Feature&gt;(requester: &<a href="..\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, _feature_witness: &Feature): <a href="capability.md#0x1_capability_Cap">Cap</a>&lt;Feature&gt;
 <b>acquires</b> <a href="capability.md#0x1_capability_CapState">CapState</a>, <a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a> {
     <a href="capability.md#0x1_capability_Cap">Cap</a>&lt;Feature&gt; { root: <a href="capability.md#0x1_capability_validate_acquire">validate_acquire</a>&lt;Feature&gt;(requester) }
 }
@@ -329,7 +329,7 @@ Acquires a linear capability token. It is up to the module which owns <code>Feat
 whether to expose a linear or non-linear capability.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_acquire_linear">acquire_linear</a>&lt;Feature&gt;(requester: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _feature_witness: &Feature): <a href="capability.md#0x1_capability_LinearCap">capability::LinearCap</a>&lt;Feature&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_acquire_linear">acquire_linear</a>&lt;Feature&gt;(requester: &<a href="..\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, _feature_witness: &Feature): <a href="capability.md#0x1_capability_LinearCap">capability::LinearCap</a>&lt;Feature&gt;
 </code></pre>
 
 
@@ -338,7 +338,7 @@ whether to expose a linear or non-linear capability.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_acquire_linear">acquire_linear</a>&lt;Feature&gt;(requester: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _feature_witness: &Feature): <a href="capability.md#0x1_capability_LinearCap">LinearCap</a>&lt;Feature&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_acquire_linear">acquire_linear</a>&lt;Feature&gt;(requester: &<a href="..\../move-stdlib\doc\signer.md#0x1_signer">signer</a>, _feature_witness: &Feature): <a href="capability.md#0x1_capability_LinearCap">LinearCap</a>&lt;Feature&gt;
 <b>acquires</b> <a href="capability.md#0x1_capability_CapState">CapState</a>, <a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a> {
     <a href="capability.md#0x1_capability_LinearCap">LinearCap</a>&lt;Feature&gt; { root: <a href="capability.md#0x1_capability_validate_acquire">validate_acquire</a>&lt;Feature&gt;(requester) }
 }
@@ -355,7 +355,7 @@ whether to expose a linear or non-linear capability.
 Helper to validate an acquire. Returns the root address of the capability.
 
 
-<pre><code><b>fun</b> <a href="capability.md#0x1_capability_validate_acquire">validate_acquire</a>&lt;Feature&gt;(requester: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <b>address</b>
+<pre><code><b>fun</b> <a href="capability.md#0x1_capability_validate_acquire">validate_acquire</a>&lt;Feature&gt;(requester: &<a href="..\../move-stdlib\doc\signer.md#0x1_signer">signer</a>): <b>address</b>
 </code></pre>
 
 
@@ -364,18 +364,18 @@ Helper to validate an acquire. Returns the root address of the capability.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="capability.md#0x1_capability_validate_acquire">validate_acquire</a>&lt;Feature&gt;(requester: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <b>address</b>
+<pre><code><b>fun</b> <a href="capability.md#0x1_capability_validate_acquire">validate_acquire</a>&lt;Feature&gt;(requester: &<a href="..\../move-stdlib\doc\signer.md#0x1_signer">signer</a>): <b>address</b>
 <b>acquires</b> <a href="capability.md#0x1_capability_CapState">CapState</a>, <a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a> {
-    <b>let</b> addr = <a href="../../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(requester);
+    <b>let</b> addr = <a href="..\../move-stdlib\doc\signer.md#0x1_signer_address_of">signer::address_of</a>(requester);
     <b>if</b> (<b>exists</b>&lt;<a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr)) {
         <b>let</b> root_addr = <b>borrow_global</b>&lt;<a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr).root;
         // double check that requester is actually registered <b>as</b> a delegate
-        <b>assert</b>!(<b>exists</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(root_addr), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="capability.md#0x1_capability_EDELEGATE">EDELEGATE</a>));
-        <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(&<b>borrow_global</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(root_addr).delegates, &addr),
-            <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="capability.md#0x1_capability_EDELEGATE">EDELEGATE</a>));
+        <b>assert</b>!(<b>exists</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(root_addr), <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="capability.md#0x1_capability_EDELEGATE">EDELEGATE</a>));
+        <b>assert</b>!(<a href="..\../move-stdlib\doc\vector.md#0x1_vector_contains">vector::contains</a>(&<b>borrow_global</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(root_addr).delegates, &addr),
+            <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="capability.md#0x1_capability_EDELEGATE">EDELEGATE</a>));
         root_addr
     } <b>else</b> {
-        <b>assert</b>!(<b>exists</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(addr), <a href="../../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="capability.md#0x1_capability_ECAPABILITY_NOT_FOUND">ECAPABILITY_NOT_FOUND</a>));
+        <b>assert</b>!(<b>exists</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(addr), <a href="..\../move-stdlib\doc\error.md#0x1_error_not_found">error::not_found</a>(<a href="capability.md#0x1_capability_ECAPABILITY_NOT_FOUND">ECAPABILITY_NOT_FOUND</a>));
         addr
     }
 }
@@ -444,7 +444,7 @@ Registers a delegation relation. If the relation already exists, this function d
 nothing.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_delegate">delegate</a>&lt;Feature&gt;(cap: <a href="capability.md#0x1_capability_Cap">capability::Cap</a>&lt;Feature&gt;, _feature_witness: &Feature, <b>to</b>: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_delegate">delegate</a>&lt;Feature&gt;(cap: <a href="capability.md#0x1_capability_Cap">capability::Cap</a>&lt;Feature&gt;, _feature_witness: &Feature, <b>to</b>: &<a href="..\../move-stdlib\doc\signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -453,9 +453,9 @@ nothing.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_delegate">delegate</a>&lt;Feature&gt;(cap: <a href="capability.md#0x1_capability_Cap">Cap</a>&lt;Feature&gt;, _feature_witness: &Feature, <b>to</b>: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_delegate">delegate</a>&lt;Feature&gt;(cap: <a href="capability.md#0x1_capability_Cap">Cap</a>&lt;Feature&gt;, _feature_witness: &Feature, <b>to</b>: &<a href="..\../move-stdlib\doc\signer.md#0x1_signer">signer</a>)
 <b>acquires</b> <a href="capability.md#0x1_capability_CapState">CapState</a> {
-    <b>let</b> addr = <a href="../../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<b>to</b>);
+    <b>let</b> addr = <a href="..\../move-stdlib\doc\signer.md#0x1_signer_address_of">signer::address_of</a>(<b>to</b>);
     <b>if</b> (<b>exists</b>&lt;<a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr)) <b>return</b>;
     <b>move_to</b>(<b>to</b>, <a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt; { root: cap.root });
     <a href="capability.md#0x1_capability_add_element">add_element</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(cap.root).delegates, addr);
@@ -502,7 +502,7 @@ Revokes a delegation relation. If no relation exists, this function does nothing
 Helper to remove an element from a vector.
 
 
-<pre><code><b>fun</b> <a href="capability.md#0x1_capability_remove_element">remove_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;E&gt;, x: &E)
+<pre><code><b>fun</b> <a href="capability.md#0x1_capability_remove_element">remove_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;E&gt;, x: &E)
 </code></pre>
 
 
@@ -511,10 +511,10 @@ Helper to remove an element from a vector.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="capability.md#0x1_capability_remove_element">remove_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;E&gt;, x: &E) {
-    <b>let</b> (found, index) = <a href="../../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(v, x);
+<pre><code><b>fun</b> <a href="capability.md#0x1_capability_remove_element">remove_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;E&gt;, x: &E) {
+    <b>let</b> (found, index) = <a href="..\../move-stdlib\doc\vector.md#0x1_vector_index_of">vector::index_of</a>(v, x);
     <b>if</b> (found) {
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_remove">vector::remove</a>(v, index);
+        <a href="..\../move-stdlib\doc\vector.md#0x1_vector_remove">vector::remove</a>(v, index);
     }
 }
 </code></pre>
@@ -530,7 +530,7 @@ Helper to remove an element from a vector.
 Helper to add an element to a vector.
 
 
-<pre><code><b>fun</b> <a href="capability.md#0x1_capability_add_element">add_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;E&gt;, x: E)
+<pre><code><b>fun</b> <a href="capability.md#0x1_capability_add_element">add_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;E&gt;, x: E)
 </code></pre>
 
 
@@ -539,9 +539,9 @@ Helper to add an element to a vector.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="capability.md#0x1_capability_add_element">add_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;E&gt;, x: E) {
-    <b>if</b> (!<a href="../../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(v, &x)) {
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(v, x)
+<pre><code><b>fun</b> <a href="capability.md#0x1_capability_add_element">add_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;E&gt;, x: E) {
+    <b>if</b> (!<a href="..\../move-stdlib\doc\vector.md#0x1_vector_contains">vector::contains</a>(v, &x)) {
+        <a href="..\../move-stdlib\doc\vector.md#0x1_vector_push_back">vector::push_back</a>(v, x)
     }
 }
 </code></pre>
@@ -572,7 +572,7 @@ Helper specification function to obtain the delegates of a capability.
 <a name="0x1_capability_spec_delegates"></a>
 
 
-<pre><code><b>fun</b> <a href="capability.md#0x1_capability_spec_delegates">spec_delegates</a>&lt;Feature&gt;(addr: <b>address</b>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; {
+<pre><code><b>fun</b> <a href="capability.md#0x1_capability_spec_delegates">spec_delegates</a>&lt;Feature&gt;(addr: <b>address</b>): <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; {
    <b>global</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(addr).delegates
 }
 </code></pre>

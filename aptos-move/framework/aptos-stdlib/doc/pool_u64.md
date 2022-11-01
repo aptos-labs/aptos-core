@@ -46,9 +46,9 @@
 -  [Function `to_u128`](#0x1_pool_u64_to_u128)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="..\../move-stdlib\doc\error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="simple_map.md#0x1_simple_map">0x1::simple_map</a>;
-<b>use</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
+<b>use</b> <a href="..\../move-stdlib\doc\vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
 
@@ -94,7 +94,7 @@
 
 </dd>
 <dt>
-<code>shareholders: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;</code>
+<code>shareholders: <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;</code>
 </dt>
 <dd>
 
@@ -242,7 +242,7 @@ Create a new pool with custom <code>scaling_factor</code>.
         total_coins: 0,
         total_shares: 0,
         shares: <a href="simple_map.md#0x1_simple_map_create">simple_map::create</a>&lt;<b>address</b>, u64&gt;(),
-        shareholders: <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<b>address</b>&gt;(),
+        shareholders: <a href="..\../move-stdlib\doc\vector.md#0x1_vector_empty">vector::empty</a>&lt;<b>address</b>&gt;(),
         scaling_factor,
     }
 }
@@ -269,7 +269,7 @@ Destroy an empty pool. This will fail if the pool has any balance of coins.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_destroy_empty">destroy_empty</a>(pool: <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>) {
-    <b>assert</b>!(pool.total_coins == 0, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="pool_u64.md#0x1_pool_u64_EPOOL_IS_NOT_EMPTY">EPOOL_IS_NOT_EMPTY</a>));
+    <b>assert</b>!(pool.total_coins == 0, <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="pool_u64.md#0x1_pool_u64_EPOOL_IS_NOT_EMPTY">EPOOL_IS_NOT_EMPTY</a>));
     <b>let</b> <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a> {
         shareholders_limit: _,
         total_coins: _,
@@ -422,7 +422,7 @@ Return the balance in coins of <code>shareholder</code> in <code>pool.</code>
 Return the list of shareholders in <code>pool</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_shareholders">shareholders</a>(pool: &<a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_shareholders">shareholders</a>(pool: &<a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>): <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
 </code></pre>
 
 
@@ -431,7 +431,7 @@ Return the list of shareholders in <code>pool</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_shareholders">shareholders</a>(pool: &<a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_shareholders">shareholders</a>(pool: &<a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>): <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; {
     pool.shareholders
 }
 </code></pre>
@@ -457,7 +457,7 @@ Return the number of shareholders in <code>pool</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_shareholders_count">shareholders_count</a>(pool: &<a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>): u64 {
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&pool.shareholders)
+    <a href="..\../move-stdlib\doc\vector.md#0x1_vector_length">vector::length</a>(&pool.shareholders)
 }
 </code></pre>
 
@@ -510,8 +510,8 @@ Allow an existing or new shareholder to add their coins to the pool in exchange 
     <b>if</b> (coins_amount == 0) <b>return</b> 0;
 
     <b>let</b> new_shares = <a href="pool_u64.md#0x1_pool_u64_amount_to_shares">amount_to_shares</a>(pool, coins_amount);
-    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_MAX_U64">MAX_U64</a> - pool.total_coins &gt;= coins_amount, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_EPOOL_TOTAL_COINS_OVERFLOW">EPOOL_TOTAL_COINS_OVERFLOW</a>));
-    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_MAX_U64">MAX_U64</a> - pool.total_shares &gt;= new_shares, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_EPOOL_TOTAL_COINS_OVERFLOW">EPOOL_TOTAL_COINS_OVERFLOW</a>));
+    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_MAX_U64">MAX_U64</a> - pool.total_coins &gt;= coins_amount, <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_EPOOL_TOTAL_COINS_OVERFLOW">EPOOL_TOTAL_COINS_OVERFLOW</a>));
+    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_MAX_U64">MAX_U64</a> - pool.total_shares &gt;= new_shares, <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_EPOOL_TOTAL_COINS_OVERFLOW">EPOOL_TOTAL_COINS_OVERFLOW</a>));
 
     pool.total_coins = pool.total_coins + coins_amount;
     pool.total_shares = pool.total_shares + new_shares;
@@ -545,17 +545,17 @@ This would dilute other shareholders if the pool's balance of coins didn't chang
     <b>if</b> (<a href="pool_u64.md#0x1_pool_u64_contains">contains</a>(pool, shareholder)) {
         <b>let</b> existing_shares = <a href="simple_map.md#0x1_simple_map_borrow_mut">simple_map::borrow_mut</a>(&<b>mut</b> pool.shares, &shareholder);
         <b>let</b> current_shares = *existing_shares;
-        <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_MAX_U64">MAX_U64</a> - current_shares &gt;= new_shares, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_ESHAREHOLDER_SHARES_OVERFLOW">ESHAREHOLDER_SHARES_OVERFLOW</a>));
+        <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_MAX_U64">MAX_U64</a> - current_shares &gt;= new_shares, <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_ESHAREHOLDER_SHARES_OVERFLOW">ESHAREHOLDER_SHARES_OVERFLOW</a>));
 
         *existing_shares = current_shares + new_shares;
         *existing_shares
     } <b>else</b> <b>if</b> (new_shares &gt; 0) {
         <b>assert</b>!(
-            <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&pool.shareholders) &lt; pool.shareholders_limit,
-            <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="pool_u64.md#0x1_pool_u64_ETOO_MANY_SHAREHOLDERS">ETOO_MANY_SHAREHOLDERS</a>),
+            <a href="..\../move-stdlib\doc\vector.md#0x1_vector_length">vector::length</a>(&pool.shareholders) &lt; pool.shareholders_limit,
+            <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="pool_u64.md#0x1_pool_u64_ETOO_MANY_SHAREHOLDERS">ETOO_MANY_SHAREHOLDERS</a>),
         );
 
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> pool.shareholders, shareholder);
+        <a href="..\../move-stdlib\doc\vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> pool.shareholders, shareholder);
         <a href="simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> pool.shares, shareholder, new_shares);
         new_shares
     } <b>else</b> {
@@ -585,8 +585,8 @@ Allow <code>shareholder</code> to redeem their shares in <code>pool</code> for c
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_redeem_shares">redeem_shares</a>(pool: &<b>mut</b> <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>, shareholder: <b>address</b>, shares_to_redeem: u64): u64 {
-    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_contains">contains</a>(pool, shareholder), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
-    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_shares">shares</a>(pool, shareholder) &gt;= shares_to_redeem, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
+    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_contains">contains</a>(pool, shareholder), <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
+    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_shares">shares</a>(pool, shareholder) &gt;= shares_to_redeem, <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
 
     <b>if</b> (shares_to_redeem == 0) <b>return</b> 0;
 
@@ -625,8 +625,8 @@ Transfer shares from <code>shareholder_1</code> to <code>shareholder_2</code>.
     shareholder_2: <b>address</b>,
     shares_to_transfer: u64,
 ) {
-    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_contains">contains</a>(pool, shareholder_1), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
-    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_shares">shares</a>(pool, shareholder_1) &gt;= shares_to_transfer, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
+    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_contains">contains</a>(pool, shareholder_1), <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
+    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_shares">shares</a>(pool, shareholder_1) &gt;= shares_to_transfer, <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
     <b>if</b> (shares_to_transfer == 0) <b>return</b>;
 
     <a href="pool_u64.md#0x1_pool_u64_deduct_shares">deduct_shares</a>(pool, shareholder_1, shares_to_transfer);
@@ -655,8 +655,8 @@ Directly deduct <code>shareholder</code>'s number of shares in <code>pool</code>
 
 
 <pre><code><b>fun</b> <a href="pool_u64.md#0x1_pool_u64_deduct_shares">deduct_shares</a>(pool: &<b>mut</b> <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>, shareholder: <b>address</b>, num_shares: u64): u64 {
-    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_contains">contains</a>(pool, shareholder), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
-    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_shares">shares</a>(pool, shareholder) &gt;= num_shares, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
+    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_contains">contains</a>(pool, shareholder), <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
+    <b>assert</b>!(<a href="pool_u64.md#0x1_pool_u64_shares">shares</a>(pool, shareholder) &gt;= num_shares, <a href="..\../move-stdlib\doc\error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64.md#0x1_pool_u64_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
 
     <b>let</b> existing_shares = <a href="simple_map.md#0x1_simple_map_borrow_mut">simple_map::borrow_mut</a>(&<b>mut</b> pool.shares, &shareholder);
     *existing_shares = *existing_shares - num_shares;
@@ -664,8 +664,8 @@ Directly deduct <code>shareholder</code>'s number of shares in <code>pool</code>
     // Remove the shareholder completely <b>if</b> they have no shares left.
     <b>let</b> remaining_shares = *existing_shares;
     <b>if</b> (remaining_shares == 0) {
-        <b>let</b> (_, shareholder_index) = <a href="../../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(&pool.shareholders, &shareholder);
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_remove">vector::remove</a>(&<b>mut</b> pool.shareholders, shareholder_index);
+        <b>let</b> (_, shareholder_index) = <a href="..\../move-stdlib\doc\vector.md#0x1_vector_index_of">vector::index_of</a>(&pool.shareholders, &shareholder);
+        <a href="..\../move-stdlib\doc\vector.md#0x1_vector_remove">vector::remove</a>(&<b>mut</b> pool.shareholders, shareholder_index);
         <a href="simple_map.md#0x1_simple_map_remove">simple_map::remove</a>(&<b>mut</b> pool.shares, &shareholder);
     };
 

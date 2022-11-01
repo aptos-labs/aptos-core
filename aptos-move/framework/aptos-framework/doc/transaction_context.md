@@ -21,7 +21,7 @@
 Return the script hash of the current entry function.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -30,7 +30,7 @@ Return the script hash of the current entry function.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -47,7 +47,7 @@ Return the script hash of the current entry function.
 ### Function `get_script_hash`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="..\../aptos-stdlib\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 

@@ -21,7 +21,7 @@ Non-cryptograhic hashes:
     -  [Function `sip_hash_from_value`](#@Specification_0_sip_hash_from_value)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<pre><code><b>use</b> <a href="..\../move-stdlib\doc\bcs.md#0x1_bcs">0x1::bcs</a>;
 </code></pre>
 
 
@@ -32,7 +32,7 @@ Non-cryptograhic hashes:
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash">sip_hash</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash">sip_hash</a>(bytes: <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
@@ -41,7 +41,7 @@ Non-cryptograhic hashes:
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash">sip_hash</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash">sip_hash</a>(bytes: <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 
@@ -64,7 +64,7 @@ Non-cryptograhic hashes:
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash_from_value">sip_hash_from_value</a>&lt;MoveValue&gt;(v: &MoveValue): u64 {
-    <b>let</b> bytes = <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(v);
+    <b>let</b> bytes = <a href="..\../move-stdlib\doc\bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(v);
 
     <a href="hash.md#0x1_aptos_hash_sip_hash">sip_hash</a>(bytes)
 }
@@ -80,7 +80,7 @@ Non-cryptograhic hashes:
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_keccak256">keccak256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_keccak256">keccak256</a>(bytes: <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -89,7 +89,7 @@ Non-cryptograhic hashes:
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_keccak256">keccak256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_keccak256">keccak256</a>(bytes: <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -106,7 +106,7 @@ Non-cryptograhic hashes:
 ### Function `sip_hash`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash">sip_hash</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash">sip_hash</a>(bytes: <a href="..\../move-stdlib\doc\vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
