@@ -7,6 +7,11 @@ slug: "resource-accounts"
 
 A [resource account](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/resource_account.move) is a developer feature used to manage resources independent of an account managed by a user, specifically publishing modules and automatically signing for transactions. For example, a developer may use a resource account to manage an account for module publishing, say managing a contract. The contract itself does not require a signer post initialization. A resource account gives you the means for the module to provide a signer to other modules and sign transactions on behalf of the module.
 
+Typically, a resource account is used for two main purposes:
+
+* Store and isolate resources; a module creates a resource account just to host specific resources.
+* Publish module as a standalone (resource) account, a building block in a decentralized design where no private keys can control the resource account. The ownership (SignerCap) can be kept in another module, such as governance.
+
 ## Restrictions
 
 In Aptos, a resource account is created based upon the SHA3-256 hash of the source's address and additional seed data. A resource account can be created only once. An entity may call `create_account` in an attempt to claim an account ahead of the creation of a resource account. But if a resource account is found, Aptos will transition ownership of the account over to the resource account. This is done by validating that the account has yet to execute any transactions and that the `Account::signer_capbility_offer::for` is none. The probability of a collision where someone has legitimately produced a private key that maps to a resource account address is improbably low.
