@@ -935,11 +935,6 @@ impl MovePackageDir {
             .map(|(key, value)| (key, value.account_address))
             .collect()
     }
-
-    pub fn add_named_address(&mut self, key: String, value: String) {
-        self.named_addresses
-            .insert(key, AccountAddressWrapper::from_str(&value).unwrap());
-    }
 }
 
 /// A wrapper around `AccountAddress` to be more flexible from strings than AccountAddress
