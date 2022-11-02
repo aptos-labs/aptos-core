@@ -1,12 +1,12 @@
 ---
-title: "Indexing"
+title: "Indexing in Aptos"
 slug: "indexing"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Indexing
+# Indexing in Aptos
 
 ## Concept
 
