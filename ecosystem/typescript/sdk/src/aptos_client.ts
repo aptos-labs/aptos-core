@@ -122,6 +122,10 @@ export class AptosClient {
 
   /**
    * Queries modules associated with given account
+   *
+   * Note: In order to get all account modules, this function may call the API
+   * multiple times as it paginates.
+   *
    * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
    * @returns Account modules array for a specific ledger version.
@@ -133,14 +137,21 @@ export class AptosClient {
     accountAddress: MaybeHexString,
     query?: { ledgerVersion?: AnyNumber },
   ): Promise<Gen.MoveModuleBytecode[]> {
-    return this.client.accounts.getAccountModules(
-      HexString.ensure(accountAddress).hex(),
-      query?.ledgerVersion?.toString(),
-    );
+    // Note: This function does not expose a `limit` parameter because it might
+    // be ambiguous how this is being used. Is it being passed to getAccountModules
+    // to limit the number of items per response, or does it limit the total output
+    // of this function? We avoid this confusion by not exposing the parameter at all.
+    const f = this.client.accounts.getAccountModules.bind({ httpRequest: this.client.request });
+    const out = await paginateWithCursor(f, accountAddress, 100, query);
+    return out;
   }
 
   /**
    * Queries module associated with given account by module name
+   *
+   * Note: In order to get all account resources, this function may call the API
+   * multiple times as it paginates.
+   *
    * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param moduleName The name of the module
    * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
@@ -172,10 +183,9 @@ export class AptosClient {
     accountAddress: MaybeHexString,
     query?: { ledgerVersion?: AnyNumber },
   ): Promise<Gen.MoveResource[]> {
-    return this.client.accounts.getAccountResources(
-      HexString.ensure(accountAddress).hex(),
-      query?.ledgerVersion?.toString(),
-    );
+    const f = this.client.accounts.getAccountResources.bind({ httpRequest: this.client.request });
+    const out = await paginateWithCursor(f, accountAddress, 1000, query);
+    return out;
   }
 
   /**
@@ -954,4 +964,43 @@ function parseApiError(target: unknown, propertyKey: string, descriptor: Propert
     }
   };
   return descriptor;
+}
+
+/// This function is a helper for paginating using a function wrapping an API
+/// endpoint that supports cursor based pagination.
+async function paginateWithCursor<T>(
+  apiFunction: (
+    address: string,
+    ledgerVersion?: string | undefined,
+    start?: string | undefined,
+    limit?: number | undefined,
+  ) => Promise<T[]>,
+  accountAddress: MaybeHexString,
+  limitPerRequest: number,
+  query?: { ledgerVersion?: AnyNumber },
+): Promise<T[]> {
+  const out = [];
+  let cursor: string | undefined;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    // eslint-disable-next-line no-await-in-loop
+    const response = await apiFunction(
+      HexString.ensure(accountAddress).hex(),
+      query?.ledgerVersion?.toString(),
+      cursor,
+      limitPerRequest,
+    );
+    // Response is the main response, i.e. the T[]. Attached to that are the headers as `__headers`.
+    // eslint-disable-next-line no-underscore-dangle
+    cursor = (response as any).__headers["x-aptos-cursor"];
+    // Now that we have the cursor (if any), we remove the headers before
+    // adding these to the output of this function.
+    // eslint-disable-next-line no-underscore-dangle
+    delete (response as any).__headers;
+    out.push(...response);
+    if (cursor === null || cursor === undefined) {
+      break;
+    }
+  }
+  return out;
 }
