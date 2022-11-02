@@ -89,7 +89,6 @@ pub struct QuorumStore {
 // }
 
 // use std::future::Future;
-use std::time::Duration;
 
 // pub fn spawn_monitored<T>(name: &'static str, future: T)
 // where
@@ -159,16 +158,16 @@ impl QuorumStore {
             config.db_quota,
         );
 
-        let metrics_monitor = tokio_metrics::TaskMonitor::new();
-        {
-            let metrics_monitor = metrics_monitor.clone();
-            tokio::spawn(async move {
-                for interval in metrics_monitor.intervals() {
-                    println!("QuorumStore:{:?}", interval);
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                }
-            });
-        }
+        // let metrics_monitor = tokio_metrics::TaskMonitor::new();
+        // {
+        //     let metrics_monitor = metrics_monitor.clone();
+        //     tokio::spawn(async move {
+        //         for interval in metrics_monitor.intervals() {
+        //             println!("QuorumStore:{:?}", interval);
+        //             tokio::time::sleep(Duration::from_secs(5)).await;
+        //         }
+        //     });
+        // }
 
         tokio::spawn(proof_builder.start(proof_builder_rx, validator_verifier));
 

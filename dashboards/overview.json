@@ -598,7 +598,8 @@
               { "color": "green", "value": null },
               { "color": "red", "value": 80 }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -699,13 +700,15 @@
         "defaults": {
           "color": { "mode": "continuous-GrYlRd" },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
               { "color": "red", "value": 80 }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -716,7 +719,7 @@
         "minVizHeight": 10,
         "minVizWidth": 0,
         "orientation": "horizontal",
-        "reduceOptions": { "calcs": [], "fields": "", "values": true },
+        "reduceOptions": { "calcs": [], "fields": "", "limit": 10, "values": true },
         "showUnfilled": true
       },
       "pluginVersion": "9.1.1",
@@ -728,7 +731,7 @@
           "location": "US",
           "project": "analytics-test-345723",
           "rawQuery": true,
-          "rawSql": "select DATE(timestamp, \"America/Los_Angeles\") as ds,  count(distinct sender) cnt\nfrom `indexer_mainnet_gcp.user_transactions`\ngroup by 1 order by 1 desc limit 10",
+          "rawSql": "\nselect\n  ds, count(*) as count\nfrom\n  (\n    select\n      *,\n      DATE(timestamp, \"America/Los_Angeles\") as ds\n    from\n      `indexer_mainnet_gcp.user_transactions`\n  )\ngroup by\n  1\norder by\n  1 desc\nlimit\n  10",
           "refId": "A",
           "sql": {
             "columns": [{ "parameters": [], "type": "function" }],
@@ -737,7 +740,7 @@
           }
         }
       ],
-      "title": "Daily active users (unique senders)",
+      "title": "Daily transactions",
       "type": "bargauge"
     },
     {
@@ -1446,7 +1449,7 @@
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
-        { "$$hashKey": "object:60", "format": "locale", "logBase": 1, "min": 0, "show": true },
+        { "$$hashKey": "object:60", "format": "locale", "logBase": 1, "show": true },
         { "$$hashKey": "object:61", "format": "short", "logBase": 1, "show": true }
       ],
       "yaxis": { "align": false }
@@ -1794,7 +1797,7 @@
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
-        { "$$hashKey": "object:60", "format": "locale", "logBase": 1, "min": 0, "show": true },
+        { "$$hashKey": "object:60", "format": "locale", "logBase": 1, "show": true },
         { "$$hashKey": "object:61", "format": "short", "logBase": 1, "show": true }
       ],
       "yaxis": { "align": false }
@@ -2083,7 +2086,7 @@
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
-        { "$$hashKey": "object:60", "format": "locale", "logBase": 1, "min": 0, "show": true },
+        { "$$hashKey": "object:60", "format": "locale", "logBase": 1, "show": true },
         { "$$hashKey": "object:61", "format": "short", "logBase": 1, "show": true }
       ],
       "yaxis": { "align": false }
@@ -3265,7 +3268,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "dark-red", "value": null },
+              { "color": "dark-red" },
               { "color": "light-red", "value": 95 },
               { "color": "orange", "value": 99 },
               { "color": "yellow", "value": 99.5 },
@@ -3357,13 +3360,7 @@
         "defaults": {
           "color": { "mode": "continuous-GrYlRd" },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
         },
         "overrides": []
       },
@@ -3418,7 +3415,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
+              { "color": "red" },
               { "color": "orange", "value": 99.95 },
               { "color": "yellow", "value": 99.99 },
               { "color": "green", "value": 100 }
@@ -3473,7 +3470,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "dark-red", "value": null },
+              { "color": "dark-red" },
               { "color": "light-red", "value": 95 },
               { "color": "orange", "value": 99 },
               { "color": "yellow", "value": 99.5 }
@@ -3577,7 +3574,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
+              { "color": "red" },
               { "color": "orange", "value": 99.95 },
               { "color": "yellow", "value": 99.99 },
               { "color": "green", "value": 100 }
@@ -3632,7 +3629,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "dark-red", "value": null },
+              { "color": "dark-red" },
               { "color": "light-red", "value": 95 },
               { "color": "orange", "value": 99 },
               { "color": "yellow", "value": 99.5 }
@@ -3761,7 +3758,7 @@
       "type": "table"
     }
   ],
-  "refresh": "1m",
+  "refresh": "10s",
   "schemaVersion": 37,
   "style": "dark",
   "tags": ["aptos-core"],
@@ -3908,6 +3905,6 @@
   "timezone": "",
   "title": "Overview",
   "uid": "overview",
-  "version": 218,
+  "version": 228,
   "weekStart": ""
 }

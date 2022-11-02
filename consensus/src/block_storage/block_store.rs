@@ -515,14 +515,6 @@ impl BlockStore {
             .set((ordered_round - commit_round) as i64);
         ordered_round > self.back_pressure_limit + commit_round
     }
-
-    pub fn ordered_round(&self) -> Round {
-        return self.ordered_root().round();
-    }
-
-    pub fn commit_round(&self) -> Round {
-        return self.commit_root().round();
-    }
 }
 
 impl BlockReader for BlockStore {
@@ -582,6 +574,10 @@ impl BlockReader for BlockStore {
             self.highest_2chain_timeout_cert()
                 .map(|tc| tc.as_ref().clone()),
         )
+    }
+
+    fn back_pressure(&self) -> bool {
+        self.back_pressure()
     }
 }
 

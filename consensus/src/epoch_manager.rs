@@ -10,7 +10,7 @@ use crate::quorum_store::{
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
-        BlockStore,
+        BlockReader, BlockStore,
     },
     counters,
     data_manager::DataManager,
@@ -557,7 +557,7 @@ impl EpochManager {
         wrapper_to_quorum_store_tx: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
         qs_config: &QuorumStoreConfig,
         num_validators: usize,
-        block_store: Arc<BlockStore>,
+        block_store: Arc<dyn BlockReader + Send + Sync>,
     ) {
         // TODO: make this not use a ConsensusRequest
         let (wrapper_quorum_store_msg_tx, wrapper_quorum_store_msg_rx) =
@@ -579,7 +579,8 @@ impl EpochManager {
             self.config.mempool_txn_pull_timeout_ms,
             qs_config.mempool_txn_pull_max_count,
             qs_config.mempool_txn_pull_max_bytes,
-            qs_config.max_batch_bytes as u64,
+            qs_config.max_batch_counts,
+            qs_config.max_batch_bytes,
             qs_config.batch_expiry_round_gap_when_init,
             qs_config.batch_expiry_round_gap_behind_latest_certified,
             qs_config.batch_expiry_round_gap_beyond_latest_certified,
