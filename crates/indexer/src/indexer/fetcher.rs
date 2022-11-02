@@ -7,7 +7,7 @@ use aptos_api_types::{AsConverter, LedgerInfo, Transaction, TransactionOnChainDa
 use aptos_logger::prelude::*;
 use aptos_vm::data_cache::StorageAdapterOwned;
 use futures::channel::mpsc;
-use futures::{SinkExt, StreamExt};
+use futures::SinkExt;
 use std::sync::Arc;
 use std::time::Duration;
 use storage_interface::state_view::DbStateView;
@@ -432,10 +432,16 @@ impl TransactionFetcher {
 impl TransactionFetcherTrait for TransactionFetcher {
     /// Fetches the next batch based on its internal version counter
     async fn fetch_next_batch(&mut self) -> Vec<Transaction> {
-        self.transaction_receiver
-            .next()
-            .await
-            .expect("No transactions, producer of batches died")
+        // try_next is nonblocking unlike next. It'll try to fetch the next one and return immediately.
+        match self.transaction_receiver.try_next() {
+            Ok(Some(transactions)) => transactions,
+            Ok(None) => {
+                // We never close the channel, so this should never happen
+                panic!("Transaction fetcher channel closed");
+            }
+            // The error here is when the channel is empty which we definitely expect.
+            Err(_) => vec![],
+        }
     }
 
     fn fetch_ledger_info(&mut self) -> LedgerInfo {
