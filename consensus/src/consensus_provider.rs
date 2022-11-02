@@ -1,10 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_manager::{DataManager, DummyDataManager};
 use crate::{
     counters,
-    data_manager::QuorumStoreDataManager,
+    data_manager::DataManager,
     epoch_manager::EpochManager,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
@@ -70,11 +69,8 @@ pub fn start_consensus(
     // LANDING QS TODO: smoke test and forge test to test on-chain config
 
     // LANDING QS TODO: combine data manager with dummy data manager
-    let data_manager: Arc<dyn DataManager> = if node_config.consensus.use_quorum_store {
-        Arc::new(QuorumStoreDataManager::new())
-    } else {
-        Arc::new(DummyDataManager::new())
-    };
+    // LANDING QS TODO: Make sure check type (QS vd direct mempool) before voting
+    let data_manager: Arc<DataManager> = Arc::new(DataManager::new());
 
     let state_computer = Arc::new(ExecutionProxy::new(
         Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),

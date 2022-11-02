@@ -46,7 +46,7 @@ pub struct ExecutionProxy {
     async_commit_notifier: channel::Sender<CommitType>,
     validators: Mutex<Vec<AccountAddress>>,
     write_mutex: AsyncMutex<()>,
-    data_manager: Arc<dyn DataManager>,
+    data_manager: Arc<DataManager>,
 }
 
 impl ExecutionProxy {
@@ -54,7 +54,7 @@ impl ExecutionProxy {
         executor: Arc<dyn BlockExecutorTrait>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-        data_manager: Arc<dyn DataManager>,
+        data_manager: Arc<DataManager>,
         handle: &tokio::runtime::Handle,
     ) -> Self {
         let (tx, mut rx) =
