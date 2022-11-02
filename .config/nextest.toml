@@ -5,6 +5,8 @@ status-level = "skip"
 failure-output = "immediate-final"
 # Cancel test run on the first failure. Accounts for retries.
 fail-fast = true
+# Show all output
+# success-output = "immediate-final"
 
 junit = { path = "junit.xml" }
 
