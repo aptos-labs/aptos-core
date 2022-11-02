@@ -94,6 +94,14 @@ impl Context {
         self.node_config.api.max_events_page_size
     }
 
+    pub fn max_account_resources_page_size(&self) -> u16 {
+        self.node_config.api.max_account_resources_page_size
+    }
+
+    pub fn max_account_modules_page_size(&self) -> u16 {
+        self.node_config.api.max_account_modules_page_size
+    }
+
     pub fn move_resolver(&self) -> Result<StorageAdapterOwned<DbStateView>> {
         self.db
             .latest_state_checkpoint_view()
