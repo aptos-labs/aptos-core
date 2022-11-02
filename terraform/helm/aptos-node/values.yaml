@@ -67,7 +67,7 @@ validator:
   resources:
     limits:
       cpu: 15.5
-      memory: 30Gi
+      memory: 26Gi
     requests:
       cpu: 15
       memory: 26Gi
@@ -101,7 +101,7 @@ fullnode:
   resources:
     limits:
       cpu: 15.5
-      memory: 30Gi
+      memory: 26Gi
     requests:
       cpu: 15
       memory: 26Gi

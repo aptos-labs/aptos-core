@@ -1418,7 +1418,7 @@ Create a vesting contract with a given configurations.
 Unlock any accumulated rewards.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_unlock_rewards">unlock_rewards</a>(contract_address: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_unlock_rewards">unlock_rewards</a>(contract_address: <b>address</b>)
 </code></pre>
 
 
@@ -1447,7 +1447,7 @@ Unlock any accumulated rewards.
 Unlock any vested portion of the grant.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vest">vest</a>(contract_address: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_vest">vest</a>(contract_address: <b>address</b>)
 </code></pre>
 
 
@@ -1520,7 +1520,7 @@ Unlock any vested portion of the grant.
 Distribute any withdrawable stake from the stake pool.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_distribute">distribute</a>(contract_address: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_distribute">distribute</a>(contract_address: <b>address</b>)
 </code></pre>
 
 
@@ -1585,7 +1585,7 @@ Distribute any withdrawable stake from the stake pool.
 Terminate the vesting contract and send all funds back to the withdrawal address.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_terminate_vesting_contract">terminate_vesting_contract</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_terminate_vesting_contract">terminate_vesting_contract</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>)
 </code></pre>
 
 
@@ -1632,7 +1632,7 @@ Withdraw all funds to the preset vesting contract's withdrawal address. This can
 has already been terminated.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_admin_withdraw">admin_withdraw</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_admin_withdraw">admin_withdraw</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>)
 </code></pre>
 
 
@@ -1676,7 +1676,7 @@ has already been terminated.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_update_operator">update_operator</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, new_operator: <b>address</b>, commission_percentage: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_update_operator">update_operator</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, new_operator: <b>address</b>, commission_percentage: u64)
 </code></pre>
 
 
@@ -1723,7 +1723,7 @@ has already been terminated.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_update_operator_with_same_commission">update_operator_with_same_commission</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, new_operator: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_update_operator_with_same_commission">update_operator_with_same_commission</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, new_operator: <b>address</b>)
 </code></pre>
 
 
@@ -1752,7 +1752,7 @@ has already been terminated.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_update_voter">update_voter</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, new_voter: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_update_voter">update_voter</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, new_voter: <b>address</b>)
 </code></pre>
 
 
@@ -1796,7 +1796,7 @@ has already been terminated.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_reset_lockup">reset_lockup</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_reset_lockup">reset_lockup</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>)
 </code></pre>
 
 
@@ -1836,7 +1836,7 @@ has already been terminated.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_set_beneficiary">set_beneficiary</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, shareholder: <b>address</b>, new_beneficiary: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_set_beneficiary">set_beneficiary</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, shareholder: <b>address</b>, new_beneficiary: <b>address</b>)
 </code></pre>
 
 
@@ -1892,7 +1892,7 @@ Remove the beneficiary for the given shareholder. All distributions will sent di
 account.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_reset_beneficiary">reset_beneficiary</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, shareholder: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_reset_beneficiary">reset_beneficiary</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, shareholder: <b>address</b>)
 </code></pre>
 
 
@@ -1931,7 +1931,7 @@ account.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_set_management_role">set_management_role</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, role: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, role_holder: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_set_management_role">set_management_role</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, role: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, role_holder: <b>address</b>)
 </code></pre>
 
 
@@ -1974,7 +1974,7 @@ account.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_set_beneficiary_resetter">set_beneficiary_resetter</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, beneficiary_resetter: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_set_beneficiary_resetter">set_beneficiary_resetter</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, beneficiary_resetter: <b>address</b>)
 </code></pre>
 
 
