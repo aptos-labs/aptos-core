@@ -100,7 +100,7 @@ impl Default for ConsensusConfigV1 {
             exclude_round: 20,
             max_failed_authors_to_store: 10,
             proposer_election_type: ProposerElectionType::LeaderReputation(
-                LeaderReputationType::ProposerAndVoter(ProposerAndVoterConfig {
+                LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
                     active_weight: 1000,
                     inactive_weight: 10,
                     failed_weight: 1,
@@ -142,6 +142,15 @@ pub enum LeaderReputationType {
     // Proposer election based on whether nodes succeeded or failed
     // their proposer election rounds, and whether they voted.
     ProposerAndVoter(ProposerAndVoterConfig),
+
+    ProposerAndVoterV2(ProposerAndVoterConfig),
+}
+
+impl LeaderReputationType {
+    pub fn use_root_hash_for_seed(&self) -> bool {
+        // all versions after V1 should use root hash
+        !matches!(self, Self::ProposerAndVoter(_))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
