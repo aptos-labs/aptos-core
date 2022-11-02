@@ -20,7 +20,6 @@ use consensus_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,

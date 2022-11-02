@@ -1,14 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::block_storage::BlockStore;
 use crate::error::DbError;
 use crate::quorum_store::{
-    quorum_store::{QuorumStoreCommand, QuorumStoreConfig},
+    quorum_store::QuorumStoreCommand,
     quorum_store_db::BatchIdDB,
     quorum_store_wrapper::QuorumStoreWrapper,
     tests::utils::{create_vec_serialized_transactions, create_vec_signed_transactions},
     types::{BatchId, SerializedTransaction},
 };
+use crate::test_utils::build_empty_tree;
+use aptos_config::config::QuorumStoreConfig;
 use aptos_crypto::HashValue;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::aggregate_signature::AggregateSignature;
@@ -87,22 +90,25 @@ async fn test_batch_creation() {
 
     let config = QuorumStoreConfig {
         channel_size: 100,
-        proof_timeout_ms: 1000,
-        batch_request_num_peers: 3,
+        proof_timeout_ms: 10000,
+        batch_request_num_peers: 2,
+        mempool_pulling_interval: 100,
         end_batch_ms: 500,
+        max_batch_counts: 200,
         max_batch_bytes: 9 * txn_size,
-        batch_request_timeout_ms: 1000,
-        batch_expiry_round_gap_when_init: 20,
-        batch_expiry_round_gap_behind_latest_certified: 20,
-        batch_expiry_round_gap_beyond_latest_certified: 100,
+        batch_request_timeout_ms: 10000,
+        batch_expiry_round_gap_when_init: 150,
+        batch_expiry_round_gap_behind_latest_certified: 500,
+        batch_expiry_round_gap_beyond_latest_certified: 500,
         batch_expiry_grace_rounds: 5,
         memory_quota: 100000000,
         db_quota: 10000000000,
-        mempool_txn_pull_max_count: 100,
+        mempool_txn_pull_max_count: 200,
         mempool_txn_pull_max_bytes: 1000000,
-        num_nodes_per_worker_handles: 2,
-        back_pressure_factor: 2,
+        num_nodes_per_worker_handles: 10,
+        back_pressure_factor: 1, // back pressure limit for QS is back_pressure_factor * num_validator
     };
+    let block_store = build_empty_tree();
 
     let mut wrapper = QuorumStoreWrapper::new(
         0,
@@ -112,12 +118,14 @@ async fn test_batch_creation() {
         10_000,
         config.mempool_txn_pull_max_count,
         config.mempool_txn_pull_max_bytes,
-        config.max_batch_bytes as u64,
+        config.max_batch_counts,
+        config.max_batch_bytes,
         config.batch_expiry_round_gap_when_init,
         config.batch_expiry_round_gap_behind_latest_certified,
         config.batch_expiry_round_gap_beyond_latest_certified,
         config.end_batch_ms,
         20,
+        block_store,
     );
 
     let serialize = |signed_txns: &Vec<SignedTransaction>| -> Vec<SerializedTransaction> {
@@ -180,11 +188,11 @@ async fn test_batch_creation() {
         }
     });
 
-    let result = wrapper.handle_scheduled_pull().await;
+    let result = wrapper.handle_scheduled_pull(false).await;
     assert!(result.is_none());
-    let result = wrapper.handle_scheduled_pull().await;
+    let result = wrapper.handle_scheduled_pull(false).await;
     assert!(result.is_some());
-    let result = wrapper.handle_scheduled_pull().await;
+    let result = wrapper.handle_scheduled_pull(false).await;
     assert!(result.is_none());
 
     timeout(Duration::from_millis(10_000), join_handle)
@@ -198,24 +206,8 @@ async fn test_block_request() {
     let (quorum_store_to_mempool_tx, mut _quorum_store_to_mempool_rx) = channel(1_024);
     let (wrapper_quorum_store_tx, mut _wrapper_quorum_store_rx) = TokioChannel(100);
 
-    let config = QuorumStoreConfig {
-        channel_size: 100,
-        proof_timeout_ms: 1000,
-        batch_request_num_peers: 3,
-        end_batch_ms: 500,
-        max_batch_bytes: 1000000,
-        batch_request_timeout_ms: 1000,
-        batch_expiry_round_gap_when_init: 20,
-        batch_expiry_round_gap_behind_latest_certified: 20,
-        batch_expiry_round_gap_beyond_latest_certified: 100,
-        batch_expiry_grace_rounds: 5,
-        memory_quota: 100000000,
-        db_quota: 10000000000,
-        mempool_txn_pull_max_count: 100,
-        mempool_txn_pull_max_bytes: 1000000,
-        num_nodes_per_worker_handles: 2,
-        back_pressure_factor: 2,
-    };
+    let config = QuorumStoreConfig::default();
+    let block_store = build_empty_tree();
 
     let mut wrapper = QuorumStoreWrapper::new(
         0,
@@ -225,12 +217,14 @@ async fn test_block_request() {
         10_000,
         config.mempool_txn_pull_max_count,
         config.mempool_txn_pull_max_bytes,
-        config.max_batch_bytes as u64,
+        config.max_batch_counts,
+        config.max_batch_bytes,
         config.batch_expiry_round_gap_when_init,
         config.batch_expiry_round_gap_behind_latest_certified,
         config.batch_expiry_round_gap_beyond_latest_certified,
         config.end_batch_ms,
         20,
+        block_store,
     );
 
     let digest = HashValue::random();

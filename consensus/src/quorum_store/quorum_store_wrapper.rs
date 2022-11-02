@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::BlockStore;
+use crate::block_storage::BlockReader;
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
 use crate::quorum_store::utils::ProofQueue;
@@ -55,7 +55,7 @@ pub struct QuorumStoreWrapper {
     mempool_txn_pull_max_bytes: u64,
     // TODO: check if this is necessary, also check batch_builder
     // For ensuring that batch size does not exceed QuorumStore limit.
-    max_batch_bytes: u64,
+    max_batch_bytes: usize,
     batch_expiry_round_gap_when_init: Round,
     batch_expiry_round_gap_behind_latest_certified: Round,
     batch_expiry_round_gap_beyond_latest_certified: Round,
@@ -67,7 +67,7 @@ pub struct QuorumStoreWrapper {
     last_batch_id: u64,
     remaining_proof_num: usize,
     back_pressure_limit: usize,
-    block_store: Arc<BlockStore>,
+    block_store: Arc<dyn BlockReader + Send + Sync>,
 }
 
 impl QuorumStoreWrapper {
@@ -79,13 +79,14 @@ impl QuorumStoreWrapper {
         mempool_txn_pull_timeout_ms: u64,
         mempool_txn_pull_max_count: u64,
         mempool_txn_pull_max_bytes: u64,
-        max_batch_bytes: u64,
+        max_batch_counts: usize,
+        max_batch_bytes: usize,
         batch_expiry_round_gap_when_init: Round,
         batch_expiry_round_gap_behind_latest_certified: Round,
         batch_expiry_round_gap_beyond_latest_certified: Round,
         end_batch_ms: u128,
         back_pressure_limit: usize,
-        block_store: Arc<BlockStore>,
+        block_store: Arc<dyn BlockReader + Send + Sync>,
     ) -> Self {
         let batch_id = if let Some(id) = db
             .clean_and_get_batch_id(epoch)
@@ -103,7 +104,7 @@ impl QuorumStoreWrapper {
             quorum_store_sender,
             batches_in_progress: HashMap::new(),
             batch_expirations: RoundExpirations::new(),
-            batch_builder: BatchBuilder::new(batch_id, max_batch_bytes as usize),
+            batch_builder: BatchBuilder::new(batch_id, max_batch_counts, max_batch_bytes),
             latest_logical_time: LogicalTime::new(epoch, 0),
             proofs_for_consensus: ProofQueue::new(),
             mempool_txn_pull_max_count,
@@ -222,13 +223,6 @@ impl QuorumStoreWrapper {
             let expiry_round =
                 self.latest_logical_time.round() + self.batch_expiry_round_gap_when_init;
             let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
-
-            debug!(
-                "QS: latest_logical_time {:?} blockstore commit round {} order round {}",
-                self.latest_logical_time,
-                self.block_store.commit_round(),
-                self.block_store.ordered_round()
-            );
 
             self.quorum_store_sender
                 .send(QuorumStoreCommand::EndBatch(

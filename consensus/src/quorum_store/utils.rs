@@ -30,16 +30,20 @@ pub(crate) struct BatchBuilder {
     id: BatchId,
     summaries: Vec<TransactionSummary>,
     data: Vec<SerializedTransaction>,
+    num_txns: usize,
+    max_txns: usize,
     num_bytes: usize,
     max_bytes: usize,
 }
 
 impl BatchBuilder {
-    pub(crate) fn new(batch_id: BatchId, max_bytes: usize) -> Self {
+    pub(crate) fn new(batch_id: BatchId, max_txns: usize, max_bytes: usize) -> Self {
         Self {
             id: batch_id,
             summaries: Vec::new(),
             data: Vec::new(),
+            num_txns: 0,
+            max_txns,
             num_bytes: 0,
             max_bytes,
         }
@@ -48,7 +52,9 @@ impl BatchBuilder {
     pub(crate) fn append_transaction(&mut self, txn: &SignedTransaction) -> bool {
         let serialized_txn = SerializedTransaction::from_signed_txn(&txn);
 
-        if self.num_bytes + serialized_txn.len() <= self.max_bytes {
+        if self.num_bytes + serialized_txn.len() <= self.max_bytes && self.num_txns < self.max_txns
+        {
+            self.num_txns += 1;
             self.num_bytes = self.num_bytes + serialized_txn.len();
 
             self.summaries.push(TransactionSummary {
