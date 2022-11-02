@@ -298,6 +298,10 @@ macro_rules! generate_success_response {
                 #[oai(header = "X-Aptos-Block-Height")] u64,
                 /// Oldest non-pruned block height of the chain
                 #[oai(header = "X-Aptos-Oldest-Block-Height")] u64,
+                /// Cursor to be used for endpoints that support cursor-based
+                /// pagination. Pass this to the `start` field of the endpoint
+                /// on the next call to get the next page of results.
+                #[oai(header = "X-Aptos-Cursor")] Option<String>,
             ),
             )*
         }
@@ -337,6 +341,7 @@ macro_rules! generate_success_response {
                             ledger_info.epoch.into(),
                             ledger_info.block_height.into(),
                             ledger_info.oldest_block_height.into(),
+                            None,
                         )
                     },
                     )*
@@ -455,6 +460,17 @@ macro_rules! generate_success_response {
                     ledger_info,
                     status
                )))
+            }
+
+            pub fn with_cursor(mut self, new_cursor: Option<aptos_types::state_store::state_key::StateKey>) -> Self {
+                match self {
+                    $(
+                    [<$enum_name>]::$name(_, _, _, _, _, _, _, _, ref mut cursor) => {
+                        *cursor = new_cursor.map(|c| aptos_api_types::StateKeyWrapper::from(c).to_string());
+                    }
+                    )*
+                }
+                self
             }
         }
         }
