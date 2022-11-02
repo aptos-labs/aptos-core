@@ -24,7 +24,7 @@ use serde_json::json;
 use crate::{
     move_types::{MoveAbility, MoveStructValue},
     Address, EntryFunctionId, HashValue, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
-    MoveStructTag, MoveType, U128, U64,
+    MoveStructTag, MoveType, StateKeyWrapper, U128, U64,
 };
 use indoc::indoc;
 
@@ -44,6 +44,23 @@ impl_poem_type!(
 
             For example, address 0x0000000000000000000000000000000000000000000000000000000000000001 is represented as 0x1.
         "})
+    )
+);
+
+impl_poem_type!(
+    EntryFunctionId,
+    "string",
+    (
+        example = Some(serde_json::Value::String(
+            "0x1::aptos_coin::transfer".to_string()
+        )),
+        description = Some(indoc! {"
+          Entry function id is string representation of a entry function defined on-chain.
+
+          Format: `{address}::{module name}::{function name}`
+
+          Both `module name` and `function name` are case-sensitive.
+  "})
     )
 );
 
@@ -213,19 +230,13 @@ impl_poem_type!(
 );
 
 impl_poem_type!(
-    EntryFunctionId,
+    StateKeyWrapper,
     "string",
     (
-        example = Some(serde_json::Value::String(
-            "0x1::aptos_coin::transfer".to_string()
-        )),
+        example = Some(serde_json::Value::String("0000000000000000000000000000000000000000000000000000000000000000012f0000000000000000000000000000000000000000000000000000000000000000010d7374616b696e675f70726f7879".to_string())),
         description = Some(indoc! {"
-            Entry function id is string representation of a entry function defined on-chain.
-
-            Format: `{address}::{module name}::{function name}`
-
-            Both `module name` and `function name` are case-sensitive.
-    "})
+          Representation of a StateKey as a hex string. This is used for cursor based pagination.
+        "})
     )
 );
 
@@ -267,6 +278,7 @@ impl_poem_parameter!(
     IdentifierWrapper,
     HexEncodedBytes,
     MoveStructTag,
+    StateKeyWrapper,
     U64,
     U128
 );

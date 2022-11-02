@@ -29,7 +29,7 @@ Additionally, most NFTs are part of a collection or a set of NFTs with a common 
 - `supply`: The total number of NFTs in this collection. 
 - `maximum`: The maximum number of NFTs that this collection can have. If `maximum` is set to 0, then supply is untracked. 
 
-## Token standard
+## Design principles
 
 The [Aptos token standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) is developed with the following principles:
 
@@ -44,7 +44,17 @@ The Aptos token standard supports [mutation of a fungible token to an NFT](#evol
 
 ### Storing customized token properties on-chain
 
-In addition to the standard token attributes, the Aptos token standard provides the [`default_properties`](https://github.com/aptos-labs/aptos-core/blob/e62fd09cb1c916d857fa655b3f174991ef8698b3/aptos-move/framework/aptos-token/sources/token.move#L98) field, a key-value store with the type information to store customized properties on-chain. Use this field to customize the token properties and store them on-chain. These properties can be directly read and written by other smart contracts.
+The Aptos token standard provides an easy way to store properties on-chain. You can define your own properties based on your application. Each token can also have its own property values. These properties can be directly read and written by smart contracts.
+
+#### Default properties
+
+You can add your properties to [`default_properties`](https://github.com/aptos-labs/aptos-core/blob/e62fd09cb1c916d857fa655b3f174991ef8698b3/aptos-move/framework/aptos-token/sources/token.move#L98) in the TokenData. The properties defined here are shared by all tokens by default.
+
+The `default_properties` field is a key-value store with type information. It leverages the PropertyMap module which contain functions for serializing and deserializing different primitive types to the property value.
+
+#### Token properties
+
+You can also use the `token_properties` defined in the token itself for customization on-chain. You can create customized values for a property of this  specific token, thereby allowing a token to have a different property value from its default.
 
 ### Evolving from fungible token to NFT
 
@@ -132,38 +142,98 @@ If the file is no longer available, the wallet can fall back to use the `animati
 
 ## Token data model
 
+The [following diagram](/img/docs/aptos-token-standard-flow.svg) depicts the flow of token data through Aptos.
+
 <ThemedImage
 alt="Signed Transaction Flow"
 sources={{
-light: useBaseUrl('/img/docs/aptos-token-standard-flow-v1.png'),
-dark: useBaseUrl('/img/docs/aptos-token-standard-flow-v1.png'),
+light: useBaseUrl('/img/docs/aptos-token-standard-flow.svg'),
+dark: useBaseUrl('/img/docs/aptos-token-standard-flow-dark.svg'),
 }}
 />
 
 ## Token resources
 
-The token-related data are stored at both creator’s account and owner’s account.
+As shown in the diagram above, token-related data are stored at both the creator’s account and the owner’s account.
 
-### Resource stored at the creator’s address
+### Struct-level resources
+
+The following tables describe fields at the struct level. For the definitive list, see the [Move reference documentation](../../guides/move-guides/index.md#aptos-move-documentation) for the [Aptos Token Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md).
+
+#### Resource stored at the creator’s address
 
 | Field | Description |
 | --- | --- |
-| `Collections` | Maintains a table called `collection_data`, which maps the collection name to the `CollectionData`. It also stores all the `TokenData` that this creator creates. |
-| `CollectionData` | Stores the collection metadata. The supply is the number of tokens created for the current collection. The maxium is the upper bound of tokens in this collection. |
-| `CollectionMutabilityConfig` | Specifies which field is mutable. |
-| `TokenData` | Acts as the main struct for holding the token metadata. Properties is a where users can add their own properties that are not defined in the token data. Users can mint more tokens based on the `TokenData`, and those tokens share the same `TokenData`. |
-| `TokenMutabilityConfig` | Control which fields are mutable. |
-| `TokenDataId` | An ID used for representing and querying `TokenData` on-chain. This ID mainly contains three fields including creator address, collection name and token name. |
-| Royalty | Specifies the denominator and numerator for calculating the royalty fee. It also has the payee account address for depositing the royalty. |
+| [`Collections`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#resource-collections) | Maintains a table called `collection_data`, which maps the collection name to the `CollectionData`. It also stores all the `TokenData` that this creator creates. |
+| [`CollectionData`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#struct-collectiondata) | Stores the collection metadata. The supply is the number of tokens created for the current collection. The maxium is the upper bound of tokens in this collection. |
+| [`CollectionMutabilityConfig`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_CollectionMutabilityConfig) | Specifies which field is mutable. |
+| [`TokenData`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_TokenData) | Acts as the main struct for holding the token metadata. Properties is a where users can add their own properties that are not defined in the token data. Users can mint more tokens based on the `TokenData`, and those tokens share the same `TokenData`. |
+| [`TokenMutabilityConfig`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_TokenMutabilityConfig) | Controls which fields are mutable. |
+| [`TokenDataId`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_TokenDataId) | An ID used for representing and querying `TokenData` on-chain. This ID mainly contains three fields including creator address, collection name and token name. |
+| [`Royalty`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_Royalty) | Specifies the denominator and numerator for calculating the royalty fee. It also has the payee account address for depositing the royalty. |
 | `PropertyValue` | Contains both value of a property and type of property. |
 
-### Resource stored at the owner’s address
+#### Resource stored at the owner’s address
 
 | Field | Description |
 | --- | --- |
-| `TokenStore` | The main struct for storing the token owned by this address. It maps `TokenId` to the actual token. |
-| `Token` | The amount is the number of tokens. |
-| `TokenId` | `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated `PropertyMap` from `default_properties` in the `TokenData`. |
+| [`TokenStore`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_TokenStore) | The main struct for storing the token owned by this address. It maps `TokenId` to the actual token. |
+| [`Token`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_Token) | The amount is the number of tokens. |
+| [`TokenId`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_TokenId) | `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated `PropertyMap` from `default_properties` in the `TokenData`. |
+
+### Coin and token field descriptions
+
+The following tables contain descriptions and examples on key token fields. Once again, see the [Move reference documentation](../../guides/move-guides/index.md#aptos-move-documentation) for the [Aptos Token Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md).
+
+#### Token module key struct
+
+##### [`Token`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move#L144)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | TokenId | Unique identification of the token |
+| `amount` | u64 | The number of tokens stored |
+| `token_properties` | PropertyMap | The properties of this token; PropertyMap is a key-value map used for storing different types in one map; the value of PropertyMap contains both the value and type information |
+
+##### `TokenId`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `token_data_id` | TokenId | Identification for the metadata of the token |
+| `property_version` | u64 | The version of the property map; when a fungible token is mutated, a new property version is created and assigned to the token to make it an NFT |
+
+##### `TokenDataId`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `creator` | address | The address of the creator, eg: 0xcafe |
+| `collection` | String | The name of collection; this is unique under the same account, eg: “Aptos Animal Collection” |
+| `name` | String | The name of the token; this is the same as the name field of TokenData |
+
+##### `TokenData`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `maximum` | u64 | The maximal number of tokens that can be minted under this TokenData; if the maximum is 0, there is no limit |
+| `largest_property_version` | u64 | The current largest property version of all tokens with this TokenData |
+| `supply` | String | The number of tokens with this TokenData |
+| `uri` | String | The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain storage; the URL length should be less than 512 characters, eg: https://arweave.net/Fmmn4ul-7Mv6vzm7JwE69O-I-vd6Bz2QriJO1niwCh4 |
+| `royalty` | Royalty | The denominator and numerator for calculating the royalty fee; it also contains payee account address for depositing the Royalty |
+| `name` | String | The name of the token, which should be unique within the collection; the length of name should be smaller than 128, characters, eg: “Aptos Animal #1234” |
+| `description` | String | The description of the token |
+| `default_properties` | PropertyMap | The properties are stored in the TokenData that are shared by all tokens  |
+| `mutability_config` | TokenMutabilityConfig | Specifies which fields are mutable  |
+
+##### `CollectionData`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `description` | String | A description for the token collection Eg: “Aptos Toad Overload” |
+| `name` | String | The collection name, which should be unique among all collections by the creator; the name should also be smaller than 128 characters, eg: “Animal Collection” |
+| `uri` | String | The URI for the collection; its length should be smaller than 512 characters |
+| `supply` | u64 | The number of different TokenData entries in this collection |
+| `maximum` | u64 | If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum If maximal is 0, Aptos doen’t track the supply of this collection, and there is no limit |
+| `mutability_config` | CollectionMutabilityConfig | Specifies which fields are mutable  |
 
 ## Token lifecycle
 
