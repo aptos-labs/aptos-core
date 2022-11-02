@@ -104,6 +104,7 @@ diesel::table! {
         expiration_timestamp -> Timestamp,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
+        token_name -> Varchar,
     }
 }
 
@@ -286,6 +287,19 @@ diesel::table! {
         success -> Bool,
         details -> Nullable<Text>,
         last_updated -> Timestamp,
+    }
+}
+
+diesel::table! {
+    proposal_votes (transaction_version, proposal_id, voter_address) {
+        transaction_version -> Int8,
+        proposal_id -> Int8,
+        voter_address -> Varchar,
+        staking_pool_address -> Varchar,
+        num_votes -> Numeric,
+        should_pass -> Bool,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -486,6 +500,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     move_resources,
     processor_status,
     processor_statuses,
+    proposal_votes,
     signatures,
     table_items,
     table_metadatas,

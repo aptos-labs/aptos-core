@@ -319,7 +319,7 @@ Only callable in tests and testnets where the core resources account exists.
 Create new coins and deposit them into dst_addr's account.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_coin.md#0x1_aptos_coin_mint">mint</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, dst_addr: <b>address</b>, amount: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_coin.md#0x1_aptos_coin_mint">mint</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, dst_addr: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -358,7 +358,7 @@ Only callable in tests and testnets where the core resources account exists.
 Create delegated token for the address so the account could claim MintCapability later.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_coin.md#0x1_aptos_coin_delegate_mint_capability">delegate_mint_capability</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_coin.md#0x1_aptos_coin_delegate_mint_capability">delegate_mint_capability</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>)
 </code></pre>
 
 
@@ -392,7 +392,7 @@ Only callable in tests and testnets where the core resources account exists.
 Claim the delegated mint capability and destroy the delegated token.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_coin.md#0x1_aptos_coin_claim_mint_capability">claim_mint_capability</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_coin.md#0x1_aptos_coin_claim_mint_capability">claim_mint_capability</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 

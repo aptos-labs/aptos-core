@@ -27,7 +27,17 @@
 // Once you have all prerequisites fulfilled, you can run this script via:
 // GIT_SHA=${{ github.sha }} GCP_DOCKER_ARTIFACT_REPO="${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}" AWS_ACCOUNT_ID="${{ secrets.AWS_ECR_ACCOUNT_NUM }}" IMAGE_TAG_PREFIX="${{ inputs.image_tag_prefix }}" ./docker/release_images.sh --wait-for-image-seconds=1800
 
-const IMAGES_TO_RELEASE = ["validator", "forge", "tools", "faucet", "node-checker"];
+const Features = {
+  Default: "default",
+  Indexer: "indexer",
+};
+
+const IMAGES_TO_RELEASE = {
+  validator: [Features.Default, Features.Indexer],
+  forge: [Features.Default],
+  tools: [Features.Default],
+  "node-checker": [Features.Default],
+};
 
 import { execSync } from "node:child_process";
 import { dirname } from "node:path";
@@ -72,7 +82,7 @@ if (process.env.CI === "true") {
   }
   crane = "./crane";
 } else {
-  if ((await $`command -v cranes`.exitCode) !== 0) {
+  if ((await $`command -v crane`.exitCode) !== 0) {
     console.log(
       chalk.red(
         "ERROR: could not find crane binary in PATH - follow https://github.com/google/go-containerregistry/tree/main/cmd/crane#installation to install",
@@ -92,15 +102,27 @@ const TARGET_REGISTRIES = [
 // default 10 seconds
 parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
 
-for (const image of IMAGES_TO_RELEASE) {
-  for (const targetRegistry of TARGET_REGISTRIES) {
-    const imageSource = `${parsedArgs.GCP_DOCKER_ARTIFACT_REPO}/${image}:${parsedArgs.GIT_SHA}`;
-    const imageTarget = `${targetRegistry}/${image}:${parsedArgs.IMAGE_TAG_PREFIX}`;
-    console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
-    await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
-    await $`${crane} copy ${imageSource} ${imageTarget}`;
-    await $`${crane} copy ${imageSource} ${imageTarget + "_" + parsedArgs.GIT_SHA}`;
+for (const [image, features] of Object.entries(IMAGES_TO_RELEASE)) {
+  for (const feature of features) {
+    const featureSuffix = feature === Features.Default ? "" : feature;
+
+    for (const targetRegistry of TARGET_REGISTRIES) {
+      const imageSource = `${parsedArgs.GCP_DOCKER_ARTIFACT_REPO}/${image}:${joinTagSegments(
+        featureSuffix,
+        parsedArgs.GIT_SHA,
+      )}`;
+      const imageTarget = `${targetRegistry}/${image}:${joinTagSegments(parsedArgs.IMAGE_TAG_PREFIX, featureSuffix)}`;
+      console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
+      await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
+      await $`${crane} copy ${imageSource} ${imageTarget}`;
+      await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
+    }
   }
+}
+
+// joinTagSegments joins tag segments with a dash, but only if the segment is not empty
+function joinTagSegments(...segments) {
+  return segments.filter((s) => s).join("_");
 }
 
 async function waitForImageToBecomeAvailable(imageToWaitFor, waitForImageSeconds) {
