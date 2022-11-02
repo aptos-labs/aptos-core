@@ -87,6 +87,7 @@ impl BatchBuilder {
 
         self.id = self.id + 1;
         self.num_bytes = 0;
+        self.num_txns = 0;
         mem::take(&mut self.summaries)
     }
 
