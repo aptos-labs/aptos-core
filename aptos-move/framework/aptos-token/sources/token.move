@@ -773,6 +773,8 @@ module aptos_token::token {
         assert_tokendata_exists(creator, token_data_id);
         let all_token_data = &mut borrow_global_mut<Collections>(token_data_id.creator).token_data;
         let token_data = table::borrow_mut(all_token_data, token_data_id);
+        // cannot change maximum from 0 and cannot change maximum to 0
+        assert!(token_data.maximum != 0 && maximum != 0, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(maximum >= token_data.supply, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(token_data.mutability_config.maximum, error::permission_denied(EFIELD_NOT_MUTABLE));
         token_data.maximum = maximum;
@@ -2180,6 +2182,26 @@ module aptos_token::token {
         );
         mutate_tokendata_maximum(creator, token_id.token_data_id, 10);
         assert!(get_tokendata_maximum(token_id.token_data_id) == 10, 1);
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 65572)]
+    fun test_mutate_tokendata_maximum_from_zero(
+        creator: &signer,
+    ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[true, false, false, false, false],
+        );
+        mutate_tokendata_maximum(creator, token_id.token_data_id, 0);
     }
 
     #[test(creator = @0xcafe)]

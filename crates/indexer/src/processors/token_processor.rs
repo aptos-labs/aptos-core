@@ -463,6 +463,7 @@ fn insert_current_ans_lookups(
                     expiration_timestamp.eq(excluded(expiration_timestamp)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
+                    token_name.eq(excluded(token_name)),
                 )),
                 Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
             )?;
