@@ -64,7 +64,7 @@ spec aptos_framework::coin {
         include ExistCoinInfo<CoinType>;
     }
 
-    spec supply<CoinType>(): Option<u128> { 
+    spec supply<CoinType>(): Option<u128> {
         // TODO: complex aborts conditions.
         pragma aborts_if_is_partial;
         include ExistCoinInfo<CoinType>;
@@ -138,7 +138,7 @@ spec aptos_framework::coin {
         modifies global<CoinStore<CoinType>>(account_addr);
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
         let post coin_store = global<CoinStore<CoinType>>(account_addr);
-        ensures !coin_store.frozen; 
+        ensures !coin_store.frozen;
     }
 
     /// The creator of `CoinType` must be `@aptos_framework`.
