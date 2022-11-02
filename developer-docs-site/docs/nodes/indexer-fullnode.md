@@ -24,6 +24,8 @@ To run an indexer fullnode, these are the steps in summary:
 
 Install the packages below. Note, you may have already installed many of these while [preparing your development environment](../guides/getting-started.md#prepare-development-environment). You can confirm by running `which command-name` and ensuring the package appears in the output (although `libpq` will not be returned even when installed).
 
+> Important: If you are on macOS, you will need to [install Docker following the official guidance](https://docs.docker.com/desktop/install/mac-install/) rather than `brew`.
+
 For an Aptos indexer fullnode, install these packages:
 
   - [`brew`](https://brew.sh/) - `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"` Run the commands emitted in the output to add the command to your path and install any dependencies
@@ -39,8 +41,7 @@ TODO: Test and provide a single `brew install` command for everything after `car
 ## Set up database
 
 1. Start the PostgreSQL server: 
-   - macOS: `brew services start postgresql`
-   - Linux: `pg_ctl -D /opt/homebrew/var/postgres start`
+   `brew services start postgresql`
 1. Ensure you can run `psql postgres` and then exit the prompt by entering: `\q`
 1. Create a PostgreSQL user `postgres` with the `createuser` command (find it with `which`):
    ```bash
@@ -85,7 +86,7 @@ error: could not find `Cargo.toml` in `/Users/claymurphy/mainnet` or any parent 
 
 1. Run the indexer fullnode with:
     ```bash
-    cargo run --bin aptos-node --features "indexer"  -- --config </path/to/fullnode.yaml>
+    cargo run --bin aptos-node --features "indexer"  -- --config /path/to/fullnode.yaml
     ```
 
 ## Restart indexer
