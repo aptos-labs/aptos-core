@@ -113,18 +113,18 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         let net = network_sender.clone();
         let metrics_monitor = tokio_metrics::TaskMonitor::new();
 
-        // print task metrics every 500ms
-        {
-            let metrics_monitor = metrics_monitor.clone();
-            tokio::spawn(async move {
-                for interval in metrics_monitor.intervals() {
-                    // pretty-print the metric interval
-                    println!("Quorum:BatchReader: {:?}", interval);
-                    // wait 500ms
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                }
-            });
-        }
+        // // print task metrics every 500ms
+        // {
+        //     let metrics_monitor = metrics_monitor.clone();
+        //     tokio::spawn(async move {
+        //         for interval in metrics_monitor.intervals() {
+        //             // pretty-print the metric interval
+        //             println!("Quorum:BatchReader: {:?}", interval);
+        //             // wait 500ms
+        //             tokio::time::sleep(Duration::from_secs(5)).await;
+        //         }
+        //     });
+        // }
 
         tokio::spawn(async move {
             metrics_monitor
