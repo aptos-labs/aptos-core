@@ -7,7 +7,7 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
-## 31 October 2022
+## 04 November 2022
 
 - Added a guide on [Resource Accounts](/docs/guides/resource-accounts.md) used by developers to publish modules and automatically sign transactions.
 
