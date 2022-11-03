@@ -371,7 +371,6 @@ module aptos_token::token {
         property_types: vector<String>
     ) acquires Collections, TokenStore {
         let token_mut_config = create_token_mutability_config(&mutate_setting);
-
         let tokendata_id = create_tokendata(
             account,
             collection,
@@ -802,7 +801,6 @@ module aptos_token::token {
     }
 
     public fun create_royalty(royalty_points_numerator: u64, royalty_points_denominator: u64, payee_address: address): Royalty {
-        assert!(royalty_points_denominator > 0, error::invalid_argument(EINVALID_ROYALTY_NUMERATOR_DENOMINATOR));
         assert!(royalty_points_numerator <= royalty_points_denominator, error::invalid_argument(EINVALID_ROYALTY_NUMERATOR_DENOMINATOR));
         assert!(account::exists_at(payee_address), error::invalid_argument(EROYALTY_PAYEE_ACCOUNT_DOES_NOT_EXIST));
         Royalty {
@@ -1021,6 +1019,8 @@ module aptos_token::token {
         assert!(string::length(&name) <= MAX_NFT_NAME_LENGTH, error::invalid_argument(ENFT_NAME_TOO_LONG));
         assert!(string::length(&collection) <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
         assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
+        assert!(royalty_points_numerator <= royalty_points_denominator, error::invalid_argument(EINVALID_ROYALTY_NUMERATOR_DENOMINATOR));
+
         let account_addr = signer::address_of(account);
         assert!(
             exists<Collections>(account_addr),
@@ -1056,11 +1056,7 @@ module aptos_token::token {
             largest_property_version: 0,
             supply: 0,
             uri,
-            royalty: Royalty {
-                royalty_points_denominator,
-                royalty_points_numerator,
-                payee_address: royalty_payee_address,
-            },
+            royalty: create_royalty(royalty_points_numerator, royalty_points_denominator, royalty_payee_address),
             name,
             description,
             default_properties: property_map::new(property_keys, property_values, property_types),
@@ -2396,6 +2392,12 @@ module aptos_token::token {
             amount: _,
             token_properties: _,
         } = token;
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 65570)]
+    public fun test_enter_illegal_royalty(){
+        create_royalty(101, 100, @0xcafe);
     }
 
     //
