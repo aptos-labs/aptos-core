@@ -12,7 +12,7 @@ Each account on the Aptos blockchain is identified by a 32-byte account address.
 There are three types of accounts in Aptos:
   * *Local account* - An account created by you for local testing.
   * *Blockchain account* - This is the on-chain representation of local account with a different storage location.
-  * *[Resource account](../guides/resource-accounts.md)* - An account used by developers to publish modules and sign transactions.
+  * *[Resource account](../guides/resource-accounts.md)* - An autonomous account used by developers to store resources or publish modules on chain without a corresponding private key.
 
 :::tip Account address example
 Account addresses are 32-bytes. They are usually shown as 64 hex characters, with each hex character a nibble.  Sometimes it's prefixed with a 0x See the [Your First Transaction](/tutorials/first-transaction.md#output) for an example of how an address looks like, reproduced below:
