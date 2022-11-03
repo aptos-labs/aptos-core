@@ -22,7 +22,7 @@ https://mainnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::staking_config::Stak
 
 With the configuration set in [staking_config.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/configs/staking_config.move).
 
-The rest of this document presents how staking works on the Aptos blockchain.
+The rest of this document presents how staking works on the Aptos blockchain. See [Supporting documentation](#supporting-documentation) at the bottom for related resources.
 
 ## Staking on the Aptos blockchain
 
@@ -287,3 +287,10 @@ For step-by-step instructions on how to leave the validator set, see: [Leaving V
 
 When you leave a validator set, you can rejoin by depositing the minimum required stake amount.
 
+## Supporting documentation
+
+* [Current on-chain data](https://mainnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::staking_config::StakingConfig)
+* [Staking Pool Operations](../nodes/validator-node/operator/staking-pool-operations.md)
+* [Configuration file `staking_config.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/configs/staking_config.move)
+* [Contract file `staking_contract.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/staking_contract.move) covering requesting commissions
+* [All staking-related `.move files](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/framework/aptos-framework/sources)
