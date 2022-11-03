@@ -20,7 +20,12 @@ In Aptos, a resource account is created based upon the SHA3-256 hash of the sour
 
 To properly set a resource account up, you will need to [initialize](https://github.com/aptos-labs/aptos-core/blob/2e9d8ee759fcd3f6e831034f05c1656b1c48efc4/aptos-move/move-examples/mint_nft/sources/minting.move#L73) the `mint_nft` module and retrieve the signer capability from both the resource account and module account. To do so, call `create_resource_account_and_publish_package` to publish the module under the resource account's address.
 
-Follow these steps and examples:
+You have three options for creating a resource account:
+* `create_resource_account_and_publish_package` - creates the resource account and results in loss of access to the resource account by design, because resource accounts are used to make contracts autonomous and immutable.
+* `create_resource_account_and_fund` - creates the resource account and funds it, retaining access to the resource account's signer until explicitly calling `retrieve_resource_account_cap`.
+* `create_resource_account` - merely creates the resource account but doesn't fund it, retaining access to the resource account's signer until explicitly calling `retrieve_resource_account_cap`.
+
+Follow these steps and examples, which assume use of `create_resource_account_and_publish_package`:
 
 1. Initialize the module as shown in the [`minting.move`](https://github.com/aptos-labs/aptos-core/blob/2e9d8ee759fcd3f6e831034f05c1656b1c48efc4/aptos-move/move-examples/mint_nft/sources/minting.move#L73) example.
 1. Call `create_resource_account_and_publish_package` to publish the module under the resource account's address, such as in the [`mint_nft.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/e2e-move-tests/src/tests/mint_nft.rs#L62) end-to-end example.
