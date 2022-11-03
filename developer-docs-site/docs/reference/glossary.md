@@ -11,7 +11,7 @@ slug: "glossary"
 
 ## Account
 
-- An **account** in the Aptos blockchain is a container for an arbitrary number of [Move modules](#move-module) and [Move resources](#move-resources). This essentially means that the state of each account is comprised of both code and data.
+- An **account** in the Aptos blockchain is a container for an arbitrary number of [Move modules](#move-module) and [Move resources](#move-resources). This essentially means that the state of each [account](/concepts/basics-accounts) is comprised of both code and data.
 - The account is identified by an [account address](#account-address).
 
 ## Account Address
@@ -238,10 +238,11 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ## Resource Account
 
-- A resource account is used to manage resources independent of an account managed by a user. For example, a developer may use a resource account to manage an account for module publishing, say managing a contract. The contract itself does not require a signer post initialization. A resource account gives you the means for the module to provide a signer to other modules and sign transactions on behalf of the module.
-- In Aptos, a resource account is created based upon the SHA3-256 hash of the source's address and additional seed data. A resource account can be created only once. An entity may call `create_account` in an attempt to claim an account ahead of the creation of a resource account. But if a resource account is found, Aptos will transition ownership of the account over to the resource account. This is done by validating that the account has yet to execute any transactions and that the `Account::signer_capbility_offer::for` is none. The probability of a collision where someone has legitimately produced a private key that maps to a resource account address is improbably low.
-- For an example, see the `SignerCapability` employed by the `mint_nft` function in this [section of `minting.move`](https://github.com/aptos-labs/aptos-core/blob/2e9d8ee759fcd3f6e831034f05c1656b1c48efc4/aptos-move/move-examples/mint_nft/sources/minting.move#L143-L181).
-- For more details, see the "resource account" references in [resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/resource_account.move) and [account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/account.move).
+- A resource account is used to manage resources independent of an account managed by a user. For example, a developer may use a resource account to manage an account for module publishing, say managing a contract.
+
+- The contract itself does not require a signer post initialization. A resource account gives you the means for the module to provide a signer to other modules and sign transactions on behalf of the module.
+
+See [Resource accounts](../guides/resource-accounts.md).
 
 ## REST Service
 
