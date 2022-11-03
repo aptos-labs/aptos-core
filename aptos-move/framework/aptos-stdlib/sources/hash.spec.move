@@ -29,4 +29,9 @@ spec aptos_std::aptos_hash {
         pragma opaque;
     }
 
+    spec blake2_256 {
+        // TODO: temporary mockup.
+        pragma opaque;
+    }
+
 }
