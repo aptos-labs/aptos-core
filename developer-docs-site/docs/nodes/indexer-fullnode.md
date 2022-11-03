@@ -62,7 +62,6 @@ TODO: Test and provide a single `brew install` command for everything after `car
 
 TODO: Determine if this should be done in the `aptos-core` checkout as indexer startup is looking for a `Cargo.toml` file:
 ```
-➜  mainnet cargo run --bin aptos-node --features "indexer"  -- --config fullnode.yaml
 error: could not find `Cargo.toml` in `/Users/claymurphy/mainnet` or any parent directory
 ```
 
@@ -87,6 +86,7 @@ error: could not find `Cargo.toml` in `/Users/claymurphy/mainnet` or any parent 
 1. Run the indexer fullnode with:
     ```bash
     cargo run --bin aptos-node --features "indexer"  -- --config /path/to/fullnode.yaml
+    cargo run -p aptos-node --features "indexer" --release -- -f /path/to/fullnode.yaml
     ```
 
 ## Restart indexer

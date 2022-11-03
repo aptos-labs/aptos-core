@@ -160,7 +160,6 @@ curl -O https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet
 
 TODO: Find out if this `mainnet` directory should reside in the `aptos-core` checkout as when attempting to start the fullnode indexer with the directory distinct results in the error:
 ```
-➜  mainnet cargo run --bin aptos-node --features "indexer"  -- --config fullnode.yaml
 error: could not find `Cargo.toml` in `/Users/claymurphy/mainnet` or any parent directory
 ```
 
