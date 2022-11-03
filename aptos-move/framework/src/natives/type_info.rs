@@ -13,6 +13,7 @@ use move_vm_types::{
     values::{Struct, Value},
 };
 
+use crate::natives::transaction_context::NativeTransactionContext;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, sync::Arc};
 
@@ -123,6 +124,42 @@ pub fn make_native_type_name(gas_params: TypeNameGasParameters) -> NativeFunctio
 }
 
 /***************************************************************************************************
+ * native fun chain_id
+ *
+ *   Returns the chain ID
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct ChainIdGasParameters {
+    pub base: InternalGas,
+}
+
+fn native_chain_id(
+    gas_params: &ChainIdGasParameters,
+    context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(arguments.is_empty());
+
+    let cost = gas_params.base;
+
+    let chain_id = context
+        .extensions()
+        .get::<NativeTransactionContext>()
+        .chain_id();
+
+    Ok(NativeResult::ok(cost, smallvec![Value::u8(chain_id)]))
+}
+
+fn make_native_chain_id(gas_params: ChainIdGasParameters) -> NativeFunction {
+    Arc::new(move |context, ty_args, args| native_chain_id(&gas_params, context, ty_args, args))
+}
+
+/***************************************************************************************************
  * module
  *
  **************************************************************************************************/
@@ -130,12 +167,17 @@ pub fn make_native_type_name(gas_params: TypeNameGasParameters) -> NativeFunctio
 pub struct GasParameters {
     pub type_of: TypeOfGasParameters,
     pub type_name: TypeNameGasParameters,
+    pub chain_id: ChainIdGasParameters,
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
         ("type_of", make_native_type_of(gas_params.type_of)),
         ("type_name", make_native_type_name(gas_params.type_name)),
+        (
+            "chain_id_internal",
+            make_native_chain_id(gas_params.chain_id),
+        ),
     ];
 
     crate::natives::helpers::make_module_natives(natives)

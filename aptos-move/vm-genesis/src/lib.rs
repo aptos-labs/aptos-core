@@ -101,6 +101,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        ChainId::test().id(),
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -196,6 +197,7 @@ pub fn encode_genesis_change_set(
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        ChainId::test().id(),
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -839,6 +841,7 @@ pub fn test_genesis_module_publishing() {
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         false,
+        ChainId::test().id(),
     )
     .unwrap();
     let id1 = HashValue::zero();

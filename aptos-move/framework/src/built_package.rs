@@ -93,7 +93,7 @@ pub(crate) fn build_model(
         test_mode: false,
         force_recompilation: false,
         fetch_deps_only: false,
-        fetch_latest_git_deps: false,
+        skip_fetch_latest_git_deps: true,
     };
     build_config.move_model_for_package(
         package_path,
@@ -120,7 +120,7 @@ impl BuiltPackage {
             test_mode: false,
             force_recompilation: false,
             fetch_deps_only: false,
-            fetch_latest_git_deps: false,
+            skip_fetch_latest_git_deps: true,
         };
         eprintln!("Compiling, may take a little while to download git dependencies...");
         let mut package =
