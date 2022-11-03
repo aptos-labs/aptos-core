@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 
 # Your First Coin
 
-This tutorial introduces how you can compile, deploy, and mint your own coin, named MoonCoin.
+This tutorial introduces how you can compile, deploy, and mint your own coin, named [MoonCoin](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/moon_coin).
 
 ## Step 1: Pick an SDK
 
