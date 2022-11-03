@@ -190,7 +190,8 @@ TODO: Find out why we have them replace the contents of a file they just downloa
 
 **NOTE**: Set `listen_address: "/ip4/127.0.0.1/tcp/6182"` if you do not want other full nodes connecting to yours. Also see the below note.
 
-4. Run the below `docker` command. **NOTE** that from time to time the Docker image tag will be updated and you should use the latest official image tag in place of `mainnet_506f94721ca0fd0d339472fffe149a1fda469cad`. See https://github.com/aptos-labs/aptos-networks/tree/main/mainnet or this page for updates:
+4. Run the below `docker` command. **NOTE** the `mainnet` tag always refers to the latest official Docker image tag. You can find the latest hash for comparison at:
+https://github.com/aptos-labs/aptos-networks/tree/main/mainnet
 
 ```bash
 docker run --pull=always \
@@ -198,7 +199,7 @@ docker run --pull=always \
     -p 9101:9101 -p 6180:6180 \
     -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data \
     --workdir /opt/aptos/etc \
-    --name=aptos-fullnode aptoslabs/validator:mainnet_506f94721ca0fd0d339472fffe149a1fda469cad aptos-node \
+    --name=aptos-fullnode aptoslabs/validator:mainnet aptos-node \
     -f /opt/aptos/etc/fullnode.yaml
 ```
 
