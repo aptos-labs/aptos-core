@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 04 November 2022
+
+- Added a guide on [Resource Accounts](/docs/guides/resource-accounts.md) used by developers to publish modules and automatically sign transactions.
+
 ## 01 November 2022
 
 - Expanded the previous Coin and Token documentation into the [Aptos Token Standard](/docs/concepts/coin-and-token/index.md) with new field descriptions and more and moved it to the [Getting Started](/docs/guides/getting-started.md) section for greater visilibity.
