@@ -8,7 +8,7 @@
 // To avoid any analytics hassle, proto2 is required here.
 syntax = "proto2";
 
-package aptos.indexer.streaming.proto.v1;
+package aptos.indexer.proto.v1;
 
 // Transaction is a simplified representation for the transaction
 // happened on the chain. Mainly built for streaming into BigQuery.

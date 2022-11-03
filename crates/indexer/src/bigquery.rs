@@ -18,7 +18,7 @@ use prost_types::{DescriptorProto, FileDescriptorSet};
 use streaming_proto::Transaction as TransactionProto;
 
 pub mod streaming_proto {
-    include!(concat!("./pb", "/aptos.indexer.streaming.proto.v1.rs"));
+    include!(concat!("./pb", "/aptos.indexer.proto.v1.rs"));
 }
 pub type BigQueryClient = GoogleApi<BigQueryWriteClient<GoogleAuthMiddleware>>;
 
