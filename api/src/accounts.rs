@@ -41,7 +41,7 @@ pub struct AccountsApi {
 impl AccountsApi {
     /// Get account
     ///
-    /// Return the authentication key and the sequence number for an account 
+    /// Return the authentication key and the sequence number for an account
     /// address. Optionally, a ledger version can be specified. If the ledger
     /// version is not specified in the request, the latest ledger version is used.
     #[oai(
