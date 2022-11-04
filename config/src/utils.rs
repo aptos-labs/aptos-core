@@ -173,9 +173,8 @@ fn open_counter_file() -> PortCounterFiles {
 }
 
 fn bind_port_from_counter(mut counter: u16) -> (u16, u16) {
-    for _ in 0..MAX_PORT_RETRIES {
+    for attempt in 0..MAX_PORT_RETRIES {
         let port = PORT_VECTOR[counter as usize];
-        info!("Attempting port: {}, counter: {}", port, counter);
         counter += 1;
         if counter as usize == PORT_VECTOR.len() {
             counter = 0;
@@ -183,10 +182,13 @@ fn bind_port_from_counter(mut counter: u16) -> (u16, u16) {
 
         match try_bind(port) {
             Ok(port) => {
-                info!("Bound port: {}, counter: {}", port, counter);
                 return (port, counter);
             }
             Err(_) => {
+                info!(
+                    "Conflicting port: {}, on count {} and attempt {}",
+                    port, counter, attempt
+                );
                 continue;
             }
         }
