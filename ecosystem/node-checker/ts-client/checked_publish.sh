@@ -10,4 +10,4 @@ set -e
 . ./check.sh
 
 # Finally, publish the package. We assume it has been built
-yarn publish --non-interactive
+pnpm publish --non-interactive
