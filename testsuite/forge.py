@@ -82,10 +82,6 @@ except ImportError:
     import psutil
 
 
-def get_current_user() -> str:
-    return pwd.getpwuid(os.getuid())[0]
-
-
 @click.group()
 def main() -> None:
     # Check that the current directory is the root of the repository.
@@ -830,25 +826,48 @@ def get_current_cluster_name(shell: Shell) -> str:
     return matches[0]
 
 
-def assert_provided_image_tags_has_profile_or_features(
+def extract_git_sha(image_tag: str) -> Optional[str]:
+    """Extract the git sha from the image tag"""
+    if len(image_tag) < 40:  # A Git commit ID is a 40 digits long SHA-1 hash
+        return None
+
+    # Just assume that it's the last 40 digits
+    return image_tag[-40:]
+
+
+def ensure_image_tags_have_profile_or_features(
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
     enable_testing_image: bool,
     enable_performance_profile: bool,
 ):
+
+    if enable_testing_image and enable_performance_profile:
+        raise Exception(
+            "Cannot yet set both testing (failpoints) image and performance"
+        )
+
+    ret_tags = []
     for tag in [image_tag, upgrade_image_tag]:
         if not tag:
+            ret_tags.append(None)
             continue
+
+        git_sha = extract_git_sha(tag)
         if (
             enable_testing_image
         ):  # testing image requires the tag to be prefixed with failpoints_
-            assert tag.startswith(
-                "failpoints"
-            ), f"Missing failpoints_ feature prefix in {tag}"
+            assert git_sha or tag.startswith(
+                "failpoints_"
+            ), f"Either not a Git SHA or missing failpoints_ feature prefix in {tag}"
+            ret_tags.append(f"failpoints_{git_sha}")
         if enable_performance_profile:
-            assert tag.startswith(
-                "performance"
-            ), f"Missing performance_ profile prefix in {tag}"
+            assert git_sha or tag.startswith(
+                "performance_"
+            ), f"Either not a Git SHA or missing performance_ feature prefix in {tag}"
+            ret_tags.append(f"performance_{git_sha}")
+
+    return ret_tags
 
 
 def find_recent_images_by_profile_or_features(
@@ -1260,7 +1279,7 @@ def test(
     enable_testing_image = forge_enable_testing_image == "true"
     enable_performance_profile = forge_enable_performance == "true"
 
-    assert_provided_image_tags_has_profile_or_features(
+    image_tag, upgrade_image_tag = ensure_image_tags_have_profile_or_features(
         image_tag,
         upgrade_image_tag,
         enable_testing_image=enable_testing_image,
@@ -1299,7 +1318,7 @@ def test(
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
 
-    assert_provided_image_tags_has_profile_or_features(
+    ensure_image_tags_have_profile_or_features(
         image_tag,
         upgrade_image_tag,
         enable_testing_image=enable_testing_image,

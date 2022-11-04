@@ -40,10 +40,10 @@ on:
         type: number
         default: 360
         description: Github job timeout in minutes
-      FORGE_ENABLE_FAILPOINTS:
+      FORGE_ENABLE_TESTING_IMAGE:
         required: false
         type: string
-        description: Whether to use failpoints images. If this option is true, and you plan to manually pass in IMAGE_TAGs, note that the tagging schema is different
+        description: Whether to use testing image, which includes debug utilities and failpoints. If this option is true, and you plan to manually pass in IMAGE_TAGs, note that the tagging schema is different
       FORGE_ENABLE_HAPROXY:
         required: false
         type: string
@@ -77,7 +77,7 @@ env:
   FORGE_ENABLE_HAPROXY: ${{ inputs.FORGE_ENABLE_HAPROXY }}
   FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
   POST_TO_SLACK: ${{ inputs.POST_TO_SLACK }}
-  FORGE_ENABLE_FAILPOINTS: ${{ inputs.FORGE_ENABLE_FAILPOINTS }}
+  FORGE_ENABLE_TESTING_IMAGE: ${{ inputs.FORGE_ENABLE_TESTING_IMAGE }}
   COMMENT_HEADER: ${{ inputs.COMMENT_HEADER }}
   VERBOSE: true
 

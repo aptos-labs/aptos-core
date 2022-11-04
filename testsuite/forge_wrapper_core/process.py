@@ -42,6 +42,10 @@ class SystemProcess(Process):
         return self.process.ppid()
 
 
+def get_current_user() -> str:
+    return pwd.getpwuid(os.getuid())[0]
+
+
 class SystemProcesses(Processes):
     def processes(self) -> Generator[Process, None, None]:
         for process in psutil.process_iter():

@@ -38,7 +38,7 @@ from forge import (
     LocalForgeRunner,
     RunResult,
     SystemContext,
-    assert_provided_image_tags_has_profile_or_features,
+    ensure_image_tags_have_profile_or_features,
     create_forge_command,
     find_recent_images,
     find_recent_images_by_profile_or_features,
@@ -527,16 +527,31 @@ class TestFindRecentImage(unittest.TestCase):
             )
 
     def testFailpointsProvidedImageTag(self) -> None:
-        with self.assertRaises(AssertionError):
-            assert_provided_image_tags_has_profile_or_features(
+        # In the case that the provided image tags are not git shas, we should not
+        # assume that we can simply add a prefix, and instead should error out
+        with self.assertRaisesRegex(
+            AssertionError, ".*missing failpoints_ feature prefix.*"
+        ):
+            ensure_image_tags_have_profile_or_features(
                 "potato_tomato",
                 "failpoints_performance_potato",
                 enable_testing_image=True,
                 enable_performance_profile=False,
             )
 
+        # In the case that the provided image tag is a git sha, we can strip any prefixes
+        # and add the required prefix.
+        a, b = ensure_image_tags_have_profile_or_features(
+            "5d81d6f7e9f6b16a7552ca14afaec2f3774114e3",
+            "performance_5d81d6f7e9f6b16a7552ca14afaec2f3774114e3",
+            enable_testing_image=False,
+            enable_performance_profile=True,
+        )
+        self.assertEqual(a, "performance_5d81d6f7e9f6b16a7552ca14afaec2f3774114e3")
+        self.assertEqual(b, "performance_5d81d6f7e9f6b16a7552ca14afaec2f3774114e3")
+
     def testFailpointsNoProvidedImageTag(self) -> None:
-        assert_provided_image_tags_has_profile_or_features(
+        ensure_image_tags_have_profile_or_features(
             None,
             None,
             enable_testing_image=True,

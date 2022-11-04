@@ -20,4 +20,4 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: slow_processing_catching_up
       POST_TO_SLACK: true
-      FORGE_ENABLE_FAILPOINTS: true
+      FORGE_ENABLE_TESTING_IMAGE: true
