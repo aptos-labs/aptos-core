@@ -12,14 +12,22 @@ This tutorial introduces how you can compile, deploy, and mint your own coin, na
 
 ## Step 0: Install prerequisites
 
-If you don't already have them (confirmed with `which command-name`), install the following packages in the order specified to take these tutorials:
+If you don't already have them (confirmed with `which command-name`), install the following packages to take this tutorial:
 
-1. **Homebrew**: [https://brew.sh/](https://brew.sh/)
-1. **Yarn**: Install the latest [Yarn](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable) by executing the below command on your Terminal:
+1. **Homebrew**: [https://brew.sh/](https://brew.sh/) by executing the following command in your terminal:
+    ````bash
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    ````
+
+1. **Yarn**: Install the latest [Yarn](https://classic.yarnpkg.com/lang/en/docs/install/:
     ```bash
     brew install yarn
     ```
-1. **Poetry**: Install Poetry from [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation).
+1. **Poetry**: Install Poetry from [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation):
+    ```bash
+    curl -sSL https://install.python-poetry.org | python3
+    poetry update
+    ```
 
 ## Step 1: Pick an SDK
 
@@ -73,13 +81,6 @@ Navigate to the Python SDK directory:
 
 ```bash
 cd ~/aptos-core/ecosystem/python/sdk
-```
-
-Install the necessary dependencies. Also see [Aptos Developer Resources](/aptos-developer-resources):
-
-```bash
-curl -sSL https://install.python-poetry.org | python3
-poetry update
 ```
 
 Run the Python [`your-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/your-coin.py) example:

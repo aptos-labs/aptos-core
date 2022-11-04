@@ -9,34 +9,13 @@ If you are new to the Aptos blockchain, begin with these quickstarts before you 
 
 Note, they should be used only in the [Aptos devnet or testnet environments](../nodes/aptos-deployments.md).
 
-## Install macOS prerequisites
-
-If running macOS, install the following packages in the order specified to take these tutorials:
-
-1. **Homebrew**: [https://brew.sh/](https://brew.sh/)
-1. **Node.js**: Install [Node.js](https://nodejs.org/en/download/), which will install `npm` and `npx`, by executing the below command on your Terminal:
-    ```bash
-    brew install node
-    ```
-1. **Yarn**: Install the latest [Yarn](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable) by executing the below command on your Terminal:
-    ```bash
-    brew install yarn
-    ```
-1. **Poetry**: Install Poetry from [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation).
-
 ## Adjust network and funding source
 
 For development purposes, the tutorials here assume you are working in the Aptos devnet network and therefore interacting with the devnet Aptos node and faucet service for creating and funding accounts. As noted in the relevant tutorials, these targets can be configured with the following environment variables:
   * `APTOS_NODE_URL`
   * `APTOS_FAUCET_URL`
 
-Here are the options for funding by network:
-  * *Testnet* - Use the faucet button [in-wallet](../guides/install-petra-wallet.md) or use the testnet faucet at: https://aptoslabs.com/testnet-faucet.
-  * *Devnet* - Use the faucet button [in-wallet](../guides/install-petra-wallet.md)
-
-As mentioned at the top, these tutorials are not intended to be followed in mainnet, where is no faucet in-wallet; you must get funds from an exchange.
-
-For more information on the available Aptos networks, see [Aptos Blockchain Deployments](../nodes/aptos-deployments.md).
+For funding, use the commands supplied in the tutorials themselves or the Faucet button [in-wallet](../guides/install-petra-wallet.md).
 
 ## Take tutorials
 

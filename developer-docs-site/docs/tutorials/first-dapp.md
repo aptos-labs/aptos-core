@@ -45,6 +45,18 @@ Ensure that your account has sufficient funds to perform transactions by clickin
 
 3. Run `aptos account list` to verify that it is working.
 
+### Brew and Node.js
+
+If you don't have it already (confirmed with `which brew`), install [Homebrew](https://brew.sh/) to install Node.js:
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Install [Node.js](https://nodejs.org/en/download/), which will install `npm` and `npx`, by executing the below command on your Terminal:
+```bash
+brew install node
+```
+
 ## Step 1: Set up a single page app
 
 We will now set up the frontend user interface for our dapp. We will use [`create-react-app`](https://create-react-app.dev/) to set up the app in this tutorial, but neither React nor `create-react-app` are required. You can use your preferred JavaScript framework.
