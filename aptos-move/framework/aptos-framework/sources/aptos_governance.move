@@ -16,6 +16,7 @@ module aptos_framework::aptos_governance {
     use std::option;
     use std::signer;
     use std::string::{Self, String, utf8};
+    use std::vector;
 
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::table::{Self, Table};
@@ -52,6 +53,8 @@ module aptos_framework::aptos_governance {
     const EMETADATA_HASH_TOO_LONG: u64 = 10;
     /// Account is not authorized to call this function.
     const EUNAUTHORIZED: u64 = 11;
+    /// The given proposal_id does not exist
+    const EPROPOSAL_ID_DOES_NOT_EXIST: u64 = 12;
 
     /// This matches the same enum const in voting. We have to duplicate it as Move doesn't have support for enums yet.
     const PROPOSAL_STATE_SUCCEEDED: u64 = 1;
@@ -354,11 +357,45 @@ module aptos_framework::aptos_governance {
         simple_map::add(&mut approved_hashes.hashes, proposal_id, execution_hash);
     }
 
+    /// Used when making a multi-step governance proposal.
+    /// Replace the current execution hash in the `ApprovedExecutionHashes` with the next execution hash
+    fun replace_approved_hash(proposal_id: u64, next_execution_hash: vector<u8>) acquires ApprovedExecutionHashes {
+        let approved_hashes = borrow_global_mut<ApprovedExecutionHashes>(@aptos_framework);
+        if (!simple_map::contains_key(&approved_hashes.hashes, &proposal_id)) {
+            return
+        };
+
+        let proposal_state = voting::get_proposal_state<GovernanceProposal>(@aptos_framework, proposal_id);
+        assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, error::invalid_argument(EPROPOSAL_NOT_RESOLVABLE_YET));
+
+        simple_map::remove(&mut approved_hashes.hashes, &proposal_id);
+        if (vector::length(&next_execution_hash)!=0) {
+            // if there's next step, replace it with the existing execution hash
+            simple_map::add(&mut approved_hashes.hashes, proposal_id, next_execution_hash);
+        };
+    }
+
+     fun get_execution_hash(proposal_id: u64): vector<u8> acquires ApprovedExecutionHashes {
+        let approved_hashes = borrow_global<ApprovedExecutionHashes>(@aptos_framework);
+        assert!(simple_map::contains_key(&approved_hashes.hashes, &proposal_id), error::invalid_argument(EPROPOSAL_ID_DOES_NOT_EXIST));
+        let proposal_state = voting::get_proposal_state<GovernanceProposal>(@aptos_framework, proposal_id);
+        assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, error::invalid_argument(EPROPOSAL_NOT_RESOLVABLE_YET));
+
+        *simple_map::borrow(&approved_hashes.hashes, &proposal_id)
+    }
+
     /// Resolve a successful proposal. This would fail if the proposal is not successful (not enough votes or more no
     /// than yes).
     public fun resolve(proposal_id: u64, signer_address: address): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
         voting::resolve<GovernanceProposal>(@aptos_framework, proposal_id);
         remove_approved_hash(proposal_id);
+        get_signer(signer_address)
+    }
+
+    /// Resolve a successful multi-step proposal. This would fail if the proposal is not successful.
+    public fun resolve_multi_step_proposal(proposal_id: u64, signer_address: address, next_execution_hash: vector<u8>): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
+        voting::resolve_multi_step_proposal<GovernanceProposal>(@aptos_framework, proposal_id, get_execution_hash(proposal_id), next_execution_hash);
+        replace_approved_hash(proposal_id, next_execution_hash);
         get_signer(signer_address)
     }
 
@@ -420,9 +457,6 @@ module aptos_framework::aptos_governance {
         simple_map::add(&mut metadata, utf8(METADATA_HASH_KEY), metadata_hash);
         metadata
     }
-
-    #[test_only]
-    use std::vector;
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
     public entry fun test_voting(

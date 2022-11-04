@@ -326,6 +326,53 @@ module aptos_framework::voting {
         option::extract(&mut proposal.execution_content)
     }
 
+    /// Resolve the multi-step proposal with given id. Can only be done if there are at least as many votes as min required and
+    /// there are more yes votes than no. If either of these conditions is not met, this will revert.
+    ///
+    /// @param voting_forum_address The address of the forum where the proposals are stored.
+    /// @param proposal_id The proposal id.
+    /// @param next_execution_hash The next execution hash of this multi-step proposal
+    public fun resolve_multi_step_proposal<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+        curr_execution_hash: vector<u8>,
+        next_execution_hash: vector<u8>,
+    ) acquires VotingForum {
+        let proposal_state = get_proposal_state<ProposalType>(voting_forum_address, proposal_id);
+        assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, error::invalid_state(EPROPOSAL_CANNOT_BE_RESOLVED));
+
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        assert!(!proposal.is_resolved, error::invalid_state(EPROPOSAL_ALREADY_RESOLVED));
+
+        let resolvable_time = to_u64(*simple_map::borrow(&proposal.metadata, &utf8(RESOLVABLE_TIME_METADATA_KEY)));
+        assert!(timestamp::now_seconds() > resolvable_time, error::invalid_state(ERESOLUTION_CANNOT_BE_ATOMIC));
+
+        assert!(
+            transaction_context::get_script_hash() == curr_execution_hash,
+            error::invalid_argument(EPROPOSAL_EXECUTION_HASH_NOT_MATCHING),
+        );
+
+        // if next execution hash is empty, it means that the current execution hash is the last step of the proposal
+        // and we can mark that this proposal is resolved and emit events
+        if (vector::length(&next_execution_hash) == 0) {
+            proposal.is_resolved = true;
+            proposal.resolution_time_secs = timestamp::now_seconds();
+
+            let resolved_early = can_be_resolved_early(proposal);
+
+            event::emit_event<ResolveProposal>(
+                &mut voting_forum.events.resolve_proposal_events,
+                ResolveProposal {
+                    proposal_id,
+                    yes_votes: proposal.yes_votes,
+                    no_votes: proposal.no_votes,
+                    resolved_early,
+                },
+            );
+        }
+    }
+
     public fun is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool acquires VotingForum {
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
