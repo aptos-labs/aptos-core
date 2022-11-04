@@ -1,0 +1,24 @@
+{
+    "enabled_clusters": [
+      "banana"
+    ],
+    "all_clusters": [
+      "banana",
+      "apple"
+    ],
+    "default_helm_values": {
+      "aptos-genesis": {
+        "image": {
+          "repo": "apple"
+        }
+      },
+      "aptos-node": {
+        "image": {
+-         "repo": "banana"
++         "repo": "banana2"
+?                        +
+
+        }
+      }
+    }
+  }
