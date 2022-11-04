@@ -555,7 +555,7 @@ mod tests {
 
     #[test]
     fn test_network_api() {
-        let mut runtime = consensus_runtime();
+        let runtime = consensus_runtime();
         let num_nodes = 5;
         let mut receivers: Vec<NetworkReceivers> = Vec::new();
         let mut playground = NetworkPlayground::new(runtime.handle().clone());
@@ -628,7 +628,7 @@ mod tests {
             .unwrap(),
             SyncInfo::new(previous_qc.clone(), previous_qc, None),
         );
-        timed_block_on(&mut runtime, async {
+        timed_block_on(&runtime, async {
             nodes[0]
                 .send_vote(vote_msg.clone(), peers[2..5].to_vec())
                 .await;
@@ -658,7 +658,7 @@ mod tests {
 
     #[test]
     fn test_rpc() {
-        let mut runtime = consensus_runtime();
+        let runtime = consensus_runtime();
         let num_nodes = 2;
         let mut senders = Vec::new();
         let mut receivers: Vec<NetworkReceivers> = Vec::new();
@@ -746,7 +746,7 @@ mod tests {
         };
         runtime.handle().spawn(on_request_block);
         let peer = peers[1];
-        timed_block_on(&mut runtime, async {
+        timed_block_on(&runtime, async {
             let response = nodes[0]
                 .request_block(
                     BlockRetrievalRequest::new(HashValue::zero(), 1),
@@ -817,7 +817,7 @@ mod tests {
         };
         let f_network_task = network_task.start();
 
-        let mut runtime = consensus_runtime();
-        timed_block_on(&mut runtime, future::join(f_network_task, f_check));
+        let runtime = consensus_runtime();
+        timed_block_on(&runtime, future::join(f_network_task, f_check));
     }
 }

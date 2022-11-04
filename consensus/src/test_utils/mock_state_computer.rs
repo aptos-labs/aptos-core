@@ -3,6 +3,7 @@
 
 use crate::{
     error::StateSyncError,
+    experimental::buffer_manager::OrderedBlocks,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
 };
@@ -15,12 +16,13 @@ use aptos_types::{
 };
 use consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
 use executor_types::{Error, StateComputeResult};
-use futures::channel::mpsc;
+use futures::{channel::mpsc, SinkExt};
+use futures_channel::mpsc::UnboundedSender;
 use std::{collections::HashMap, sync::Arc};
 
 pub struct MockStateComputer {
     state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
-    commit_callback: mpsc::UnboundedSender<LedgerInfoWithSignatures>,
+    executor_channel: UnboundedSender<OrderedBlocks>,
     consensus_db: Arc<MockStorage>,
     block_cache: Mutex<HashMap<HashValue, Payload>>,
 }
@@ -28,15 +30,48 @@ pub struct MockStateComputer {
 impl MockStateComputer {
     pub fn new(
         state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
-        commit_callback: mpsc::UnboundedSender<LedgerInfoWithSignatures>,
+        executor_channel: UnboundedSender<OrderedBlocks>,
         consensus_db: Arc<MockStorage>,
     ) -> Self {
         MockStateComputer {
             state_sync_client,
-            commit_callback,
+            executor_channel,
             consensus_db,
             block_cache: Mutex::new(HashMap::new()),
         }
+    }
+
+    pub async fn commit_to_storage(&self, blocks: OrderedBlocks) -> Result<(), Error> {
+        let OrderedBlocks {
+            ordered_blocks,
+            ordered_proof,
+            callback,
+        } = blocks;
+
+        self.consensus_db
+            .commit_to_storage(ordered_proof.ledger_info().clone());
+
+        // mock sending commit notif to state sync
+        let mut txns = vec![];
+        for block in &ordered_blocks {
+            let mut payload = self
+                .block_cache
+                .lock()
+                .remove(&block.id())
+                .ok_or_else(|| format_err!("Cannot find block"))?
+                .into_iter()
+                .collect();
+            txns.append(&mut payload);
+        }
+        // they may fail during shutdown
+        let _ = self.state_sync_client.unbounded_send(txns);
+
+        callback(
+            &ordered_blocks.into_iter().map(Arc::new).collect::<Vec<_>>(),
+            ordered_proof,
+        );
+
+        Ok(())
     }
 }
 
@@ -58,30 +93,30 @@ impl StateComputer for MockStateComputer {
     async fn commit(
         &self,
         blocks: &[Arc<ExecutedBlock>],
-        commit: LedgerInfoWithSignatures,
-        call_back: StateComputerCommitCallBackType,
+        finality_proof: LedgerInfoWithSignatures,
+        callback: StateComputerCommitCallBackType,
     ) -> Result<(), Error> {
-        self.consensus_db
-            .commit_to_storage(commit.ledger_info().clone());
-
-        // mock sending commit notif to state sync
-        let mut txns = vec![];
-        for block in blocks {
-            let mut payload = self
-                .block_cache
-                .lock()
-                .remove(&block.id())
-                .ok_or_else(|| format_err!("Cannot find block"))?
-                .into_iter()
-                .collect();
-            txns.append(&mut payload);
+        assert!(!blocks.is_empty());
+        info!(
+            "MockStateComputer commit put on queue {:?}",
+            blocks.iter().map(|v| v.round()).collect::<Vec<_>>()
+        );
+        if self
+            .executor_channel
+            .clone()
+            .send(OrderedBlocks {
+                ordered_blocks: blocks
+                    .iter()
+                    .map(|b| (**b).clone())
+                    .collect::<Vec<ExecutedBlock>>(),
+                ordered_proof: finality_proof,
+                callback,
+            })
+            .await
+            .is_err()
+        {
+            debug!("Failed to send to buffer manager, maybe epoch ends");
         }
-        // they may fail during shutdown
-        let _ = self.state_sync_client.unbounded_send(txns);
-
-        let _ = self.commit_callback.unbounded_send(commit.clone());
-
-        call_back(blocks, commit);
 
         Ok(())
     }
@@ -93,9 +128,6 @@ impl StateComputer for MockStateComputer {
         );
         self.consensus_db
             .commit_to_storage(commit.ledger_info().clone());
-        self.commit_callback
-            .unbounded_send(commit)
-            .expect("Fail to notify about sync");
         Ok(())
     }
 
