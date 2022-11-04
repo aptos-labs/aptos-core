@@ -19,10 +19,9 @@ export class AccountsService {
 
     /**
      * Get account
-     * Retrieves high level information about an account such as its sequence number and
-     * authentication key
-     *
-     * Returns a 404 if the account doesn't exist
+     * Return the authentication key and the sequence number for an account
+     * address. Optionally, a ledger version can be specified. If the ledger
+     * version is not specified in the request, the latest ledger version is used.
      * @param address Address of account with or without a `0x` prefix
      * @param ledgerVersion Ledger version to get state of account
      *
