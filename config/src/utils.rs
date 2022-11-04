@@ -21,7 +21,7 @@ use std::{env, fs, thread};
 
 const MAX_PORT_RETRIES: u16 = 1000;
 // Intersection of Linux and Mac OS
-const EPHEMERAL_PORT_RANGE: Range<u16> = 49152..61000;
+const UNIQUE_PORT_RANGE: Range<u16> = 10000..30000;
 // Consistent seed across processes
 const PORT_SEED: [u8; 32] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
@@ -35,7 +35,7 @@ static NEXTEST_RUN_ID: Lazy<Option<String>> = Lazy::new(|| {
     }
 });
 static PORT_VECTOR: Lazy<Vec<u16>> = Lazy::new(|| {
-    let mut ports: Vec<_> = EPHEMERAL_PORT_RANGE.collect();
+    let mut ports: Vec<_> = UNIQUE_PORT_RANGE.collect();
     let mut rng = rand::rngs::StdRng::from_seed(PORT_SEED);
     ports.shuffle(&mut rng);
     ports
