@@ -28,7 +28,7 @@ pub struct PropertyMap {
 
 impl PropertyMap {
     /// Deserializes PropertyValue from bcs encoded json
-    pub fn from_bsc_encode_str(val: Value) -> Option<Value> {
+    pub fn from_bcs_encode_str(val: Value) -> Option<Value> {
         let mut pm = PropertyMap {
             data: HashMap::new(),
         };
