@@ -9,13 +9,11 @@ If you are new to the Aptos blockchain, begin with these quickstarts before you 
 
 Note, these tutorials should be used only in the [Aptos devnet environment](../nodes/aptos-deployments.md).
 
-## Adjust network and funding source
+## Adjust network
 
 For development purposes, the tutorials here assume you are working in the Aptos devnet network and therefore interacting with the devnet Aptos node and faucet service for creating and funding accounts. As noted in the relevant tutorials, these targets can be configured with the following environment variables:
   * `APTOS_NODE_URL`
   * `APTOS_FAUCET_URL`
-
-For funding, use the commands supplied in the tutorials themselves or the Faucet button [in-wallet](../guides/install-petra-wallet.md).
 
 ## Take tutorials
 
