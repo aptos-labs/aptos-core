@@ -11,7 +11,7 @@ Note, these tutorials should be used only in the [Aptos devnet environment](../n
 
 ## Adjust network
 
-For development purposes, the tutorials here assume you are working in the Aptos devnet network and therefore interacting with the devnet Aptos node and faucet service for creating and funding accounts. As noted in the relevant tutorials, these targets can be configured with the following environment variables:
+For development purposes, the tutorials here assume you are working in the Aptos devnet network and therefore interacting with the devnet Aptos node and faucet service for creating and funding accounts. As noted in the relevant tutorials, these targets can be configured with the following environment variables once you have graduated to working in testnet and mainnet:
   * `APTOS_NODE_URL`
   * `APTOS_FAUCET_URL`
 

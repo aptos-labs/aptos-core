@@ -24,10 +24,9 @@ If you don't already have them (confirmed with `which command-name`), install th
     ````bash
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     ````
-
-1. **Yarn**: Install the latest [Yarn](https://classic.yarnpkg.com/lang/en/docs/install/:
+1. **pnpm**: Install the latest [pnpm](https://pnpm.io/):
     ```bash
-    brew install yarn
+    brew install pnpm
     ```
 1. **Poetry**: Install Poetry from [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation):
     ```bash
