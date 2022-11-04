@@ -7,7 +7,7 @@ slug: "aptos-quickstarts"
 
 If you are new to the Aptos blockchain, begin with these quickstarts before you get into in-depth development. These tutorials will help you become familiar with how to develop for the Aptos blockchain using the Aptos SDK.
 
-Note, they should be used only in the [Aptos devnet or testnet environments](../nodes/aptos-deployments.md).
+Note, these tutorials should be used only in the [Aptos devnet environment](../nodes/aptos-deployments.md).
 
 ## Adjust network and funding source
 
