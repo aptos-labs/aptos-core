@@ -326,7 +326,7 @@ function App() {
     client.getAccountModules(address).then(setModules);
   }, [address]);
 
-  const hasModule = modules.some((m) => m.abi?.name === 'Message');
+  const hasModule = modules.some((m) => m.abi?.name === 'message');
   const publishInstructions = (
     <pre>
       Run this command to publish the module:
