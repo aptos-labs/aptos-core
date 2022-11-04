@@ -194,7 +194,7 @@ const config = {
                       <a href="https://aptosfoundation.org/privacy" target="_blank">Privacy</a>
                       <a href="https://aptosfoundation.org/terms" target="_blank">Terms</a></div>
                   </div>
-                </div>  
+                </div>
                 `,
               },
             ],

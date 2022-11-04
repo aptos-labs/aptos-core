@@ -7,15 +7,17 @@ use crate::response::{
     block_pruned_by_height, json_api_disabled, version_not_found, version_pruned, ForbiddenError,
     InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
 };
-use anyhow::{ensure, format_err, Context as AnyhowContext, Result};
+use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
     AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, TransactionOnChainData,
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_logger::error;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
+use aptos_types::access_path::{AccessPath, Path};
 use aptos_types::account_config::NewBlockEvent;
 use aptos_types::account_view::AccountView;
 use aptos_types::on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig};
@@ -33,11 +35,12 @@ use aptos_types::{
 use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned};
 use futures::{channel::oneshot, SinkExt};
 use itertools::Itertools;
+use move_core_types::language_storage::{ModuleId, StructTag};
 use std::sync::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
-    DbReader, Order,
+    DbReader, Order, MAX_REQUEST_LIMIT,
 };
 
 // Context holds application scope context
@@ -89,6 +92,14 @@ impl Context {
 
     pub fn max_events_page_size(&self) -> u16 {
         self.node_config.api.max_events_page_size
+    }
+
+    pub fn max_account_resources_page_size(&self) -> u16 {
+        self.node_config.api.max_account_resources_page_size
+    }
+
+    pub fn max_account_modules_page_size(&self) -> u16 {
+        self.node_config.api.max_account_modules_page_size
     }
 
     pub fn move_resolver(&self) -> Result<StorageAdapterOwned<DbStateView>> {
@@ -236,10 +247,111 @@ impl Context {
         address: AccountAddress,
         version: u64,
     ) -> Result<HashMap<StateKey, StateValue>> {
-        self.db
-            .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)
+        let mut iter = self.db.get_prefixed_state_value_iterator(
+            &StateKeyPrefix::from(address),
+            None,
+            version,
+        )?;
+        let kvs = iter
+            .by_ref()
+            .take(MAX_REQUEST_LIMIT as usize)
+            .collect::<Result<_>>()?;
+        if iter.next().transpose()?.is_some() {
+            bail!("Too many state items under account ({:?}).", address);
+        }
+        Ok(kvs)
     }
 
+    pub fn get_resources_by_pagination(
+        &self,
+        address: AccountAddress,
+        prev_state_key: Option<&StateKey>,
+        version: u64,
+        limit: u64,
+    ) -> Result<(Vec<(StructTag, Vec<u8>)>, Option<StateKey>)> {
+        let account_iter = self.db.get_prefixed_state_value_iterator(
+            &StateKeyPrefix::from(address),
+            prev_state_key,
+            version,
+        )?;
+        let mut resource_iter = account_iter
+            .filter_map(|res| match res {
+                Ok((k, v)) => match k {
+                    StateKey::AccessPath(AccessPath { address: _, path }) => {
+                        match Path::try_from(path.as_slice()) {
+                            Ok(Path::Resource(struct_tag)) => {
+                                Some(Ok((struct_tag, v.into_bytes())))
+                            }
+                            Ok(Path::Code(_)) => None,
+                            Err(e) => Some(Err(anyhow::Error::from(e))),
+                        }
+                    }
+                    _ => {
+                        error!("storage prefix scan return inconsistent key ({:?}) with expected key prefix ({:?}).", k, StateKeyPrefix::from(address));
+                        Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
+                    }
+                },
+                Err(e) => Some(Err(e)),
+            })
+            .take(limit as usize + 1);
+        let kvs = resource_iter
+            .by_ref()
+            .take(limit as usize)
+            .collect::<Result<_>>()?;
+        let next_key = resource_iter.next().transpose()?.map(|(struct_tag, _v)| {
+            StateKey::AccessPath(AccessPath::new(
+                address,
+                AccessPath::resource_path_vec(struct_tag),
+            ))
+        });
+        Ok((kvs, next_key))
+    }
+
+    pub fn get_modules_by_pagination(
+        &self,
+        address: AccountAddress,
+        prev_state_key: Option<&StateKey>,
+        version: u64,
+        limit: u64,
+    ) -> Result<(Vec<(ModuleId, Vec<u8>)>, Option<StateKey>)> {
+        let account_iter = self.db.get_prefixed_state_value_iterator(
+            &StateKeyPrefix::from(address),
+            prev_state_key,
+            version,
+        )?;
+        let mut module_iter = account_iter
+            .filter_map(|res| match res {
+                Ok((k, v)) => match k {
+                    StateKey::AccessPath(AccessPath { address: _, path }) => {
+                        match Path::try_from(path.as_slice()) {
+                            Ok(Path::Code(module_id)) => Some(Ok((module_id, v.into_bytes()))),
+                            Ok(Path::Resource(_)) => None,
+                            Err(e) => Some(Err(anyhow::Error::from(e))),
+                        }
+                    }
+                    _ => {
+                        error!("storage prefix scan return inconsistent key ({:?}) with expected key prefix ({:?}).", k, StateKeyPrefix::from(address));
+                        Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
+                    }
+                },
+                Err(e) => Some(Err(e)),
+            })
+            .take(limit as usize + 1);
+        let kvs = module_iter
+            .by_ref()
+            .take(limit as usize)
+            .collect::<Result<_>>()?;
+        let next_key = module_iter.next().transpose()?.map(|(module_id, _v)| {
+            StateKey::AccessPath(AccessPath::new(
+                address,
+                AccessPath::code_path_vec(module_id),
+            ))
+        });
+        Ok((kvs, next_key))
+    }
+
+    // This function should be deprecated. DO NOT USE it.
+    // Instead, call either `get_modules_by_pagination` or `get_modules_by_pagination`.
     pub fn get_account_state<E: InternalError>(
         &self,
         address: AccountAddress,
