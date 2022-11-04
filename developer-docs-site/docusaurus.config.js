@@ -61,6 +61,12 @@ const config = {
       integrity: "sha384-odtC+0UGzzFL/6PNoE8rX/SPcQDXBJ+uRepguP4QkPCm2LBxH3FA3y+fKSiJ+AmM",
       crossorigin: "anonymous",
     },
+    {
+      href: "https://unpkg.com/@stoplight/elements/styles.min.css",
+      type: "text/css",
+      integrity: "sha384-mS2+08UV7BvSC96l6SGdnZv1SexFzKSJnHwTETEb4+97GyWualVrW9nAU2MwDu16",
+      crossorigin: "anonymous",
+    },
   ],
 
   themeConfig:
