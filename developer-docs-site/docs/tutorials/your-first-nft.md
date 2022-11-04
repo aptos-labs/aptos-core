@@ -45,12 +45,12 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
 
   Install the necessary dependencies:
   ```bash
-  yarn install
+  pnpm install
   ```
 
   Run the Typescript [`simple_nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/simple_nft.ts) example:
   ```bash
-  yarn run simple_nft
+  pnpm run simple_nft
   ```
   </TabItem>
   <TabItem value="python" label="Python">

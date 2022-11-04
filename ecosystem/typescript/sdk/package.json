@@ -15,18 +15,18 @@
     }
   },
   "scripts": {
-    "prepack": "yarn build",
-    "build": "yarn build:clean && yarn _build:node && yarn _build:browser",
+    "prepack": "pnpm build",
+    "build": "pnpm build:clean && pnpm _build:node && pnpm _build:browser",
     "build:clean": "rm -rf dist",
     "_build:browser": "tsup --platform browser --format iife --global-name aptosSDK --minify",
     "_build:node": "tsup --format cjs,esm --dts",
     "lint": "eslint \"**/*.ts\"",
     "test": "jest",
     "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
-    "fmt": "yarn _fmt --write",
-    "fmt:check": "yarn _fmt --check",
+    "fmt": "pnpm _fmt --write",
+    "fmt:check": "pnpm _fmt --check",
     "cov:clean": "rm -rf coverage",
-    "generate-client": "yarn && openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
+    "generate-client": "pnpm && openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
     "checked-publish": "./checked_publish.sh"
   },
   "repository": {
