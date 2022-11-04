@@ -131,7 +131,7 @@ module aptos_framework::account {
 
     #[test_only]
     /// Create signer for testing, independently of an Aptos-style `Account`.
-    public fun create_signer_for_test(addr: address): signer {create_signer(addr)}
+    public fun create_signer_for_test(addr: address): signer { create_signer(addr) }
 
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(aptos_framework: &signer) {
