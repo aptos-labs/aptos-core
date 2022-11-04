@@ -16,7 +16,7 @@ specifiers:
   eslint-plugin-import: 2.26.0
   form-data: 4.0.0
   jest: 28.1.3
-  openapi-typescript-codegen: https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p5/openapi-typescript-codegen-v0.23.0-p5.tgz
+  openapi-typescript-codegen: https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0/openapi-typescript-codegen-v0.24.0.tgz
   prettier: 2.6.2
   ts-jest: 28.0.8
   ts-loader: 9.3.1
@@ -44,7 +44,7 @@ devDependencies:
   eslint-config-prettier: 8.5.0_eslint@8.23.0
   eslint-plugin-import: 2.26.0_iepzrjnvahcxaf6zc7cutko6om
   jest: 28.1.3_seampb7kvrlatjhbvs2ov4kp2i
-  openapi-typescript-codegen: '@github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p5/openapi-typescript-codegen-v0.23.0-p5.tgz'
+  openapi-typescript-codegen: '@github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0/openapi-typescript-codegen-v0.24.0.tgz'
   prettier: 2.6.2
   ts-jest: 28.0.8_556mfp7b5dutuj2jcrj5i7zc5q
   ts-loader: 9.3.1_typescript@4.8.2
@@ -4175,10 +4175,10 @@ packages:
     engines: {node: '>=10'}
     dev: true
 
-  '@github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p5/openapi-typescript-codegen-v0.23.0-p5.tgz':
-    resolution: {tarball: https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p5/openapi-typescript-codegen-v0.23.0-p5.tgz}
+  '@github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0/openapi-typescript-codegen-v0.24.0.tgz':
+    resolution: {tarball: https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0/openapi-typescript-codegen-v0.24.0.tgz}
     name: openapi-typescript-codegen
-    version: 0.23.0-p5
+    version: 0.24.0
     hasBin: true
     dependencies:
       camelcase: 6.3.0
