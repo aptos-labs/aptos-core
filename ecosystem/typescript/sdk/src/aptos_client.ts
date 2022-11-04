@@ -8,6 +8,7 @@ import {
   DEFAULT_MAX_GAS_AMOUNT,
   DEFAULT_TXN_TIMEOUT_SEC,
   fixNodeUrl,
+  paginateWithCursor,
   Memoize,
   sleep,
   APTOS_COIN,
@@ -122,6 +123,10 @@ export class AptosClient {
 
   /**
    * Queries modules associated with given account
+   *
+   * Note: In order to get all account modules, this function may call the API
+   * multiple times as it paginates.
+   *
    * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
    * @returns Account modules array for a specific ledger version.
@@ -133,14 +138,21 @@ export class AptosClient {
     accountAddress: MaybeHexString,
     query?: { ledgerVersion?: AnyNumber },
   ): Promise<Gen.MoveModuleBytecode[]> {
-    return this.client.accounts.getAccountModules(
-      HexString.ensure(accountAddress).hex(),
-      query?.ledgerVersion?.toString(),
-    );
+    // Note: This function does not expose a `limit` parameter because it might
+    // be ambiguous how this is being used. Is it being passed to getAccountModules
+    // to limit the number of items per response, or does it limit the total output
+    // of this function? We avoid this confusion by not exposing the parameter at all.
+    const f = this.client.accounts.getAccountModules.bind({ httpRequest: this.client.request });
+    const out = await paginateWithCursor(f, accountAddress, 100, query);
+    return out;
   }
 
   /**
    * Queries module associated with given account by module name
+   *
+   * Note: In order to get all account resources, this function may call the API
+   * multiple times as it paginates.
+   *
    * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param moduleName The name of the module
    * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
@@ -172,10 +184,9 @@ export class AptosClient {
     accountAddress: MaybeHexString,
     query?: { ledgerVersion?: AnyNumber },
   ): Promise<Gen.MoveResource[]> {
-    return this.client.accounts.getAccountResources(
-      HexString.ensure(accountAddress).hex(),
-      query?.ledgerVersion?.toString(),
-    );
+    const f = this.client.accounts.getAccountResources.bind({ httpRequest: this.client.request });
+    const out = await paginateWithCursor(f, accountAddress, 1000, query);
+    return out;
   }
 
   /**
