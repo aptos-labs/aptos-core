@@ -3924,6 +3924,7 @@ dependencies = [
  "cached-packages",
  "forge",
  "framework",
+ "jemallocator",
  "serde_yaml 0.8.26",
  "structopt",
  "testcases",
