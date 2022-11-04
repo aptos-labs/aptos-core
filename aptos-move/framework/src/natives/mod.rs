@@ -130,7 +130,7 @@ impl GasParameters {
                     base: 0.into(),
                     per_byte: 0.into(),
                 },
-                blake2_256: hash::Blake2_256HashGasParameters {
+                blake2b_256: hash::Blake2B256HashGasParameters {
                     base: 0.into(),
                     per_byte: 0.into(),
                 },

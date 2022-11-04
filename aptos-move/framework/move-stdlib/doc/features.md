@@ -15,8 +15,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `sha_512_and_ripemd_160_enabled`](#0x1_features_sha_512_and_ripemd_160_enabled)
 -  [Function `get_aptos_stdlib_chain_id_feature`](#0x1_features_get_aptos_stdlib_chain_id_feature)
 -  [Function `aptos_stdlib_chain_id_enabled`](#0x1_features_aptos_stdlib_chain_id_enabled)
--  [Function `get_blake2_256_feature`](#0x1_features_get_blake2_256_feature)
--  [Function `blake2_256_enabled`](#0x1_features_blake2_256_enabled)
+-  [Function `get_blake2b_256_feature`](#0x1_features_get_blake2b_256_feature)
+-  [Function `blake2b_256_enabled`](#0x1_features_blake2b_256_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -77,14 +77,14 @@ Lifetime: transient
 
 
 
-<a name="0x1_features_BLAKE2_256_NATIVE"></a>
+<a name="0x1_features_BLAKE2B_256_NATIVE"></a>
 
-Whether the new BLAKE2-256 hash function natives is enabled.
+Whether the new BLAKE2B-256 hash function natives is enabled.
 This is needed because of the introduction of new native functions.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_BLAKE2_256_NATIVE">BLAKE2_256_NATIVE</a>: u64 = 5;
+<pre><code><b>const</b> <a href="features.md#0x1_features_BLAKE2B_256_NATIVE">BLAKE2B_256_NATIVE</a>: u64 = 5;
 </code></pre>
 
 
@@ -275,13 +275,13 @@ Lifetime: ephemeral
 
 </details>
 
-<a name="0x1_features_get_blake2_256_feature"></a>
+<a name="0x1_features_get_blake2b_256_feature"></a>
 
-## Function `get_blake2_256_feature`
+## Function `get_blake2b_256_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_blake2_256_feature">get_blake2_256_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_blake2b_256_feature">get_blake2b_256_feature</a>(): u64
 </code></pre>
 
 
@@ -290,20 +290,20 @@ Lifetime: ephemeral
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_blake2_256_feature">get_blake2_256_feature</a>(): u64 { <a href="features.md#0x1_features_BLAKE2_256_NATIVE">BLAKE2_256_NATIVE</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_blake2b_256_feature">get_blake2b_256_feature</a>(): u64 { <a href="features.md#0x1_features_BLAKE2B_256_NATIVE">BLAKE2B_256_NATIVE</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_blake2_256_enabled"></a>
+<a name="0x1_features_blake2b_256_enabled"></a>
 
-## Function `blake2_256_enabled`
+## Function `blake2b_256_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_blake2_256_enabled">blake2_256_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_blake2b_256_enabled">blake2b_256_enabled</a>(): bool
 </code></pre>
 
 
@@ -312,8 +312,8 @@ Lifetime: ephemeral
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_blake2_256_enabled">blake2_256_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLAKE2_256_NATIVE">BLAKE2_256_NATIVE</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_blake2b_256_enabled">blake2b_256_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLAKE2B_256_NATIVE">BLAKE2B_256_NATIVE</a>)
 }
 </code></pre>
 

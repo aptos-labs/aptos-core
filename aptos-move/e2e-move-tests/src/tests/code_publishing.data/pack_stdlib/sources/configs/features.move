@@ -69,15 +69,15 @@ module std::features {
         is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
     }
 
-    /// Whether the new BLAKE2-256 hash function natives is enabled.
+    /// Whether the new BLAKE2B-256 hash function natives is enabled.
     /// This is needed because of the introduction of new native functions.
     /// Lifetime: transient
-    const BLAKE2_256_NATIVE: u64 = 5;
+    const BLAKE2B_256_NATIVE: u64 = 5;
 
-    public fun get_blake2_256_feature(): u64 { BLAKE2_256_NATIVE }
+    public fun get_blake2b_256_feature(): u64 { BLAKE2B_256_NATIVE }
 
-    public fun blake2_256_enabled(): bool acquires Features {
-        is_enabled(BLAKE2_256_NATIVE)
+    public fun blake2b_256_enabled(): bool acquires Features {
+        is_enabled(BLAKE2B_256_NATIVE)
     }
     // ============================================================================================
     // Feature Flag Implementation

@@ -20,11 +20,11 @@ Non-cryptograhic hashes:
 -  [Function `sha2_512`](#0x1_aptos_hash_sha2_512)
 -  [Function `sha3_512`](#0x1_aptos_hash_sha3_512)
 -  [Function `ripemd160`](#0x1_aptos_hash_ripemd160)
--  [Function `blake2_256`](#0x1_aptos_hash_blake2_256)
+-  [Function `blake2b_256`](#0x1_aptos_hash_blake2b_256)
 -  [Function `sha2_512_internal`](#0x1_aptos_hash_sha2_512_internal)
 -  [Function `sha3_512_internal`](#0x1_aptos_hash_sha3_512_internal)
 -  [Function `ripemd160_internal`](#0x1_aptos_hash_ripemd160_internal)
--  [Function `blake2_256_internal`](#0x1_aptos_hash_blake2_256_internal)
+-  [Function `blake2b_256_internal`](#0x1_aptos_hash_blake2b_256_internal)
 -  [Specification](#@Specification_1)
     -  [Function `sip_hash`](#@Specification_1_sip_hash)
     -  [Function `sip_hash_from_value`](#@Specification_1_sip_hash_from_value)
@@ -32,7 +32,7 @@ Non-cryptograhic hashes:
     -  [Function `sha2_512`](#@Specification_1_sha2_512)
     -  [Function `sha3_512`](#@Specification_1_sha3_512)
     -  [Function `ripemd160`](#@Specification_1_ripemd160)
-    -  [Function `blake2_256`](#@Specification_1_blake2_256)
+    -  [Function `blake2b_256`](#@Specification_1_blake2b_256)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -220,16 +220,16 @@ hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD
 
 </details>
 
-<a name="0x1_aptos_hash_blake2_256"></a>
+<a name="0x1_aptos_hash_blake2b_256"></a>
 
-## Function `blake2_256`
+## Function `blake2b_256`
 
-Returns the BLAKE2-256 hash of <code>bytes</code>.
+Returns the BLAKE2B-256 hash of <code>bytes</code>.
 
 WARNING: TODO
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2_256">blake2_256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256">blake2b_256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -238,12 +238,12 @@ WARNING: TODO
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2_256">blake2_256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>if</b>(!<a href="../../move-stdlib/doc/features.md#0x1_features_blake2_256_enabled">features::blake2_256_enabled</a>()) {
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256">blake2b_256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>if</b>(!<a href="../../move-stdlib/doc/features.md#0x1_features_blake2b_256_enabled">features::blake2b_256_enabled</a>()) {
         <b>abort</b>(std::error::invalid_state(<a href="hash.md#0x1_aptos_hash_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
     };
 
-    <a href="hash.md#0x1_aptos_hash_blake2_256_internal">blake2_256_internal</a>(bytes)
+    <a href="hash.md#0x1_aptos_hash_blake2b_256_internal">blake2b_256_internal</a>(bytes)
 }
 </code></pre>
 
@@ -323,16 +323,16 @@ hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD
 
 </details>
 
-<a name="0x1_aptos_hash_blake2_256_internal"></a>
+<a name="0x1_aptos_hash_blake2b_256_internal"></a>
 
-## Function `blake2_256_internal`
+## Function `blake2b_256_internal`
 
-Returns the BLAKE2-256 hash of <code>bytes</code>.
+Returns the BLAKE2B-256 hash of <code>bytes</code>.
 
 WARNING: TODO
 
 
-<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2_256_internal">blake2_256_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256_internal">blake2b_256_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -341,7 +341,7 @@ WARNING: TODO
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2_256_internal">blake2_256_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256_internal">blake2b_256_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -449,12 +449,12 @@ WARNING: TODO
 
 
 
-<a name="@Specification_1_blake2_256"></a>
+<a name="@Specification_1_blake2b_256"></a>
 
-### Function `blake2_256`
+### Function `blake2b_256`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2_256">blake2_256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256">blake2b_256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 

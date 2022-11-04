@@ -65,15 +65,15 @@ module aptos_std::aptos_hash {
         ripemd160_internal(bytes)
     }
 
-    /// Returns the BLAKE2-256 hash of `bytes`.
+    /// Returns the BLAKE2B-256 hash of `bytes`.
     ///
     /// WARNING: TODO
-    public fun blake2_256(bytes: vector<u8>): vector<u8> {
-        if(!features::blake2_256_enabled()) {
+    public fun blake2b_256(bytes: vector<u8>): vector<u8> {
+        if(!features::blake2b_256_enabled()) {
             abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
         };
 
-        blake2_256_internal(bytes)
+        blake2b_256_internal(bytes)
     }
 
     //
@@ -93,10 +93,10 @@ module aptos_std::aptos_hash {
     /// hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD-160(x_1) = RIPEMD-160(x_2).
     native fun ripemd160_internal(bytes: vector<u8>): vector<u8>;
 
-    /// Returns the BLAKE2-256 hash of `bytes`.
+    /// Returns the BLAKE2B-256 hash of `bytes`.
     ///
     /// WARNING: TODO
-    native fun blake2_256_internal(bytes: vector<u8>): vector<u8>;
+    native fun blake2b_256_internal(bytes: vector<u8>): vector<u8>;
 
     //
     // Testing
@@ -210,25 +210,25 @@ module aptos_std::aptos_hash {
 
 
     #[test(fx = @aptos_std)]
-    fun blake2_256_test(fx: signer) {
+    fun blake2b_256_test(fx: signer) {
         // We need to enable the feature in order for the native call to be allowed.
-        features::change_feature_flags(&fx, vector[features::get_blake2_256_feature()], vector[]);
+        features::change_feature_flags(&fx, vector[features::get_blake2b_256_feature()], vector[]);
         let inputs = vector[
         b"testing",
         b"testing again", // empty message doesn't yield an output on the online generator
         ];
 
-        // From https://www.toolkitbay.com/tkb/tool/BLAKE2s_256
+        // From https://www.toolkitbay.com/tkb/tool/BLAKE2b_256
         let outputs = vector[
-        x"e2c65a953f92e8843c99e7db0cddd03e0b27d701f033c349ce3ae525de190955",
-        x"5638667b24bf188c80eafea468ba78a35202de5e048b2206070510b712a186a9",
+        x"99397ff32ae348b8b6536d5c213f343d7e9fdeaa10e8a23a9f90ab21a1658565",
+        x"1deab5a4eb7481453ca9b29e1f7c4be8ba44de4faeeafdf173b310cbaecfc84c",
         ];
 
         let i = 0;
         while (i < std::vector::length(&inputs)) {
             let input = *std::vector::borrow(&inputs, i);
             let hash_expected = *std::vector::borrow(&outputs, i);
-            let hash = blake2_256(input);
+            let hash = blake2b_256(input);
 
             assert!(hash_expected == hash, 1);
 

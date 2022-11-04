@@ -93,8 +93,8 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.hash.ripemd160.base, optional "hash.ripemd160.base", 3000],
     [.hash.ripemd160.per_byte, optional "hash.ripemd160.per_byte", 50],
     // Using SHA2-256's cost
-    [.hash.blake2_256.base, optional "hash.blake2_256.base", 3000],
-    [.hash.blake2_256.per_byte, optional "hash.blake2_256.per_byte", 50],
+    [.hash.blake2b_256.base, optional "hash.blake2b_256.base", 3000],
+    [.hash.blake2b_256.per_byte, optional "hash.blake2b_256.per_byte", 50],
 
     [.util.from_bytes.base, "util.from_bytes.base", 300 * MUL],
     [.util.from_bytes.per_byte, "util.from_bytes.per_byte", 5 * MUL],
