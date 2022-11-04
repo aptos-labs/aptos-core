@@ -19,7 +19,6 @@ spec:
           annotations:
             seccomp.security.alpha.kubernetes.io/pod: runtime/default
         spec:
-          parallelism: {{ .Values.load_test.parallelism }}
           restartPolicy: Never
           priorityClassName: {{ include "testnet-addons.fullname" . }}-high
           containers:
