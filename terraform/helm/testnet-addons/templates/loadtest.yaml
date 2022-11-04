@@ -19,6 +19,7 @@ spec:
           annotations:
             seccomp.security.alpha.kubernetes.io/pod: runtime/default
         spec:
+          parallelism: {{ .Values.load_test.parallelism }}
           restartPolicy: Never
           priorityClassName: {{ include "testnet-addons.fullname" . }}-high
           containers:
@@ -85,6 +86,10 @@ spec:
           {{- end }}
           {{- with .tolerations }}
           tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .resources }}
+          resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           securityContext:

@@ -28,6 +28,8 @@ waypoint:
 load_test:
   # -- Whether to enable the load test CronJob
   enabled: false
+  # -- Job parallelism
+  parallelism: 1
   image:
     # -- Image repo to use for tools image for running load tests
     repo: aptoslabs/tools
