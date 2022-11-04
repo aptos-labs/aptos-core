@@ -199,7 +199,7 @@ The following tables contain descriptions and examples on key token fields. Once
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `token_data_id` | TokenId | Identification for the metadata of the token |
+| `token_data_id` | TokenDataId | Identification for the metadata of the token |
 | `property_version` | u64 | The version of the property map; when a fungible token is mutated, a new property version is created and assigned to the token to make it an NFT |
 
 ##### `TokenDataId`

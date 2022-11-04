@@ -22,10 +22,12 @@ export class TransactionsService {
 
     /**
      * Get transactions
-     * Retrieve on-chain committed transactions. The page size and start can be provided to
-     * get a specific sequence of transactions.
+     * Retrieve on-chain committed transactions. The page size and start ledger version
+     * can be provided to get a specific sequence of transactions.
      *
-     * If the version has been pruned, then a 410 will be returned
+     * If the version has been pruned, then a 410 will be returned.
+     *
+     * To retrieve a pending transaction, use /transactions/by_hash.
      * @param start Ledger version to start list of transactions
      *
      * If not provided, defaults to showing the latest transactions
@@ -113,8 +115,8 @@ export class TransactionsService {
 
     /**
      * Get transaction by version
-     * Retrieves a transaction by a given version.  If the version has been pruned, a 410 will
-     * be returned.
+     * Retrieves a transaction by a given version. If the version has been
+     * pruned, a 410 will be returned.
      * @param txnVersion Version of transaction to retrieve
      * @returns Transaction
      * @throws ApiError
@@ -133,10 +135,12 @@ export class TransactionsService {
 
     /**
      * Get account transactions
-     * Retrieves transactions from an account.  If the start version is too far in the past
-     * a 410 will be returned.
+     * Retrieves on-chain committed transactions from an account. If the start
+     * version is too far in the past, a 410 will be returned.
      *
-     * If no start version is given, it will start at 0
+     * If no start version is given, it will start at version 0.
+     *
+     * To retrieve a pending transaction, use /transactions/by_hash.
      * @param address Address of account with or without a `0x` prefix
      * @param start Ledger version to start list of transactions
      *

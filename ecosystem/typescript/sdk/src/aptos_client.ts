@@ -450,7 +450,9 @@ export class AptosClient {
   }
 
   /**
-   * Queries on-chain transactions
+   * Queries on-chain transactions. This function will not return pending
+   * transactions. For that, use `getTransactionsByHash`.
+   *
    * @param query Optional pagination object
    * @param query.start The start transaction version of the page. Default is the latest ledger version
    * @param query.limit The max number of transactions should be returned for the page. Default is 25
@@ -463,7 +465,7 @@ export class AptosClient {
 
   /**
    * @param txnHash - Transaction hash should be hex-encoded bytes string with 0x prefix.
-   * @returns Transaction from mempool or on-chain transaction
+   * @returns Transaction from mempool (pending) or on-chain (committed) transaction
    */
   @parseApiError
   async getTransactionByHash(txnHash: string): Promise<Gen.Transaction> {
@@ -472,7 +474,8 @@ export class AptosClient {
 
   /**
    * @param txnVersion - Transaction version is an uint64 number.
-   * @returns Transaction from mempool or on-chain transaction
+   * @returns On-chain transaction. Only on-chain transactions have versions, so this
+   * function cannot be used to query pending transactions.
    */
   @parseApiError
   async getTransactionByVersion(txnVersion: AnyNumber): Promise<Gen.Transaction> {
