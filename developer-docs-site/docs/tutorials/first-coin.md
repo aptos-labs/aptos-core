@@ -10,6 +10,17 @@ import TabItem from '@theme/TabItem';
 
 This tutorial introduces how you can compile, deploy, and mint your own coin, named MoonCoin.
 
+## Step 0: Install prerequisites
+
+If you don't already have them (confirmed with `which command-name`), install the following packages in the order specified to take these tutorials:
+
+1. **Homebrew**: [https://brew.sh/](https://brew.sh/)
+1. **Yarn**: Install the latest [Yarn](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable) by executing the below command on your Terminal:
+    ```bash
+    brew install yarn
+    ```
+1. **Poetry**: Install Poetry from [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation).
+
 ## Step 1: Pick an SDK
 
 Install your preferred SDK from the below list:
