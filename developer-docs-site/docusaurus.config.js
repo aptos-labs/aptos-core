@@ -174,7 +174,8 @@ const config = {
           },
           {
             position: "left",
-            href: "https://fullnode.devnet.aptoslabs.com/v1/spec#/",
+            type: "doc",
+            docId: "nodes/aptos-api-spec",
             label: "REST API",
           },
           {

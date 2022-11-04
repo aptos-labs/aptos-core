@@ -14,9 +14,9 @@ import TabItem from '@theme/TabItem';
     <ApiExplorer network="mainnet" layout="stacked" />
   </TabItem>
   <TabItem value="testnet" label="Testnet">
-    <ApiExplorer network="testnet" />
+    <ApiExplorer network="testnet" layout="stacked" />
   </TabItem>
   <TabItem value="devnet" label="Devnet">
-<ApiExplorer network="devnet" />
+    <ApiExplorer network="devnet" layout="stacked" />
   </TabItem>
 </Tabs>
