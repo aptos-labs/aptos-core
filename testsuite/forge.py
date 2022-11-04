@@ -1276,7 +1276,7 @@ def test(
     assert forge_cluster_name, "Forge cluster name is required"
 
     # These features and profile flags are set as strings
-    enable_testing_image = forge_enable_testing_image == "true"
+    enable_testing_image = True # CANARY
     enable_performance_profile = forge_enable_performance == "true"
 
     image_tag, upgrade_image_tag = ensure_image_tags_have_profile_or_features(
