@@ -53,10 +53,16 @@ Aptos provides a rate-limited GraphQL API for public use. See below a few exampl
 - **Mainnet:** https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql
 - **Testnet:** https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql
 
+### Format of the address
+
+Make sure that the address (either owner address or any Aptos blockchain account address) in the query contains a prefix of `0x` followed by the 64 hex characters, for example, `0xaa921481e07b82a26dbd5d3bc472b9ad82d3e5bfd248bacac160eac51687c2ff`.
+
 ### Running example queries
 
 - Click on [Mainnet GraphQL server](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql) or [Testnet GraphQL server](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql).
 - On the server page, paste the **Query** code from an example into the main query section, and the **Query variables** code from the same example into the QUERY VARIABLES section (below the main query section).
+
+
 
 ### Example token queries
 
