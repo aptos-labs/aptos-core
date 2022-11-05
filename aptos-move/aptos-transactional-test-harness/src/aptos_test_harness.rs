@@ -29,7 +29,17 @@ use aptos_vm::{
 };
 use clap::StructOpt;
 use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
-use move_deps::{
+use once_cell::sync::Lazy;
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::TryFrom,
+    fmt,
+    path::Path,
+    string::String,
+    sync::Arc,
+};
+use vm_genesis::GENESIS_KEYPAIR;
+use {
     move_binary_format::file_format::{CompiledModule, CompiledScript},
     move_command_line_common::{
         address::ParsedAddress, files::verify_and_create_named_address_mapping,
@@ -52,16 +62,7 @@ use move_deps::{
     },
     move_vm_runtime::session::SerializedReturnValues,
 };
-use once_cell::sync::Lazy;
-use std::{
-    collections::{BTreeMap, HashMap},
-    convert::TryFrom,
-    fmt,
-    path::Path,
-    string::String,
-    sync::Arc,
-};
-use vm_genesis::GENESIS_KEYPAIR;
+
 /**
  * Definitions
  */

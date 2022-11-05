@@ -352,8 +352,8 @@ class RestClient:
     def offer_token(
         self,
         account: Account,
-        receiver: str,
-        creator: str,
+        receiver: AccountAddress,
+        creator: AccountAddress,
         collection_name: str,
         token_name: str,
         property_version: int,
@@ -382,8 +382,8 @@ class RestClient:
     def claim_token(
         self,
         account: Account,
-        sender: str,
-        creator: str,
+        sender: AccountAddress,
+        creator: AccountAddress,
         collection_name: str,
         token_name: str,
         property_version: int,

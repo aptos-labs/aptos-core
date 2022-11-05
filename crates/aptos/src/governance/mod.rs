@@ -27,7 +27,7 @@ use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
 use framework::{BuildOptions, BuiltPackage, ReleasePackage};
-use move_deps::move_core_types::transaction_argument::TransactionArgument;
+use move_core_types::transaction_argument::TransactionArgument;
 use reqwest::Url;
 use serde::Deserialize;
 use serde::Serialize;
@@ -596,8 +596,7 @@ fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
         with_abis: false,
         with_source_maps: false,
         with_error_map: false,
-        install_dir: None,
-        named_addresses: Default::default(),
+        ..BuildOptions::default()
     };
 
     let pack = BuiltPackage::build(package_dir.to_path_buf(), build_options)?;

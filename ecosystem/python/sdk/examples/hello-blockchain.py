@@ -8,9 +8,9 @@ One method to do so is to use the CLI:
     * Acquire the Aptos CLI
     * `cd ~`
     * `aptos init`
-    * `cd ~/aptos-core/aptos-move/
-    * `aptos move publish --named-address hello_blockchain=${your_address_from_aptos_init}`
-    * `python -m examples.hello-blockhain ${your_address_from_aptos_init}`
+    * `cd ~/aptos-core/aptos-move/move-examples/hello_blockchain`
+    * `aptos move publish --named-addresses hello_blockchain=${your_address_from_aptos_init}`
+    * `python -m examples.hello-blockchain ${your_address_from_aptos_init}`
 """
 
 import sys

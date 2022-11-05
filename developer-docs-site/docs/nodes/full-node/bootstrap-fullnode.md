@@ -1,10 +1,10 @@
 ---
-title: "Bootstrap a new Fullnode"
+title: "Bootstrap a New Fullnode"
 slug: "bootstrap-fullnode"
 sidebar_position: 14
 ---
 
-# Bootstrap a new Fullnode
+# Bootstrap a New Fullnode
 
 Bootstrapping a new fullnode using state-sync might not work well after the network is running for a while, it can either take super long time, or won't be able to fetch required data because most of nodes pruned the ledge history. The most effective way for bootstrapping a new fullnode is to use data restore.
 

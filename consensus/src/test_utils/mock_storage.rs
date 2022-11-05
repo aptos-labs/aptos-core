@@ -118,16 +118,19 @@ impl MockStorage {
             .map(|(_, v)| v)
             .collect();
         blocks.sort_by_key(Block::round);
+        let last_vote = self.shared_storage.last_vote.lock().clone();
+        let qc = self
+            .shared_storage
+            .highest_2chain_timeout_certificate
+            .lock()
+            .clone();
         RecoveryData::new(
-            self.shared_storage.last_vote.lock().clone(),
+            last_vote,
             ledger_recovery_data,
             blocks,
             RootMetadata::new_empty(),
             quorum_certs,
-            self.shared_storage
-                .highest_2chain_timeout_certificate
-                .lock()
-                .clone(),
+            qc,
         )
     }
 
@@ -154,17 +157,20 @@ impl PersistentLivenessStorage for MockStorage {
         // When the shared storage is empty, we are expected to not able to construct an block tree
         // from it. During test we will intentionally clear shared_storage to simulate the situation
         // of restarting from an empty consensusDB
+        // info!("step 1.3.4.2.3.1");
         let should_check_for_consistency = !(self.shared_storage.block.lock().is_empty()
             && self.shared_storage.qc.lock().is_empty());
         for block in blocks {
             self.shared_storage.block.lock().insert(block.id(), block);
         }
+        // info!("step 1.3.4.2.3.2");
         for qc in quorum_certs {
             self.shared_storage
                 .qc
                 .lock()
                 .insert(qc.certified_block().id(), qc);
         }
+        // info!("step 1.3.4.2.3.3");
         if should_check_for_consistency {
             if let Err(e) = self.verify_consistency() {
                 panic!("invalid db after save tree: {}", e);

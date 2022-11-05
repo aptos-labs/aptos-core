@@ -120,12 +120,17 @@ variable "fullnode_name" {
 
 variable "machine_type" {
   description = "Machine type for running fullnode"
-  default     = "c2-standard-16"
+  default     = "n2-standard-32"
 }
 
 variable "enable_backup" {
   description = "enable data backup from fullnode"
   default     = false
+}
+
+variable "backup_fullnode_index" {
+  description = "index of fullnode to backup data from"
+  default     = 0
 }
 
 variable "enable_monitoring" {
@@ -147,4 +152,34 @@ variable "enable_prometheus_node_exporter" {
 variable "enable_kube_state_metrics" {
   description = "Enable kube-state-metrics within monitoring helm chart"
   default     = false
+}
+
+variable "gke_enable_private_nodes" {
+  description = "Enable private nodes for GKE cluster"
+  default     = true
+}
+
+variable "gke_enable_node_autoprovisioning" {
+  description = "Enable node autoprovisioning for GKE cluster. See https://cloud.google.com/kubernetes-engine/docs/how-to/node-auto-provisioning"
+  default     = false
+}
+
+variable "gke_node_autoprovisioning_max_cpu" {
+  description = "Maximum CPU utilization for GKE node_autoprovisioning"
+  default     = 10
+}
+
+variable "gke_node_autoprovisioning_max_memory" {
+  description = "Maximum memory utilization for GKE node_autoprovisioning"
+  default     = 100
+}
+
+variable "gke_enable_autoscaling" {
+  description = "Enable autoscaling for the nodepools in the GKE cluster. See https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-autoscaler"
+  default     = true
+}
+
+variable "gke_autoscaling_max_node_count" {
+  description = "Maximum number of nodes for GKE nodepool autoscaling"
+  default     = 10
 }

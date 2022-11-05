@@ -308,7 +308,16 @@ impl MoveValue {
 
     pub fn convert_utf8_string(v: AnnotatedMoveStruct) -> anyhow::Result<MoveValue> {
         if let Some((_, AnnotatedMoveValue::Bytes(bytes))) = v.value.into_iter().next() {
-            Ok(MoveValue::String(String::from_utf8(bytes)?))
+            match String::from_utf8(bytes.clone()) {
+                Ok(string) => Ok(MoveValue::String(string)),
+                Err(_) => {
+                    // There's no real use in logging the error, since this is only done on output conversion
+                    Ok(MoveValue::String(format!(
+                        "Unparsable utf-8 {}",
+                        HexEncodedBytes(bytes)
+                    )))
+                }
+            }
         } else {
             bail!("expect string::String, but failed to decode struct value");
         }

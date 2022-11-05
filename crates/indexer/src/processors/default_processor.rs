@@ -24,7 +24,7 @@ use crate::{
 };
 use aptos_api_types::Transaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
+use diesel::{result::Error, PgConnection};
 use field_count::FieldCount;
 use std::fmt::Debug;
 
@@ -117,8 +117,7 @@ fn insert_transactions(
             diesel::insert_into(schema::transactions::table)
                 .values(&txns[start_ind..end_ind])
                 .on_conflict(version)
-                .do_update()
-                .set((epoch.eq(excluded(epoch)),)),
+                .do_nothing(),
             None,
         )?;
     }
@@ -148,8 +147,7 @@ fn insert_user_transactions_w_sigs(
             diesel::insert_into(schema::user_transactions::table)
                 .values(&all_user_transactions[start_ind..end_ind])
                 .on_conflict(ut_schema::version)
-                .do_update()
-                .set((ut_schema::epoch.eq(excluded(ut_schema::epoch)),)),
+                .do_nothing(),
             None,
         )?;
     }

@@ -210,7 +210,8 @@ impl EpochManager {
                     weight_by_voting_power,
                     use_history_from_previous_epoch_max_count,
                 ) = match &leader_reputation_type {
-                    LeaderReputationType::ProposerAndVoter(proposer_and_voter_config) => {
+                    LeaderReputationType::ProposerAndVoter(proposer_and_voter_config)
+                    | LeaderReputationType::ProposerAndVoterV2(proposer_and_voter_config) => {
                         let proposer_window_size = proposers.len()
                             * proposer_and_voter_config.proposer_window_num_validators_multiplier;
                         let voter_window_size = proposers.len()
@@ -224,6 +225,7 @@ impl EpochManager {
                                 proposer_and_voter_config.failure_threshold_percent,
                                 voter_window_size,
                                 proposer_window_size,
+                                leader_reputation_type.use_reputation_window_from_stale_end(),
                             ));
                         (
                             heuristic,
@@ -293,6 +295,7 @@ impl EpochManager {
                     backend,
                     heuristic,
                     onchain_config.leader_reputation_exclude_round(),
+                    leader_reputation_type.use_root_hash_for_seed(),
                 ));
                 // LeaderReputation is not cheap, so we can cache the amount of rounds round_manager needs.
                 Box::new(CachedProposerElection::new(
@@ -446,7 +449,7 @@ impl EpochManager {
                     "process_block_retrieval",
                     block_store.process_block_retrieval(request).await
                 ) {
-                    error!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                    warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
                 }
             }
             info!(epoch = epoch, "Block retrieval task stops");

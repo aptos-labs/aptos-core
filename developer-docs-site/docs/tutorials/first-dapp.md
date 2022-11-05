@@ -11,9 +11,9 @@ For this tutorial, we will use the Move module `HelloBlockchain` described in [Y
 
 We will use:
 
-- The [Aptos Typescript SDK][ts_sdk].
-- The [Aptos Wallet][building_wallet], and
-- The [Aptos CLI][install_cli] to interact with the Aptos blockchain.
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Aptos Wallet Extension](../guides/building-your-own-wallet.md)
+* [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
 
 The end result is a dapp that lets users publish and share snippets of text on the Aptos blockchain.
 
@@ -39,7 +39,7 @@ Ensure that your account has sufficient funds to perform transactions by clickin
 
 ### Aptos CLI
 
-1. Install the [Aptos CLI][install_cli].
+1. Install the [Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md).
 
 2. Run `aptos init`, and when it asks for your private key, paste the private key from the Aptos Wallet that you copied earlier. This will initialize the Aptos CLI to use the same account as used by the Aptos Wallet.
 
@@ -160,7 +160,7 @@ First, add the SDK to the project's dependencies:
 npm install --save aptos
 ```
 
-You will now see `"aptos": "^0.0.20"` (or similar) in your `package.json`.
+You will now see `"aptos": "^1.3.15"` (or similar) in your `package.json`.
 
 ### Create an `AptosClient`
 
@@ -320,7 +320,7 @@ function App() {
   // ...
 
   // Check for the module; show publish instructions if not present.
-  const [modules, setModules] = React.useState<Types.MoveModule[]>([]);
+  const [modules, setModules] = React.useState<Types.MoveModuleBytecode[]>([]);
   React.useEffect(() => {
     if (!address) return;
     client.getAccountModules(address).then(setModules);
@@ -550,6 +550,8 @@ function App() {
 
 That concludes this tutorial.
 
-[building_wallet]: /guides/building-wallet-extension
-[install_cli]: /cli-tools/aptos-cli-tool/install-aptos-cli
-[ts_sdk]: /sdks/ts-sdk/index
+## Supporting documentation
+
+* [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Building Wallet Extension](../guides/building-your-own-wallet.md)

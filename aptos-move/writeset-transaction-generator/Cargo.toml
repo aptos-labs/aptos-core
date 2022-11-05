@@ -1,13 +1,16 @@
 [package]
 name = "aptos-writeset-generator"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Generating writesets used for incident management"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
@@ -25,4 +28,9 @@ aptos-vm = { path = "../aptos-vm" }
 
 cached-packages =  { path = "../framework/cached-packages" }
 framework =  { path = "../framework" }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "table-extension"] }
+move-command-line-common = { workspace = true }
+move-compiler = { workspace = true }
+
+move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }

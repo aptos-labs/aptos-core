@@ -10,11 +10,13 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_config::config::NodeConfig;
+use aptos_logger::prelude::*;
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
-use forge::{get_highest_synced_version, LocalNode, Node, NodeExt, SwarmExt};
-use move_deps::move_core_types::language_storage::CORE_CODE_ADDRESS;
+use forge::{get_highest_synced_version, LocalNode, Node, NodeExt, SwarmExt, Validator};
+use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use regex::Regex;
+use std::time::Instant;
 use std::{fs, process::Command, str::FromStr, time::Duration};
 
 fn update_node_config_restart(validator: &mut LocalNode, mut config: NodeConfig) {
@@ -22,6 +24,26 @@ fn update_node_config_restart(validator: &mut LocalNode, mut config: NodeConfig)
     let node_path = validator.config_path();
     config.save(node_path).unwrap();
     validator.start().unwrap();
+}
+
+async fn wait_for_node(validator: &mut dyn Validator, expected_to_connect: usize) {
+    let deadline = Instant::now().checked_add(Duration::from_secs(60)).unwrap();
+    validator
+        .wait_until_healthy(deadline)
+        .await
+        .unwrap_or_else(|err| {
+            let lsof_output = Command::new("lsof").arg("-i").output().unwrap();
+            panic!(
+                "wait_until_healthy failed. lsof -i: {:?}: {}",
+                lsof_output, err
+            );
+        });
+    info!("Validator restart health check passed");
+    validator
+        .wait_for_connectivity(expected_to_connect, deadline)
+        .await
+        .unwrap();
+    info!("Validator restart connectivity check passed");
 }
 
 #[tokio::test]
@@ -52,6 +74,7 @@ async fn test_genesis_transaction_flow() {
     let mut new_config = node.config().clone();
     new_config.consensus.sync_only = true;
     update_node_config_restart(node, new_config.clone());
+    wait_for_node(node, num_nodes - 1).await;
     // wait for some versions
     env.wait_for_all_nodes_to_catchup_to_version(10, Duration::from_secs(10))
         .await
@@ -61,7 +84,8 @@ async fn test_genesis_transaction_flow() {
     for node in env.validators_mut() {
         let mut node_config = node.config().clone();
         node_config.consensus.sync_only = true;
-        update_node_config_restart(node, node_config)
+        update_node_config_restart(node, node_config);
+        wait_for_node(node, num_nodes - 1).await;
     }
 
     println!("3. delete one node's db and test they can still sync when sync_only is true for every nodes");
@@ -153,13 +177,14 @@ async fn test_genesis_transaction_flow() {
     let waypoint = parse_waypoint(output);
 
     println!("7. apply genesis transaction for nodes 0, 1, 2");
-    for node in env.validators_mut().take(3) {
+    for (expected_to_connect, node) in env.validators_mut().take(3).enumerate() {
         let mut node_config = node.config().clone();
         insert_waypoint(&mut node_config, waypoint);
         node_config.execution.genesis = Some(genesis_transaction.clone());
         // reset the sync_only flag to false
         node_config.consensus.sync_only = false;
         update_node_config_restart(node, node_config);
+        wait_for_node(node, expected_to_connect).await;
     }
 
     println!("8. verify it's able to mint after the waypoint");
@@ -215,6 +240,7 @@ async fn test_genesis_transaction_flow() {
     db_restore(backup_path.path(), db_dir.as_path(), &[waypoint]);
 
     node.start().unwrap();
+    wait_for_node(node, num_nodes - 2).await;
     let client = node.rest_client();
     // wait for it to catch up
     {

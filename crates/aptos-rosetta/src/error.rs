@@ -5,7 +5,7 @@ use crate::{types, types::ErrorDetails};
 use aptos_rest_client::aptos_api_types::AptosErrorCode;
 use aptos_rest_client::error::RestError;
 use hex::FromHexError;
-use move_deps::move_core_types::account_address::AccountAddressParseError;
+use move_core_types::account_address::AccountAddressParseError;
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 use warp::{http::StatusCode, reply::Reply};

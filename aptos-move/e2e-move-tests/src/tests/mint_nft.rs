@@ -9,7 +9,7 @@ use aptos_types::{
     account_address::create_resource_address, account_address::AccountAddress, event::EventHandle,
     state_store::state_key::StateKey,
 };
-use move_deps::move_core_types::parser::parse_struct_tag;
+use move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
@@ -202,5 +202,51 @@ fn sample_mint_nft_signature() {
     println!(
         "Mint Proof Signature for NFT receiver 2: {:?}",
         mint_proof_signature2
+    );
+}
+
+/// run `cargo test sample_tutorial_signature -- --nocapture`
+/// to sample a valid signature for calling `resource_account_address::minting::mint_nft()`
+/// in `aptos-move/move-exampels/mint_nft`
+#[test]
+fn sample_tutorial_signature() {
+    let mut h = MoveHarness::new();
+
+    // supply the actual resource_address
+    // let resource_address = h.new_account_at(AccountAddress::from_hex_literal("0x[resource account's address]").unwrap());
+    let resource_address = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    // supply the actual nft_receiver's address
+    // let nft_receiver = h.new_account_at(AccountAddress::from_hex_literal("0x[nft-receiver's address]").unwrap());
+    let nft_receiver = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    let admin_account = h.new_account_with_key_pair();
+    // supply the actual private key of the admin
+    // let admin_private_key = Ed25519PrivateKey::from_encoded_string("...").unwrap();
+    let admin_private_key = admin_account.privkey;
+
+    // construct the token_data_id and mint_proof, which are required to mint the nft
+    let token_data_id = TokenDataId {
+        creator: *resource_address.address(),
+        collection: String::from("Collection name").into_bytes(),
+        name: String::from("Token name").into_bytes(),
+    };
+
+    let mint_proof = MintProofChallenge {
+        account_address: *resource_address.address(),
+        module_name: String::from("minting"),
+        struct_name: String::from("MintProofChallenge"),
+        receiver_account_sequence_number: 0,
+        receiver_account_address: *nft_receiver.address(),
+        token_data_id,
+    };
+
+    // sign the MintProofChallenge using the resource account's private key
+    let mint_proof_msg = bcs::to_bytes(&mint_proof);
+
+    let mint_proof_signature = admin_private_key.sign_arbitrary_message(&mint_proof_msg.unwrap());
+    println!(
+        "Mint Proof Signature for NFT receiver: {:?}",
+        mint_proof_signature
     );
 }

@@ -20,7 +20,7 @@ The first step in signing a transaction is to generate the signing message from 
   - Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md) that explains this approach.
 - However, you may prefer instead that your client application, for example, a hardware security module (HSM), be responsible for generating the signed transaction. In this approach, before submitting transactions, a client must:
   - Serialize the transactions into bytes, and
-  - Sign the bytes with the account private key. See [Accounts][account] for how account and private key works.
+  - Sign the bytes with the account private key. See [Accounts](../concepts/basics-accounts.md) for how accounts and private keys work.
 
 This guide will introduce the concepts behind constructing a transaction, generating the appropriate message to sign using the BCS-serialization, and various methods for signing within Aptos.
 
@@ -55,9 +55,9 @@ sources={{
 
 Unsigned transactions are known as `RawTransaction`s. They contain all the information about how to execute an operation on an account within Aptos. But they lack the appropriate authorization with a signature or `Authenticator`.
 
-In Aptos blockchain, all the data is encoded as [BCS][bcs] (Binary Canonical Serialization).
+In Aptos blockchain, all the data is encoded as [BCS (Binary Canonical Serialization)](#bcs).
 
-Aptos supports many different approaches to signing a transaction but defaults to a single signer using [Ed25519][ed25519].
+Aptos supports many different approaches to signing a transaction but defaults to a single signer using the [Ed25519](https://en.wikipedia.org/wiki/EdDSA#Ed25519) signature scheme.
 
 The `Authenticator` produced during the signing of the transaction gives authorization to the Aptos blockchain to execute the transaction on behalf of the account owner.
 
@@ -77,7 +77,7 @@ A raw transaction consists of the following fields:
 
 ### BCS
 
-Binary Canonical Serialization (BCS) is a serialization format applied to the raw (unsigned) transaction. See [BCS][bcs] for a description of the design goals of BCS.
+Binary Canonical Serialization (BCS) is a serialization format applied to the raw (unsigned) transaction. See [BCS](#bcs) for a description of the design goals of BCS.
 
 BCS is not a self-describing format. As such, in order to deserialize a message, one must know the message type and layout ahead of time.
 
@@ -105,7 +105,7 @@ The prefixing step is not shown in the diagram in the [Overview](#overview) sect
 
 ### Signature
 
-A signature is the result of hashing the signing message with the client's private key. By default Aptos uses the [Ed25519][ed25519] scheme to generate the signature of the raw transaction.
+A signature is the result of hashing the signing message with the client's private key. By default Aptos uses the [Ed25519](https://en.wikipedia.org/wiki/EdDSA#Ed25519) scheme to generate the signature of the raw transaction.
 
 - By signing a signing message with the private key, clients prove to the Aptos blockchain that they have authorized the transaction be executed.
 - Aptos blockchain will validate the signature with client account's public key to ensure that the transaction submitted is indeed signed by the client.
@@ -234,7 +234,7 @@ The `BCS` serialization shown in the code above is not the same as the BCS Seria
 
 ### Step 2. Creating the signing message and signing it
 
-1. Generate prefix (`prefix_bytes`) with [SHA3_256][sha3] hash bytes of string `APTOS::RawTransaction`.
+1. Generate prefix (`prefix_bytes`) with [SHA3-256](https://en.wikipedia.org/wiki/SHA-3) hash bytes of string `APTOS::RawTransaction`.
 2. Bytes of BCS serialized RawTransaction.
 3. Concat the prefix and BCS bytes.
 4. Signing the bytes with account private key.

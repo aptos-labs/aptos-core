@@ -43,13 +43,16 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version-file: .node-version
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 7.14.2
       # install packages for examples
-      - run: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install
-      - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install
+      - run: cd ./ecosystem/typescript/sdk/examples/typescript && pnpm install
+      - run: cd ./ecosystem/typescript/sdk/examples/javascript && pnpm install
       # Run package build+lint + tests
-      - run: cd ./ecosystem/typescript/sdk && yarn install
-      - run: cd ./ecosystem/typescript/sdk && yarn lint
-      - run: cd ./ecosystem/typescript/sdk && yarn fmt:check
+      - run: cd ./ecosystem/typescript/sdk && pnpm install
+      - run: cd ./ecosystem/typescript/sdk && pnpm lint
+      - run: cd ./ecosystem/typescript/sdk && pnpm fmt:check
 
   docs-lint:
     runs-on: ubuntu-latest
@@ -58,7 +61,10 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version-file: .node-version
-      - run: yarn lint
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 7.14.2
+      - run: pnpm lint
         working-directory: developer-docs-site
 
   rust-cryptohasher-domain-separation-check:
@@ -118,9 +124,9 @@ jobs:
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
-      - name: Upload smoke test logs for failures
+      # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
+      - name: Upload smoke test logs for failed and flaky tests
         uses: actions/upload-artifact@v3
-        if: failure()
         with:
           name: failed-smoke-test-logs
           # Retain all smoke test data except for the db (which may be large).

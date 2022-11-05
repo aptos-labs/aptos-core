@@ -4,14 +4,10 @@
 use crate::common::init::Network;
 use crate::common::utils::prompt_yes_with_override;
 use crate::{
-    common::{
-        init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
-        utils::{
-            chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
-            to_common_success_result, write_to_file, write_to_file_with_opts,
-            write_to_user_only_file,
-        },
+    common::utils::{
+        chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
+        get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
+        to_common_success_result, write_to_file, write_to_file_with_opts, write_to_user_only_file,
     },
     config::GlobalConfig,
     genesis::git::from_yaml,
@@ -33,7 +29,7 @@ use aptos_types::transaction::{
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use hex::FromHexError;
-use move_deps::move_core_types::account_address::AccountAddress;
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 #[cfg(unix)]
@@ -886,9 +882,7 @@ impl RestOptions {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
         } else {
-            reqwest::Url::parse(DEFAULT_REST_URL).map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to parse default rest URL {}", err))
-            })
+            Err(CliError::CommandArgumentError("No rest url given.  Please add --url or add a rest_url to the .aptos/config.yaml for the current profile".to_string()))
         }
     }
 
@@ -940,6 +934,11 @@ impl MovePackageDir {
             .into_iter()
             .map(|(key, value)| (key, value.account_address))
             .collect()
+    }
+
+    pub fn add_named_address(&mut self, key: String, value: String) {
+        self.named_addresses
+            .insert(key, AccountAddressWrapper::from_str(&value).unwrap());
     }
 }
 
@@ -1194,9 +1193,7 @@ impl FaucetOptions {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
         } else {
-            reqwest::Url::parse(DEFAULT_FAUCET_URL).map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to parse default faucet URL {}", err))
-            })
+            Err(CliError::CommandArgumentError("No faucet given.  Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
         }
     }
 }
@@ -1233,16 +1230,6 @@ pub struct GasOptions {
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
-    /// [Deprecated] Estimate maximum gas via simulation
-    ///
-    /// Deprecated parameter, the default behavior is now to estimate max gas automatically, and ask for
-    /// confirmation
-    ///
-    /// This will simulate the transaction, and use the simulated actual amount of gas
-    /// to be used as the max gas.
-    #[clap(long)]
-    pub(crate) estimate_max_gas: bool,
-
     /// Sender account address
     ///
     /// This allows you to override the account address from the derived account address

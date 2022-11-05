@@ -4,11 +4,9 @@
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_vm::natives;
-use move_deps::move_unit_test::UnitTestingConfig;
-use move_deps::{
-    move_cli::base::test::run_move_unit_tests,
-    move_vm_runtime::native_functions::NativeFunctionTable,
-};
+use move_cli::base::test::run_move_unit_tests;
+use move_unit_test::UnitTestingConfig;
+use move_vm_runtime::native_functions::NativeFunctionTable;
 use std::{collections::BTreeMap, path::PathBuf};
 use tempfile::tempdir;
 
@@ -28,7 +26,7 @@ pub fn run_tests_for_pkg(
     let pkg_path = path_in_crate(path_to_pkg);
     run_move_unit_tests(
         &pkg_path,
-        move_deps::move_package::BuildConfig {
+        move_package::BuildConfig {
             test_mode: true,
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
             additional_named_addresses: named_addr,

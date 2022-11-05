@@ -16,7 +16,10 @@ use crate::{
         token_claims::CurrentTokenPendingClaim,
         token_datas::{CurrentTokenData, TokenData},
         token_ownerships::{CurrentTokenOwnership, TokenOwnership},
-        tokens::{CurrentTokenOwnershipPK, CurrentTokenPendingClaimPK, Token, TokenDataIdHash},
+        tokens::{
+            CurrentTokenOwnershipPK, CurrentTokenPendingClaimPK, TableMetadataForToken, Token,
+            TokenDataIdHash,
+        },
     },
     schema,
 };
@@ -175,7 +178,11 @@ fn insert_tokens(
             diesel::insert_into(schema::tokens::table)
                 .values(&tokens_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, property_version, transaction_version))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -203,7 +210,11 @@ fn insert_token_ownerships(
                     transaction_version,
                     table_handle,
                 ))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -224,7 +235,10 @@ fn insert_token_datas(
                 .values(&token_datas_to_insert[start_ind..end_ind])
                 .on_conflict((token_data_id_hash, transaction_version))
                 .do_update()
-                .set((description.eq(excluded(description)),)),
+                .set((
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -278,6 +292,7 @@ fn insert_current_token_ownerships(
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     collection_data_id_hash.eq(excluded(collection_data_id_hash)),
                     table_type.eq(excluded(table_type)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -320,6 +335,7 @@ fn insert_current_token_datas(
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     collection_data_id_hash.eq(excluded(collection_data_id_hash)),
                     description.eq(excluded(description)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -354,6 +370,7 @@ fn insert_current_collection_datas(
                     description_mutable.eq(excluded(description_mutable)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     table_handle.eq(excluded(table_handle)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -380,7 +397,11 @@ fn insert_token_activities(
                     event_creation_number,
                     event_sequence_number,
                 ))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -414,6 +435,7 @@ fn insert_current_token_claims(
                     amount.eq(excluded(amount)),
                     table_handle.eq(excluded(table_handle)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -440,6 +462,8 @@ fn insert_current_ans_lookups(
                     registered_address.eq(excluded(registered_address)),
                     expiration_timestamp.eq(excluded(expiration_timestamp)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                    token_name.eq(excluded(token_name)),
                 )),
                 Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
             )?;
@@ -460,6 +484,11 @@ impl TransactionProcessor for TokenTransactionProcessor {
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
         let mut conn = self.get_conn();
+
+        // First get all token related table metadata from the batch of transactions. This is in case
+        // an earlier transaction has metadata (in resources) that's missing from a later transaction.
+        let table_handle_to_owner =
+            TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
 
         let mut all_tokens = vec![];
         let mut all_token_ownerships = vec![];
@@ -493,7 +522,7 @@ impl TransactionProcessor for TokenTransactionProcessor {
                 current_token_datas,
                 current_collection_datas,
                 current_token_claims,
-            ) = Token::from_transaction(&txn, &mut conn);
+            ) = Token::from_transaction(&txn, &table_handle_to_owner, &mut conn);
             all_tokens.append(&mut tokens);
             all_token_ownerships.append(&mut token_ownerships);
             all_token_datas.append(&mut token_datas);

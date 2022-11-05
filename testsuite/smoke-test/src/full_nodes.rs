@@ -107,7 +107,15 @@ async fn test_full_node_basic_flow() {
 
 #[tokio::test]
 async fn test_vfn_failover() {
-    let mut swarm = local_swarm_with_fullnodes(4, 4).await;
+    // VFN failover happens when validator is down even for default_failovers = 0
+    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    vfn_config.mempool.default_failovers = 0;
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_num_fullnodes(4)
+        .with_aptos()
+        .with_vfn_config(vfn_config)
+        .build()
+        .await;
     let transaction_factory = swarm.chain_info().transaction_factory();
 
     for fullnode in swarm.full_nodes_mut() {

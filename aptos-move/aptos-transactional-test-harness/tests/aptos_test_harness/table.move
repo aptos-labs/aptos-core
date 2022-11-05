@@ -6,7 +6,7 @@
 //# run --signers Alice --args x"6170746f735f70756e6b73" x"" x"" 100 x"000000" --show-events -- 0x3::token::create_collection_script
 
 // Mint "geek_token" for collection "aptos_punks"
-//# run --signers Alice --args x"6170746f735f70756e6b73" x"6765656b5f746f6b656e" x"" 10 100 x"" @Alice 0 0 x"0000000000" x"" x"" x"" --show-events -- 0x3::token::create_token_script
+//# run --signers Alice --args x"6170746f735f70756e6b73" x"6765656b5f746f6b656e" x"" 10 100 x"" @Alice 1 0 x"0000000000" x"" x"" x"" --show-events -- 0x3::token::create_token_script
 
 //# view --address Alice  --resource 0x3::token::Collections
 

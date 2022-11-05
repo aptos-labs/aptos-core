@@ -113,7 +113,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.5, rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
@@ -637,7 +637,13 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "s"
         },
         "overrides": []
@@ -688,7 +694,13 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "s"
         },
         "overrides": []
@@ -739,7 +751,13 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "s"
         },
         "overrides": []
@@ -4709,109 +4727,119 @@
         "type": "datasource"
       },
       {
-        "name": "metrics_source",
-        "type": "query",
-        "datasource": null,
-        "refresh": 1,
-        "options": [],
-        "includeAll": true,
         "allFormat": "",
         "allValue": ".*",
+        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
+        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
         "multi": false,
         "multiFormat": "",
+        "name": "metrics_source",
+        "options": [],
         "query": {
           "query": "label_values(node_process_start_time{}, metrics_source)",
           "refId": "StandardVariableQuery"
         },
+        "refresh": 1,
         "regex": "",
-        "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "label": "",
-        "hide": 0,
-        "sort": 0
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       },
       {
-        "name": "chain_name",
-        "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "refresh": 1,
-        "options": [],
-        "includeAll": false,
         "allFormat": "",
         "allValue": "",
+        "current": { "text": ["mainnet"], "value": "mainnet" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
         "multi": false,
         "multiFormat": "",
+        "name": "chain_name",
+        "options": [],
         "query": {
           "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
           "refId": "StandardVariableQuery"
         },
+        "refresh": 1,
         "regex": "",
-        "current": { "text": ["mainnet"], "value": "mainnet" },
-        "label": "",
-        "hide": 0,
-        "sort": 1
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       },
       {
-        "name": "cluster",
-        "type": "query",
-        "datasource": null,
-        "refresh": 1,
-        "options": [],
-        "includeAll": true,
         "allFormat": "",
         "allValue": ".*",
+        "current": { "text": ["All"], "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
         "multi": false,
         "multiFormat": "",
+        "name": "cluster",
+        "options": [],
         "query": {
           "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"}, cluster)",
           "refId": "StandardVariableQuery"
         },
+        "refresh": 1,
         "regex": "",
-        "current": { "text": ["All"], "value": "$__all" },
-        "label": "",
-        "hide": 0,
-        "sort": 0
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       },
       {
-        "name": "namespace",
-        "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "refresh": 1,
-        "options": [],
-        "includeAll": true,
         "allFormat": "",
         "allValue": ".*",
+        "current": { "text": ["All"], "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
         "multi": false,
         "multiFormat": "",
+        "name": "namespace",
+        "options": [],
         "query": {
           "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"}, namespace)",
           "refId": "StandardVariableQuery"
         },
+        "refresh": 1,
         "regex": "",
-        "current": { "text": ["All"], "value": "$__all" },
-        "label": "",
-        "hide": 0,
-        "sort": 1
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       },
       {
-        "name": "kubernetes_pod_name",
-        "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "refresh": 1,
-        "options": [],
-        "includeAll": true,
         "allFormat": "",
         "allValue": ".*",
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
         "multi": true,
         "multiFormat": "",
+        "name": "kubernetes_pod_name",
+        "options": [],
         "query": {
           "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"}, kubernetes_pod_name)",
           "refId": "StandardVariableQuery"
         },
+        "refresh": 1,
         "regex": "",
-        "current": { "text": ["All"], "value": ["$__all"] },
-        "label": "",
-        "hide": 0,
-        "sort": 1
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       },
       {
         "allFormat": "",
@@ -4878,6 +4906,6 @@
   "timezone": "browser",
   "title": "Consensus",
   "uid": "consensus",
-  "version": 74,
+  "version": 76,
   "weekStart": ""
 }

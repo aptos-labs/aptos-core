@@ -118,6 +118,18 @@ impl GasParameters {
                     base: 0.into(),
                     per_byte: 0.into(),
                 },
+                sha2_512: hash::Sha2_512HashGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
+                sha3_512: hash::Sha3_512HashGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
+                ripemd160: hash::Ripemd160HashGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
             },
             type_info: type_info::GasParameters {
                 type_of: type_info::TypeOfGasParameters {
@@ -128,6 +140,7 @@ impl GasParameters {
                     base: 0.into(),
                     per_byte_in_str: 0.into(),
                 },
+                chain_id: type_info::ChainIdGasParameters { base: 0.into() },
             },
             util: util::GasParameters {
                 from_bytes: util::FromBytesGasParameters {

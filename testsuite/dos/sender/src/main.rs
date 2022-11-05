@@ -110,7 +110,7 @@ async fn burst_target(addr: Arc<String>, burst: u16) {
                         "{curr}/{}:{}: Got: {:?}",
                         burst,
                         ack.fetch_add(1, Ordering::Relaxed),
-                        String::from_utf8((&buf[..n]).to_vec()).unwrap()
+                        String::from_utf8(buf[..n].to_vec()).unwrap()
                     );
                 } else {
                     println!(
