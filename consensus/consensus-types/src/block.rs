@@ -10,6 +10,7 @@ use anyhow::{bail, ensure, format_err};
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
 use aptos_types::{
+    transaction::SignedTransaction,
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
@@ -331,19 +332,17 @@ impl Block {
         Ok(())
     }
 
-    pub fn transactions_to_execute(&self, validators: &[AccountAddress]) -> Vec<Transaction> {
+    pub fn transactions_to_execute(
+        &self,
+        validators: &[AccountAddress],
+        txns: Vec<SignedTransaction>,
+    ) -> Vec<Transaction> {
         once(Transaction::BlockMetadata(
             self.new_block_metadata(validators),
         ))
-        .chain(
-            self.payload()
-                .unwrap_or(&Payload::empty())
-                .clone()
-                .into_iter()
-                .map(Transaction::UserTransaction),
-        )
-        .chain(once(Transaction::StateCheckpoint(self.id)))
-        .collect()
+            .chain(txns.into_iter().map(Transaction::UserTransaction))
+            .chain(once(Transaction::StateCheckpoint(self.id)))
+            .collect()
     }
 
     fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {

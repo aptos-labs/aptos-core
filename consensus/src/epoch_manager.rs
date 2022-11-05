@@ -6,8 +6,8 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockStore,
     },
-    commit_notifier::CommitNotifier,
     counters,
+    data_manager::DataManager,
     error::{error_kind, DbError},
     experimental::{
         buffer_manager::{OrderedBlocks, ResetRequest},
@@ -58,7 +58,7 @@ use channel::{aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
-    request_response::ConsensusRequest,
+    request_response::WrapperCommand,
 };
 use event_notifications::ReconfigNotificationListener;
 use fail::fail_point;
@@ -108,7 +108,7 @@ pub struct EpochManager {
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener,
-    commit_notifier: Arc<dyn CommitNotifier>,
+    data_manager: Arc<DataManager>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
@@ -119,7 +119,7 @@ pub struct EpochManager {
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<EpochState>,
     block_retrieval_tx:
-        Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
+    Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
 }
 
 impl EpochManager {
@@ -133,7 +133,7 @@ impl EpochManager {
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         reconfig_events: ReconfigNotificationListener,
-        commit_notifier: Arc<dyn CommitNotifier>,
+        data_manager: Arc<DataManager>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -151,7 +151,7 @@ impl EpochManager {
             storage,
             safety_rules_manager,
             reconfig_events,
-            commit_notifier,
+            data_manager,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
@@ -421,9 +421,9 @@ impl EpochManager {
         Ok(())
     }
 
-    fn spawn_quorum_store(
+    fn spawn_direct_mempool_quorum_store(
         &mut self,
-        consensus_to_quorum_store_receiver: Receiver<ConsensusRequest>,
+        consensus_to_quorum_store_receiver: Receiver<WrapperCommand>,
     ) {
         let quorum_store = DirectMempoolQuorumStore::new(
             consensus_to_quorum_store_receiver,
@@ -523,8 +523,8 @@ impl EpochManager {
                 tx: ack_tx,
                 stop: true,
             })
-            .await
-            .expect("[EpochManager] Fail to drop buffer manager");
+                .await
+                .expect("[EpochManager] Fail to drop buffer manager");
             ack_rx
                 .await
                 .expect("[EpochManager] Fail to drop buffer manager");
@@ -607,16 +607,6 @@ impl EpochManager {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
-        let (consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =
-            mpsc::channel(self.config.intra_consensus_channel_buffer_size);
-        self.spawn_quorum_store(consensus_to_quorum_store_receiver);
-        let payload_manager = QuorumStoreClient::new(
-            consensus_to_quorum_store_sender.clone(),
-            self.config.quorum_store_poll_count,
-            self.config.quorum_store_pull_timeout_ms,
-        );
-        self.commit_notifier
-            .new_epoch(consensus_to_quorum_store_sender);
 
         self.commit_state_computer.new_epoch(&epoch_state);
         let state_computer = if onchain_config.decoupled_execution() {
@@ -636,7 +626,20 @@ impl EpochManager {
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             onchain_config.back_pressure_limit(),
+            self.data_manager.clone(),
         ));
+
+
+        // Start QuorumStore
+        let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
+            mpsc::channel(self.config.intra_consensus_channel_buffer_size);
+        self.spawn_direct_mempool_quorum_store(consensus_to_quorum_store_rx);
+
+        let payload_manager = QuorumStoreClient::new(
+            consensus_to_quorum_store_tx,
+            self.config.quorum_store_poll_count,
+            self.config.quorum_store_pull_timeout_ms,
+        );
 
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)
@@ -713,7 +716,7 @@ impl EpochManager {
                     epoch_state,
                     onchain_config.unwrap_or_default(),
                 )
-                .await
+                    .await
             }
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.start_recovery_manager(ledger_data, epoch_state).await
@@ -747,16 +750,16 @@ impl EpochManager {
                     .clone()
                     .verify(&self.epoch_state().verifier)
             )
-            .context("[EpochManager] Verify event")
-            .map_err(|err| {
-                error!(
+                .context("[EpochManager] Verify event")
+                .map_err(|err| {
+                    error!(
                     SecurityEvent::ConsensusInvalidMessage,
                     remote_peer = peer_id,
                     error = ?err,
                     unverified_event = unverified_event
                 );
-                err
-            })?;
+                    err
+                })?;
 
             // process the verified event
             self.process_event(peer_id, verified_event)?;

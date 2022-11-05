@@ -15,9 +15,11 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = "1.0.57"
 async-trait = "0.1.53"
+arc-swap = "1.5.0"
 bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
 byteorder = { version = "1.4.3" }
 bytes = "1.1.0"
+dashmap = "4.0.2"
 fail = "0.5.0"
 # Previously: Pinning futures to 0.3.21, since release v0.3.23 is causing the network_tests to fail because messages are not received in the channel.
 # Now: Some futures crates were using 0.3.23 as well, which is not a good idea. 0.3.23 has a known issues, so moving to 0.3.24.

@@ -13,6 +13,7 @@ use consensus_types::{
 use executor_types::{Error as ExecutionError, StateComputeResult};
 use futures::future::BoxFuture;
 use std::sync::Arc;
+use consensus_types::common::Round;
 
 pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<ExecutedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
@@ -21,6 +22,7 @@ pub type StateComputerCommitCallBackType =
 pub trait PayloadManager: Send + Sync {
     async fn pull_payload(
         &self,
+        round: Round,
         max_items: u64,
         max_bytes: u64,
         exclude: PayloadFilter,

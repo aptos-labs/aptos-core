@@ -5,11 +5,14 @@ use crate::common::{Payload, PayloadFilter, Round};
 use anyhow::Result;
 use futures::channel::oneshot;
 use std::{fmt, fmt::Formatter};
+use aptos_crypto::HashValue;
+use crate::proof_of_store::LogicalTime;
 
 /// Message sent from Consensus to QuorumStore.
-pub enum ConsensusRequest {
+pub enum WrapperCommand {
     /// Request to pull block to submit to consensus.
     GetBlockRequest(
+        Round,
         // max block size
         u64,
         // max byte size
@@ -20,28 +23,27 @@ pub enum ConsensusRequest {
         oneshot::Sender<Result<ConsensusResponse>>,
     ),
     /// Request to clean quorum store at commit logical time
-    CleanRequest(
-        // epoch
-        u64,
-        // round
-        Round,
-        // callback to respond to
-        oneshot::Sender<Result<ConsensusResponse>>,
-    ),
+    CleanRequest(LogicalTime, Vec<HashValue>),
 }
 
-impl fmt::Display for ConsensusRequest {
+impl fmt::Display for WrapperCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ConsensusRequest::GetBlockRequest(max_txns, max_bytes, excluded, _) => {
+            WrapperCommand::GetBlockRequest(round, max_txns, max_bytes, excluded, _) => {
                 write!(
                     f,
-                    "GetBlockRequest [max_txns: {}, max_bytes: {} excluded: {}]",
-                    max_txns, max_bytes, excluded
+                    "GetBlockRequest [round: {}, max_txns: {}, max_bytes: {} excluded: {}]",
+                    round, max_txns, max_bytes, excluded
                 )
             }
-            ConsensusRequest::CleanRequest(epoch, round, _) => {
-                write!(f, "CleanRequest [epoch: {}, round: {}]", epoch, round)
+            WrapperCommand::CleanRequest(logical_time, digests) => {
+                write!(
+                    f,
+                    "CleanRequest [epoch: {}, round: {}, digests: {:?}]",
+                    logical_time.epoch(),
+                    logical_time.round(),
+                    digests
+                )
             }
         }
     }

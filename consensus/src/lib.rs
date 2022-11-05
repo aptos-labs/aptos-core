@@ -47,6 +47,7 @@ pub mod consensus_provider;
 pub mod counters;
 /// AptosNet interface.
 pub mod network_interface;
+mod data_manager;
 
 /// Required by the smoke tests
 pub use consensusdb::CONSENSUS_DB_NAME;

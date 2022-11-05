@@ -7,3 +7,5 @@ pub mod direct_mempool_quorum_store;
 mod counters;
 #[cfg(test)]
 mod tests;
+pub(crate) mod utils;
+pub(crate) mod batch_reader;

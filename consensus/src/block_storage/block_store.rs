@@ -13,6 +13,7 @@ use crate::{
     },
     state_replication::StateComputer,
     util::time_service::TimeService,
+    data_manager::DataManager,
 };
 use anyhow::{bail, ensure, format_err, Context};
 
@@ -103,6 +104,7 @@ pub struct BlockStore {
     time_service: Arc<dyn TimeService>,
     // consistent with round type
     back_pressure_limit: Round,
+    data_manager: Arc<DataManager>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
 }
@@ -115,6 +117,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         back_pressure_limit: Round,
+        data_manager: Arc<DataManager>,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
@@ -129,6 +132,7 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             time_service,
             back_pressure_limit,
+            data_manager,
         ));
         block_on(block_store.try_commit());
         block_store
@@ -166,6 +170,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         back_pressure_limit: Round,
+        data_manager: Arc<DataManager>,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
@@ -191,12 +196,12 @@ impl BlockStore {
             root_metadata.accu_hash,
             root_metadata.frozen_root_hashes,
             root_metadata.num_leaves, /* num_leaves */
-            vec![],                   /* parent_root_hashes */
-            0,                        /* parent_num_leaves */
-            None,                     /* epoch_state */
-            vec![],                   /* compute_status */
-            vec![],                   /* txn_infos */
-            vec![],                   /* reconfig_events */
+            vec![], /* parent_root_hashes */
+            0, /* parent_num_leaves */
+            None, /* epoch_state */
+            vec![], /* compute_status */
+            vec![], /* txn_infos */
+            vec![], /* reconfig_events */
         );
 
         let executed_root_block = ExecutedBlock::new(
@@ -220,6 +225,7 @@ impl BlockStore {
             storage,
             time_service,
             back_pressure_limit,
+            data_manager,
             #[cfg(any(test, feature = "fuzzing"))]
             back_pressure_for_test: AtomicBool::new(false),
         };
@@ -316,8 +322,9 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.back_pressure_limit,
+            self.data_manager.clone(),
         )
-        .await;
+            .await;
 
         // Unwrap the new tree and replace the existing tree.
         *self.inner.write() = Arc::try_unwrap(inner)
@@ -375,6 +382,9 @@ impl BlockStore {
             }
             self.time_service.wait_until(block_time).await;
         }
+        self.data_manager
+            .update_payload(executed_block.block())
+            .await;
         self.storage
             .save_tree(vec![executed_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
@@ -484,11 +494,11 @@ impl BlockStore {
 
     pub fn back_pressure(&self) -> bool {
         #[cfg(any(test, feature = "fuzzing"))]
-        {
-            if self.back_pressure_for_test.load(Ordering::Relaxed) {
-                return true;
+            {
+                if self.back_pressure_for_test.load(Ordering::Relaxed) {
+                    return true;
+                }
             }
-        }
         let commit_round = self.commit_root().round();
         let ordered_round = self.ordered_root().round();
         counters::OP_COUNTERS

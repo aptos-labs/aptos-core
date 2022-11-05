@@ -3,6 +3,7 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
+    data_manager::DataManager,
     liveness::{
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
@@ -195,6 +196,7 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
+            Arc::new(DataManager::new()),
         ));
 
         let proposal_generator = ProposalGenerator::new(
