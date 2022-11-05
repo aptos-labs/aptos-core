@@ -240,7 +240,7 @@ You can also verify that the module was published by going to the [Aptos Explore
 ```json
 {
   "address": "0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481",
-  "name": "Message",
+  "name": "message",
   "friends": [],
   "exposedFunctions": [
     {
@@ -307,11 +307,11 @@ You can also verify that the module was published by going to the [Aptos Explore
 }
 ```
 
-Make a note of `"name": "Message"`, we will use it in the next section.
+Make a note of `"name": "message"`, we will use it in the next section.
 
 ### Add module publishing instructions to the dapp
 
-As a convenience to the users, we can have the app display the `aptos move publish` command if the module does not exist. To do so, we will use the Aptos SDK to retrieve the account modules and look for one where `module.abi.name` equals `"Message"` (i.e., the `"name": "Message"` we saw in the Aptos Explorer).
+As a convenience to the users, we can have the app display the `aptos move publish` command if the module does not exist. To do so, we will use the Aptos SDK to retrieve the account modules and look for one where `module.abi.name` equals `"message"` (i.e., the `"name": "message"` we saw in the Aptos Explorer).
 
 Update `src/App.tsx`:
 
@@ -326,7 +326,7 @@ function App() {
     client.getAccountModules(address).then(setModules);
   }, [address]);
 
-  const hasModule = modules.some((m) => m.abi?.name === 'Message');
+  const hasModule = modules.some((m) => m.abi?.name === 'message');
   const publishInstructions = (
     <pre>
       Run this command to publish the module:
@@ -481,7 +481,7 @@ function App() {
   // ...
 
   // Get the message from account resources.
-  const [resources, setResources] = React.useState<Types.AccountResource[]>([]);
+  const [resources, setResources] = React.useState<Types.MoveResource[]>([]);
   React.useEffect(() => {
     if (!address) return;
     client.getAccountResources(address).then(setResources);
