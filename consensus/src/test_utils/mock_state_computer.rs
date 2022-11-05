@@ -57,7 +57,7 @@ impl MockStateComputer {
         // mock sending commit notif to state sync
         let mut txns = vec![];
         let mut txns = vec![];
-        for block in blocks {
+        for block in &ordered_blocks {
             let _payload = self
                 .block_cache
                 .lock()

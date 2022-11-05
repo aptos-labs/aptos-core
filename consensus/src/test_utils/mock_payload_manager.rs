@@ -16,6 +16,7 @@ use consensus_types::{
 };
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
+use consensus_types::common::Round;
 
 pub struct MockPayloadManager {
     // used non-mocked TxnManager to test interaction with shared mempool
@@ -51,6 +52,7 @@ impl PayloadManager for MockPayloadManager {
     /// The returned future is fulfilled with the vector of SignedTransactions
     async fn pull_payload(
         &self,
+        _round: Round,
         _max_size: u64,
         _max_bytes: u64,
         _exclude: PayloadFilter,
