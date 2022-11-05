@@ -325,14 +325,14 @@ impl BatchReader {
         let prev_round = self
             .last_certified_round
             .fetch_max(certified_time.round(), Ordering::SeqCst);
-        // Note: prev_round may be equal to certified_time round due to state-sync
-        // at the epoch boundary.
-        assert!(
-            prev_round <= certified_time.round(),
-            "Decreasing executed rounds reported to BatchReader {} {}",
-            prev_round,
-            certified_time.round(),
-        );
+        // // Note: prev_round may be equal to certified_time round due to state-sync
+        // // at the epoch boundary.
+        // assert!(
+        //     prev_round <= certified_time.round(),
+        //     "Decreasing executed rounds reported to BatchReader {} {}",
+        //     prev_round,
+        //     certified_time.round(),
+        // );
 
         let expired_keys = self.clear_expired_payload(certified_time);
         if let Err(e) = self
