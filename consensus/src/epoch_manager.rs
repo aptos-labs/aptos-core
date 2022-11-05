@@ -119,7 +119,7 @@ pub struct EpochManager {
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<EpochState>,
     block_retrieval_tx:
-    Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
+        Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
 }
 
 impl EpochManager {
@@ -526,8 +526,8 @@ impl EpochManager {
                 tx: ack_tx,
                 stop: true,
             })
-                .await
-                .expect("[EpochManager] Fail to drop buffer manager");
+            .await
+            .expect("[EpochManager] Fail to drop buffer manager");
             ack_rx
                 .await
                 .expect("[EpochManager] Fail to drop buffer manager");
@@ -610,7 +610,6 @@ impl EpochManager {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
-
         self.commit_state_computer.new_epoch(&epoch_state);
         let state_computer = if onchain_config.decoupled_execution() {
             Arc::new(self.spawn_decoupled_execution(
@@ -631,7 +630,6 @@ impl EpochManager {
             onchain_config.back_pressure_limit(),
             self.data_manager.clone(),
         ));
-
 
         // Start QuorumStore
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
@@ -719,7 +717,7 @@ impl EpochManager {
                     epoch_state,
                     onchain_config.unwrap_or_default(),
                 )
-                    .await
+                .await
             }
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.start_recovery_manager(ledger_data, epoch_state).await
@@ -753,16 +751,16 @@ impl EpochManager {
                     .clone()
                     .verify(&self.epoch_state().verifier)
             )
-                .context("[EpochManager] Verify event")
-                .map_err(|err| {
-                    error!(
+            .context("[EpochManager] Verify event")
+            .map_err(|err| {
+                error!(
                     SecurityEvent::ConsensusInvalidMessage,
                     remote_peer = peer_id,
                     error = ?err,
                     unverified_event = unverified_event
                 );
-                    err
-                })?;
+                err
+            })?;
 
             // process the verified event
             self.process_event(peer_id, verified_event)?;

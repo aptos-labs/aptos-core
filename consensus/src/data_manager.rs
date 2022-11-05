@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::quorum_store::batch_reader::BatchReader;
 use crate::quorum_store::utils::RoundExpirations;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -16,11 +17,9 @@ use consensus_types::{
 use dashmap::DashMap;
 use executor_types::*;
 use futures::channel::mpsc::Sender;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::sync::oneshot;
-use crate::quorum_store::batch_reader::BatchReader;
-
 
 enum DataStatus {
     Cached(Vec<SignedTransaction>),
@@ -159,7 +158,6 @@ impl DataManager {
         }
         if self.quorum_store_enabled.load(Ordering::Relaxed) {
             if let Payload::InQuorumStore(proofs) = block.payload().unwrap() {
-
                 // let data_status = self.digest_status.entry(block.id());
                 match self.digest_status.entry(block.id()) {
                     dashmap::mapref::entry::Entry::Occupied(mut entry) => match entry.get_mut() {

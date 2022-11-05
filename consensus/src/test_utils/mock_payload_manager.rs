@@ -9,6 +9,7 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
     vm_status::StatusCode,
 };
+use consensus_types::common::Round;
 use consensus_types::{
     block::block_test_utils::random_payload,
     common::{Payload, PayloadFilter},
@@ -16,7 +17,6 @@ use consensus_types::{
 };
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
-use consensus_types::common::Round;
 
 pub struct MockPayloadManager {
     // used non-mocked TxnManager to test interaction with shared mempool

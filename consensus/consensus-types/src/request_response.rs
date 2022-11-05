@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{Payload, PayloadFilter, Round};
+use crate::proof_of_store::LogicalTime;
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use futures::channel::oneshot;
 use std::{fmt, fmt::Formatter};
-use aptos_crypto::HashValue;
-use crate::proof_of_store::LogicalTime;
 
 /// Message sent from Consensus to QuorumStore.
 pub enum WrapperCommand {

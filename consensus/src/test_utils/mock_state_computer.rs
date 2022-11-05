@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    data_manager::DataManager,
     error::StateSyncError,
     experimental::buffer_manager::OrderedBlocks,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
-    data_manager::DataManager
 };
 use anyhow::{format_err, Result};
 use aptos_crypto::HashValue;

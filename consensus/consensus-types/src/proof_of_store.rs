@@ -1,15 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-
+use crate::common::Round;
 use anyhow::Context;
 use aptos_crypto::HashValue;
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use crate::common::Round;
-use serde::{Deserialize, Serialize};
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::validator_verifier::ValidatorVerifier;
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
 pub struct LogicalTime {
@@ -32,7 +30,7 @@ impl LogicalTime {
 }
 
 #[derive(
-Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub struct SignedDigestInfo {
     pub digest: HashValue,

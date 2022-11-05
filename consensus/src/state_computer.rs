@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::data_manager::DataManager;
 use crate::monitor;
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
@@ -18,15 +19,18 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
 use consensus_notifications::ConsensusNotificationSender;
-use consensus_types::{block::Block, common::{Round, Payload}, executed_block::ExecutedBlock};
+use consensus_types::proof_of_store::LogicalTime;
+use consensus_types::{
+    block::Block,
+    common::{Payload, Round},
+    executed_block::ExecutedBlock,
+};
 use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
-use consensus_types::{proof_of_store::LogicalTime};
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc};
 use std::cmp::max;
+use std::{boxed::Box, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
-use crate::data_manager::DataManager;
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,

@@ -4,9 +4,10 @@
 use crate::{error::QuorumStoreError, monitor, state_replication::PayloadManager};
 use anyhow::Result;
 use aptos_logger::prelude::*;
+use consensus_types::common::Round;
 use consensus_types::{
     common::{Payload, PayloadFilter},
-    request_response::{WrapperCommand, ConsensusResponse},
+    request_response::{ConsensusResponse, WrapperCommand},
 };
 use fail::fail_point;
 use futures::{
@@ -15,7 +16,6 @@ use futures::{
 };
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
-use consensus_types::common::Round;
 
 const NO_TXN_DELAY: u64 = 30;
 

@@ -8,12 +8,12 @@ use crate::{
         BlockReader,
     },
     counters,
+    data_manager::DataManager,
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
     state_replication::StateComputer,
     util::time_service::TimeService,
-    data_manager::DataManager,
 };
 use anyhow::{bail, ensure, format_err, Context};
 
@@ -196,12 +196,12 @@ impl BlockStore {
             root_metadata.accu_hash,
             root_metadata.frozen_root_hashes,
             root_metadata.num_leaves, /* num_leaves */
-            vec![], /* parent_root_hashes */
-            0, /* parent_num_leaves */
-            None, /* epoch_state */
-            vec![], /* compute_status */
-            vec![], /* txn_infos */
-            vec![], /* reconfig_events */
+            vec![],                   /* parent_root_hashes */
+            0,                        /* parent_num_leaves */
+            None,                     /* epoch_state */
+            vec![],                   /* compute_status */
+            vec![],                   /* txn_infos */
+            vec![],                   /* reconfig_events */
         );
 
         let executed_root_block = ExecutedBlock::new(
@@ -324,7 +324,7 @@ impl BlockStore {
             self.back_pressure_limit,
             self.data_manager.clone(),
         )
-            .await;
+        .await;
 
         // Unwrap the new tree and replace the existing tree.
         *self.inner.write() = Arc::try_unwrap(inner)
@@ -494,11 +494,11 @@ impl BlockStore {
 
     pub fn back_pressure(&self) -> bool {
         #[cfg(any(test, feature = "fuzzing"))]
-            {
-                if self.back_pressure_for_test.load(Ordering::Relaxed) {
-                    return true;
-                }
+        {
+            if self.back_pressure_for_test.load(Ordering::Relaxed) {
+                return true;
             }
+        }
         let commit_round = self.commit_root().round();
         let ordered_round = self.ordered_root().round();
         counters::OP_COUNTERS

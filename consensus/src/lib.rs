@@ -45,9 +45,9 @@ mod util;
 pub mod consensus_provider;
 /// Required by the telemetry service
 pub mod counters;
+mod data_manager;
 /// AptosNet interface.
 pub mod network_interface;
-mod data_manager;
 
 /// Required by the smoke tests
 pub use consensusdb::CONSENSUS_DB_NAME;

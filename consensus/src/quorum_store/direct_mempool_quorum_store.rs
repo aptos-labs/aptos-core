@@ -8,7 +8,7 @@ use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use consensus_types::{
     common::{Payload, PayloadFilter, TransactionSummary},
-    request_response::{WrapperCommand, ConsensusResponse},
+    request_response::{ConsensusResponse, WrapperCommand},
 };
 use futures::{
     channel::{
@@ -88,10 +88,7 @@ impl DirectMempoolQuorumStore {
             PayloadFilter::Empty => Vec::new(),
         };
 
-        let (txns, result) = match self
-            .pull_internal(max_txns, max_bytes, exclude_txns)
-            .await
-        {
+        let (txns, result) = match self.pull_internal(max_txns, max_bytes, exclude_txns).await {
             Err(_) => {
                 error!("GetBatch failed");
                 (vec![], counters::REQUEST_FAIL_LABEL)
@@ -122,7 +119,13 @@ impl DirectMempoolQuorumStore {
 
     async fn handle_consensus_request(&self, req: WrapperCommand) {
         match req {
-            WrapperCommand::GetBlockRequest(_round, max_txns, max_bytes, payload_filter, callback) => {
+            WrapperCommand::GetBlockRequest(
+                _round,
+                max_txns,
+                max_bytes,
+                payload_filter,
+                callback,
+            ) => {
                 self.handle_block_request(max_txns, max_bytes, payload_filter, callback)
                     .await;
             }

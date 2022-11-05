@@ -340,9 +340,9 @@ impl Block {
         once(Transaction::BlockMetadata(
             self.new_block_metadata(validators),
         ))
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
-            .chain(once(Transaction::StateCheckpoint(self.id)))
-            .collect()
+        .chain(txns.into_iter().map(Transaction::UserTransaction))
+        .chain(once(Transaction::StateCheckpoint(self.id)))
+        .collect()
     }
 
     fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {

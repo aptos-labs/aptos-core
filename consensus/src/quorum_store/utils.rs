@@ -1,15 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-
-
-
+use consensus_types::common::Round;
 use std::{
     cmp::Reverse,
     collections::{BinaryHeap, HashSet},
-    hash::Hash
+    hash::Hash,
 };
-use consensus_types::common::Round;
 
 pub(crate) struct RoundExpirations<I: Ord> {
     expiries: BinaryHeap<(Reverse<Round>, I)>,
@@ -40,4 +37,3 @@ impl<I: Ord + Hash> RoundExpirations<I> {
         ret
     }
 }
-

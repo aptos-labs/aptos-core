@@ -8,6 +8,7 @@ use crate::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::HashValue;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -16,7 +17,6 @@ use aptos_types::{
 };
 use executor_types::StateComputeResult;
 use std::fmt::{Debug, Display, Formatter};
-use aptos_types::transaction::SignedTransaction;
 
 /// ExecutedBlocks are managed in a speculative tree, the committed blocks form a chain. Besides
 /// block data, each executed block also has other derived meta data which could be regenerated from
@@ -118,11 +118,11 @@ impl ExecutedBlock {
             self.block.transactions_to_execute(validators, txns),
             self.state_compute_result.compute_status(),
         )
-            .filter_map(|(txn, status)| match status {
-                TransactionStatus::Keep(_) => Some(txn),
-                _ => None,
-            })
-            .collect()
+        .filter_map(|(txn, status)| match status {
+            TransactionStatus::Keep(_) => Some(txn),
+            _ => None,
+        })
+        .collect()
     }
 
     pub fn reconfig_event(&self) -> Vec<ContractEvent> {

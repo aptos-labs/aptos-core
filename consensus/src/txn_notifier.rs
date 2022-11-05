@@ -5,7 +5,7 @@ use crate::{error::MempoolError, monitor};
 use anyhow::{format_err, Result};
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::transaction::{SignedTransaction, TransactionStatus};
-use consensus_types::{common::RejectedTransactionSummary};
+use consensus_types::common::RejectedTransactionSummary;
 use executor_types::StateComputeResult;
 use futures::channel::{mpsc, oneshot};
 use itertools::Itertools;
