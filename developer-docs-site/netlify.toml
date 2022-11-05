@@ -9,7 +9,7 @@
 # and here https://answers.netlify.com/t/builds-cancelled-for-a-new-branch-due-to-no-content-change/17169/4
 ignore = "if [ \"$PULL_REQUEST\" == \"true\" ]; then git diff --quiet main $COMMIT_REF . ; else git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF; fi"
 
-base = "./"
+base = "developer-docs-site/"
 
 # This is relative to base.
 publish = "build/"
