@@ -151,7 +151,7 @@ test(
 );
 
 test(
-  "submits multisig transaction",
+  "submits multisig transaction simulation",
   async () => {
     const client = new AptosClient(NODE_URL);
     const faucetClient = getFaucetClient();
@@ -211,6 +211,16 @@ test(
 
       return muliEd25519Sig;
     }, multiSigPublicKey);
+
+    // simulate transaction
+    const [simulateTransactionRes] = await client.simulateTransaction(multiSigPublicKey, rawTxn, {
+      estimateGasUnitPrice: true,
+      estimateMaxGasAmount: true,
+      estimatePrioritizedGasUnitPrice: true,
+    });
+
+    expect(parseInt(simulateTransactionRes.gas_used, 10) > 0);
+    expect(simulateTransactionRes.success);
 
     const bcsTxn = txnBuilder.sign(rawTxn);
     const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
