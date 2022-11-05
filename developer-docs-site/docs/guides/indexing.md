@@ -55,7 +55,7 @@ Aptos provides a rate-limited GraphQL API for public use. See below a few exampl
 
 ### Format of the address
 
-Make sure that the address (either owner address or any Aptos blockchain account address) in the query contains a prefix of `0x` followed by the 64 hex characters, for example, `0xaa921481e07b82a26dbd5d3bc472b9ad82d3e5bfd248bacac160eac51687c2ff`. In JavaScript you can do this to make it so: `'0x'+address.substring(2).padStart(64, '0')`.
+Make sure that the address (either owner address or any Aptos blockchain account address) in the query contains a prefix of `0x` followed by the 64 hex characters, for example, `0xaa921481e07b82a26dbd5d3bc472b9ad82d3e5bfd248bacac160eac51687c2ff`.
 
 ### Running example queries
 
