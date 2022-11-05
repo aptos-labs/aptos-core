@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 
 This tutorial details how to compile, test, publish and interact with Move modules on the Aptos blockchain. The steps in summary are:
 
-1. Install the precombiled binary for the Aptos CLI.
+1. Install the precompiled binary for the Aptos CLI.
 2. Create an account on the Aptos blockchain and fund it.
 3. Compile and test a Move module.
 4. Publish a Move module to the Aptos blockchain.
@@ -18,49 +18,61 @@ This tutorial details how to compile, test, publish and interact with Move modul
 
 ## Step 1: Install the CLI
 
-[Install the precombiled binary for the Aptos CLI][install_cli].
+[Install the precompiled binary for the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md).
 
 ---
 
 ## Step 2: Create an account and fund it 
 
-After installing the CLI binary, next step is to create and fund an account on the Aptos blockchain. 
+After installing the CLI binary, create and fund an account on the Aptos blockchain. 
 
-1. Begin by starting a new terminal and run the below command to initialize a new local account: 
+Start a new terminal and run the following command to initialize a new local account: 
 
 ```bash
 aptos init
 ```
 
-The output will be similar to below. 
+You will see output asking for an endpoint:
+
 ```text
 Enter your rest endpoint [Current: None | No input: https://fullnode.devnet.aptoslabs.com/v1]
+```
 
-No rest url given, using https://fullnode.devnet.aptoslabs.com/v1...
-Enter your faucet endpoint [Current: None | No input: https://faucet.devnet.aptoslabs.com | 'skip' to not use a faucet]
+Press **return** to accept the default devnet network or specify the network of your choosing:
 
-No faucet url given, using https://faucet.devnet.aptoslabs.com...
+```text
+No network given, using devnet...
+```
+
+See and respond to the prompt for your private key by accepting the default to create anew or by entering an existing key:
+
+```text
 Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
+```
 
+Assuming you elected to create anew, you will see:
+
+```text
 No key given, generating key...
-Account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a doesn't exist, creating it and funding it with 10000 coins
+Account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a doesn't exist, creating it and funding it with 10000 Octas
 Aptos is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a!  Run `aptos help` for more information about commands
 {
   "Result": "Success"
 }
 ```
 
-The account address in the above output:  `a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` is your new account, and is aliased as the profile `default`. This account address will be different for you as it is generated randomly. From now on, either `default` or `0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` are interchangeable.
+The account address in the above output  `a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` is your new account and is aliased as the profile `default`. This account address will be different for you as it is generated randomly. From now on, either `default` or `0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` are used interchangeably in this document. Of course, substitute your own address as needed.
 
-2. Now fund this account by running this command: 
+Now fund this account by running this command: 
 
 ```bash
 aptos account fund-with-faucet --account default
 ```
-You will see an output similar to the below:
-```
+You will see output resembling:
+
+```text
 {
-  "Result": "Added 10000 coins to account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a"
+  "Result": "Added 500000 Octas to account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a"
 }
 ```
 
@@ -68,7 +80,7 @@ You will see an output similar to the below:
 
 ## Step 3: Compile and test the module
 
-Several example Move modules are available in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory. Open a terminal and change directories into the `hello_blockchain` directory: 
+Several example Move modules are available in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory for your use. Open a terminal and change directories into the [`hello_blockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain) directory: 
 
 ```bash
 cd aptos-core/aptos-move/move-examples/hello_blockchain
@@ -80,13 +92,41 @@ Run the below command to compile the `hello_blockchain` module:
 aptos move compile --named-addresses hello_blockchain=default
 ```
 
+You will see output resembling:
+
+```text
+{
+  "Result": [
+    "a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message"
+  ]
+}
+```
+
+The `compile` command must contain `--named-addresses` as above because the [`Move.toml`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/hello_blockchain/Move.toml) file leaves this as undefined (see below).
+
 To test the module run: 
 
 ```bash
 aptos move test --named-addresses hello_blockchain=default
 ```
 
-The CLI entry must contain `--named-addresses` because the [`Move.toml`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/hello_blockchain/Move.toml) file leaves this as undefined (see below). To prepare the module for the account created in the previous step, we specify that the named address `hello_blockchain` is set to our account address, using the `default` profile alias.
+And receive output like:
+
+```text
+INCLUDING DEPENDENCY AptosFramework
+INCLUDING DEPENDENCY AptosStdlib
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING Examples
+Running Move unit tests
+[ PASS    ] 0x1a42874787568af30c785622899a27dacce066d671fa487e7fb958d6d0c85077::message::sender_can_set_message
+[ PASS    ] 0x1a42874787568af30c785622899a27dacce066d671fa487e7fb958d6d0c85077::message_tests::sender_can_set_message
+Test result: OK. Total tests: 2; passed: 2; failed: 0
+{
+  "Result": "Success"
+}
+```
+
+To prepare the module for the account created in the previous step, we specify that the named address `hello_blockchain` is set to our account address, using the `default` profile alias.
 
 ```toml
 [addresses]
@@ -97,13 +137,13 @@ hello_blockchain = "_"
 
 ## Step 4: Publish the Move module
 
-After the code was compiled and tested, we can publish the module to the account created for this tutorial. Run this below command:
+After the code is compiled and tested, we can publish the module to the account created for this tutorial with the command:
 
 ```bash
 aptos move publish --named-addresses hello_blockchain=default
 ```
 
-You will see the output similar to the below:
+You will see the output similar to:
 
 ```bash
 package size 1631 bytes
@@ -129,7 +169,7 @@ At this point, the module is now stored on the account in the Aptos blockchain.
 
 ## Step 5: Interact with the Move module
 
-Move modules expose access points, also referred as `entry functions`. These access points can be called via transactions. The CLI allows for seamless access to these access points. The example Move module `hello_blockchain` exposes a `set_message` entry function that takes in a `string`. This can be called via the CLI:
+Move modules expose access points, known as *entry functions*. These entry functions can be called via transactions. The Aptos CLI allows for seamless access to these entry functions. The example Move module `hello_blockchain` exposes a `set_message` entry function that takes in a `string`. This can be called via the CLI:
 
 ```bash
 aptos move run \
@@ -163,7 +203,7 @@ The `set_message` function modifies the `hello_blockchain` `MessageHolder` resou
 https://fullnode.devnet.aptoslabs.com/v1/accounts/a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a/resource/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder
 ```
 
-which, after the first execution contains the following:
+After the first execution, this should contain:
 
 ```json
 {
@@ -188,7 +228,7 @@ Notice that the `message` field contains `hello, blockchain`.
 Each successful call to `set_message` after the first call results in an update to `message_change_events`. The `message_change_events` for a given account can be accessed via the REST API: 
 
 ```bash
-http://127.0.0.1:8080/v1/accounts/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a/events/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder/message_change_events
+https://fullnode.devnet.aptoslabs.com/v1/accounts/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a/events/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder/message_change_events
 ```
 
 where, after a call to set the message to `hello, blockchain, again`, the event stream would contain the following:
@@ -207,13 +247,13 @@ where, after a call to set the message to `hello, blockchain, again`, the event 
 ```
 
 :::tip
-
 Other accounts can reuse the published module by calling the exact same function as in this example. It is left as an exercise to the reader.
-
 :::
 
-[account_basics]: /concepts/basics-accounts
-[alice_account_rest]: https://fullnode.devnet.aptoslabs.com/v1/accounts/a52671f10dc3479b09d0a11ce47694c0/
-[bob_account_explorer]: https://explorer.aptoslabs.com/account/ec6ec14e4abe10aaa6ad53b0b63a1806
-[install_cli]: /cli-tools/aptos-cli-tool/install-aptos-cli#download-precompiled-binary
-[rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/
+## Supporting documentation
+
+* [Account basics](../concepts/basics-accounts.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
+* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)

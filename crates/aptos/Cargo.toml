@@ -1,13 +1,16 @@
 [package]
 name = "aptos"
-version = "1.0.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos tool for management of nodes and interacting with the blockchain"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "1.0.1"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
@@ -73,6 +76,9 @@ move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true, features = [ "testing" ] }
 
 storage-interface = { path = "../../storage/storage-interface" }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 
 [features]
 default = []

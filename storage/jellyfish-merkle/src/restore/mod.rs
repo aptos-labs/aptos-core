@@ -26,7 +26,7 @@ use aptos_types::{
     transaction::Version,
 };
 use itertools::Itertools;
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::sync::mpsc::{channel, Receiver};
 use std::{cmp::Eq, collections::HashMap, sync::Arc};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -160,8 +160,8 @@ pub struct JellyfishMerkleRestore<K> {
     /// Already finished, deem all chunks overlap.
     finished: bool,
 
-    /// Optionally, do DB commit asynchronously, only wait for previous commit when the next is ready.
-    async_commit_channel: Option<(SyncSender<Result<()>>, Receiver<Result<()>>)>,
+    async_commit: bool,
+    async_commit_result: Option<Receiver<Result<()>>>,
 }
 
 impl<K> JellyfishMerkleRestore<K>
@@ -202,14 +202,6 @@ where
             )
         };
 
-        let async_commit_channel = if async_commit {
-            let (tx, rx) = sync_channel(1);
-            // Put in one Ok to the channel for the first add_chunk() call to wait on.
-            tx.try_send(Ok(())).unwrap();
-            Some((tx, rx))
-        } else {
-            None
-        };
         Ok(Self {
             store,
             version,
@@ -219,7 +211,8 @@ where
             num_keys_received: 0,
             expected_root_hash,
             finished,
-            async_commit_channel,
+            async_commit,
+            async_commit_result: None,
         })
     }
 
@@ -237,7 +230,8 @@ where
             num_keys_received: 0,
             expected_root_hash,
             finished: false,
-            async_commit_channel: None,
+            async_commit: false,
+            async_commit_result: None,
         })
     }
 
@@ -382,25 +376,24 @@ where
         self.verify(proof)?;
 
         // Write the frozen nodes to storage.
-        if let Some((tx, rx)) = &self.async_commit_channel {
-            // Wait for previous commit to conclude.
-            rx.recv()??;
+        if self.async_commit {
+            self.wait_for_async_commit()?;
+            let (tx, rx) = channel();
+            self.async_commit_result = Some(rx);
 
             let mut frozen_nodes = HashMap::new();
             std::mem::swap(&mut frozen_nodes, &mut self.frozen_nodes);
             let store = self.store.clone();
-            let sender = tx.clone();
 
             IO_POOL.spawn(move || {
                 let res = store.write_node_batch(&frozen_nodes);
-                sender
-                    .try_send(res)
-                    .expect("Always only one commit can be scheduled.");
+                tx.send(res).unwrap();
             });
         } else {
             self.store.write_node_batch(&self.frozen_nodes)?;
             self.frozen_nodes.clear();
         }
+
         Ok(())
     }
 
@@ -731,14 +724,9 @@ where
         }
     }
 
-    pub fn wait_for_async_commit(&self) -> Result<()> {
-        if let Some((tx, rx)) = &self.async_commit_channel {
-            // wait for the last commit to complete
+    pub fn wait_for_async_commit(&mut self) -> Result<()> {
+        if let Some(rx) = self.async_commit_result.take() {
             rx.recv()??;
-            // Drop will receive once to make sure there's no in flight committing, adding this so
-            // it's not a dead lock waiting there.
-            tx.try_send(Ok(()))
-                .expect("Always only one commit can be scheduled.");
         }
         Ok(())
     }
@@ -789,7 +777,7 @@ where
 
 impl<K> Drop for JellyfishMerkleRestore<K> {
     fn drop(&mut self) {
-        if let Some((_tx, rx)) = &self.async_commit_channel {
+        if let Some(rx) = self.async_commit_result.take() {
             rx.recv().unwrap().unwrap();
         }
     }

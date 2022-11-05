@@ -32,10 +32,9 @@ paths:
       - Accounts
       summary: Get account
       description: |-
-        Retrieves high level information about an account such as its sequence number and
-        authentication key
-
-        Returns a 404 if the account doesn't exist
+        Return the authentication key and the sequence number for an account
+        address. Optionally, a ledger version can be specified. If the ledger
+        version is not specified in the request, the latest ledger version is used.
       parameters:
       - name: address
         schema:
@@ -119,6 +118,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -445,6 +452,32 @@ paths:
         required: false
         deprecated: false
         explode: true
+      - name: start
+        schema:
+          $ref: '#/components/schemas/StateKeyWrapper'
+        in: query
+        description: |-
+          Cursor specifying where to start for pagination
+
+          This cursor cannot be derived manually client-side. Instead, you must
+          call this endpoint once without this query parameter specified, and
+          then use the cursor returned in the X-Aptos-Cursor header in the
+          response.
+        required: false
+        deprecated: false
+        explode: true
+      - name: limit
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        description: |-
+          Max number of account resources to retrieve
+
+          If not provided, defaults to default page size.
+        required: false
+        deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -510,6 +543,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -836,6 +877,32 @@ paths:
         required: false
         deprecated: false
         explode: true
+      - name: start
+        schema:
+          $ref: '#/components/schemas/StateKeyWrapper'
+        in: query
+        description: |-
+          Cursor specifying where to start for pagination
+
+          This cursor cannot be derived manually client-side. Instead, you must
+          call this endpoint once without this query parameter specified, and
+          then use the cursor returned in the X-Aptos-Cursor header in the
+          response.
+        required: false
+        deprecated: false
+        explode: true
+      - name: limit
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        description: |-
+          Max number of account modules to retrieve
+
+          If not provided, defaults to default page size.
+        required: false
+        deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -901,6 +968,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -1301,6 +1376,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -1498,6 +1581,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -1891,6 +1982,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -2307,6 +2406,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -2728,6 +2835,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -3094,6 +3209,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -3393,6 +3516,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -3790,6 +3921,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -4190,6 +4329,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -4491,10 +4638,12 @@ paths:
       - Transactions
       summary: Get transactions
       description: |-
-        Retrieve on-chain committed transactions. The page size and start can be provided to
-        get a specific sequence of transactions.
+        Retrieve on-chain committed transactions. The page size and start ledger version
+        can be provided to get a specific sequence of transactions.
 
-        If the version has been pruned, then a 410 will be returned
+        If the version has been pruned, then a 410 will be returned.
+
+        To retrieve a pending transaction, use /transactions/by_hash.
       parameters:
       - name: start
         schema:
@@ -4584,6 +4733,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -4975,6 +5132,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -5359,6 +5524,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -5660,8 +5833,8 @@ paths:
       - Transactions
       summary: Get transaction by version
       description: |-
-        Retrieves a transaction by a given version.  If the version has been pruned, a 410 will
-        be returned.
+        Retrieves a transaction by a given version. If the version has been
+        pruned, a 410 will be returned.
       parameters:
       - name: txn_version
         schema:
@@ -5734,6 +5907,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -6035,10 +6216,12 @@ paths:
       - Transactions
       summary: Get account transactions
       description: |-
-        Retrieves transactions from an account.  If the start version is too far in the past
-        a 410 will be returned.
+        Retrieves on-chain committed transactions from an account. If the start
+        version is too far in the past, a 410 will be returned.
 
-        If no start version is given, it will start at 0
+        If no start version is given, it will start at version 0.
+
+        To retrieve a pending transaction, use /transactions/by_hash.
       parameters:
       - name: address
         schema:
@@ -6136,6 +6319,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -6534,6 +6725,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '206':
           description: ''
           content:
@@ -6596,6 +6795,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -7016,6 +7223,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -7402,6 +7617,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -7674,6 +7897,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -8879,6 +9110,11 @@ components:
             $ref: '#/components/schemas/WriteSetChange'
         timestamp:
           $ref: '#/components/schemas/U64'
+    StateKeyWrapper:
+      type: string
+      description: |
+        Representation of a StateKey as a hex string. This is used for cursor based pagination.
+      example: 0000000000000000000000000000000000000000000000000000000000000000012f0000000000000000000000000000000000000000000000000000000000000000010d7374616b696e675f70726f7879
     SubmitTransactionRequest:
       type: object
       description: |-

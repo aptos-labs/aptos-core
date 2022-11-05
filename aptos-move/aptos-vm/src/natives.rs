@@ -5,6 +5,7 @@ use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 
+use aptos_types::chain_id::ChainId;
 #[cfg(feature = "testing")]
 use {
     framework::natives::{
@@ -51,17 +52,27 @@ pub fn aptos_natives(
         .collect()
 }
 
-pub fn assert_no_test_natives() {
-    assert!(aptos_natives(
-        NativeGasParameters::zeros(),
-        AbstractValueSizeGasParameters::zeros(),
-        LATEST_GAS_FEATURE_VERSION
+pub fn assert_no_test_natives(err_msg: &str) {
+    assert!(
+        aptos_natives(
+            NativeGasParameters::zeros(),
+            AbstractValueSizeGasParameters::zeros(),
+            LATEST_GAS_FEATURE_VERSION
+        )
+        .into_iter()
+        .all(|(_, module_name, func_name, _)| {
+            !(module_name.as_str() == "unit_test"
+                && func_name.as_str() == "create_signers_for_testing"
+                || module_name.as_str() == "ed25519"
+                    && func_name.as_str() == "generate_keys_internal"
+                || module_name.as_str() == "ed25519" && func_name.as_str() == "sign_internal"
+                || module_name.as_str() == "multi_ed25519"
+                    && func_name.as_str() == "generate_keys_internal"
+                || module_name.as_str() == "multi_ed25519" && func_name.as_str() == "sign_internal")
+        }),
+        "{}",
+        err_msg
     )
-    .into_iter()
-    .all(
-        |(_, module_name, func_name, _)| module_name.as_str() != "unit_test"
-            && func_name.as_str() != "create_signers_for_testing"
-    ))
 }
 
 #[cfg(feature = "testing")]
@@ -72,7 +83,7 @@ pub fn configure_for_unit_test() {
 #[cfg(feature = "testing")]
 fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeCodeContext::default());
-    exts.add(NativeTransactionContext::new(vec![1]));
+    exts.add(NativeTransactionContext::new(vec![1], ChainId::test().id())); // We use the testing environment chain ID here
     exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
 }

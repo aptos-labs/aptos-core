@@ -87,16 +87,21 @@ impl CliCommand<()> for InitTool {
         eprintln!("Configuring for profile {}", profile_name);
 
         // Choose a network
-        eprintln!(
-            "Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]"
-        );
-        let input = read_line("network")?;
-        let input = input.trim();
-        let network = if input.is_empty() {
-            eprintln!("No network given, using devnet...");
-            Network::Devnet
+        let network = if let Some(network) = self.network {
+            eprintln!("Configuring for network {:?}", network);
+            network
         } else {
-            Network::from_str(input)?
+            eprintln!(
+                "Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]"
+            );
+            let input = read_line("network")?;
+            let input = input.trim();
+            if input.is_empty() {
+                eprintln!("No network given, using devnet...");
+                Network::Devnet
+            } else {
+                Network::from_str(input)?
+            }
         };
 
         match network {
@@ -212,9 +217,9 @@ impl CliCommand<()> for InitTool {
         } else if account_exists {
             eprintln!("Account {} has been already found onchain", address);
         } else if network == Network::Testnet {
-            eprintln!("Account {} does not exist, you will need to create and fun the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account", address);
+            eprintln!("Account {} does not exist, you will need to create and fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account", address);
         } else if network == Network::Mainnet {
-            eprintln!("Account {} does not exist, you will need to create and fun the account through a faucet or by transferring funds from another account", address);
+            eprintln!("Account {} does not exist, you will need to create and fund the account through a faucet or by transferring funds from another account", address);
         } else {
             eprintln!("Account {} has been initialized locally, but you must have coins transferred to it to create the account onchain", address);
         }
@@ -309,7 +314,7 @@ impl InitTool {
 /// A simplified list of all networks supported by the CLI
 ///
 /// Any command using this, will be simpler to setup as profiles
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Network {
     Mainnet,
     Testnet,

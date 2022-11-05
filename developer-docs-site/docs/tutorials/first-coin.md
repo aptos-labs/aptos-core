@@ -14,15 +14,15 @@ This tutorial introduces how you can compile, deploy, and mint your own coin, na
 
 Install your preferred SDK from the below list:
 
-* [TypeScript SDK][typescript-sdk]
-* [Python SDK][python-sdk]
-* [Rust SDK][rust-sdk]
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
 
 ---
 
 ## Step 2: Install the CLI
 
-[Install the precombiled binary for the Aptos CLI][install_cli].
+[Install the precompiled binary for the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md).
 
 ---
 
@@ -46,13 +46,14 @@ cd ~/aptos-core/ecosystem/typescript/sdk
 Install the necessary dependencies:
 
 ```bash
-yarn
+pnpm install
 ```
 
 Run the TypeScript [`your_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/your_coin.ts) example:
 
 ```bash
-yarn your_coin ~/aptos-core/aptos-move/move-examples/moon_coin
+cd examples/typescript
+pnpm your_coin ~/aptos-core/aptos-move/move-examples/moon_coin
 ```
 
   </TabItem>
@@ -169,7 +170,7 @@ These are read by the example and published to the Aptos blockchain:
 
 ### Step 4.2: Understanding the MoonCoin module
 
-The MoonCoin module defines the `MoonCoin` struct, or the distinct type of coin type. In addition, it contains a function called `init_module`. The `init_module` function is called when the module is published. In this case, MoonCoin initializes the `MoonCoin` coin type as a `ManagedCoin`, which is maintained by the owner of the account. 
+The MoonCoin module defines the `MoonCoin` struct, or the distinct type of coin type. In addition, it contains a function called `init_module`. The `init_module` function is called when the module is published. In this case, MoonCoin initializes the `MoonCoin` coin type as a `ManagedCoin`, which is maintained by the owner of the account.
 
 :::tip ManagedCoin framework
 [`ManagedCoin`](https://github.com/aptos-labs/aptos-core/blob/f81ccb01f00227f9c0f36856fead4879f185a9f6/aptos-move/framework/aptos-framework/sources/managed_coin.move#L1) is a simple coin management framework for coins directly managed by users. It provides convenience wrappers around `mint` and `burn`.
@@ -312,7 +313,8 @@ Aptos provides several building blocks to support coin transfers:
 Aptos does not emit transfer events, but instead it leverages withdraw and deposit events.
 :::
 
-[typescript-sdk]: /sdks/ts-sdk/index
-[python-sdk]: /sdks/python-sdk
-[rust-sdk]: /sdks/rust-sdk
-[install_cli]: /cli-tools/aptos-cli-tool/install-aptos-cli
+* [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
+* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)

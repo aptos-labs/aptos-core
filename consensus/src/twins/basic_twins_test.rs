@@ -25,7 +25,7 @@ use std::collections::HashMap;
 /// Run the test:
 /// cargo xtest -p consensus basic_start_test -- --nocapture
 fn basic_start_test() {
-    let mut runtime = consensus_runtime();
+    let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     let num_nodes = 4;
     let num_twins = 0;
@@ -37,7 +37,7 @@ fn basic_start_test() {
         None,
     );
     let genesis = Block::make_genesis_block_from_ledger_info(&nodes[0].storage.get_ledger_info());
-    timed_block_on(&mut runtime, async {
+    timed_block_on(&runtime, async {
         let msg = playground
             .wait_for_messages(1, NetworkPlayground::proposals_only)
             .await;
@@ -77,7 +77,7 @@ fn basic_start_test() {
 /// cargo xtest -p consensus drop_config_test -- --nocapture
 #[ignore] // TODO: https://github.com/aptos-labs/aptos-core/issues/8767
 fn drop_config_test() {
-    let mut runtime = consensus_runtime();
+    let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     let num_nodes = 4;
     let num_twins = 0;
@@ -98,7 +98,7 @@ fn drop_config_test() {
     assert!(playground.split_network(vec![n2_twin_id], vec![n0_twin_id, n1_twin_id, n3_twin_id]));
     runtime.spawn(playground.start());
 
-    timed_block_on(&mut runtime, async {
+    timed_block_on(&runtime, async {
         // Check that the commit log for n0 is not empty
         let node0_commit = nodes[0].commit_cb_receiver.next().await;
         assert!(node0_commit.is_some());
@@ -133,7 +133,7 @@ fn drop_config_test() {
 /// Run the test:
 /// cargo xtest -p consensus twins_vote_dedup_test -- --nocapture
 fn twins_vote_dedup_test() {
-    let mut runtime = consensus_runtime();
+    let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     let num_nodes = 4;
     let num_twins = 1;
@@ -160,7 +160,7 @@ fn twins_vote_dedup_test() {
     ));
     runtime.spawn(playground.start());
 
-    timed_block_on(&mut runtime, async {
+    timed_block_on(&runtime, async {
         // No node should be able to commit because of the way partitions
         // have been created
         let mut commit_seen = false;
@@ -191,7 +191,7 @@ fn twins_vote_dedup_test() {
 /// Run the test:
 /// cargo xtest -p consensus twins_proposer_test -- --nocapture
 fn twins_proposer_test() {
-    let mut runtime = consensus_runtime();
+    let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     let num_nodes = 4;
     let num_twins = 2;
@@ -239,7 +239,7 @@ fn twins_proposer_test() {
     assert!(playground.split_network_round(&round_partitions));
     runtime.spawn(playground.start());
 
-    timed_block_on(&mut runtime, async {
+    timed_block_on(&runtime, async {
         let node0_commit = nodes[0].commit_cb_receiver.next().await;
         let twin0_commit = nodes[4].commit_cb_receiver.next().await;
 
@@ -274,7 +274,7 @@ fn twins_proposer_test() {
 /// Run the test:
 /// cargo xtest -p consensus twins_commit_test -- --nocapture
 fn twins_commit_test() {
-    let mut runtime = consensus_runtime();
+    let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     let num_nodes = 4;
     let num_twins = 1;
@@ -296,7 +296,7 @@ fn twins_commit_test() {
     );
     runtime.spawn(playground.start());
 
-    timed_block_on(&mut runtime, async {
+    timed_block_on(&runtime, async {
         let node0_commit = nodes[0].commit_cb_receiver.next().await;
         let twin0_commit = nodes[4].commit_cb_receiver.next().await;
 

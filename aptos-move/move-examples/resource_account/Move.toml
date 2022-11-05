@@ -5,3 +5,7 @@ upgrade_policy = "compatible"
 
 [dependencies]
 AptosFramework = { local = "../../framework/aptos-framework" }
+
+[addresses]
+# change it to `source_addr = "_" when calling `create-resource-account-and-publish-package` from the cli
+source_addr = "0xcafe"

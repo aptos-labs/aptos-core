@@ -5,9 +5,14 @@ id: "basics-accounts"
 
 # Accounts
 
-An account on the Aptos blockchain contains blockchain assets. These assets, for example, coins and NFTs, are by nature scarce and must be access-controlled. Any such asset is represented in the blockchain account as a **resource**. A resource is a Move language primitive that emphasizes access control and scarcity in its representation. However, a resource can also be used to represent other on-chain capabilities, identifying information, and access control. 
+An account on the Aptos blockchain contains blockchain assets. These assets, for example, coins and NFTs, are by nature scarce and must be access-controlled. Any such asset is represented in the blockchain account as a **resource**. A resource is a Move language primitive that emphasizes access control and scarcity in its representation. However, a resource can also be used to represent other on-chain capabilities, identifying information, and access control.
 
-Each account on the Aptos blockchain is identified by a 32-byte account address. An account can store data and it stores this data in resources. The initial resource is the account data itself (authentication key and sequence number). Additional resources like currency or NFTs are added after creating the account. 
+Each account on the Aptos blockchain is identified by a 32-byte account address. An account can store data and it stores this data in resources. The initial resource is the account data itself (authentication key and sequence number). Additional resources like currency or NFTs are added after creating the account.
+
+There are three types of accounts in Aptos:
+  * *Local account* - An account created by you for local testing.
+  * *Blockchain account* - This is the on-chain representation of local account with a different storage location.
+  * *[Resource account](../guides/resource-accounts.md)* - An autonomous account used by developers to store resources or publish modules on chain without a corresponding private key.
 
 :::tip Account address example
 Account addresses are 32-bytes. They are usually shown as 64 hex characters, with each hex character a nibble.  Sometimes it's prefixed with a 0x See the [Your First Transaction](/tutorials/first-transaction.md#output) for an example of how an address looks like, reproduced below:

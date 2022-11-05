@@ -3,6 +3,7 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
+use crate::utils::iterators::PrefixedStateValueIterator;
 use crate::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     epoch_by_version::EpochByVersionSchema,
@@ -16,7 +17,7 @@ use crate::{
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
     StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
-use anyhow::{anyhow, ensure, format_err, Result};
+use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -57,7 +58,6 @@ mod state_store_test;
 
 type StateValueBatch = crate::state_restore::StateValueBatch<StateKey, Option<StateValue>>;
 
-pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 // We assume TARGET_SNAPSHOT_INTERVAL_IN_VERSION > block size.
 const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT_INTERVAL_IN_VERSION
     * (buffered_state::ASYNC_COMMIT_CHANNEL_BUFFER_SIZE + 2 + 1/*  Rendezvous channel */)
@@ -418,59 +418,18 @@ impl StateStore {
     /// Returns the key, value pairs for a particular state key prefix at at desired version. This
     /// API can be used to get all resources of an account by passing the account address as the
     /// key prefix.
-    pub fn get_values_by_key_prefix(
+    pub fn get_prefixed_state_value_iterator(
         &self,
         key_prefix: &StateKeyPrefix,
+        first_key_opt: Option<&StateKey>,
         desired_version: Version,
-    ) -> Result<HashMap<StateKey, StateValue>> {
-        let mut read_opts = ReadOptions::default();
-        // Without this, iterators are not guaranteed a total order of all keys, but only keys for the same prefix.
-        // For example,
-        // aptos/abc|0
-        // aptos/abc|1
-        // aptos/abd|1
-        // if we seek('aptos/'), and call next, we may not reach `aptos/abd/1` because the prefix extractor we adopted
-        // here will stick with prefix `aptos/abc` and return `None` or any arbitrary result after visited all the
-        // keys starting with `aptos/abc`.
-        read_opts.set_total_order_seek(true);
-        let mut iter = self.ledger_db.iter::<StateValueSchema>(read_opts)?;
-        let mut result = HashMap::new();
-        let mut prev_key = None;
-        iter.seek(&(key_prefix))?;
-        while let Some(((state_key, version), state_value_opt)) = iter.next().transpose()? {
-            // In case the previous seek() ends on the same key with version 0.
-            if Some(&state_key) == prev_key.as_ref() {
-                continue;
-            }
-            // Cursor is currently at the first available version of the state key.
-            // Check if the key_prefix is a valid prefix of the state_key we got from DB.
-            if !key_prefix.is_prefix(&state_key)? {
-                // No more keys matching the key_prefix, we can return the result.
-                break;
-            }
-
-            if version > desired_version {
-                iter.seek(&(state_key.clone(), desired_version))?;
-                continue;
-            }
-
-            if let Some(state_value) = state_value_opt {
-                result.insert(state_key.clone(), state_value);
-            }
-            // We don't allow fetching arbitrarily large number of values to be fetched as this can
-            // potentially slowdown the DB.
-            if result.len() > MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX {
-                return Err(anyhow!(
-                    "Too many values requested for key_prefix {:?} - maximum allowed {:?}",
-                    key_prefix,
-                    MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX
-                ));
-            }
-            prev_key = Some(state_key.clone());
-            // Seek to the next key - this can be done by seeking to the current key with version 0
-            iter.seek(&(state_key, 0))?;
-        }
-        Ok(result)
+    ) -> Result<PrefixedStateValueIterator> {
+        PrefixedStateValueIterator::new(
+            &self.ledger_db,
+            key_prefix.clone(),
+            first_key_opt.cloned(),
+            desired_version,
+        )
     }
 
     /// Gets the proof that proves a range of accounts.

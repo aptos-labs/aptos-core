@@ -110,13 +110,6 @@ spec:
           name: api
         - containerPort: 9101
           name: metrics
-        livenessProbe:
-          tcpSocket:
-            port: 9101
-          initialDelaySeconds: 30
-        readinessProbe:
-          tcpSocket:
-            port: 6182
         securityContext:
           {{- if $.Values.enablePrivilegedMode }}
           runAsUser: 0

@@ -12,7 +12,28 @@ To kickstart your journey in the Aptos ecosystem, set up your environment as nee
 
 See the [Workflows](#workflows) for use cases associated with each path. See the [Aptos developer resources](#aptos-developer-resources) for quick links to Aptos networks, SDKs, and other tools.
 
+Then review the Aptos source code, found in the [Aptos-core](https://github.com/aptos-labs/aptos-core) repository of GitHub, and continue your journey through this site. The source contains READMEs and code comments invaluable to developing on Aptos.
+
+## Use supported operating systems
+
+Aptos can be built on various operating systems, including Linux, macOS. and Windows. Aptos is tested extensively on Linux and macOS, and less so on Windows. Here are the versions we use:
+
+* Linux - Ubuntu version 20.04 and 22.04
+* macOS - macOS Monterey and later
+* Microsoft Windows - Windows 10, 11 and Windows Server 2022+
+
+See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for instructions by operating system.
+
+## Meet hardware requirements
+
+Aptos requires no specific hardware to develop on the blockchain. To run one of our nodes, see the hardware requirements for:
+
+* [Fullnodes](nodes/full-node/fullnode-source-code-or-docker.md#hardware-requirements)
+* [Validators](nodes/validator-node/operator/node-requirements.md#hardware-requirements)
+
 ## Workflows
+
+### CLI only
 
 Most Aptos users will want to have the Aptos CLI installed. [Install](../cli-tools/aptos-cli-tool/install-aptos-cli.md) and [use](../cli-tools/aptos-cli-tool/use-aptos-cli.md) the Aptos CLI if you will:
 
@@ -20,6 +41,8 @@ Most Aptos users will want to have the Aptos CLI installed. [Install](../cli-too
 * [Manage accounts](../cli-tools/aptos-cli-tool/use-aptos-cli.md#account-examples).
 * [Generate keys](../cli-tools/aptos-cli-tool/use-aptos-cli.md#key-examples).
 * [Compile Move packages](../cli-tools/aptos-cli-tool/use-aptos-cli.md#move-examples).
+
+### Source code and CLI
 
 In addition to installing the CLI, [clone](#clone-the-aptos-core-repo) and [review](https://github.com/aptos-labs/aptos-core) the Aptos repository if you will:
 
@@ -34,9 +57,9 @@ Although Docker options exist for many of these configurations, you should downl
 The [Aptos source files](https://github.com/aptos-labs/aptos-core) themselves also contain a wealth of information in docs comments worth reviewing.
 :::
 
-## Install the CLI
+## Install the Aptos CLI
 
-[Install Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) to interact with the Aptos network. As a developer in the Aptos ecosystem, set up your development environment as described in the link. See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for the supported operating systems.
+[Install Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) to interact with the Aptos network. As a developer in the Aptos ecosystem, set up your development environment as described in the link.
 
 ## Clone the Aptos-core repo
 
@@ -48,28 +71,19 @@ As described in [Workflows](#workflows), you may interact with Aptos using only 
       git clone https://github.com/aptos-labs/aptos-core.git
       ```
 
-2. `cd` into `aptos-core` directory.
+1. `cd` into `aptos-core` directory.
 
     ```
     cd aptos-core
     ```
 
-3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment by installing most of the dependencies needed to build, test and inspect Aptos Core. Note, you may be prompted for your password:
-
-    ```
-    ./scripts/dev_setup.sh
-    ```
-    :::tip
-    You can see the available options for the script by running `./scripts/dev_setup.sh --help`
-    :::
-
-4. Update your current shell environment to run `cargo build` and other Aptos-related commands:
+1. Update your current shell environment to run `cargo build` and other Aptos-related commands:
 
     ```
     source ~/.cargo/env
     ```
 
-5. Optionally, check out a release branch to install an Aptos node:
+1. Optionally, check out a release branch to install an Aptos node:
 
     <Tabs groupId="network">
     <TabItem value="devnet" label="Devnet">
@@ -88,11 +102,52 @@ As described in [Workflows](#workflows), you may interact with Aptos using only 
     git checkout --track origin/testnet
     ```
     </TabItem>
+    <TabItem value="mainnet" label="Mainnet">
+
+    Check out the `mainnet` branch using:
+
+    ```
+    git checkout --track origin/mainnet
+    ```
+    </TabItem>
     </Tabs>
 
-Now your basic Aptos development environment is ready.
+## Prepare development environment
 
-## Aptos developer resources
+Prepare your developer environment by installing the dependencies needed to build, test and inspect Aptos Core. You can do this either via the Aptos [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) Bash script or by manually installing all dependencies. as shown below.
+
+No matter your selected mechanism for installing these dependencies, **it is imperative you keep your entire toolchain up-to-date**. If you encounter issues later, update all packages and try again.
+
+### Use the script
+The `dev_setup.sh` script currently supports macOS and Ubuntu Linux with other Linux distributions working but untested. The script does not support Windows. Note, you may be prompted for your password:
+
+```
+./scripts/dev_setup.sh
+```
+
+:::tip
+You can see the available options for the script by running `./scripts/dev_setup.sh --help`
+:::
+
+### Install packages manually
+
+If the script doesn't work for your operating system, manually install these packages:
+* [Rust](https://www.rust-lang.org/tools/install)
+* [Git](https://git-scm.com/download)
+* [CMake](https://cmake.org/download/)
+* [LLVM](https://releases.llvm.org/)
+* Linux only - [libssl-dev](https://packages.ubuntu.com/bionic/libssl-dev) and [libclang-dev](https://packages.ubuntu.com/bionic/libclang-dev)
+* Windows only - [C++ build tools](https://visualstudio.microsoft.com/downloads/#microsoft-visual-c-redistributable-for-visual-studio-2022)
+
+See [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) for other potential packages needed in your environment.
+
+Now your basic Aptos development environment is ready. Head over to our [Developer Tutorials](tutorials/index.md) to get started in Aptos.
+
+## Understand the Aptos Token Standard
+
+The [Aptos Token Standard](../concepts/coin-and-token/index.md) lays out the rules for creating and distributing digital assets on the Aptos blockchain.
+
+## Find Aptos developer resources
 
 This section contains links to frequently referred Aptos developer resources. 
 
@@ -128,7 +183,7 @@ This section contains links to frequently referred Aptos developer resources.
 ### Aptos CLI
 
 - [Aptos CLI releases](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true)
-- [Aptos CLI documentation](/cli-tools/aptos-cli-tool/aptos-cli-index)
+- [Aptos CLI documentation](/cli-tools/aptos-cli-tool/use-aptos-cli)
 
 ### Aptos SDK
 

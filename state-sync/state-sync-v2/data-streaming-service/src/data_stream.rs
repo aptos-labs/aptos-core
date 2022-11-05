@@ -410,7 +410,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         data_client_request: &DataClientRequest,
         data_client_error: &aptos_data_client::Error,
     ) -> Result<(), Error> {
-        error!(LogSchema::new(LogEntry::ReceivedDataResponse)
+        warn!(LogSchema::new(LogEntry::ReceivedDataResponse)
             .stream_id(self.data_stream_id)
             .event(LogEvent::Error)
             .error(&data_client_error.clone().into())

@@ -11,7 +11,7 @@ mod transactional_tests_runner;
 pub use stored_package::*;
 
 use crate::common::types::MoveManifestAccountWrapper;
-use crate::common::types::{ProfileOptions, RestOptions};
+use crate::common::types::{CliConfig, ConfigSearchMode, ProfileOptions, RestOptions};
 use crate::common::utils::{
     create_dir_if_not_exist, dir_default_to_current, prompt_yes_with_override, write_to_file,
 };
@@ -33,11 +33,13 @@ use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
-use aptos_types::account_address::AccountAddress;
+use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_types::transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
+use framework::docgen::DocgenOptions;
 use framework::natives::code::UpgradePolicy;
+use framework::prover::ProverOptions;
 use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
 use move_cli::base::test::UnitTestResult;
@@ -58,7 +60,6 @@ use {
         language_storage::{ModuleId, TypeTag},
     },
     move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
-    move_prover, move_prover_boogie_backend,
     move_unit_test::UnitTestingConfig,
 };
 
@@ -80,7 +81,9 @@ pub enum MoveTool {
     RunScript(RunScript),
     Test(TestPackage),
     Prove(ProvePackage),
+    Document(DocumentPackage),
     TransactionalTest(TransactionalTestOpts),
+    CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
 }
 
 impl MoveTool {
@@ -97,7 +100,11 @@ impl MoveTool {
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
+            MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
+            MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
+                tool.execute_serialized_success().await
+            }
         }
     }
 }
@@ -293,7 +300,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
 #[derive(Parser)]
 pub struct TestPackage {
     /// A filter string to determine which unit tests to run
-    #[clap(long)]
+    #[clap(long, short)]
     pub filter: Option<String>,
 
     #[clap(flatten)]
@@ -331,6 +338,7 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestingConfig {
                 filter: self.filter,
                 instruction_execution_bound: Some(self.instruction_execution_bound),
+                report_stacktrace_on_abort: true,
                 ..UnitTestingConfig::default_with_bound(None)
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
@@ -376,12 +384,11 @@ impl CliCommand<()> for TransactionalTestOpts {
 /// the Move prover
 #[derive(Parser)]
 pub struct ProvePackage {
-    /// A filter string to determine which files to verify
-    #[clap(long)]
-    pub filter: Option<String>,
-
     #[clap(flatten)]
     move_options: MovePackageDir,
+
+    #[clap(flatten)]
+    prover_options: ProverOptions,
 }
 
 #[async_trait]
@@ -391,38 +398,61 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses(),
-            test_mode: true,
-            install_dir: self.move_options.output_dir.clone(),
-            ..Default::default()
-        };
-
-        const APTOS_NATIVE_TEMPLATE: &[u8] = include_bytes!("aptos-natives.bpl");
-
-        let mut options = move_prover::cli::Options::default();
-        options.backend.custom_natives =
-            Some(move_prover_boogie_backend::options::CustomNativeOptions {
-                template_bytes: APTOS_NATIVE_TEMPLATE.to_vec(),
-                module_instance_names: vec![],
-            });
+        let ProvePackage {
+            move_options,
+            prover_options,
+        } = self;
 
         let result = task::spawn_blocking(move || {
-            move_cli::base::prove::run_move_prover(
-                config,
-                self.move_options.get_package_path()?.as_path(),
-                &self.filter,
-                true,
-                move_prover::cli::Options::default(),
+            prover_options.prove(
+                move_options.get_package_path()?.as_path(),
+                move_options.named_addresses(),
             )
         })
         .await
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
-
         match result {
             Ok(_) => Ok("Success"),
             Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
         }
+    }
+}
+
+/// Documents a Move package
+///
+/// This converts the content of the package into markdown for documentation.
+#[derive(Parser)]
+pub struct DocumentPackage {
+    #[clap(flatten)]
+    move_options: MovePackageDir,
+
+    #[clap(flatten)]
+    docgen_options: DocgenOptions,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for DocumentPackage {
+    fn command_name(&self) -> &'static str {
+        "DocumentPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let DocumentPackage {
+            move_options,
+            docgen_options,
+        } = self;
+        let build_options = BuildOptions {
+            with_srcs: false,
+            with_abis: false,
+            with_source_maps: false,
+            with_error_map: false,
+            with_docs: true,
+            install_dir: None,
+            named_addresses: move_options.named_addresses(),
+            docgen_options: Some(docgen_options),
+        };
+        BuiltPackage::build(move_options.get_package_path()?, build_options)?;
+        Ok("succeeded")
     }
 }
 
@@ -502,7 +532,7 @@ impl IncludedArtifacts {
                 // Always enable error map bytecode injection
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
             Sparse => BuildOptions {
                 with_srcs: true,
@@ -510,7 +540,7 @@ impl IncludedArtifacts {
                 with_source_maps: false,
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
             All => BuildOptions {
                 with_srcs: true,
@@ -518,7 +548,7 @@ impl IncludedArtifacts {
                 with_source_maps: true,
                 with_error_map: true,
                 named_addresses,
-                install_dir: Option::None,
+                ..BuildOptions::default()
             },
         }
     }
@@ -549,6 +579,98 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         // Send the compiled module and metadata using the code::publish_package_txn.
         let metadata = package.extract_metadata()?;
         let payload = cached_packages::aptos_stdlib::code_publish_package_txn(
+            bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+            compiled_units,
+        );
+        let size = bcs::serialized_size(&payload)?;
+        println!("package size {} bytes", size);
+        if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+            return Err(CliError::UnexpectedError(format!(
+                "The package is larger than {} bytes ({} bytes)! To lower the size \
+                you may want to include less artifacts via `--included_artifacts`. \
+                You can also override this check with `--override-size-check",
+                MAX_PUBLISH_PACKAGE_SIZE, size
+            )));
+        }
+        txn_options
+            .submit_transaction(payload)
+            .await
+            .map(TransactionSummary::from)
+    }
+}
+
+/// Publishes the modules in a Move package to the Aptos blockchain under a resource account
+#[derive(Parser)]
+pub struct CreateResourceAccountAndPublishPackage {
+    #[clap(long)]
+    pub(crate) seed: String,
+
+    #[clap(long)]
+    pub(crate) address_name: String,
+
+    /// Whether to override the check for maximal size of published data
+    #[clap(long)]
+    pub(crate) override_size_check: bool,
+
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
+    fn command_name(&self) -> &'static str {
+        "ResourceAccountPublishPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let CreateResourceAccountAndPublishPackage {
+            seed,
+            address_name,
+            mut move_options,
+            txn_options,
+            override_size_check,
+            included_artifacts_args,
+        } = self;
+
+        let account = if let Some(Some(account)) = CliConfig::load_profile(
+            txn_options.profile_options.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.account)
+        {
+            account
+        } else {
+            return Err(CliError::CommandArgumentError(
+                "Please provide an account using --profile or run aptos init".to_string(),
+            ));
+        };
+
+        let resource_address =
+            create_resource_address(account, &bcs::to_bytes(&seed.clone()).unwrap());
+        move_options.add_named_address(address_name, resource_address.to_string());
+
+        let package_path = move_options.get_package_path()?;
+        let options = included_artifacts_args
+            .included_artifacts
+            .build_options(move_options.named_addresses());
+        let package = BuiltPackage::build(package_path, options)?;
+        let compiled_units = package.extract_code();
+
+        // Send the compiled module and metadata using the code::publish_package_txn.
+        let metadata = package.extract_metadata()?;
+
+        let message = format!(
+            "Do you want to publish this package under the resource account's address {}?",
+            resource_address
+        );
+        prompt_yes_with_override(&message, txn_options.prompt_options)?;
+
+        let payload = cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
+            bcs::to_bytes(&seed)?,
             bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
             compiled_units,
         );

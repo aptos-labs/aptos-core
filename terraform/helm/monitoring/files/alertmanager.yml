@@ -4,7 +4,7 @@
 global:
 
 route:
-  group_by: [...] # TBD
+  group_by: ["instance", "kubernetes_pod_name", "role"]
 
   # When a new group of alerts is created by an incoming alert, wait at
   # least 'group_wait' to send the initial notification.
@@ -22,7 +22,7 @@ route:
   repeat_interval: 10m
 
   # A default receiver
-  receiver: 'default'
+  receiver: "default"
 
   # The child route trees.
   # https://prometheus.io/docs/alerting/latest/configuration/#route

@@ -19,6 +19,7 @@ use std::{
 mod cargo;
 mod node;
 mod swarm;
+pub use cargo::cargo_build_common_args;
 pub use node::LocalNode;
 pub use swarm::{LocalSwarm, SwarmDirectory};
 

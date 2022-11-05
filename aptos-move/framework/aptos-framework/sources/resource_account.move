@@ -70,6 +70,8 @@ module aptos_framework::resource_account {
 
     /// Container resource not found in account
     const ECONTAINER_NOT_PUBLISHED: u64 = 1;
+    /// The resource account was not created by the specified source account
+    const EUNAUTHORIZED_NOT_OWNER: u64 = 2;
 
     const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -169,6 +171,7 @@ module aptos_framework::resource_account {
         let resource_addr = signer::address_of(resource);
         let (resource_signer_cap, empty_container) = {
             let container = borrow_global_mut<Container>(source_addr);
+            assert!(simple_map::contains_key(&container.store, &resource_addr), error::invalid_argument(EUNAUTHORIZED_NOT_OWNER));
             let (_resource_addr, signer_cap) = simple_map::remove(&mut container.store, &resource_addr);
             (signer_cap, simple_map::length(&container.store) == 0)
         };
@@ -195,6 +198,25 @@ module aptos_framework::resource_account {
         let container = borrow_global<Container>(user_addr);
 
         let resource_addr = aptos_framework::account::create_resource_address(&user_addr, seed);
+        let resource_cap = simple_map::borrow(&container.store, &resource_addr);
+
+        let resource = account::create_signer_with_capability(resource_cap);
+        let _resource_cap = retrieve_resource_account_cap(&resource, user_addr);
+    }
+
+    #[test(user = @0x1111)]
+    #[expected_failure(abort_code = 0x10002)]
+    public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(user: signer) acquires Container {
+        let user_addr = signer::address_of(&user);
+        account::create_account(user_addr);
+
+        let seed = x"01";
+        let seed2 = x"02";
+
+        create_resource_account(&user, seed2, vector::empty());
+        let container = borrow_global<Container>(user_addr);
+
+        let resource_addr = account::create_resource_address(&user_addr, seed);
         let resource_cap = simple_map::borrow(&container.store, &resource_addr);
 
         let resource = account::create_signer_with_capability(resource_cap);

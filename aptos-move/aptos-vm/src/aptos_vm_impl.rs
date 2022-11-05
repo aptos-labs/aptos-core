@@ -17,6 +17,7 @@ use aptos_gas::{
 };
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
+use aptos_types::chain_id::ChainId;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::transaction::AbortInfo;
 use aptos_types::{
@@ -112,11 +113,16 @@ impl AptosVMImpl {
         };
 
         let features = Features::fetch_config(&storage).unwrap_or_default();
+
+        // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
+        let chain_id = ChainId::fetch_config(&storage).unwrap_or_else(ChainId::test);
+
         let inner = MoveVmExt::new(
             native_gas_params,
             abs_val_size_gas_params,
             gas_feature_version,
             features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+            chain_id.id(),
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
@@ -523,6 +529,7 @@ impl AptosVMImpl {
         r: &'r R,
         session_id: SessionId,
     ) -> SessionExt<'r, '_, R> {
+        self.metadata_cache.clear();
         self.move_vm.new_session(r, session_id)
     }
 

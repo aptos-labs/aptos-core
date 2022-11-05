@@ -8,16 +8,12 @@ import httpx
 
 from .account import Account
 from .account_address import AccountAddress
-from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
+from .authenticator import (Authenticator, Ed25519Authenticator,
+                            MultiAgentAuthenticator)
 from .bcs import Serializer
-from .transactions import (
-    EntryFunction,
-    MultiAgentRawTransaction,
-    RawTransaction,
-    SignedTransaction,
-    TransactionArgument,
-    TransactionPayload,
-)
+from .transactions import (EntryFunction, MultiAgentRawTransaction,
+                           RawTransaction, SignedTransaction,
+                           TransactionArgument, TransactionPayload)
 from .type_tag import StructTag, TypeTag
 
 U64_MAX = 18446744073709551615
@@ -50,7 +46,7 @@ class RestClient:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
-    def account_balance(self, account_address: str) -> int:
+    def account_balance(self, account_address: AccountAddress) -> int:
         """Returns the test coin balance associated with the account"""
         return self.account_resource(
             account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
@@ -336,7 +332,9 @@ class RestClient:
                 Serializer.sequence_serializer(Serializer.bool),
             ),
             TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
-            TransactionArgument([], Serializer.sequence_serializer(Serializer.bytes)),
+            TransactionArgument(
+                [], Serializer.sequence_serializer(Serializer.to_bytes)
+            ),
             TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
         ]
 
@@ -354,8 +352,8 @@ class RestClient:
     def offer_token(
         self,
         account: Account,
-        receiver: str,
-        creator: str,
+        receiver: AccountAddress,
+        creator: AccountAddress,
         collection_name: str,
         token_name: str,
         property_version: int,
@@ -384,8 +382,8 @@ class RestClient:
     def claim_token(
         self,
         account: Account,
-        sender: str,
-        creator: str,
+        sender: AccountAddress,
+        creator: AccountAddress,
         collection_name: str,
         token_name: str,
         property_version: int,
@@ -538,9 +536,9 @@ class RestClient:
         self, sender: Account, package_metadata: bytes, modules: List[bytes]
     ) -> str:
         transaction_arguments = [
-            TransactionArgument(package_metadata, Serializer.bytes),
+            TransactionArgument(package_metadata, Serializer.to_bytes),
             TransactionArgument(
-                modules, Serializer.sequence_serializer(Serializer.bytes)
+                modules, Serializer.sequence_serializer(Serializer.to_bytes)
             ),
         ]
 
