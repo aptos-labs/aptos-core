@@ -37,10 +37,6 @@ When a user requests to create an account, for example by using the [Aptos SDK](
 
 From now on, the user should use the private key for signing the transactions with this account. 
 
-:::tip Create an account by receiving funds
-You can also create an account by receiving funds from a third party.
-:::
-
 ## Account sequence number
 
 The sequence number for an account indicates the number of transactions that have been submitted and committed on chain from that account. It is incremented every time a transaction sent from that account is executed or aborted and stored in the blockchain.
