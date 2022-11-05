@@ -266,6 +266,7 @@ impl<'t> AccountMinter<'t> {
             let batch_size = min(max_submit_batch_size, seed_account_num - i);
             let mut rng = StdRng::from_rng(self.rng()).unwrap();
             let mut batch = gen_random_accounts(batch_size, &mut rng);
+            /*
             let source_account = &mut self.source_account;
             let txn_factory = &self.txn_factory;
             let create_requests = batch
@@ -286,6 +287,7 @@ impl<'t> AccountMinter<'t> {
                 failed_requests,
             )
             .await?;
+            */
             i += batch_size;
             seed_accounts.append(&mut batch);
         }
