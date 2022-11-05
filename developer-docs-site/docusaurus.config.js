@@ -6,6 +6,8 @@ const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 
 const codeInjector = require("./src/remark/code-injector");
 
+const { ProvidePlugin } = require("webpack");
+
 // KaTeX plugin stuff
 const math = require("remark-math");
 const katex = require("rehype-katex");
@@ -57,6 +59,12 @@ const config = {
       href: "https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css",
       type: "text/css",
       integrity: "sha384-odtC+0UGzzFL/6PNoE8rX/SPcQDXBJ+uRepguP4QkPCm2LBxH3FA3y+fKSiJ+AmM",
+      crossorigin: "anonymous",
+    },
+    {
+      href: "https://unpkg.com/@stoplight/elements/styles.min.css",
+      type: "text/css",
+      integrity: "sha384-mS2+08UV7BvSC96l6SGdnZv1SexFzKSJnHwTETEb4+97GyWualVrW9nAU2MwDu16",
       crossorigin: "anonymous",
     },
   ],
@@ -166,7 +174,8 @@ const config = {
           },
           {
             position: "left",
-            href: "https://fullnode.devnet.aptoslabs.com/v1/spec#/",
+            type: "doc",
+            docId: "nodes/aptos-api-spec",
             label: "REST API",
           },
           {
@@ -335,6 +344,36 @@ const config = {
         ],
       },
     ],
+    () => ({
+      name: "custom-webpack-config",
+      configureWebpack: () => {
+        return {
+          module: {
+            rules: [
+              {
+                test: /\.m?js/,
+                resolve: {
+                  fullySpecified: false,
+                },
+              },
+            ],
+          },
+          plugins: [
+            new ProvidePlugin({
+              process: require.resolve("process/browser"),
+            }),
+          ],
+          resolve: {
+            fallback: {
+              buffer: require.resolve("buffer"),
+              stream: false,
+              path: false,
+              process: false,
+            },
+          },
+        };
+      },
+    }),
   ],
 };
 

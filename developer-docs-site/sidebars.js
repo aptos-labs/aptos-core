@@ -109,6 +109,7 @@ const sidebars = {
     },
     "nodes/nodes-landing",
     "nodes/aptos-deployments",
+    "nodes/aptos-api-spec",
     "nodes/leaderboard-metrics",
     {
       type: "category",
@@ -129,7 +130,7 @@ const sidebars = {
       items: [
         "nodes/ait/whats-new-in-ait3",
         "nodes/ait/steps-in-ait3",
-        
+
       ],
     },  */
     {
