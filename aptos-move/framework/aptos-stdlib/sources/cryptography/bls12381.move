@@ -6,6 +6,8 @@
 
 module aptos_std::bls12381 {
     use std::option::{Self, Option};
+    use aptos_std::ed25519;
+    use std::bcs;
 
     /// The signature size, in bytes
     const SIGNATURE_SIZE: u64 = 96;
@@ -21,6 +23,11 @@ module aptos_std::bls12381 {
 
     // TODO: Performance would increase if structs in this module are implemented natively via handles (similar to Table and
     // RistrettoPoint). This will avoid unnecessary (de)serialization. We would need to allow storage of these structs too.
+
+    #[test_only]
+    struct SecretKey has drop {
+        bytes: vector<u8>,
+    }
 
     /// A *validated* public key that:
     ///   (1) is a point in the prime-order subgroup of the BLS12-381 elliptic curve, and
@@ -217,6 +224,16 @@ module aptos_std::bls12381 {
         verify_normal_signature_internal(signature.bytes, public_key.bytes, message)
     }
 
+    /// Verifies a normal, non-aggregated signature.
+    public fun verify_normal_signature_t<T: drop>(
+        signature: &Signature,
+        public_key: &PublicKey,
+        data: T
+    ): bool {
+        let encoded = ed25519::new_signed_message(data);
+        verify_normal_signature_internal(signature.bytes, public_key.bytes, bcs::to_bytes(&encoded))
+    }
+
     /// Verifies a signature share in the multisignature share or an aggregate signature share.
     public fun verify_signature_share(
         signature_share: &Signature,
@@ -225,6 +242,43 @@ module aptos_std::bls12381 {
     ): bool {
         verify_signature_share_internal(signature_share.bytes, public_key.bytes, message)
     }
+
+    #[test_only]
+    public fun generate_keys(): (SecretKey, PublicKeyWithPoP) {
+        let (sk_bytes, pk_bytes) = generate_keys_internal();
+        let sk = SecretKey {
+            bytes: sk_bytes
+        };
+        let pkpop = PublicKeyWithPoP {
+            bytes: pk_bytes
+        };
+        (sk, pkpop)
+    }
+
+    #[test_only]
+    public fun sign_arbitrary_bytes(signing_key: &SecretKey, message: vector<u8>): Signature {
+        Signature {
+            bytes: sign_internal(signing_key.bytes, message)
+        }
+    }
+
+    #[test_only]
+    public fun sign_struct<T: drop>(signing_key: &SecretKey, data: T) : Signature {
+        let encoded = ed25519::new_signed_message(data);
+        Signature {
+            bytes: sign_internal(signing_key.bytes, bcs::to_bytes(&encoded))
+        }
+    }
+
+//    #[test_only]
+//    public fun multi_sign_arbitrary_bytes(signing_keys: vector<SecretKey>, message: vector<u8>): AggrOrMultiSignature {
+//
+//    }
+//
+//    #[test_only]
+//    public fun aggr_sign_arbitrary_bytes(signing_keys: vector<SecretKey>, messages: vector<vector<u8>>): AggrOrMultiSignature {
+//    }
+
 
     //
     // Native functions
@@ -330,6 +384,10 @@ module aptos_std::bls12381 {
         message: vector<u8>
     ): bool;
 
+
+    native fun generate_keys_internal(): (vector<u8>, vector<u8>);
+    native fun sign_internal(sk: vector<u8>, msg: vector<u8>): vector<u8>;
+
     //
     // Constants and helpers for tests
     //
@@ -342,9 +400,21 @@ module aptos_std::bls12381 {
     /// The associated SK is 07416693b6b32c84abe45578728e2379f525729e5b94762435a31e65ecc728da.
     const RANDOM_PK: vector<u8> = x"8a53e7ae5270e3e765cd8a4032c2e77c6f7e87a44ebb85bf28a4d7865565698f975346714262f9e47c6f3e0d5d951660";
 
+    public fun public_key_with_pop_to_unvalidated(pkpop: &PublicKeyWithPoP): PublicKey {
+        PublicKey {
+            bytes: pkpop.bytes
+        }
+    }
+
     //
     // Tests
     //
+
+    #[test_only]
+    struct TestMessage has copy, drop {
+        field1: vector<u8>,
+        field2: u128,
+    }
 
     #[test_only]
     fun get_random_aggsig(): AggrOrMultiSignature {
@@ -360,6 +430,21 @@ module aptos_std::bls12381 {
         PublicKeyWithPoP {
             bytes: RANDOM_PK
         }
+    }
+
+    #[test]
+    fun test_gen_sign_verify() {
+        let (sk,pkpop) = generate_keys();
+        let pk = public_key_with_pop_to_unvalidated(&pkpop);
+        let msg1 = b"hello world";
+        let sig1 = sign_arbitrary_bytes(&sk, msg1);
+        assert!(verify_normal_signature(&sig1, &pk, msg1), 1);
+        let msg2 = TestMessage {
+            field1: b"hello aptos",
+            field2: 123,
+        };
+        let sig2 = sign_struct(&sk, copy msg2);
+        assert!(verify_normal_signature_t(&sig2, &pk, copy msg2), 1);
     }
 
     #[test]
