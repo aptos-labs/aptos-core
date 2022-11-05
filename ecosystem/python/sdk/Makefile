@@ -6,8 +6,14 @@ test:
 
 fmt:
 	- find ./examples ./aptos_sdk *.py -type f -name "*.py" | xargs poetry run autoflake -i -r --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports
-	- find ./examples ./aptos_sdk *.py -type f -name "*.py" | xargs poetry run isort
 	- find ./examples ./aptos_sdk *.py -type f -name "*.py" | xargs poetry run black
+        - find ./examples ./aptos_sdk *.py -type f -name "*.py" | xargs poetry run isort
+
+lint:
+	- poetry run mypy aptos_sdk
+	- poetry run flake8 aptos_sdk examples setup.py
+	- poetry run black aptos_sdk examples setup.py --check
+	- poetry run isort aptos_sdk examples setup.py --check-only
 
 examples:
 	- poetry run python -m examples.transfer-coin
