@@ -21,7 +21,7 @@ use aptosdb::AptosDB;
 use claims::{assert_lt, assert_matches, assert_ok};
 use executor_test_helpers::bootstrap_genesis;
 use futures::{FutureExt, StreamExt};
-use move_deps::move_core_types::language_storage::TypeTag;
+use move_core_types::language_storage::TypeTag;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, sync::Arc};
 use storage_interface::DbReaderWriter;

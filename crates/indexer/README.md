@@ -26,7 +26,7 @@ When developing your own, ensure each `TransactionProcessor` is idempotent, and 
 4. `/opt/homebrew/bin/createuser -s postgres`
 5. Ensure you're able to do: `psql postgres`
 6. `cargo install diesel_cli --no-default-features --features postgres`
-7. In this folder, run `diesel migration run --database-url postgresql://localhost/postgres`
+7. Make sure that you're in the indexer folder (run `cd crates/indexer` from base directory), run `diesel migration run --database-url postgresql://localhost/postgres`
    a. If for some reason this database is already being used, try a different db. e.g.
       `DATABASE_URL=postgres://postgres@localhost:5432/indexer_v2 diesel database reset`
 
@@ -35,12 +35,16 @@ Please follow standard fullnode installation guide on aptos.dev (https://aptos.d
 
 ### Running indexer
 ```bash
-cargo run --bin aptos-node --features "indexer"  -- --config <some_path>/fullnode.yaml
+cargo run -p aptos-node --features "indexer" --release -- -f <some_path>/fullnode.yaml
 ```
    * Example fullnode.yaml modification
       ```
       storage:
-         enable_indexer: true
+      enable_indexer: true
+      # This is to avoid the node being pruned
+      storage_pruner_config:
+         ledger_pruner_config:
+            enable: false
 
       indexer:
          enabled: true

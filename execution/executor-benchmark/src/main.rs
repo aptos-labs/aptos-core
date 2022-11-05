@@ -112,7 +112,7 @@ enum Command {
         #[structopt(long, default_value = "1000000")]
         num_accounts: usize,
 
-        #[structopt(long, default_value = "1000000")]
+        #[structopt(long, default_value = "10000000000")]
         init_account_balance: u64,
     },
     RunExecutor {

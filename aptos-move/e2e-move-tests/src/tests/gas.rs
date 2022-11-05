@@ -139,7 +139,7 @@ fn test_gas() {
                 4,
                 "uri".to_owned().into_bytes(),
                 account_1_address,
-                0,
+                1,
                 0,
                 vec![false, false, false, false, true],
                 vec!["age".as_bytes().to_vec()],

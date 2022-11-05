@@ -14,9 +14,9 @@ This tutorial describes how to generate and submit transactions to the Aptos blo
 
 Install your preferred SDK from the below list:
 
-* [Typescript SDK][typescript-sdk]
-* [Python SDK][python-sdk]
-* [Rust SDK][rust-sdk]
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
 
 ---
 
@@ -37,13 +37,13 @@ git clone https://github.com/aptos-labs/aptos-core.git
 
   Install the necessary dependencies:
   ```bash
-  yarn install
+  pnpm install
   ```
 
   Run the [`transfer_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) example:
 
   ```bash
-  yarn run transfer_coin
+  pnpm run transfer_coin
   ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -86,19 +86,19 @@ An output very similar to the following will appear after executing the above co
 
 ```yaml
 === Addresses ===
-Alice: 0x0baec07bfc42f8018ea304ddc307a359c1c6ab20fbce598065b6cb19acff7043
-Bob: 0xc98ceafadaa32e50d06d181842406dbbf518b6586ab67cfa2b736aaddeb7c74f
+Alice: 0xbd20517751571ba3fd06326c23761bc0bc69cf450898ffb43412fbe670c28806
+Bob: 0x8705f98a74f5efe17740276ed75031927402c3a965e10f2ee16cda46d99d8f7f
 
 === Initial Balances ===
-Alice: 20000
+Alice: 100000000
 Bob: 0
 
 === Intermediate Balances ===
-Alice: 18996
+Alice: 99944900
 Bob: 1000
 
 === Final Balances ===
-Alice: 17992
+Alice: 99889800
 Bob: 2000
 ```
 
@@ -109,23 +109,23 @@ The above output demonstrates that the `transfer-coin` example executes the foll
   * The funding and creation of Alice's account from a faucet.
   * The creation of Bob's account from a faucet.
 * The transferring of 1000 coins from Alice to Bob.
-* The 4 coins of gas paid for by Alice to make that transfer.
+* The 54100 coins of gas paid for by Alice to make that transfer.
 * Another transfer of 1000 coins from Alice to Bob.
-* The additional 4 coins of gas paid for by Alice to make that transfer.
+* The additional 54100 coins of gas paid for by Alice to make that transfer.
 
-Next, see below a walk-through of the SDK functions that are used to accomplish the above steps.
+Now see the below walkthrough of the SDK functions used to accomplish the above steps.
 
 ---
 
 ## Step 4: The SDK in depth
 
-The `transfer-coin` example code uses helper functions to interact with the [REST API][rest_spec]. This section reviews each of the calls and gives insights into functionality.
+The `transfer-coin` example code uses helper functions to interact with the [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/). This section reviews each of the calls and gives insights into functionality.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
 :::tip See the full code
-See the Typescript [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) for the complete code as you follow the below steps.
+See the TypeScript [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="python" label="Python">
@@ -146,9 +146,9 @@ See the Rust [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/mai
 
 ### Step 4.1: Initializing the clients
 
-In the first step, the `transfer-coin` example initializes both the REST and faucet clients.
+In the first step, the `transfer-coin` example initializes both the REST and faucet clients:
 
-- The REST client interacts with the REST API, and
+- The REST client interacts with the REST API.
 - The faucet client interacts with the devnet Faucet service for creating and funding accounts.
 
 <Tabs groupId="sdk-examples">
@@ -158,7 +158,7 @@ In the first step, the `transfer-coin` example initializes both the REST and fau
 :!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_1
 ```
 
-Using the API client we can create a `CoinClient`, which we use for common coin operations such as transferring coins and checking balances.
+Using the API client we can create a `CoinClient` that we use for common coin operations such as transferring coins and checking balances.
 ```ts
 :!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_1a
 ```
@@ -174,7 +174,7 @@ Using the API client we can create a `CoinClient`, which we use for common coin 
 :!: static/sdks/python/examples/transfer-coin.py section_1
 ```
 
-The [`common.py`](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk/examples/common.py) initializes these values as follows:
+[`common.py`](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk/examples/common.py) initializes these values as follows:
 
 ```python
 :!: static/sdks/python/examples/common.py section_1
@@ -200,7 +200,7 @@ In the example we initialize the URL values as such:
 
 :::tip
 
-By default the URLs for both the services point to Aptos devnet services. However, they can be configured with the following environment variables:
+By default, the URLs for both the services point to Aptos devnet services. However, they can be configured with the following environment variables:
   - `APTOS_NODE_URL`
   - `APTOS_FAUCET_URL`
 :::
@@ -209,7 +209,7 @@ By default the URLs for both the services point to Aptos devnet services. Howeve
 
 ### Step 4.2: Creating local accounts
 
-The next step is to create two accounts locally. [Accounts][account_basics] represent both on and off-chain state. Off-chain state consists of an address and the public, private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
+The next step is to create two accounts locally. [Accounts](../concepts/basics-accounts.md) represent both on and off-chain state. Off-chain state consists of an address and the public/private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -236,7 +236,7 @@ The next step is to create two accounts locally. [Accounts][account_basics] repr
 
 ### Step 4.3: Creating blockchain accounts
 
-In Aptos, each account must have an on-chain representation in order to support receive tokens and coins as well as interacting in other dApps. An account represents a medium for storing assets, hence it must be explicitly created. This example leverages the Faucet to create and fund Alice's account and to only create Bob's account:
+In Aptos, each account must have an on-chain representation in order to receive tokens and coins and interact with other dApps. An account represents a medium for storing assets; hence, it must be explicitly created. This example leverages the Faucet to create and fund Alice's account and to create but not fund Bob's account:
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -312,7 +312,7 @@ let balance = self
 
 ### Step 4.5: Transferring
 
-Like the previous step, this is another helper step that constructs a transaction which transfers the coins from Alice to Bob. For correctly generated transactions, the API will return a transaction hash that can be used in the subsequent step to check on the transaction status. The Aptos blockchain does perform a handful of validation checks on submission and if any of those fail, the user will instead be given an error. These validations include the transaction signature, unused sequence number, and submitting the transaction to the appropriate chain.
+Like the previous step, this is another helper step that constructs a transaction transferring the coins from Alice to Bob. For correctly generated transactions, the API will return a transaction hash that can be used in the subsequent step to check on the transaction status. The Aptos blockchain does perform a handful of validation checks on submission; and if any of those fail, the user will instead be given an error. These validations use the transaction signature and unused sequence number, and submitting the transaction to the appropriate chain.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -386,9 +386,9 @@ Breaking the above down into pieces:
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-In Typescript, just calling `coinClient.transfer` is sufficient to wait for the transaction to complete. The function will return the `Transaction` returned by the API once it is processed (either successfully or unsuccessfully) or throw an error if processing time exceeds the timeout.
+In TypeScript, just calling `coinClient.transfer` is sufficient to wait for the transaction to complete. The function will return the `Transaction` returned by the API once it is processed (either successfully or unsuccessfully) or throw an error if processing time exceeds the timeout.
 
-You can set `checkSuccess` to true when calling `transfer` if you'd like it to throw if the transaction was not committed successfully:
+You can set `checkSuccess` to true when calling `transfer` if you'd like it to throw an error if the transaction was not committed successfully:
 ```ts
 :!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_6a
 ```
@@ -412,8 +412,10 @@ The transaction hash can be used to query the status of a transaction:
   </TabItem>
 </Tabs>
 
-[account_basics]: /concepts/basics-accounts
-[typescript-sdk]: /sdks/ts-sdk/index
-[python-sdk]: /sdks/python-sdk
-[rust-sdk]: /sdks/rust-sdk
-[rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/
+## Supporting documentation
+
+* [Account basics](../concepts/basics-accounts.md)
+* [TypeScript SDK](../sdks/ts-sdk/index.md)
+* [Python SDK](../sdks/python-sdk.md)
+* [Rust SDK](../sdks/rust-sdk.md)
+* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)

@@ -22,9 +22,9 @@ use crate::{
 use anyhow::{anyhow, Context as AnyhowContext};
 use aptos_api_types::{
     verify_function_identifier, verify_module_identifier, Address, AptosError, AptosErrorCode,
-    AsConverter, EncodeSubmissionRequest, GasEstimation, HashValue, HexEncodedBytes, LedgerInfo,
-    MoveType, PendingTransaction, SubmitTransactionRequest, Transaction, TransactionData,
-    TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
+    AsConverter, EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue,
+    HexEncodedBytes, LedgerInfo, MoveType, PendingTransaction, SubmitTransactionRequest,
+    Transaction, TransactionData, TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
     TransactionsBatchSubmissionResult, UserTransaction, VerifyInput, VerifyInputWithRecursion,
     MAX_RECURSIVE_TYPES_ALLOWED, U64,
 };
@@ -137,10 +137,12 @@ pub struct TransactionsApi {
 impl TransactionsApi {
     /// Get transactions
     ///
-    /// Retrieve on-chain committed transactions. The page size and start can be provided to
-    /// get a specific sequence of transactions.
+    /// Retrieve on-chain committed transactions. The page size and start ledger version
+    /// can be provided to get a specific sequence of transactions.
     ///
-    /// If the version has been pruned, then a 410 will be returned
+    /// If the version has been pruned, then a 410 will be returned.
+    ///
+    /// To retrieve a pending transaction, use /transactions/by_hash.
     #[oai(
         path = "/transactions",
         method = "get",
@@ -206,8 +208,8 @@ impl TransactionsApi {
 
     /// Get transaction by version
     ///
-    /// Retrieves a transaction by a given version.  If the version has been pruned, a 410 will
-    /// be returned.
+    /// Retrieves a transaction by a given version. If the version has been
+    /// pruned, a 410 will be returned.
     #[oai(
         path = "/transactions/by_version/:txn_version",
         method = "get",
@@ -229,10 +231,12 @@ impl TransactionsApi {
 
     /// Get account transactions
     ///
-    /// Retrieves transactions from an account.  If the start version is too far in the past
-    /// a 410 will be returned.
+    /// Retrieves on-chain committed transactions from an account. If the start
+    /// version is too far in the past, a 410 will be returned.
     ///
-    /// If no start version is given, it will start at 0
+    /// If no start version is given, it will start at version 0.
+    ///
+    /// To retrieve a pending transaction, use /transactions/by_hash.
     #[oai(
         path = "/accounts/:address/transactions",
         method = "get",
@@ -406,6 +410,9 @@ impl TransactionsApi {
         /// If set to true, the gas unit price in the transaction will be ignored
         /// and the estimated value will be used
         estimate_gas_unit_price: Query<Option<bool>>,
+        /// If set to true, the transaction will use a higher price than the original
+        /// estimate.
+        estimate_prioritized_gas_unit_price: Query<Option<bool>>,
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
         data.verify()
@@ -425,16 +432,27 @@ impl TransactionsApi {
         let ledger_info = self.context.get_latest_ledger_info()?;
         let mut signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
 
-        let estimated_gas_unit_price = if estimate_gas_unit_price.0.unwrap_or_default() {
-            Some(self.context.estimate_gas_price(&ledger_info)?)
-        } else {
-            None
+        let estimated_gas_unit_price = match (
+            estimate_gas_unit_price.0.unwrap_or_default(),
+            estimate_prioritized_gas_unit_price.0.unwrap_or_default(),
+        ) {
+            (_, true) => {
+                let gas_estimation = self.context.estimate_gas_price(&ledger_info)?;
+                // The prioritized gas estimate should always be set, but if it's not use the gas estimate
+                Some(
+                    gas_estimation
+                        .prioritized_gas_estimate
+                        .unwrap_or(gas_estimation.gas_estimate),
+                )
+            }
+            (true, false) => Some(self.context.estimate_gas_price(&ledger_info)?.gas_estimate),
+            (false, false) => None,
         };
 
         // If estimate max gas amount is provided, we will just make it the maximum value
         let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
             // Retrieve max possible gas units
-            let gas_params = self.context.get_gas_schedule(&ledger_info)?;
+            let (_, gas_params) = self.context.get_gas_schedule(&ledger_info)?;
             let min_number_of_gas_units = u64::from(gas_params.txn.min_transaction_gas_units)
                 / u64::from(gas_params.txn.gas_unit_scaling_factor);
             let max_number_of_gas_units = u64::from(gas_params.txn.maximum_number_of_gas_units);
@@ -527,7 +545,6 @@ impl TransactionsApi {
     /// - Sign the bytes to create the signature.
     /// - Use that as the signature field in something like Ed25519Signature, which you then use to build a TransactionSignature.
     //
-    // TODO: Link an example of how to do this. Use externalDoc.
     #[oai(
         path = "/transactions/encode_submission",
         method = "post",
@@ -574,12 +591,7 @@ impl TransactionsApi {
         self.context
             .check_api_output_enabled("Estimate gas price", &accept_type)?;
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
-        let estimated_gas_price = self.context.estimate_gas_price(&latest_ledger_info)?;
-
-        // TODO: Do we want to give more than just a single gas price?  Percentiles?
-        let gas_estimation = GasEstimation {
-            gas_estimate: estimated_gas_price,
-        };
+        let gas_estimation = self.context.estimate_gas_price(&latest_ledger_info)?;
 
         match accept_type {
             AcceptType::Json => BasicResponse::try_from_json((
@@ -587,11 +599,16 @@ impl TransactionsApi {
                 &latest_ledger_info,
                 BasicResponseStatus::Ok,
             )),
-            AcceptType::Bcs => BasicResponse::try_from_bcs((
-                gas_estimation,
-                &latest_ledger_info,
-                BasicResponseStatus::Ok,
-            )),
+            AcceptType::Bcs => {
+                let gas_estimation_bcs = GasEstimationBcs {
+                    gas_estimate: gas_estimation.gas_estimate,
+                };
+                BasicResponse::try_from_bcs((
+                    gas_estimation_bcs,
+                    &latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
         }
     }
 }
@@ -782,8 +799,8 @@ impl TransactionsApi {
         address: Address,
     ) -> BasicResultWith404<Vec<Transaction>> {
         // Verify the account exists
-        let account = Account::new(self.context.clone(), address, None)?;
-        account.account_state()?;
+        let account = Account::new(self.context.clone(), address, None, None, None)?;
+        account.get_account_resource()?;
 
         let latest_ledger_info = account.latest_ledger_info;
         // TODO: Return more specific errors from within this function.

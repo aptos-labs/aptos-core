@@ -11,7 +11,7 @@ slug: "glossary"
 
 ## Account
 
-- An **account** in the Aptos blockchain is a container for an arbitrary number of [Move modules](#move-module) and [Move resources](#move-resources). This essentially means that the state of each account is comprised of both code and data.
+- An **account** in the Aptos blockchain is a container for an arbitrary number of [Move modules](#move-module) and [Move resources](#move-resources). This essentially means that the state of each [account](/concepts/basics-accounts) is comprised of both code and data.
 - The account is identified by an [account address](#account-address).
 
 ## Account Address
@@ -177,7 +177,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - **Merkle tree** is a type of authenticated data structure that allows for efficient verification of data integrity and updates.
 - The Aptos network treats the entire blockchain as a single data structure that records the history of transactions and states over time.
-- The Merkle tree implementation simplifies the work of apps accessing the blockchain. It allows apps to:
+- The [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) implementation simplifies the work of apps accessing the blockchain. It allows apps to:
   - Read any data from any point in time.
   - Verify the integrity of the data using a unified framework.
 
@@ -185,7 +185,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - The [Merkle Accumulator](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf) is an _append-only_ Merkle tree that the Aptos blockchain uses to store the ledger.
 - Merkle accumulators can provide proofs that a transaction was included in the chain (“proof of inclusion”).
-- They are also called ["history trees"](http://people.cs.vt.edu/danfeng/courses/cs6204/sp10-papers/crosby.pdf) in literature.
+- They are also called "history trees" in literature.
 
 ## Move
 
@@ -235,6 +235,14 @@ then there is a guarantee that T_N will never be included in the blockchain.
 - For example, if a user queries the information within a particular executed transaction, they will be provided with a cryptographic proof that the data returned to them is correct.
 
 # R
+
+## Resource Account
+
+- A resource account is used to manage resources independent of an account managed by a user. For example, a developer may use a resource account to manage an account for module publishing, say managing a contract.
+
+- The contract itself does not require a signer post initialization. A resource account gives you the means for the module to provide a signer to other modules and sign transactions on behalf of the module.
+
+See [Resource accounts](../guides/resource-accounts.md).
 
 ## REST Service
 

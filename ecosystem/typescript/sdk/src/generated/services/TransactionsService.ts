@@ -22,10 +22,12 @@ export class TransactionsService {
 
     /**
      * Get transactions
-     * Retrieve on-chain committed transactions. The page size and start can be provided to
-     * get a specific sequence of transactions.
+     * Retrieve on-chain committed transactions. The page size and start ledger version
+     * can be provided to get a specific sequence of transactions.
      *
-     * If the version has been pruned, then a 410 will be returned
+     * If the version has been pruned, then a 410 will be returned.
+     *
+     * To retrieve a pending transaction, use /transactions/by_hash.
      * @param start Ledger version to start list of transactions
      *
      * If not provided, defaults to showing the latest transactions
@@ -113,8 +115,8 @@ export class TransactionsService {
 
     /**
      * Get transaction by version
-     * Retrieves a transaction by a given version.  If the version has been pruned, a 410 will
-     * be returned.
+     * Retrieves a transaction by a given version. If the version has been
+     * pruned, a 410 will be returned.
      * @param txnVersion Version of transaction to retrieve
      * @returns Transaction
      * @throws ApiError
@@ -133,10 +135,12 @@ export class TransactionsService {
 
     /**
      * Get account transactions
-     * Retrieves transactions from an account.  If the start version is too far in the past
-     * a 410 will be returned.
+     * Retrieves on-chain committed transactions from an account. If the start
+     * version is too far in the past, a 410 will be returned.
      *
-     * If no start version is given, it will start at 0
+     * If no start version is given, it will start at version 0.
+     *
+     * To retrieve a pending transaction, use /transactions/by_hash.
      * @param address Address of account with or without a `0x` prefix
      * @param start Ledger version to start list of transactions
      *
@@ -220,6 +224,8 @@ export class TransactionsService {
      * and the maximum possible gas will be used
      * @param estimateGasUnitPrice If set to true, the gas unit price in the transaction will be ignored
      * and the estimated value will be used
+     * @param estimatePrioritizedGasUnitPrice If set to true, the transaction will use a higher price than the original
+     * estimate.
      * @returns UserTransaction
      * @throws ApiError
      */
@@ -227,6 +233,7 @@ export class TransactionsService {
         requestBody: SubmitTransactionRequest,
         estimateMaxGasAmount?: boolean,
         estimateGasUnitPrice?: boolean,
+        estimatePrioritizedGasUnitPrice?: boolean,
     ): CancelablePromise<Array<UserTransaction>> {
         return this.httpRequest.request({
             method: 'POST',
@@ -234,6 +241,7 @@ export class TransactionsService {
             query: {
                 'estimate_max_gas_amount': estimateMaxGasAmount,
                 'estimate_gas_unit_price': estimateGasUnitPrice,
+                'estimate_prioritized_gas_unit_price': estimatePrioritizedGasUnitPrice,
             },
             body: requestBody,
             mediaType: 'application/json',

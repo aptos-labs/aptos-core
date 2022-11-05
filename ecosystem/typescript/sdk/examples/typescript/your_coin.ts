@@ -11,7 +11,7 @@ import { AptosAccount, AptosClient, TxnBuilderTypes, MaybeHexString, HexString, 
 
   One method to do so is to use the CLI:
       * Acquire the Aptos CLI, see https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
-      * `yarn your_coin ~/aptos-core/aptos-move/move-examples/moon_coin`.
+      * `pnpm your_coin ~/aptos-core/aptos-move/move-examples/moon_coin`.
       * Open another terminal and `aptos move compile --package-dir ~/aptos-core/aptos-move/move-examples/moon_coin --save-metadata --named-addresses MoonCoin=<Alice address from above step>`.
       * Return to the first terminal and press enter.
  */

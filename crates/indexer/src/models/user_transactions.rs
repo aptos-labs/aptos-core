@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     schema::user_transactions,
-    util::{parse_timestamp, parse_timestamp_secs, u64_to_bigdecimal},
+    util::{parse_timestamp, parse_timestamp_secs, standardize_address, u64_to_bigdecimal},
 };
 use aptos_api_types::{TransactionPayload, UserTransaction as APIUserTransaction};
 use bigdecimal::BigDecimal;
@@ -35,6 +35,7 @@ pub struct UserTransaction {
     pub gas_unit_price: BigDecimal,
     pub timestamp: chrono::NaiveDateTime,
     pub entry_function_id_str: String,
+    pub epoch: i64,
 }
 
 /// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
@@ -54,10 +55,15 @@ pub struct UserTransactionQuery {
     pub timestamp: chrono::NaiveDateTime,
     pub entry_function_id_str: String,
     pub inserted_at: chrono::NaiveDateTime,
+    pub epoch: i64,
 }
 
 impl UserTransaction {
-    pub fn from_transaction(txn: &APIUserTransaction, block_height: i64) -> (Self, Vec<Signature>) {
+    pub fn from_transaction(
+        txn: &APIUserTransaction,
+        block_height: i64,
+        epoch: i64,
+    ) -> (Self, Vec<Signature>) {
         let version = txn.info.version.0 as i64;
         (
             Self {
@@ -69,7 +75,7 @@ impl UserTransaction {
                     .as_ref()
                     .map(Signature::get_signature_type)
                     .unwrap_or_default(),
-                sender: txn.request.sender.inner().to_hex_literal(),
+                sender: standardize_address(&txn.request.sender.inner().to_hex_literal()),
                 sequence_number: txn.request.sequence_number.0 as i64,
                 max_gas_amount: u64_to_bigdecimal(txn.request.max_gas_amount.0),
                 expiration_timestamp_secs: parse_timestamp_secs(
@@ -84,6 +90,7 @@ impl UserTransaction {
                     }
                     _ => String::default(),
                 },
+                epoch,
             },
             txn.request
                 .signature

@@ -13,8 +13,50 @@ variable "zone" {
   type        = string
 }
 
+variable "workspace_name_override" {
+  description = "If specified, overrides the usage of Terraform workspace for naming purposes"
+  default     = ""
+}
+
+variable "tls_sans" {
+  description = "List of Subject Alternate Names to include in TLS certificate"
+  type        = list(string)
+  default     = []
+}
+
+variable "workspace_dns" {
+  description = "Include Terraform workspace name in DNS records"
+  default     = true
+}
+
+variable "dns_prefix_name" {
+  description = "DNS prefix for fullnode url"
+  default     = "fullnode"
+}
+
+variable "zone_name" {
+  description = "Zone name of GCP Cloud DNS zone to create records in"
+  default     = ""
+}
+
+variable "zone_project" {
+  description = "GCP project which the DNS zone is in (if different)"
+  default     = ""
+}
+
+variable "create_google_managed_ssl_certificate" {
+  description = "Whether to create a Google Managed SSL Certificate for the GCE Ingress"
+  default     = false
+}
+
 variable "helm_values" {
   description = "Map of values to pass to Helm"
+  type        = any
+  default     = {}
+}
+
+variable "pfn_helm_values" {
+  description = "Map of values to pass to pfn-addons Helm"
   type        = any
   default     = {}
 }
@@ -71,12 +113,73 @@ variable "chain_name" {
   default     = "devnet"
 }
 
+variable "fullnode_name" {
+  description = "Name of the fullnode node owner"
+  type        = string
+}
+
 variable "machine_type" {
   description = "Machine type for running fullnode"
-  default     = "c2-standard-16"
+  default     = "n2-standard-32"
 }
 
 variable "enable_backup" {
   description = "enable data backup from fullnode"
   default     = false
+}
+
+variable "backup_fullnode_index" {
+  description = "index of fullnode to backup data from"
+  default     = 0
+}
+
+variable "enable_monitoring" {
+  description = "Enable monitoring helm chart"
+  default     = false
+}
+
+variable "monitoring_helm_values" {
+  description = "Map of values to pass to monitoring Helm"
+  type        = any
+  default     = {}
+}
+
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  default     = false
+}
+
+variable "gke_enable_private_nodes" {
+  description = "Enable private nodes for GKE cluster"
+  default     = true
+}
+
+variable "gke_enable_node_autoprovisioning" {
+  description = "Enable node autoprovisioning for GKE cluster. See https://cloud.google.com/kubernetes-engine/docs/how-to/node-auto-provisioning"
+  default     = false
+}
+
+variable "gke_node_autoprovisioning_max_cpu" {
+  description = "Maximum CPU utilization for GKE node_autoprovisioning"
+  default     = 10
+}
+
+variable "gke_node_autoprovisioning_max_memory" {
+  description = "Maximum memory utilization for GKE node_autoprovisioning"
+  default     = 100
+}
+
+variable "gke_enable_autoscaling" {
+  description = "Enable autoscaling for the nodepools in the GKE cluster. See https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-autoscaler"
+  default     = true
+}
+
+variable "gke_autoscaling_max_node_count" {
+  description = "Maximum number of nodes for GKE nodepool autoscaling"
+  default     = 10
 }

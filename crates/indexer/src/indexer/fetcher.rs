@@ -7,7 +7,7 @@ use aptos_api_types::{AsConverter, LedgerInfo, Transaction, TransactionOnChainDa
 use aptos_logger::prelude::*;
 use aptos_vm::data_cache::StorageAdapterOwned;
 use futures::channel::mpsc;
-use futures::{SinkExt, StreamExt};
+use futures::SinkExt;
 use std::sync::Arc;
 use std::time::Duration;
 use storage_interface::state_view::DbStateView;
@@ -243,67 +243,73 @@ async fn fetch_nexts(
             )
         });
     let mut timestamp = block_event.proposed_time();
+    let mut epoch = block_event.epoch();
+    let mut epoch_bcs = aptos_api_types::U64::from(epoch);
     let mut block_height = block_event.height();
     let mut block_height_bcs = aptos_api_types::U64::from(block_height);
 
     let resolver = context.move_resolver().unwrap();
     let converter = resolver.as_converter(context.db.clone());
 
-    let transactions_res: Result<Vec<Transaction>, anyhow::Error> = raw_txns
-        .into_iter()
-        .enumerate()
-        .map(|(ind, t)| {
-            // Do not update block_height if first block is block metadata
-            if ind > 0 {
-                // Update the timestamp if the next block occurs
-                if let aptos_types::transaction::Transaction::BlockMetadata(ref txn) = t.transaction
-                {
-                    timestamp = txn.timestamp_usecs();
-                    block_height += 1;
-                    block_height_bcs = aptos_api_types::U64::from(block_height);
-                }
+    let mut transactions = vec![];
+    for (ind, raw_txn) in raw_txns.into_iter().enumerate() {
+        let txn_version = raw_txn.version;
+        // Do not update block_height if first block is block metadata
+        if ind > 0 {
+            // Update the timestamp if the next block occurs
+            if let aptos_types::transaction::Transaction::BlockMetadata(ref txn) =
+                raw_txn.transaction
+            {
+                timestamp = txn.timestamp_usecs();
+                epoch = txn.epoch();
+                epoch_bcs = aptos_api_types::U64::from(epoch);
+                block_height += 1;
+                block_height_bcs = aptos_api_types::U64::from(block_height);
             }
-            converter
-                .try_into_onchain_transaction(timestamp, t)
-                .map(|mut txn| {
-                    match txn {
-                        Transaction::PendingTransaction(_) => {
-                            unreachable!("Indexer should never see pending transactions")
-                        }
-                        Transaction::UserTransaction(ref mut ut) => {
-                            ut.info.block_height = Some(block_height_bcs)
-                        }
-                        Transaction::GenesisTransaction(ref mut gt) => {
-                            gt.info.block_height = Some(block_height_bcs)
-                        }
-                        Transaction::BlockMetadataTransaction(ref mut bmt) => {
-                            bmt.info.block_height = Some(block_height_bcs)
-                        }
-                        Transaction::StateCheckpointTransaction(ref mut sct) => {
-                            sct.info.block_height = Some(block_height_bcs)
-                        }
-                    };
-                    txn
-                })
-        })
-        .collect::<Result<_, anyhow::Error>>();
-
-    let transactions = match transactions_res {
-        Ok(transactions) => transactions,
-        Err(err) => {
-            UNABLE_TO_FETCH_TRANSACTION.inc();
-            error!(
-                starting_version = starting_version,
-                num_transactions = num_transactions_to_fetch,
-                error = format!("{:?}", err),
-                "Could not convert from OnChainTransactions",
-            );
-            panic!(
-                "Could not convert {} txn from OnChainTransactions starting at {}: {:?}",
-                num_transactions_to_fetch, starting_version, err
-            );
         }
-    };
+        match converter
+            .try_into_onchain_transaction(timestamp, raw_txn)
+            .map(|mut txn| {
+                match txn {
+                    Transaction::PendingTransaction(_) => {
+                        unreachable!("Indexer should never see pending transactions")
+                    }
+                    Transaction::UserTransaction(ref mut ut) => {
+                        ut.info.block_height = Some(block_height_bcs);
+                        ut.info.epoch = Some(epoch_bcs);
+                    }
+                    Transaction::GenesisTransaction(ref mut gt) => {
+                        gt.info.block_height = Some(block_height_bcs);
+                        gt.info.epoch = Some(epoch_bcs);
+                    }
+                    Transaction::BlockMetadataTransaction(ref mut bmt) => {
+                        bmt.info.block_height = Some(block_height_bcs);
+                        bmt.info.epoch = Some(epoch_bcs);
+                    }
+                    Transaction::StateCheckpointTransaction(ref mut sct) => {
+                        sct.info.block_height = Some(block_height_bcs);
+                        sct.info.epoch = Some(epoch_bcs);
+                    }
+                };
+                txn
+            }) {
+            Ok(transaction) => transactions.push(transaction),
+            Err(err) => {
+                UNABLE_TO_FETCH_TRANSACTION.inc();
+                error!(
+                    version = txn_version,
+                    error = format!("{:?}", err),
+                    "Could not convert from OnChainTransactions",
+                );
+                // IN CASE WE NEED TO SKIP BAD TXNS
+                // continue;
+                panic!(
+                    "Could not convert txn {} from OnChainTransactions: {:?}",
+                    txn_version, err
+                );
+            }
+        }
+    }
 
     if transactions.is_empty() {
         panic!("No transactions!");
@@ -426,10 +432,16 @@ impl TransactionFetcher {
 impl TransactionFetcherTrait for TransactionFetcher {
     /// Fetches the next batch based on its internal version counter
     async fn fetch_next_batch(&mut self) -> Vec<Transaction> {
-        self.transaction_receiver
-            .next()
-            .await
-            .expect("No transactions, producer of batches died")
+        // try_next is nonblocking unlike next. It'll try to fetch the next one and return immediately.
+        match self.transaction_receiver.try_next() {
+            Ok(Some(transactions)) => transactions,
+            Ok(None) => {
+                // We never close the channel, so this should never happen
+                panic!("Transaction fetcher channel closed");
+            }
+            // The error here is when the channel is empty which we definitely expect.
+            Err(_) => vec![],
+        }
     }
 
     fn fetch_ledger_info(&mut self) -> LedgerInfo {

@@ -1,13 +1,16 @@
 [package]
 name = "vm-validator"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos vm validator"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
@@ -30,7 +33,7 @@ aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptosdb = { path = "../storage/aptosdb", features = ["fuzzing"] }
 cached-packages = { path = "../aptos-move/framework/cached-packages" }
 executor-test-helpers = { path = "../execution/executor-test-helpers" }
-move-deps = { path = "../aptos-move/move-deps", features = ["address32"] }
+move-core-types = { workspace = true }
 vm-genesis = { path = "../aptos-move/vm-genesis" }
 
 [features]

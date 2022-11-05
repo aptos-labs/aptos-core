@@ -62,7 +62,7 @@ pub(crate) async fn execute_broadcast<V>(
             .await
         {
             match err {
-                BroadcastError::NetworkError(peer, error) => error!(LogSchema::event_log(
+                BroadcastError::NetworkError(peer, error) => warn!(LogSchema::event_log(
                     LogEntry::BroadcastTransaction,
                     LogEvent::NetworkSendFail
                 )
@@ -120,7 +120,7 @@ pub(crate) async fn process_client_transaction_submission<V>(
 
     if let Some(status) = statuses.first() {
         if callback.send(Ok(status.1.clone())).is_err() {
-            error!(LogSchema::event_log(
+            warn!(LogSchema::event_log(
                 LogEntry::JsonRpc,
                 LogEvent::CallbackFail
             ));
@@ -143,7 +143,7 @@ pub(crate) async fn process_client_get_transaction<V>(
     let txn = smp.mempool.lock().get_by_hash(hash);
 
     if callback.send(txn).is_err() {
-        error!(LogSchema::event_log(
+        warn!(LogSchema::event_log(
             LogEntry::GetTransaction,
             LogEvent::CallbackFail
         ));
@@ -175,7 +175,7 @@ pub(crate) async fn process_transaction_broadcast<V>(
     // size, so there's no need to check them here.
     if let Err(e) = network_sender.send_to(peer, ack_response) {
         counters::network_send_fail_inc(counters::ACK_TXNS);
-        error!(
+        warn!(
             LogSchema::event_log(LogEntry::BroadcastACK, LogEvent::NetworkSendFail)
                 .peer(&peer)
                 .error(&e.into())
@@ -404,12 +404,29 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 .collect();
             let txns;
             {
+                let lock_timer = counters::mempool_service_start_latency_timer(
+                    counters::GET_BLOCK_LOCK_LABEL,
+                    counters::REQUEST_SUCCESS_LABEL,
+                );
                 let mut mempool = smp.mempool.lock();
-                // gc before pulling block as extra protection against txns that may expire in consensus
-                // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
-                let curr_time = aptos_infallible::duration_since_epoch();
-                mempool.gc_by_expiration_time(curr_time);
+                lock_timer.observe_duration();
+
+                {
+                    let _gc_timer = counters::mempool_service_start_latency_timer(
+                        counters::GET_BLOCK_GC_LABEL,
+                        counters::REQUEST_SUCCESS_LABEL,
+                    );
+                    // gc before pulling block as extra protection against txns that may expire in consensus
+                    // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
+                    let curr_time = aptos_infallible::duration_since_epoch();
+                    mempool.gc_by_expiration_time(curr_time);
+                }
+
                 let max_txns = cmp::max(max_txns, 1);
+                let _get_batch_timer = counters::mempool_service_start_latency_timer(
+                    counters::GET_BLOCK_GET_BATCH_LABEL,
+                    counters::REQUEST_SUCCESS_LABEL,
+                );
                 txns = mempool.get_batch(max_txns, max_bytes, exclude_transactions);
             }
 

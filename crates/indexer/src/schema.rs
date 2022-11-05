@@ -60,6 +60,20 @@ diesel::table! {
         decimals -> Int4,
         transaction_created_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        supply_aggregator_table_handle -> Nullable<Varchar>,
+        supply_aggregator_table_key -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    coin_supply (transaction_version, coin_type_hash) {
+        transaction_version -> Int8,
+        coin_type_hash -> Varchar,
+        coin_type -> Varchar,
+        supply -> Numeric,
+        transaction_timestamp -> Timestamp,
+        transaction_epoch -> Int8,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -90,6 +104,7 @@ diesel::table! {
         expiration_timestamp -> Timestamp,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
+        token_name -> Varchar,
     }
 }
 
@@ -125,6 +140,15 @@ diesel::table! {
 }
 
 diesel::table! {
+    current_staking_pool_voter (staking_pool_address) {
+        staking_pool_address -> Varchar,
+        voter_address -> Varchar,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     current_token_datas (token_data_id_hash) {
         token_data_id_hash -> Varchar,
         creator_address -> Varchar,
@@ -147,6 +171,7 @@ diesel::table! {
         inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
         last_transaction_timestamp -> Timestamp,
+        description -> Text,
     }
 }
 
@@ -248,12 +273,33 @@ diesel::table! {
 }
 
 diesel::table! {
+    processor_status (processor) {
+        processor -> Varchar,
+        last_success_version -> Int8,
+        last_updated -> Timestamp,
+    }
+}
+
+diesel::table! {
     processor_statuses (name, version) {
         name -> Varchar,
         version -> Int8,
         success -> Bool,
         details -> Nullable<Text>,
         last_updated -> Timestamp,
+    }
+}
+
+diesel::table! {
+    proposal_votes (transaction_version, proposal_id, voter_address) {
+        transaction_version -> Int8,
+        proposal_id -> Int8,
+        voter_address -> Varchar,
+        staking_pool_address -> Varchar,
+        num_votes -> Numeric,
+        should_pass -> Bool,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -344,6 +390,7 @@ diesel::table! {
         inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
         transaction_timestamp -> Timestamp,
+        description -> Text,
     }
 }
 
@@ -398,6 +445,7 @@ diesel::table! {
         num_events -> Int8,
         num_write_set_changes -> Int8,
         inserted_at -> Timestamp,
+        epoch -> Int8,
     }
 }
 
@@ -414,6 +462,7 @@ diesel::table! {
         timestamp -> Timestamp,
         entry_function_id_str -> Text,
         inserted_at -> Timestamp,
+        epoch -> Int8,
     }
 }
 
@@ -435,10 +484,12 @@ diesel::allow_tables_to_appear_in_same_query!(
     coin_activities,
     coin_balances,
     coin_infos,
+    coin_supply,
     collection_datas,
     current_ans_lookup,
     current_coin_balances,
     current_collection_datas,
+    current_staking_pool_voter,
     current_token_datas,
     current_token_ownerships,
     current_token_pending_claims,
@@ -447,7 +498,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     ledger_infos,
     move_modules,
     move_resources,
+    processor_status,
     processor_statuses,
+    proposal_votes,
     signatures,
     table_items,
     table_metadatas,

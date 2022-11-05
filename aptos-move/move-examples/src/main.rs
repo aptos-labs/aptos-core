@@ -27,7 +27,7 @@ fn main() {
         BTreeMap::new()
     };
 
-    let build_config = move_deps::move_package::BuildConfig {
+    let build_config = move_package::BuildConfig {
         dev_mode: false,
         generate_abis: false,
         generate_docs: true,

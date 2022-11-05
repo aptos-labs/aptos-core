@@ -154,14 +154,6 @@ spec:
         - containerPort: 9101
         - containerPort: 9102
         - containerPort: 9103
-        livenessProbe:
-          httpGet:
-            path: /healthy
-            port: 9101
-        readinessProbe:
-          httpGet:
-            path: /healthy
-            port: 9101
         volumeMounts:
         - name: haproxy-config
           mountPath: /usr/local/etc/haproxy

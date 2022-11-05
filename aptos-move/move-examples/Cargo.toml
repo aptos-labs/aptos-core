@@ -1,12 +1,16 @@
 [package]
 name = "move-examples"
+description = "Move examples"
 version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-repository = "https://github.com/aptos-core/aptos-labs"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 aptos-gas = { path = "../aptos-gas" }
@@ -15,7 +19,11 @@ clap = "3.1.8"
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../aptos-vm", features = ["testing"] }
 
-move-deps = { path = "../../aptos-move/move-deps", features = ["table-extension"] }
+move-cli = { workspace = true }
+move-package = { workspace = true }
+move-prover = { workspace = true }
+move-unit-test = { workspace = true }
+move-vm-runtime = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.3.0"

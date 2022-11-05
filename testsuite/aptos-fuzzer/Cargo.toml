@@ -1,13 +1,16 @@
 [package]
 name = "aptos-fuzzer"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos fuzzer"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
@@ -36,7 +39,9 @@ consensus-types = { path = "../../consensus/consensus-types", features = ["fuzzi
 executor = { path = "../../execution/executor", features = ["fuzzing"] }
 executor-types = { path = "../../execution/executor-types", features = ["fuzzing"] }
 language-e2e-tests = { path = "../../aptos-move/e2e-tests" }
-move-deps = { path = "../../aptos-move/move-deps", features = ["fuzzing"] }
+move-binary-format = { workspace = true, features = ["fuzzing"] }
+move-core-types = { workspace = true, features = ["fuzzing"] }
+move-vm-types = { workspace = true }
 network = { path = "../../network", features = ["fuzzing"] }
 safety-rules = { path = "../../consensus/safety-rules", features = ["fuzzing", "testing"] }
 scratchpad = { path = "../../storage/scratchpad", features = ["fuzzing"] }

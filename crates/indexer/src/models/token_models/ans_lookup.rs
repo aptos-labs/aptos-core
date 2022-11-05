@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use crate::{
     schema::current_ans_lookup,
-    util::{bigdecimal_to_u64, parse_timestamp_secs},
+    util::{bigdecimal_to_u64, parse_timestamp_secs, standardize_address},
 };
 use aptos_api_types::{deserialize_from_string, MoveType, Transaction as APITransaction};
 use bigdecimal::BigDecimal;
@@ -24,12 +24,14 @@ pub type CurrentAnsLookupPK = (Domain, Subdomain);
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(domain, subdomain))]
 #[diesel(table_name = current_ans_lookup)]
+#[diesel(treat_none_as_null = true)]
 pub struct CurrentAnsLookup {
     pub domain: String,
     pub subdomain: String,
     pub registered_address: Option<String>,
     pub last_transaction_version: i64,
     pub expiration_timestamp: chrono::NaiveDateTime,
+    pub token_name: String,
 }
 
 pub enum ANSEvent {
@@ -114,15 +116,22 @@ impl CurrentAnsLookup {
                                     bigdecimal_to_u64(&inner.expiration_time_secs),
                                     txn_version,
                                 );
+                                let subdomain =
+                                    inner.subdomain_name.get_string().unwrap_or_default();
+                                let mut token_name = format!("{}.apt", &inner.domain_name);
+                                if !subdomain.is_empty() {
+                                    token_name = format!("{}.{}", &subdomain, token_name);
+                                }
                                 Self {
                                     domain: inner.domain_name,
-                                    subdomain: inner
-                                        .subdomain_name
+                                    subdomain,
+                                    registered_address: inner
+                                        .new_address
                                         .get_string()
-                                        .unwrap_or_default(),
-                                    registered_address: inner.new_address.get_string(),
+                                        .map(|s| standardize_address(&s)),
                                     last_transaction_version: txn_version,
                                     expiration_timestamp,
+                                    token_name,
                                 }
                             }
                             ANSEvent::RegisterNameEventV1(inner) => {
@@ -130,15 +139,19 @@ impl CurrentAnsLookup {
                                     bigdecimal_to_u64(&inner.expiration_time_secs),
                                     txn_version,
                                 );
+                                let subdomain =
+                                    inner.subdomain_name.get_string().unwrap_or_default();
+                                let mut token_name = format!("{}.apt", &inner.domain_name);
+                                if !subdomain.is_empty() {
+                                    token_name = format!("{}.{}", &subdomain, token_name);
+                                }
                                 Self {
                                     domain: inner.domain_name,
-                                    subdomain: inner
-                                        .subdomain_name
-                                        .get_string()
-                                        .unwrap_or_default(),
+                                    subdomain,
                                     registered_address: None,
                                     last_transaction_version: txn_version,
                                     expiration_timestamp,
+                                    token_name,
                                 }
                             }
                         };

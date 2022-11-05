@@ -330,6 +330,10 @@ pub struct TransactionInfo {
     #[oai(skip)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_height: Option<U64>,
+    /// Epoch of the transaction belongs in, this field will not be present through the API
+    #[oai(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub epoch: Option<U64>,
 }
 
 /// A transaction waiting in mempool
@@ -1257,7 +1261,18 @@ impl TransactionSigningMessage {
 
 /// Struct holding the outputs of the estimate gas API
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct GasEstimation {
+pub struct GasEstimationBcs {
     /// The current estimate for the gas unit price
     pub gas_estimate: u64,
+}
+
+/// Struct holding the outputs of the estimate gas API
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct GasEstimation {
+    /// The deprioritized estimate for the gas unit price
+    pub deprioritized_gas_estimate: Option<u64>,
+    /// The current estimate for the gas unit price
+    pub gas_estimate: u64,
+    /// The prioritized estimate for the gas unit price
+    pub prioritized_gas_estimate: Option<u64>,
 }

@@ -15,16 +15,14 @@ use aptos_vm::{
     data_cache::StorageAdapter,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
 };
-use move_deps::{
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{ModuleId, TypeTag},
-        transaction_argument::convert_txn_args,
-        value::{serialize_values, MoveValue},
-    },
-    move_vm_runtime::session::SerializedReturnValues,
-    move_vm_types::gas::UnmeteredGasMeter,
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+    transaction_argument::convert_txn_args,
+    value::{serialize_values, MoveValue},
 };
+use move_vm_runtime::session::SerializedReturnValues;
+use move_vm_types::gas::UnmeteredGasMeter;
 
 pub struct GenesisSession<'r, 'l, S>(SessionExt<'r, 'l, S>);
 
@@ -104,7 +102,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
     }
 }
 
-pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F) -> ChangeSet
+pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: u8) -> ChangeSet
 where
     F: FnOnce(&mut GenesisSession<StorageAdapter<S>>),
 {
@@ -113,6 +111,7 @@ where
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        chain_id,
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);

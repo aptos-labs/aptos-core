@@ -80,7 +80,7 @@ pub struct MemoryListener {
 
 impl Drop for MemoryListener {
     fn drop(&mut self) {
-        let mut switchboard = (&*SWITCHBOARD).lock();
+        let mut switchboard = (*SWITCHBOARD).lock();
         // Remove the Sending side of the channel in the switchboard when
         // MemoryListener is dropped
         switchboard.port_to_sender_map.remove(&self.port);
@@ -110,7 +110,7 @@ impl MemoryListener {
     ///
     /// [`local_addr`]: #method.local_addr
     pub fn bind(port: u16) -> Result<Self> {
-        let mut switchboard = (&*SWITCHBOARD).lock();
+        let mut switchboard = (*SWITCHBOARD).lock();
 
         // Get the port we should bind to. If 0 was given, use a random port.
         let port = if port != 0 {
@@ -314,7 +314,7 @@ impl MemorySocket {
     /// # Ok(())}
     /// ```
     pub fn connect(port: u16) -> Result<MemorySocket> {
-        let mut switchboard = (&*SWITCHBOARD).lock();
+        let mut switchboard = (*SWITCHBOARD).lock();
 
         // Find port to connect to
         let port = NonZeroU16::new(port).ok_or(ErrorKind::AddrNotAvailable)?;

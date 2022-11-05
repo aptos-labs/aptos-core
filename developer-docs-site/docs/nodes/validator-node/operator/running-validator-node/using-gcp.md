@@ -73,8 +73,8 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
     region        = "us-central1"  # Specify the region
     zone          = "c"            # Specify the zone suffix
     project       = "<GCP Project ID>" # Specify your GCP project ID
-    era           = 1              # bump era number to wipe the chain
-    chain_id      = 43
+    era           = 1  # bump era number to wipe the chain
+    chain_id      = 1  # for mainnet. Use different value for testnet or devnet.
     image_tag     = "mainnet" # Specify the docker image tag to use
     validator_name = "<Name of your validator, no space, e.g. aptosbot>"
   }
@@ -149,7 +149,9 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-12. Download the genesis blob and waypoint for the network you want to connect to. See [Node Files](/nodes/node-files.md) for a full list of files you should download and the download commands. 
+12. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page:
+    - `genesis.blob`
+    - `waypoint.txt`
 
 13. To summarize, in your working directory you should have a list of files:
     - `main.tf`: The Terraform files to install the `aptos-node` module (from steps 3 and 4).

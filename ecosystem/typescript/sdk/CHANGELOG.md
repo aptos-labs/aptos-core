@@ -6,7 +6,22 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
-N/A
+- `getAccountModules` and `getAccountResources` now use pagination under the hood. This addresses the issue raised here: https://github.com/aptos-labs/aptos-core/issues/5298. The changes are non-breaking, if you use these functions with an older node that hasn't updated to include the relevant support in its API service, it will still work as it did before.
+- To support the above, the generated client has been updated to attach the headers to the response object, as per the changes here: https://github.com/aptos-labs/openapi-typescript-codegen/compare/v0.23.0...aptos-labs:openapi-typescript-codegen:0.24.0?expand=1. Consider this an implementation detail, not a supported part of the SDK interface.
+
+## 1.3.17 (2022-11-04)
+
+- Add functions to token client support
+  - direct transfer with opt-in
+  - burn token by owner 
+  - burn token by creator
+  - mutate token properties
+- Add property map serializer to serialize input to BCS encode
+
+## 1.3.16 (2022-10-12)
+
+- Add `estimatePrioritizedGasUnitPrice` to the simulation interface. If set to true, the estimated gas unit price is higher than the original estimate. Therefore, transactions have a higher chance to be executed during congestion period.
+- `esitmateGasPrice` now returns `deprioritized_gas_estimate` and `prioritized_gas_estimate` along with `gas_estimate`. `deprioritized_gas_estimate` is a conservative price estimate. Users might end up paying less gas eventually, but the transaction execution is deprioritized by the block chain. On the other hand, `prioritized_gas_estimate` is a higher price esitmate. Transactions need to be executed sooner could use `prioritized_gas_estimate`.
 
 ## 1.3.15 (2022-09-30)
 

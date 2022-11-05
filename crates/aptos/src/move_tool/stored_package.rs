@@ -6,7 +6,7 @@ use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
 use framework::natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
 use framework::unzip_metadata_str;
-use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
+use move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
 use std::fs;
 use std::path::Path;
@@ -129,7 +129,13 @@ impl<'a> CachedPackageMetadata<'a> {
         let sources_dir = path.join(CompiledPackageLayout::Sources.path());
         fs::create_dir_all(&sources_dir)?;
         for module in &self.metadata.modules {
-            let source = unzip_metadata_str(&module.source)?;
+            let source = match module.source.is_empty() {
+                true => {
+                    println!("module without code: {}", module.name);
+                    "".into()
+                }
+                false => unzip_metadata_str(&module.source)?,
+            };
             fs::write(sources_dir.join(format!("{}.move", module.name)), source)?;
         }
         Ok(())

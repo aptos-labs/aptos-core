@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::util::make_native_from_func;
+#[cfg(feature = "testing")]
+use crate::natives::util::make_test_only_native_from_func;
 use aptos_crypto::ed25519::ED25519_PUBLIC_KEY_LENGTH;
+#[cfg(feature = "testing")]
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+#[cfg(feature = "testing")]
+use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{ed25519, traits::*};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use move_binary_format::errors::PartialVMResult;
@@ -12,6 +18,8 @@ use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
+#[cfg(feature = "testing")]
+use rand_core::OsRng;
 use smallvec::smallvec;
 use std::{collections::VecDeque, convert::TryFrom};
 
@@ -136,8 +144,10 @@ pub struct GasParameters {
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [
-        // Ed25519
+    let mut natives = vec![];
+
+    // Always-on natives.
+    natives.append(&mut vec![
         (
             "public_key_validate_internal",
             make_native_from_func(gas_params.clone(), native_public_key_validate),
@@ -146,7 +156,52 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             "signature_verify_strict_internal",
             make_native_from_func(gas_params, native_signature_verify_strict),
         ),
-    ];
+    ]);
+
+    // Test-only natives.
+    #[cfg(feature = "testing")]
+    natives.append(&mut vec![
+        (
+            "generate_keys_internal",
+            make_test_only_native_from_func(native_test_only_generate_keys_internal),
+        ),
+        (
+            "sign_internal",
+            make_test_only_native_from_func(native_test_only_sign_internal),
+        ),
+    ]);
 
     crate::natives::helpers::make_module_natives(natives)
+}
+
+#[cfg(feature = "testing")]
+fn native_test_only_generate_keys_internal(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut _args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    let key_pair = KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut OsRng);
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![
+            Value::vector_u8(key_pair.private_key.to_bytes()),
+            Value::vector_u8(key_pair.public_key.to_bytes())
+        ],
+    ))
+}
+
+#[cfg(feature = "testing")]
+fn native_test_only_sign_internal(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    let msg_bytes = pop_arg!(args, Vec<u8>);
+    let sk_bytes = pop_arg!(args, Vec<u8>);
+    let sk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
+    let sig = sk.sign_arbitrary_message(msg_bytes.as_slice());
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![Value::vector_u8(sig.to_bytes())],
+    ))
 }

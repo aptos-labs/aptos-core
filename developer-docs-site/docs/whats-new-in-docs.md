@@ -7,6 +7,46 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 04 November 2022
+
+- Added a guide on [Resource Accounts](/docs/guides/resource-accounts.md) used by developers to publish modules and automatically sign transactions.
+
+## 25 October 2022
+
+- Replaced the outdated auto-generated Move docs formally located at `aptos-core/tree/framework-docs` with new online versions now found at:
+  * [Aptos tokens](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md)
+  * [Aptos framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md)
+  * [Aptos stdlib](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/doc/overview.md)
+  * [Move stdlib](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/overview.md)
+
+## 13 October 2022
+
+- Added [user documentation](/docs/guides/use-aptos-explorer.md) for [Aptos Explorer](https://explorer.aptoslabs.com/) to Aptos.dev covering common use cases and popular Explorer screen descriptions.
+
+## 12 October 2022
+
+- Added [Node Connections](/docs/nodes/full-node/fullnode-network-connections.md) document that describes how to configure node network connections.
+
+## 11 October 2022
+
+- Added [Data Pruning](/docs/guides/data-pruning.md) document that describes how to change the data pruning settings.
+
+## 10 October 2022
+
+- Added [Staking Pool Operations](/docs/nodes/validator-node/operator/staking-pool-operations.md) document.
+
+## 07 October 2022
+
+- [Using the Petra Wallet](https://petra.app/docs/use) covers common use cases of the Petra Wallet Chrome browser extension and can be found from [Install Petra Extension](guides/install-petra-wallet.md) on Aptos.dev.
+
+## 06 October 2022
+
+- Added [Node Files](/docs/nodes/node-files-all-networks/node-files.md) document that lists all the files required during node deployment process. Includes commands to download each file.
+
+## 05 October 2022
+
+- Related Aptos resources (aptoslabs.com, Twitter, Discord, and more) can be found in the [Have fun](https://aptos.dev/#have-fun) section of the Aptos.dev landing page.
+
 ## 03 October 2022
 
 - [How Base Gas Works](/docs/concepts/base-gas.md) describes the types of gas involved in Aptos transactions and offers optimizations for your use.
@@ -54,7 +94,7 @@ The [hardware requirements](/docs/nodes/validator-node/operator/node-requirement
 
 ## 06 September 2022
 
-- A new concept document explaining the [State Synchronization](/concepts/state-sync.md) is posted.
+- A new concept document explaining the [State Synchronization](/guides/state-sync.md) is posted.
 
 - The [Staking](/concepts/staking.md) document is updated.
 

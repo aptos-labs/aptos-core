@@ -27,4 +27,8 @@ set -x
 
 cargo xclippy
 cargo fmt $CHECK_ARG
+
+# Once cargo-sort correctly handles workspace dependencies,
+# we can move to cleaner workspace dependency notation.
+# See: https://github.com/DevinR528/cargo-sort/issues/47
 cargo sort --grouped --workspace $CHECK_ARG

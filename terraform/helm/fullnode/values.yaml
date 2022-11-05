@@ -1,50 +1,55 @@
+# -- Default image tag to use for all validator and fullnode images
+imageTag: devnet
+
 chain:
+  # -- Bump this number to wipe the underlying storage
   era: 1
+  # -- Name of the testnet to connect to. There must be a corresponding entry in .Values.aptos_chains
   name: devnet
+  # -- Kubernetes Configmap from which to load the genesis.blob and waypoint.txt
   genesisConfigmap:
+  # -- Kubernetes Secret from which to load the genesis.blob and waypoint.txt
   genesisSecret:
 
+# -- For each supported chain, specify the URLs from which to download the genesis.blob and waypoint.txt
 aptos_chains:
   devnet:
     waypoint_txt_url: https://devnet.aptoslabs.com/waypoint.txt
     genesis_blob_url: https://devnet.aptoslabs.com/genesis.blob
   testnet:
-    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/waypoint.txt
-    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-genesis-waypoint/main/testnet/genesis.blob
-  ait3:
-    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-ait3/main/waypoint.txt
-    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-ait3/main/genesis.blob
+    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/waypoint.txt
+    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis.blob
+  mainnet:
+    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt
+    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob
 
-# fullnode network config
-fullnode_identity:
-  # Set this to start fullnode from an existing key.
-  # If not set, it will generate a random one on startup.
-fullnode_max_inbound_connections: 100
+fullnode:
+  # -- Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
+  config:
+    full_node_networks:
+      # The first item in the array `full_node_networks` must always refer to the public fullnode network
+      - network_id: "public"
+        seeds: {}
+        identity: {}
+        inbound_rate_limit_config:
+        outbound_rate_limit_config:
+        max_inbound_connections: 100
 
-# fullnode pruner config
-# disable ledger pruning will keep all the history transaction
-enable_ledger_pruner: true
-# set pruner window to override the default value
-ledger_prune_window: 
-
-# fullnode state sync config
-# To make fullnode execute every transaction, set:
-# bootstrapping_mode: ExecuteTransactionsFromGenesis
-# continuous_syncing_mode: ExecuteTransactions
-bootstrapping_mode: ApplyTransactionOutputsFromGenesis
-continuous_syncing_mode: ApplyTransactionOutputs
-
+# -- Log level for the fullnode
 rust_log: info
 
 image:
+  # -- Image repo to use for fullnode images. Fullnodes and validators use the same image
   repo: aptoslabs/validator
+  # -- Image tag to use for fullnode images
   tag: devnet
+  # -- Image pull policy to use for fullnode images
   pullPolicy: IfNotPresent
 
 resources:
   limits:
     cpu: 14
-    memory: 30Gi
+    memory: 26Gi
   requests:
     cpu: 14
     memory: 26Gi
@@ -54,41 +59,49 @@ tolerations: []
 affinity: {}
 
 storage:
-  # Set this to a StorageClass available on your Kubernetes cluster
+  # -- Kubernetes storage class to use for fullnode persistent storage
   class:
+  # -- Size of fullnode persistent storage
   size: 1000Gi
 
 service:
-  # Change this to LoadBalancer to expose the REST API, aptosnet endpoint externally
+  # -- The Kubernetes ServiceType to use for the fullnode. Change this to LoadBalancer expose the REST API, aptosnet endpoint externally
   type: ClusterIP
+  # -- Whether to expose the node REST API
+  exposeApi: true
+  # -- The externalTrafficPolicy for the fullnode service
   externalTrafficPolicy:
+  # -- If set and if the ServiceType is LoadBalancer, allow traffic to fullnode from these CIDRs
   loadBalancerSourceRanges: []
   annotations: {}
 
 ingress:
-  #change enabled to true and fill out the rest of the fields to expose the REST API externally via your ingress controller
+  # -- Change enabled to true and fill out the rest of the fields to expose the REST API externally via your ingress controller
   enabled: false
-  hostName: #aptos-fullnode.example.com
-  #leaving class empty will result in an ingress that implicity uses the default ingress class
-  ingressClassName: #nginx
+  # -- The hostname to use for the ingress
+  hostName:
+  # -- The ingress class for fullnode ingress. Leaving class empty will result in an ingress that implicity uses the default ingress class
+  ingressClassName:
   annotations: {}
 
-
 serviceAccount:
-  # Specifies whether a service account should be created
+  # -- Specifies whether a service account should be created
   create: true
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
+  # -- The name of the service account to use. If not set and create is true, a name is generated using the fullname template
   name:
   annotations: {}
 
 logging:
+  # -- Address for remote logging
   address:
 
 backup:
   image:
+    # -- Image repo to use for backup images
     repo: aptoslabs/tools
-    tag: devnet
+    # -- Image tag to use for backup images
+    tag:
+    # -- Image pull policy to use for backup images
     pullPolicy: IfNotPresent
   resources:
     limits:
@@ -100,8 +113,10 @@ backup:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  # -- Whether to enable backup
   enable: false
   config:
+    # -- Which of the below backup configurations to use
     location:
     s3:
       bucket:
@@ -111,26 +126,32 @@ backup:
       account:
       container:
       sas:
+    # -- State snapshot interval epochs
     state_snapshot_interval_epochs: 1
+    # -- Transaction batch size
     transaction_batch_size: 1000000
 
 backup_verify:
-  schedule: '@daily'
+  # -- The schedule for backup verification
+  schedule: "@daily"
   resources:
     limits:
-      cpu: 0.5
-      memory: 512Mi
+      cpu: 4
+      memory: 4Gi
     requests:
-      cpu: 0.5
-      memory: 512Mi
+      cpu: 4
+      memory: 4Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
 
 restore:
   image:
+    # -- Image repo to use for restore images
     repo: aptoslabs/tools
-    tag: devnet
+    # -- Image tag to use for restore images
+    tag:
+    # -- Image pull policy to use for restore images
     pullPolicy: IfNotPresent
   resources:
     limits:
@@ -143,6 +164,7 @@ restore:
   tolerations: []
   affinity: {}
   config:
+    # -- Which of the below backup configurations to use
     location:
     s3:
       bucket:
@@ -152,6 +174,9 @@ restore:
       account:
       container:
       sas:
+    # -- List of trusted waypoints for restore
     trusted_waypoints: []
+    # -- Number of concurrent downloads for restore
     concurrent_downloads: 2
+    # -- If set, specifies a different era to restore other than the default era set in chain.era
     restore_era:
