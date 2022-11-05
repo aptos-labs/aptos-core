@@ -53,9 +53,7 @@ impl MockStateComputer {
 
         self.consensus_db
             .commit_to_storage(ordered_proof.ledger_info().clone());
-
         // mock sending commit notif to state sync
-        let mut txns = vec![];
         let mut txns = vec![];
         for block in &ordered_blocks {
             let _payload = self
