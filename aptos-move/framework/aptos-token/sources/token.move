@@ -1382,6 +1382,60 @@ module aptos_token::token {
         token_data.royalty
     }
 
+    public fun get_tokendata_id(token_id: TokenId): TokenDataId {
+        token_id.token_data_id
+    }
+
+    public fun get_token_mutability_config(token_data_id: TokenDataId): TokenMutabilityConfig acquires Collections {
+        let creator_addr = token_data_id.creator;
+        assert!(exists<Collections>(creator_addr), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        let all_token_data = &borrow_global<Collections>(creator_addr).token_data;
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
+        table::borrow(all_token_data, token_data_id).mutability_config
+    }
+
+    public fun get_token_mutability_maximum(config: TokenMutabilityConfig): bool {
+        config.maximum
+    }
+
+    public fun get_token_mutability_royalty(config: TokenMutabilityConfig): bool {
+        config.royalty
+    }
+
+    public fun get_token_mutability_uri(config: TokenMutabilityConfig): bool {
+        config.uri
+    }
+
+    public fun get_token_mutability_description(config: TokenMutabilityConfig): bool {
+        config.description
+    }
+
+    public fun get_token_mutability_default_properties(config: TokenMutabilityConfig): bool {
+        config.properties
+    }
+
+    public fun get_collection_mutability_config(
+        creator: address,
+        collection_name: String
+    ): CollectionMutabilityConfig acquires Collections {
+        assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        let all_collection_data = &borrow_global<Collections>(creator).collection_data;
+        assert!(table::contains(all_collection_data, collection_name), error::not_found(ECOLLECTION_NOT_PUBLISHED));
+        table::borrow(all_collection_data, collection_name).mutability_config
+    }
+
+    public fun get_collection_mutability_description(config: CollectionMutabilityConfig): bool {
+        config.description
+    }
+
+    public fun get_collection_mutability_uri(config: CollectionMutabilityConfig): bool {
+        config.uri
+    }
+
+    public fun get_collection_mutability_maximum(config: CollectionMutabilityConfig): bool {
+        config.maximum
+    }
+
     //
     // Private functions
     //
