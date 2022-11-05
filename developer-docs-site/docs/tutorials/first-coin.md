@@ -52,6 +52,7 @@ pnpm install
 Run the TypeScript [`your_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/your_coin.ts) example:
 
 ```bash
+cd examples/typescript
 pnpm your_coin ~/aptos-core/aptos-move/move-examples/moon_coin
 ```
 
