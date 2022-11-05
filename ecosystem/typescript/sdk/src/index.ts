@@ -12,4 +12,4 @@ export * from "./transaction_builder";
 export * as TokenTypes from "./token_types";
 export * as Types from "./generated/index";
 export * as AptosTypes from "./aptos_types";
-export {derivePath} from "./utils/hd-key";
+export { derivePath } from "./utils/hd-key";
