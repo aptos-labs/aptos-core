@@ -615,6 +615,10 @@ function install_nodejs {
     install_pkg npm "$PACKAGE_MANAGER"
 }
 
+function install_pnpm {
+    curl -fsSL https://get.pnpm.io/install.sh | "${PRE_COMMAND[@]}" env PNPM_VERSION=7.14.2 bash -
+}
+
 function install_python3 {
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
     install_pkg python3-all-dev "$PACKAGE_MANAGER"
@@ -890,6 +894,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_pkg git "$PACKAGE_MANAGER"
   install_lcov "$PACKAGE_MANAGER"
   install_nodejs "$PACKAGE_MANAGER"
+  install_pnpm "$PACKAGE_MANAGER"
   install_pkg unzip "$PACKAGE_MANAGER"
   install_protoc
 fi
