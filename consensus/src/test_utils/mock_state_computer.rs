@@ -56,15 +56,15 @@ impl MockStateComputer {
 
         // mock sending commit notif to state sync
         let mut txns = vec![];
-        for block in &ordered_blocks {
-            let mut payload = self
+        let mut txns = vec![];
+        for block in blocks {
+            let _payload = self
                 .block_cache
                 .lock()
                 .remove(&block.id())
-                .ok_or_else(|| format_err!("Cannot find block"))?
-                .into_iter()
-                .collect();
-            txns.append(&mut payload);
+                .ok_or_else(|| format_err!("Cannot find block"))?;
+            let mut payload_txns = self.data_manager.get_data(block.block()).await?;
+            txns.append(&mut payload_txns);
         }
         // they may fail during shutdown
         let _ = self.state_sync_client.unbounded_send(txns);
