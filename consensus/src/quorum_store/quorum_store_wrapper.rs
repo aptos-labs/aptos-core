@@ -377,10 +377,10 @@ impl QuorumStoreWrapper {
                     logical_time.epoch(),
                     "Wrong epoch"
                 );
-                assert!(
-                    self.latest_logical_time <= logical_time,
-                    "Non-increasing logical time"
-                );
+                // assert!(
+                //     self.latest_logical_time <= logical_time,
+                //     "Non-increasing logical time"
+                // );
                 self.latest_logical_time = logical_time;
                 // Cleans up all batches that expire in rounds <= logical_time.round(). This is
                 // safe since clean request must occur only after execution result is certified.
