@@ -48,6 +48,7 @@ pub const TRANSACTION_BY_HASH_CF_NAME: ColumnFamilyName = "transaction_by_hash";
 pub const TRANSACTION_INFO_CF_NAME: ColumnFamilyName = "transaction_info";
 pub const VERSION_DATA_CF_NAME: ColumnFamilyName = "version_data";
 pub const WRITE_SET_CF_NAME: ColumnFamilyName = "write_set";
+pub const XERKLE_NODE_CF_NAME: ColumnFamilyName = "xerkle_node";
 
 fn ensure_slice_len_eq(data: &[u8], len: usize) -> Result<()> {
     ensure!(

@@ -3,6 +3,7 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
+use crate::state_xerkle_db::StateXerkleDb;
 use crate::utils::iterators::PrefixedStateValueIterator;
 use crate::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -74,6 +75,7 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 #[derive(Debug)]
 pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
+    pub state_xerkle_db: Arc<StateXerkleDb>,
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
@@ -267,6 +269,7 @@ impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
+        state_xerkle_db: Arc<DB>,
         state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
         epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
         buffered_state_target_items: usize,
@@ -277,8 +280,13 @@ impl StateStore {
             state_merkle_db,
             max_nodes_per_lru_cache_shard,
         ));
+        let state_xerkle_db = Arc::new(StateXerkleDb::new(
+            state_xerkle_db,
+            max_nodes_per_lru_cache_shard,
+        ));
         let state_db = Arc::new(StateDb {
             ledger_db,
+            state_xerkle_db,
             state_merkle_db,
             state_pruner,
             epoch_snapshot_pruner,
