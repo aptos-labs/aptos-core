@@ -726,6 +726,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "async-trait",
+ "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "bigdecimal",
  "chrono",
  "clap 3.2.17",
