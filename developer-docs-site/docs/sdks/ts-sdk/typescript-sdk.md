@@ -20,6 +20,12 @@ Aptos provides an official Typescript SDK. This section describes how to install
    ```bash
    yarn add aptos
    ```
+
+   or
+
+   ```bash
+   pnpm add aptos
+   ```
    
    :::tip
    The above command installs the TS SDK and should not be confused as installing the Aptos CLI.

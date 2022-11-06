@@ -461,6 +461,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-debugger"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-gas",
+ "aptos-resource-viewer",
+ "aptos-rest-client",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-validator-interface",
+ "aptos-vm",
+ "move-binary-format",
+ "move-cli",
+ "move-compiler",
+ "move-core-types",
+ "move-resource-viewer",
+ "move-table-extension",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+]
+
+[[package]]
 name = "aptos-faucet"
 version = "0.1.0"
 dependencies = [
@@ -1421,12 +1443,16 @@ name = "aptos-validator-interface"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-api-types",
  "aptos-config",
+ "aptos-rest-client",
  "aptos-state-view",
  "aptos-types",
  "aptosdb",
+ "async-trait",
  "move-binary-format",
  "storage-interface",
+ "tokio",
 ]
 
 [[package]]
@@ -3924,6 +3950,7 @@ dependencies = [
  "cached-packages",
  "forge",
  "framework",
+ "jemallocator",
  "serde_yaml 0.8.26",
  "structopt",
  "testcases",
@@ -8759,6 +8786,7 @@ dependencies = [
  "aptos",
  "aptos-config",
  "aptos-crypto",
+ "aptos-debugger",
  "aptos-faucet",
  "aptos-gas",
  "aptos-genesis",
