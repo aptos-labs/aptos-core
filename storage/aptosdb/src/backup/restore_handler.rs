@@ -57,6 +57,7 @@ impl RestoreHandler {
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         StateSnapshotRestore::new(
             &self.state_store.state_merkle_db,
+            &self.state_store.state_xerkle_db,
             &self.state_store,
             version,
             expected_root_hash,

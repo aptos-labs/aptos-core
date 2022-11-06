@@ -17,7 +17,7 @@ use aptos_config::config::{
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
-use aptos_jellyfish_merkle::{NodeBatch, TreeWriter};
+use aptos_jellyfish_merkle::{NodeBatch, TreeWriter as JmtTreeWriter};
 use aptos_logger::info;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
@@ -25,6 +25,8 @@ use aptos_types::{
     transaction::Version,
     waypoint::Waypoint,
 };
+use aptos_xerkle::node_type::{Node, NodeKey};
+use aptos_xerkle::TreeWriter as XerkleTreeWriter;
 use aptosdb::state_restore::StateSnapshotProgress;
 use aptosdb::{
     backup::restore_handler::RestoreHandler,
@@ -151,8 +153,14 @@ pub enum RestoreRunMode {
 
 struct MockStore;
 
-impl TreeWriter<StateKey> for MockStore {
+impl JmtTreeWriter<StateKey> for MockStore {
     fn write_node_batch(&self, _node_batch: &NodeBatch<StateKey>) -> Result<()> {
+        Ok(())
+    }
+}
+
+impl XerkleTreeWriter<StateKey> for MockStore {
+    fn write_node_batch(&self, node_batch: &HashMap<NodeKey, Node<StateKey>>) -> Result<()> {
         Ok(())
     }
 }
@@ -203,6 +211,7 @@ impl RestoreRunMode {
             Self::Verify => {
                 let mock_store = Arc::new(MockStore);
                 StateSnapshotRestore::new_overwrite(
+                    &mock_store,
                     &mock_store,
                     &mock_store,
                     version,

@@ -8,6 +8,8 @@ use aptos_crypto::HashValue;
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::Version;
 use aptos_types::xibble::XibblePath;
+use aptos_xerkle::node_type::{Node, NodeKey};
+use aptos_xerkle::{TreeReader, TreeWriter};
 use schemadb::schema::{KeyCodec, Schema, ValueCodec};
 use schemadb::{SchemaBatch, DB};
 use std::collections::HashMap;
@@ -137,5 +139,13 @@ impl StateXerkleDb {
 
     pub(crate) fn lru_cache(&self) -> &LruNodeCache {
         &self.lru_cache
+    }
+}
+
+impl TreeReader<StateKey> for StateXerkleDb {}
+
+impl TreeWriter<StateKey> for StateXerkleDb {
+    fn write_node_batch(&self, node_batch: &HashMap<NodeKey, Node<StateKey>>) -> Result<()> {
+        todo!()
     }
 }

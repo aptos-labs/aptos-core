@@ -1998,6 +1998,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-xerkle",
  "aptosdb",
  "async-trait",
  "backup-service",

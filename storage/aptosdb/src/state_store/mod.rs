@@ -686,6 +686,7 @@ impl StateStore {
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
         Ok(Box::new(StateSnapshotRestore::new(
             &self.state_merkle_db,
+            &self.state_xerkle_db,
             self,
             version,
             expected_root_hash,
@@ -720,28 +721,28 @@ impl StateStore {
         Ok(())
     }
 
-    #[cfg(test)]
-    pub fn get_all_jmt_nodes_referenced(
-        &self,
-        version: Version,
-    ) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
-        aptos_jellyfish_merkle::JellyfishMerkleTree::new(self.state_merkle_db.as_ref())
-            .get_all_nodes_referenced(version)
-    }
-
-    #[cfg(test)]
-    pub fn get_all_jmt_nodes(&self) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
-        let mut iter = self
-            .state_db
-            .state_merkle_db
-            .db
-            .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
-            Default::default(),
-        )?;
-        iter.seek_to_first();
-        let all_rows = iter.collect::<Result<Vec<_>>>()?;
-        Ok(all_rows.into_iter().map(|(k, _v)| k).collect())
-    }
+    // #[cfg(test)]
+    // pub fn get_all_jmt_nodes_referenced(
+    //     &self,
+    //     version: Version,
+    // ) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
+    //     aptos_jellyfish_merkle::JellyfishMerkleTree::new(self.state_merkle_db.as_ref())
+    //         .get_all_nodes_referenced(version)
+    // }
+    //
+    // #[cfg(test)]
+    // pub fn get_all_jmt_nodes(&self) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
+    //     let mut iter = self
+    //         .state_db
+    //         .state_merkle_db
+    //         .db
+    //         .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
+    //         Default::default(),
+    //     )?;
+    //     iter.seek_to_first();
+    //     let all_rows = iter.collect::<Result<Vec<_>>>()?;
+    //     Ok(all_rows.into_iter().map(|(k, _v)| k).collect())
+    // }
 }
 
 impl StateValueWriter<StateKey, StateValue> for StateStore {

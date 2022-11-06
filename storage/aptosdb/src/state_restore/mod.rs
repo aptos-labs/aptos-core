@@ -7,10 +7,16 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
     restore::JellyfishMerkleRestore,
-    IO_POOL, {Key, TreeReader, TreeWriter, Value},
+    IO_POOL,
+    {Key as JmtKey, TreeReader as JmtTreeReader, TreeWriter as JmtTreeWriter, Value as JmtValue},
 };
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{proof::SparseMerkleRangeProof, transaction::Version};
+use aptos_xerkle::restore::XerkleRestore;
+use aptos_xerkle::Key as XerkleKey;
+use aptos_xerkle::TreeReader as XerkleTreeReader;
+use aptos_xerkle::TreeWriter as XerkleTreeWriter;
+use aptos_xerkle::Value as XerkleValue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -55,7 +61,7 @@ struct StateValueRestore<K, V> {
     db: Arc<dyn StateValueWriter<K, V>>,
 }
 
-impl<K: Key + CryptoHash + Eq + Hash, V: Value> StateValueRestore<K, V> {
+impl<K: JmtKey + CryptoHash + Eq + Hash, V: JmtValue> StateValueRestore<K, V> {
     pub fn new<D: 'static + StateValueWriter<K, V>>(db: Arc<D>, version: Version) -> Self {
         Self { version, db }
     }
@@ -115,12 +121,20 @@ impl<K: Key + CryptoHash + Eq + Hash, V: Value> StateValueRestore<K, V> {
 
 pub struct StateSnapshotRestore<K, V> {
     tree_restore: Arc<Mutex<Option<JellyfishMerkleRestore<K>>>>,
+    xerkle_restore: Arc<Mutex<Option<XerkleRestore<K>>>>,
     kv_restore: Arc<Mutex<Option<StateValueRestore<K, V>>>>,
 }
 
-impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
-    pub fn new<T: 'static + TreeReader<K> + TreeWriter<K>, S: 'static + StateValueWriter<K, V>>(
-        tree_store: &Arc<T>,
+impl<K: JmtKey + XerkleKey + CryptoHash + Hash + Eq, V: JmtValue + XerkleValue>
+    StateSnapshotRestore<K, V>
+{
+    pub fn new<
+        T1: 'static + JmtTreeReader<K> + JmtTreeWriter<K>,
+        T2: 'static + XerkleTreeReader<K> + XerkleTreeWriter<K>,
+        S: 'static + StateValueWriter<K, V>,
+    >(
+        jmt_store: &Arc<T1>,
+        xerkle_store: &Arc<T2>,
         value_store: &Arc<S>,
         version: Version,
         expected_root_hash: HashValue,
@@ -128,7 +142,13 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
     ) -> Result<Self> {
         Ok(Self {
             tree_restore: Arc::new(Mutex::new(Some(JellyfishMerkleRestore::new(
-                Arc::clone(tree_store),
+                Arc::clone(jmt_store),
+                version,
+                expected_root_hash,
+                async_commit,
+            )?))),
+            xerkle_restore: Arc::new(Mutex::new(Some(XerkleRestore::new(
+                Arc::clone(xerkle_store),
                 version,
                 expected_root_hash,
                 async_commit,
@@ -140,15 +160,25 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
         })
     }
 
-    pub fn new_overwrite<T: 'static + TreeWriter<K>, S: 'static + StateValueWriter<K, V>>(
-        tree_store: &Arc<T>,
+    pub fn new_overwrite<
+        T1: 'static + JmtTreeWriter<K>,
+        T2: 'static + XerkleTreeWriter<K>,
+        S: 'static + StateValueWriter<K, V>,
+    >(
+        jmt_store: &Arc<T1>,
+        xerkle_store: &Arc<T2>,
         value_store: &Arc<S>,
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<Self> {
         Ok(Self {
             tree_restore: Arc::new(Mutex::new(Some(JellyfishMerkleRestore::new_overwrite(
-                Arc::clone(tree_store),
+                Arc::clone(jmt_store),
+                version,
+                expected_root_hash,
+            )?))),
+            xerkle_restore: Arc::new(Mutex::new(Some(XerkleRestore::new_overwrite(
+                Arc::clone(xerkle_store),
                 version,
                 expected_root_hash,
             )?))),
@@ -188,7 +218,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
     }
 }
 
-impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
+impl<K: JmtKey + CryptoHash + Hash + Eq, V: JmtValue> StateSnapshotReceiver<K, V>
     for StateSnapshotRestore<K, V>
 {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()> {
