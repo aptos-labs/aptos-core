@@ -58,17 +58,17 @@ impl StateMerkleBatchCommitter {
                     } = data;
                     // commit jellyfish merkle nodes
                     let _timer = OTHER_TIMERS_SECONDS
-                        .with_label_values(&["commit_jellyfish_merkle_nodes"])
+                        .with_label_values(&["commit_xerkle_nodes"])
                         .start_timer();
                     self.state_db
-                        .state_merkle_db
+                        .state_xerkle_db
                         .write_schemas(batch)
-                        .expect("State merkle batch commit failed.");
-                    if self.state_db.state_merkle_db.cache_enabled() {
+                        .expect("State xerkle batch commit failed.");
+                    if self.state_db.state_xerkle_db.cache_enabled() {
                         self.state_db
-                            .state_merkle_db
+                            .state_xerkle_db
                             .version_cache()
-                            .maybe_evict_version(self.state_db.state_merkle_db.lru_cache());
+                            .maybe_evict_version(self.state_db.state_xerkle_db.lru_cache());
                     }
                     // TODO(grao): Consider remove the following sender once we verified the
                     // version cache correctly cached all nodes we need.

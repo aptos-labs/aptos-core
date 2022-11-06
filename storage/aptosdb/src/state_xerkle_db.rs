@@ -11,6 +11,7 @@ use aptos_types::xibble::XibblePath;
 use schemadb::schema::{KeyCodec, Schema, ValueCodec};
 use schemadb::{SchemaBatch, DB};
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -19,6 +20,13 @@ pub struct StateXerkleDb {
     enable_cache: bool,
     version_cache: VersionedNodeCache,
     lru_cache: LruNodeCache,
+}
+
+impl Deref for StateXerkleDb {
+    type Target = DB;
+    fn deref(&self) -> &Self::Target {
+        &self.db
+    }
 }
 
 impl StateXerkleDb {
@@ -117,5 +125,17 @@ impl StateXerkleDb {
         // result
         //     .map(|raw_value| <S::Value as ValueCodec<S>>::decode_value(&raw_value))
         //     .transpose()
+    }
+
+    pub(crate) fn cache_enabled(&self) -> bool {
+        self.enable_cache
+    }
+
+    pub(crate) fn version_cache(&self) -> &VersionedNodeCache {
+        &self.version_cache
+    }
+
+    pub(crate) fn lru_cache(&self) -> &LruNodeCache {
+        &self.lru_cache
     }
 }
