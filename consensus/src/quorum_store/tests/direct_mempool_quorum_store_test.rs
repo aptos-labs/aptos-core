@@ -30,6 +30,7 @@ async fn test_block_request_no_txns() {
     let (consensus_callback, consensus_callback_rcv) = oneshot::channel();
     consensus_to_quorum_store_sender
         .try_send(WrapperCommand::GetBlockRequest(
+            1,
             100,
             1000,
             PayloadFilter::DirectMempool(vec![]),

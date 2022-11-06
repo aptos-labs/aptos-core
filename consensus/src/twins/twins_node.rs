@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    commit_notifier::QuorumStoreCommitNotifier,
     counters,
     data_manager::DataManager,
     epoch_manager::EpochManager,

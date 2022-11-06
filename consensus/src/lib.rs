@@ -15,7 +15,6 @@
 extern crate core;
 
 mod block_storage;
-mod commit_notifier;
 mod consensusdb;
 mod epoch_manager;
 mod error;
