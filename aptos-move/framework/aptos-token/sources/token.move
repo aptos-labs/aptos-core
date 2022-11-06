@@ -836,6 +836,10 @@ module aptos_token::token {
         deposit_token(receiver, token);
     }
 
+    public fun get_direct_transfer(receiver: address): bool acquires TokenStore {
+        borrow_global<TokenStore>(receiver).direct_transfer
+    }
+
     public fun initialize_token_store(account: &signer) {
         if (!exists<TokenStore>(signer::address_of(account))) {
             move_to(
