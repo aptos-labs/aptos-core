@@ -90,6 +90,7 @@ use aptos_crypto::{
 };
 use aptos_infallible::Mutex;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_types::xibble::XibblePath;
 use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt};
 use std::sync::MutexGuard;
 use std::{
@@ -533,6 +534,10 @@ where
             &mut node_hashes,
         );
         node_hashes
+    }
+
+    pub fn new_node_hashes_since_v2(&self, since_smt: &Self) -> HashMap<XibblePath, HashValue> {
+        todo!()
     }
 
     /// Recursively generate the partial node update batch of jellyfish merkle
