@@ -95,15 +95,14 @@ impl DataManager {
 
             let digests: Vec<HashValue> = payloads
                 .into_iter()
-                .map(|payload| match payload {
+                .flat_map(|payload| match payload {
                     Payload::DirectMempool(_) => {
                         unreachable!()
                     }
                     Payload::InQuorumStore(proofs) => proofs,
                     Payload::Empty => Vec::new(),
                 })
-                .flatten()
-                .map(|proof| proof.digest().clone())
+                .map(|proof| *proof.digest())
                 .collect();
 
             let _ = self
@@ -125,28 +124,26 @@ impl DataManager {
     }
 
     pub async fn update_payload(&self, block: &Block) {
-        if self.quorum_store_enabled.load(Ordering::Relaxed) {
-            if block.payload().is_some() {
-                match block.payload().unwrap() {
-                    Payload::InQuorumStore(proofs) => {
-                        if !self.digest_status.contains_key(&block.id()) {
-                            let receivers = self
-                                .request_data(
-                                    proofs.clone(),
-                                    LogicalTime::new(block.epoch(), block.round()),
-                                )
-                                .await;
-                            self.digest_status
-                                .insert(block.id(), DataStatus::Requested(receivers));
-                            self.expiration_status
-                                .lock()
-                                .add_item(block.id(), block.round());
-                        }
+        if self.quorum_store_enabled.load(Ordering::Relaxed) && block.payload().is_some() {
+            match block.payload().unwrap() {
+                Payload::InQuorumStore(proofs) => {
+                    if !self.digest_status.contains_key(&block.id()) {
+                        let receivers = self
+                            .request_data(
+                                proofs.clone(),
+                                LogicalTime::new(block.epoch(), block.round()),
+                            )
+                            .await;
+                        self.digest_status
+                            .insert(block.id(), DataStatus::Requested(receivers));
+                        self.expiration_status
+                            .lock()
+                            .add_item(block.id(), block.round());
                     }
-                    Payload::Empty => {}
-                    Payload::DirectMempool(_) => {
-                        unreachable!()
-                    }
+                }
+                Payload::Empty => {}
+                Payload::DirectMempool(_) => {
+                    unreachable!()
                 }
             }
         }
@@ -161,9 +158,7 @@ impl DataManager {
                 // let data_status = self.digest_status.entry(block.id());
                 match self.digest_status.entry(block.id()) {
                     dashmap::mapref::entry::Entry::Occupied(mut entry) => match entry.get_mut() {
-                        DataStatus::Cached(data) => {
-                            return Ok(data.clone());
-                        }
+                        DataStatus::Cached(data) => Ok(data.clone()),
                         DataStatus::Requested(receivers) => {
                             let mut vec_ret = Vec::new();
                             debug!("QSE: waiting for data on {} receivers", receivers.len());
@@ -208,13 +203,11 @@ impl DataManager {
                 warn!("should use QuorumStore");
                 Ok(Vec::new())
             }
+        } else if let Payload::DirectMempool(txns) = block.payload().unwrap() {
+            Ok(txns.clone())
         } else {
-            if let Payload::DirectMempool(txns) = block.payload().unwrap() {
-                Ok(txns.clone())
-            } else {
-                warn!("should not use QuorumStore");
-                Ok(Vec::new())
-            }
+            warn!("should not use QuorumStore");
+            Ok(Vec::new())
         }
     }
     #[allow(dead_code)]

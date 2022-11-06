@@ -51,5 +51,4 @@ impl fmt::Display for WrapperCommand {
 
 pub enum ConsensusResponse {
     GetBlockResponse(Payload),
-    CleanResponse(),
 }
