@@ -43,6 +43,8 @@ aptos-crypto-derive = { path = "../aptos-crypto-derive", version = "0.0.3" }
 
 [dev-dependencies]
 bitvec = "0.19.4"
+blake2 = "0.10.4"
+blake2-rfc = "0.2.18"
 byteorder = "1.4.3"
 criterion = "0.3.5"
 proptest = "1.0.0"
