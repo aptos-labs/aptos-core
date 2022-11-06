@@ -25,6 +25,7 @@ pub(crate) mod transaction_by_hash;
 pub(crate) mod transaction_info;
 pub(crate) mod version_data;
 pub(crate) mod write_set;
+pub(crate) mod xerkle_node;
 
 use anyhow::{ensure, Result};
 use schemadb::ColumnFamilyName;

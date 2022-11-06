@@ -41,6 +41,7 @@ aptos-state-view = { path = "../state-view" }
 aptos-temppath = { path = "../../crates/aptos-temppath", optional = true }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
+aptos-xerkle = { path = "../xerkle" }
 aptosdb-indexer = { path = "../indexer" }
 
 executor-types = { path = "../../execution/executor-types" }

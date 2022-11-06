@@ -3,6 +3,7 @@
 
 //! This file defines the state merkle snapshot committer running in background thread.
 
+use crate::xerkle_node::XerkleNodeSchema;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     metrics::LATEST_SNAPSHOT_VERSION,
@@ -12,9 +13,10 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
-use aptos_jellyfish_merkle::node_type::NodeKey;
+use aptos_jellyfish_merkle::node_type::NodeKey as JmtNodeKey;
 use aptos_logger::{info, trace};
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_xerkle::node_type::NodeKey as XerkleNodeKey;
 use schemadb::SchemaBatch;
 use std::sync::{mpsc::Receiver, Arc};
 use storage_interface::state_delta::StateDelta;
@@ -110,18 +112,18 @@ impl StateMerkleBatchCommitter {
             .get::<VersionDataSchema>(&version)?
             .ok_or_else(|| anyhow!("VersionData missing for version {}", version))?
             .get_state_storage_usage();
-        let leaf_count_from_jmt = self
+        let leaf_count_from_state_tree = self
             .state_db
-            .state_merkle_db
-            .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version))?
+            .state_xerkle_db
+            .get::<XerkleNodeSchema>(&XerkleNodeKey::new_empty_path(version))?
             .ok_or_else(|| anyhow!("Root node missing at version {}", version))?
             .leaf_count();
 
         ensure!(
-            usage_from_ledger_db.items() == leaf_count_from_jmt,
+            usage_from_ledger_db.items() == leaf_count_from_state_tree,
             "State item count inconsistent, {} from ledger db and {} from state tree.",
             usage_from_ledger_db.items(),
-            leaf_count_from_jmt,
+            leaf_count_from_state_tree,
         );
 
         let usage_from_smt = state_delta.current.usage();

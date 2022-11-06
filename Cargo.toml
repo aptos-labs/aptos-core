@@ -115,6 +115,7 @@ members = [
     "storage/scratchpad",
     "storage/state-view",
     "storage/storage-interface",
+    "storage/xerkle",
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
     "testsuite/dos/http_test",

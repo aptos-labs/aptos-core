@@ -8,6 +8,7 @@ use aptos_crypto::HashValue;
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::Version;
 use aptos_types::xibble::XibblePath;
+use schemadb::schema::{KeyCodec, Schema, ValueCodec};
 use schemadb::{SchemaBatch, DB};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -97,5 +98,24 @@ impl StateXerkleDb {
         // }
         //
         // Ok((batch, new_root_hash))
+    }
+
+    pub fn get<S: Schema>(&self, schema_key: &S::Key) -> Result<Option<S::Value>> {
+        todo!()
+        // let _timer = APTOS_SCHEMADB_GET_LATENCY_SECONDS
+        //     .with_label_values(&[S::COLUMN_FAMILY_NAME])
+        //     .start_timer();
+        //
+        // let k = <S::Key as KeyCodec<S>>::encode_key(schema_key)?;
+        // let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
+        //
+        // let result = self.inner.get_cf(cf_handle, &k)?;
+        // APTOS_SCHEMADB_GET_BYTES
+        //     .with_label_values(&[S::COLUMN_FAMILY_NAME])
+        //     .observe(result.as_ref().map_or(0.0, |v| v.len() as f64));
+        //
+        // result
+        //     .map(|raw_value| <S::Value as ValueCodec<S>>::decode_value(&raw_value))
+        //     .transpose()
     }
 }
