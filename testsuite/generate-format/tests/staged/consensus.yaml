@@ -265,6 +265,10 @@ LedgerInfoWithV0:
         TYPENAME: LedgerInfo
     - signatures:
         TYPENAME: AggregateSignature
+LogicalTime:
+  STRUCT:
+    - epoch: U64
+    - round: U64
 Module:
   STRUCT:
     - code: BYTES
@@ -286,10 +290,23 @@ MultiEd25519Signature:
 Payload:
   ENUM:
     0:
+      Empty: UNIT
+    1:
       DirectMempool:
         NEWTYPE:
           SEQ:
             TYPENAME: SignedTransaction
+    2:
+      InQuorumStore:
+        NEWTYPE:
+          SEQ:
+            TYPENAME: ProofOfStore
+ProofOfStore:
+  STRUCT:
+    - info:
+        TYPENAME: SignedDigestInfo
+    - multi_signature:
+        TYPENAME: AggregateSignature
 ProposalMsg:
   STRUCT:
     - proposal:
@@ -327,6 +344,14 @@ Script:
           TYPENAME: TransactionArgument
 Signature:
   NEWTYPESTRUCT: BYTES
+SignedDigestInfo:
+  STRUCT:
+    - digest:
+        TYPENAME: HashValue
+    - expiration:
+        TYPENAME: LogicalTime
+    - num_txns: U64
+    - num_bytes: U64
 SignedTransaction:
   STRUCT:
     - raw_txn:
