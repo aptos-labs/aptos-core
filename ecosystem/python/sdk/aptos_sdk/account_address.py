@@ -19,7 +19,9 @@ class AccountAddress:
         if len(address) != AccountAddress.LENGTH:
             raise Exception("Expected address of length 32")
 
-    def __eq__(self, other: AccountAddress) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, AccountAddress):
+            return NotImplemented
         return self.address == other.address
 
     def __str__(self):
@@ -28,6 +30,7 @@ class AccountAddress:
     def hex(self) -> str:
         return f"0x{self.address.hex()}"
 
+    @staticmethod
     def from_hex(address: str) -> AccountAddress:
         addr = address
 
@@ -40,11 +43,13 @@ class AccountAddress:
 
         return AccountAddress(bytes.fromhex(addr))
 
+    @staticmethod
     def from_key(key: ed25519.PublicKey) -> AccountAddress:
         hasher = hashlib.sha3_256()
         hasher.update(key.key.encode() + b"\x00")
         return AccountAddress(hasher.digest())
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> AccountAddress:
         return AccountAddress(deserializer.fixed_bytes(AccountAddress.LENGTH))
 

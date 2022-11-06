@@ -37,13 +37,13 @@ git clone https://github.com/aptos-labs/aptos-core.git
 
   Install the necessary dependencies:
   ```bash
-  yarn install
+  pnpm install
   ```
 
   Run the [`transfer_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) example:
 
   ```bash
-  yarn run transfer_coin
+  pnpm run transfer_coin
   ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -120,9 +120,6 @@ Now see the below walkthrough of the SDK functions used to accomplish the above 
 ## Step 4: The SDK in depth
 
 The `transfer-coin` example code uses helper functions to interact with the [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/). This section reviews each of the calls and gives insights into functionality.
-
-
-
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">

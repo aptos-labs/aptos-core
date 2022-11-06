@@ -41,7 +41,7 @@ module aptos_std::ed25519 {
         bytes: vector<u8>
     }
 
-    /// A BCS-serializable message, which one can verify signatures on via `verify_signature_t`
+    /// A BCS-serializable message, which one can verify signatures on via `signature_verify_strict_t`
     struct SignedMessage<MessageType> has drop {
         type_info: TypeInfo,
         inner: MessageType,
@@ -60,7 +60,7 @@ module aptos_std::ed25519 {
         bytes: vector<u8>
     }
 
-    /// A purported Ed25519 signature that can be verified via `verify_signature_strict` or `verify_signature_strict_t`.
+    /// A purported Ed25519 signature that can be verified via `signature_verify_strict` or `signature_verify_strict_t`.
     struct Signature has copy, drop, store {
         bytes: vector<u8>
     }

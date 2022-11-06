@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::chain_id::ChainId;
 use crate::{
     access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
@@ -19,6 +20,7 @@ use std::{collections::HashMap, fmt, sync::Arc};
 mod approved_execution_hashes;
 mod aptos_features;
 mod aptos_version;
+mod chain_id;
 mod consensus_config;
 mod gas_schedule;
 mod validator_set;
@@ -65,6 +67,7 @@ pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
     ValidatorSet::CONFIG_ID,
     Version::CONFIG_ID,
     OnChainConsensusConfig::CONFIG_ID,
+    ChainId::CONFIG_ID,
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -172,10 +175,7 @@ pub fn new_epoch_event_key() -> EventKey {
 
 pub fn access_path_for_config(config_id: ConfigID) -> AccessPath {
     let struct_tag = struct_tag_for_config(config_id);
-    AccessPath::new(
-        CORE_CODE_ADDRESS,
-        AccessPath::resource_access_vec(struct_tag),
-    )
+    AccessPath::new(CORE_CODE_ADDRESS, AccessPath::resource_path_vec(struct_tag))
 }
 
 pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {

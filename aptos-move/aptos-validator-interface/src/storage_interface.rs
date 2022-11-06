@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::AptosValidatorInterface;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use aptos_config::config::{
     RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
@@ -10,14 +10,12 @@ use aptos_config::config::{
 use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
-    contract_event::EventWithVersion,
-    event::EventKey,
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{Transaction, Version},
 };
 use aptosdb::AptosDB;
 use std::{path::Path, sync::Arc};
-use storage_interface::{DbReader, Order};
+use storage_interface::{DbReader, MAX_REQUEST_LIMIT};
 
 pub struct DBDebuggerInterface(Arc<dyn DbReader>);
 
@@ -35,21 +33,31 @@ impl DBDebuggerInterface {
     }
 }
 
+#[async_trait::async_trait]
 impl AptosValidatorInterface for DBDebuggerInterface {
-    fn get_account_state_by_version(
+    async fn get_account_state_by_version(
         &self,
         account: AccountAddress,
         version: Version,
     ) -> Result<Option<AccountState>> {
-        AccountState::from_access_paths_and_values(
-            account,
-            &self
-                .0
-                .get_state_values_by_key_prefix(&StateKeyPrefix::from(account), version)?,
-        )
+        let key_prefix = StateKeyPrefix::from(account);
+        let mut iter = self
+            .0
+            .get_prefixed_state_value_iterator(&key_prefix, None, version)?;
+        let kvs = iter
+            .by_ref()
+            .take(MAX_REQUEST_LIMIT as usize)
+            .collect::<Result<_>>()?;
+        if iter.next().is_some() {
+            bail!(
+                "Too many state items under state key prefix {:?}.",
+                key_prefix
+            );
+        }
+        AccountState::from_access_paths_and_values(account, &kvs)
     }
 
-    fn get_state_value_by_version(
+    async fn get_state_value_by_version(
         &self,
         state_key: &StateKey,
         version: Version,
@@ -60,25 +68,18 @@ impl AptosValidatorInterface for DBDebuggerInterface {
             .0)
     }
 
-    fn get_events(
+    async fn get_committed_transactions(
         &self,
-        key: &EventKey,
-        start_seq: u64,
+        start: Version,
         limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<EventWithVersion>> {
-        self.0
-            .get_events(key, start_seq, Order::Ascending, limit, ledger_version)
-    }
-
-    fn get_committed_transactions(&self, start: Version, limit: u64) -> Result<Vec<Transaction>> {
+    ) -> Result<Vec<Transaction>> {
         Ok(self
             .0
-            .get_transactions(start, limit, self.get_latest_version()?, false)?
+            .get_transactions(start, limit, self.get_latest_version().await?, false)?
             .transactions)
     }
 
-    fn get_latest_version(&self) -> Result<Version> {
+    async fn get_latest_version(&self) -> Result<Version> {
         let (version, _) = self
             .0
             .get_latest_transaction_info_option()?
@@ -86,12 +87,12 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         Ok(version)
     }
 
-    fn get_version_by_account_sequence(
+    async fn get_version_by_account_sequence(
         &self,
         account: AccountAddress,
         seq: u64,
     ) -> Result<Option<Version>> {
-        let ledger_version = self.get_latest_version()?;
+        let ledger_version = self.get_latest_version().await?;
         Ok(self
             .0
             .get_account_transaction(account, seq, false, ledger_version)?

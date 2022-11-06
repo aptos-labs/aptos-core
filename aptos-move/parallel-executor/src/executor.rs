@@ -453,7 +453,7 @@ where
         let executor = E::init(executor_arguments);
         let mut data_map = BTreeMap::new();
 
-        let mut ret = vec![];
+        let mut ret = Vec::with_capacity(num_txns);
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             // this call internally materializes deltas.
             let res = executor.execute_transaction_btree_view(&data_map, txn, idx);

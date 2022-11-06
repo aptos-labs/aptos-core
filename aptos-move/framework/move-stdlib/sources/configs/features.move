@@ -47,6 +47,28 @@ module std::features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
     }
 
+    /// Whether the new SHA2-512, SHA3-512 and RIPEMD-160 hash function natives are enabled.
+    /// This is needed because of the introduction of new native functions.
+    /// Lifetime: transient
+    const SHA_512_AND_RIPEMD_160_NATIVES: u64 = 3;
+
+    public fun get_sha_512_and_ripemd_160_feature(): u64 { SHA_512_AND_RIPEMD_160_NATIVES }
+
+    public fun sha_512_and_ripemd_160_enabled(): bool acquires Features {
+        is_enabled(SHA_512_AND_RIPEMD_160_NATIVES)
+    }
+
+    /// Whether the new `aptos_stdlib::type_info::chain_id()` native for fetching the chain ID is enabled.
+    /// This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const APTOS_STD_CHAIN_ID_NATIVES: u64 = 4;
+
+    public fun get_aptos_stdlib_chain_id_feature(): u64 { APTOS_STD_CHAIN_ID_NATIVES }
+
+    public fun aptos_stdlib_chain_id_enabled(): bool acquires Features {
+        is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

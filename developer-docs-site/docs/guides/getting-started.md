@@ -14,7 +14,7 @@ See the [Workflows](#workflows) for use cases associated with each path. See the
 
 Then review the Aptos source code, found in the [Aptos-core](https://github.com/aptos-labs/aptos-core) repository of GitHub, and continue your journey through this site. The source contains READMEs and code comments invaluable to developing on Aptos.
 
-## Supported operating systems
+## Use supported operating systems
 
 Aptos can be built on various operating systems, including Linux, macOS. and Windows. Aptos is tested extensively on Linux and macOS, and less so on Windows. Here are the versions we use:
 
@@ -24,7 +24,7 @@ Aptos can be built on various operating systems, including Linux, macOS. and Win
 
 See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for instructions by operating system.
 
-## Hardware requirements
+## Meet hardware requirements
 
 Aptos requires no specific hardware to develop on the blockchain. To run one of our nodes, see the hardware requirements for:
 
@@ -143,7 +143,11 @@ See [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/
 
 Now your basic Aptos development environment is ready. Head over to our [Developer Tutorials](tutorials/index.md) to get started in Aptos.
 
-## Aptos developer resources
+## Understand the Aptos Token Standard
+
+The [Aptos Token Standard](../concepts/coin-and-token/index.md) lays out the rules for creating and distributing digital assets on the Aptos blockchain.
+
+## Find Aptos developer resources
 
 This section contains links to frequently referred Aptos developer resources. 
 

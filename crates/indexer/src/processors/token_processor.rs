@@ -180,7 +180,7 @@ fn insert_tokens(
                 .on_conflict((token_data_id_hash, property_version, transaction_version))
                 .do_update()
                 .set((
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    token_properties.eq(excluded(token_properties)),
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             None,
@@ -210,11 +210,7 @@ fn insert_token_ownerships(
                     transaction_version,
                     table_handle,
                 ))
-                .do_update()
-                .set((
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -236,7 +232,7 @@ fn insert_token_datas(
                 .on_conflict((token_data_id_hash, transaction_version))
                 .do_update()
                 .set((
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                    default_properties.eq(excluded(default_properties)),
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             None,
@@ -397,11 +393,7 @@ fn insert_token_activities(
                     event_creation_number,
                     event_sequence_number,
                 ))
-                .do_update()
-                .set((
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -463,6 +455,7 @@ fn insert_current_ans_lookups(
                     expiration_timestamp.eq(excluded(expiration_timestamp)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
+                    token_name.eq(excluded(token_name)),
                 )),
                 Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
             )?;
