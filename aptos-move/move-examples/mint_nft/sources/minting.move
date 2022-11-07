@@ -272,7 +272,7 @@ module mint_nft::minting {
         create_account_for_test(@admin_addr);
     }
 
-    #[test (origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, nft_receiver2 = @0x234, aptos_framework = @aptos_framework)]
+    #[test (origin_account = @0xcafe, resource_account = @0x0b6beee9bc1ad3177403a04efeefb1901c12b7b575ac5124c0205efc0dd2e32a, nft_receiver = @0x123, nft_receiver2 = @0x234, aptos_framework = @aptos_framework)]
     public entry fun test_happy_path(origin_account: signer, resource_account: signer, nft_receiver: signer, nft_receiver2: signer, aptos_framework: signer) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
         set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);
@@ -332,7 +332,7 @@ module mint_nft::minting {
         mint_nft(&nft_receiver, ed25519::signature_to_bytes(&sig));
     }
 
-    #[test (origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, admin = @admin_addr, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
+    #[test (origin_account = @0xcafe, resource_account = @0x0b6beee9bc1ad3177403a04efeefb1901c12b7b575ac5124c0205efc0dd2e32a, admin = @admin_addr, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x50002)]
     public entry fun test_update_expiration_time(origin_account: signer, resource_account: signer, admin: signer, nft_receiver: signer, aptos_framework: signer) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
