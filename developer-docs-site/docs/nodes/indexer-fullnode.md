@@ -76,10 +76,18 @@ For an Aptos indexer fullnode, install these packages:
         emit_every: 500
     ```
 
-1. Run the indexer fullnode with:
+1. Run the indexer fullnode with either `cargo` for source setup or `docker`:
     ```bash
-    cargo run --bin aptos-node --features "indexer"  -- --config /path/to/fullnode.yaml
     cargo run -p aptos-node --features "indexer" --release -- -f /path/to/fullnode.yaml
+    ```
+    ```bash
+    docker run --pull=always \
+    --rm -p 8080:8080 \
+    -p 9101:9101 -p 6180:6180 \
+    -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data \
+    --workdir /opt/aptos/etc \
+    --name=aptos-fullnode aptoslabs/validator:mainnet aptos-node \
+    -f /opt/aptos/etc/fullnode.yaml
     ```
 
 ## Restart indexer
