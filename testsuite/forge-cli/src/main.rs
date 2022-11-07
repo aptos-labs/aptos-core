@@ -189,6 +189,7 @@ fn main() -> Result<()> {
     let args = Args::from_args();
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
+    let duration = Duration::from_secs(3600);
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -473,7 +474,25 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
             .with_initial_fullnode_count(12)
             .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-            .with_network_tests(vec![&ThreeRegionSimulationTest])
+            .with_network_tests(vec![&ThreeRegionSimulationTest {
+                add_execution_delay: false,
+            }])
+            // TODO(rustielin): tune these success critiera after we have a better idea of the test behavior
+            .with_success_criteria(SuccessCriteria::new(3000, 100000, true, None, None, None)),
+        "three_region_simulation_with_different_node_speed" => config
+            .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+            .with_initial_fullnode_count(30)
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+            .with_network_tests(vec![&ThreeRegionSimulationTest {
+                add_execution_delay: true,
+            }])
+            .with_node_helm_config_fn(Arc::new(move |helm_values| {
+                helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
+                helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                    4000.into();
+                helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+                    1000000.into();
+            }))
             // TODO(rustielin): tune these success critiera after we have a better idea of the test behavior
             .with_success_criteria(SuccessCriteria::new(3000, 100000, true, None, None, None)),
         "network_bandwidth" => config
@@ -876,7 +895,9 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(vec![
             &NetworkBandwidthTest,
-            &ThreeRegionSimulationTest,
+            &ThreeRegionSimulationTest {
+                add_execution_delay: false,
+            },
             &NetworkLossTest,
         ])
         .with_success_criteria(SuccessCriteria::new(
