@@ -84,6 +84,7 @@ const sidebars = {
         "guides/state-sync",
         "guides/data-pruning",
         "guides/indexing",
+        "guides/resource-accounts",
         "guides/building-your-own-wallet",
         "guides/install-petra-wallet",
         "guides/building-wallet-extension",
@@ -108,6 +109,7 @@ const sidebars = {
     },
     "nodes/nodes-landing",
     "nodes/aptos-deployments",
+    "nodes/aptos-api-spec",
     "nodes/leaderboard-metrics",
     {
       type: "category",
@@ -128,7 +130,7 @@ const sidebars = {
       items: [
         "nodes/ait/whats-new-in-ait3",
         "nodes/ait/steps-in-ait3",
-        
+
       ],
     },  */
     {

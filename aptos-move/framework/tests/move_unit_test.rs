@@ -21,6 +21,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         // TODO(Gas): double check if this is correct
         UnitTestingConfig::default_with_bound(Some(100_000)),
         aptos_test_natives(),
+        /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
     )

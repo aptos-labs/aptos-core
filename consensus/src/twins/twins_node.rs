@@ -5,6 +5,7 @@ use crate::{
     commit_notifier::QuorumStoreCommitNotifier,
     counters,
     epoch_manager::EpochManager,
+    experimental::buffer_manager::OrderedBlocks,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
     network_tests::{NetworkPlayground, TwinId},
@@ -32,6 +33,7 @@ use channel::{self, aptos_channel, message_queues::QueueStyle};
 use consensus_types::common::{Author, Round};
 use event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use futures::channel::mpsc;
+use futures::StreamExt;
 use network::{
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
@@ -81,12 +83,12 @@ impl SMRNode {
         playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
         let (state_sync_client, state_sync) = mpsc::unbounded();
-        let (commit_cb_sender, commit_cb_receiver) = mpsc::unbounded::<LedgerInfoWithSignatures>();
+        let (ordered_blocks_tx, mut ordered_blocks_events) = mpsc::unbounded::<OrderedBlocks>();
         let shared_mempool = MockSharedMempool::new();
         let (quorum_store_to_mempool_sender, _) = mpsc::channel(1_024);
         let state_computer = Arc::new(MockStateComputer::new(
             state_sync_client,
-            commit_cb_sender,
+            ordered_blocks_tx,
             Arc::clone(&storage),
         ));
         let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
@@ -140,7 +142,7 @@ impl SMRNode {
             network_sender,
             timeout_sender,
             quorum_store_to_mempool_sender,
-            state_computer,
+            state_computer.clone(),
             storage.clone(),
             reconfig_listener,
             commit_notifier,
@@ -149,6 +151,21 @@ impl SMRNode {
 
         runtime.spawn(network_task.start());
         runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
+
+        let (commit_cb_sender, commit_cb_receiver) = mpsc::unbounded::<LedgerInfoWithSignatures>();
+        runtime.spawn(async move {
+            loop {
+                let ordered_blocks = ordered_blocks_events.next().await.unwrap();
+                let commit = ordered_blocks.ordered_proof.clone();
+                state_computer
+                    .commit_to_storage(ordered_blocks)
+                    .await
+                    .unwrap();
+
+                commit_cb_sender.unbounded_send(commit.clone()).unwrap();
+            }
+        });
+
         Self {
             id: twin_id,
             _runtime: runtime,

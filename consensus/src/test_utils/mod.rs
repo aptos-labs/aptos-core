@@ -205,7 +205,7 @@ pub fn consensus_runtime() -> runtime::Runtime {
         .expect("Failed to create Tokio runtime!")
 }
 
-pub fn timed_block_on<F>(runtime: &mut runtime::Runtime, f: F) -> <F as Future>::Output
+pub fn timed_block_on<F>(runtime: &runtime::Runtime, f: F) -> <F as Future>::Output
 where
     F: Future,
 {

@@ -23,22 +23,27 @@ class Account:
         self.account_address = account_address
         self.private_key = private_key
 
-    def __eq__(self, other: Account) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Account):
+            return NotImplemented
         return (
             self.account_address == other.account_address
             and self.private_key == other.private_key
         )
 
+    @staticmethod
     def generate() -> Account:
         private_key = ed25519.PrivateKey.random()
         account_address = AccountAddress.from_key(private_key.public_key())
         return Account(account_address, private_key)
 
+    @staticmethod
     def load_key(key: str) -> Account:
         private_key = ed25519.PrivateKey.from_hex(key)
         account_address = AccountAddress.from_key(private_key.public_key())
         return Account(account_address, private_key)
 
+    @staticmethod
     def load(path: str) -> Account:
         with open(path) as file:
             data = json.load(file)

@@ -119,14 +119,14 @@ proptest! {
             // match the signer_strategy in validator_signer.rs
             |key| Author::from_bytes(&key.public_key().to_bytes()[0..32]).unwrap()
         ).collect();
-        let mut runtime = consensus_runtime();
+        let runtime = consensus_runtime();
         let block_store = build_empty_tree();
         for block in blocks {
             if block.round() > 0 && authors.contains(&block.author().unwrap()) {
                 let known_parent = block_store.block_exists(block.parent_id());
                 let certified_parent = block.quorum_cert().certified_block().id() == block.parent_id();
                 let verify_res = block.verify_well_formed();
-                let res = timed_block_on(&mut runtime, block_store.execute_and_insert_block(block.clone()));
+                let res = timed_block_on(&runtime, block_store.execute_and_insert_block(block.clone()));
                 if !certified_parent {
                     prop_assert!(verify_res.is_err());
                 } else if !known_parent {
