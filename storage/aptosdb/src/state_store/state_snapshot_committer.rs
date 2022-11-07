@@ -65,7 +65,7 @@ impl StateSnapshotCommitter {
                         .current
                         .clone()
                         .freeze()
-                        .new_node_hashes_since_v2(&delta_to_commit.base.clone().freeze());
+                        .new_node_hashes_since(&delta_to_commit.base.clone().freeze());
                     let version = delta_to_commit.current_version.expect("Cannot be empty");
                     let base_version = delta_to_commit.base_version;
 
@@ -77,7 +77,7 @@ impl StateSnapshotCommitter {
 
                     let (batch, root_hash) = self
                         .state_db
-                        .state_xerkle_db
+                        .state_merkle_db
                         .merklize_value_set(
                             jmt_update_refs(&jmt_updates(&delta_to_commit.updates_since_base)),
                             Some(&node_hashes),

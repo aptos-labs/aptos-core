@@ -61,14 +61,14 @@ impl StateMerkleBatchCommitter {
                         .with_label_values(&["commit_xerkle_nodes"])
                         .start_timer();
                     self.state_db
-                        .state_xerkle_db
+                        .state_merkle_db
                         .write_schemas(batch)
                         .expect("State xerkle batch commit failed.");
-                    if self.state_db.state_xerkle_db.cache_enabled() {
+                    if self.state_db.state_merkle_db.cache_enabled() {
                         self.state_db
-                            .state_xerkle_db
+                            .state_merkle_db
                             .version_cache()
-                            .maybe_evict_version(self.state_db.state_xerkle_db.lru_cache());
+                            .maybe_evict_version(self.state_db.state_merkle_db.lru_cache());
                     }
                     // TODO(grao): Consider remove the following sender once we verified the
                     // version cache correctly cached all nodes we need.
@@ -112,19 +112,6 @@ impl StateMerkleBatchCommitter {
             .get::<VersionDataSchema>(&version)?
             .ok_or_else(|| anyhow!("VersionData missing for version {}", version))?
             .get_state_storage_usage();
-        let leaf_count_from_state_tree = self
-            .state_db
-            .state_xerkle_db
-            .get::<XerkleNodeSchema>(&XerkleNodeKey::new_empty_path(version))?
-            .ok_or_else(|| anyhow!("Root node missing at version {}", version))?
-            .leaf_count();
-
-        ensure!(
-            usage_from_ledger_db.items() == leaf_count_from_state_tree,
-            "State item count inconsistent, {} from ledger db and {} from state tree.",
-            usage_from_ledger_db.items(),
-            leaf_count_from_state_tree,
-        );
 
         let usage_from_smt = state_delta.current.usage();
         if !usage_from_smt.is_untracked() {
