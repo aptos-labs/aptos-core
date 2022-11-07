@@ -59,12 +59,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         ctx.report.report_text(msg);
 
         // Generate some traffic
-        let txn_stat = generate_traffic(
-            ctx,
-            &all_validators,
-            duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::liveness-check", self.name()),
             &txn_stat,
@@ -81,12 +76,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         runtime.block_on(batch_update(ctx, &[first_node], &new_version))?;
 
         // Generate some traffic
-        let txn_stat = generate_traffic(
-            ctx,
-            &[first_node],
-            duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let txn_stat = generate_traffic(ctx, &[first_node], duration)?;
         ctx.report.report_txn_stats(
             format!("{}::single-validator-upgrade", self.name()),
             &txn_stat,
@@ -103,12 +93,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         runtime.block_on(batch_update(ctx, &first_batch, &new_version))?;
 
         // Generate some traffic
-        let txn_stat = generate_traffic(
-            ctx,
-            &first_batch,
-            duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let txn_stat = generate_traffic(ctx, &first_batch, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::half-validator-upgrade", self.name()),
             &txn_stat,
@@ -124,12 +109,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         runtime.block_on(batch_update(ctx, &second_batch, &new_version))?;
 
         // Generate some traffic
-        let txn_stat = generate_traffic(
-            ctx,
-            &second_batch,
-            duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let txn_stat = generate_traffic(ctx, &second_batch, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::rest-validator-upgrade", self.name()),
             &txn_stat,

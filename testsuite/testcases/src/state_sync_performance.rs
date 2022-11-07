@@ -54,12 +54,7 @@ impl NetworkTest for StateSyncFullnodePerformance {
             "Generating the initial traffic for {:?} seconds.",
             emit_txn_duration.as_secs()
         );
-        let _txn_stat = generate_traffic(
-            ctx,
-            &all_fullnodes,
-            emit_txn_duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let _txn_stat = generate_traffic(ctx, &all_fullnodes, emit_txn_duration)?;
 
         // Wait for all nodes to synchronize. We time bound this to ensure
         // fullnodes don't fall too far behind the validators.
@@ -134,12 +129,7 @@ impl NetworkTest for StateSyncValidatorPerformance {
             "Generating the initial traffic for {:?} seconds.",
             emit_txn_duration.as_secs()
         );
-        let _txn_stat = generate_traffic(
-            ctx,
-            &all_validators,
-            emit_txn_duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let _txn_stat = generate_traffic(ctx, &all_validators, emit_txn_duration)?;
 
         // Wait for all nodes to synchronize and stabilize.
         info!("Waiting for the validators to be synchronized.");
