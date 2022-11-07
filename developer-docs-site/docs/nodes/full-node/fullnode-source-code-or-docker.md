@@ -158,11 +158,6 @@ curl -O https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet
 curl -O https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob
 ```
 
-TODO: Find out if this `mainnet` directory should reside in the `aptos-core` checkout as when attempting to start the fullnode indexer with the directory distinct results in the error:
-```
-error: could not find `Cargo.toml` in `/Users/claymurphy/mainnet` or any parent directory
-```
-
 3. Make sure that the `fullnode.yaml` configuration file that you downloaded contains only the following configuration content. This will ensure that this configuration is for public fullnode and not for either a validator node or a validator fullnode:
 
 ```yaml
@@ -184,8 +179,6 @@ api:
   enabled: true
   address: "0.0.0.0:8080"
 ```
-
-TODO: Find out why we have them replace the contents of a file they just downloaded with the contents of this doc. Also build in the latest docker tag to the image.
 
 **NOTE**: Set `listen_address: "/ip4/127.0.0.1/tcp/6182"` if you do not want other full nodes connecting to yours. Also see the below note.
 
