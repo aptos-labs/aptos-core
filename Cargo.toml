@@ -197,7 +197,6 @@ read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = 
 # END MOVE DEPENDENCIES
 
 [profile.release]
-debug = true
 overflow-checks = true
 
 # The performance build is not currently recommended
