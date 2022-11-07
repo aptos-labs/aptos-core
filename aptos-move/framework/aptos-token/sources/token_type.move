@@ -9,18 +9,6 @@
 module std::token_type {
 
     use aptos_token::token::{Self, TokenId};
-    #[test_only]
-    use aptos_framework::account;
-    #[test_only]
-    use std::signer;
-    #[test_only]
-    use aptos_token::token::{create_collection_and_token};
-    #[test_only]
-    use std::string::String;
-    #[test_only]
-    use std::string;
-    #[test_only]
-    use std::bcs;
 
     //
     // Constants
@@ -50,6 +38,19 @@ module std::token_type {
             FUNGIBLE
         }
     }
+
+    #[test_only]
+    use aptos_framework::account;
+    #[test_only]
+    use std::signer;
+    #[test_only]
+    use aptos_token::token::{create_collection_and_token};
+    #[test_only]
+    use std::string::String;
+    #[test_only]
+    use std::string;
+    #[test_only]
+    use std::bcs;
 
     #[test(creator = @0xcafe)]
     fun test_token_is_nft(creator: &signer){

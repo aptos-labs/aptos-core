@@ -1164,6 +1164,7 @@ module aptos_token::token {
         }
     }
 
+    /// mint more tokens with an existing tokendata id
     public fun mint_token(
         account: &signer,
         token_data_id: TokenDataId,
@@ -1317,6 +1318,7 @@ module aptos_token::token {
         )
     }
 
+    /// return the token creator, collection and name in a tuple
     public fun get_token_data_id_fields(token_data_id: &TokenDataId): (address, String, String) {
         (
             token_data_id.creator,
@@ -1343,6 +1345,7 @@ module aptos_token::token {
         }
     }
 
+    /// return the maximum from tokendata
     public fun get_tokendata_maximum(token_data_id: TokenDataId): u64 acquires Collections {
         let creator_address = token_data_id.creator;
         assert!(exists<Collections>(creator_address), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
@@ -1353,6 +1356,7 @@ module aptos_token::token {
         token_data.maximum
     }
 
+    /// return the uri of the token
     public fun get_tokendata_uri(creator: address, token_data_id: TokenDataId): String acquires Collections {
         assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
         let all_token_data = &borrow_global<Collections>(creator).token_data;
@@ -1362,6 +1366,7 @@ module aptos_token::token {
         token_data.uri
     }
 
+    /// return the description of the token
     public fun get_tokendata_description(token_data_id: TokenDataId): String acquires Collections {
         let creator_address = token_data_id.creator;
         assert!(exists<Collections>(creator_address), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
@@ -1372,6 +1377,7 @@ module aptos_token::token {
         token_data.description
     }
 
+    /// return the royalty of the token
     public fun get_tokendata_royalty(token_data_id: TokenDataId): Royalty acquires Collections {
         let creator_address = token_data_id.creator;
         assert!(exists<Collections>(creator_address), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
@@ -1382,10 +1388,12 @@ module aptos_token::token {
         token_data.royalty
     }
 
+    /// return the token_data_id from the token_id
     public fun get_tokendata_id(token_id: TokenId): TokenDataId {
         token_id.token_data_id
     }
 
+    /// return the mutation setting of the token
     public fun get_token_mutability_config(token_data_id: TokenDataId): TokenMutabilityConfig acquires Collections {
         let creator_addr = token_data_id.creator;
         assert!(exists<Collections>(creator_addr), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
@@ -1394,26 +1402,32 @@ module aptos_token::token {
         table::borrow(all_token_data, token_data_id).mutability_config
     }
 
-    public fun get_token_mutability_maximum(config: TokenMutabilityConfig): bool {
+    /// return if the token's maximum is mutable
+    public fun get_token_mutability_maximum(config: &TokenMutabilityConfig): bool {
         config.maximum
     }
 
-    public fun get_token_mutability_royalty(config: TokenMutabilityConfig): bool {
+    /// return if the token royalty is mutable with a token mutability config
+    public fun get_token_mutability_royalty(config: &TokenMutabilityConfig): bool {
         config.royalty
     }
 
-    public fun get_token_mutability_uri(config: TokenMutabilityConfig): bool {
+    /// return if the token uri is mutable with a token mutability config
+    public fun get_token_mutability_uri(config: &TokenMutabilityConfig): bool {
         config.uri
     }
 
-    public fun get_token_mutability_description(config: TokenMutabilityConfig): bool {
+    /// return if the token description is mutable with a token mutability config
+    public fun get_token_mutability_description(config: &TokenMutabilityConfig): bool {
         config.description
     }
 
-    public fun get_token_mutability_default_properties(config: TokenMutabilityConfig): bool {
+    /// return if the tokendata's default properties is mutable with a token mutability config
+    public fun get_token_mutability_default_properties(config: &TokenMutabilityConfig): bool {
         config.properties
     }
 
+    /// return the collection mutation setting
     public fun get_collection_mutability_config(
         creator: address,
         collection_name: String
@@ -1424,15 +1438,18 @@ module aptos_token::token {
         table::borrow(all_collection_data, collection_name).mutability_config
     }
 
-    public fun get_collection_mutability_description(config: CollectionMutabilityConfig): bool {
+    /// return if the collection description is mutable with a collection mutability config
+    public fun get_collection_mutability_description(config: &CollectionMutabilityConfig): bool {
         config.description
     }
 
-    public fun get_collection_mutability_uri(config: CollectionMutabilityConfig): bool {
+    /// return if the collection uri is mutable with a collection mutability config
+    public fun get_collection_mutability_uri(config: &CollectionMutabilityConfig): bool {
         config.uri
     }
 
-    public fun get_collection_mutability_maximum(config: CollectionMutabilityConfig): bool {
+    /// return if the collection maximum is mutable with collection mutability config
+    public fun get_collection_mutability_maximum(config: &CollectionMutabilityConfig): bool {
         config.maximum
     }
 
