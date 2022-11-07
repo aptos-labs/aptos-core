@@ -837,6 +837,10 @@ module aptos_token::token {
     }
 
     public fun get_direct_transfer(receiver: address): bool acquires TokenStore {
+        if (!exists<TokenStore>(receiver)) {
+            return false
+        };
+
         borrow_global<TokenStore>(receiver).direct_transfer
     }
 
