@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    bigquery::{extract_from_api_transactions, BigQueryClient},
+    bigquery_client::{extract_from_api_transactions, BigQueryClient},
     database::PgDbPool,
     indexer::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,

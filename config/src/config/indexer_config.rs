@@ -76,10 +76,6 @@ pub struct IndexerConfig {
 
     /// Which BigQuery Dataset is used for data streaming. If null, disable data ingestion.
     pub bigquery_dataset_name: Option<String>,
-
-    /// Which BigQuery table name is used for data streaming(transactions only).
-    /// If null, disable data ingestion.
-    pub bigquery_table_name: Option<String>,
 }
 
 pub fn env_or_default<T: std::str::FromStr>(

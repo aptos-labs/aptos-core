@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    bigquery_client::BigQueryClient,
     database::{
         clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
     },
@@ -31,11 +32,24 @@ use std::fmt::Debug;
 pub const NAME: &str = "default_processor";
 pub struct DefaultTransactionProcessor {
     connection_pool: PgDbPool,
+    bigquery_client_and_stream: (BigQueryClient, String),
+    bigquery_project_id: Option<String>,
+    bigquery_dataset_name: Option<String>,
 }
 
 impl DefaultTransactionProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(
+        connection_pool: PgDbPool,
+        bigquery_client_and_stream: Option<(BigQueryClient, String)>,
+        bigquery_project_id: Option<String>,
+        bigquery_dataset_name: Option<String>,
+    ) -> Self {
+        Self {
+            connection_pool,
+            bigquery_client_and_stream,
+            bigquery_project_id,
+            bigquery_dataset_name,
+        }
     }
 }
 

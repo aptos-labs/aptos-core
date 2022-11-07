@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    bigquery::BigQueryClient,
+    bigquery_client::BigQueryClient,
     database::new_db_pool,
     indexer::{
         fetcher::TransactionFetcherOptions, processing_result::ProcessingResult, tailer::Tailer,
         transaction_processor::TransactionProcessor,
     },
     processors::{
-        coin_processor::CoinTransactionProcessor, data_ingestion_processor::DataIngestionProcessor,
-        default_processor::DefaultTransactionProcessor, stake_processor::StakeTransactionProcessor,
+        coin_processor::CoinTransactionProcessor, default_processor::DefaultTransactionProcessor,
+        default_processor_bq::DefaultProcessorBQ, stake_processor::StakeTransactionProcessor,
         token_processor::TokenTransactionProcessor, Processor,
     },
 };
@@ -134,7 +134,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     let processor_enum = Processor::from_string(&processor_name);
 
     let bigquery_client_and_stream: Option<(BigQueryClient, String)> = match processor_enum {
-        Processor::DataIngestionProcessor => {
+        Processor::DefaultProcessorBQ => {
             let client = GoogleApi::from_function(
                 BigQueryWriteClient::new,
                 "https://bigquerystorage.googleapis.com",
@@ -151,21 +151,23 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     info!(processor_name = processor_name, "Instantiating tailer... ");
 
     let processor: Arc<dyn TransactionProcessor> = match processor_enum {
-        Processor::DefaultProcessor => {
-            Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
-        }
+        Processor::DefaultProcessor => Arc::new(DefaultTransactionProcessor::new(
+            conn_pool.clone(),
+            None,
+            None,
+            None,
+        )),
         Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
             conn_pool.clone(),
             config.ans_contract_address,
         )),
         Processor::CoinProcessor => Arc::new(CoinTransactionProcessor::new(conn_pool.clone())),
         Processor::StakeProcessor => Arc::new(StakeTransactionProcessor::new(conn_pool.clone())),
-        Processor::DataIngestionProcessor => Arc::new(DataIngestionProcessor::new(
+        Processor::DefaultProcessorBQ => Arc::new(DefaultTransactionProcessor::new(
             conn_pool.clone(),
-            bigquery_client_and_stream.unwrap(),
+            Some(bigquery_client_and_stream.unwrap()),
             config.bigquery_project_id,
             config.bigquery_dataset_name,
-            config.bigquery_table_name,
         )),
     };
 

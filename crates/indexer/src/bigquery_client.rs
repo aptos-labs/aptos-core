@@ -62,37 +62,6 @@ pub async fn create_bigquery_client(
     (client, write_stream_resp.into_inner().name)
 }
 
-fn from_transaction_info(
-    info: &TransactionInfo,
-    // Serialized Json string.
-    payload: Option<String>,
-    type_: String,
-    num_events: i64,
-    block_height: i64,
-    epoch: i64,
-) -> TransactionProto {
-    TransactionProto {
-        type_str: type_,
-        payload,
-        version: info.version.0 as i64,
-        block_height,
-        hash: info.hash.to_string().as_bytes().to_vec(),
-        state_change_hash: info.state_change_hash.to_string().as_bytes().to_vec(),
-        event_root_hash: info.event_root_hash.to_string().as_bytes().to_vec(),
-        state_checkpoint_hash: match info.state_checkpoint_hash.map(|h| h.to_string()) {
-            Some(hash) => Some(hash.as_bytes().to_vec()),
-            None => None,
-        },
-        gas_used: u64_to_bigdecimal_str(info.gas_used.0),
-        success: info.success,
-        vm_status: info.vm_status.clone(),
-        accumulator_root_hash: info.accumulator_root_hash.to_string().as_bytes().to_vec(),
-        num_events,
-        num_write_set_changes: info.changes.len() as i64,
-        epoch,
-    }
-}
-
 pub fn extract_from_api_transactions(transactions: &[APITransaction]) -> AppendRowsRequest {
     let a = transactions
         .iter()
@@ -168,3 +137,34 @@ pub fn extract_from_api_transactions(transactions: &[APITransaction]) -> AppendR
         ..AppendRowsRequest::default()
     }
 }
+
+// fn from_transaction_info(
+//     info: &TransactionInfo,
+//     // Serialized Json string.
+//     payload: Option<String>,
+//     type_: String,
+//     num_events: i64,
+//     block_height: i64,
+//     epoch: i64,
+// ) -> TransactionProto {
+//     TransactionProto {
+//         type_str: type_,
+//         payload,
+//         version: info.version.0 as i64,
+//         block_height,
+//         hash: info.hash.to_string().as_bytes().to_vec(),
+//         state_change_hash: info.state_change_hash.to_string().as_bytes().to_vec(),
+//         event_root_hash: info.event_root_hash.to_string().as_bytes().to_vec(),
+//         state_checkpoint_hash: match info.state_checkpoint_hash.map(|h| h.to_string()) {
+//             Some(hash) => Some(hash.as_bytes().to_vec()),
+//             None => None,
+//         },
+//         gas_used: u64_to_bigdecimal_str(info.gas_used.0),
+//         success: info.success,
+//         vm_status: info.vm_status.clone(),
+//         accumulator_root_hash: info.accumulator_root_hash.to_string().as_bytes().to_vec(),
+//         num_events,
+//         num_write_set_changes: info.changes.len() as i64,
+//         epoch,
+//     }
+// }
