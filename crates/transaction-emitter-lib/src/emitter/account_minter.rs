@@ -460,7 +460,7 @@ pub async fn execute_and_wait_transactions(
     txns: Vec<SignedTransaction>,
     failure_counter: &AtomicUsize,
 ) -> Result<()> {
-    debug!(
+    info!(
         "[{:?}] Submitting transactions {} - {} for {}",
         client.path_prefix_string(),
         account.sequence_number() - txns.len() as u64,
@@ -583,17 +583,24 @@ pub async fn execute_and_wait_transactions(
     let state = state.into_inner();
 
     for txn in state.txns.iter() {
-        RETRY_POLICY
-            .retry(move || {
-                client.wait_for_transaction_by_hash_bcs(
-                    txn.clone().committed_hash(),
-                    txn.expiration_timestamp_secs(),
-                    Some(Duration::from_secs(120)),
-                    None,
-                )
-            })
+        client
+            .wait_for_transaction_by_hash_bcs(
+                txn.clone().committed_hash(),
+                txn.expiration_timestamp_secs(),
+                Some(Duration::from_secs(120)),
+                None,
+            )
             .await
-            .map_err(|e| format_err!("Failed to wait for transactions: {:?}", e))?;
+            .map_err(|e| {
+                format_err!(
+                    "Failed to wait for transaction: {:?}, gas price: {}",
+                    e,
+                    txn.gas_unit_price()
+                )
+            })?;
+        // RETRY_POLICY
+        //     .retry(move || {
+        //     })
     }
 
     debug!(
