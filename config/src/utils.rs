@@ -20,7 +20,7 @@ const RANDOM_PORT_RANGE: Range<u16> = 10000..30000;
 /// TIME_WAIT state ensuring that the OS won't hand out this port for some grace period.
 /// Callers should be able to bind to this port given they use SO_REUSEADDR.
 pub fn get_available_port() -> u16 {
-    for i in 0..MAX_PORT_RETRIES {
+    for _ in 0..MAX_PORT_RETRIES {
         if let Ok(port) = get_random_port() {
             return port;
         }
