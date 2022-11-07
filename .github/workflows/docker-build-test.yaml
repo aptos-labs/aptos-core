@@ -127,7 +127,7 @@ jobs:
       FEATURES: indexer
       BUILD_ADDL_TESTING_IMAGES: true
 
-  rust-images-testing:
+  rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
     uses: ./.github/workflows/docker-rust-build.yaml
     secrets: inherit
@@ -163,7 +163,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
 
   forge-e2e-test:
-    needs: [rust-images, rust-images-testing, rust-images-performance, determine-docker-build-metadata]
+    needs: [rust-images, rust-images-failpoints, determine-docker-build-metadata]
     if: |
       !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
