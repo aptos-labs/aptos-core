@@ -836,14 +836,6 @@ module aptos_token::token {
         deposit_token(receiver, token);
     }
 
-    public fun get_direct_transfer(receiver: address): bool acquires TokenStore {
-        if (!exists<TokenStore>(receiver)) {
-            return false
-        };
-
-        borrow_global<TokenStore>(receiver).direct_transfer
-    }
-
     public fun initialize_token_store(account: &signer) {
         if (!exists<TokenStore>(signer::address_of(account))) {
             move_to(
@@ -1152,6 +1144,14 @@ module aptos_token::token {
     /// return the TokenId for a given Token
     public fun get_token_id(token: &Token): TokenId {
         token.id
+    }
+
+    public fun get_direct_transfer(receiver: address): bool acquires TokenStore {
+        if (!exists<TokenStore>(receiver)) {
+            return false
+        };
+
+        borrow_global<TokenStore>(receiver).direct_transfer
     }
 
     public fun create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig {
