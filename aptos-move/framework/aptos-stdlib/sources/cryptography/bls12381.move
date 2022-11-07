@@ -550,11 +550,11 @@ module aptos_std::bls12381 {
         assert!(verify_aggregate_signature(&sig_1, public_keys, message_list_1), 5);
 
         let item_list_2 = vector[
-            TestMessage {
+            TestObject {
                 field1: b"hello ed25519",
                 field2: 25519,
             },
-            TestMessage {
+            TestObject {
                 field1: b"hello bls12381",
                 field2: 12381,
             },
