@@ -4,11 +4,15 @@
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos_logger::info;
 use forge::{
-    GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkBandwidth,
-    SwarmNetworkDelay, Test,
+    GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmExt,
+    SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
 };
+use rand::Rng;
+use tokio::runtime::Runtime;
 
-pub struct ThreeRegionSimulationTest;
+pub struct ThreeRegionSimulationTest {
+    pub add_execution_delay: bool,
+}
 
 impl Test for ThreeRegionSimulationTest {
     fn name(&self) -> &'static str {
@@ -99,6 +103,60 @@ fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
     }
 }
 
+fn add_execution_delay(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+    let runtime = Runtime::new().unwrap();
+    let validators = swarm.get_validator_clients_with_names();
+
+    runtime.block_on(async {
+        let mut rng = rand::thread_rng();
+        for (name, validator) in validators {
+            let sleep_time = rng.gen_range(20, 500);
+            let name = name.clone();
+
+            validator
+                .set_failpoint(
+                    "aptos_vm::execution::block_metadata".to_string(),
+                    format!("sleep({})", sleep_time),
+                )
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "set_failpoint to remove execution delay on {} failed, {:?}",
+                        name,
+                        e
+                    )
+                })?;
+        }
+        Ok::<(), anyhow::Error>(())
+    })
+}
+
+fn remove_execution_delay(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+    let runtime = Runtime::new().unwrap();
+    let validators = swarm.get_validator_clients_with_names();
+
+    runtime.block_on(async {
+        for (name, validator) in validators {
+            let name = name.clone();
+
+            validator
+                .set_failpoint(
+                    "aptos_vm::execution::block_metadata".to_string(),
+                    "off".to_string(),
+                )
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "set_failpoint to remove execution delay on {} failed, {:?}",
+                        name,
+                        e
+                    )
+                })?;
+        }
+        Ok::<(), anyhow::Error>(())
+    })
+}
+
 impl NetworkLoadTest for ThreeRegionSimulationTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
         // inject network delay
@@ -111,10 +169,18 @@ impl NetworkLoadTest for ThreeRegionSimulationTest {
         let chaos = SwarmChaos::Bandwidth(bandwidth);
         ctx.swarm().inject_chaos(chaos)?;
 
+        if self.add_execution_delay {
+            add_execution_delay(ctx.swarm())?;
+        }
+
         Ok(LoadDestination::AllNodes)
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+        if self.add_execution_delay {
+            remove_execution_delay(swarm)?;
+        }
+
         swarm.remove_all_chaos()
     }
 }

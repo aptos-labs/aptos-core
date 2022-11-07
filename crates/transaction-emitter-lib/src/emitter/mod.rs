@@ -605,6 +605,12 @@ async fn wait_for_single_account_sequence(
         match query_sequence_number(client, account.address()).await {
             Ok(sequence_number) => {
                 if sequence_number >= account.sequence_number() {
+                    info!(
+                        "[{}] Account {} on seq num {}",
+                        client.path_prefix_string(),
+                        account.address(),
+                        sequence_number
+                    );
                     return Ok(());
                 }
             }
