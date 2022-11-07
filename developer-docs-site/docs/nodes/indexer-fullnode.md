@@ -36,8 +36,6 @@ For an Aptos indexer fullnode, install these packages:
   -  [`postgres` PostgreSQL server](https://www.postgresql.org/) - `brew install postgresql`
   - [`diesel`](https://diesel.rs/) - `brew install diesel`
 
-TODO: Test and provide a single `brew install` command for everything after `cargo` here. Also find out if we need Cargo if they go the Docker route.
-
 ## Set up database
 
 1. Start the PostgreSQL server: 
@@ -59,11 +57,6 @@ TODO: Test and provide a single `brew install` command for everything after `car
     This will create a database schema with the subdirectory `migrations` located in this `aptos-core/crates/indexer` directory. If for some reason this database is already in use, try a different database. For example: `DATABASE_URL=postgres://postgres@localhost:5432/indexer_v2 diesel database reset`
 
 ## Start fullnode indexer
-
-TODO: Determine if this should be done in the `aptos-core` checkout as indexer startup is looking for a `Cargo.toml` file:
-```
-error: could not find `Cargo.toml` in `/Users/claymurphy/mainnet` or any parent directory
-```
 
 1. Follow the instructions to set up a [public fullnode](full-node/fullnode-source-code-or-docker/) and prepare the setup, but **do not** yet start the indexer (with `cargo run` or `docker run`).
 1. Edit the `./fullnode.yaml` and add the following configuration:
