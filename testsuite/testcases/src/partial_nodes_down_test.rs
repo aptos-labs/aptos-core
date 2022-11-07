@@ -33,12 +33,7 @@ impl NetworkTest for PartialNodesDown {
         thread::sleep(Duration::from_secs(5));
 
         // Generate some traffic
-        let txn_stat = generate_traffic(
-            ctx,
-            &up_nodes,
-            duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )?;
+        let txn_stat = generate_traffic(ctx, &up_nodes, duration)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
         for n in &down_nodes {
