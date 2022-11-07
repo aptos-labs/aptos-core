@@ -86,7 +86,7 @@ For an Aptos indexer fullnode, install these packages:
     -p 9101:9101 -p 6180:6180 \
     -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data \
     --workdir /opt/aptos/etc \
-    --name=aptos-fullnode aptoslabs/validator:mainnet aptos-node \
+    --name=aptos-fullnode aptoslabs/validator:nightly_indexer aptos-node \
     -f /opt/aptos/etc/fullnode.yaml
     ```
 
