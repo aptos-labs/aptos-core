@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import typing
+from typing import List
 
 from .account_address import AccountAddress
 from .bcs import Deserializer, Serializer
@@ -26,7 +27,9 @@ class TypeTag:
     def __init__(self, value: typing.Any):
         self.value = value
 
-    def __eq__(self, other: TypeTag) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TypeTag):
+            return NotImplemented
         return (
             self.value.variant() == other.value.variant() and self.value == other.value
         )
@@ -37,6 +40,7 @@ class TypeTag:
     def __repr__(self):
         return self.__str__()
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> TypeTag:
         variant = deserializer.uleb128()
         if variant == TypeTag.BOOL:
@@ -68,7 +72,9 @@ class BoolTag:
     def __init__(self, value: bool):
         self.value = value
 
-    def __eq__(self, other: BoolTag) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, BoolTag):
+            return NotImplemented
         return self.value == other.value
 
     def __str__(self):
@@ -77,8 +83,9 @@ class BoolTag:
     def variant(self):
         return TypeTag.BOOL
 
-    def deserialize(deserializer: Deserializer) -> Tag:
-        return Tag(deserializer.bool())
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> BoolTag:
+        return BoolTag(deserializer.bool())
 
     def serialize(self, serializer: Serializer):
         serializer.bool(self.value)
@@ -90,7 +97,9 @@ class U8Tag:
     def __init__(self, value: int):
         self.value = value
 
-    def __eq__(self, other: U8Tag) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, U8Tag):
+            return NotImplemented
         return self.value == other.value
 
     def __str__(self):
@@ -99,8 +108,9 @@ class U8Tag:
     def variant(self):
         return TypeTag.U8
 
-    def deserialize(deserializer: Deserializer) -> Tag:
-        return Tag(deserializer.u8())
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> U8Tag:
+        return U8Tag(deserializer.u8())
 
     def serialize(self, serializer: Serializer):
         serializer.u8(self.value)
@@ -112,7 +122,9 @@ class U64Tag:
     def __init__(self, value: int):
         self.value = value
 
-    def __eq__(self, other: U64Tag) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, U64Tag):
+            return NotImplemented
         return self.value == other.value
 
     def __str__(self):
@@ -121,8 +133,9 @@ class U64Tag:
     def variant(self):
         return TypeTag.U64
 
-    def deserialize(deserializer: Deserializer) -> Tag:
-        return Tag(deserializer.u64())
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> U64Tag:
+        return U64Tag(deserializer.u64())
 
     def serialize(self, serializer: Serializer):
         serializer.u64(self.value)
@@ -134,7 +147,9 @@ class U128Tag:
     def __init__(self, value: int):
         self.value = value
 
-    def __eq__(self, other: U128Tag) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, U128Tag):
+            return NotImplemented
         return self.value == other.value
 
     def __str__(self):
@@ -143,8 +158,9 @@ class U128Tag:
     def variant(self):
         return TypeTag.U128
 
-    def deserialize(deserializer: Deserializer) -> Tag:
-        return Tag(deserializer.u128())
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> U128Tag:
+        return U128Tag(deserializer.u128())
 
     def serialize(self, serializer: Serializer):
         serializer.u128(self.value)
@@ -156,7 +172,9 @@ class AccountAddressTag:
     def __init__(self, value: AccountAddress):
         self.value = value
 
-    def __eq__(self, other: AccountAddressTag) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, AccountAddressTag):
+            return NotImplemented
         return self.value == other.value
 
     def __str__(self):
@@ -165,7 +183,8 @@ class AccountAddressTag:
     def variant(self):
         return TypeTag.ACCOUNT_ADDRESS
 
-    def deserialize(deserializer: Deserializer) -> Tag:
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> AccountAddressTag:
         return AccountAddressTag(deserializer.struct(AccountAddress))
 
     def serialize(self, serializer: Serializer):
@@ -184,7 +203,9 @@ class StructTag:
         self.name = name
         self.type_args = type_args
 
-    def __eq__(self, other: StructTag) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, StructTag):
+            return NotImplemented
         return (
             self.address == other.address
             and self.module == other.module
@@ -196,11 +217,12 @@ class StructTag:
         value = f"{self.address}::{self.module}::{self.name}"
         if len(self.type_args) > 0:
             value += f"<{self.type_args[0]}"
-            for type_arg in type_args[1:]:
+            for type_arg in self.type_args[1:]:
                 value += f", {type_arg}"
             value += ">"
         return value
 
+    @staticmethod
     def from_str(type_tag: str) -> StructTag:
         name = ""
         index = 0
@@ -219,6 +241,7 @@ class StructTag:
     def variant(self):
         return TypeTag.STRUCT
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> StructTag:
         address = deserializer.struct(AccountAddress)
         module = deserializer.str()

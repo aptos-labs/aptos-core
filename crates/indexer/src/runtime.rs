@@ -4,12 +4,13 @@
 use crate::{
     database::new_db_pool,
     indexer::{
-        fetcher::TransactionFetcherOptions, tailer::Tailer,
+        fetcher::TransactionFetcherOptions, processing_result::ProcessingResult, tailer::Tailer,
         transaction_processor::TransactionProcessor,
     },
     processors::{
         coin_processor::CoinTransactionProcessor, default_processor::DefaultTransactionProcessor,
-        token_processor::TokenTransactionProcessor, Processor,
+        stake_processor::StakeTransactionProcessor, token_processor::TokenTransactionProcessor,
+        Processor,
     },
 };
 
@@ -112,6 +113,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     let processor_tasks = config.processor_tasks.unwrap();
     let emit_every = config.emit_every.unwrap();
     let batch_size = config.batch_size.unwrap();
+    let lookback_versions = config.gap_lookback_versions.unwrap() as i64;
 
     info!(processor_name = processor_name, "Starting indexer...");
 
@@ -138,6 +140,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
             config.ans_contract_address,
         )),
         Processor::CoinProcessor => Arc::new(CoinTransactionProcessor::new(conn_pool.clone())),
+        Processor::StakeProcessor => Arc::new(StakeTransactionProcessor::new(conn_pool.clone())),
     };
 
     let options =
@@ -153,9 +156,11 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
     info!(
         processor_name = processor_name,
+        lookback_versions = lookback_versions,
         "Fetching starting version from db..."
     );
-    let starting_version_from_db = tailer
+    // For now this is not being used but we'd want to track it anyway
+    let starting_version_from_db_short = tailer
         .get_start_version(&processor_name)
         .unwrap_or_else(|e| panic!("Failed to get starting version: {:?}", e))
         .unwrap_or_else(|| {
@@ -166,7 +171,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
             0
         }) as u64;
     let start_version = match config.starting_version {
-        None => starting_version_from_db,
+        None => starting_version_from_db_short,
         Some(version) => version,
     };
 
@@ -174,7 +179,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         processor_name = processor_name,
         final_start_version = start_version,
         start_version_from_config = config.starting_version,
-        starting_version_from_db = starting_version_from_db,
+        starting_version_from_db = starting_version_from_db_short,
         "Setting starting version..."
     );
     tailer.set_fetcher_version(start_version as u64).await;
@@ -199,52 +204,56 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
             .expect("Failed to get chain ID");
     }
 
-    let (tx, mut receiver) = tokio::sync::mpsc::channel(100);
-    let mut tasks = vec![];
-    for _ in 0..processor_tasks {
-        let other_tx = tx.clone();
-        let other_tailer = tailer.clone();
-        let task = tokio::task::spawn(async move {
-            loop {
-                let (num_res, res) = other_tailer.process_next_batch().await;
-                other_tx.send((num_res, res)).await.unwrap();
-            }
-        });
-        tasks.push(task);
-    }
-
     let mut ma = MovingAverage::new(10_000);
 
     loop {
-        let (num_res, result) = receiver
-            .recv()
-            .await
-            .expect("Failed to receive batch results: got None!");
-
-        let processing_result = match result {
+        let mut tasks = vec![];
+        for _ in 0..processor_tasks {
+            let other_tailer = tailer.clone();
+            let task = tokio::spawn(async move { other_tailer.process_next_batch().await });
+            tasks.push(task);
+        }
+        let batches = match futures::future::try_join_all(tasks).await {
             Ok(res) => res,
-            Err(tpe) => {
-                let (err, start_version, end_version, _) = tpe.inner();
-                error!(
-                    processor_name = processor_name,
-                    start_version = start_version,
-                    end_version = end_version,
-                    error =? err,
-                    "Error processing batch!"
-                );
-                panic!(
-                    "Error in '{}' while processing batch: {:?}",
-                    processor_name, err
-                );
-            }
+            Err(err) => panic!("Error processing transaction batches: {:?}", err),
         };
 
+        let mut batch_start_version = u64::MAX;
+        let mut batch_end_version = 0;
+        let mut num_res = 0;
+
+        for (num_txn, res) in batches {
+            let processed_result: ProcessingResult = match res {
+                // When the batch is empty b/c we're caught up, continue to next batch
+                None => continue,
+                Some(Ok(res)) => res,
+                Some(Err(tpe)) => {
+                    let (err, start_version, end_version, _) = tpe.inner();
+                    error!(
+                        processor_name = processor_name,
+                        start_version = start_version,
+                        end_version = end_version,
+                        error =? err,
+                        "Error processing batch!"
+                    );
+                    panic!(
+                        "Error in '{}' while processing batch: {:?}",
+                        processor_name, err
+                    );
+                }
+            };
+            batch_start_version =
+                std::cmp::min(batch_start_version, processed_result.start_version);
+            batch_end_version = std::cmp::max(batch_end_version, processed_result.end_version);
+            num_res += num_txn;
+        }
+
         tailer
-            .update_last_processed_version(&processor_name, processing_result.end_version)
+            .update_last_processed_version(&processor_name, batch_end_version)
             .unwrap_or_else(|e| {
                 error!(
                     processor_name = processor_name,
-                    end_version = processing_result.end_version,
+                    end_version = batch_end_version,
                     error = format!("{:?}", e),
                     "Failed to update last processed version!"
                 );
@@ -260,8 +269,8 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
                 base = new_base;
                 info!(
                     processor_name = processor_name,
-                    batch_start_version = processing_result.start_version,
-                    batch_end_version = processing_result.end_version,
+                    batch_start_version = batch_start_version,
+                    batch_end_version = batch_end_version,
                     versions_processed = versions_processed,
                     tps = (ma.avg() * 1000.0) as u64,
                     "Processed batch version"

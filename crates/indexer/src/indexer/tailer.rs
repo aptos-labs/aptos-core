@@ -18,6 +18,12 @@ use anyhow::{ensure, Context, Result};
 use aptos_api::context::Context as ApiContext;
 use aptos_logger::{debug, info};
 use chrono::ParseError;
+use diesel::{
+    pg::upsert::excluded,
+    sql_query,
+    sql_types::{BigInt, Text},
+    ExpressionMethods, RunQueryDsl,
+};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness};
 use std::{fmt::Debug, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -114,7 +120,10 @@ impl Tailer {
 
     pub async fn process_next_batch(
         &self,
-    ) -> (u64, Result<ProcessingResult, TransactionProcessingError>) {
+    ) -> (
+        u64,
+        Option<Result<ProcessingResult, TransactionProcessingError>>,
+    ) {
         let transactions = self
             .transaction_fetcher
             .lock()
@@ -123,6 +132,10 @@ impl Tailer {
             .await;
 
         let num_txns = transactions.len() as u64;
+        // When the batch is empty b/c we're caught up
+        if num_txns == 0 {
+            return (0, None);
+        }
         let start_version = transactions.first().unwrap().version();
         let end_version = transactions.last().unwrap().version();
 
@@ -150,7 +163,7 @@ impl Tailer {
             "Finished processing of transaction batch"
         );
 
-        (num_txns, results)
+        (num_txns, Some(results))
     }
 
     /// Store last processed version from database. We can assume that all previously processed
@@ -168,11 +181,16 @@ impl Tailer {
                 .values(&status)
                 .on_conflict(processor_status::processor)
                 .do_update()
-                .set(&status),
+                .set((
+                    processor_status::last_success_version
+                        .eq(excluded(processor_status::last_success_version)),
+                    processor_status::last_updated.eq(excluded(processor_status::last_updated)),
+                )),
             Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
         )?;
         Ok(())
     }
+
     /// Get last version processed successfully from databse
     pub fn get_start_version(&self, processor_name: &String) -> Result<Option<i64>> {
         let mut conn = self.connection_pool.get()?;
@@ -181,6 +199,93 @@ impl Tailer {
             Some(status) => Ok(Some(status.last_success_version + 1)),
             None => Ok(None),
         }
+    }
+
+    /// Get starting version from database. Starting version is defined as the first version that's either
+    /// not successful or missing from the DB.
+    pub fn get_start_version_long(
+        &self,
+        processor_name: &String,
+        lookback_versions: i64,
+    ) -> Option<i64> {
+        let mut conn = self
+            .connection_pool
+            .get()
+            .expect("DB connection should be available to get starting version");
+
+        // This query gets the first version that isn't equal to the next version (versions would be sorted of course).
+        // There's also special handling if the gap happens in the beginning.
+        let sql = "
+        WITH raw_boundaries AS
+        (
+            SELECT
+                MAX(version) AS MAX_V,
+                MIN(version) AS MIN_V
+            FROM
+                processor_statuses
+            WHERE
+                name = $1
+                AND success = TRUE
+        ),
+        boundaries AS
+        (
+            SELECT
+                MAX(version) AS MAX_V,
+                MIN(version) AS MIN_V
+            FROM
+                processor_statuses, raw_boundaries
+            WHERE
+                name = $1
+                AND success = true
+                and version >= GREATEST(MAX_V - $2, 0)
+        ),
+        gap AS
+        (
+            SELECT
+                MIN(version) + 1 AS maybe_gap
+            FROM
+                (
+                    SELECT
+                        version,
+                        LEAD(version) OVER (
+                    ORDER BY
+                        version ASC) AS next_version
+                    FROM
+                        processor_statuses,
+                        boundaries
+                    WHERE
+                        name = $1
+                        AND success = TRUE
+                        AND version >= GREATEST(MAX_V - $2, 0)
+                ) a
+            WHERE
+                version + 1 <> next_version
+        )
+        SELECT
+            CASE
+                WHEN
+                    MIN_V <> GREATEST(MAX_V - $2, 0)
+                THEN
+                    GREATEST(MAX_V - $2, 0)
+                ELSE
+                    COALESCE(maybe_gap, MAX_V + 1)
+            END
+            AS version
+        FROM
+            gap, boundaries
+        ";
+        #[derive(Debug, QueryableByName)]
+        pub struct Gap {
+            #[diesel(sql_type = BigInt)]
+            pub version: i64,
+        }
+        let mut res: Vec<Option<Gap>> = sql_query(sql)
+            .bind::<Text, _>(processor_name)
+            // This is the number used to determine how far we look back for gaps. Increasing it may result in slower startup
+            .bind::<BigInt, _>(lookback_versions)
+            .get_results(&mut conn)
+            .unwrap();
+        res.pop().unwrap().map(|g| g.version)
     }
 }
 

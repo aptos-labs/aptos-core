@@ -1,13 +1,16 @@
 [package]
 name = "e2e-move-tests"
-version = "0.1.0"
-edition = "2021"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Move e2e tests"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.59"
@@ -37,7 +40,9 @@ vm-genesis = { path = "../vm-genesis" }
 
 aptos-writeset-generator = { path = "../writeset-transaction-generator" }
 language-e2e-tests = { path = "../e2e-tests" }
-move-deps = { path = "../move-deps", features = ["address32"] }
+move-core-types = { workspace = true }
+move-package = { workspace = true }
+move-symbol-pool = { workspace = true }
 
 [lib]
 doctest = false

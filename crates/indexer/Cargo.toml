@@ -1,13 +1,16 @@
 [package]
 name = "aptos-indexer"
-version = "0.0.1"
 description = "Aptos Indexer"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-edition = "2021"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
+version = "0.0.1"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
@@ -16,6 +19,7 @@ aptos-api-types = { path = "../../api/types" }
 aptos-bitvec = { path = "../aptos-bitvec" }
 aptos-config = { path = "../../config" }
 async-trait = "0.1.53"
+bcs = "0.1.3"
 bigdecimal = { version = "0.3.0", features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = [
   "clock",

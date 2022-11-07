@@ -38,7 +38,7 @@ For running an Aptos **validator node and validator fullnode** we recommend the 
     - c6i.8xlarge + io1/io2 EBS volume with 40K IOPS.
 - **GCP**
     - n2-standard-16 (if use local SSD)
-    - n2-standard-30 + pd-ssd with 40K IOPS.
+    - n2-standard-32 + pd-ssd with 40K IOPS.
 
 ### Motivations for hardware requirements
 
@@ -69,6 +69,7 @@ You can configure the port settings on your node using the configuration YAML fi
 For the validator:
 
 - Open the TCP port 6180, to enable the validators to talk to each other.
+- Open the TCP port 6181, to enable validator fullnode to connect.
 - Open the TCP port 9101, to send the validator metrics to validate the health stats.
 - Make sure to keep the TCP port 6186 open for the local backup storage service. 
 

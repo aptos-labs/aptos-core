@@ -1,13 +1,16 @@
 [package]
 name = "aptos-vm"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos VM runtime"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
@@ -34,20 +37,20 @@ aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
 
 framework =  { path = "../framework" }
-move-binary-format = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
-move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
-move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e", features = ["address32"] }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
+move-binary-format = { workspace = true }
+move-bytecode-utils = { workspace = true }
+move-bytecode-verifier = { workspace = true }
+move-core-types = { workspace = true }
+move-stdlib = { workspace = true }
 mvhashmap = { path = "../mvhashmap" }
 
-move-table-extension = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
-move-vm-runtime = { git = "https://github.com/move-language/move", features = ["lazy_natives"], rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
-move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e", features = ["table-extension"] }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
-read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
+move-table-extension = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-test-utils = { workspace = true }
+move-vm-types = { workspace = true }
+read-write-set-dynamic = { workspace = true }
 
-move-unit-test = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e", features = ["table-extension"], optional = true }
+move-unit-test = { workspace = true, optional = true }
 
 [dev-dependencies]
 proptest = "1.0.0"
@@ -59,4 +62,4 @@ default = []
 mirai-contracts = []
 fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "framework/fuzzing"]
 failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
-testing = ["move-unit-test"]
+testing = ["move-unit-test", "framework/testing"]

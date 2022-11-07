@@ -1,13 +1,16 @@
 [package]
 name = "vm-genesis"
-version = "0.1.0"
-edition = "2021"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos vm genesis"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
@@ -24,8 +27,8 @@ aptos-vm = { path = "../aptos-vm" }
 cached-packages =  { path = "../framework/cached-packages" }
 framework =  { path = "../framework" }
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e", features = ["address32"] }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
+move-core-types = { workspace = true }
+move-vm-types = { workspace = true }
 
 [dev-dependencies]
 proptest = "1.0.0"
@@ -33,7 +36,7 @@ proptest-derive = "0.3.0"
 
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e", features = ["address32", "fuzzing"] }
+move-core-types = { workspace = true, features = ["fuzzing"] }
 
 [features]
 default = []

@@ -8,9 +8,9 @@ One method to do so is to use the CLI:
     * Acquire the Aptos CLI
     * `cd ~`
     * `aptos init`
-    * `cd ~/aptos-core/aptos-move/
-    * `aptos move publish --named-address hello_blockchain=${your_address_from_aptos_init}`
-    * `python -m examples.hello-blockhain ${your_address_from_aptos_init}`
+    * `cd ~/aptos-core/aptos-move/move-examples/hello_blockchain`
+    * `aptos move publish --named-addresses hello_blockchain=${your_address_from_aptos_init}`
+    * `python -m examples.hello-blockchain ${your_address_from_aptos_init}`
 """
 
 import sys
@@ -20,11 +20,8 @@ from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.bcs import Serializer
 from aptos_sdk.client import FaucetClient, RestClient
-from aptos_sdk.transactions import (
-    EntryFunction,
-    TransactionArgument,
-    TransactionPayload,
-)
+from aptos_sdk.transactions import (EntryFunction, TransactionArgument,
+                                    TransactionPayload)
 
 from .common import FAUCET_URL, NODE_URL
 

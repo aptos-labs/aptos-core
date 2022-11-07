@@ -4,7 +4,10 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::util::{hash_str, truncate_str};
+use crate::util::{
+    deserialize_property_map_from_bcs_hexstring, deserialize_string_from_hexstring, hash_str,
+    truncate_str,
+};
 use anyhow::{Context, Result};
 use aptos_api_types::deserialize_from_string;
 use bigdecimal::BigDecimal;
@@ -43,11 +46,7 @@ impl TokenDataIdType {
     }
 
     pub fn get_collection_data_id_hash(&self) -> String {
-        CollectionDataIdType {
-            creator: self.creator.clone(),
-            name: self.name.clone(),
-        }
-        .to_hash()
+        CollectionDataIdType::new(self.creator.clone(), self.collection.clone()).to_hash()
     }
 }
 
@@ -97,7 +96,7 @@ impl fmt::Display for TokenIdType {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenDataType {
-    // TODO: decode bcs
+    #[serde(deserialize_with = "deserialize_property_map_from_bcs_hexstring")]
     pub default_properties: serde_json::Value,
     pub description: String,
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -145,7 +144,7 @@ pub struct TokenType {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: BigDecimal,
     pub id: TokenIdType,
-    // TODO: decode bcs
+    #[serde(deserialize_with = "deserialize_property_map_from_bcs_hexstring")]
     pub token_properties: serde_json::Value,
 }
 
@@ -179,20 +178,6 @@ impl CollectionDataType {
 pub struct TokenOfferIdType {
     pub to_addr: String,
     pub token_id: TokenIdType,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TokenCoinSwapType {
-    #[serde(deserialize_with = "deserialize_from_string")]
-    pub min_price_per_token: BigDecimal,
-    pub token_amount: BigDecimal,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TokenEscrowType {
-    #[serde(deserialize_with = "deserialize_from_string")]
-    pub locked_until_secs: BigDecimal,
-    pub token: TokenType,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -277,9 +262,9 @@ pub struct ClaimTokenEventType {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TypeInfo {
     pub account_address: String,
-    // TODO: decode hexstring
+    #[serde(deserialize_with = "deserialize_string_from_hexstring")]
     pub module_name: String,
-    // TODO: decode hexstring
+    #[serde(deserialize_with = "deserialize_string_from_hexstring")]
     pub struct_name: String,
 }
 

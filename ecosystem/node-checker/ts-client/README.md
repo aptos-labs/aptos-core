@@ -6,8 +6,11 @@
 
 ## Quickstart
 ```bash
-yarn add aptos-node-checker-client
+pnpm add aptos-node-checker-client
 ```
+
+You can also use `yarn` or `npm`.
+
 ## Usage
 
 For Javascript or Typescript usage, check out the [`./examples`][examples] folder with ready-made `package.json` files to get you going quickly!
@@ -29,17 +32,17 @@ and `allowSyntheticDefaultImports` in your `tsconfig` for types compatibility:
 ### Requirements
 
 - [Node.js](https://nodejs.org)
-- [Yarn](https://yarnpkg.com/)
+- [pnpm](https://pnpm.io/installation)
 
 ```bash
-yarn install
+pnpm install
 ```
 
 ### Generating API client
 To generate the client from the spec, run:
 
 ```bash
-yarn generate-client
+pnpm generate-client
 ```
 
 ### Running tests
@@ -55,7 +58,7 @@ cargo run -p aptos-node-checker -- server run --baseline-node-config-paths ecosy
 
 Run the tests:
 ```
-yarn test
+pnpm test
 ```
 
 If you see strange behavior regarding HTTP clients, try running the tests with `--detectOpenHandles`.
@@ -71,19 +74,19 @@ To release a new version of the SDK do the following.
 1. Regenerate the client:
 
 ```
-yarn generate-client
+pnpm generate-client
 ```
 
 2. Test:
 
 ```
-yarn test
+pnpm test
 ```
 
 3. Bump the version in `package.json` according to [semver](https://semver.org/).
 4. Add an entry in the CHANGELOG for the version. We adhere to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 5. Once you're confident everything is correct, submit your PR.
-6. Once the PR is approved and on main, run `yarn checked-publish` manually.
+6. Once the PR is approved and on main, run `pnpm checked-publish` manually.
 
 ## References
 

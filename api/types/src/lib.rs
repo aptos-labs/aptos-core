@@ -37,7 +37,7 @@ pub use move_types::{
 };
 use serde::{Deserialize, Deserializer};
 use std::str::FromStr;
-pub use table::TableItemRequest;
+pub use table::{RawTableItemRequest, TableItemRequest};
 pub use transaction::{
     AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
     DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, EntryFunctionPayload, Event,
@@ -49,7 +49,7 @@ pub use transaction::{
     UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
     WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
 };
-pub use wrappers::{EventGuid, IdentifierWrapper};
+pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};
 
 pub fn deserialize_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where

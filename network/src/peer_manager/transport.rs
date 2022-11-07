@@ -66,7 +66,7 @@ where
         let addr_string = format!("{}", listen_addr);
         let (listener, listen_addr) = transport
             .listen_on(listen_addr)
-            .unwrap_or_else(|_| panic!("Transport listen on fails: {}", addr_string));
+            .unwrap_or_else(|err| panic!("Transport listen on fails: {}: {}", addr_string, err));
         debug!(
             NetworkSchema::new(&network_context),
             listen_address = listen_addr,
@@ -256,7 +256,7 @@ where
                 Ok(())
             }
             Err(err) => {
-                error!(
+                warn!(
                     NetworkSchema::new(&self.network_context)
                         .remote_peer(&peer_id)
                         .network_address(&addr),

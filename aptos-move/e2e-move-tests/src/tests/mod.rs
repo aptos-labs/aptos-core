@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod aggregator;
+mod chain_id;
 mod code_publishing;
 mod common;
 mod error_map;

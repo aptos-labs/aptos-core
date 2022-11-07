@@ -1,13 +1,16 @@
 [package]
 name = "storage-interface"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos storage interface"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
@@ -29,7 +32,7 @@ aptos-vm = { path = "../../aptos-move/aptos-vm" }
 
 scratchpad = { path = "../scratchpad" }
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e", features = ["address32"] }
+move-core-types = { workspace = true }
 
 [dev-dependencies]
 assert_unordered = "0.1.1"

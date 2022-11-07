@@ -18,7 +18,26 @@ const sidebars = {
   aptosSidebar: [
     "index",
     "whats-new-in-docs",
-    "guides/getting-started",
+    {
+      type: "category",
+      label: "Getting Started",
+      link: { type: "doc", id: "guides/getting-started" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "cli-tools/aptos-cli-tool/install-aptos-cli",
+        "cli-tools/build-aptos-cli",
+        "cli-tools/install-move-prover",
+        {
+          type: "category",
+          label: "Aptos Token Standard",
+          link: { type: "doc", id: "concepts/coin-and-token/index" },
+          collapsible: true,
+          collapsed: true,
+          items: ["concepts/coin-and-token/aptos-coin", "concepts/coin-and-token/aptos-token"],
+        },
+      ],
+    },
     {
       type: "category",
       label: "Developer Tutorials",
@@ -45,14 +64,6 @@ const sidebars = {
         "concepts/basics-events",
         "concepts/basics-gas-txn-fee",
         "concepts/base-gas",
-        {
-          type: "category",
-          label: "Coin and Token",
-          link: { type: "doc", id: "concepts/coin-and-token/index" },
-          collapsible: true,
-          collapsed: true,
-          items: ["concepts/coin-and-token/aptos-coin", "concepts/coin-and-token/aptos-token"],
-        },
         "concepts/basics-fullnodes",
         "concepts/basics-validator-nodes",
         "concepts/basics-node-networks-sync",
@@ -73,6 +84,7 @@ const sidebars = {
         "guides/state-sync",
         "guides/data-pruning",
         "guides/indexing",
+        "guides/resource-accounts",
         "guides/building-your-own-wallet",
         "guides/install-petra-wallet",
         "guides/building-wallet-extension",
@@ -97,6 +109,7 @@ const sidebars = {
     },
     "nodes/nodes-landing",
     "nodes/aptos-deployments",
+    "nodes/aptos-api-spec",
     "nodes/leaderboard-metrics",
     {
       type: "category",
@@ -117,7 +130,7 @@ const sidebars = {
       items: [
         "nodes/ait/whats-new-in-ait3",
         "nodes/ait/steps-in-ait3",
-        
+
       ],
     },  */
     {
@@ -232,14 +245,7 @@ const sidebars = {
         "sdks/rust-sdk",
       ],
     },
-    {
-      type: "category",
-      label: "Aptos CLI",
-      collapsible: true,
-      collapsed: true,
-      link: { type: "doc", id: "cli-tools/aptos-cli-tool/index" },
-      items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
-    },
+    "cli-tools/aptos-cli-tool/use-aptos-cli",
     {
       type: "html",
       value: "White Paper",

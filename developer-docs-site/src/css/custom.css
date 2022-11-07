@@ -6,15 +6,15 @@
 
 /* You can override the default Infima variables here. */
 :root {
+  --ifm-background-color: #ffffff;
   --ifm-color-primary: #000000;
   --ifm-color-primary-inverse: white;
-
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-color-primary-dark: #00adb2;
+  --ifm-color-primary-darker: #00878d;
+  --ifm-color-primary-darkest: #00686f;
+  --ifm-color-primary-light: #3ffdff;
+  --ifm-color-primary-lighter: #84feff;
+  --ifm-color-primary-lightest: #c2ffff;
   --ifm-code-font-size: 95%;
 
   /* Override this */
@@ -23,16 +23,17 @@
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 html[data-theme='dark'] {
+  --ifm-background-color: #121616;
   --ifm-color-primary: #ffffff;
   --ifm-color-primary-inverse: black;
 
-  --ifm-color-primary-dark: #1ee9b6;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --ifm-color-primary-custom-lightest: #d5f1eb;
+  --ifm-color-primary-dark: #06f7f7;
+  --ifm-color-primary-darker: #00dadc;
+  --ifm-color-primary-darkest: #00adb2;
+  --ifm-color-primary-light: #3ffdff;
+  --ifm-color-primary-lighter: #84feff;
+  --ifm-color-primary-lightest: #c2ffff;
+  --ifm-color-primary-custom-lightest: #c2ffff;
 
   /* Override this */
   --ifm-link-color: var(--ifm-color-primary-dark);
@@ -97,18 +98,67 @@ img.deep-dive-image {
   );
 }
 
+audio,canvas,embed,iframe,img,object,svg,video {
+    display:inline;
+}
 
 footer.footer {
-  background-color: black;
-  color:white;
+  background-color: var(--ifm-background-color);
+  color:var(--ifm-navbar-link-color);
   font-size: 18px;
   font-weight: 300;
   letter-spacing: normal;
   line-height: 28px;
 }
 
+footer.footer .footer__col {
+  margin-bottom:0;
+}
+
+footer.footer .footer__links {
+  flex-direction:column;
+}
+@media (min-width: 768px) {
+  footer.footer .footer__links {
+    flex-direction:row;
+  }
+}
+
+footer.footer .footer-left {
+  display:flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-direction:column;
+}
+
+@media (min-width: 768px) {
+  footer.footer .footer-left {
+    flex-direction:row;
+  }
+}
+
+footer.footer .footer-left .copyright-text {
+  font-size: .75rem;
+  line-height: 1rem;
+  margin-bottom:0;
+  white-space: nowrap;
+}
+
+footer.footer .footer-left .copyright-links {
+  display:flex;
+  gap:0.5rem;
+  justify-content:center;
+}
+
+@media (min-width: 768px) {
+  footer.footer .footer-left .copyright-links {
+    justify-content:start;
+  }
+}
+
 footer.footer a {
-  color:white;
+  color: var(--ifm-navbar-link-color);
+  font-size: .75rem;
   text-decoration: underline;
 }
 footer.footer .emails{
@@ -120,31 +170,60 @@ footer.footer .right{
 }
 
 footer.footer .icon{
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
 }
 
-footer.footer .logo{
-  width: 150px;
+footer.footer .footer-logo{
+  width:48px;
+  color: var(--ifm-navbar-link-color);
 }
-
 
 footer.footer a.social-link{
   text-decoration: none;
-  height: 20px;
-  padding-right: 30px;
+  width:26px;
+  color: var(--ifm-navbar-link-color);
 }
 
 footer.footer nav.social-links {
-  text-align: right;
+  display:flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  color:#fff;
+}
+
+@media (min-width: 768px) {
+  footer.footer nav.social-links {
+    justify-content: end;
+  }
 }
 
 footer.footer > div.container-fluid {
   max-width: inherit;
 }
 
-div.navbar__logo {
-  height: 1.6rem;
+.navbar {
+  background:var(--ifm-background-color);
+  height:80px;
+  border-bottom:1px solid var(--ifm-toc-border-color);
+  padding-left:1.5rem;
+  padding-right:1.5rem;
+}
+
+@media (min-width: 640px) {
+  .navbar {
+    padding-left:1rem;
+    padding-right:1rem;
+  }
+}
+
+.navbar__logo {
+  width:96px;
+}
+
+.navbar__logo img {
+  width:100%;
 }
 
 b.navbar__title{

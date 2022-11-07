@@ -88,7 +88,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 <div class="col">
     <div class="card h-100" >
     <div class="card-body d-flex flex-column" >
-    <a href="/cli-tools/aptos-cli-tool/aptos-cli-index" class="card-title card-link stretched-link"> <h2>CLI</h2></a>
+    <a href="/cli-tools/aptos-cli-tool/use-aptos-cli" class="card-title card-link stretched-link"> <h2>CLI</h2></a>
     <p class="card-text">CLI for developing and deploying on the Aptos blockchain.</p>
 </div>
 </div>
@@ -114,37 +114,37 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 
 ## Connect to Aptos networks
 
-Aptos offers running a local testnet, as well as using the shared devnet and testnet, with mainnet on the way. See the [System Integrators Guide](guides/system-integrators-guide.md#networks) for a summary of the available networks and the means to connect to them.
+Aptos offers running a local testnet, as well as using the shared devnet and testnet, with mainnet now launched. See the [System Integrators Guide](guides/system-integrators-guide.md#networks) for a summary of the available networks and the means to connect to them.
 
 :::tip Aptos Devnet Resets
-The Aptos devnet is reset every Thursday. See the latest updates in Aptos [Discord][discord].
+The Aptos devnet is reset every Thursday. See the latest updates in [Aptos Discord](https://discord.gg/aptoslabs).
 :::info
 
 ## Ask questions and offer answers
 
-Join [Discord][discord] to speak with developers and hop into the Aptos community. It's the best way to keep up to date with news and developments in the Aptos universe. Be sure to check pinned messages in the channels - this is where we like to keep topic-specific links, events, and more.
+Join [Aptos Discord](https://discord.gg/aptoslabs) to speak with developers and hop into the Aptos community. It's the best way to keep up to date with news and developments in the Aptos universe. Be sure to check pinned messages in the channels - this is where we like to keep topic-specific links, events, and more.
 
-Or even if you just want to stop by to say "Good Morning!". There's a little something for everyone!
+For technical questions, we recommend [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos) so anyone in the world may search for, benefit from, and upvote questions and answers in a persistent location.
 
-:::caution Be safe out there
+:::caution Be safe with communications
 
-It's dangerous to go alone. Please remember, community managers will never message or DM you first, and they will never ask you to send them money or share any sensitive, private, or personal information. If this happens to you, please report it to us in [Discord][discord], or by sending an email to [security@aptoslabs.com](mailto:security@aptoslabs.com).
+Please remember, community managers will never message or DM you first, and they will never ask you to send them money or share any sensitive, private, or personal information. If this happens to you, please report it to us in [Aptos Discord](https://discord.gg/aptoslabs), or by sending an email to [security@aptoslabs.com](mailto:security@aptoslabs.com).
 
 :::
 
-## Join us
+## Join the team
 
-Want to join a great team working on amazing world-scale problems? Take a look at [active roles](https://boards.greenhouse.io/aptoslabs), and come build with us!
+Want to join a great team working on amazing world-scale problems? Take a look at [active roles](https://aptoslabs.com/careers) on [AptosLabs.com](https://www.aptoslabs.com/) and come build with us!
 
 Or simply [create a pull request](https://github.com/aptos-labs/aptos-core/pulls) to make updates and [file issues](https://github.com/aptos-labs/aptos-core/issues) to report problems.
 
-## Have fun!
+## Find the ecosystem
 
-We are excited that you are here, and we look forward to getting to know you. Welcome to the Aptos community! Find out more about us at:
+We are excited that you are here, and we look forward to getting to know you. Welcome to the Aptos community! Find out more about us and exchange ideas at:
 
-* [AptosLabs.com](https://www.aptoslabs.com/)
+* [Aptos Discord](https://discord.gg/aptoslabs)
+* [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos)
 * [Forum](https://forum.aptoslabs.com/)
-* [Discord](https://discord.gg/aptoslabs)
 * [Medium](https://medium.com/aptoslabs)
 * [Telegram](https://t.me/aptos_official)
 * [Twitter](https://twitter.com/AptosLabs)

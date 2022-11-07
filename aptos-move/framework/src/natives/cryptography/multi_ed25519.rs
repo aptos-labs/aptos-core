@@ -3,16 +3,28 @@
 
 use crate::natives::cryptography::ed25519::GasParameters;
 use crate::natives::util::make_native_from_func;
+#[cfg(feature = "testing")]
+use crate::natives::util::make_test_only_native_from_func;
+#[cfg(feature = "testing")]
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_crypto::ed25519::{ED25519_PUBLIC_KEY_LENGTH, ED25519_SIGNATURE_LENGTH};
+#[cfg(feature = "testing")]
+use aptos_crypto::multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey};
+#[cfg(feature = "testing")]
+use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{multi_ed25519, traits::*};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use move_binary_format::errors::PartialVMResult;
+#[cfg(feature = "testing")]
+use move_core_types::gas_algebra::InternalGas;
 use move_core_types::gas_algebra::NumBytes;
 use move_core_types::gas_algebra::{InternalGasPerArg, NumArgs};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
+#[cfg(feature = "testing")]
+use rand_core::OsRng;
 use smallvec::smallvec;
 use std::{collections::VecDeque, convert::TryFrom};
 
@@ -106,13 +118,59 @@ fn native_signature_verify_strict(
     ))
 }
 
+#[cfg(feature = "testing")]
+fn native_generate_keys(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    let n = pop_arg!(arguments, u8);
+    let threshold = pop_arg!(arguments, u8);
+    let key_pairs: Vec<KeyPair<Ed25519PrivateKey, Ed25519PublicKey>> = (0..n)
+        .map(|_i| KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut OsRng))
+        .collect();
+    let private_keys = key_pairs
+        .iter()
+        .map(|pair| pair.private_key.clone())
+        .collect();
+    let public_keys = key_pairs
+        .iter()
+        .map(|pair| pair.public_key.clone())
+        .collect();
+    let group_sk = MultiEd25519PrivateKey::new(private_keys, threshold).unwrap();
+    let group_pk = MultiEd25519PublicKey::new(public_keys, threshold).unwrap();
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![
+            Value::vector_u8(group_sk.to_bytes()),
+            Value::vector_u8(group_pk.to_bytes()),
+        ],
+    ))
+}
+
+#[cfg(feature = "testing")]
+fn native_sign(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    let message = pop_arg!(arguments, Vec<u8>);
+    let sk_bytes = pop_arg!(arguments, Vec<u8>);
+    let group_sk = MultiEd25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
+    let sig = group_sk.sign_arbitrary_message(message.as_slice());
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![Value::vector_u8(sig.to_bytes()),],
+    ))
+}
 /***************************************************************************************************
  * module
  *
  **************************************************************************************************/
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [
+    let mut natives = vec![];
+    natives.append(&mut vec![
         // MultiEd25519
         (
             "public_key_validate_internal",
@@ -122,7 +180,17 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             "signature_verify_strict_internal",
             make_native_from_func(gas_params, native_signature_verify_strict),
         ),
-    ];
-
+    ]);
+    #[cfg(feature = "testing")]
+    natives.append(&mut vec![
+        (
+            "generate_keys_internal",
+            make_test_only_native_from_func(native_generate_keys),
+        ),
+        (
+            "sign_internal",
+            make_test_only_native_from_func(native_sign),
+        ),
+    ]);
     crate::natives::helpers::make_module_natives(natives)
 }

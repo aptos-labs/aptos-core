@@ -7,6 +7,30 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 07 November 2022
+
+- Created an Aptos tag on [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos) and started populating it with common questions and answers.
+
+## 04 November 2022
+
+- Added a guide on [Resource Accounts](/docs/guides/resource-accounts.md) used by developers to publish modules and automatically sign transactions.
+
+## 02 November 2022
+
+- Created a #docs-feedback channel on [Discord](https://discord.com/channels/945856774056083548/1034215378299133974) seeking input on Aptos.dev and taking action with updates to the documentation.
+
+## 01 November 2022
+
+- Expanded the previous Coin and Token documentation into the [Aptos Token Standard](/docs/concepts/coin-and-token/index.md) with new field descriptions and more and moved it to the [Getting Started](/docs/guides/getting-started.md) section for greater visilibity.
+
+## 25 October 2022
+
+- Replaced the outdated auto-generated Move docs formally located at `aptos-core/tree/framework-docs` with new online versions now found at:
+  * [Aptos tokens](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md)
+  * [Aptos framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md)
+  * [Aptos stdlib](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/doc/overview.md)
+  * [Move stdlib](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/overview.md)
+
 ## 13 October 2022
 
 - Added [user documentation](/docs/guides/use-aptos-explorer.md) for [Aptos Explorer](https://explorer.aptoslabs.com/) to Aptos.dev covering common use cases and popular Explorer screen descriptions.

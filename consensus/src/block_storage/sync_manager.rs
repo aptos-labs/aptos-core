@@ -260,11 +260,15 @@ impl BlockStore {
             .iter()
             .any(|block| block.id() == highest_commit_cert.certified_block().id())
         {
+            info!(
+                "Found forked QC {}, fetching it as well",
+                highest_commit_cert
+            );
             let mut additional_blocks = retriever
                 .retrieve_block_for_qc(
                     highest_commit_cert,
                     1,
-                    highest_commit_cert.commit_info().id(),
+                    highest_commit_cert.certified_block().id(),
                 )
                 .await?;
 

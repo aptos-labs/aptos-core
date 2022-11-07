@@ -1,13 +1,16 @@
 [package]
 name = "smoke-test"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos end to end tests"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
@@ -29,11 +32,13 @@ tokio = { version = "1.21.0", features = ["full"] }
 aptos = { path = "../../crates/aptos", features = ["fuzzing"] }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-debugger = { path = "../../aptos-move/aptos-debugger" }
 aptos-faucet = { path = "../../crates/aptos-faucet" }
 aptos-gas = { path = "../../aptos-move/aptos-gas", features = ["testing"] }
 aptos-global-constants = { path = "../../config/global-constants", features = ["testing"] }
 aptos-indexer = { path = "../../crates/indexer" }
 aptos-keygen = { path = "../../crates/aptos-keygen" }
+aptos-release-builder = { path = "../../aptos-move/aptos-release-builder" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-rosetta = { path = "../../crates/aptos-rosetta" }
 aptos-sdk = { path = "../../sdk" }
@@ -44,7 +49,7 @@ cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 consensus = { path = "../../consensus" }
 forge = { path = "../forge", features = ["testing"] }
 framework = { path = "../../aptos-move/framework" }
-move-deps = { path = "../../aptos-move/move-deps" }
+move-core-types = { workspace = true }
 
 [dev-dependencies]
 base64 = "0.13.0"

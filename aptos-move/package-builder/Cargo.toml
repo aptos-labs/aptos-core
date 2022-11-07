@@ -1,20 +1,23 @@
 [package]
 name = "package-builder"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Helper for building Move packages for tests"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
 itertools = "0.10.0"
 tempfile = "3.3.0"
 
-move-command-line-common = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
-move-package = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
+move-command-line-common = { workspace = true }
+move-package = { workspace = true }
 
 framework = { path = "../framework" }

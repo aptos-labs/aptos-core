@@ -29,7 +29,7 @@ use aptos_types::transaction::{
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use hex::FromHexError;
-use move_deps::move_core_types::account_address::AccountAddress;
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 #[cfg(unix)]
@@ -934,6 +934,11 @@ impl MovePackageDir {
             .into_iter()
             .map(|(key, value)| (key, value.account_address))
             .collect()
+    }
+
+    pub fn add_named_address(&mut self, key: String, value: String) {
+        self.named_addresses
+            .insert(key, AccountAddressWrapper::from_str(&value).unwrap());
     }
 }
 

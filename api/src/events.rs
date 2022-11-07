@@ -69,8 +69,8 @@ impl EventsApi {
         );
 
         // Ensure that account exists
-        let account = Account::new(self.context.clone(), address.0, None)?;
-        account.account_state()?;
+        let account = Account::new(self.context.clone(), address.0, None, None, None)?;
+        account.get_account_resource()?;
         self.list(
             account.latest_ledger_info,
             accept_type,
@@ -131,7 +131,7 @@ impl EventsApi {
             limit.0,
             self.context.max_events_page_size(),
         );
-        let account = Account::new(self.context.clone(), address.0, None)?;
+        let account = Account::new(self.context.clone(), address.0, None, None, None)?;
         let key = account.find_event_key(event_handle.0, field_name.0.into())?;
         self.list(account.latest_ledger_info, accept_type, page, key)
     }

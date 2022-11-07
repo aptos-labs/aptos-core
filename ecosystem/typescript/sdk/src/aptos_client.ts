@@ -8,6 +8,7 @@ import {
   DEFAULT_MAX_GAS_AMOUNT,
   DEFAULT_TXN_TIMEOUT_SEC,
   fixNodeUrl,
+  paginateWithCursor,
   Memoize,
   sleep,
   APTOS_COIN,
@@ -19,6 +20,7 @@ import {
   TransactionBuilderEd25519,
   TransactionBuilderRemoteABI,
   RemoteABIBuilderConfig,
+  TransactionBuilderMultiEd25519,
 } from "./transaction_builder";
 import {
   bcsSerializeBytes,
@@ -31,7 +33,7 @@ import {
   Uint64,
   AnyNumber,
 } from "./bcs";
-import { Ed25519PublicKey } from "./aptos_types";
+import { Ed25519PublicKey, MultiEd25519PublicKey } from "./aptos_types";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
@@ -122,6 +124,10 @@ export class AptosClient {
 
   /**
    * Queries modules associated with given account
+   *
+   * Note: In order to get all account modules, this function may call the API
+   * multiple times as it paginates.
+   *
    * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
    * @returns Account modules array for a specific ledger version.
@@ -133,14 +139,21 @@ export class AptosClient {
     accountAddress: MaybeHexString,
     query?: { ledgerVersion?: AnyNumber },
   ): Promise<Gen.MoveModuleBytecode[]> {
-    return this.client.accounts.getAccountModules(
-      HexString.ensure(accountAddress).hex(),
-      query?.ledgerVersion?.toString(),
-    );
+    // Note: This function does not expose a `limit` parameter because it might
+    // be ambiguous how this is being used. Is it being passed to getAccountModules
+    // to limit the number of items per response, or does it limit the total output
+    // of this function? We avoid this confusion by not exposing the parameter at all.
+    const f = this.client.accounts.getAccountModules.bind({ httpRequest: this.client.request });
+    const out = await paginateWithCursor(f, accountAddress, 100, query);
+    return out;
   }
 
   /**
    * Queries module associated with given account by module name
+   *
+   * Note: In order to get all account resources, this function may call the API
+   * multiple times as it paginates.
+   *
    * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param moduleName The name of the module
    * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
@@ -172,10 +185,9 @@ export class AptosClient {
     accountAddress: MaybeHexString,
     query?: { ledgerVersion?: AnyNumber },
   ): Promise<Gen.MoveResource[]> {
-    return this.client.accounts.getAccountResources(
-      HexString.ensure(accountAddress).hex(),
-      query?.ledgerVersion?.toString(),
-    );
+    const f = this.client.accounts.getAccountResources.bind({ httpRequest: this.client.request });
+    const out = await paginateWithCursor(f, accountAddress, 1000, query);
+    return out;
   }
 
   /**
@@ -187,7 +199,7 @@ export class AptosClient {
    * @example An example of an account resource
    * ```
    * {
-   *    type: "0x1::AptosAccount::Coin",
+   *    type: "0x1::aptos_coin::AptosCoin",
    *    data: { value: 6 }
    * }
    * ```
@@ -321,12 +333,12 @@ export class AptosClient {
    * for which events are queried. This refers to the account that events were emitted
    * to, not the account hosting the move module that emits that event type.
    * @param eventHandleStruct String representation of an on-chain Move struct type.
-   * (e.g. `0x1::Coin::CoinStore<0x1::aptos_coin::AptosCoin>`)
+   * (e.g. `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`)
    * @param fieldName The field name of the EventHandle in the struct
    * @param query Optional query object
    * @param query.start The start sequence number in the EVENT STREAM, defaulting to the latest event.
    * The events are returned in the reverse order of sequence number
-   * @param query.limit The number of events to be returned for the page default is 5
+   * @param query.limit The number of events to be returned. The default is 25.
    * @returns Array of events
    */
   @parseApiError
@@ -373,7 +385,7 @@ export class AptosClient {
    *
    */
   async simulateTransaction(
-    accountOrPubkey: AptosAccount | Ed25519PublicKey,
+    accountOrPubkey: AptosAccount | Ed25519PublicKey | MultiEd25519PublicKey,
     rawTransaction: TxnBuilderTypes.RawTransaction,
     query?: {
       estimateGasUnitPrice?: boolean;
@@ -385,6 +397,20 @@ export class AptosClient {
 
     if (accountOrPubkey instanceof AptosAccount) {
       signedTxn = AptosClient.generateBCSSimulation(accountOrPubkey, rawTransaction);
+    } else if (accountOrPubkey instanceof MultiEd25519PublicKey) {
+      const txnBuilder = new TransactionBuilderMultiEd25519(() => {
+        const { threshold } = accountOrPubkey;
+        const bits: Seq<number> = [];
+        const signatures: TxnBuilderTypes.Ed25519Signature[] = [];
+        for (let i = 0; i < threshold; i += 1) {
+          bits.push(i);
+          signatures.push(new TxnBuilderTypes.Ed25519Signature(new Uint8Array(64)));
+        }
+        const bitmap = TxnBuilderTypes.MultiEd25519Signature.createBitmap(bits);
+        return new TxnBuilderTypes.MultiEd25519Signature(signatures, bitmap);
+      }, accountOrPubkey);
+
+      signedTxn = txnBuilder.sign(rawTransaction);
     } else {
       const txnBuilder = new TransactionBuilderEd25519(() => {
         const invalidSigBytes = new Uint8Array(64);
@@ -450,7 +476,9 @@ export class AptosClient {
   }
 
   /**
-   * Queries on-chain transactions
+   * Queries on-chain transactions. This function will not return pending
+   * transactions. For that, use `getTransactionsByHash`.
+   *
    * @param query Optional pagination object
    * @param query.start The start transaction version of the page. Default is the latest ledger version
    * @param query.limit The max number of transactions should be returned for the page. Default is 25
@@ -463,7 +491,7 @@ export class AptosClient {
 
   /**
    * @param txnHash - Transaction hash should be hex-encoded bytes string with 0x prefix.
-   * @returns Transaction from mempool or on-chain transaction
+   * @returns Transaction from mempool (pending) or on-chain (committed) transaction
    */
   @parseApiError
   async getTransactionByHash(txnHash: string): Promise<Gen.Transaction> {
@@ -472,7 +500,8 @@ export class AptosClient {
 
   /**
    * @param txnVersion - Transaction version is an uint64 number.
-   * @returns Transaction from mempool or on-chain transaction
+   * @returns On-chain transaction. Only on-chain transactions have versions, so this
+   * function cannot be used to query pending transactions.
    */
   @parseApiError
   async getTransactionByVersion(txnVersion: AnyNumber): Promise<Gen.Transaction> {

@@ -1,13 +1,16 @@
 [package]
 name = "aptos-api"
-version = "0.2.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos REST API"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version = "0.2.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
@@ -43,7 +46,7 @@ aptos-vm = { path = "../aptos-move/aptos-vm" }
 
 storage-interface = { path = "../storage/storage-interface" }
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e", features = ["address32"] }
+move-core-types = { workspace = true }
 
 [dev-dependencies]
 aptos-api-test-context = { path = "./test-context", package = "aptos-api-test-context" }
@@ -57,7 +60,7 @@ regex = "1.5.5"
 reqwest = { version = "0.11.10", features = ["blocking", "json"], default_features = false }
 warp = { version = "0.3.2", features = ["default"] }
 
-move-package = { git = "https://github.com/move-language/move", rev = "6a32284d6e04ea5bfa5919df9aac2ccb3ffa010e" }
+move-package = { workspace = true }
 
 [features]
 failpoints = ["fail/failpoints"]

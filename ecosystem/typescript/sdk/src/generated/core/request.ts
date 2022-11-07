@@ -401,7 +401,14 @@ export const request = <T>(config: OpenAPIConfig, options: ApiRequestOptions): C
 
                 catchErrorCodes(options, result);
 
-                resolve(result.body);
+                // Attach the response headers to the output. This is a hack to fix
+                // https://github.com/ferdikoomen/openapi-typescript-codegen/issues/1295
+                const out = result.body;
+                try {
+                    out["__headers"] = response.headers;
+                } catch (_) {}
+
+                resolve(out);
             }
         } catch (error) {
             reject(error);

@@ -1,14 +1,16 @@
 [package]
 name = "aptos-transactional-test-harness"
-version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Transactional testing framework for Move"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = "1.0.57"
@@ -20,7 +22,13 @@ serde = { version = "1.0.137", default-features = false }
 serde_json = "1.0.81"
 
 # Move dependencies
-move-deps = { path = "../move-deps", features = ["address32"] }
+move-binary-format = { workspace = true, features = [ "fuzzing" ] }
+move-command-line-common = { workspace = true }
+move-compiler = { workspace = true }
+move-core-types = { workspace = true, features = [ "fuzzing" ] }
+move-resource-viewer = { workspace = true }
+move-transactional-test-runner = { workspace = true }
+move-vm-runtime = { workspace = true }
 
 # Aptos Move dependencies
 aptos-api-types = { path = "../../api/types" }
