@@ -31,6 +31,7 @@ import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder
 import * as Gen from "../generated/index";
 import { DEFAULT_TXN_EXP_SEC_FROM_NOW, DEFAULT_MAX_GAS_AMOUNT, MemoizeExpiring } from "../utils";
 
+export { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArgumentABI };
 export { TypeTagParser } from "./builder_utils";
 
 const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
