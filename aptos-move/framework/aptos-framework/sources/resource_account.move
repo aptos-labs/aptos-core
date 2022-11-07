@@ -182,8 +182,7 @@ module aptos_framework::resource_account {
             simple_map::destroy_empty(store);
         };
 
-        let resource = account::create_signer_with_capability(&resource_signer_cap);
-        account::rotate_authentication_key_internal(&resource, ZERO_AUTH_KEY);
+        account::rotate_authentication_key_internal(resource, ZERO_AUTH_KEY);
         resource_signer_cap
     }
 

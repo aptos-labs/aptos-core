@@ -11,10 +11,10 @@ module aptos_std::big_vector {
     const EVECTOR_NOT_EMPTY: u64 = 3;
 
     /// Index of the value in the buckets.
-    struct BigVectorIndex has copy, drop, store {
-        bucket_index: u64,
-        vec_index: u64,
-    }
+//    struct BigVectorIndex has copy, drop, store {
+//        bucket_index: u64,
+//        vec_index: u64,
+//    }
 
     /// A Scalable vector implementation based on tables, elements are grouped into buckets with `bucket_size`.
     struct BigVector<T> has store {

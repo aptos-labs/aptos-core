@@ -356,8 +356,7 @@ the SignerCapability.
         <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_destroy_empty">simple_map::destroy_empty</a>(store);
     };
 
-    <b>let</b> resource = <a href="account.md#0x1_account_create_signer_with_capability">account::create_signer_with_capability</a>(&resource_signer_cap);
-    <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(&resource, <a href="resource_account.md#0x1_resource_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>);
+    <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(resource, <a href="resource_account.md#0x1_resource_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>);
     resource_signer_cap
 }
 </code></pre>
