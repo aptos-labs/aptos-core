@@ -7,28 +7,14 @@ use crate::{
 };
 use aptos_crypto::ValidCryptoMaterialStringExt;
 use aptos_gas::{AptosGasParameters, GasQuantity, InitialGasSchedule, ToOnChainGasSchedule};
+use aptos_release_builder::components::{
+    feature_flags::Features, gas::generate_gas_upgrade_proposal,
+};
 use aptos_temppath::TempPath;
+use aptos_types::on_chain_config::FeatureFlag;
 use forge::Swarm;
+use std::fs;
 use std::process::Command;
-use std::{fmt::Write, fs};
-
-fn generate_blob(data: &[u8]) -> String {
-    let mut buf = String::new();
-
-    write!(buf, "vector[").unwrap();
-    for (i, b) in data.iter().enumerate() {
-        if i % 20 == 0 {
-            if i > 0 {
-                writeln!(buf).unwrap();
-            }
-        } else {
-            write!(buf, " ").unwrap();
-        }
-        write!(buf, "{}u8,", b).unwrap();
-    }
-    write!(buf, "]").unwrap();
-    buf
-}
 
 #[tokio::test]
 /// This test verifies the flow of aptos framework upgrade process.
@@ -61,23 +47,10 @@ async fn test_upgrade_flow() {
         entries: gas_parameters.to_on_chain_gas_schedule(),
     };
 
-    let update_gas_script = format!(
-        r#"
-    script {{
-        use aptos_framework::aptos_governance;
-        use aptos_framework::gas_schedule;
-
-        fun main(core_resources: &signer) {{
-            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-
-            let gas_bytes = {};
-
-            gas_schedule::set_gas_schedule(&framework_signer, gas_bytes);
-        }}
-    }}
-    "#,
-        generate_blob(&bcs::to_bytes(&gas_schedule).unwrap())
-    );
+    let (_, update_gas_script) = generate_gas_upgrade_proposal(&gas_schedule, true)
+        .unwrap()
+        .pop()
+        .unwrap();
 
     let gas_script_path = TempPath::new();
     let mut gas_script_path = gas_script_path.path().to_path_buf();
@@ -103,50 +76,40 @@ async fn test_upgrade_flow() {
         .unwrap()
         .status
         .success());
+    *env.aptos_public_info().root_account().sequence_number_mut() += 1;
 
-    // Generate the governance proposal script.
-    let package_path_list = vec![
-        ("0x1", "aptos-move/framework/move-stdlib"),
-        ("0x1", "aptos-move/framework/aptos-stdlib"),
-        ("0x1", "aptos-move/framework/aptos-framework"),
-        ("0x3", "aptos-move/framework/aptos-token"),
-    ];
+    let upgrade_scripts_folder = TempPath::new();
+    upgrade_scripts_folder.create_as_dir().unwrap();
 
-    for (publish_addr, relative_package_path) in package_path_list.iter() {
-        let temp_script_path = TempPath::new();
-        let mut move_script_path = temp_script_path.path().to_path_buf();
-        move_script_path.set_extension("move");
+    let config = aptos_release_builder::ReleaseConfig {
+        feature_flags: Some(Features {
+            enabled: vec![
+                FeatureFlag::CODE_DEPENDENCY_CHECK,
+                FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
+            ],
+            disabled: vec![],
+        }),
+        ..Default::default()
+    };
 
-        let mut package_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf();
-        package_path.pop();
-        package_path.pop();
-        package_path.push(relative_package_path);
+    config
+        .generate_release_proposal_scripts(upgrade_scripts_folder.path(), true)
+        .unwrap();
+    let mut scripts = fs::read_dir(upgrade_scripts_folder.path())
+        .unwrap()
+        .map(|res| res.unwrap().path())
+        .collect::<Vec<_>>();
 
-        assert!(Command::new(aptos_cli.as_path())
-            .current_dir(workspace_root())
-            .args(&vec![
-                "governance",
-                "generate-upgrade-proposal",
-                "--testnet",
-                "--account",
-                publish_addr,
-                "--package-dir",
-                package_path.to_str().unwrap(),
-                "--output",
-                move_script_path.to_str().unwrap(),
-            ])
-            .output()
-            .unwrap()
-            .status
-            .success());
+    scripts.sort();
 
+    for path in scripts.iter() {
         assert!(Command::new(aptos_cli.as_path())
             .current_dir(workspace_root())
             .args(&vec![
                 "move",
                 "run-script",
                 "--script-path",
-                move_script_path.to_str().unwrap(),
+                path.to_str().unwrap(),
                 "--sender-account",
                 "0xA550C18",
                 "--url",
@@ -159,11 +122,11 @@ async fn test_upgrade_flow() {
             .unwrap()
             .status
             .success());
+
+        *env.aptos_public_info().root_account().sequence_number_mut() += 1;
     }
 
-    // Two transactions has been emitted to root account.
-    *env.aptos_public_info().root_account().sequence_number_mut() +=
-        1 + package_path_list.len() as u64;
+    //TODO: Make sure gas schedule is indeed updated by the tool.
 
     // Test the module publishing workflow
     let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));

@@ -17,6 +17,7 @@
 -  [Function `verify_type_of`](#0x1_type_info_verify_type_of)
 -  [Function `verify_type_of_generic`](#0x1_type_info_verify_type_of_generic)
 -  [Specification](#@Specification_1)
+    -  [Function `type_of`](#@Specification_1_type_of)
     -  [Function `chain_id_internal`](#@Specification_1_chain_id_internal)
 
 
@@ -316,6 +317,23 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 <a name="@Specification_1"></a>
 
 ## Specification
+
+
+<a name="@Specification_1_type_of"></a>
+
+### Function `type_of`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;(): <a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+</code></pre>
+
 
 
 <a name="@Specification_1_chain_id_internal"></a>
