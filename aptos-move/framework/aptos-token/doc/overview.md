@@ -16,6 +16,7 @@ This is the reference documentation of the Aptos Token framework.
 -  [`0x3::token`](token.md#0x3_token)
 -  [`0x3::token_coin_swap`](token_coin_swap.md#0x3_token_coin_swap)
 -  [`0x3::token_transfers`](token_transfers.md#0x3_token_transfers)
+-  [`0x1::token_type`](token_type.md#0x1_token_type)
 
 
 [move-book]: https://move-language.github.io/move/introduction.html
