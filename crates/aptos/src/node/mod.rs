@@ -1193,11 +1193,8 @@ impl CliCommand<()> for RunLocalTestnet {
 
         // This future just waits for the node thread.
         let node_future = async move {
-            loop {
-                if node_thread_handle.is_finished() {
-                    return;
-                }
-                tokio::time::sleep(Duration::from_millis(500)).await;
+            while !node_thread_handle.is_finished() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
             }
         };
 
