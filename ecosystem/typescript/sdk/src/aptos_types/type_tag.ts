@@ -125,6 +125,17 @@ export class TypeTagStruct extends TypeTag {
     const value = StructTag.deserialize(deserializer);
     return new TypeTagStruct(value);
   }
+
+  isStringTypeTag(): boolean {
+    if (
+      this.value.module_name.value === "string" &&
+      this.value.name.value === "String" &&
+      this.value.address === AccountAddress.fromHex("0x1")
+    ) {
+      return true;
+    }
+    return false;
+  }
 }
 
 export class StructTag {

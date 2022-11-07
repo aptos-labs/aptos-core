@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+export * from "./abi";
 export * from "./account_address";
 export * from "./authenticator";
 export * from "./transaction";

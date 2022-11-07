@@ -30,7 +30,9 @@ jobs:
           node-version-file: .node-version
           registry-url: 'https://registry.npmjs.org'
 
-      - run: npm install -g yarn@1.22.19
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 7.14.2
 
       # Run example code in typescript.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
@@ -38,7 +40,7 @@ jobs:
         with:
           max_attempts: 5
           timeout_minutes: 20
-          command: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install && yarn test
+          command: cd ./ecosystem/typescript/sdk/examples/typescript && pnpm install && pnpm test
 
       # Run example code in javascript.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
@@ -46,4 +48,4 @@ jobs:
         with:
           max_attempts: 5
           timeout_minutes: 20
-          command: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test
+          command: cd ./ecosystem/typescript/sdk/examples/javascript && pnpm install && pnpm test

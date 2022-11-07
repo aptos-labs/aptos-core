@@ -98,6 +98,9 @@ img.deep-dive-image {
   );
 }
 
+audio,canvas,embed,iframe,img,object,svg,video {
+    display:inline;
+}
 
 footer.footer {
   background-color: var(--ifm-background-color);

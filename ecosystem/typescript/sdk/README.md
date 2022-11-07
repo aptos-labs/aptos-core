@@ -9,7 +9,7 @@
 The public SDK downloaded from [npmjs](https://www.npmjs.com/package/aptos) is compatible with the [Aptos devnet](https://fullnode.devnet.aptoslabs.com). To start building, run below command in your project directory:
 
 ```bash
-yarn add aptos
+pnpm add aptos
 ```
 
 or use the browser bundle
@@ -43,10 +43,10 @@ and `allowSyntheticDefaultImports` in your `tsconfig` for types compatibility:
 ### Requirements
 
 - [Node.js](https://nodejs.org)
-- [Yarn](https://yarnpkg.com/)
+- [Yarn](https://pnpmpkg.com/)
 
 ```bash
-yarn install
+pnpm install
 ```
 
 ### Generating API client
@@ -56,7 +56,7 @@ This SDK is composed of two parts, a core client generated from the OpenAPI spec
 To generate the core client from the spec, run:
 
 ```bash
-yarn generate-client
+pnpm generate-client
 ```
 
 ### Working with devnet
@@ -87,7 +87,7 @@ echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> .env
 Run the tests:
 
 ```
-yarn test
+pnpm test
 ```
 
 If you see strange behavior regarding HTTP clients, try running the tests with `--detectOpenHandles`.
@@ -95,10 +95,10 @@ If you see strange behavior regarding HTTP clients, try running the tests with `
 Package the SDK and start building:
 
 ```bash
-yarn build
-yarn pack
+pnpm build
+pnpm pack
 # In your project directory
-yarn add PATH_TO_LOCAL_SDK_PACKAGE
+pnpm add PATH_TO_LOCAL_SDK_PACKAGE
 ```
 
 ## Semantic versioning
@@ -123,15 +123,15 @@ To release a new version of the SDK do the following.
 1. Regenerate the client:
 
 ```
-yarn generate-client
+pnpm generate-client
 ```
 
 2. Test, lint and format:
 
 ```
-yarn test
-yarn lint
-yarn fmt
+pnpm test
+pnpm lint
+pnpm fmt
 ```
 
 3. Bump the version in `package.json` according to [semver](https://semver.org/).
