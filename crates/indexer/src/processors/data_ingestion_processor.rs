@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    bigquery_client::{extract_from_api_transactions, BigQueryClient},
+    bigquery_client::{extract_from_api_transactions, BigQueryClient, TypedAppendRowsRequest},
     database::PgDbPool,
     indexer::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,
@@ -10,28 +10,21 @@ use crate::{
     },
 };
 use aptos_api_types::Transaction as APITransaction;
-use aptos_logger::Level::Error;
 use async_trait::async_trait;
-use futures_util::{stream, StreamExt};
-use gcloud_sdk::google::cloud::bigquery::storage::v1::append_rows_response::Response;
-use gcloud_sdk::google::cloud::bigquery::storage::v1::{AppendRowsRequest, WriteStream};
 use std::fmt::Debug;
-use std::sync::{mpsc, Arc, Mutex};
-use std::thread;
-use std::time::Duration;
-use tonic;
+use std::sync::Arc;
 
 pub const NAME: &str = "bigquery_default_processor";
 
 pub struct DataIngestionProcessor {
     connection_pool: PgDbPool,
-    bigquery_client: BigQueryClient,
+    bigquery_client: Arc<BigQueryClient>,
     bigquery_project_id: String,
 }
 
 impl DataIngestionProcessor {
     pub async fn new(connection_pool: PgDbPool, bigquery_project_id: String) -> Self {
-        let bigquery_client = BigQueryClient::new(bigquery_project_id.clone()).await;
+        let bigquery_client = Arc::new(BigQueryClient::new(bigquery_project_id.clone()).await);
         Self {
             connection_pool,
             bigquery_client,
@@ -62,7 +55,15 @@ impl TransactionProcessor for DataIngestionProcessor {
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
         let append_row_request = extract_from_api_transactions(&transactions);
-        match self.bigquery_client.send_data(append_row_request).await {
+        match self
+            .bigquery_client
+            .send_data(
+                TypedAppendRowsRequest::Transactions(append_row_request),
+                start_version,
+                end_version,
+            )
+            .await
+        {
             Ok(_) => Ok(ProcessingResult::new(
                 self.name(),
                 start_version,

@@ -5,7 +5,6 @@
 use crate::indexer::errors::TransactionProcessingError;
 use crate::util::u64_to_bigdecimal_str;
 use aptos_api_types::{Transaction as APITransaction, TransactionInfo};
-use futures_util::io::Write;
 use futures_util::stream;
 use gcloud_sdk::google::cloud::bigquery::storage::v1::append_rows_request::{ProtoData, Rows};
 use gcloud_sdk::google::cloud::bigquery::storage::v1::{
@@ -19,23 +18,32 @@ use once_cell::sync::Lazy;
 use prost::Message;
 use prost_types::{DescriptorProto, FileDescriptorSet};
 use std::collections::HashMap;
-use std::sync::Mutex;
 use streaming_proto::Transaction as TransactionProto;
+use tokio::sync::Mutex;
 
-pub const BIGQUERY_DATASET_NAME: &str = "aptos_indexer_bigquery_data";
+const BIGQUERY_DATASET_NAME: &str = "aptos_indexer_bigquery_data";
 
 pub mod streaming_proto {
     include!(concat!("./pb", "/aptos.indexer.proto.v1.rs"));
 }
 
+/// Typed AppendRowsRequest, which facilitates the table name(data destination) resolution.
+pub enum TypedAppendRowsRequest {
+    Transactions(AppendRowsRequest),
+}
+
+/// Thread-safe BigQuery client, which manages single stream for each table.
 pub struct BigQueryClient {
     /// BigQuery client  that handles stream management and data flow.
     client: GoogleApi<BigQueryWriteClient<GoogleAuthMiddleware>>,
-    /// Maps from table name to the corresponding stream id. If not present, create one.
-    pub stream_map: HashMap<String, String>,
+    /// Maps from table/resource name to the corresponding stream id. If not present, create one.
+    pub stream_map: Mutex<HashMap<String, String>>,
     /// BigQuery path to the data set.
     ///   Example: "projects/YOUR_PROJECT_ID/datasets/YOUR_DATASET/tables/"
     pub data_set_path: String,
+    /// TODO(laliu): move this to an event-driven approach. This is to avoid concurrent operations
+    /// for the stream.
+    pub sender_counter: Mutex<u64>,
 }
 
 impl BigQueryClient {
@@ -55,13 +63,14 @@ impl BigQueryClient {
         );
         Self {
             client,
-            stream_map: HashMap::new(),
+            stream_map: Mutex::new(HashMap::new()),
             data_set_path,
+            sender_counter: Mutex::new(0),
         }
     }
     /// Returns the default stream for the data; if not present, create one.
-    pub async fn get_stream(&self, table: String) -> String {
-        match self.stream_map.get(&table) {
+    async fn get_stream(&self, table: String) -> String {
+        match self.stream_map.lock().await.get(&table) {
             Some(stream_id) => stream_id.to_owned(),
             None => {
                 let write_stream_resp = self
@@ -84,20 +93,77 @@ impl BigQueryClient {
     /// Sends the data.
     pub async fn send_data(
         &self,
-        mut append_row_req: AppendRowsRequest,
+        append_row_req: TypedAppendRowsRequest,
+        start_version: u64,
+        end_version: u64,
     ) -> Result<(), TransactionProcessingError> {
-        // TODO(laliu): fix this.
-        append_row_req.write_stream = self.get_stream("transactions".to_string()).await;
-
+        let req = match append_row_req {
+            TypedAppendRowsRequest::Transactions(mut data) => {
+                data.write_stream = self.get_stream("transactions".to_string()).await;
+                data
+            }
+        };
+        let mut current = self.sender_counter.lock().await;
         match self
             .client
             .get()
-            .append_rows(tonic::Request::new(stream::iter(vec![append_row_req])))
+            .append_rows(tonic::Request::new(stream::iter(vec![req])))
             .await
         {
-            Ok(_) => Ok(()),
+            Ok(resp) => {
+                match resp.into_inner().message().await {
+                    Ok(res) => {
+                        match res {
+                            Some(data) => {
+                                match data.row_errors.len() {
+                                0 => {
+                                    *current += end_version - start_version;
+                                    Ok(())
+                                },
+                                // For any row insertion error, we need to abort the insertion and
+                                // retry. Handle the data duplication downstream.
+                                _ => {
+                                    Err(TransactionProcessingError::BigQueryTransactionCommitError(
+                                        (anyhow::Error::msg("Failed to insert one of more rows into BigQuery."), start_version, end_version, "transactions"),
+                                    ))
+                                }
+                            }
+                            }
+                            None => Err(
+                                TransactionProcessingError::BigQueryTransactionCommitError((
+                                    anyhow::Error::msg(
+                                        "No Response received for current insertion.",
+                                    ),
+                                    start_version,
+                                    end_version,
+                                    "transactions",
+                                )),
+                            ),
+                        }
+                    }
+                    Err(err) => Err(TransactionProcessingError::BigQueryTransactionCommitError(
+                        (
+                            anyhow::Error::msg(format!(
+                                "Failed to connect to BigQuery for ingesting data. {}",
+                                err.message()
+                            )),
+                            start_version,
+                            end_version,
+                            "transactions",
+                        ),
+                    )),
+                }
+            }
             Err(err) => Err(TransactionProcessingError::BigQueryTransactionCommitError(
-                (anyhow::Error::msg("123"), 0, 1, "testing"),
+                (
+                    anyhow::Error::msg(format!(
+                        "Failed to connect to BigQuery for ingesting data. {}",
+                        err.message()
+                    )),
+                    start_version,
+                    end_version,
+                    "transactions",
+                ),
             )),
         }
     }

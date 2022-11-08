@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    bigquery_client::BigQueryClient,
     database::new_db_pool,
     indexer::{
         fetcher::TransactionFetcherOptions, processing_result::ProcessingResult, tailer::Tailer,
@@ -19,9 +18,6 @@ use aptos_config::config::{IndexerConfig, NodeConfig};
 use aptos_logger::{error, info};
 use aptos_mempool::MempoolClientSender;
 use aptos_types::chain_id::ChainId;
-use futures::channel;
-use gcloud_sdk::google::cloud::bigquery::storage::v1::big_query_write_client::BigQueryWriteClient;
-use gcloud_sdk::GoogleApi;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use storage_interface::DbReader;
