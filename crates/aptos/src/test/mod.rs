@@ -371,6 +371,7 @@ impl CliTestFramework {
                 Some(GasOptions {
                     gas_unit_price: Some(1),
                     max_gas: Some(10000),
+                    expiration_secs: 30,
                 }),
             ),
             amount,
@@ -545,6 +546,7 @@ impl CliTestFramework {
                 Some(GasOptions {
                     gas_unit_price: Some(1),
                     max_gas: Some(100000),
+                    expiration_secs: 30,
                 }),
             ),
             initial_stake_amount,

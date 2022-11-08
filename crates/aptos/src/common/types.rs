@@ -5,8 +5,8 @@ use crate::common::init::Network;
 use crate::common::utils::{get_account_with_state, prompt_yes_with_override};
 use crate::{
     common::utils::{
-        chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-        get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
+        check_if_file_exists, create_dir_if_not_exist, dir_default_to_current, get_auth_key,
+        get_sequence_number, read_from_file, start_logger, to_common_result,
         to_common_success_result, write_to_file, write_to_file_with_opts, write_to_user_only_file,
     },
     config::GlobalConfig,
@@ -23,6 +23,7 @@ use aptos_rest_client::aptos_api_types::{ExplainVMStatus, HashValue};
 use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_types::chain_id::ChainId;
 use aptos_types::transaction::{
     authenticator::AuthenticationKey, SignedTransaction, TransactionPayload,
 };
@@ -44,7 +45,6 @@ use std::{
     time::Instant,
 };
 use thiserror::Error;
-use aptos_types::chain_id::ChainId;
 
 const US_IN_SECS: u64 = 1000000;
 pub const DEFAULT_PROFILE: &str = "default";
@@ -1315,7 +1315,7 @@ impl TransactionOptions {
         let (account, state) = get_account_with_state(&client, sender_address).await?;
         let sequence_number = account.sequence_number;
         let expiration_time = state.timestamp_usecs + self.gas_options.expiration_secs * US_IN_SECS;
-
+        let chain_id = ChainId::new(state.chain_id);
         // TODO: Check auth key against current private key and provide a better message
 
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
@@ -1327,7 +1327,7 @@ impl TransactionOptions {
             max_gas
         } else {
             let transaction_factory =
-                TransactionFactory::new(ChainId::new(state.chain_id)).with_gas_unit_price(gas_unit_price);
+                TransactionFactory::new(chain_id).with_gas_unit_price(gas_unit_price);
 
             let unsigned_transaction = transaction_factory
                 .payload(payload.clone())
@@ -1378,7 +1378,7 @@ impl TransactionOptions {
         };
 
         // Sign and submit transaction
-        let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
+        let transaction_factory = TransactionFactory::new(chain_id)
             .with_gas_unit_price(gas_unit_price)
             .with_max_gas_amount(max_gas)
             .with_transaction_expiration_time(expiration_time);
