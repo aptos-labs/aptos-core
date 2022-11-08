@@ -68,7 +68,12 @@ pub fn assert_no_test_natives(err_msg: &str) {
                 || module_name.as_str() == "ed25519" && func_name.as_str() == "sign_internal"
                 || module_name.as_str() == "multi_ed25519"
                     && func_name.as_str() == "generate_keys_internal"
-                || module_name.as_str() == "multi_ed25519" && func_name.as_str() == "sign_internal")
+                || module_name.as_str() == "multi_ed25519" && func_name.as_str() == "sign_internal"
+                || module_name.as_str() == "bls12381"
+                    && func_name.as_str() == "generate_keys_internal"
+                || module_name.as_str() == "bls12381" && func_name.as_str() == "sign_internal"
+                || module_name.as_str() == "bls12381"
+                    && func_name.as_str() == "generate_proof_of_possession_internal")
         }),
         "{}",
         err_msg
