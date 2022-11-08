@@ -106,8 +106,13 @@ serviceAccount:
 kube-state-metrics:
   enabled: false
   namespaceOverride: kube-system
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
 
 prometheus-node-exporter:
   enabled: false
   namespaceOverride: kube-system
-
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9100"

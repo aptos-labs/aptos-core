@@ -29,6 +29,9 @@ framework = { path = "../../aptos-move/framework" }
 serde_yaml = "0.8.24"
 testcases = { path = "../testcases" }
 
+[target.'cfg(unix)'.dependencies]
+jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
+
 [[bin]]
 name = "forge"
 path = "src/main.rs"

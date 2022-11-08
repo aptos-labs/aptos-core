@@ -22,6 +22,11 @@ The <code><a href="string.md#0x1_string">string</a></code> module defines the <c
 -  [Function `internal_is_char_boundary`](#0x1_string_internal_is_char_boundary)
 -  [Function `internal_sub_string`](#0x1_string_internal_sub_string)
 -  [Function `internal_index_of`](#0x1_string_internal_index_of)
+-  [Specification](#@Specification_1)
+    -  [Function `internal_check_utf8`](#@Specification_1_internal_check_utf8)
+    -  [Function `internal_is_char_boundary`](#@Specification_1_internal_is_char_boundary)
+    -  [Function `internal_sub_string`](#@Specification_1_internal_sub_string)
+    -  [Function `internal_index_of`](#@Specification_1_internal_index_of)
 
 
 <pre><code><b>use</b> <a href="option.md#0x1_option">0x1::option</a>;
@@ -441,6 +446,96 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+<a name="@Specification_1_internal_check_utf8"></a>
+
+### Function `internal_check_utf8`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="string.md#0x1_string_internal_check_utf8">internal_check_utf8</a>(v: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="string.md#0x1_string_spec_internal_check_utf8">spec_internal_check_utf8</a>(v);
+</code></pre>
+
+
+
+<a name="@Specification_1_internal_is_char_boundary"></a>
+
+### Function `internal_is_char_boundary`
+
+
+<pre><code><b>fun</b> <a href="string.md#0x1_string_internal_is_char_boundary">internal_is_char_boundary</a>(v: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, i: u64): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="string.md#0x1_string_spec_internal_is_char_boundary">spec_internal_is_char_boundary</a>(v, i);
+</code></pre>
+
+
+
+<a name="@Specification_1_internal_sub_string"></a>
+
+### Function `internal_sub_string`
+
+
+<pre><code><b>fun</b> <a href="string.md#0x1_string_internal_sub_string">internal_sub_string</a>(v: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, i: u64, j: u64): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="string.md#0x1_string_spec_internal_sub_string">spec_internal_sub_string</a>(v, i, j);
+</code></pre>
+
+
+
+<a name="@Specification_1_internal_index_of"></a>
+
+### Function `internal_index_of`
+
+
+<pre><code><b>fun</b> <a href="string.md#0x1_string_internal_index_of">internal_index_of</a>(v: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, r: &<a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="string.md#0x1_string_spec_internal_index_of">spec_internal_index_of</a>(v, r);
+</code></pre>
+
+
+
+
+<a name="0x1_string_spec_internal_check_utf8"></a>
+
+
+<pre><code><b>fun</b> <a href="string.md#0x1_string_spec_internal_check_utf8">spec_internal_check_utf8</a>(v: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+<a name="0x1_string_spec_internal_is_char_boundary"></a>
+<b>fun</b> <a href="string.md#0x1_string_spec_internal_is_char_boundary">spec_internal_is_char_boundary</a>(v: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, i: u64): bool;
+<a name="0x1_string_spec_internal_sub_string"></a>
+<b>fun</b> <a href="string.md#0x1_string_spec_internal_sub_string">spec_internal_sub_string</a>(v: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, i: u64, j: u64): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<a name="0x1_string_spec_internal_index_of"></a>
+<b>fun</b> <a href="string.md#0x1_string_spec_internal_index_of">spec_internal_index_of</a>(v: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, r: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html

@@ -25,6 +25,10 @@ spec:
           - name: load-test
             image: {{ .Values.load_test.image.repo }}:{{ .Values.load_test.image.tag | default .Values.imageTag }}
             imagePullPolicy: {{ .Values.load_test.image.pullPolicy }}
+            {{- with .resources }}
+            resources:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
             command:
             - transaction-emitter
             - emit-tx

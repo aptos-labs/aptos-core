@@ -37,13 +37,13 @@ git clone https://github.com/aptos-labs/aptos-core.git
 
   Install the necessary dependencies:
   ```bash
-  yarn install
+  pnpm install
   ```
 
   Run the [`transfer_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) example:
 
   ```bash
-  yarn run transfer_coin
+  pnpm run transfer_coin
   ```
   </TabItem>
   <TabItem value="python" label="Python">
