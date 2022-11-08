@@ -6,6 +6,8 @@
 
 module aptos_std::bls12381 {
     use std::option::{Self, Option};
+    #[test_only]
+    use std::error::invalid_argument;
 
     /// The signature size, in bytes
     const SIGNATURE_SIZE: u64 = 96;
@@ -19,6 +21,7 @@ module aptos_std::bls12381 {
     /// One of the given inputs has the wrong size.s
     const EWRONG_SIZE: u64 = 2;
 
+    /// The number of signers does not match the number of messages to be signed.
     const ESIGNER_COUNT_NOT_MATCH_MESSAGE_COUNT: u64 = 3;
 
     // TODO: Performance would increase if structs in this module are implemented natively via handles (similar to Table and
@@ -268,10 +271,12 @@ module aptos_std::bls12381 {
 
     #[test_only]
     public fun aggr_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, messages: &vector<vector<u8>>): AggrOrMultiSignature {
-        let n = std::vector::length(signing_keys);
+        let signing_key_count = std::vector::length(signing_keys);
+        let message_count = std::vector::length(messages);
+        assert!(signing_key_count == message_count, invalid_argument(ESIGNER_COUNT_NOT_MATCH_MESSAGE_COUNT));
         let sigs = vector[];
         let i: u64 = 0;
-        while (i < n) {
+        while (i < signing_key_count) {
             let sig = sign_arbitrary_bytes(std::vector::borrow(signing_keys, i), *std::vector::borrow(messages, i));
             std::vector::push_back(&mut sigs, sig);
             i = i + 1;
