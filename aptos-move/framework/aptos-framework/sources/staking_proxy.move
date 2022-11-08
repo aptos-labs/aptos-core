@@ -107,7 +107,7 @@ module aptos_framework::staking_proxy {
         vesting::update_operator(owner, vesting_contract_2, operator_2_address, 0);
 
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::initialize_test_validator_new(&pk, &pop, owner, INITIAL_BALANCE, false, false);
+        stake::initialize_test_validator(&pk, &pop, owner, INITIAL_BALANCE, false, false);
         stake::set_operator(owner, operator_1_address);
 
         set_operator(owner, operator_1_address, new_operator_address);
@@ -184,7 +184,7 @@ module aptos_framework::staking_proxy {
         vesting::update_operator(owner, vesting_contract_2, operator_2_address, 0);
 
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::initialize_test_validator_new(&pk, &pop, owner, INITIAL_BALANCE, false, false);
+        stake::initialize_test_validator(&pk, &pop, owner, INITIAL_BALANCE, false, false);
 
         set_voter(owner, operator_1_address, new_voter_address);
         // Stake pool's voter has been updated.
