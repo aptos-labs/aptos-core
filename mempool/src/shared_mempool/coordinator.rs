@@ -54,6 +54,7 @@ pub(crate) async fn coordinator<V>(
         LogEntry::CoordinatorRuntime,
         LogEvent::Start
     ));
+
     // Combine `NetworkEvents` for each `NetworkId` into one stream
     let smp_events: Vec<_> = network_events
         .into_iter()
@@ -66,6 +67,17 @@ pub(crate) async fn coordinator<V>(
     // worker tasks that can process incoming transactions.
     let workers_available = smp.config.shared_mempool_max_concurrent_inbound_syncs;
     let bounded_executor = BoundedExecutor::new(workers_available, executor.clone());
+
+    let initial_reconfig = mempool_reconfig_events
+        .next()
+        .await
+        .expect("Reconfig sender dropped, unable to start mempool");
+    handle_mempool_reconfig_event(
+        &mut smp,
+        &bounded_executor,
+        initial_reconfig.on_chain_configs,
+    )
+    .await;
 
     loop {
         let _timer = counters::MAIN_LOOP.start_timer();
