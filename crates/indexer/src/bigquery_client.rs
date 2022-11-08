@@ -87,11 +87,7 @@ impl BigQueryClient {
         mut append_row_req: AppendRowsRequest,
     ) -> Result<(), TransactionProcessingError> {
         // TODO(laliu): fix this.
-        append_row_req.write_stream = self
-            .stream_map
-            .get(&"transactions".to_string())
-            .unwrap()
-            .to_string();
+        append_row_req.write_stream = self.get_stream("transactions".to_string()).await;
 
         match self
             .client
