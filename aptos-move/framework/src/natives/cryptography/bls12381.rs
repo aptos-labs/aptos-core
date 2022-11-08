@@ -694,20 +694,6 @@ pub fn native_generate_proof_of_possession(
     ))
 }
 
-pub fn native_aggr_sign(
-    _context: &mut NativeContext,
-    _ty_args: Vec<Type>,
-    mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    let msg = pop_arg!(arguments, Vec<u8>);
-    let sk_bytes = pop_arg!(arguments, Vec<u8>);
-    let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
-    let sig = sk.sign_arbitrary_message(msg.as_slice());
-    Ok(NativeResult::ok(
-        InternalGas::zero(),
-        smallvec![Value::vector_u8(sig.to_bytes()),],
-    ))
-}
 /***************************************************************************************************
  * module
  *

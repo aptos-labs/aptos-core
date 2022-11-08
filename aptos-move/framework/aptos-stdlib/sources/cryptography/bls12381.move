@@ -122,6 +122,13 @@ module aptos_std::bls12381 {
         }
     }
 
+    /// Creates a normal public key from a PoP'd public key.
+    public fun public_key_with_pop_to_normal(pkpop: &PublicKeyWithPoP): PublicKey {
+        PublicKey {
+            bytes: pkpop.bytes
+        }
+    }
+
     /// Serializes a PoP'd public key into 48 bytes.
     public fun public_key_with_pop_to_bytes(pk: &PublicKeyWithPoP): vector<u8> {
         pk.bytes
@@ -237,6 +244,7 @@ module aptos_std::bls12381 {
     }
 
     #[test_only]
+    /// Generates a key pair.
     public fun generate_keys(): (SecretKey, PublicKeyWithPoP) {
         let (sk_bytes, pk_bytes) = generate_keys_internal();
         let sk = SecretKey {
@@ -249,6 +257,7 @@ module aptos_std::bls12381 {
     }
 
     #[test_only]
+    /// Generates a normal signature for a message with a signing key.
     public fun sign_arbitrary_bytes(signing_key: &SecretKey, message: vector<u8>): Signature {
         Signature {
             bytes: sign_internal(signing_key.bytes, message)
@@ -256,6 +265,7 @@ module aptos_std::bls12381 {
     }
 
     #[test_only]
+    /// Generates a multi-signature for a message with multiple signing keys.
     public fun multi_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, messages: vector<u8>): AggrOrMultiSignature {
         let n = std::vector::length(signing_keys);
         let sigs = vector[];
@@ -270,6 +280,7 @@ module aptos_std::bls12381 {
     }
 
     #[test_only]
+    /// Generates an aggregated signature for n normal signatures.
     public fun aggr_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, messages: &vector<vector<u8>>): AggrOrMultiSignature {
         let signing_key_count = std::vector::length(signing_keys);
         let message_count = std::vector::length(messages);
@@ -389,19 +400,16 @@ module aptos_std::bls12381 {
         message: vector<u8>
     ): bool;
 
-    public fun public_key_with_pop_to_unvalidated(pkpop: &PublicKeyWithPoP): PublicKey {
-        PublicKey {
-            bytes: pkpop.bytes
-        }
-    }
-
     #[test_only]
+    /// Generates a bls12381 key pair.
     native fun generate_keys_internal(): (vector<u8>, vector<u8>);
 
     #[test_only]
+    /// Generates a signature for a message with a signing key.
     native fun sign_internal(sk: vector<u8>, msg: vector<u8>): vector<u8>;
 
     #[test_only]
+    /// Generates a proof-of-possession from a secret key.
     native fun generate_proof_of_possession_internal(sk: vector<u8>): vector<u8>;
 
 
@@ -425,7 +433,7 @@ module aptos_std::bls12381 {
     #[test]
     fun test_gen_sign_verify_normal_signature_or_signature_share() {
         let (sk, pk) = generate_keys();
-        let pk_unvalidated = public_key_with_pop_to_unvalidated(&pk);
+        let pk_unvalidated = public_key_with_pop_to_normal(&pk);
 
         let msg = b"hello world";
         let sig = sign_arbitrary_bytes(&sk, msg);
