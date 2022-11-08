@@ -114,6 +114,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: release
+      BUILD_ADDL_TESTING_IMAGES: true
 
   rust-images-indexer:
     needs: [permission-check, determine-docker-build-metadata]
@@ -124,8 +125,9 @@ jobs:
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: release
       FEATURES: indexer
+      BUILD_ADDL_TESTING_IMAGES: true
 
-  rust-images-testing:
+  rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
     uses: ./.github/workflows/docker-rust-build.yaml
     secrets: inherit
@@ -134,7 +136,7 @@ jobs:
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: release
       FEATURES: failpoints
-      BUILD_TEST_IMAGES: true
+      BUILD_ADDL_TESTING_IMAGES: true
 
   rust-images-performance:
     needs: [permission-check, determine-docker-build-metadata]
@@ -144,6 +146,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: performance
+      BUILD_ADDL_TESTING_IMAGES: true
 
   sdk-release:
     needs: [rust-images, determine-docker-build-metadata]
@@ -160,7 +163,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
 
   forge-e2e-test:
-    needs: [rust-images, rust-images-testing, rust-images-performance, determine-docker-build-metadata]
+    needs: [rust-images, rust-images-failpoints, determine-docker-build-metadata]
     if: |
       !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
@@ -181,7 +184,7 @@ jobs:
 
   # Run e2e compat test against testnet branch
   forge-compat-test:
-    needs: [rust-images, rust-images-testing, rust-images-performance, determine-docker-build-metadata]
+    needs: [rust-images, rust-images-failpoints, determine-docker-build-metadata]
     if: |
       !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
         (github.event_name == 'push' && github.ref_name != 'main') ||

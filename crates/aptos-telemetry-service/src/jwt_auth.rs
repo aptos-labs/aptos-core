@@ -3,14 +3,15 @@
 
 use aptos_types::{chain_id::ChainId, PeerId};
 
+use crate::error;
 use chrono::Utc;
 use jsonwebtoken::{errors::Error, TokenData};
-use tracing::error;
 use warp::{reject, Rejection};
 
 use crate::context::JsonWebTokenService;
+use crate::errors::JwtAuthError;
 use crate::{context::Context, types::auth::Claims};
-use crate::{error::ServiceError, types::common::NodeType};
+use crate::{errors::ServiceError, types::common::NodeType};
 
 const BEARER: &str = "BEARER ";
 
@@ -45,7 +46,9 @@ pub async fn authorize_jwt(
 ) -> anyhow::Result<Claims, Rejection> {
     let decoded: TokenData<Claims> = context.jwt_service().decode(&token).map_err(|e| {
         error!("unable to authorize jwt token: {}", e);
-        reject::custom(ServiceError::unauthorized("invalid authorization token"))
+        reject::custom(ServiceError::unauthorized(
+            JwtAuthError::InvalidAuthToken.into(),
+        ))
     })?;
     let claims = decoded.claims;
 
@@ -53,14 +56,14 @@ pub async fn authorize_jwt(
         Some(info) => info.0,
         None => {
             return Err(reject::custom(ServiceError::unauthorized(
-                "expired authorization token",
+                JwtAuthError::ExpiredAuthToken.into(),
             )));
         }
     };
 
     if !allow_roles.contains(&claims.node_type) {
         return Err(reject::custom(ServiceError::forbidden(
-            "the peer does not have access to this resource",
+            JwtAuthError::AccessDenied.into(),
         )));
     }
 
@@ -68,7 +71,7 @@ pub async fn authorize_jwt(
         Ok(claims)
     } else {
         Err(reject::custom(ServiceError::unauthorized(
-            "expired authorization token",
+            JwtAuthError::ExpiredAuthToken.into(),
         )))
     }
 }
@@ -78,7 +81,7 @@ pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<Stri
         Some(v) => v,
         None => {
             return Err(reject::custom(ServiceError::unauthorized(
-                "no/invalid authorization header",
+                JwtAuthError::from("bearer token missing".to_owned()).into(),
             )))
         }
     };
@@ -89,7 +92,7 @@ pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<Stri
         .eq_ignore_ascii_case(BEARER)
     {
         return Err(reject::custom(ServiceError::unauthorized(
-            "invalid authorization header",
+            JwtAuthError::from("malformed bearer token".to_owned()).into(),
         )));
     }
     Ok(auth_header
@@ -102,6 +105,8 @@ pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<Stri
 mod tests {
 
     use std::collections::HashMap;
+
+    use warp::hyper::StatusCode;
 
     use super::super::tests::test_context;
     use super::*;
@@ -175,9 +180,13 @@ mod tests {
         .unwrap();
         let result = authorize_jwt(token, test_context.inner, vec![NodeType::Validator]).await;
         assert!(result.is_err());
+
+        let rejection = result.err().unwrap();
+        let service_error = rejection.find::<ServiceError>().unwrap();
+        assert_eq!(service_error.http_status_code(), StatusCode::FORBIDDEN);
         assert_eq!(
-            *result.err().unwrap().find::<ServiceError>().unwrap(),
-            ServiceError::forbidden("the peer does not have access to this resource",)
-        )
+            service_error.error_as_string(),
+            "authorization error: access denied to this resource"
+        );
     }
 }
