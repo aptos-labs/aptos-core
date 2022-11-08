@@ -2180,7 +2180,8 @@ module aptos_framework::stake {
         initialize_for_test_custom(aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, false, 1, 100, 100);
 
         // Joining the validator set should fail as post genesis validator set change is not allowed.
-        initialize_test_validator(validator, 100, true, true);
+        let (_sk, pk, pop) = generate_identity();
+        initialize_test_validator_new(&pk, &pop, validator, 100, true, true);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
@@ -2190,8 +2191,8 @@ module aptos_framework::stake {
         validator: &signer,
     ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         initialize_for_test(aptos_framework);
-        initialize_test_validator(validator, 100,
-            true, true);
+        let (_sk, pk, pop) = generate_identity();
+        initialize_test_validator_new(&pk, &pop, validator, 100, true, true);
         join_validator_set(validator, @0x234);
     }
 
@@ -2202,7 +2203,8 @@ module aptos_framework::stake {
         validator: &signer,
     ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         initialize_for_test_custom(aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, false, 1, 100, 100);
-        initialize_test_validator(validator, 100, false, false);
+        let (_sk, pk, pop) = generate_identity();
+        initialize_test_validator_new(&pk, &pop, validator, 100, false, false);
 
         // Bypass the check to join. This is the same function called during Genesis.
         let validator_address = signer::address_of(validator);
@@ -2237,11 +2239,17 @@ module aptos_framework::stake {
 
         initialize_for_test(aptos_framework);
 
-        initialize_test_validator(validator_1, 100, false, false);
-        initialize_test_validator(validator_2, 100, false, false);
-        initialize_test_validator(validator_3, 100, false, false);
-        initialize_test_validator(validator_4, 100, false, false);
-        initialize_test_validator(validator_5, 100, false, false);
+        let (_sk_1, pk_1, pop_1) = generate_identity();
+        let (_sk_2, pk_2, pop_2) = generate_identity();
+        let (_sk_3, pk_3, pop_3) = generate_identity();
+        let (_sk_4, pk_4, pop_4) = generate_identity();
+        let (_sk_5, pk_5, pop_5) = generate_identity();
+
+        initialize_test_validator_new(&pk_1, &pop_1, validator_1, 100, false, false);
+        initialize_test_validator_new(&pk_2, &pop_2, validator_2, 100, false, false);
+        initialize_test_validator_new(&pk_3, &pop_3, validator_3, 100, false, false);
+        initialize_test_validator_new(&pk_4, &pop_4, validator_4, 100, false, false);
+        initialize_test_validator_new(&pk_5, &pop_5, validator_5, 100, false, false);
 
         join_validator_set(validator_3, v3_addr);
         end_epoch();
