@@ -899,21 +899,25 @@ impl CliCommand<&'static str> for CleanPackage {
     async fn execute(self) -> CliTypedResult<&'static str> {
         let path = self.move_options.get_package_path()?;
         let build_dir = path.join("build");
-        std::fs::remove_dir_all(build_dir)
-            .map_err(|e| CliError::IO("Removing Move build dir".to_string(), e))?;
+        // Only remove the build dir if it exists, allowing for users to still clean their cache
+        if build_dir.exists() {
+            std::fs::remove_dir_all(build_dir.as_path())
+                .map_err(|e| CliError::IO(build_dir.display().to_string(), e))?;
+        }
 
-        let move_dir = &*MOVE_HOME;
-        if prompt_yes_with_override(
-            &format!(
-                "Do you also want to delete the local package download cache at `{}`?",
-                move_dir
-            ),
-            self.prompt_options,
-        )
-        .is_ok()
+        let move_dir = PathBuf::from(MOVE_HOME.as_str());
+        if move_dir.exists()
+            && prompt_yes_with_override(
+                &format!(
+                    "Do you also want to delete the local package download cache at `{}`?",
+                    move_dir.display()
+                ),
+                self.prompt_options,
+            )
+            .is_ok()
         {
-            std::fs::remove_dir_all(PathBuf::from(move_dir))
-                .map_err(|e| CliError::IO("Removing Move cache dir".to_string(), e))?;
+            std::fs::remove_dir_all(move_dir.as_path())
+                .map_err(|e| CliError::IO(move_dir.display().to_string(), e))?;
         }
         Ok("succeeded")
     }
