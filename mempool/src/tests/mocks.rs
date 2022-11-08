@@ -18,7 +18,7 @@ use aptos_types::{
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY, transaction::SignedTransaction,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use event_notifications::EventSubscriptionService;
+use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use futures::channel::mpsc;
 use mempool_notifications::{self, MempoolNotifier};
 use network::{
@@ -120,6 +120,7 @@ impl MockSharedMempool {
             Arc::new(RwLock::new(db.clone())),
         );
         let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
+        event_subscriber.notify_initial_configs(0).unwrap();
         let network_handles = vec![(NetworkId::Validator, network_sender, network_events)];
         let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
 
