@@ -1398,8 +1398,8 @@ module aptos_framework::stake {
 
     #[test_only]
     public fun initialize_test_validator(
-        pk: &bls12381::PublicKey,
-        pop: &bls12381::ProofOfPossession,
+        public_key: &bls12381::PublicKey,
+        proof_of_possession: &bls12381::ProofOfPossession,
         validator: &signer,
         amount: u64,
         should_join_validator_set: bool,
@@ -1410,8 +1410,8 @@ module aptos_framework::stake {
             account::create_account_for_test(validator_address);
         };
 
-        let pk_bytes = bls12381::public_key_to_bytes(pk);
-        let pop_bytes = bls12381::proof_of_possession_to_bytes(pop);
+        let pk_bytes = bls12381::public_key_to_bytes(public_key);
+        let pop_bytes = bls12381::proof_of_possession_to_bytes(proof_of_possession);
         initialize_validator(validator, pk_bytes, pop_bytes, vector::empty(), vector::empty());
 
         if (amount > 0) {
@@ -1430,13 +1430,13 @@ module aptos_framework::stake {
     public fun create_validator_set(
         aptos_framework: &signer,
         active_validator_addresses: vector<address>,
-        pks: vector<bls12381::PublicKey>,
+        public_keys: vector<bls12381::PublicKey>,
     ) {
         let active_validators = vector::empty<ValidatorInfo>();
         let i = 0;
         while (i < vector::length(&active_validator_addresses)) {
             let validator_address = vector::borrow(&active_validator_addresses, i);
-            let pk = vector::borrow(&pks, i);
+            let pk = vector::borrow(&public_keys, i);
             vector::push_back(&mut active_validators, ValidatorInfo {
                 addr: *validator_address,
                 voting_power: 0,
@@ -1485,6 +1485,14 @@ module aptos_framework::stake {
         failed_proposer_indices: vector<u64>,
     ) acquires ValidatorPerformance {
         update_performance_statistics(proposer_index, failed_proposer_indices);
+    }
+
+    #[test_only]
+    public fun generate_identity(): (bls12381::SecretKey, bls12381::PublicKey, bls12381::ProofOfPossession) {
+        let (sk, pkpop) = bls12381::generate_keys();
+        let pop = bls12381::generate_proof_of_possession(&sk);
+        let unvalidated_pk = bls12381::public_key_with_pop_to_unvalidated(&pkpop);
+        (sk, unvalidated_pk, pop)
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
@@ -2473,14 +2481,6 @@ module aptos_framework::stake {
             };
             i = i + 1;
         };
-    }
-
-    #[test_only]
-    public fun generate_identity(): (bls12381::SecretKey, bls12381::PublicKey, bls12381::ProofOfPossession) {
-        let (sk, pkpop) = bls12381::generate_keys();
-        let pop = bls12381::generate_proof_of_possession(&sk);
-        let unvalidated_pk = bls12381::public_key_with_pop_to_unvalidated(&pkpop);
-        (sk, unvalidated_pk, pop)
     }
 
     #[test(aptos_framework = @0x1, validator_1 = @0x123, validator_2 = @0x234)]
