@@ -1325,11 +1325,13 @@ module aptos_framework::stake {
 
     #[test_only]
     public fun join_validator_set_for_test(
+        pk: &bls12381::PublicKey,
+        pop: &bls12381::ProofOfPossession,
         operator: &signer,
         pool_address: address,
         should_end_epoch: bool,
     ) acquires AptosCoinCapabilities, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
-        rotate_consensus_key(operator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
+        rotate_consensus_key(operator, pool_address, bls12381::public_key_to_bytes(pk), bls12381::proof_of_possession_to_bytes(pop));
         join_validator_set(operator, pool_address);
         if (should_end_epoch) {
             end_epoch();
@@ -1433,17 +1435,19 @@ module aptos_framework::stake {
     #[test_only]
     public fun create_validator_set(
         aptos_framework: &signer,
-        active_validator_addresses: vector<address>
+        active_validator_addresses: vector<address>,
+        pks: vector<bls12381::PublicKey>,
     ) {
         let active_validators = vector::empty<ValidatorInfo>();
         let i = 0;
         while (i < vector::length(&active_validator_addresses)) {
             let validator_address = vector::borrow(&active_validator_addresses, i);
+            let pk = vector::borrow(&pks, i);
             vector::push_back(&mut active_validators, ValidatorInfo {
                 addr: *validator_address,
                 voting_power: 0,
                 config: ValidatorConfig {
-                    consensus_pubkey: CONSENSUS_KEY_1,
+                    consensus_pubkey: bls12381::public_key_to_bytes(pk),
                     network_addresses: b"",
                     fullnode_addresses: b"",
                     validator_index: 0,
