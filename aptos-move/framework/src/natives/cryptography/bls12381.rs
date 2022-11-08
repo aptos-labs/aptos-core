@@ -1,11 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "testing")]
 use crate::natives::util::make_test_only_native_from_func;
 use crate::{natives::util::make_native_from_func, pop_vec_arg};
-use aptos_crypto::bls12381::{PrivateKey, ProofOfPossession, PublicKey, Signature};
+#[cfg(feature = "testing")]
+use aptos_crypto::bls12381::ProofOfPossession;
+use aptos_crypto::bls12381::{PrivateKey, PublicKey, Signature};
+#[cfg(feature = "testing")]
 use aptos_crypto::test_utils::KeyPair;
-use aptos_crypto::{bls12381, traits, SigningKey, Uniform};
+#[cfg(feature = "testing")]
+use aptos_crypto::Uniform;
+use aptos_crypto::{bls12381, traits, SigningKey};
 use move_binary_format::errors::PartialVMError;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{
@@ -17,6 +23,7 @@ use move_vm_types::values::Struct;
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
+#[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::smallvec;
 use std::{collections::VecDeque, convert::TryFrom};
@@ -656,6 +663,7 @@ pub fn native_generate_keys(
     ))
 }
 
+#[cfg(feature = "testing")]
 pub fn native_sign(
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -671,6 +679,7 @@ pub fn native_sign(
     ))
 }
 
+#[cfg(feature = "testing")]
 pub fn native_generate_proof_of_possession(
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -750,6 +759,7 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params, native_bls12381_verify_signature_share),
         ),
     ]);
+    #[cfg(feature = "testing")]
     natives.append(&mut vec![
         (
             "generate_keys_internal",
