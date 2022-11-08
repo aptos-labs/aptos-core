@@ -1429,6 +1429,34 @@ module aptos_framework::stake {
     }
 
     #[test_only]
+    public fun initialize_test_validator_new(
+        pk: &bls12381::PublicKey,
+        pop: &bls12381::ProofOfPossession,
+        validator: &signer,
+        amount: u64,
+        should_join_validator_set: bool,
+        should_end_epoch: bool,
+    ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        let validator_address = signer::address_of(validator);
+        if (!account::exists_at(signer::address_of(validator))) {
+            account::create_account_for_test(validator_address);
+        };
+
+        initialize_validator(validator, bls12381::public_key_to_bytes(pk), bls12381::proof_of_possession_to_bytes(pop), vector::empty(), vector::empty());
+
+        if (amount > 0) {
+            mint_and_add_stake(validator, amount);
+        };
+
+        if (should_join_validator_set) {
+            join_validator_set(validator, validator_address);
+        };
+        if (should_end_epoch) {
+            end_epoch();
+        };
+    }
+
+    #[test_only]
     public fun create_validator_set(
         aptos_framework: &signer,
         active_validator_addresses: vector<address>
@@ -2419,6 +2447,14 @@ module aptos_framework::stake {
         };
     }
 
+    #[test_only]
+    fun generate_identity(): (bls12381::SecretKey, bls12381::PublicKey, bls12381::ProofOfPossession) {
+        let (sk, pkpop) = bls12381::generate_keys();
+        let pop = bls12381::generate_proof_of_possession(&sk);
+        let unvalidated_pk = bls12381::public_key_with_pop_to_unvalidated(&pkpop);
+        (sk, unvalidated_pk, pop)
+    }
+
     #[test(aptos_framework = @0x1, validator_1 = @0x123, validator_2 = @0x234)]
     public entry fun test_removing_validator_from_active_set(
         aptos_framework: &signer,
@@ -2426,8 +2462,10 @@ module aptos_framework::stake {
         validator_2: &signer,
     ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         initialize_for_test(aptos_framework);
-        initialize_test_validator(validator_1, 100, true, false);
-        initialize_test_validator(validator_2, 100, true, true);
+        let (_sk_1, pk_1, pop_1) = generate_identity();
+        let (_sk_2, pk_2, pop_2) = generate_identity();
+        initialize_test_validator_new(&pk_1, &pop_1, validator_1, 100, true, false);
+        initialize_test_validator_new(&pk_2, &pop_2, validator_2, 100, true, true);
         assert!(vector::length(&borrow_global<ValidatorSet>(@aptos_framework).active_validators) == 2, 0);
 
         // Remove validator 1 from the active validator set. Only validator 2 remains.
