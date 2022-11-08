@@ -173,6 +173,7 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<&AptosGasParameters, VMStatus> {
         self.gas_params.as_ref().ok_or_else(|| {
+            println!("get_gas_parameters() failed.");
             log_context.alert();
             error!(*log_context, "VM Startup Failed. Gas Parameters Not Found");
             VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
@@ -186,6 +187,7 @@ impl AptosVMImpl {
         match self.gas_feature_version {
             0 => Ok(None),
             _ => Ok(Some(self.storage_gas_params.as_ref().ok_or_else(|| {
+                println!("get_storage_gas_parameters() failed.");
                 log_context.alert();
                 error!(
                     *log_context,
@@ -202,6 +204,7 @@ impl AptosVMImpl {
 
     pub fn get_version(&self) -> Result<Version, VMStatus> {
         self.version.clone().ok_or_else(|| {
+            println!("get_version() failed.");
             CRITICAL_ERRORS.inc();
             error!("VM Startup Failed. Version Not Found");
             VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)

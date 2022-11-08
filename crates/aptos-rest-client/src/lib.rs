@@ -957,6 +957,7 @@ impl Client {
             .send()
             .await
             .map_err(anyhow::Error::from)?;
+        println!("get resource response: {:?}", response);
         self.json(response).await
     }
 
@@ -997,6 +998,7 @@ impl Client {
         ))?;
 
         let response = self.get_bcs(url).await?;
+        println!("get account resource at version response: {:?}", response);
         Ok(response.map(|inner| inner.to_vec()))
     }
 
