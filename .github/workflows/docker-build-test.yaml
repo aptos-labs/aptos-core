@@ -184,7 +184,7 @@ jobs:
 
   # Run e2e compat test against testnet branch
   forge-compat-test:
-    needs: [rust-images, rust-images-testing, rust-images-performance, determine-docker-build-metadata]
+    needs: [rust-images, rust-images-failpoints, determine-docker-build-metadata]
     if: |
       !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
