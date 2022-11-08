@@ -210,6 +210,8 @@ spec aptos_framework::account {
     }
 
     spec register_coin<CoinType>(account_addr: address) {
+        // TODO: Add the abort condition about `type_info::type_of`
+        pragma aborts_if_is_partial;
         aborts_if !exists<Account>(account_addr);
         modifies global<Account>(account_addr);
     }

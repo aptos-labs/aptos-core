@@ -37,8 +37,8 @@ variable "ecr_base" {
 
 variable "NORMALIZED_GIT_BRANCH_OR_PR" {}
 variable "IMAGE_TAG_PREFIX" {}
-variable "BUILD_TEST_IMAGES" {
-  // Whether to build test images
+variable "BUILD_ADDL_TESTING_IMAGES" {
+  // Whether to build additional testing images
   default = "false"
 }
 variable "PROFILE" {
@@ -57,7 +57,7 @@ group "all" {
     "faucet",
     "forge",
     "telemetry-service",
-    BUILD_TEST_IMAGES == "true" ? [
+    BUILD_ADDL_TESTING_IMAGES == "true" ? [
       "validator-testing"
     ] : []
   ])

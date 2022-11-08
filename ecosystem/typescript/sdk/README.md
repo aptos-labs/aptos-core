@@ -105,17 +105,6 @@ pnpm add PATH_TO_LOCAL_SDK_PACKAGE
 
 This project follows [semver](https://semver.org/) as closely as possible.
 
-## References
-
-[examples]: https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/
-[repo]: https://github.com/aptos-labs/aptos-core
-[npm-image-version]: https://img.shields.io/npm/v/aptos.svg
-[npm-image-downloads]: https://img.shields.io/npm/dm/aptos.svg
-[npm-url]: https://npmjs.org/package/aptos
-[discord-image]: https://img.shields.io/discord/945856774056083548?label=Discord&logo=discord&style=flat~~~~
-[discord-url]: https://discord.gg/aptoslabs
-[api-doc]: https://aptos-labs.github.io/ts-sdk-doc/
-
 ## Release process
 
 To release a new version of the SDK do the following.
@@ -139,3 +128,14 @@ pnpm fmt
 5. Once you're confident everything is correct, submit your PR. The CI will ensure that you have followed all the previous steps, specifically ensuring that the API, API spec, and SDK client are all compatible, that you've updated the changelog, that the tests pass, etc.
 6. Land the PR on main.
 7. Apply the changes to the devnet branch. CI will detect that the version has changed, build a new package, and upload it automatically to npmjs.
+
+
+[examples]: https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/
+[repo]: https://github.com/aptos-labs/aptos-core
+[npm-image-version]: https://img.shields.io/npm/v/aptos.svg
+[npm-image-downloads]: https://img.shields.io/npm/dm/aptos.svg
+[npm-url]: https://npmjs.org/package/aptos
+[discord-image]: https://img.shields.io/discord/945856774056083548?label=Discord&logo=discord&style=flat~~~~
+[discord-url]: https://discord.gg/aptoslabs
+[api-doc]: https://aptos-labs.github.io/ts-sdk-doc/
+
