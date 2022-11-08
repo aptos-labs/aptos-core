@@ -3,7 +3,7 @@
 
 use crate::natives::util::make_test_only_native_from_func;
 use crate::{natives::util::make_native_from_func, pop_vec_arg};
-use aptos_crypto::bls12381::{PrivateKey, PublicKey, Signature};
+use aptos_crypto::bls12381::{PrivateKey, ProofOfPossession, PublicKey, Signature};
 use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{bls12381, traits, SigningKey, Uniform};
 use move_binary_format::errors::PartialVMError;
@@ -671,6 +671,20 @@ pub fn native_sign(
     ))
 }
 
+pub fn native_generate_proof_of_possession(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    let sk_bytes = pop_arg!(arguments, Vec<u8>);
+    let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
+    let pop = ProofOfPossession::create(&sk);
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![Value::vector_u8(pop.to_bytes()),],
+    ))
+}
+
 pub fn native_aggr_sign(
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -744,6 +758,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "sign_internal",
             make_test_only_native_from_func(native_sign),
+        ),
+        (
+            "generate_proof_of_possession_internal",
+            make_test_only_native_from_func(native_generate_proof_of_possession),
         ),
     ]);
     crate::natives::helpers::make_module_natives(natives)
