@@ -179,6 +179,11 @@ variable "enable_forge" {
   default     = false
 }
 
+variable "forge_config_s3_bucket" {
+  description = "S3 bucket in which Forge config is stored"
+  default     = "forge-wrapper-config"
+}
+
 variable "forge_helm_values" {
   description = "Map of values to pass to Forge Helm"
   type        = any
