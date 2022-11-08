@@ -2292,8 +2292,10 @@ module aptos_framework::stake {
         let validator_2_address = signer::address_of(validator_2);
 
         // Both validators join the set.
-        initialize_test_validator(validator_1, 100, true, false);
-        initialize_test_validator(validator_2, 100, true, true);
+        let (_sk_1, pk_1, pop_1) = generate_identity();
+        let (_sk_2, pk_2, pop_2) = generate_identity();
+        initialize_test_validator_new(&pk_1, &pop_1, validator_1, 100, true, false);
+        initialize_test_validator_new(&pk_2, &pop_2, validator_2, 100, true, true);
 
         // Validator 2 failed proposal.
         let failed_proposer_indices = vector::empty<u64>();
@@ -2334,7 +2336,8 @@ module aptos_framework::stake {
         initialize_for_test(aptos_framework);
 
         let validator_address = signer::address_of(validator);
-        initialize_test_validator(validator, 100, true, true);
+        let (_sk, pk, pop) = generate_identity();
+        initialize_test_validator_new(&pk, &pop, validator, 100, true, true);
 
         let valid_validator_index = borrow_global<ValidatorConfig>(validator_address).validator_index;
         let out_of_bounds_index = valid_validator_index + 100;
