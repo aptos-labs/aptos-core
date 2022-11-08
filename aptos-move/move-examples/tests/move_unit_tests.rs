@@ -4,7 +4,7 @@
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_vm::natives;
-use move_cli::base::test::run_move_unit_tests;
+use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use std::{collections::BTreeMap, path::PathBuf};
@@ -24,7 +24,7 @@ pub fn run_tests_for_pkg(
     named_addr: BTreeMap<String, AccountAddress>,
 ) {
     let pkg_path = path_in_crate(path_to_pkg);
-    run_move_unit_tests(
+    let ok = run_move_unit_tests(
         &pkg_path,
         move_package::BuildConfig {
             test_mode: true,
@@ -40,6 +40,9 @@ pub fn run_tests_for_pkg(
         &mut std::io::stdout(),
     )
     .unwrap();
+    if ok != UnitTestResult::Success {
+        panic!("move unit tests failed")
+    }
 }
 
 pub fn aptos_test_natives() -> NativeFunctionTable {
