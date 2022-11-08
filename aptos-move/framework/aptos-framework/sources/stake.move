@@ -1303,16 +1303,6 @@ module aptos_framework::stake {
     use aptos_std::bls12381::proof_of_possession_from_bytes;
 
     #[test_only]
-    const CONSENSUS_KEY_1: vector<u8> = x"8a54b92288d4ba5073d3a52e80cc00ae9fbbc1cc5b433b46089b7804c38a76f00fc64746c7685ee628fc2d0b929c2294";
-    #[test_only]
-    const CONSENSUS_POP_1: vector<u8> = x"a9d6c1f1270f2d1454c89a83a4099f813a56dc7db55591d46aa4e6ccae7898b234029ba7052f18755e6fa5e6b73e235f14efc4e2eb402ca2b8f56bad69f965fc11b7b25eb1c95a06f83ddfd023eac4559b6582696cfea97b227f4ce5bdfdfed0";
-
-    #[test_only]
-    const CONSENSUS_KEY_2: vector<u8> = x"a344eb437bcd8096384206e1be9c80be3893fd7fdf867acce5a048e5b1546028bdac4caf419413fd16d4d6a609e0b0a3";
-    #[test_only]
-    const CONSENSUS_POP_2: vector<u8> = x"909d3a378ad5c17faf89f7a2062888100027eda18215c7735f917a4843cd41328b42fa4242e36dedb04432af14608973150acbff0c5d3f325ba04b287be9747398769a91d4244689cfa9c535a5a4d67073ee22090d5ab0a88ab8d2ff680e991e";
-
-    #[test_only]
     const EPOCH_DURATION: u64 = 60;
 
     #[test_only]
@@ -1331,7 +1321,9 @@ module aptos_framework::stake {
         pool_address: address,
         should_end_epoch: bool,
     ) acquires AptosCoinCapabilities, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
-        rotate_consensus_key(operator, pool_address, bls12381::public_key_to_bytes(pk), bls12381::proof_of_possession_to_bytes(pop));
+        let pk_bytes = bls12381::public_key_to_bytes(pk);
+        let pop_bytes = bls12381::proof_of_possession_to_bytes(pop);
+        rotate_consensus_key(operator, pool_address, pk_bytes, pop_bytes);
         join_validator_set(operator, pool_address);
         if (should_end_epoch) {
             end_epoch();
@@ -1418,7 +1410,9 @@ module aptos_framework::stake {
             account::create_account_for_test(validator_address);
         };
 
-        initialize_validator(validator, bls12381::public_key_to_bytes(pk), bls12381::proof_of_possession_to_bytes(pop), vector::empty(), vector::empty());
+        let pk_bytes = bls12381::public_key_to_bytes(pk);
+        let pop_bytes = bls12381::proof_of_possession_to_bytes(pop);
+        initialize_validator(validator, pk_bytes, pop_bytes, vector::empty(), vector::empty());
 
         if (amount > 0) {
             mint_and_add_stake(validator, amount);
@@ -2080,6 +2074,7 @@ module aptos_framework::stake {
 
         initialize_for_test_custom(aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100, 100);
         let (_sk_1, pk_1, pop_1) = generate_identity();
+        let pk_1_bytes = bls12381::public_key_to_bytes(&pk_1);
         let (_sk_2, pk_2, pop_2) = generate_identity();
         let (_sk_3, pk_3, pop_3) = generate_identity();
         initialize_test_validator(&pk_1, &pop_1, validator_1, 100, false, false);
@@ -2106,7 +2101,9 @@ module aptos_framework::stake {
 
         // Validator 1 rotates consensus key. Validator 2 leaves. Validator 3 joins.
         let (_sk_1b, pk_1b, pop_1b) = generate_identity();
-        rotate_consensus_key(validator_1, validator_1_address, bls12381::public_key_to_bytes(&pk_1b), bls12381::proof_of_possession_to_bytes(&pop_1b));
+        let pk_1b_bytes = bls12381::public_key_to_bytes(&pk_1b);
+        let pop_1b_bytes = bls12381::proof_of_possession_to_bytes(&pop_1b);
+        rotate_consensus_key(validator_1, validator_1_address, pk_1b_bytes, pop_1b_bytes);
         leave_validator_set(validator_2, validator_2_address);
         join_validator_set(validator_3, validator_3_address);
         // Validator 2 is not effectively removed until next epoch.
@@ -2115,7 +2112,7 @@ module aptos_framework::stake {
         // Validator 3 is not effectively added until next epoch.
         assert!(get_validator_state(validator_3_address) == VALIDATOR_STATUS_PENDING_ACTIVE, 7);
         assert!(vector::borrow(&borrow_global<ValidatorSet>(@aptos_framework).pending_active, 0).addr == validator_3_address, 0);
-        assert!(vector::borrow(&borrow_global<ValidatorSet>(@aptos_framework).active_validators, 0).config.consensus_pubkey == bls12381::public_key_to_bytes(&pk_1), 0);
+        assert!(vector::borrow(&borrow_global<ValidatorSet>(@aptos_framework).active_validators, 0).config.consensus_pubkey == pk_1_bytes, 0);
 
         // Changes applied after new epoch
         end_epoch();
@@ -2127,7 +2124,7 @@ module aptos_framework::stake {
         assert_validator_state(validator_2_address, 101, 0, 0, 0, 1);
         assert!(get_validator_state(validator_3_address) == VALIDATOR_STATUS_ACTIVE, 10);
         assert_validator_state(validator_3_address, 100, 0, 0, 0, 1);
-        assert!(vector::borrow(&borrow_global<ValidatorSet>(@aptos_framework).active_validators, 0).config.consensus_pubkey == bls12381::public_key_to_bytes(&pk_1b), 0);
+        assert!(vector::borrow(&borrow_global<ValidatorSet>(@aptos_framework).active_validators, 0).config.consensus_pubkey == pk_1b_bytes, 0);
 
         // Validators without enough stake will be removed.
         unlock(validator_1, 50);
@@ -2169,9 +2166,12 @@ module aptos_framework::stake {
         assert_validator_state(pool_address, 0, 0, 0, 0, 0);
 
         // Operator can separately rotate consensus key.
-        rotate_consensus_key(validator, pool_address, CONSENSUS_KEY_2, CONSENSUS_POP_2);
+        let (_sk_new, pk_new, pop_new) = generate_identity();
+        let pk_new_bytes = bls12381::public_key_to_bytes(&pk_new);
+        let pop_new_bytes = bls12381::proof_of_possession_to_bytes(&pop_new);
+        rotate_consensus_key(validator, pool_address, pk_new_bytes, pop_new_bytes);
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
-        assert!(validator_config.consensus_pubkey == CONSENSUS_KEY_2, 2);
+        assert!(validator_config.consensus_pubkey == pk_new_bytes, 2);
 
         // Operator can update network and fullnode addresses.
         update_network_and_fullnode_addresses(validator, pool_address, b"1", b"2");
@@ -2414,7 +2414,10 @@ module aptos_framework::stake {
 
         // Initialize validator config.
         let validator_address = signer::address_of(validator);
-        rotate_consensus_key(validator, validator_address, CONSENSUS_KEY_2, CONSENSUS_POP_2);
+        let (_sk_new, pk_new, pop_new) = generate_identity();
+        let pk_new_bytes = bls12381::public_key_to_bytes(&pk_new);
+        let pop_new_bytes = bls12381::proof_of_possession_to_bytes(&pop_new);
+        rotate_consensus_key(validator, validator_address, pk_new_bytes, pop_new_bytes);
 
         // Join the validator set with enough stake. This now wouldn't fail since the validator config already exists.
         join_validator_set(validator, validator_address);
