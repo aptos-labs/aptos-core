@@ -5,6 +5,9 @@
 
 set -e
 
+cd "$(dirname "$0")"
+cd ..
+
 # Get the latest version of the package on npm.js
 PUBLISHED_VERSION=`npm show aptos version`
 
