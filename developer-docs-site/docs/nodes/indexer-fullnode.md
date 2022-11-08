@@ -59,6 +59,10 @@ For an Aptos indexer fullnode, install these packages:
 ## Start fullnode indexer
 
 1. Follow the instructions to set up a [public fullnode](full-node/fullnode-source-code-or-docker/) and prepare the setup, but **do not** yet start the indexer (with `cargo run` or `docker run`).
+1. Pull the latest indexer Docker image with:
+    ```bash
+    docker pull aptoslabs/validator:nightly_indexer
+    ```
 1. Edit the `./fullnode.yaml` and add the following configuration:
     ```yaml
     storage:
@@ -76,19 +80,7 @@ For an Aptos indexer fullnode, install these packages:
         emit_every: 500
     ```
 
-1. Run the indexer fullnode with either `cargo` for source setup or `docker`:
-    ```bash
-    cargo run -p aptos-node --features "indexer" --release -- -f /path/to/fullnode.yaml
-    ```
-    ```bash
-    docker run --pull=always \
-    --rm -p 8080:8080 \
-    -p 9101:9101 -p 6180:6180 \
-    -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data \
-    --workdir /opt/aptos/etc \
-    --name=aptos-fullnode aptoslabs/validator:nightly_indexer aptos-node \
-    -f /opt/aptos/etc/fullnode.yaml
-    ```
+1. Run the indexer fullnode with either `cargo run` or `docker run` depending upon your setup. Remember to supply the arguments you need for your specific node.
 
 ## Restart indexer
 
