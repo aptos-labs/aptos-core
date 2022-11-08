@@ -142,11 +142,9 @@ module aptos_std::bucket_table {
 
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
-    /// The requirement of &mut BucketTable is to bypass the borrow checker issue described in https://github.com/move-language/move/issues/95
-    /// Once Table supports borrow by K, we can remove the &mut
-    public fun borrow<K: copy + drop, V>(map: &mut BucketTable<K, V>, key: K): &V {
+    public fun borrow<K: copy + drop, V>(map: &BucketTable<K, V>, key: K): &V {
         let index = bucket_index(map.level, map.num_buckets, sip_hash_from_value(&key));
-        let bucket = table_with_length::borrow_mut(&mut map.buckets, index);
+        let bucket = table_with_length::borrow(&map.buckets, index);
         let i = 0;
         let len = vector::length(bucket);
         while (i < len) {
@@ -241,7 +239,7 @@ module aptos_std::bucket_table {
         i = 0;
         while (i < 200) {
             *borrow_mut(&mut map, i) = i * 2;
-            assert!(*borrow(&mut map, i) == i * 2, 0);
+            assert!(*borrow(&map, i) == i * 2, 0);
             i = i + 1;
         };
         i = 0;
