@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! BigQuery-related functions
+use crate::indexer::errors::TransactionProcessingError;
 use crate::util::u64_to_bigdecimal_str;
 use aptos_api_types::{Transaction as APITransaction, TransactionInfo};
+use futures_util::io::Write;
+use futures_util::stream;
 use gcloud_sdk::google::cloud::bigquery::storage::v1::append_rows_request::{ProtoData, Rows};
 use gcloud_sdk::google::cloud::bigquery::storage::v1::{
-    AppendRowsRequest, CreateWriteStreamRequest, ProtoRows, ProtoSchema,
+    write_stream, AppendRowsRequest, CreateWriteStreamRequest, ProtoRows, ProtoSchema, WriteStream,
 };
 use gcloud_sdk::{
     google::cloud::bigquery::storage::v1::big_query_write_client::BigQueryWriteClient, GoogleApi,
@@ -15,18 +18,100 @@ use gcloud_sdk::{
 use once_cell::sync::Lazy;
 use prost::Message;
 use prost_types::{DescriptorProto, FileDescriptorSet};
+use std::collections::HashMap;
+use std::sync::Mutex;
 use streaming_proto::Transaction as TransactionProto;
+
+pub const BIGQUERY_DATASET_NAME: &str = "aptos_indexer_bigquery_data";
 
 pub mod streaming_proto {
     include!(concat!("./pb", "/aptos.indexer.proto.v1.rs"));
 }
-pub type BigQueryClient = GoogleApi<BigQueryWriteClient<GoogleAuthMiddleware>>;
+
+pub struct BigQueryClient {
+    /// BigQuery client  that handles stream management and data flow.
+    client: GoogleApi<BigQueryWriteClient<GoogleAuthMiddleware>>,
+    /// Maps from table name to the corresponding stream id. If not present, create one.
+    pub stream_map: HashMap<String, String>,
+    /// BigQuery path to the data set.
+    ///   Example: "projects/YOUR_PROJECT_ID/datasets/YOUR_DATASET/tables/"
+    pub data_set_path: String,
+}
+
+impl BigQueryClient {
+    /// Creates BigQuery client based on service account credential file(json).
+    /// GOOGLE_APPLICATION_CREDENTIALS saves the absolute path pointing to the file.
+    pub async fn new(project_id: String) -> Self {
+        let client = GoogleApi::from_function(
+            BigQueryWriteClient::new,
+            "https://bigquerystorage.googleapis.com",
+            None,
+        )
+        .await
+        .expect("Create raw Bigquery Client successfully");
+        let data_set_path = format!(
+            "projects/{}/datasets/{}/tables/",
+            project_id, BIGQUERY_DATASET_NAME
+        );
+        Self {
+            client,
+            stream_map: HashMap::new(),
+            data_set_path,
+        }
+    }
+    /// Returns the default stream for the data; if not present, create one.
+    pub async fn get_stream(&self, table: String) -> String {
+        match self.stream_map.get(&table) {
+            Some(stream_id) => stream_id.to_owned(),
+            None => {
+                let write_stream_resp = self
+                    .client
+                    .get()
+                    .create_write_stream(tonic::Request::new(CreateWriteStreamRequest {
+                        parent: format!("{}{}", self.data_set_path, table),
+                        write_stream: Some(WriteStream {
+                            r#type: i32::from(write_stream::Type::Committed),
+                            ..WriteStream::default()
+                        }),
+                    }))
+                    .await
+                    .expect("Create stream successfully.");
+                write_stream_resp.into_inner().name
+            }
+        }
+    }
+
+    /// Sends the data.
+    pub async fn send_data(
+        &self,
+        mut append_row_req: AppendRowsRequest,
+    ) -> Result<(), TransactionProcessingError> {
+        // TODO(laliu): fix this.
+        append_row_req.write_stream = self
+            .stream_map
+            .get(&"transactions".to_string())
+            .unwrap()
+            .to_string();
+
+        match self
+            .client
+            .get()
+            .append_rows(tonic::Request::new(stream::iter(vec![append_row_req])))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err) => Err(TransactionProcessingError::BigQueryTransactionCommitError(
+                (anyhow::Error::msg("123"), 0, 1, "testing"),
+            )),
+        }
+    }
+}
 
 /// The Protobuf descriptor for Transaction.
 static TRANSACTION_DESCRIPTOR: Lazy<DescriptorProto> = Lazy::new(|| {
     let node_set = FileDescriptorSet::decode(&streaming_proto::FILE_DESCRIPTOR_SET[..])
         .expect("Decode Proto successfully.");
-    let msg_type = node_set
+    node_set
         .file
         // First one in file set.
         .get(0)
@@ -35,33 +120,10 @@ static TRANSACTION_DESCRIPTOR: Lazy<DescriptorProto> = Lazy::new(|| {
         // First type defined in this file.
         .get(0)
         .unwrap()
-        .clone();
-    msg_type
+        .clone()
 });
 
-/// Creates BigQuery client based on service account credential(json).
-/// GOOGLE_APPLICATION_CREDENTIALS saves the absolute path pointing to the file.
-pub async fn create_bigquery_client(
-    cloud_resource_prefix: String,
-) -> (GoogleApi<BigQueryWriteClient<GoogleAuthMiddleware>>, String) {
-    let client = GoogleApi::from_function(
-        BigQueryWriteClient::new,
-        "https://bigquerystorage.googleapis.com",
-        Some(cloud_resource_prefix),
-    )
-    .await
-    .expect("Create Bigquery Client successfully");
-
-    let write_stream_resp = client
-        .get()
-        .create_write_stream(tonic::Request::new(CreateWriteStreamRequest {
-            ..CreateWriteStreamRequest::default()
-        }))
-        .await
-        .expect("Create stream successfully.");
-    (client, write_stream_resp.into_inner().name)
-}
-
+// Deprecated; separate this out from bigquery client module.
 fn from_transaction_info(
     info: &TransactionInfo,
     // Serialized Json string.
