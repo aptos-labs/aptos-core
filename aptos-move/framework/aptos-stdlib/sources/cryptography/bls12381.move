@@ -6,10 +6,6 @@
 
 module aptos_std::bls12381 {
     use std::option::{Self, Option};
-    use aptos_std::ed25519;
-    use std::bcs;
-    use aptos_std::ed25519::new_signed_message;
-    use std::error::invalid_argument;
 
     /// The signature size, in bytes
     const SIGNATURE_SIZE: u64 = 96;
@@ -210,15 +206,6 @@ module aptos_std::bls12381 {
         verify_aggregate_signature_internal(aggr_sig.bytes, public_keys, messages)
     }
 
-    public fun verify_aggregate_signature_t<T: copy+drop>(
-        aggr_sig: &AggrOrMultiSignature,
-        public_keys: &vector<PublicKeyWithPoP>,
-        items: &vector<T>,
-    ): bool {
-        let messages = encode_items(items);
-        verify_aggregate_signature_internal(aggr_sig.bytes, *public_keys, messages)
-    }
-
     /// Verifies a multisignature: an aggregation of many signatures, each on the same message `m`.
     public fun verify_multisignature(
         multisig: &AggrOrMultiSignature,
@@ -226,16 +213,6 @@ module aptos_std::bls12381 {
         message: vector<u8>
     ): bool {
         verify_multisignature_internal(multisig.bytes, aggr_public_key.bytes, message)
-    }
-
-    /// Verifies a multisignature: an aggregation of many signatures, each on the same message `m`.
-    public fun verify_multisignature_t<T: drop>(
-        multisig: &AggrOrMultiSignature,
-        aggr_public_key: &AggrPublicKeysWithPoP,
-        data: T,
-    ): bool {
-        let encoded = new_signed_message(data);
-        verify_multisignature_internal(multisig.bytes, aggr_public_key.bytes, bcs::to_bytes(&encoded))
     }
 
     /// Verifies a normal, non-aggregated signature.
@@ -247,16 +224,6 @@ module aptos_std::bls12381 {
         verify_normal_signature_internal(signature.bytes, public_key.bytes, message)
     }
 
-    /// Verifies a normal, non-aggregated signature.
-    public fun verify_normal_signature_t<T: drop>(
-        signature: &Signature,
-        public_key: &PublicKey,
-        data: T
-    ): bool {
-        let encoded = ed25519::new_signed_message(data);
-        verify_normal_signature_internal(signature.bytes, public_key.bytes, bcs::to_bytes(&encoded))
-    }
-
     /// Verifies a signature share in the multisignature share or an aggregate signature share.
     public fun verify_signature_share(
         signature_share: &Signature,
@@ -264,19 +231,6 @@ module aptos_std::bls12381 {
         message: vector<u8>
     ): bool {
         verify_signature_share_internal(signature_share.bytes, public_key.bytes, message)
-    }
-
-    fun encode_items<T: copy+drop>(items: &vector<T>): vector<vector<u8>> {
-        let item_count = std::vector::length(items);
-        let messages = vector[];
-        let i = 0;
-        while (i < item_count) {
-            let item = std::vector::borrow(items, i);
-            let encoded = new_signed_message(*item);
-            std::vector::push_back(&mut messages, bcs::to_bytes(&encoded));
-            i = i + 1;
-        };
-        messages
     }
 
     #[test_only]
@@ -299,14 +253,6 @@ module aptos_std::bls12381 {
     }
 
     #[test_only]
-    public fun sign_struct<T: drop>(signing_key: &SecretKey, data: T) : Signature {
-        let encoded = ed25519::new_signed_message(data);
-        Signature {
-            bytes: sign_internal(signing_key.bytes, bcs::to_bytes(&encoded))
-        }
-    }
-
-    #[test_only]
     public fun multi_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, messages: vector<u8>): AggrOrMultiSignature {
         let n = std::vector::length(signing_keys);
         let sigs = vector[];
@@ -321,12 +267,6 @@ module aptos_std::bls12381 {
     }
 
     #[test_only]
-    public fun multi_sign_struct<T: drop>(signing_keys: &vector<SecretKey>, data: T) : AggrOrMultiSignature {
-        let encoded = new_signed_message(data);
-        multi_sign_arbitrary_bytes(signing_keys, bcs::to_bytes(&encoded))
-    }
-
-    #[test_only]
     public fun aggr_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, messages: &vector<vector<u8>>): AggrOrMultiSignature {
         let n = std::vector::length(signing_keys);
         let sigs = vector[];
@@ -338,16 +278,6 @@ module aptos_std::bls12381 {
         };
         let multisig = aggregate_signatures(sigs);
         option::extract(&mut multisig)
-    }
-
-    #[test_only]
-    public fun aggr_sign_struct<T: copy+drop>(signing_keys: &vector<SecretKey>, items: &vector<T>) : AggrOrMultiSignature {
-        let signing_key_count = std::vector::length(signing_keys);
-        let item_count = std::vector::length(items);
-        assert!(signing_key_count == item_count, invalid_argument(ESIGNER_COUNT_NOT_MATCH_MESSAGE_COUNT));
-        assert!(signing_key_count >= 1, invalid_argument(EWRONG_SIZE));
-        let messages = encode_items(items);
-        aggr_sign_arbitrary_bytes(signing_keys, &messages)
     }
 
     //
@@ -481,12 +411,6 @@ module aptos_std::bls12381 {
     //
 
     #[test_only]
-    struct TestObject has copy, drop {
-        field1: vector<u8>,
-        field2: u128,
-    }
-
-    #[test_only]
     fun get_random_aggsig(): AggrOrMultiSignature {
         assert!(signature_subgroup_check_internal(RANDOM_SIGNATURE), 1);
 
@@ -507,16 +431,9 @@ module aptos_std::bls12381 {
         let (sk,pkpop) = generate_keys();
         let pk = public_key_with_pop_to_unvalidated(&pkpop);
 
-        let msg_1 = b"hello world";
-        let sig_1 = sign_arbitrary_bytes(&sk, msg_1);
-        assert!(verify_normal_signature(&sig_1, &pk, msg_1), 1);
-
-        let item_2 = TestObject {
-            field1: b"hello aptos",
-            field2: 202210,
-        };
-        let sig_2 = sign_struct(&sk, copy item_2);
-        assert!(verify_normal_signature_t(&sig_2, &pk, copy item_2), 2);
+        let msg = b"hello world";
+        let sig = sign_arbitrary_bytes(&sk, msg);
+        assert!(verify_normal_signature(&sig, &pk, msg), 1);
     }
 
     #[test]
@@ -526,16 +443,9 @@ module aptos_std::bls12381 {
         let signing_keys = vector[sk_a, sk_b];
         let aggr_pk = aggregate_pubkeys(vector[pk_a, pk_b]);
 
-        let msg_1 = b"hello world";
-        let sig_1 = multi_sign_arbitrary_bytes(&signing_keys, msg_1);
-        assert!(verify_multisignature(&sig_1, &aggr_pk, msg_1), 3);
-
-        let item_2 = TestObject {
-            field1: b"hello aptos",
-            field2: 202210,
-        };
-        let sig_2 = multi_sign_struct(&signing_keys, copy item_2);
-        assert!(verify_multisignature_t(&sig_2, &aggr_pk, copy item_2), 4);
+        let msg = b"hello world";
+        let sig = multi_sign_arbitrary_bytes(&signing_keys, msg);
+        assert!(verify_multisignature(&sig, &aggr_pk, msg), 3);
     }
 
     #[test]
@@ -545,23 +455,9 @@ module aptos_std::bls12381 {
         let signing_keys = vector[sk_a, sk_b];
         let public_keys = vector[pk_a, pk_b];
 
-        let message_list_1 = vector[b"hello world", b"hello aptos"];
-        let sig_1 = aggr_sign_arbitrary_bytes(&signing_keys, &message_list_1);
-        assert!(verify_aggregate_signature(&sig_1, public_keys, message_list_1), 5);
-
-        let item_list_2 = vector[
-            TestObject {
-                field1: b"hello ed25519",
-                field2: 25519,
-            },
-            TestObject {
-                field1: b"hello bls12381",
-                field2: 12381,
-            },
-        ];
-
-        let sig_2 = aggr_sign_struct(&signing_keys, &item_list_2);
-        assert!(verify_aggregate_signature_t(&sig_2, &public_keys, &item_list_2), 6);
+        let messages = vector[b"hello world", b"hello aptos"];
+        let sig = aggr_sign_arbitrary_bytes(&signing_keys, &messages);
+        assert!(verify_aggregate_signature(&sig, public_keys, messages), 5);
     }
 
     #[test]
