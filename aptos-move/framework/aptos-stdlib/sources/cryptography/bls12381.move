@@ -424,17 +424,17 @@ module aptos_std::bls12381 {
 
     #[test]
     fun test_gen_sign_verify_normal_signature_or_signature_share() {
-        let (sk,pkpop) = generate_keys();
-        let pk = public_key_with_pop_to_unvalidated(&pkpop);
+        let (sk, pk) = generate_keys();
+        let pk_unvalidated = public_key_with_pop_to_unvalidated(&pk);
 
         let msg = b"hello world";
         let sig = sign_arbitrary_bytes(&sk, msg);
-        assert!(verify_normal_signature(&sig, &pk, msg), 1);
-        assert!(verify_signature_share(&sig, &pkpop, msg), 1);
+        assert!(verify_normal_signature(&sig, &pk_unvalidated, msg), 1);
+        assert!(verify_signature_share(&sig, &pk, msg), 1);
 
         maul_first_byte(&mut sig.bytes);
-        assert!(!verify_normal_signature(&sig, &pk, msg), 1);
-        assert!(!verify_signature_share(&sig, &pkpop, msg), 1);
+        assert!(!verify_normal_signature(&sig, &pk_unvalidated, msg), 1);
+        assert!(!verify_signature_share(&sig, &pk, msg), 1);
     }
 
     #[test]
