@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::init::Network;
-use crate::common::utils::prompt_yes_with_override;
+use crate::common::utils::{get_account_with_state, prompt_yes_with_override};
 use crate::{
     common::utils::{
         chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -46,6 +46,7 @@ use std::{
 use thiserror::Error;
 
 const MAX_POSSIBLE_GAS_UNITS: u64 = 1_000_000;
+const US_IN_SECS: u64 = 1000000;
 pub const DEFAULT_PROFILE: &str = "default";
 
 /// A common result to be returned to users
@@ -1225,6 +1226,9 @@ pub struct GasOptions {
     /// Without a value, it will determine the price based on simulating the current transaction
     #[clap(long)]
     pub max_gas: Option<u64>,
+    /// Number of seconds to expire the transaction
+    #[clap(long, default_value = 30)]
+    pub expiration_secs: u64,
 }
 
 /// Common options for interacting with an account for a validator
@@ -1294,9 +1298,6 @@ impl TransactionOptions {
         let client = self.rest_client()?;
         let (sender_key, sender_address) = self.get_key_and_address()?;
 
-        // Get sequence number for account
-        let sequence_number = self.sequence_number(sender_address).await?;
-
         // Ask to confirm price if the gas unit price is estimated above the lowest value when
         // it is automatically estimated
         let ask_to_confirm_price;
@@ -1310,6 +1311,13 @@ impl TransactionOptions {
             gas_unit_price
         };
 
+        // Get sequence number for account
+        let (account, state) = get_account_with_state(&client, sender_address).await?;
+        let sequence_number = account.sequence_number;
+        let expiration_time = state.timestamp_usecs + self.gas_options.expiration_secs * US_IN_SECS;
+
+        // TODO: Check auth key against current private key and provide a better message
+
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
             if ask_to_confirm_price {
@@ -1318,13 +1326,14 @@ impl TransactionOptions {
             }
             max_gas
         } else {
-            let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
-                .with_gas_unit_price(gas_unit_price);
+            let transaction_factory =
+                TransactionFactory::new(state.chain_id.into()).with_gas_unit_price(gas_unit_price);
 
             let unsigned_transaction = transaction_factory
                 .payload(payload.clone())
                 .sender(sender_address)
                 .sequence_number(sequence_number)
+                .expiration_timestamp_secs(expiration_time)
                 .build();
 
             let signed_transaction = SignedTransaction::new(
@@ -1371,7 +1380,8 @@ impl TransactionOptions {
         // Sign and submit transaction
         let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
             .with_gas_unit_price(gas_unit_price)
-            .with_max_gas_amount(max_gas);
+            .with_max_gas_amount(max_gas)
+            .with_transaction_expiration_time(expiration_time);
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction =
             sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
