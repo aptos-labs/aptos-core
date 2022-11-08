@@ -5,10 +5,10 @@ use crate::{
     common::{
         init::Network,
         utils::{
-            chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_auth_key, get_sequence_number, prompt_yes_with_override, read_from_file,
-            start_logger, to_common_result, to_common_success_result, write_to_file,
-            write_to_file_with_opts, write_to_user_only_file,
+            check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
+            get_account_with_state, get_auth_key, get_sequence_number, prompt_yes_with_override,
+            read_from_file, start_logger, to_common_result, to_common_success_result,
+            write_to_file, write_to_file_with_opts, write_to_user_only_file,
         },
     },
     config::GlobalConfig,
@@ -22,8 +22,9 @@ use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::{aptos_api_types::HashValue, error::RestError, Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use aptos_types::transaction::{
-    authenticator::AuthenticationKey, SignedTransaction, TransactionPayload,
+use aptos_types::{
+    chain_id::ChainId,
+    transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
@@ -39,10 +40,13 @@ use std::{
     fs::OpenOptions,
     path::{Path, PathBuf},
     str::FromStr,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
 
+const US_IN_SECS: u64 = 1_000_000;
+const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
+pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
 
 /// A common result to be returned to users
@@ -854,7 +858,7 @@ pub struct RestOptions {
     pub(crate) url: Option<reqwest::Url>,
 
     /// Connection timeout in seconds, used for the REST endpoint of the fullnode
-    #[clap(long, default_value = "30", alias = "connection-timeout-s")]
+    #[clap(long, default_value_t = DEFAULT_EXPIRATION_SECS, alias = "connection-timeout-s")]
     pub connection_timeout_secs: u64,
 }
 
@@ -862,7 +866,7 @@ impl RestOptions {
     pub fn new(url: Option<reqwest::Url>, connection_timeout_secs: Option<u64>) -> Self {
         RestOptions {
             url,
-            connection_timeout_secs: connection_timeout_secs.unwrap_or(30),
+            connection_timeout_secs: connection_timeout_secs.unwrap_or(DEFAULT_EXPIRATION_SECS),
         }
     }
 
@@ -1214,7 +1218,7 @@ impl FaucetOptions {
 }
 
 /// Gas price options for manipulating how to prioritize transactions
-#[derive(Debug, Default, Eq, Parser, PartialEq)]
+#[derive(Debug, Eq, Parser, PartialEq)]
 pub struct GasOptions {
     /// Gas multiplier per unit of gas
     ///
@@ -1240,6 +1244,21 @@ pub struct GasOptions {
     /// Without a value, it will determine the price based on simulating the current transaction
     #[clap(long)]
     pub max_gas: Option<u64>,
+    /// Number of seconds to expire the transaction
+    ///
+    /// This is the number of seconds from the current local computer time.
+    #[clap(long, default_value_t = DEFAULT_EXPIRATION_SECS)]
+    pub expiration_secs: u64,
+}
+
+impl Default for GasOptions {
+    fn default() -> Self {
+        GasOptions {
+            gas_unit_price: None,
+            max_gas: None,
+            expiration_secs: DEFAULT_EXPIRATION_SECS,
+        }
+    }
 }
 
 /// Common options for interacting with an account for a validator
@@ -1309,9 +1328,6 @@ impl TransactionOptions {
         let client = self.rest_client()?;
         let (sender_key, sender_address) = self.get_key_and_address()?;
 
-        // Get sequence number for account
-        let sequence_number = self.sequence_number(sender_address).await?;
-
         // Ask to confirm price if the gas unit price is estimated above the lowest value when
         // it is automatically estimated
         let ask_to_confirm_price;
@@ -1325,6 +1341,27 @@ impl TransactionOptions {
             gas_unit_price
         };
 
+        // Get sequence number for account
+        let (account, state) = get_account_with_state(&client, sender_address).await?;
+        let sequence_number = account.sequence_number;
+
+        // Retrieve local time, and ensure it's within an expected skew of the blockchain
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?
+            .as_secs();
+        let now_usecs = now * US_IN_SECS;
+
+        // Warn local user that clock is skewed behind the blockchain.
+        // There will always be a little lag from real time to blockchain time
+        if now_usecs < state.timestamp_usecs - ACCEPTED_CLOCK_SKEW_US {
+            eprintln!("Local clock is is skewed from blockchain clock.  Clock is more than {} seconds behind the blockchain {}", ACCEPTED_CLOCK_SKEW_US, state.timestamp_usecs / US_IN_SECS );
+        }
+        let expiration_time_secs = now + self.gas_options.expiration_secs;
+
+        let chain_id = ChainId::new(state.chain_id);
+        // TODO: Check auth key against current private key and provide a better message
+
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
             if ask_to_confirm_price {
@@ -1333,13 +1370,14 @@ impl TransactionOptions {
             }
             max_gas
         } else {
-            let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
-                .with_gas_unit_price(gas_unit_price);
+            let transaction_factory =
+                TransactionFactory::new(chain_id).with_gas_unit_price(gas_unit_price);
 
             let unsigned_transaction = transaction_factory
                 .payload(payload.clone())
                 .sender(sender_address)
                 .sequence_number(sequence_number)
+                .expiration_timestamp_secs(expiration_time_secs)
                 .build();
 
             let signed_transaction = SignedTransaction::new(
@@ -1379,9 +1417,10 @@ impl TransactionOptions {
         };
 
         // Sign and submit transaction
-        let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
+        let transaction_factory = TransactionFactory::new(chain_id)
             .with_gas_unit_price(gas_unit_price)
-            .with_max_gas_amount(max_gas);
+            .with_max_gas_amount(max_gas)
+            .with_transaction_expiration_time(self.gas_options.expiration_secs);
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction =
             sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));

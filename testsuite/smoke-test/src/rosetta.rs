@@ -363,6 +363,7 @@ async fn test_account_balance() {
             Some(GasOptions {
                 gas_unit_price: None,
                 max_gas: Some(1000),
+                expiration_secs: 30,
             }),
         )
         .await
@@ -1686,6 +1687,7 @@ async fn test_invalid_transaction_gas_charged() {
             Some(GasOptions {
                 gas_unit_price: None,
                 max_gas: Some(1000),
+                expiration_secs: 30,
             }),
         )
         .await
