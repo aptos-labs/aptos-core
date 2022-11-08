@@ -1182,18 +1182,19 @@ module aptos_token::token {
 
         // we add more tokens with property_version 0
         let token_id = create_token_id(token_data_id, 0);
-        deposit_token(account,
-            Token {
-                id: token_id,
-                amount,
-                token_properties: property_map::empty(), // same as default properties no need to store
-            }
-        );
         event::emit_event<MintTokenEvent>(
             &mut borrow_global_mut<Collections>(creator_addr).mint_token_events,
             MintTokenEvent {
                 id: token_data_id,
                 amount,
+            }
+        );
+
+        deposit_token(account,
+            Token {
+                id: token_id,
+                amount,
+                token_properties: property_map::empty(), // same as default properties no need to store
             }
         );
 
@@ -1224,19 +1225,20 @@ module aptos_token::token {
 
         // we add more tokens with property_version 0
         let token_id = create_token_id(token_data_id, 0);
-        direct_deposit(receiver,
-            Token {
-                id: token_id,
-                amount,
-                token_properties: property_map::empty(), // same as default properties no need to store
-            }
-        );
 
         event::emit_event<MintTokenEvent>(
             &mut borrow_global_mut<Collections>(creator_addr).mint_token_events,
             MintTokenEvent {
                 id: token_data_id,
                 amount,
+            }
+        );
+
+        direct_deposit(receiver,
+            Token {
+                id: token_id,
+                amount,
+                token_properties: property_map::empty(), // same as default properties no need to store
             }
         );
     }
