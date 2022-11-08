@@ -1,11 +1,11 @@
 ---
-title: "Indexer Fullnode"
+title: "Aptos Indexer Fullnode"
 slug: "indexer-fullnode"
 ---
 
-# Indexer Fullnode
+# Aptos Indexer Fullnode
 
-This document describes how to run an indexer fullnode on the Aptos network. See [Indexing](/guides/indexing.md) guide that describes the basic indexing concept and the available options for indexing service on the Aptos blockchain.
+This document describes how to run an indexer fullnode on the Aptos network. See the [Indexing](/guides/indexing.md) guide that describes the indexing concept and provides the available options for the indexing service on the Aptos blockchain.
 
 :::danger On macOS with Apple silicon only
 The below installation steps are verified only on macOS with Apple silicon.
@@ -16,54 +16,54 @@ The below installation steps are verified only on macOS with Apple silicon.
 To run an indexer fullnode, these are the steps in summary:
 
 1. Make sure that you have all the required tools and packages described below in this document.
-2. Follow the [method #1 of setting up a public fullnode by using the source code](full-node/fullnode-source-code-or-docker/#method-1-building-and-running-from-source) and prepare the setup, but **do not run** the `cargo run -p aptos-node --release -- -f ./fullnode.yaml` command yet. 
-:::danger Docker not supported
-Docker is not yet supported for indexer fullnode. In the above step 2, use only the source code method.
-:::
-3. Edit the `fullnode.yaml` as described below in this document.
-4. Run the indexer fullnode by executing the command described below in this document.
+1. Follow the instructions to [set up a public fullnode](full-node/fullnode-source-code-or-docker/) but do not start the fullnode yet. 
+1. Edit the `fullnode.yaml` as described below in this document.
+1. Run the indexer fullnode per the instructions below.
 
-### Required tools and packages
+## Prerequisites
 
-- Install [Brew](https://brew.sh/).
-- Install Cargo and Rust via [Install Rust](https://www.rust-lang.org/tools/install).
-- Install [libpq](https://formulae.brew.sh/formula/libpq). This is a Postgres C API library. Make sure to perform all export commands after the installation.
-  - macOS: `brew install libpq`
-  - Linux: `apt install libpq`
-- Install [PostgreSQL](https://www.postgresql.org/):
-  - macOS: `brew install postgres`
-  - Linux: `apt install postgres`
-- Install [Diesel](https://diesel.rs/):
-`cargo install diesel_cli --no-default-features --features postgres`.
+Install the packages below. Note, you may have already installed many of these while [preparing your development environment](../guides/getting-started.md#prepare-development-environment). You can confirm by running `which command-name` and ensuring the package appears in the output (although `libpq` will not be returned even when installed).
 
-### Setup
+> Important: If you are on macOS, you will need to [install Docker following the official guidance](https://docs.docker.com/desktop/install/mac-install/) rather than `brew`.
+
+For an Aptos indexer fullnode, install these packages:
+
+  - [`brew`](https://brew.sh/) - `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"` Run the commands emitted in the output to add the command to your path and install any dependencies
+  - [`cargo` Rust package manager](https://www.rust-lang.org/tools/install) - `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+  - [`docker`](https://docs.docker.com/get-docker/) - `brew install docker`
+  - [libpq Postgres C API library containing the `pg_ctl` command](https://formulae.brew.sh/formula/libpq) - `brew install libpq`
+    Make sure to perform all export commands after the installation.
+  -  [`postgres` PostgreSQL server](https://www.postgresql.org/) - `brew install postgresql`
+  - [`diesel`](https://diesel.rs/) - `brew install diesel`
+
+## Set up database
 
 1. Start the PostgreSQL server: 
-   - macOS: `brew services start postgresql`
-   - Linux: `pg_ctl -D /opt/homebrew/var/postgres start`
-2. Run the following command to create a PostgreSQL user `postgres` (macOS commmand example below):
+   `brew services start postgresql`
+1. Ensure you can run `psql postgres` and then exit the prompt by entering: `\q`
+1. Create a PostgreSQL user `postgres` with the `createuser` command (find it with `which`):
    ```bash
-   /opt/homebrew/bin/createuser -s postgres
+   /path/to/createuser -s postgres
    ```
-3. Ensure you are able to do: `psql postgres `.
-4. Install the Diesel CLI: 
-    ```bash
-    cargo install diesel_cli --no-default-features --features postgres
-    ```
-5. Clone `aptos-core` repo:
+1. Clone `aptos-core` repository if you have not already:
     ```bash
     git clone https://github.com/aptos-labs/aptos-core.git
     ```
-6. `cd` into `aptos-core/crates/indexer` directory.
-7.  Run the command:
+1. Navigate (or `cd`) into `aptos-core/crates/indexer` directory.
+1.  Create the database schema:
     ```bash
     diesel migration run --database-url postgresql://localhost/postgres
     ```
-    This will create a database schema with the subdirectory `migrations` located in this `aptos-core/crates/indexer` directory.
-    - If for some reason this database is already being used, try a different database. For example: `DATABASE_URL=postgres://postgres@localhost:5432/indexer_v2 diesel database reset`
+    This will create a database schema with the subdirectory `migrations` located in this `aptos-core/crates/indexer` directory. If for some reason this database is already in use, try a different database. For example: `DATABASE_URL=postgres://postgres@localhost:5432/indexer_v2 diesel database reset`
 
-8. Follow the [method #1 of setting up a public fullnode by using the source code](full-node/fullnode-source-code-or-docker/#method-1-building-and-running-from-source) and prepare the setup, but **do not run** the `cargo run -p aptos-node --release -- -f ./fullnode.yaml` command yet. **Docker is not yet supported for the indexer fullnode.**
-9. Edit the `./fullnode.yaml` and add the following configuration:
+## Start fullnode indexer
+
+1. Follow the instructions to set up a [public fullnode](full-node/fullnode-source-code-or-docker/) and prepare the setup, but **do not** yet start the indexer (with `cargo run` or `docker run`).
+1. Pull the latest indexer Docker image with:
+    ```bash
+    docker pull aptoslabs/validator:nightly_indexer
+    ```
+1. Edit the `./fullnode.yaml` and add the following configuration:
     ```yaml
     storage:
         enable_indexer: true
@@ -80,8 +80,23 @@ Docker is not yet supported for indexer fullnode. In the above step 2, use only 
         emit_every: 500
     ```
 
-10. Run the indexer fullnode with:
+1. Run the indexer fullnode with either `cargo run` or `docker run` depending upon your setup. Remember to supply the arguments you need for your specific node.
+
+## Restart indexer
+
+To restart the PostgreSQL server:
+
+1. [shut down the server](https://www.postgresql.org/docs/8.1/postmaster-shutdown.html) by searching for the `postmaster` process and killing it:
     ```bash
-    cargo run --bin aptos-node --features "indexer"  -- --config </path/to/fullnode.yaml>`
+    ps -ef | grep -i postmaster
+    ```
 
+1. Copy the process ID (PID) for the process and pass it to the following command to shut it down:
+    ```bash
+    kill -INT PID
+    ```
 
+1. Restart the PostgreSQL server with:
+    ```bash
+    brew services restart postgresql@14
+    ```
