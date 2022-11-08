@@ -19,7 +19,7 @@ use aptos_crypto::{
 };
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{ExplainVMStatus, HashValue, UserTransaction};
+use aptos_rest_client::aptos_api_types::{ExplainVMStatus, HashValue};
 use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
@@ -44,8 +44,8 @@ use std::{
     time::Instant,
 };
 use thiserror::Error;
+use aptos_types::chain_id::ChainId;
 
-const MAX_POSSIBLE_GAS_UNITS: u64 = 1_000_000;
 const US_IN_SECS: u64 = 1000000;
 pub const DEFAULT_PROFILE: &str = "default";
 
@@ -1227,7 +1227,7 @@ pub struct GasOptions {
     #[clap(long)]
     pub max_gas: Option<u64>,
     /// Number of seconds to expire the transaction
-    #[clap(long, default_value = 30)]
+    #[clap(long, default_value_t = 30)]
     pub expiration_secs: u64,
 }
 
@@ -1327,7 +1327,7 @@ impl TransactionOptions {
             max_gas
         } else {
             let transaction_factory =
-                TransactionFactory::new(state.chain_id.into()).with_gas_unit_price(gas_unit_price);
+                TransactionFactory::new(ChainId::new(state.chain_id)).with_gas_unit_price(gas_unit_price);
 
             let unsigned_transaction = transaction_factory
                 .payload(payload.clone())
@@ -1391,69 +1391,6 @@ impl TransactionOptions {
             .map_err(|err| CliError::ApiError(err.to_string()))?;
 
         Ok(response.into_inner())
-    }
-
-    pub async fn simulate_transaction(
-        &self,
-        payload: TransactionPayload,
-        gas_price: Option<u64>,
-        amount_transfer: Option<u64>,
-    ) -> CliTypedResult<UserTransaction> {
-        let client = self.rest_client()?;
-        let (sender_key, sender_address) = self.get_key_and_address()?;
-
-        // Get sequence number for account
-        let sequence_number = get_sequence_number(&client, sender_address).await?;
-
-        // Estimate gas price if necessary
-        let gas_price = if let Some(gas_price) = gas_price {
-            gas_price
-        } else {
-            self.estimate_gas_price().await?
-        };
-        // Simulate transaction
-        // To get my known possible max gas, I need to get my current balance
-        let account_balance = client
-            .get_account_balance(sender_address)
-            .await?
-            .into_inner()
-            .coin
-            .value
-            .0;
-
-        let max_possible_gas = if gas_price == 0 {
-            MAX_POSSIBLE_GAS_UNITS
-        } else if let Some(amount) = amount_transfer {
-            std::cmp::min(
-                account_balance
-                    .saturating_sub(amount)
-                    .saturating_div(gas_price),
-                MAX_POSSIBLE_GAS_UNITS,
-            )
-        } else {
-            std::cmp::min(
-                account_balance.saturating_div(gas_price),
-                MAX_POSSIBLE_GAS_UNITS,
-            )
-        };
-
-        let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
-            .with_gas_unit_price(gas_price)
-            .with_max_gas_amount(max_possible_gas);
-
-        let unsigned_transaction = transaction_factory
-            .payload(payload)
-            .sender(sender_address)
-            .sequence_number(sequence_number)
-            .build();
-
-        let signed_transaction = SignedTransaction::new(
-            unsigned_transaction,
-            sender_key.public_key(),
-            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
-        );
-        let txns = client.simulate(&signed_transaction).await?.into_inner();
-        Ok(txns.first().unwrap().clone())
     }
 
     pub async fn estimate_gas_price(&self) -> CliTypedResult<u64> {
