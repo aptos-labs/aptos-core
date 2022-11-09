@@ -22,7 +22,7 @@ module aptos_std::bls12381 {
     const EWRONG_SIZE: u64 = 2;
 
     /// The number of signers does not match the number of messages to be signed.
-    const ESIGNER_COUNT_NOT_MATCH_MESSAGE_COUNT: u64 = 3;
+    const E_NUM_SIGNERS_MUST_EQ_NUM_MESSAGES: u64 = 3;
 
     // TODO: Performance would increase if structs in this module are implemented natively via handles (similar to Table and
     // RistrettoPoint). This will avoid unnecessary (de)serialization. We would need to allow storage of these structs too.
@@ -284,7 +284,7 @@ module aptos_std::bls12381 {
     public fun aggr_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, messages: &vector<vector<u8>>): AggrOrMultiSignature {
         let signing_key_count = std::vector::length(signing_keys);
         let message_count = std::vector::length(messages);
-        assert!(signing_key_count == message_count, invalid_argument(ESIGNER_COUNT_NOT_MATCH_MESSAGE_COUNT));
+        assert!(signing_key_count == message_count, invalid_argument(E_NUM_SIGNERS_MUST_EQ_NUM_MESSAGES));
         let sigs = vector[];
         let i: u64 = 0;
         while (i < signing_key_count) {
@@ -429,14 +429,6 @@ module aptos_std::bls12381 {
     }
 
     #[test]
-    fun test_pubkey_validation() {
-        // test low order points (in group for PK)
-        assert!(option::is_none(&public_key_from_bytes(x"ae3cd9403b69c20a0d455fd860e977fe6ee7140a7f091f26c860f2caccd3e0a7a7365798ac10df776675b3a67db8faa0")), 1);
-        assert!(option::is_none(&public_key_from_bytes(x"928d4862a40439a67fd76a9c7560e2ff159e770dcf688ff7b2dd165792541c88ee76c82eb77dd6e9e72c89cbf1a56a68")), 1);
-        assert!(option::is_some(&public_key_from_bytes(x"b3e4921277221e01ed71284be5e3045292b26c7f465a6fcdba53ee47edd39ec5160da3b229a73c75671024dcb36de091")), 1);
-    }
-
-    #[test]
     fun test_pubkey_validation_against_invalid_keys() {
         let (_sk, pk) = generate_keys();
         let pk_bytes = public_key_with_pop_to_bytes(&pk);
@@ -447,9 +439,24 @@ module aptos_std::bls12381 {
     }
 
     #[test]
+    fun test_pubkey_validation() {
+        // test low order points (in group for PK)
+        assert!(option::is_none(&public_key_from_bytes(x"ae3cd9403b69c20a0d455fd860e977fe6ee7140a7f091f26c860f2caccd3e0a7a7365798ac10df776675b3a67db8faa0")), 1);
+        assert!(option::is_none(&public_key_from_bytes(x"928d4862a40439a67fd76a9c7560e2ff159e770dcf688ff7b2dd165792541c88ee76c82eb77dd6e9e72c89cbf1a56a68")), 1);
+        assert!(option::is_some(&public_key_from_bytes(x"b3e4921277221e01ed71284be5e3045292b26c7f465a6fcdba53ee47edd39ec5160da3b229a73c75671024dcb36de091")), 1);
+    }
+
+    #[test]
     #[expected_failure(abort_code = 65537)]
     fun test_empty_pubkey_aggregation() {
+        // First, make sure if no inputs are given, the function returns None
+        // assert!(aggregate_pop_verified_pubkeys(vector::empty()) == option::none(), 1);
         aggregate_pubkeys(std::vector::empty());
+    }
+
+    #[test]
+    fun test_pubkey_aggregation() {
+        // Already covered in `test_gen_sign_verify_multi_signature()`.
     }
 
     #[test]
@@ -459,11 +466,6 @@ module aptos_std::bls12381 {
 
         // TODO: normal signature aggregation is covered in `test_gen_sign_verify_multi_signature()`.
         // This function should be renamed to `test_empty_signature_aggregation`.
-    }
-
-    #[test]
-    fun test_pubkey_aggregation() {
-        // Already covered in `test_gen_sign_verify_multi_signature()`.
     }
 
     #[test]
@@ -512,12 +514,20 @@ module aptos_std::bls12381 {
         let signing_keys = vector[sk_a, sk_b];
         let public_keys = vector[pk_a, pk_b];
 
-        let messages = vector[b"hello world", b"hello aptos"];
-        let sig = aggr_sign_arbitrary_bytes(&signing_keys, &messages);
-        assert!(verify_aggregate_signature(&sig, public_keys, messages), 1);
+        let message_1 = b"hello world";
+        let message_2 = b"hello aptos";
+        let messages = vector[message_1, message_2];
+        let aggrsig = aggr_sign_arbitrary_bytes(&signing_keys, &messages);
+        assert!(verify_aggregate_signature(&aggrsig, public_keys, messages), 1);
 
-        maul_first_byte(&mut sig.bytes);
-        assert!(!verify_aggregate_signature(&sig, public_keys, messages), 1);
+        // Also test signature aggregation.
+        let sig_a_1 = sign_arbitrary_bytes(&sk_a, message_1);
+        let sig_b_2 = sign_arbitrary_bytes(&sk_b, message_2);
+        let sig_a_1_b_2 = option::extract(&mut aggregate_signatures(vector[sig_a_1, sig_b_2]));
+        assert!(aggr_or_multi_signature_to_bytes(&sig_a_1_b_2) == aggr_or_multi_signature_to_bytes(&aggrsig), 1);
+
+        maul_first_byte(&mut aggrsig.bytes);
+        assert!(!verify_aggregate_signature(&aggrsig, public_keys, messages), 1);
     }
 
     #[test]
