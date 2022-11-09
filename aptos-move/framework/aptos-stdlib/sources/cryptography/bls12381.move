@@ -467,11 +467,20 @@ module aptos_std::bls12381 {
         let aggr_pk = aggregate_pubkeys(vector[pk_a, pk_b]);
 
         let msg = b"hello world";
-        let sig = multi_sign_arbitrary_bytes(&signing_keys, msg);
-        assert!(verify_multisignature(&sig, &aggr_pk, msg), 1);
 
-        maul_first_byte(&mut sig.bytes);
-        assert!(!verify_multisignature(&sig, &aggr_pk, msg), 1);
+        let multisig = multi_sign_arbitrary_bytes(&signing_keys, msg);
+
+        assert!(verify_multisignature(&multisig, &aggr_pk, msg), 1);
+
+        // Also test signature aggregation.
+        let sig_a = sign_arbitrary_bytes(&sk_a, msg);
+        let sig_b = sign_arbitrary_bytes(&sk_b, msg);
+        let sig_a_b = option::extract(&mut aggregate_signatures(vector[sig_a, sig_b]));
+        assert!(aggr_or_multi_signature_subgroup_check(&sig_a_b), 1);
+        assert!(aggr_or_multi_signature_to_bytes(&sig_a_b) == aggr_or_multi_signature_to_bytes(&multisig), 1);
+
+        maul_first_byte(&mut multisig.bytes);
+        assert!(!verify_multisignature(&multisig, &aggr_pk, msg), 1);
     }
 
     #[test]
@@ -496,21 +505,22 @@ module aptos_std::bls12381 {
     }
 
     #[test]
+    fun test_pubkey_aggregation() {
+        // Already covered in `test_gen_sign_verify_multi_signature()`.
+    }
+
+    #[test]
     fun test_empty_signature_aggregation() {
         assert!(option::is_none(&mut aggregate_signatures(vector[])), 1);
     }
 
     #[test]
     fun test_signature_aggregation() {
-        let (sk_a,_pk_a) = generate_keys();
-        let (sk_b,_pk_b) = generate_keys();
-        let (sk_c,_pk_c) = generate_keys();
-        let message = b"hello aptos";
-        let sig_1 = sign_arbitrary_bytes(&sk_a, message);
-        let sig_2 = sign_arbitrary_bytes(&sk_b, message);
-        let sig_3 = sign_arbitrary_bytes(&sk_c, message);
-        let multisig = option::extract(&mut aggregate_signatures(vector[sig_1, sig_2, sig_3]));
-        assert!(aggr_or_multi_signature_subgroup_check(&multisig), 1);
+        // First, test empty aggregation
+        assert!(option::is_none(&mut aggregate_signatures(vector[])), 1);
+
+        // TODO: normal signature aggregation is covered in `test_gen_sign_verify_multi_signature()`.
+        // This function should be renamed to `test_empty_signature_aggregation`.
     }
 
     #[test]
