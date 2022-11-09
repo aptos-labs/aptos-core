@@ -266,12 +266,12 @@ module aptos_std::bls12381 {
 
     #[test_only]
     /// Generates a multi-signature for a message with multiple signing keys.
-    public fun multi_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, messages: vector<u8>): AggrOrMultiSignature {
+    public fun multi_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, message: vector<u8>): AggrOrMultiSignature {
         let n = std::vector::length(signing_keys);
         let sigs = vector[];
         let i: u64 = 0;
         while (i < n) {
-            let sig = sign_arbitrary_bytes(std::vector::borrow(signing_keys, i), messages);
+            let sig = sign_arbitrary_bytes(std::vector::borrow(signing_keys, i), message);
             std::vector::push_back(&mut sigs, sig);
             i = i + 1;
         };
