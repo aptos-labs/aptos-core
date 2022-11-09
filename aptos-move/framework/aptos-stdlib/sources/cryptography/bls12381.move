@@ -405,11 +405,11 @@ module aptos_std::bls12381 {
     native fun generate_keys_internal(): (vector<u8>, vector<u8>);
 
     #[test_only]
-    /// Generates a signature for a message with a signing key.
+    /// Generates a BLS signature for a message with a signing key.
     native fun sign_internal(sk: vector<u8>, msg: vector<u8>): vector<u8>;
 
     #[test_only]
-    /// Generates a proof-of-possession from a secret key.
+    /// Generates a proof-of-possession (PoP) for the public key associated with the secret key `sk`.
     native fun generate_proof_of_possession_internal(sk: vector<u8>): vector<u8>;
 
 
