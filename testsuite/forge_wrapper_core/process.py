@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import atexit
 import os
+import pwd
 from dataclasses import dataclass
 from typing import (
     Callable,
@@ -55,3 +56,6 @@ class SystemProcesses(Processes):
 
     def user(self) -> str:
         return get_current_user()
+
+def get_current_user() -> str:
+    return pwd.getpwuid(os.getuid())[0]
