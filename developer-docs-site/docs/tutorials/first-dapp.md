@@ -12,7 +12,7 @@ For this tutorial, we will use the Move module `HelloBlockchain` described in [Y
 We will use:
 
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Aptos Wallet Extension](../guides/building-your-own-wallet.md)
+* [Petra Wallet](../guides/install-petra-wallet-extension)
 * [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
 
 The end result is a dapp that lets users publish and share snippets of text on the Aptos blockchain.
@@ -26,7 +26,7 @@ The full source code for this tutorial is being updated. Meanwhile, the older on
 
 ### Aptos Wallet
 
-Before starting this tutorial, install the [Aptos Wallet extension](../guides/building-wallet-extension.md).
+Before starting this tutorial, install the [Petra extension](../guides/install-petra-wallet-extension).
 
 After you install it:
 
@@ -554,4 +554,4 @@ That concludes this tutorial.
 
 * [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Building Wallet Extension](../guides/building-your-own-wallet.md)
+* [Wallet Standard](../guides/wallet-standard.md)
