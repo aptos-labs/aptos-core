@@ -268,9 +268,11 @@ public fun register<CoinType>(account: &signer) {
 }
 ```
 
-As this is a `public fun` and not a `public entry fun`, coins will need to provide their own means for registering or users can construct Move `scripts` to call the function.
+As this is a `public fun` and not a `public entry fun`, coins will need to provide their own means for registering or users can construct Move `scripts` to call the function. MoonCoin uses `ManagedCoin` that provides an entry function wrapper: `managed_coin::register`. Here is an example script for registration:
 
-MoonCoin uses `ManagedCoin` that provides an entry function wrapper: `managed_coin::register`.
+```rust
+:!: static/move-examples/moon_coin/scripts/register.move
+```
 
 ---
 
