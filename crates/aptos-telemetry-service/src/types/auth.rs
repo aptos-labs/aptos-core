@@ -36,3 +36,23 @@ pub struct Claims {
 fn default_role_type() -> RoleType {
     RoleType::Validator
 }
+
+impl Claims {
+    #[cfg(test)]
+    pub(crate) fn test() -> Self {
+        use chrono::Duration;
+        use chrono::Utc;
+
+        Self {
+            chain_id: ChainId::test(),
+            peer_id: PeerId::random(),
+            node_type: NodeType::Validator,
+            epoch: 10,
+            exp: Utc::now().timestamp() as usize,
+            iat: Utc::now()
+                .checked_add_signed(Duration::seconds(3600))
+                .unwrap()
+                .timestamp() as usize,
+        }
+    }
+}
