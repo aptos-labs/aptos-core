@@ -401,7 +401,7 @@ module aptos_std::bls12381 {
     ): bool;
 
     #[test_only]
-    /// Generates a bls12381 key pair.
+    /// Generates a BLS key-pair: a secret key with its corresponding public key.
     native fun generate_keys_internal(): (vector<u8>, vector<u8>);
 
     #[test_only]
