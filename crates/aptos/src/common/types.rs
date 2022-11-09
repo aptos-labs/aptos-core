@@ -19,7 +19,7 @@ use aptos_crypto::{
 };
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{ExplainVMStatus, HashValue, UserTransaction};
+use aptos_rest_client::aptos_api_types::{HashValue, UserTransaction};
 use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
@@ -1333,32 +1333,28 @@ impl TransactionOptions {
                 Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
             );
             // TODO: Cleanup to use the gas price estimation here
-            let simulated_txn = client
-                .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
+            let txns = client
+                .simulate_with_gas_estimation(&signed_transaction, true, false)
                 .await?
                 .into_inner();
+            let simulated_txn = txns.first().unwrap();
 
             // Check if the transaction will pass, if it doesn't then fail
             // TODO: Add move resolver so we can explain the VM status with a proper error map
-            let status = simulated_txn.info.status();
-            if !status.is_success() {
-                let status = client.explain_vm_status(status);
-                return Err(CliError::SimulationError(status));
+            if simulated_txn.info.success {
+                return Err(CliError::SimulationError(
+                    simulated_txn.info.vm_status.clone(),
+                ));
             }
 
             // Take the gas used and use a headroom factor on it
-            let adjusted_max_gas = adjust_gas_headroom(
-                simulated_txn.info.gas_used(),
-                simulated_txn
-                    .transaction
-                    .as_signed_user_txn()
-                    .expect("Should be signed user transaction")
-                    .max_gas_amount(),
-            );
+            let gas_used = simulated_txn.info.gas_used.0;
+            let adjusted_max_gas =
+                adjust_gas_headroom(gas_used, simulated_txn.request.max_gas_amount.0);
 
             // Ask if you want to accept the estimate amount
             let upper_cost_bound = adjusted_max_gas * gas_unit_price;
-            let lower_cost_bound = simulated_txn.info.gas_used() * gas_unit_price;
+            let lower_cost_bound = gas_used * gas_unit_price;
             let message = format!(
                     "Do you want to submit a transaction for a range of [{} - {}] Octas at a gas unit price of {} Octas?",
                     lower_cost_bound,
