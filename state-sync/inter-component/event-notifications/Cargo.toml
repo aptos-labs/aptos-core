@@ -35,6 +35,7 @@ aptos-temppath = { path = "../../../crates/aptos-temppath" }
 aptos-vm = { path = "../../../aptos-move/aptos-vm" }
 aptosdb = { path = "../../../storage/aptosdb" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
+inter-component-test-helpers = { path = "../test-helpers" }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 vm-genesis = { path = "../../../aptos-move/vm-genesis", features = ["fuzzing"] }

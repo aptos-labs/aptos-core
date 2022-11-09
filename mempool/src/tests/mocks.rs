@@ -20,14 +20,16 @@ use aptos_types::{
 use channel::{self, aptos_channel, message_queues::QueueStyle};
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use futures::channel::mpsc;
+use inter_component_test_helpers::create_database;
 use mempool_notifications::{self, MempoolNotifier};
 use network::{
     application::storage::PeerMetadataStorage,
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::network::{NewNetworkEvents, NewNetworkSender},
 };
+use std::ops::Deref;
 use std::{collections::HashSet, sync::Arc};
-use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
+use storage_interface::DbReaderWriter;
 use tokio::runtime::{Builder, Handle, Runtime};
 use vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
@@ -54,11 +56,9 @@ impl MockSharedMempool {
             .enable_all()
             .build()
             .expect("[mock shared mempool] failed to create runtime");
-        let (ac_client, mempool, quorum_store_sender, mempool_notifier) = Self::start(
-            runtime.handle(),
-            &DbReaderWriter::new(MockDbReaderWriter),
-            MockVMValidator,
-        );
+        let db = create_database();
+        let (ac_client, mempool, quorum_store_sender, mempool_notifier) =
+            Self::start(runtime.handle(), db.read().deref(), MockVMValidator);
         Self {
             _runtime: Some(runtime),
             _handle: None,

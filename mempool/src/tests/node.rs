@@ -20,11 +20,12 @@ use aptos_types::{
 };
 use channel::{aptos_channel, message_queues::QueueStyle};
 use enum_dispatch::enum_dispatch;
-use event_notifications::EventSubscriptionService;
+use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use futures::{
     channel::mpsc::{self, unbounded, UnboundedReceiver},
     FutureExt, StreamExt,
 };
+use inter_component_test_helpers::create_database;
 use netcore::transport::ConnectionOrigin;
 use network::{
     application::storage::PeerMetadataStorage,
@@ -41,7 +42,6 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use tokio::runtime::{Builder, Runtime};
 use vm_validator::mocks::mock_vm_validator::MockVMValidator;
 
@@ -567,17 +567,16 @@ fn start_node_mempool(
     Runtime,
     UnboundedReceiver<SharedMempoolNotification>,
 ) {
+    let db = create_database();
     let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
     let (sender, subscriber) = unbounded();
     let (_ac_endpoint_sender, ac_endpoint_receiver) = mpsc::channel(1_024);
     let (_quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
     let (_mempool_notifier, mempool_listener) =
         mempool_notifications::new_mempool_notifier_listener_pair();
-    let mut event_subscriber = EventSubscriptionService::new(
-        ON_CHAIN_CONFIG_REGISTRY,
-        Arc::new(RwLock::new(DbReaderWriter::new(MockDbReaderWriter))),
-    );
+    let mut event_subscriber = EventSubscriptionService::new(ON_CHAIN_CONFIG_REGISTRY, db.clone());
     let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
+    event_subscriber.notify_initial_configs(0).unwrap();
     let runtime = Builder::new_multi_thread()
         .thread_name("shared-mem")
         .disable_lifo_slot()
@@ -593,7 +592,7 @@ fn start_node_mempool(
         quorum_store_receiver,
         mempool_listener,
         reconfig_event_subscriber,
-        Arc::new(MockDbReaderWriter),
+        db.read().reader.clone(),
         Arc::new(RwLock::new(MockVMValidator)),
         vec![sender],
         peer_metadata_storage,

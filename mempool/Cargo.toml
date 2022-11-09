@@ -41,6 +41,7 @@ bounded-executor = { path = "../crates/bounded-executor" }
 channel = { path = "../crates/channel" }
 consensus-types = { path = "../consensus/consensus-types" }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }
+inter-component-test-helpers = { path = "../state-sync/inter-component/test-helpers" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 netcore = { path = "../network/netcore" }
 network = { path = "../network" }
@@ -55,6 +56,7 @@ proptest = "1.0.0"
 aptos-compression = { path = "../crates/aptos-compression" }
 aptos-config = { path = "../config", features = ["fuzzing"] }
 aptos-id-generator = { path = "../crates/aptos-id-generator" }
+inter-component-test-helpers = { path = "../state-sync/inter-component/test-helpers" }
 network = { path = "../network", features = ["fuzzing"] }
 storage-interface = { path = "../storage/storage-interface", features = ["fuzzing"] }
 

@@ -20,8 +20,9 @@ use aptos_types::{
     account_address::AccountAddress, mempool_status::MempoolStatusCode,
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY, transaction::SignedTransaction,
 };
-use event_notifications::EventSubscriptionService;
+use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use futures::{channel::oneshot, SinkExt};
+use inter_component_test_helpers::create_database;
 use mempool_notifications::MempoolNotifier;
 use network::{
     application::storage::PeerMetadataStorage,
@@ -41,7 +42,6 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use tokio::{runtime::Handle, time::Duration};
 use tokio_stream::StreamExt;
 use vm_validator::mocks::mock_vm_validator::MockVMValidator;
@@ -488,11 +488,12 @@ fn setup_mempool(
 
     let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));
-    let db_rw = Arc::new(RwLock::new(DbReaderWriter::new(MockDbReaderWriter)));
-    let db_ro = Arc::new(MockDbReaderWriter);
+    let db_rw = create_database();
+    let db_ro = db_rw.read().reader.clone();
 
     let mut event_subscriber = EventSubscriptionService::new(ON_CHAIN_CONFIG_REGISTRY, db_rw);
     let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
+    event_subscriber.notify_initial_configs(0).unwrap();
 
     start_shared_mempool(
         &Handle::current(),

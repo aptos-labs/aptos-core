@@ -101,6 +101,7 @@ members = [
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",
     "state-sync/inter-component/mempool-notifications",
+    "state-sync/inter-component/test-helpers",
     "state-sync/state-sync-v2/data-streaming-service",
     "state-sync/state-sync-v2/state-sync-driver",
     "state-sync/storage-service/client",
