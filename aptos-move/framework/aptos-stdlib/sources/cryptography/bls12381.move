@@ -434,14 +434,36 @@ module aptos_std::bls12381 {
         assert!(option::is_none(&public_key_from_bytes(x"ae3cd9403b69c20a0d455fd860e977fe6ee7140a7f091f26c860f2caccd3e0a7a7365798ac10df776675b3a67db8faa0")), 1);
         assert!(option::is_none(&public_key_from_bytes(x"928d4862a40439a67fd76a9c7560e2ff159e770dcf688ff7b2dd165792541c88ee76c82eb77dd6e9e72c89cbf1a56a68")), 1);
         assert!(option::is_some(&public_key_from_bytes(x"b3e4921277221e01ed71284be5e3045292b26c7f465a6fcdba53ee47edd39ec5160da3b229a73c75671024dcb36de091")), 1);
+    }
 
-        // test random valid/invalid public keys.
+    #[test]
+    fun test_pubkey_validation_against_invalid_keys() {
         let (_sk, pk) = generate_keys();
         let pk_bytes = public_key_with_pop_to_bytes(&pk);
         assert!(option::is_some(&public_key_from_bytes(pk_bytes)), 1);
 
         maul_first_byte(&mut pk_bytes);
         assert!(option::is_none(&public_key_from_bytes(pk_bytes)), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 65537)]
+    fun test_empty_pubkey_aggregation() {
+        aggregate_pubkeys(std::vector::empty());
+    }
+
+    #[test]
+    fun test_signature_aggregation() {
+        // First, test empty aggregation
+        assert!(option::is_none(&mut aggregate_signatures(vector[])), 1);
+
+        // TODO: normal signature aggregation is covered in `test_gen_sign_verify_multi_signature()`.
+        // This function should be renamed to `test_empty_signature_aggregation`.
+    }
+
+    #[test]
+    fun test_pubkey_aggregation() {
+        // Already covered in `test_gen_sign_verify_multi_signature()`.
     }
 
     #[test]
@@ -499,28 +521,8 @@ module aptos_std::bls12381 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 65537)]
-    fun test_empty_pubkey_aggregation() {
-        aggregate_pubkeys(std::vector::empty());
-    }
-
-    #[test]
-    fun test_pubkey_aggregation() {
-        // Already covered in `test_gen_sign_verify_multi_signature()`.
-    }
-
-    #[test]
     fun test_empty_signature_aggregation() {
         assert!(option::is_none(&mut aggregate_signatures(vector[])), 1);
-    }
-
-    #[test]
-    fun test_signature_aggregation() {
-        // First, test empty aggregation
-        assert!(option::is_none(&mut aggregate_signatures(vector[])), 1);
-
-        // TODO: normal signature aggregation is covered in `test_gen_sign_verify_multi_signature()`.
-        // This function should be renamed to `test_empty_signature_aggregation`.
     }
 
     #[test]
