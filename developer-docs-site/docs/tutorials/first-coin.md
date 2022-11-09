@@ -250,25 +250,10 @@ MoonCoin calls this `initialize` function automatically upon package publishing.
 To use a coin, an entity must register a `CoinStore` for it on their account:
 
 ```rust
-public fun register<CoinType>(account: &signer) {
-    let account_addr = signer::address_of(account);
-    assert!(
-        !is_account_registered<CoinType>(account_addr),
-        error::already_exists(ECOIN_STORE_ALREADY_PUBLISHED),
-    );
-
-    account::register_coin<CoinType>(account_addr);
-    let coin_store = CoinStore<CoinType> {
-        coin: Coin { value: 0 },
-        frozen: false,
-        deposit_events: account::new_event_handle<DepositEvent>(account),
-        withdraw_events: account::new_event_handle<WithdrawEvent>(account),
-    };
-    move_to(account, coin_store);
-}
+public entry fun registerCoinType(account: &signer) {
 ```
 
-As this is a `public fun` and not a `public entry fun`, coins will need to provide their own means for registering or users can construct Move `scripts` to call the function. MoonCoin uses `ManagedCoin` that provides an entry function wrapper: `managed_coin::register`. Here is an example script for registration:
+MoonCoin uses `ManagedCoin` that provides an entry function wrapper: `managed_coin::register`. Here is an example script for registration:
 
 ```rust
 :!: static/move-examples/moon_coin/scripts/register.move
