@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 
 # Your First Coin
 
-This tutorial introduces how you can compile, deploy, and mint your own coin, named MoonCoin.
+This tutorial introduces how you can compile, deploy, and mint your own coin, named [MoonCoin](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/moon_coin).
 
 ## Step 1: Pick an SDK
 
@@ -312,9 +312,10 @@ Aptos provides several building blocks to support coin transfers:
 - `coin::transfer<CoinType>`: Leverages withdraw and deposit to perform an end-to-end transfer.
 
 :::tip important
-Aptos does not emit transfer events, but instead it leverages withdraw and deposit events.
+Aptos does not emit transfer events; instead it leverages withdraw and deposit events.
 :::
 
+## Supporting documentation
 * [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
