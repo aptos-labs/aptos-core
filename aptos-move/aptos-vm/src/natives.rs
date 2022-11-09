@@ -5,6 +5,7 @@ use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 
+#[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
 #[cfg(feature = "testing")]
 use {

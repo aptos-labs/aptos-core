@@ -6,12 +6,16 @@ use crate::natives::util::make_test_only_native_from_func;
 use crate::{natives::util::make_native_from_func, pop_vec_arg};
 #[cfg(feature = "testing")]
 use aptos_crypto::bls12381::ProofOfPossession;
-use aptos_crypto::bls12381::{PrivateKey, PublicKey, Signature};
+use aptos_crypto::bls12381::Signature;
+#[cfg(feature = "testing")]
+use aptos_crypto::bls12381::{PrivateKey, PublicKey};
 #[cfg(feature = "testing")]
 use aptos_crypto::test_utils::KeyPair;
 #[cfg(feature = "testing")]
+use aptos_crypto::SigningKey;
+#[cfg(feature = "testing")]
 use aptos_crypto::Uniform;
-use aptos_crypto::{bls12381, traits, SigningKey};
+use aptos_crypto::{bls12381, traits};
 use move_binary_format::errors::PartialVMError;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{
