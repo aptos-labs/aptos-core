@@ -280,7 +280,7 @@ module aptos_std::bls12381 {
     }
 
     #[test_only]
-    /// Generates an aggregated signature for n normal signatures.
+    /// Generates an aggregated signature over all messages in messages, where signing_keys[i] signs messages[i].
     public fun aggr_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, messages: &vector<vector<u8>>): AggrOrMultiSignature {
         let signing_key_count = std::vector::length(signing_keys);
         let message_count = std::vector::length(messages);
