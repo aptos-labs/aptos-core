@@ -244,7 +244,7 @@ module aptos_std::bls12381 {
     }
 
     #[test_only]
-    /// Generates a key pair.
+    /// Generates a BLS key-pair: a secret key with its corresponding public key.
     public fun generate_keys(): (SecretKey, PublicKeyWithPoP) {
         let (sk_bytes, pk_bytes) = generate_keys_internal();
         let sk = SecretKey {
@@ -257,7 +257,7 @@ module aptos_std::bls12381 {
     }
 
     #[test_only]
-    /// Generates a normal signature for a message with a signing key.
+    /// Generates a BLS signature for a message with a signing key.
     public fun sign_arbitrary_bytes(signing_key: &SecretKey, message: vector<u8>): Signature {
         Signature {
             bytes: sign_internal(signing_key.bytes, message)
@@ -401,15 +401,12 @@ module aptos_std::bls12381 {
     ): bool;
 
     #[test_only]
-    /// Generates a BLS key-pair: a secret key with its corresponding public key.
     native fun generate_keys_internal(): (vector<u8>, vector<u8>);
 
     #[test_only]
-    /// Generates a BLS signature for a message with a signing key.
     native fun sign_internal(sk: vector<u8>, msg: vector<u8>): vector<u8>;
 
     #[test_only]
-    /// Generates a proof-of-possession (PoP) for the public key associated with the secret key `sk`.
     native fun generate_proof_of_possession_internal(sk: vector<u8>): vector<u8>;
 
 
@@ -424,6 +421,7 @@ module aptos_std::bls12381 {
     }
 
     #[test_only]
+    /// Generates a proof-of-possession (PoP) for the public key associated with the secret key `sk`.
     public fun generate_proof_of_possession(sk: &SecretKey): ProofOfPossession {
         ProofOfPossession {
             bytes: generate_proof_of_possession_internal(sk.bytes)
