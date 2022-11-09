@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::{convert::Infallible, sync::Arc};
 
 use crate::clients::big_query::TableWriteClient;
@@ -55,20 +55,20 @@ impl PeerStoreTuple {
 
 #[derive(Clone)]
 pub struct ClientTuple {
-    bigquery_client: TableWriteClient,
-    victoria_metrics_client: MetricsClient,
-    humio_client: HumioClient,
+    bigquery_client: Option<TableWriteClient>,
+    victoria_metrics_clients: Option<BTreeMap<String, MetricsClient>>,
+    humio_client: Option<HumioClient>,
 }
 
 impl ClientTuple {
     pub(crate) fn new(
-        bigquery_client: TableWriteClient,
-        victoria_metrics_client: MetricsClient,
-        humio_client: HumioClient,
+        bigquery_client: Option<TableWriteClient>,
+        victoria_metrics_clients: Option<BTreeMap<String, MetricsClient>>,
+        humio_client: Option<HumioClient>,
     ) -> ClientTuple {
         Self {
             bigquery_client,
-            victoria_metrics_client,
+            victoria_metrics_clients,
             humio_client,
         }
     }
@@ -113,20 +113,22 @@ impl JsonWebTokenService {
 pub struct Context {
     noise_config: Arc<noise::NoiseConfig>,
     peers: PeerStoreTuple,
-    clients: Option<ClientTuple>,
+    clients: ClientTuple,
     chain_set: HashSet<ChainId>,
     jwt_service: JsonWebTokenService,
     log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
+    peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
 }
 
 impl Context {
     pub fn new(
         private_key: x25519::PrivateKey,
         peers: PeerStoreTuple,
-        clients: Option<ClientTuple>,
+        clients: ClientTuple,
         chain_set: HashSet<ChainId>,
         jwt_service: JsonWebTokenService,
         log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
+        peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
     ) -> Self {
         Self {
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
@@ -135,6 +137,7 @@ impl Context {
             chain_set,
             jwt_service,
             log_env_map,
+            peer_identities,
         }
     }
 
@@ -154,16 +157,25 @@ impl Context {
         &self.jwt_service
     }
 
-    pub fn metrics_client(&self) -> &MetricsClient {
-        &self.clients.as_ref().unwrap().victoria_metrics_client
+    pub fn metrics_client(&self) -> &BTreeMap<String, MetricsClient> {
+        self.clients.victoria_metrics_clients.as_ref().unwrap()
+    }
+
+    #[cfg(test)]
+    pub fn metrics_client_mut(&mut self) -> &mut BTreeMap<String, MetricsClient> {
+        self.clients.victoria_metrics_clients.as_mut().unwrap()
     }
 
     pub fn humio_client(&self) -> &HumioClient {
-        &self.clients.as_ref().unwrap().humio_client
+        self.clients.humio_client.as_ref().unwrap()
     }
 
     pub(crate) fn bigquery_client(&self) -> Option<&TableWriteClient> {
-        self.clients.as_ref().map(|c| &c.bigquery_client)
+        self.clients.bigquery_client.as_ref()
+    }
+
+    pub(crate) fn peer_identities(&self) -> &HashMap<ChainId, HashMap<PeerId, String>> {
+        &self.peer_identities
     }
 
     pub fn chain_set(&self) -> &HashSet<ChainId> {

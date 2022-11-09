@@ -69,13 +69,37 @@ pub mod common {
     }
 }
 
-pub mod index {
+pub mod response {
     use aptos_crypto::x25519;
+    use reqwest::StatusCode;
     use serde::{Deserialize, Serialize};
+
+    use crate::errors::ServiceError;
 
     #[derive(Serialize, Deserialize)]
     pub struct IndexResponse {
         pub public_key: x25519::PublicKey,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct ErrorResponse {
+        code: u16,
+        message: String,
+    }
+
+    impl ErrorResponse {
+        pub fn new(code: StatusCode, message: String) -> Self {
+            Self {
+                code: code.as_u16(),
+                message,
+            }
+        }
+    }
+
+    impl From<&ServiceError> for ErrorResponse {
+        fn from(err: &ServiceError) -> Self {
+            Self::new(err.http_status_code(), err.to_string())
+        }
     }
 }
 

@@ -21,6 +21,8 @@ export class AuthenticationKey {
 
   static readonly ED25519_SCHEME: number = 0;
 
+  static readonly DERIVE_RESOURCE_ACCOUNT_SCHEME: number = 255;
+
   readonly bytes: Bytes;
 
   constructor(bytes: Bytes) {

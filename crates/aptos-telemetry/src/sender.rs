@@ -12,7 +12,7 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::debug;
 use aptos_telemetry_service::types::{
     auth::{AuthRequest, AuthResponse},
-    index::IndexResponse,
+    response::IndexResponse,
     telemetry::TelemetryDump,
 };
 use aptos_types::{chain_id::ChainId, PeerId};
