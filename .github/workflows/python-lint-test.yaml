@@ -32,6 +32,14 @@ jobs:
           python testsuite/determinator.py changed-files --github-output-key SHOULD_RUN --pattern 'testsuite/.*py' ${{steps.changed-files.outputs.all_changed_files }}
         id: should-run-tests
 
+      - name: Run python lint
+        if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
+        run: flake8 --filename testsuite/**/*.py
+
+      - name: Run python fmt
+        if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
+        run: black --check --diff testsuite
+
       - name: Run python unit tests
         if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
         run: python -m unittest testsuite/*test*.py
