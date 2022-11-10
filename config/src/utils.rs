@@ -20,7 +20,7 @@ use std::time::Duration;
 use std::{env, fs, thread};
 
 const MAX_PORT_RETRIES: u16 = 1000;
-// Intersection of Linux and Mac OS
+// Using non-ephemeral ports, to avoid conflicts with OS-selected ports (i.e., bind on port 0)
 const UNIQUE_PORT_RANGE: Range<u16> = 10000..30000;
 // Consistent seed across processes
 const PORT_SEED: [u8; 32] = [
@@ -74,7 +74,7 @@ pub fn get_available_port() -> u16 {
 /// Callers should be able to bind to this port given they use SO_REUSEADDR.
 fn get_random_port() -> u16 {
     for _ in 0..MAX_PORT_RETRIES {
-        if let Ok(port) = get_ephemeral_port() {
+        if let Ok(port) = try_bind(None) {
             return port;
         }
     }
@@ -82,9 +82,14 @@ fn get_random_port() -> u16 {
     panic!("Error: could not find an available port");
 }
 
-fn get_ephemeral_port() -> ::std::io::Result<u16> {
-    // Request a random available port from the OS
-    let listener = TcpListener::bind(("localhost", 0))?;
+fn try_bind(port: Option<u16>) -> ::std::io::Result<u16> {
+    // Use the provided port or 0 to request a random available port from the OS
+    let port = if let Some(provided_port) = port {
+        provided_port
+    } else {
+        0
+    };
+    let listener = TcpListener::bind(("localhost", port))?;
     let addr = listener.local_addr()?;
 
     // Create and accept a connection (which we'll promptly drop) in order to force the port
@@ -180,7 +185,7 @@ fn bind_port_from_counter(mut counter: u16) -> (u16, u16) {
             counter = 0;
         }
 
-        match try_bind(port) {
+        match try_bind(Some(port)) {
             Ok(port) => {
                 return (port, counter);
             }
@@ -198,20 +203,6 @@ fn bind_port_from_counter(mut counter: u16) -> (u16, u16) {
         "Error: could not find an available port. Counter: {}",
         counter
     );
-}
-
-fn try_bind(port: u16) -> ::std::io::Result<u16> {
-    // Request a random available port from the OS
-    let listener = TcpListener::bind(("localhost", port))?;
-    let addr = listener.local_addr()?;
-
-    // Create and accept a connection (which we'll promptly drop) in order to force the port
-    // into the TIME_WAIT state, ensuring that the port will be reserved from some limited
-    // amount of time (roughly 60s on some Linux systems)
-    let _sender = TcpStream::connect(addr)?;
-    let _incoming = listener.accept()?;
-
-    Ok(addr.port())
 }
 
 /// Extracts one local non-loopback IP address, if one exists. Otherwise returns None.
