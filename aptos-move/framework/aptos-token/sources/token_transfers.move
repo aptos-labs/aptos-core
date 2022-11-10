@@ -231,7 +231,7 @@ module aptos_token::token_transfers {
         use std::string::{Self, String};
 
         let collection_name = string::utf8(b"Hello, World");
-        let collection_mutation_setting = vector<bool>[false, false, false];
+        let collection_mutation_setting = vector<bool>[false, false, false, false];
         aptos_framework::account::create_account_for_test(signer::address_of(creator));
 
         token::create_collection(

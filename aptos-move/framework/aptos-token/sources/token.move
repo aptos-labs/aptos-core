@@ -27,6 +27,7 @@ module aptos_token::token {
     const COLLECTION_DESCRIPTION_MUTABLE_IND: u64 = 0;
     const COLLECTION_URI_MUTABLE_IND: u64 = 1;
     const COLLECTION_MAX_MUTABLE_IND: u64 = 2;
+    const COLLECTION_FROZEN_MUTABLE_IND: u64 = 3;
 
     const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
     const MAX_NFT_NAME_LENGTH: u64 = 128;
@@ -141,6 +142,9 @@ module aptos_token::token {
     /// Collection or tokendata maximum must be larger than supply
     const EINVALID_MAXIMUM: u64 = 36;
 
+    /// Collection is frozen
+    const ECOLLECTION_IS_FROZEN: u64 = 37;
+
     //
     // Core data structures for holding tokens
     //
@@ -236,6 +240,8 @@ module aptos_token::token {
         uri: bool,
         // control if collection maxium is mutable
         maximum: bool,
+        // control if collection is frozen
+        frozen: bool,
     }
 
     /// Represent collection and token metadata for a creator
@@ -260,6 +266,8 @@ module aptos_token::token {
         // If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum
         // If maximal is 0, Aptos doesn't track the supply of this collection, and there is no limit
         maximum: u64,
+        // If the collection is frozen,the tokens cannot be transferred.
+        frozen: bool,
         // control which collectionData field is mutable
         mutability_config: CollectionMutabilityConfig,
     }
@@ -459,7 +467,7 @@ module aptos_token::token {
         name: String,
         property_version: u64,
         amount: u64,
-    ) acquires TokenStore {
+    ) acquires TokenStore, Collections {
         let token_id = create_token_id_raw(creators_address, collection, name, property_version);
         direct_transfer(sender, receiver, token_id, amount);
     }
@@ -481,7 +489,7 @@ module aptos_token::token {
         token_property_version: u64,
         to: address,
         amount: u64,
-    ) acquires TokenStore {
+    ) acquires TokenStore, Collections {
         let token_id = create_token_id_raw(creator, collection_name, token_name, token_property_version);
         transfer(from, token_id, to, amount);
     }
@@ -592,7 +600,11 @@ module aptos_token::token {
         assert!(burn_by_owner_flag, error::permission_denied(EOWNER_CANNOT_BURN_TOKEN));
 
         // Burn the tokens.
-        let Token { id: _, amount: burned_amount, token_properties: _ } = withdraw_token(owner, token_id, amount);
+        let Token { id: _, amount: burned_amount, token_properties: _ } = withdraw_with_event_internal(
+            signer::address_of(owner),
+            token_id,
+            amount
+        );
         let token_store = borrow_global_mut<TokenStore>(signer::address_of(owner));
         event::emit_event<BurnTokenEvent>(
             &mut token_store.burn_events,
@@ -663,6 +675,14 @@ module aptos_token::token {
         assert!(maximum >= collection_data.supply, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(collection_data.mutability_config.maximum, error::permission_denied(EFIELD_NOT_MUTABLE));
         collection_data.maximum = maximum;
+    }
+
+    public fun mutate_collection_frozen(creator: &signer, collection_name: String, frozen: bool) acquires Collections {
+        let creator_address = signer::address_of(creator);
+        assert_collection_exists(creator_address, collection_name);
+        let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
+        assert!(collection_data.mutability_config.frozen, error::permission_denied(EFIELD_NOT_MUTABLE));
+        collection_data.frozen = frozen;
     }
 
     // Functions for mutating TokenData fields
@@ -831,7 +851,7 @@ module aptos_token::token {
         receiver: &signer,
         token_id: TokenId,
         amount: u64,
-    ) acquires TokenStore {
+    ) acquires TokenStore, Collections {
         let token = withdraw_token(sender, token_id, amount);
         deposit_token(receiver, token);
     }
@@ -880,7 +900,7 @@ module aptos_token::token {
         id: TokenId,
         to: address,
         amount: u64,
-    ) acquires TokenStore {
+    ) acquires TokenStore, Collections {
         let opt_in_transfer = borrow_global<TokenStore>(to).direct_transfer;
         assert!(opt_in_transfer, error::permission_denied(EUSER_NOT_OPT_IN_DIRECT_TRANSFER));
         let token = withdraw_token(from, id, amount);
@@ -906,9 +926,17 @@ module aptos_token::token {
     /// Withdraw the token with a capability
     public fun withdraw_with_capability(
         withdraw_proof: WithdrawCapability,
-    ): Token acquires TokenStore {
+    ): Token acquires TokenStore, Collections {
         // verify the delegation hasn't expired yet
         assert!(timestamp::now_seconds() <= *&withdraw_proof.expiration_sec, error::invalid_argument(EWITHDRAW_PROOF_EXPIRES));
+        // Make sure the collection is not frozen.
+        assert!(
+            !get_collection_frozen(
+                withdraw_proof.token_id.token_data_id.creator,
+                withdraw_proof.token_id.token_data_id.collection
+            ),
+            error::unavailable(ECOLLECTION_IS_FROZEN),
+        );
 
         withdraw_with_event_internal(
             withdraw_proof.token_owner,
@@ -921,7 +949,13 @@ module aptos_token::token {
         account: &signer,
         id: TokenId,
         amount: u64,
-    ): Token acquires TokenStore {
+    ): Token acquires TokenStore, Collections {
+        // Make sure the collection is not frozen.
+        assert!(
+            !get_collection_frozen(id.token_data_id.creator, id.token_data_id.collection),
+            error::unavailable(ECOLLECTION_IS_FROZEN),
+        );
+
         let account_addr = signer::address_of(account);
         withdraw_with_event_internal(account_addr, id, amount)
     }
@@ -965,6 +999,7 @@ module aptos_token::token {
             uri,
             supply: 0,
             maximum,
+            frozen: false,
             mutability_config
         };
 
@@ -1119,6 +1154,12 @@ module aptos_token::token {
         collection_data.maximum
     }
 
+    public fun get_collection_frozen(creator_address: address, collection_name: String): bool acquires Collections {
+        assert_collection_exists(creator_address, collection_name);
+        let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
+        collection_data.frozen
+    }
+
     /// return the number of distinct token_id created under this TokenData
     public fun get_token_supply(creator_address: address, token_data_id: TokenDataId): Option<u64> acquires Collections {
         assert!(exists<Collections>(creator_address), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
@@ -1161,6 +1202,7 @@ module aptos_token::token {
             description: *vector::borrow(mutate_setting, COLLECTION_DESCRIPTION_MUTABLE_IND),
             uri: *vector::borrow(mutate_setting, COLLECTION_URI_MUTABLE_IND),
             maximum: *vector::borrow(mutate_setting, COLLECTION_MAX_MUTABLE_IND),
+            frozen: *vector::borrow(mutate_setting, COLLECTION_FROZEN_MUTABLE_IND),
         }
     }
 
@@ -1408,6 +1450,7 @@ module aptos_token::token {
             uri: _,
             supply: _,
             maximum: _,
+            frozen: _,
             mutability_config: _,
         } = collection_data;
     }
@@ -1516,7 +1559,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
 
@@ -1539,7 +1582,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
 
@@ -1564,7 +1607,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         let default_keys = vector<String>[ string::utf8(b"attack"), string::utf8(b"num_of_use") ];
@@ -1604,7 +1647,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         assert!(balance_of(signer::address_of(&owner), token_id) == 0, 1);
@@ -1685,7 +1728,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         let collections = borrow_global<Collections>(signer::address_of(&creator));
@@ -1704,7 +1747,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         let token_data_id = create_token_data_id(
@@ -1721,7 +1764,7 @@ module aptos_token::token {
         assert!(balance_of(signer::address_of(creator), token_id) == 3, 1);
     }
 
-    #[test(creator = @0xAF, owner = @0xBB)]
+    #[test(creator = @0xAF)]
     fun test_mutate_token_property_upsert(creator: &signer) acquires Collections, TokenStore {
         use std::bcs;
         account::create_account_for_test(signer::address_of(creator));
@@ -1735,7 +1778,7 @@ module aptos_token::token {
             vector<String>[string::utf8(TOKEN_PROPERTY_MUTABLE)],
             vector<vector<u8>>[bcs::to_bytes<bool>(&true)],
             vector<String>[string::utf8(b"bool")],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         assert!(token_id.property_version == 0, 1);
@@ -1764,7 +1807,7 @@ module aptos_token::token {
         );
     }
 
-    #[test(creator = @0xAF, owner = @0xBB)]
+    #[test(creator = @0xAF)]
     fun test_get_property_map_should_not_update_source_value(creator: &signer) acquires Collections, TokenStore {
         use std::bcs;
         account::create_account_for_test(signer::address_of(creator));
@@ -1778,7 +1821,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, true],
         );
         assert!(token_id.property_version == 0, 1);
@@ -1827,7 +1870,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
 
@@ -1863,7 +1906,7 @@ module aptos_token::token {
             vector<String>[string::utf8(BURNABLE_BY_CREATOR)],
             vector<vector<u8>>[bcs::to_bytes<bool>(&true)],
             vector<String>[string::utf8(b"bool")],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         // burn token from limited token
@@ -1883,7 +1926,7 @@ module aptos_token::token {
             vector<String>[string::utf8(BURNABLE_BY_OWNER)],
             vector<vector<u8>>[bcs::to_bytes<bool>(&true)],
             vector<String>[string::utf8(b"bool")],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         let pre = balance_of(new_addr, new_token_id);
@@ -1909,7 +1952,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         let owner_addr = signer::address_of(owner);
@@ -1935,7 +1978,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         let owner_addr = signer::address_of(owner);
@@ -1961,7 +2004,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         let owner_addr = signer::address_of(owner);
@@ -1976,7 +2019,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         opt_in_direct_transfer(owner, true);
@@ -2001,7 +2044,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
 
@@ -2028,7 +2071,7 @@ module aptos_token::token {
             vector<String>[string::utf8(BURNABLE_BY_CREATOR), string::utf8(BURNABLE_BY_OWNER)],
             vector<vector<u8>>[bcs::to_bytes<bool>(&true), bcs::to_bytes<bool>(&true)],
             vector<String>[string::utf8(b"bool"), string::utf8(b"bool")],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
         opt_in_direct_transfer(owner, true);
@@ -2059,7 +2102,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[true, false, false],
+            vector<bool>[true, false, false, false],
             vector<bool>[false, false, false, false, false],
         );
 
@@ -2083,7 +2126,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, true, false],
+            vector<bool>[false, true, false, false],
             vector<bool>[false, false, false, false, false],
         );
 
@@ -2107,16 +2150,63 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, true],
+            vector<bool>[false, false, false, true],
             vector<bool>[false, false, false, false, false],
         );
 
         let collection_name = get_collection_name();
-        mutate_collection_maximum(creator, collection_name, 10);
-        assert!(get_collection_maximum(creator_address, collection_name) == 10, 1);
+        mutate_collection_frozen(creator, collection_name, true);
+        assert!(get_collection_frozen(creator_address, collection_name), 1);
     }
 
-    #[test(creator = @0xcafe, owner = @0x456)]
+    #[test(creator = @0xcafe)]
+    fun test_mutate_collection_frozen(
+        creator: &signer,
+    ) acquires Collections, TokenStore {
+        let creator_address = signer::address_of(creator);
+        account::create_account_for_test(creator_address);
+        create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false, true],
+            vector<bool>[false, false, false, false, false],
+        );
+
+        let collection_name = get_collection_name();
+        mutate_collection_frozen(creator, collection_name, true);
+        assert!(get_collection_frozen(creator_address, collection_name), 1);
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 852005)]
+    fun test_withdraw_when_collection_is_frozen(creator: &signer): Token acquires Collections, TokenStore {
+        let creator_address = signer::address_of(creator);
+        account::create_account_for_test(creator_address);
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false, true],
+            vector<bool>[false, false, false, false, false],
+        );
+
+        let collection_name = get_collection_name();
+        mutate_collection_frozen(creator, collection_name, true);
+        assert!(get_collection_frozen(creator_address, collection_name), 1);
+
+        withdraw_token(creator, token_id, 1)
+    }
+
+    #[test(creator = @0xcafe)]
     fun test_mutate_default_token_properties(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2132,7 +2222,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, true],
         );
         assert!(token_id.property_version == 0, 1);
@@ -2173,7 +2263,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[true, false, false, false, false],
         );
         mutate_tokendata_maximum(creator, token_id.token_data_id, 10);
@@ -2194,7 +2284,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[true, false, false, false, false],
         );
         mutate_tokendata_maximum(creator, token_id.token_data_id, 0);
@@ -2214,7 +2304,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, true, false, false, false],
         );
         mutate_tokendata_uri(creator, token_id.token_data_id, string::utf8(b""));
@@ -2234,7 +2324,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, true, false, false],
         );
 
@@ -2256,7 +2346,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, true, false],
         );
 
@@ -2280,7 +2370,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, false, false, false, true],
         );
         assert!(token_id.property_version == 0, 1);
@@ -2361,7 +2451,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, true, false, false, false],
         );
     }
@@ -2381,7 +2471,7 @@ module aptos_token::token {
             vector<String>[],
             vector<vector<u8>>[],
             vector<String>[],
-            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false],
             vector<bool>[false, true, false, false, false],
         );
         let token = withdraw_token(creator, token_id, 1);
