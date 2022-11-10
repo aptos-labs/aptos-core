@@ -1291,7 +1291,7 @@ class ForgeConfigTests(unittest.TestCase):
             filesystem.assert_writes(self)
             self.assertEqual(ret.exception, None)
             self.assertEqual(ret.exit_code, 0)
-            assert(ret.stdout_bytes.decode("utf-8").strip())
+            assert ret.stdout_bytes.decode("utf-8").strip()
             self.assertEqual(
                 ret.stdout_bytes.decode("utf-8").strip(),
                 config_fixture_preview.read_bytes().decode("utf-8").strip(),

@@ -51,10 +51,10 @@ class RunResult:
         return self.exit_code == 0
 
 
-def get_prompt_answer(prompt: str, answer: Optional[str]=None) -> bool:
+def get_prompt_answer(prompt: str, answer: Optional[str] = None) -> bool:
     """Get a yes/no answer from the user, or use the default answer if provided."""
     if not answer and not os.getenv("CI"):
-        answer = input(f"{prompt} (y/n) ").strip().lower() 
+        answer = input(f"{prompt} (y/n) ").strip().lower()
     return answer in ("y", "yes", "yeet", "yessir", "si", "true")
 
 
@@ -1670,7 +1670,10 @@ def ensure_forge_config(value: Any) -> ForgeConfigValue:
         raise Exception("Type had errors:\n" + "\n".join(errors))
     return value
 
-def get_forge_config_diff(old_config: dict, new_config: dict, full_diff: Optional[bool]=False) -> list:
+
+def get_forge_config_diff(
+    old_config: dict, new_config: dict, full_diff: Optional[bool] = False
+) -> list:
     """Returns a list of diffs between the old and new config"""
     config_string = json.dumps(new_config, indent=2)
     old_config_string = json.dumps(old_config, indent=2)
@@ -1681,6 +1684,7 @@ def get_forge_config_diff(old_config: dict, new_config: dict, full_diff: Optiona
         return diff.compare(old_lines, new_lines)
     else:
         return difflib.unified_diff(old_lines, new_lines)
+
 
 class ForgeConfigBackend:
     def create(self) -> None:
@@ -2321,6 +2325,7 @@ def test_config_enable(
     else:
         print("Config not updated")
 
+
 @test_config.command("disable")
 @click.argument("suite_name")
 @click.argument("test_name")
@@ -2360,6 +2365,7 @@ def test_config_disable(
         config.flush()
     else:
         print("Config not updated")
+
 
 if __name__ == "__main__":
     main()
