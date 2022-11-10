@@ -73,4 +73,11 @@ module aptos_framework::gas_schedule {
         // transaction.
         reconfiguration::reconfigure();
     }
+
+    public fun set_free_quota(aptos_framework: &signer, free_read_in_bytes: u64, free_write_in_bytes: u64) {
+        storage_gas::set_free_quota(aptos_framework, free_read_in_bytes, free_write_in_bytes);
+        // Need to trigger reconfiguration so the VM is guaranteed to load the new gas fee starting from the next
+        // transaction.
+        reconfiguration::reconfigure();
+    }
 }

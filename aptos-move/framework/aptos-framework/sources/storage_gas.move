@@ -147,11 +147,12 @@
 ///
 /// The below index is automatically generated from source code:
 module aptos_framework::storage_gas {
-
     use aptos_framework::system_addresses;
     use std::error;
     use aptos_framework::state_storage;
     use std::vector;
+    #[test_only]
+    use std::signer;
 
     friend aptos_framework::gas_schedule;
     friend aptos_framework::genesis;
@@ -164,6 +165,7 @@ module aptos_framework::storage_gas {
     const ETARGET_USAGE_TOO_BIG: u64 = 4;
     const EINVALID_MONOTONICALLY_NON_DECREASING_CURVE: u64 = 5;
     const EINVALID_POINT_RANGE: u64 = 6;
+    const EFREE_GAS_QUOTA: u64 = 7;
 
     const BASIS_POINT_DENOMINATION: u64 = 10000;
 
@@ -193,6 +195,12 @@ module aptos_framework::storage_gas {
         per_byte_create: u64,
         /// Cost to overwrite a byte in global storage.
         per_byte_write: u64,
+    }
+
+    /// The quota in bytes that is free of storage gas charge.
+    struct FreeGasQuota has key {
+        bytes_read: u64,
+        bytes_write: u64,
     }
 
     /// A point in a Eulerian curve approximation, with each coordinate
@@ -362,7 +370,24 @@ module aptos_framework::storage_gas {
 
     public(friend) fun set_config(aptos_framework: &signer, config: StorageGasConfig) acquires StorageGasConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(
+            exists<StorageGasConfig>(@aptos_framework),
+            error::not_found(ESTORAGE_GAS_CONFIG)
+        );
         *borrow_global_mut<StorageGasConfig>(@aptos_framework) = config;
+    }
+
+    public(friend) fun set_free_quota(aptos_framework: &signer, bytes_read: u64, bytes_write: u64) acquires FreeGasQuota {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        if (!exists<FreeGasQuota>(@aptos_framework)) {
+            move_to(aptos_framework, FreeGasQuota {
+                bytes_read: 0,
+                bytes_write: 1000,
+            });
+        };
+        let free_quota = borrow_global_mut<FreeGasQuota>(@aptos_framework);
+        free_quota.bytes_read = bytes_read;
+        free_quota.bytes_write = bytes_write;
     }
 
     /// Initialize per-item and per-byte gas prices.
@@ -424,6 +449,15 @@ module aptos_framework::storage_gas {
             per_byte_read: 300,
             per_byte_create: 5 * k,
             per_byte_write: 5 * k,
+        });
+
+        assert!(
+            !exists<FreeGasQuota>(@aptos_framework),
+            error::already_exists(EFREE_GAS_QUOTA)
+        );
+        move_to(aptos_framework, FreeGasQuota {
+            bytes_read: 0,
+            bytes_write: 1 * k,
         });
     }
 
@@ -535,11 +569,14 @@ module aptos_framework::storage_gas {
     // TODO: reactivate this test after fixing assertions
     //#[test(framework = @aptos_framework)]
     #[test_only]
-    fun test_initialize_and_reconfig(framework: signer) acquires StorageGas, StorageGasConfig {
+    fun test_initialize_and_reconfig(framework: signer) acquires StorageGas, StorageGasConfig, FreeGasQuota {
         state_storage::initialize(&framework);
         initialize(&framework);
+        let free_quota = borrow_global<FreeGasQuota>(signer::address_of(&framework));
+        assert!(free_quota.bytes_read == 10, 0);
+        assert!(free_quota.bytes_write == 1000, 0);
         on_reconfig();
-        let gas_parameter = borrow_global<StorageGas>(@aptos_framework);
+        let gas_parameter = borrow_global<StorageGas>(signer::address_of(&framework));
         assert!(gas_parameter.per_item_read == 10, 0);
         assert!(gas_parameter.per_item_create == 10, 0);
         assert!(gas_parameter.per_item_write == 10, 0);
@@ -571,6 +608,14 @@ module aptos_framework::storage_gas {
     }
 
     #[test(framework = @aptos_framework)]
+    fun test_set_free_quota(framework: signer) acquires FreeGasQuota {
+        set_free_quota(&framework, 123, 321);
+        let free_quota = borrow_global<FreeGasQuota>(signer::address_of(&framework));
+        assert!(free_quota.bytes_read == 123, 0);
+        assert!(free_quota.bytes_write == 321, 0);
+    }
+
+    #[test(framework = @aptos_framework)]
     fun test_set_storage_gas_config(framework: signer) acquires StorageGas, StorageGasConfig {
         state_storage::initialize(&framework);
         initialize(&framework);
@@ -585,28 +630,28 @@ module aptos_framework::storage_gas {
         {
             state_storage::set_for_test(0, 20, 100);
             on_reconfig();
-            let gas_parameter = borrow_global<StorageGas>(@aptos_framework);
+            let gas_parameter = borrow_global<StorageGas>(signer::address_of(&framework));
             assert!(gas_parameter.per_item_read == 1000, 0);
             assert!(gas_parameter.per_byte_read == 30, 0);
         };
         {
             state_storage::set_for_test(0, 40, 800);
             on_reconfig();
-            let gas_parameter = borrow_global<StorageGas>(@aptos_framework);
+            let gas_parameter = borrow_global<StorageGas>(signer::address_of(&framework));
             assert!(gas_parameter.per_item_create == 1250, 0);
             assert!(gas_parameter.per_byte_create == 240, 0);
         };
         {
             state_storage::set_for_test(0, 60, 1200);
             on_reconfig();
-            let gas_parameter = borrow_global<StorageGas>(@aptos_framework);
+            let gas_parameter = borrow_global<StorageGas>(signer::address_of(&framework));
             assert!(gas_parameter.per_item_write == 1500, 0);
             assert!(gas_parameter.per_byte_write == 440, 0);
         };
         {
             state_storage::set_for_test(0, 90, 1800);
             on_reconfig();
-            let gas_parameter = borrow_global<StorageGas>(@aptos_framework);
+            let gas_parameter = borrow_global<StorageGas>(signer::address_of(&framework));
             assert!(gas_parameter.per_item_create == 1750, 0);
             assert!(gas_parameter.per_byte_create == 860, 0);
         };
@@ -614,7 +659,7 @@ module aptos_framework::storage_gas {
             // usage overflow case
             state_storage::set_for_test(0, 110, 2200);
             on_reconfig();
-            let gas_parameter = borrow_global<StorageGas>(@aptos_framework);
+            let gas_parameter = borrow_global<StorageGas>(signer::address_of(&framework));
             assert!(gas_parameter.per_item_read == 2000, 0);
             assert!(gas_parameter.per_byte_read == 1000, 0);
         };

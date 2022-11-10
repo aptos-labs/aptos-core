@@ -14,6 +14,7 @@ it costs to execute Move on the network.
 -  [Function `initialize`](#0x1_gas_schedule_initialize)
 -  [Function `set_gas_schedule`](#0x1_gas_schedule_set_gas_schedule)
 -  [Function `set_storage_gas_config`](#0x1_gas_schedule_set_storage_gas_config)
+-  [Function `set_free_quota`](#0x1_gas_schedule_set_free_quota)
 -  [Specification](#@Specification_1)
     -  [Function `set_gas_schedule`](#@Specification_1_set_gas_schedule)
     -  [Function `set_storage_gas_config`](#@Specification_1_set_storage_gas_config)
@@ -240,6 +241,33 @@ This can be called by on-chain governance to update the gas schedule.
 
 <pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_storage_gas_config">set_storage_gas_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: StorageGasConfig) {
     <a href="storage_gas.md#0x1_storage_gas_set_config">storage_gas::set_config</a>(aptos_framework, config);
+    // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so the VM is guaranteed <b>to</b> load the new gas fee starting from the next
+    // transaction.
+    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_gas_schedule_set_free_quota"></a>
+
+## Function `set_free_quota`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_free_quota">set_free_quota</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, free_read_in_bytes: u64, free_write_in_bytes: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_free_quota">set_free_quota</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, free_read_in_bytes: u64, free_write_in_bytes: u64) {
+    <a href="storage_gas.md#0x1_storage_gas_set_free_quota">storage_gas::set_free_quota</a>(aptos_framework, free_read_in_bytes, free_write_in_bytes);
     // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so the VM is guaranteed <b>to</b> load the new gas fee starting from the next
     // transaction.
     <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();

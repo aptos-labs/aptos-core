@@ -214,6 +214,7 @@ The below index is automatically generated from source code:
     -  [Setting configurations](#@Setting_configurations_10)
 -  [Complete docgen index](#@Complete_docgen_index_11)
 -  [Resource `StorageGas`](#0x1_storage_gas_StorageGas)
+-  [Resource `FreeGasQuota`](#0x1_storage_gas_FreeGasQuota)
 -  [Struct `Point`](#0x1_storage_gas_Point)
 -  [Struct `UsageGasConfig`](#0x1_storage_gas_UsageGasConfig)
 -  [Struct `GasCurve`](#0x1_storage_gas_GasCurve)
@@ -228,6 +229,7 @@ The below index is automatically generated from source code:
 -  [Function `new_usage_gas_config`](#0x1_storage_gas_new_usage_gas_config)
 -  [Function `new_storage_gas_config`](#0x1_storage_gas_new_storage_gas_config)
 -  [Function `set_config`](#0x1_storage_gas_set_config)
+-  [Function `set_free_quota`](#0x1_storage_gas_set_free_quota)
 -  [Function `initialize`](#0x1_storage_gas_initialize)
 -  [Function `validate_points`](#0x1_storage_gas_validate_points)
 -  [Function `calculate_gas`](#0x1_storage_gas_calculate_gas)
@@ -315,6 +317,40 @@ first transaction of an epoch.
 </dt>
 <dd>
  Cost to overwrite a byte in global storage.
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_storage_gas_FreeGasQuota"></a>
+
+## Resource `FreeGasQuota`
+
+The quota in bytes that is free of storage gas charge.
+
+
+<pre><code><b>struct</b> <a href="storage_gas.md#0x1_storage_gas_FreeGasQuota">FreeGasQuota</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>bytes_read: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>bytes_write: u64</code>
+</dt>
+<dd>
+
 </dd>
 </dl>
 
@@ -526,6 +562,15 @@ Gas configurations for per-item and per-byte prices.
 
 
 <pre><code><b>const</b> <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>: u64 = 10000;
+</code></pre>
+
+
+
+<a name="0x1_storage_gas_EFREE_GAS_QUOTA"></a>
+
+
+
+<pre><code><b>const</b> <a href="storage_gas.md#0x1_storage_gas_EFREE_GAS_QUOTA">EFREE_GAS_QUOTA</a>: u64 = 7;
 </code></pre>
 
 
@@ -824,7 +869,44 @@ Which means that the price above <code>min_gas</code> is approximately
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="storage_gas.md#0x1_storage_gas_set_config">set_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>) <b>acquires</b> <a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@aptos_framework),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="storage_gas.md#0x1_storage_gas_ESTORAGE_GAS_CONFIG">ESTORAGE_GAS_CONFIG</a>)
+    );
     *<b>borrow_global_mut</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@aptos_framework) = config;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_storage_gas_set_free_quota"></a>
+
+## Function `set_free_quota`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="storage_gas.md#0x1_storage_gas_set_free_quota">set_free_quota</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, bytes_read: u64, bytes_write: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="storage_gas.md#0x1_storage_gas_set_free_quota">set_free_quota</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, bytes_read: u64, bytes_write: u64) <b>acquires</b> <a href="storage_gas.md#0x1_storage_gas_FreeGasQuota">FreeGasQuota</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>if</b> (!<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_FreeGasQuota">FreeGasQuota</a>&gt;(@aptos_framework)) {
+        <b>move_to</b>(aptos_framework, <a href="storage_gas.md#0x1_storage_gas_FreeGasQuota">FreeGasQuota</a> {
+            bytes_read: 0,
+            bytes_write: 1000,
+        });
+    };
+    <b>let</b> free_quota = <b>borrow_global_mut</b>&lt;<a href="storage_gas.md#0x1_storage_gas_FreeGasQuota">FreeGasQuota</a>&gt;(@aptos_framework);
+    free_quota.bytes_read = bytes_read;
+    free_quota.bytes_write = bytes_write;
 }
 </code></pre>
 
@@ -906,6 +988,15 @@ target utilization.
         per_byte_read: 300,
         per_byte_create: 5 * k,
         per_byte_write: 5 * k,
+    });
+
+    <b>assert</b>!(
+        !<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_FreeGasQuota">FreeGasQuota</a>&gt;(@aptos_framework),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="storage_gas.md#0x1_storage_gas_EFREE_GAS_QUOTA">EFREE_GAS_QUOTA</a>)
+    );
+    <b>move_to</b>(aptos_framework, <a href="storage_gas.md#0x1_storage_gas_FreeGasQuota">FreeGasQuota</a> {
+        bytes_read: 0,
+        bytes_write: 1 * k,
     });
 }
 </code></pre>
