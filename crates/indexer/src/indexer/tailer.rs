@@ -294,7 +294,7 @@ pub async fn await_tasks<T: Debug>(tasks: Vec<JoinHandle<T>>) -> Vec<T> {
     for task in tasks {
         let result = task.await;
         match result {
-            Ok(_) => results.push(result.unwrap()),
+            Ok(e) => results.push(e),
             Err(err) => {
                 panic!("Error joining task: {:?}", err);
             }

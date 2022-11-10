@@ -11,6 +11,7 @@ extern crate diesel_migrations;
 #[macro_use]
 extern crate diesel;
 
+pub mod bigquery_client;
 pub mod counters;
 pub mod database;
 pub mod indexer;

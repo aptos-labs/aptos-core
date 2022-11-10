@@ -1,0 +1,77 @@
+[
+  {
+    "name": "version",
+    "type": "INTEGER",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "block_height",
+    "type": "INTEGER",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "hash",
+    "type": "BYTES",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "type_str",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "payload",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "state_change_hash",
+    "type": "BYTES",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "event_root_hash",
+    "type": "BYTES",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "state_checkpoint_hash",
+    "type": "BYTES",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gas_used",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "success",
+    "type": "BOOLEAN",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "vm_status",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "accumulator_root_hash",
+    "type": "BYTES",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "num_events",
+    "type": "INTEGER",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "num_write_set_changes",
+    "type": "INTEGER",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "epoch",
+    "type": "INTEGER",
+    "mode": "REQUIRED"
+  }
+]

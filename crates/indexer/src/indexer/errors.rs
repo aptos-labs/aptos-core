@@ -13,6 +13,8 @@ pub enum TransactionProcessingError {
     ConnectionPoolError(ErrorWithVersionAndName),
     /// Could not commit the transaction
     TransactionCommitError(ErrorWithVersionAndName),
+    /// Could not commit the transaction to BigQuery
+    BigQueryTransactionCommitError(ErrorWithVersionAndName),
 }
 
 impl TransactionProcessingError {
@@ -20,6 +22,7 @@ impl TransactionProcessingError {
         match self {
             TransactionProcessingError::ConnectionPoolError(ewv) => ewv,
             TransactionProcessingError::TransactionCommitError(ewv) => ewv,
+            TransactionProcessingError::BigQueryTransactionCommitError(ewv) => ewv,
         }
     }
 }

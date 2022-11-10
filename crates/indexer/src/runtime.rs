@@ -8,12 +8,11 @@ use crate::{
         transaction_processor::TransactionProcessor,
     },
     processors::{
-        coin_processor::CoinTransactionProcessor, default_processor::DefaultTransactionProcessor,
-        stake_processor::StakeTransactionProcessor, token_processor::TokenTransactionProcessor,
-        Processor,
+        coin_processor::CoinTransactionProcessor, data_ingestion_processor::DataIngestionProcessor,
+        default_processor::DefaultTransactionProcessor, stake_processor::StakeTransactionProcessor,
+        token_processor::TokenTransactionProcessor, Processor,
     },
 };
-
 use aptos_api::context::Context;
 use aptos_config::config::{IndexerConfig, NodeConfig};
 use aptos_logger::{error, info};
@@ -128,9 +127,10 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         "Created the connection pool... "
     );
 
+    let processor_enum = Processor::from_string(&processor_name);
+
     info!(processor_name = processor_name, "Instantiating tailer... ");
 
-    let processor_enum = Processor::from_string(&processor_name);
     let processor: Arc<dyn TransactionProcessor> = match processor_enum {
         Processor::DefaultProcessor => {
             Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
@@ -141,6 +141,10 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         )),
         Processor::CoinProcessor => Arc::new(CoinTransactionProcessor::new(conn_pool.clone())),
         Processor::StakeProcessor => Arc::new(StakeTransactionProcessor::new(conn_pool.clone())),
+        Processor::DataIngestionProcessor => Arc::new(
+            DataIngestionProcessor::new(conn_pool.clone(), config.bigquery_project_id.unwrap())
+                .await,
+        ),
     };
 
     let options =

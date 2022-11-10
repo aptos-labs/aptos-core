@@ -69,6 +69,10 @@ pub struct IndexerConfig {
     /// Which address does the ans contract live at. Only available for token_processor. If null, disable ANS indexing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ans_contract_address: Option<String>,
+
+    /// Which GCP project is used for data streaming. If null, disable data ingestion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bigquery_project_id: Option<String>,
 }
 
 pub fn env_or_default<T: std::str::FromStr>(
