@@ -58,14 +58,14 @@ fn test_get_nibble() {
 #[test]
 fn test_get_nibble_from_byte_array() {
     let bytes = vec![0x12, 0x34, 0x56, 0x78];
-    let nibble_path = NibblePath::new_from_byte_array(bytes.as_slice(), 4);
+    let nibble_path = NibblePath::new_from_bytes(bytes.as_slice(), 4);
     assert_eq!(nibble_path.num_nibbles, 4);
     assert_eq!(nibble_path.get_nibble(0), Nibble::from(0x01));
     assert_eq!(nibble_path.get_nibble(1), Nibble::from(0x02));
     assert_eq!(nibble_path.get_nibble(2), Nibble::from(0x03));
     assert_eq!(nibble_path.get_nibble(3), Nibble::from(0x04));
 
-    let nibble_path = NibblePath::new_from_byte_array(bytes.as_slice(), 3);
+    let nibble_path = NibblePath::new_from_bytes(bytes.as_slice(), 3);
     assert_eq!(nibble_path.num_nibbles, 3);
     assert_eq!(nibble_path.get_nibble(0), Nibble::from(0x01));
     assert_eq!(nibble_path.get_nibble(1), Nibble::from(0x02));

@@ -7,11 +7,14 @@
 #[cfg(test)]
 mod nibble_path_test;
 
+use crate::misc::bits_to_byte;
+use crate::nibble::NIBBLE_SIZE_IN_BITS;
 use crate::{
     nibble::{Nibble, ROOT_NIBBLE_HEIGHT},
     state_store::state_key::StateKey,
 };
 use aptos_crypto::hash::CryptoHash;
+use move_core_types::gas_algebra::Byte;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{collection::vec, prelude::*};
 use serde::{Deserialize, Serialize};
@@ -20,17 +23,14 @@ use std::{fmt, iter::FromIterator};
 /// NibblePath defines a path in Merkle tree in the unit of nibble (4 bits).
 #[derive(Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct NibblePath {
-    /// Indicates the total number of nibbles in bytes. Either `bytes.len() * 2 - 1` or
-    /// `bytes.len() * 2`.
-    // Guarantees intended ordering based on the top-to-bottom declaration order of the struct's
-    // members.
-    num_nibbles: usize,
-    /// The underlying bytes that stores the path, 2 nibbles per byte. If the number of nibbles is
-    /// odd, the second half of the last byte must be 0.
-    bytes: Vec<u8>,
-    // invariant num_nibbles <= ROOT_NIBBLE_HEIGHT
+    nibbles: Vec<Nibble>,
 }
 
+impl Default for NibblePath {
+    fn default() -> Self {
+        NibblePath { nibbles: vec![] }
+    }
+}
 /// Supports debug format by concatenating nibbles literally. For example, [0x12, 0xa0] with 3
 /// nibbles will be printed as "12a".
 impl fmt::Debug for NibblePath {
@@ -42,7 +42,7 @@ impl fmt::Debug for NibblePath {
 /// Convert a vector of bytes into `NibblePath` using the lower 4 bits of each byte as nibble.
 impl FromIterator<Nibble> for NibblePath {
     fn from_iter<I: IntoIterator<Item = Nibble>>(iter: I) -> Self {
-        let mut nibble_path = NibblePath::new_even(vec![]);
+        let mut nibble_path = NibblePath::default();
         for nibble in iter {
             nibble_path.push(nibble);
         }
@@ -87,116 +87,82 @@ prop_compose! {
     }
 }
 
+pub fn byte_to_bits(byte: &u8) -> Vec<bool> {
+    (0..8)
+        .map(|i| {
+            let mask = 1 << (7 - i);
+            byte & mask != 0
+        })
+        .collect()
+}
+
 impl NibblePath {
-    /// Creates a new `NibblePath` from a vector of bytes assuming each byte has 2 nibbles.
-    pub fn new_even(bytes: Vec<u8>) -> Self {
-        assert!(bytes.len() <= ROOT_NIBBLE_HEIGHT / 2);
-        let num_nibbles = bytes.len() * 2;
-        NibblePath { num_nibbles, bytes }
-    }
-
-    /// Similar to `new()` but asserts that the bytes have one less nibble.
-    pub fn new_odd(bytes: Vec<u8>) -> Self {
-        assert!(bytes.len() <= ROOT_NIBBLE_HEIGHT / 2);
-        assert_eq!(
-            bytes.last().expect("Should have odd number of nibbles.") & 0x0f,
-            0,
-            "Last nibble must be 0."
-        );
-        let num_nibbles = bytes.len() * 2 - 1;
-        NibblePath { num_nibbles, bytes }
-    }
-
     pub fn new_from_state_key(state_key: &StateKey, num_nibbles: usize) -> Self {
-        NibblePath::new_from_byte_array(state_key.hash().as_ref(), num_nibbles)
+        NibblePath::new_from_bytes(state_key.hash().as_ref(), num_nibbles)
     }
 
-    fn new_from_byte_array(bytes: &[u8], num_nibbles: usize) -> Self {
-        assert!(num_nibbles <= ROOT_NIBBLE_HEIGHT);
-        if num_nibbles % 2 == 1 {
-            // Rounded up number of bytes to be considered
-            let num_bytes = (num_nibbles + 1) / 2;
-            assert!(bytes.len() >= num_bytes);
-            let mut nibble_bytes = bytes[..num_bytes].to_vec();
-            // If number of nibbles is odd, make sure to pad the last nibble with 0s.
-            let last_byte_padded = bytes[num_bytes - 1] & 0xF0;
-            nibble_bytes[num_bytes - 1] = last_byte_padded;
-            NibblePath::new_odd(nibble_bytes)
-        } else {
-            assert!(bytes.len() >= num_nibbles / 2);
-            NibblePath::new_even(bytes[..num_nibbles / 2].to_vec())
-        }
+    /// Will panic if not enough bytes are provided to make `required_nibble_count` nibbles.
+    pub fn new_from_bytes(bytes: &[u8], required_nibble_count: usize) -> Self {
+        assert!(required_nibble_count <= ROOT_NIBBLE_HEIGHT);
+        let bits: Vec<bool> = bytes.iter().map(byte_to_bits).flatten().collect();
+        Self::new_from_bits(bits.as_slice(), required_nibble_count)
     }
 
+    pub fn new_from_bits(bits: &[bool], required_nibble_count: usize) -> Self {
+        assert!(bits.len() >= NIBBLE_SIZE_IN_BITS * required_nibble_count);
+        let nibbles = (0..required_nibble_count)
+            .map(|i| {
+                let start = NIBBLE_SIZE_IN_BITS * i;
+                let end = NIBBLE_SIZE_IN_BITS * (i + 1);
+                Nibble::from(&bits[start..end])
+            })
+            .collect();
+        Self { nibbles }
+    }
     /// Adds a nibble to the end of the nibble path.
     pub fn push(&mut self, nibble: Nibble) {
-        assert!(ROOT_NIBBLE_HEIGHT > self.num_nibbles);
-        if self.num_nibbles % 2 == 0 {
-            self.bytes.push(u8::from(nibble) << 4);
-        } else {
-            self.bytes[self.num_nibbles / 2] |= u8::from(nibble);
-        }
-        self.num_nibbles += 1;
+        assert!(ROOT_NIBBLE_HEIGHT > self.num_nibbles());
+        self.nibbles.push(nibble);
     }
 
     /// Pops a nibble from the end of the nibble path.
     pub fn pop(&mut self) -> Option<Nibble> {
-        let poped_nibble = if self.num_nibbles % 2 == 0 {
-            self.bytes.last_mut().map(|last_byte| {
-                let nibble = *last_byte & 0x0f;
-                *last_byte &= 0xf0;
-                Nibble::from(nibble)
-            })
-        } else {
-            self.bytes.pop().map(|byte| Nibble::from(byte >> 4))
-        };
-        if poped_nibble.is_some() {
-            self.num_nibbles -= 1;
-        }
-        poped_nibble
+        self.nibbles.pop()
     }
 
     /// Returns the last nibble.
     pub fn last(&self) -> Option<Nibble> {
-        let last_byte_option = self.bytes.last();
-        if self.num_nibbles % 2 == 0 {
-            last_byte_option.map(|last_byte| Nibble::from(*last_byte & 0x0f))
-        } else {
-            let last_byte = last_byte_option.expect("Last byte must exist if num_nibbles is odd.");
-            Some(Nibble::from(*last_byte >> 4))
-        }
+        self.nibbles.last().map(|n| *n)
     }
 
     /// Get the i-th bit.
     fn get_bit(&self, i: usize) -> bool {
-        assert!(i < self.num_nibbles * 4);
-        let pos = i / 8;
-        let bit = 7 - i % 8;
-        ((self.bytes[pos] >> bit) & 1) != 0
+        let nid = i / NIBBLE_SIZE_IN_BITS;
+        let bid = i % NIBBLE_SIZE_IN_BITS;
+        self.nibbles[nid].get_bit(bid)
     }
 
     /// Get the i-th nibble.
     pub fn get_nibble(&self, i: usize) -> Nibble {
-        assert!(i < self.num_nibbles);
-        Nibble::from((self.bytes[i / 2] >> (if i % 2 == 1 { 0 } else { 4 })) & 0xf)
+        self.nibbles[i]
     }
 
     /// Get a bit iterator iterates over the whole nibble path.
     pub fn bits(&self) -> BitIterator {
         BitIterator {
             nibble_path: self,
-            pos: (0..self.num_nibbles * 4),
+            pos: (0..NIBBLE_SIZE_IN_BITS * self.num_nibbles()),
         }
     }
 
     /// Get a nibble iterator iterates over the whole nibble path.
     pub fn nibbles(&self) -> NibbleIterator {
-        NibbleIterator::new(self, 0, self.num_nibbles)
+        NibbleIterator::new(self, 0, self.num_nibbles())
     }
 
     /// Get the total number of nibbles stored.
     pub fn num_nibbles(&self) -> usize {
-        self.num_nibbles
+        self.nibbles.len()
     }
 
     ///  Returns `true` if the nibbles contains no elements.
@@ -205,17 +171,14 @@ impl NibblePath {
     }
 
     /// Get the underlying bytes storing nibbles.
-    pub fn bytes(&self) -> &[u8] {
-        &self.bytes
+    pub fn bytes(&self) -> ByteIterator {
+        ByteIterator {
+            bit_iterator: self.bits(),
+        }
     }
 
     pub fn truncate(&mut self, len: usize) {
-        assert!(len <= self.num_nibbles);
-        self.num_nibbles = len;
-        self.bytes.truncate((len + 1) / 2);
-        if len % 2 != 0 {
-            *self.bytes.last_mut().expect("must exist.") &= 0xf0;
-        }
+        self.nibbles.truncate(len)
     }
 }
 
@@ -367,4 +330,31 @@ where
         y.next();
     }
     count
+}
+
+pub struct ByteIterator<'a> {
+    bit_iterator: BitIterator<'a>,
+}
+
+impl<'a> Iterator for ByteIterator<'a> {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut bits: Vec<bool> = Vec::with_capacity(8);
+
+        for _i in 0..8 {
+            match self.bit_iterator.next() {
+                None => break,
+                Some(b) => bits.push(b),
+            }
+        }
+
+        if bits.len() == 0 {
+            None
+        } else {
+            let paddings = vec![false; 8 - bits.len()];
+            bits.extend(paddings.iter());
+            Some(bits_to_byte(bits.as_slice()))
+        }
+    }
 }

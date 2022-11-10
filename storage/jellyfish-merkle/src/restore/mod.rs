@@ -17,6 +17,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_logger::info;
+use aptos_types::nibble::NIBBLE_SIZE_IN_BITS;
 use aptos_types::{
     nibble::{
         nibble_path::{NibbleIterator, NibblePath},
@@ -310,7 +311,7 @@ where
             if node_key.nibble_path().is_empty() {
                 break;
             }
-            previous_child_index = node_key.nibble_path().last().map(|x| u8::from(x) as usize);
+            previous_child_index = node_key.nibble_path().last().map(|x| usize::from(x));
             node_key = node_key.gen_parent_node_key();
         }
 
@@ -400,11 +401,11 @@ where
     /// Restores one account.
     fn add_one(&mut self, new_key: &K, new_value_hash: HashValue) {
         let new_hashed_key = new_key.hash();
-        let nibble_path = NibblePath::new_even(new_hashed_key.to_vec());
+        let nibble_path = NibblePath::new_from_bytes(new_hashed_key.as_slice(), ROOT_NIBBLE_HEIGHT);
         let mut nibbles = nibble_path.nibbles();
 
         for i in 0..ROOT_NIBBLE_HEIGHT {
-            let child_index = u8::from(nibbles.next().expect("This nibble must exist.")) as usize;
+            let child_index = usize::from(nibbles.next().expect("This nibble must exist."));
 
             assert!(i < self.partial_nodes.len());
             match self.partial_nodes[i].children[child_index] {
@@ -489,7 +490,7 @@ where
 
             let mut internal_info = InternalInfo::new_empty(new_node_key);
             internal_info.set_child(
-                u8::from(next_nibble) as usize,
+                usize::from(next_nibble),
                 ChildInfo::Internal {
                     hash: None,
                     leaf_count: None,
@@ -506,7 +507,7 @@ where
         // Next we put the existing leaf as a child of this internal node.
         let existing_child_index = existing_leaf.account_key().get_nibble(common_prefix_len);
         internal_info.set_child(
-            u8::from(existing_child_index) as usize,
+            usize::from(existing_child_index),
             ChildInfo::Leaf(existing_leaf),
         );
 
@@ -526,7 +527,7 @@ where
             .last_mut()
             .expect("This node must exist.")
             .set_child(
-                u8::from(new_child_index) as usize,
+                usize::from(new_child_index),
                 ChildInfo::Leaf(LeafNode::new(
                     new_hashed_key,
                     new_value_hash,
@@ -633,13 +634,13 @@ where
         for (i, bit) in previous_key.iter_bits().enumerate() {
             if bit {
                 // This node is a right child and there should be a sibling on the left.
-                let sibling = if i >= self.partial_nodes.len() * 4 {
+                let sibling = if i >= self.partial_nodes.len() * NIBBLE_SIZE_IN_BITS {
                     *SPARSE_MERKLE_PLACEHOLDER_HASH
                 } else {
                     Self::compute_left_sibling(
-                        &self.partial_nodes[i / 4],
-                        previous_key.get_nibble(i / 4),
-                        (3 - i % 4) as u8,
+                        &self.partial_nodes[i / NIBBLE_SIZE_IN_BITS],
+                        previous_key.get_nibble(i / NIBBLE_SIZE_IN_BITS),
+                        (NIBBLE_SIZE_IN_BITS - 1 - i % NIBBLE_SIZE_IN_BITS),
                     )
                 };
                 left_siblings.push(sibling);
@@ -683,10 +684,10 @@ where
     }
 
     /// Computes the sibling on the left for the `n`-th child.
-    fn compute_left_sibling(partial_node: &InternalInfo<K>, n: Nibble, height: u8) -> HashValue {
-        assert!(height < 4);
+    fn compute_left_sibling(partial_node: &InternalInfo<K>, n: Nibble, height: usize) -> HashValue {
+        assert!(height < NIBBLE_SIZE_IN_BITS);
         let width = 1usize << height;
-        let start = get_child_and_sibling_half_start(n, height).1 as usize;
+        let start = get_child_and_sibling_half_start(n, height).1;
         Self::compute_left_sibling_impl(&partial_node.children[start..start + width]).0
     }
 

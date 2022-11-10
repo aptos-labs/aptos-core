@@ -17,6 +17,7 @@ pub mod event;
 pub mod governance;
 pub mod ledger_info;
 pub mod mempool_status;
+pub mod misc;
 pub mod move_resource;
 pub mod network_address;
 pub mod nibble;

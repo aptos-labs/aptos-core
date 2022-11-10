@@ -89,6 +89,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_infallible::Mutex;
+use aptos_types::nibble::ROOT_NIBBLE_HEIGHT;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt};
 use std::sync::MutexGuard;
@@ -569,7 +570,8 @@ where
                     pos.pop();
                 }
                 NodeInner::Leaf(leaf_node) => {
-                    let mut path = NibblePath::new_even(leaf_node.key.to_vec());
+                    let mut path =
+                        NibblePath::new_from_bytes(leaf_node.key.as_slice(), ROOT_NIBBLE_HEIGHT);
                     if !is_nibble {
                         path.truncate(pos.len() as usize / BITS_IN_NIBBLE + 1);
                     }
@@ -583,17 +585,11 @@ where
         assert!(pos.len() <= HashValue::LENGTH_IN_BITS);
 
         if pos.len() % BITS_IN_NIBBLE == 0 {
-            let mut bytes = pos.clone().into_vec();
-            if pos.len() % BITS_IN_BYTE == 0 {
-                Some(NibblePath::new_even(bytes))
-            } else {
-                // Unused bits in `BitVec` is uninitialized, setting to 0 to make sure.
-                if let Some(b) = bytes.last_mut() {
-                    *b &= 0xf0
-                }
-
-                Some(NibblePath::new_odd(bytes))
-            }
+            let bits: Vec<bool> = pos.iter().map(|&x| x).collect();
+            Some(NibblePath::new_from_bits(
+                bits.as_slice(),
+                pos.len() / BITS_IN_NIBBLE,
+            ))
         } else {
             None
         }

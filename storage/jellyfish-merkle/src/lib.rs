@@ -805,7 +805,7 @@ where
         // Empty tree just returns proof with no sibling hash.
         let mut next_node_key = NodeKey::new_empty_path(version);
         let mut siblings = vec![];
-        let nibble_path = NibblePath::new_even(key.to_vec());
+        let nibble_path = NibblePath::new_from_bytes(key.as_slice(), ROOT_NIBBLE_HEIGHT);
         let mut nibble_iter = nibble_path.nibbles();
 
         // We limit the number of loops here deliberately to avoid potential cyclic graph bugs

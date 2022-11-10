@@ -33,6 +33,8 @@ use proptest::{collection::hash_map, prelude::*};
 use proptest_derive::Arbitrary;
 
 use crate::TreeReader;
+use aptos_types::misc::one_positions;
+use aptos_types::nibble::{MAX_NIBBLE, NIBBLE_SIZE_IN_BITS};
 use aptos_types::proof::definition::NodeInProof;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -63,7 +65,7 @@ impl NodeKey {
 
     /// A shortcut to generate a node key consisting of a version and an empty nibble path.
     pub fn new_empty_path(version: Version) -> Self {
-        Self::new(version, NibblePath::new_even(vec![]))
+        Self::new(version, NibblePath::default())
     }
 
     /// Gets the version.
@@ -102,8 +104,9 @@ impl NodeKey {
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut out = vec![];
         out.write_u64::<BigEndian>(self.version())?;
-        out.write_u8(self.nibble_path().num_nibbles() as u8)?;
-        out.write_all(self.nibble_path().bytes())?;
+        out.write_u64::<BigEndian>(self.nibble_path().num_nibbles() as u64)?;
+        let bytes: Vec<u8> = self.nibble_path().bytes().collect();
+        out.write_all(bytes.as_slice())?;
         Ok(out)
     }
 
@@ -111,31 +114,23 @@ impl NodeKey {
     pub fn decode(val: &[u8]) -> Result<NodeKey> {
         let mut reader = Cursor::new(val);
         let version = reader.read_u64::<BigEndian>()?;
-        let num_nibbles = reader.read_u8()? as usize;
+        let num_nibbles = reader.read_u64::<BigEndian>()? as usize;
         ensure!(
             num_nibbles <= ROOT_NIBBLE_HEIGHT,
             "Invalid number of nibbles: {}",
             num_nibbles,
         );
-        let mut nibble_bytes = Vec::with_capacity((num_nibbles + 1) / 2);
+
+        let nibble_path_size_in_bytes = (num_nibbles * NIBBLE_SIZE_IN_BITS + 7) / 8;
+        let mut nibble_bytes = Vec::with_capacity(nibble_path_size_in_bytes);
         reader.read_to_end(&mut nibble_bytes)?;
         ensure!(
-            (num_nibbles + 1) / 2 == nibble_bytes.len(),
+            nibble_path_size_in_bytes == nibble_bytes.len(),
             "encoded num_nibbles {} mismatches nibble path bytes {:?}",
             num_nibbles,
             nibble_bytes
         );
-        let nibble_path = if num_nibbles % 2 == 0 {
-            NibblePath::new_even(nibble_bytes)
-        } else {
-            let padding = nibble_bytes.last().unwrap() & 0x0f;
-            ensure!(
-                padding == 0,
-                "Padding nibble expected to be 0, got: {}",
-                padding,
-            );
-            NibblePath::new_odd(nibble_bytes)
-        };
+        let nibble_path = NibblePath::new_from_bytes(nibble_bytes.as_slice(), num_nibbles);
         Ok(NodeKey::new(version, nibble_path))
     }
 
@@ -327,10 +322,11 @@ impl InternalNode {
     }
 
     pub fn hash(&self) -> HashValue {
+        let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
         self.merkle_hash(
             0,  /* start index */
             16, /* the number of leaves in the subtree of which we want the hash of root */
-            self.generate_bitmaps(),
+            (existence_bitmap.as_slice(), leaf_bitmap.as_slice()),
         )
     }
 
@@ -340,10 +336,13 @@ impl InternalNode {
 
     pub fn serialize(&self, binary: &mut Vec<u8>) -> Result<()> {
         let (mut existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
-        binary.write_u16::<LittleEndian>(existence_bitmap)?;
-        binary.write_u16::<LittleEndian>(leaf_bitmap)?;
-        for _ in 0..existence_bitmap.count_ones() {
-            let next_child = existence_bitmap.trailing_zeros() as u8;
+        binary.write_u64::<LittleEndian>(existence_bitmap.len() as u64)?;
+        for i in 0..existence_bitmap.len() {
+            binary.write_u8(existence_bitmap[i] as u8)?;
+            binary.write_u8(leaf_bitmap[i] as u8)?;
+        }
+        let existence_positions = one_positions(existence_bitmap.as_slice());
+        for next_child in existence_positions {
             let child = &self.children[&Nibble::from(next_child)];
             serialize_u64_varint(child.version, binary);
             binary.extend(child.hash.to_vec());
@@ -354,7 +353,6 @@ impl InternalNode {
                 }
                 NodeType::Null => unreachable!("Child cannot be Null"),
             };
-            existence_bitmap &= !(1 << next_child);
         }
         Ok(())
     }
@@ -362,54 +360,59 @@ impl InternalNode {
     pub fn deserialize(data: &[u8]) -> Result<Self> {
         let mut reader = Cursor::new(data);
         let len = data.len();
+        let bitmap_size = reader.read_u64::<LittleEndian>()? as usize;
 
         // Read and validate existence and leaf bitmaps
-        let mut existence_bitmap = reader.read_u16::<LittleEndian>()?;
-        let leaf_bitmap = reader.read_u16::<LittleEndian>()?;
-        match existence_bitmap {
-            0 => return Err(NodeDecodeError::NoChildren.into()),
-            _ if (existence_bitmap & leaf_bitmap) != leaf_bitmap => {
-                return Err(NodeDecodeError::ExtraLeaves {
-                    existing: existence_bitmap,
-                    leaves: leaf_bitmap,
-                }
-                .into())
+        let mut existence_bitmap = vec![false; bitmap_size];
+        let mut leaf_bitmap = vec![false; bitmap_size];
+        let mut existence_positions = vec![];
+        for i in 0..bitmap_size {
+            existence_bitmap[i] = reader.read_u8()? != 0;
+            leaf_bitmap[i] = reader.read_u8()? != 0;
+            if existence_bitmap[i] {
+                existence_positions.push(i);
             }
-            _ => (),
         }
+        // match existence_bitmap {
+        //     0 => return Err(NodeDecodeError::NoChildren.into()),
+        //     _ if (existence_bitmap & leaf_bitmap) != leaf_bitmap => {
+        //         return Err(NodeDecodeError::ExtraLeaves {
+        //             existing: existence_bitmap,
+        //             leaves: leaf_bitmap,
+        //         }
+        //         .into())
+        //     }
+        //     _ => (),
+        // }
 
         // Reconstruct children
         let mut children = HashMap::new();
-        for _ in 0..existence_bitmap.count_ones() {
-            let next_child = existence_bitmap.trailing_zeros() as u8;
+        for &child_id in existence_positions.iter() {
             let version = deserialize_u64_varint(&mut reader)?;
             let pos = reader.position() as usize;
-            let remaining = len - pos;
 
-            ensure!(
-                remaining >= size_of::<HashValue>(),
-                "not enough bytes left, children: {}, bytes: {}",
-                existence_bitmap.count_ones(),
-                remaining
-            );
+            {
+                let remaining = len - pos;
+                ensure!(
+                    remaining >= size_of::<HashValue>(),
+                    "not enough bytes left, children: {}, bytes: {}",
+                    existence_positions.len(),
+                    remaining
+                );
+            }
+
             let hash = HashValue::from_slice(&reader.get_ref()[pos..pos + size_of::<HashValue>()])?;
             reader.seek(SeekFrom::Current(size_of::<HashValue>() as i64))?;
 
-            let child_bit = 1 << next_child;
-            let node_type = if (leaf_bitmap & child_bit) != 0 {
+            let node_type = if leaf_bitmap[child_id] {
                 NodeType::Leaf
             } else {
                 let leaf_count = deserialize_u64_varint(&mut reader)? as usize;
                 NodeType::Internal { leaf_count }
             };
 
-            children.insert(
-                Nibble::from(next_child),
-                Child::new(hash, version, node_type),
-            );
-            existence_bitmap &= !child_bit;
+            children.insert(Nibble::from(child_id), Child::new(hash, version, node_type));
         }
-        assert_eq!(existence_bitmap, 0);
 
         Self::new_impl(children)
     }
@@ -422,47 +425,59 @@ impl InternalNode {
     /// Generates `existence_bitmap` and `leaf_bitmap` as a pair of `u16`s: child at index `i`
     /// exists if `existence_bitmap[i]` is set; child at index `i` is leaf node if
     /// `leaf_bitmap[i]` is set.
-    pub fn generate_bitmaps(&self) -> (u16, u16) {
-        let mut existence_bitmap = 0;
-        let mut leaf_bitmap = 0;
+    pub fn generate_bitmaps(&self) -> (Vec<bool>, Vec<bool>) {
+        let mut existence_bitmap = vec![false; MAX_NIBBLE];
+        let mut leaf_bitmap = vec![false; MAX_NIBBLE];
         for (nibble, child) in self.children.iter() {
-            let i = u8::from(*nibble);
-            existence_bitmap |= 1u16 << i;
-            if child.is_leaf() {
-                leaf_bitmap |= 1u16 << i;
-            }
+            let i = usize::from(*nibble);
+            existence_bitmap[i] = true;
+            leaf_bitmap[i] = child.is_leaf();
         }
-        // `leaf_bitmap` must be a subset of `existence_bitmap`.
-        assert_eq!(existence_bitmap | leaf_bitmap, existence_bitmap);
         (existence_bitmap, leaf_bitmap)
     }
 
     /// Given a range [start, start + width), returns the sub-bitmap of that range.
-    fn range_bitmaps(start: u8, width: u8, bitmaps: (u16, u16)) -> (u16, u16) {
-        assert!(start < 16 && width.count_ones() == 1 && start % width == 0);
-        assert!(width <= 16 && (start + width) <= 16);
-        // A range with `start == 8` and `width == 4` will generate a mask 0b0000111100000000.
-        // use as converting to smaller integer types when 'width == 16'
-        let mask = (((1u32 << width) - 1) << start) as u16;
-        (bitmaps.0 & mask, bitmaps.1 & mask)
+    fn range_bitmaps(
+        start: usize,
+        width: usize,
+        bitmaps: (&[bool], &[bool]),
+    ) -> (Vec<bool>, Vec<bool>) {
+        assert!(start < MAX_NIBBLE && width.count_ones() == 1 && start % width == 0);
+        assert!(width <= MAX_NIBBLE && (start + width) <= MAX_NIBBLE);
+        let mut masked_bitmap_0 = [
+            vec![false; start].as_slice(),
+            &bitmaps.0[start..start + width],
+            vec![false; bitmaps.0.len() - start - width].as_slice(),
+        ]
+        .concat();
+        let mut masked_bitmap_1 = [
+            vec![false; start].as_slice(),
+            &bitmaps.1[start..start + width],
+            vec![false; bitmaps.1.len() - start - width].as_slice(),
+        ]
+        .concat();
+        (masked_bitmap_0, masked_bitmap_1)
     }
 
     fn merkle_hash(
         &self,
-        start: u8,
-        width: u8,
-        (existence_bitmap, leaf_bitmap): (u16, u16),
+        start: usize,
+        width: usize,
+        (existence_bitmap, leaf_bitmap): (&[bool], &[bool]),
     ) -> HashValue {
         // Given a bit [start, 1 << nibble_height], return the value of that range.
         let (range_existence_bitmap, range_leaf_bitmap) =
             Self::range_bitmaps(start, width, (existence_bitmap, leaf_bitmap));
-        if range_existence_bitmap == 0 {
+        let range_existence_positions = one_positions(&range_existence_bitmap);
+        let range_leaf_positions = one_positions(&range_leaf_bitmap);
+        if range_existence_positions.len() == 0 {
             // No child under this subtree
             *SPARSE_MERKLE_PLACEHOLDER_HASH
-        } else if width == 1 || (range_existence_bitmap.count_ones() == 1 && range_leaf_bitmap != 0)
+        } else if width == 1
+            || (range_existence_positions.len() == 1 && range_leaf_positions.len() >= 1)
         {
             // Only 1 leaf child under this subtree or reach the lowest level
-            let only_child_index = Nibble::from(range_existence_bitmap.trailing_zeros() as u8);
+            let only_child_index = Nibble::from(range_existence_positions[0]);
             self.child(only_child_index)
                 .with_context(|| {
                     format!(
@@ -477,12 +492,18 @@ impl InternalNode {
             let left_child = self.merkle_hash(
                 start,
                 width / 2,
-                (range_existence_bitmap, range_leaf_bitmap),
+                (
+                    range_existence_bitmap.as_slice(),
+                    range_leaf_bitmap.as_slice(),
+                ),
             );
             let right_child = self.merkle_hash(
                 start + width / 2,
                 width / 2,
-                (range_existence_bitmap, range_leaf_bitmap),
+                (
+                    range_existence_bitmap.as_slice(),
+                    range_leaf_bitmap.as_slice(),
+                ),
             );
             SparseMerkleInternalNode::new(left_child, right_child).hash()
         }
@@ -490,21 +511,24 @@ impl InternalNode {
 
     fn gen_node_in_proof<K: crate::Key, R: TreeReader<K>>(
         &self,
-        start: u8,
-        width: u8,
-        (existence_bitmap, leaf_bitmap): (u16, u16),
+        start: usize,
+        width: usize,
+        (existence_bitmap, leaf_bitmap): (&[bool], &[bool]),
         (tree_reader, node_key): (&R, &NodeKey),
     ) -> Result<NodeInProof> {
         // Given a bit [start, 1 << nibble_height], return the value of that range.
         let (range_existence_bitmap, range_leaf_bitmap) =
             Self::range_bitmaps(start, width, (existence_bitmap, leaf_bitmap));
-        Ok(if range_existence_bitmap == 0 {
+        let range_existence_positions = one_positions(range_existence_bitmap.as_slice());
+        let range_leaf_positions = one_positions(range_leaf_bitmap.as_slice());
+        Ok(if range_existence_positions.len() == 0 {
             // No child under this subtree
             NodeInProof::Other(*SPARSE_MERKLE_PLACEHOLDER_HASH)
-        } else if width == 1 || (range_existence_bitmap.count_ones() == 1 && range_leaf_bitmap != 0)
+        } else if width == 1
+            || (range_existence_positions.len() == 1 && range_leaf_positions.len() >= 1)
         {
             // Only 1 leaf child under this subtree or reach the lowest level
-            let only_child_index = Nibble::from(range_existence_bitmap.trailing_zeros() as u8);
+            let only_child_index = Nibble::from(range_existence_positions[0]);
             let only_child = self
                 .child(only_child_index)
                 .with_context(|| {
@@ -534,12 +558,18 @@ impl InternalNode {
             let left_child = self.merkle_hash(
                 start,
                 width / 2,
-                (range_existence_bitmap, range_leaf_bitmap),
+                (
+                    range_existence_bitmap.as_slice(),
+                    range_leaf_bitmap.as_slice(),
+                ),
             );
             let right_child = self.merkle_hash(
                 start + width / 2,
                 width / 2,
-                (range_existence_bitmap, range_leaf_bitmap),
+                (
+                    range_existence_bitmap.as_slice(),
+                    range_leaf_bitmap.as_slice(),
+                ),
             );
             NodeInProof::Other(SparseMerkleInternalNode::new(left_child, right_child).hash())
         })
@@ -575,7 +605,7 @@ impl InternalNode {
         let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
 
         // Nibble height from 3 to 0.
-        for h in (0..4).rev() {
+        for h in (0..NIBBLE_SIZE_IN_BITS).rev() {
             // Get the number of children of the internal node that each subtree at this height
             // covers.
             let width = 1 << h;
@@ -585,30 +615,38 @@ impl InternalNode {
                 siblings.push(self.gen_node_in_proof(
                     sibling_half_start,
                     width,
-                    (existence_bitmap, leaf_bitmap),
+                    (existence_bitmap.as_slice(), leaf_bitmap.as_slice()),
                     (reader, node_key),
                 )?);
             } else {
                 siblings.push(
-                    self.merkle_hash(sibling_half_start, width, (existence_bitmap, leaf_bitmap))
-                        .into(),
+                    self.merkle_hash(
+                        sibling_half_start,
+                        width,
+                        (existence_bitmap.as_slice(), leaf_bitmap.as_slice()),
+                    )
+                    .into(),
                 );
             }
 
-            let (range_existence_bitmap, range_leaf_bitmap) =
-                Self::range_bitmaps(child_half_start, width, (existence_bitmap, leaf_bitmap));
-
-            if range_existence_bitmap == 0 {
+            let (range_existence_bitmap, range_leaf_bitmap) = Self::range_bitmaps(
+                child_half_start,
+                width,
+                (existence_bitmap.as_slice(), leaf_bitmap.as_slice()),
+            );
+            let range_existence_positions = one_positions(range_existence_bitmap.as_slice());
+            let range_leaf_positions = one_positions(range_leaf_bitmap.as_slice());
+            if range_existence_positions.len() == 0 {
                 // No child in this range.
                 return Ok((None, siblings));
             } else if width == 1
-                || (range_existence_bitmap.count_ones() == 1 && range_leaf_bitmap != 0)
+                || (range_existence_positions.len() == 1 && range_leaf_positions.len() >= 1)
             {
                 // Return the only 1 leaf child under this subtree or reach the lowest level
                 // Even this leaf child is not the n-th child, it should be returned instead of
                 // `None` because it's existence indirectly proves the n-th child doesn't exist.
                 // Please read proof format for details.
-                let only_child_index = Nibble::from(range_existence_bitmap.trailing_zeros() as u8);
+                let only_child_index = Nibble::from(range_existence_positions[0]);
                 return Ok((
                     {
                         let only_child_version = self
@@ -635,15 +673,14 @@ impl InternalNode {
 
 /// Given a nibble, computes the start position of its `child_half_start` and `sibling_half_start`
 /// at `height` level.
-pub(crate) fn get_child_and_sibling_half_start(n: Nibble, height: u8) -> (u8, u8) {
-    // Get the index of the first child belonging to the same subtree whose root, let's say `r` is
-    // at `height` that the n-th child belongs to.
-    // Note: `child_half_start` will be always equal to `n` at height 0.
-    let child_half_start = (0xff << height) & u8::from(n);
-
-    // Get the index of the first child belonging to the subtree whose root is the sibling of `r`
-    // at `height`.
-    let sibling_half_start = child_half_start ^ (1 << height);
+pub(crate) fn get_child_and_sibling_half_start(n: Nibble, height: usize) -> (usize, usize) {
+    // Example: nibble = 9_usize == 00111001_bin, height=2
+    // mask = 00000100_bin
+    // mask2 = 11111100_bin
+    let mask: usize = 1 << height;
+    let mask2 = (mask - 1) ^ ((1 << NIBBLE_SIZE_IN_BITS) - 1);
+    let child_half_start = usize::from(n) & mask2;
+    let sibling_half_start = child_half_start ^ mask;
 
     (child_half_start, sibling_half_start)
 }
