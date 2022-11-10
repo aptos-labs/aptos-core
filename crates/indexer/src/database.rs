@@ -44,17 +44,13 @@ pub fn get_chunks(num_items_to_insert: usize, column_count: usize) -> Vec<(usize
     chunks
 }
 
-pub fn get_chunks_v2<T>(
-    // items: Vec<T>,
-    items: &[T],
-    column_count: usize,
-) -> Vec<Vec<T>> {
+pub fn get_chunks_v2<T: Clone>(items: &[T], column_count: usize) -> Vec<Vec<T>> {
     let size = MAX_DIESEL_PARAM_SIZE as usize / column_count;
     items
-        .into_iter()
+        .iter()
         .chunks(size)
         .into_iter()
-        .map(|chunk| chunk.collect())
+        .map(|chunk| chunk.cloned().collect())
         .collect()
 }
 
@@ -149,5 +145,41 @@ mod test {
             get_chunks(65535, 3),
             vec![(0, 21845), (21845, 43690), (43690, 65535)]
         );
+    }
+
+    #[tokio::test]
+    async fn test_get_chunks_logic_v2() {
+        assert_chunks_match((0, 10), 1, vec![(0, 10)]);
+        assert_chunks_match((0, 65534), 1, vec![(0, 65534)]);
+        // 200,000 total items will take 6 buckets. Each bucket can only be 3276 size.
+        assert_chunks_match(
+            (0, 9999),
+            20,
+            vec![(0, 3275), (3276, 6551), (6552, 9827), (9828, 9999)],
+        );
+        assert_chunks_match(
+            (0, 65534),
+            2,
+            vec![(0, 32766), (32767, 65533), (65534, 65534)],
+        );
+        assert_chunks_match(
+            (0, 65534),
+            3,
+            vec![(0, 21844), (21845, 43689), (43690, 65534)],
+        );
+    }
+
+    fn assert_chunks_match(
+        input_vec_params: (u32, u32), // will generate a vec with this range, note that the second value is inclusive
+        input_column_count: usize,
+        expected_boundaries: Vec<(u32, u32)>, // boundaries of the chunks, inclusive
+    ) {
+        let test_vec = (input_vec_params.0..input_vec_params.1 + 1).collect::<Vec<u32>>();
+        let chunks = get_chunks_v2(&test_vec, input_column_count);
+        let mut chunk_boundaries = vec![];
+        for chunk in chunks {
+            chunk_boundaries.push((chunk[0], chunk[chunk.len() - 1]));
+        }
+        assert_eq!(chunk_boundaries, expected_boundaries);
     }
 }

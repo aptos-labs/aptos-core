@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::transactions::TransactionQuery;
 
-#[derive(Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
 #[diesel(primary_key(account_address, creation_number, sequence_number))]
 #[diesel(table_name = events)]

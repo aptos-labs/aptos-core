@@ -14,7 +14,9 @@ use aptos_api_types::WriteSetChange as APIWriteSetChange;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(
+    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
+)]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
 #[diesel(primary_key(transaction_version, index))]
 #[diesel(table_name = write_set_changes)]

@@ -27,7 +27,7 @@ use aptos_api_types::Transaction;
 use async_trait::async_trait;
 use diesel::{result::Error, PgConnection};
 use field_count::FieldCount;
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 pub const NAME: &str = "default_processor";
 pub struct DefaultTransactionProcessor {
@@ -52,31 +52,69 @@ impl Debug for DefaultTransactionProcessor {
 }
 
 fn prep_data(
-    txns: Vec<TransactionModel>,
-    txn_details: Vec<TransactionDetail>,
-    events: Vec<EventModel>,
-    wscs: Vec<WriteSetChangeModel>,
-    wsc_details: Vec<WriteSetChangeDetail>,
+    txns: &[TransactionModel],
+    txn_details: &[TransactionDetail],
+    events: &[EventModel],
+    wscs: &[WriteSetChangeModel],
+    wsc_details: &[WriteSetChangeDetail],
 ) -> (
     Vec<Vec<TransactionModel>>,
-    Vec<Vec<TransactionModel>>,
-    // Chunks<'static, UserTransactionModel>,
-    // Chunks<'static, BlockMetadataTransactionModel>,
-    // Chunks<'static, EventModel>,
-    // Chunks<'static, WriteSetChangeModel>,
-    // Chunks<'static, MoveModule>,
-    // Chunks<'static, MoveResource>,
-    // Chunks<'static, TableItem>,
-    // Chunks<'static, TableMetadata>,
+    Vec<Vec<UserTransactionModel>>,
+    Vec<Vec<Signature>>,
+    Vec<Vec<BlockMetadataTransactionModel>>,
+    Vec<Vec<EventModel>>,
+    Vec<Vec<WriteSetChangeModel>>,
+    Vec<Vec<MoveModule>>,
+    Vec<Vec<MoveResource>>,
+    Vec<Vec<TableItem>>,
+    Vec<Vec<TableMetadata>>,
 ) {
+    let mut signatures = vec![];
+    let mut user_transactions = vec![];
+    let mut block_metadata_transactions = vec![];
+    for detail in txn_details {
+        match detail {
+            TransactionDetail::User(user_txn, sigs) => {
+                signatures.append(&mut sigs.clone());
+                user_transactions.push(user_txn.clone());
+            }
+            TransactionDetail::BlockMetadata(bmt) => block_metadata_transactions.push(bmt.clone()),
+        }
+    }
+    let mut move_modules = vec![];
+    let mut move_resources = vec![];
+    let mut table_items = vec![];
+    let mut table_metadata = HashMap::new();
+    for detail in wsc_details {
+        match detail {
+            WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),
+            WriteSetChangeDetail::Resource(resource) => move_resources.push(resource.clone()),
+            WriteSetChangeDetail::Table(item, metadata) => {
+                table_items.push(item.clone());
+                if let Some(meta) = metadata {
+                    table_metadata.insert(meta.handle.clone(), meta.clone());
+                }
+            }
+        }
+    }
+    let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
+    table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+
     (
         get_chunks_v2(&txns, TransactionModel::field_count()),
-        get_chunks_v2(&txns, TransactionModel::field_count()),
+        get_chunks_v2(&user_transactions, UserTransactionModel::field_count()),
+        get_chunks_v2(&signatures, Signature::field_count()),
+        get_chunks_v2(
+            &block_metadata_transactions,
+            BlockMetadataTransactionModel::field_count(),
+        ),
+        get_chunks_v2(&events, EventModel::field_count()),
+        get_chunks_v2(&wscs, WriteSetChangeModel::field_count()),
+        get_chunks_v2(&move_modules, MoveModule::field_count()),
+        get_chunks_v2(&move_resources, MoveResource::field_count()),
+        get_chunks_v2(&table_items, TableItem::field_count()),
+        get_chunks_v2(&table_metadata, TableMetadata::field_count()),
     )
-    // let txn_chunks = chunks
-    //     .into_iter()
-    //     .map(|(start, end)| txns[start..end])
-    //     .collect::<Vec<Vec<TransactionModel>>>();
 }
 
 fn insert_to_db(
@@ -85,10 +123,19 @@ fn insert_to_db(
     start_version: u64,
     end_version: u64,
     txns: Vec<TransactionModel>,
-    txn_details: Vec<TransactionDetail>,
+    txn_details: (
+        Vec<UserTransactionModel>,
+        Vec<Signature>,
+        Vec<BlockMetadataTransactionModel>,
+    ),
     events: Vec<EventModel>,
     wscs: Vec<WriteSetChangeModel>,
-    wsc_details: Vec<WriteSetChangeDetail>,
+    wsc_details: (
+        Vec<MoveModule>,
+        Vec<MoveResource>,
+        Vec<TableItem>,
+        Vec<TableMetadata>,
+    ),
 ) -> Result<(), diesel::result::Error> {
     aptos_logger::trace!(
         name = name,
@@ -96,13 +143,15 @@ fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
+    let (user_transactions, signatures, block_metadata_transactions) = txn_details;
+    let (move_modules, move_resources, table_items, table_metadata) = wsc_details;
     match conn
         .build_transaction()
         .read_write()
         .run::<_, Error, _>(|pg_conn| {
             insert_transactions(pg_conn, &txns)?;
-            insert_user_transactions_w_sigs(pg_conn, &txn_details)?;
-            insert_block_metadata_transactions(pg_conn, &txn_details)?;
+            insert_user_transactions(pg_conn, &user_transactions)?;
+            insert_signatures(pg_conn, &signatures)?;
             insert_events(pg_conn, &events)?;
             insert_write_set_changes(pg_conn, &wscs)?;
             insert_move_modules(pg_conn, &wsc_details)?;
@@ -136,15 +185,15 @@ fn insert_to_db(
 
 fn insert_transactions(
     conn: &mut PgConnection,
-    txns: &[TransactionModel],
+    items_to_insert: &[TransactionModel],
 ) -> Result<(), diesel::result::Error> {
     use schema::transactions::dsl::*;
-    let chunks = get_chunks(txns.len(), TransactionModel::field_count());
+    let chunks = get_chunks(items_to_insert.len(), TransactionModel::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::transactions::table)
-                .values(&txns[start_ind..end_ind])
+                .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
                 .do_nothing(),
             None,
@@ -153,44 +202,41 @@ fn insert_transactions(
     Ok(())
 }
 
-fn insert_user_transactions_w_sigs(
+fn insert_user_transactions(
     conn: &mut PgConnection,
-    txn_details: &[TransactionDetail],
+    items_to_insert: &[UserTransactionModel],
 ) -> Result<(), diesel::result::Error> {
-    use schema::{signatures::dsl as sig_schema, user_transactions::dsl as ut_schema};
-    let mut all_signatures = vec![];
-    let mut all_user_transactions = vec![];
-    for detail in txn_details {
-        if let TransactionDetail::User(user_txn, sigs) = detail {
-            all_signatures.append(&mut sigs.clone());
-            all_user_transactions.push(user_txn.clone());
-        }
-    }
-    let chunks = get_chunks(
-        all_user_transactions.len(),
-        UserTransactionModel::field_count(),
-    );
+    use schema::user_transactions::dsl::*;
+    let chunks = get_chunks(items_to_insert.len(), UserTransactionModel::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::user_transactions::table)
-                .values(&all_user_transactions[start_ind..end_ind])
-                .on_conflict(ut_schema::version)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict(version)
                 .do_nothing(),
             None,
         )?;
     }
-    let chunks = get_chunks(all_signatures.len(), Signature::field_count());
+    Ok(())
+}
+
+fn insert_signatures(
+    conn: &mut PgConnection,
+    items_to_insert: &[Signature],
+) -> Result<(), diesel::result::Error> {
+    use schema::signatures::dsl::*;
+    let chunks = get_chunks(items_to_insert.len(), Signature::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::signatures::table)
-                .values(&all_signatures[start_ind..end_ind])
+                .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((
-                    sig_schema::transaction_version,
-                    sig_schema::multi_agent_index,
-                    sig_schema::multi_sig_index,
-                    sig_schema::is_sender_primary,
+                    transaction_version,
+                    multi_agent_index,
+                    multi_sig_index,
+                    is_sender_primary,
                 ))
                 .do_nothing(),
             None,
@@ -201,24 +247,18 @@ fn insert_user_transactions_w_sigs(
 
 fn insert_block_metadata_transactions(
     conn: &mut PgConnection,
-    txn_details: &[TransactionDetail],
+    items_to_insert: &[BlockMetadataTransactionModel],
 ) -> Result<(), diesel::result::Error> {
     use schema::block_metadata_transactions::dsl::*;
-
-    let bmt = txn_details
-        .iter()
-        .filter_map(|detail| match detail {
-            TransactionDetail::BlockMetadata(bmt) => Some(bmt.clone()),
-            _ => None,
-        })
-        .collect::<Vec<BlockMetadataTransactionModel>>();
-
-    let chunks = get_chunks(bmt.len(), BlockMetadataTransactionModel::field_count());
+    let chunks = get_chunks(
+        items_to_insert.len(),
+        BlockMetadataTransactionModel::field_count(),
+    );
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::block_metadata_transactions::table)
-                .values(&bmt[start_ind..end_ind])
+                .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
                 .do_nothing(),
             None,
@@ -227,16 +267,17 @@ fn insert_block_metadata_transactions(
     Ok(())
 }
 
-fn insert_events(conn: &mut PgConnection, ev: &[EventModel]) -> Result<(), diesel::result::Error> {
+fn insert_events(
+    conn: &mut PgConnection,
+    items_to_insert: &[EventModel],
+) -> Result<(), diesel::result::Error> {
     use schema::events::dsl::*;
-
-    let chunks = get_chunks(ev.len(), EventModel::field_count());
-
+    let chunks = get_chunks(items_to_insert.len(), EventModel::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::events::table)
-                .values(&ev[start_ind..end_ind])
+                .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((account_address, creation_number, sequence_number))
                 .do_nothing(),
             None,
@@ -247,17 +288,15 @@ fn insert_events(conn: &mut PgConnection, ev: &[EventModel]) -> Result<(), diese
 
 fn insert_write_set_changes(
     conn: &mut PgConnection,
-    wscs: &[WriteSetChangeModel],
+    items_to_insert: &[WriteSetChangeModel],
 ) -> Result<(), diesel::result::Error> {
     use schema::write_set_changes::dsl::*;
-
-    let chunks = get_chunks(wscs.len(), WriteSetChangeModel::field_count());
-
+    let chunks = get_chunks(items_to_insert.len(), WriteSetChangeModel::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::write_set_changes::table)
-                .values(&wscs[start_ind..end_ind])
+                .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, index))
                 .do_nothing(),
             None,
@@ -268,24 +307,15 @@ fn insert_write_set_changes(
 
 fn insert_move_modules(
     conn: &mut PgConnection,
-    wsc_details: &[WriteSetChangeDetail],
+    items_to_insert: &[MoveModule],
 ) -> Result<(), diesel::result::Error> {
     use schema::move_modules::dsl::*;
-
-    let modules = wsc_details
-        .iter()
-        .filter_map(|detail| match detail {
-            WriteSetChangeDetail::Module(module) => Some(module.clone()),
-            _ => None,
-        })
-        .collect::<Vec<MoveModule>>();
-
-    let chunks = get_chunks(modules.len(), MoveModule::field_count());
+    let chunks = get_chunks(items_to_insert.len(), MoveModule::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::move_modules::table)
-                .values(&modules[start_ind..end_ind])
+                .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
@@ -296,24 +326,15 @@ fn insert_move_modules(
 
 fn insert_move_resources(
     conn: &mut PgConnection,
-    wsc_details: &[WriteSetChangeDetail],
+    items_to_insert: &[MoveResource],
 ) -> Result<(), diesel::result::Error> {
     use schema::move_resources::dsl::*;
-
-    let resources = wsc_details
-        .iter()
-        .filter_map(|detail| match detail {
-            WriteSetChangeDetail::Resource(resource) => Some(resource.clone()),
-            _ => None,
-        })
-        .collect::<Vec<MoveResource>>();
-
-    let chunks = get_chunks(resources.len(), MoveResource::field_count());
+    let chunks = get_chunks(items_to_insert.len(), MoveResource::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::move_resources::table)
-                .values(&resources[start_ind..end_ind])
+                .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
@@ -322,49 +343,37 @@ fn insert_move_resources(
     Ok(())
 }
 
-/// This will insert all table data within each transaction within a block
-fn insert_table_data(
+fn insert_table_items(
     conn: &mut PgConnection,
-    wsc_details: &[WriteSetChangeDetail],
+    items_to_insert: &[TableItem],
 ) -> Result<(), diesel::result::Error> {
-    use schema::{table_items::dsl as ti, table_metadatas::dsl as tm};
-
-    let (items, metadata): (Vec<TableItem>, Vec<Option<TableMetadata>>) = wsc_details
-        .iter()
-        .filter_map(|detail| match detail {
-            WriteSetChangeDetail::Table(table_item, table_metadata) => {
-                Some((table_item.clone(), table_metadata.clone()))
-            }
-            _ => None,
-        })
-        .collect::<Vec<(TableItem, Option<TableMetadata>)>>()
-        .into_iter()
-        .unzip();
-    let mut metadata_nonnull = metadata
-        .iter()
-        .filter_map(|x| x.clone())
-        .collect::<Vec<TableMetadata>>();
-    metadata_nonnull.dedup_by(|a, b| a.handle == b.handle);
-    metadata_nonnull.sort_by(|a, b| a.handle.cmp(&b.handle));
-
-    let chunks = get_chunks(items.len(), TableItem::field_count());
+    use schema::table_items::dsl::*;
+    let chunks = get_chunks(items_to_insert.len(), TableItem::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::table_items::table)
-                .values(&items[start_ind..end_ind])
-                .on_conflict((ti::transaction_version, ti::write_set_change_index))
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
         )?;
     }
-    let chunks = get_chunks(metadata_nonnull.len(), TableMetadata::field_count());
+    Ok(())
+}
+
+fn insert_table_metadata(
+    conn: &mut PgConnection,
+    items_to_insert: &[TableMetadata],
+) -> Result<(), diesel::result::Error> {
+    use schema::table_metadatas::dsl::*;
+    let chunks = get_chunks(items_to_insert.len(), TableMetadata::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::table_metadatas::table)
-                .values(&metadata_nonnull[start_ind..end_ind])
-                .on_conflict(tm::handle)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict(handle)
                 .do_nothing(),
             None,
         )?;
@@ -387,6 +396,39 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         let (txns, txn_details, events, write_set_changes, wsc_details) =
             TransactionModel::from_transactions(&transactions);
 
+        let mut signatures = vec![];
+        let mut user_transactions = vec![];
+        let mut block_metadata_transactions = vec![];
+        for detail in txn_details {
+            match detail {
+                TransactionDetail::User(user_txn, sigs) => {
+                    signatures.append(&mut sigs.clone());
+                    user_transactions.push(user_txn.clone());
+                }
+                TransactionDetail::BlockMetadata(bmt) => {
+                    block_metadata_transactions.push(bmt.clone())
+                }
+            }
+        }
+        let mut move_modules = vec![];
+        let mut move_resources = vec![];
+        let mut table_items = vec![];
+        let mut table_metadata = HashMap::new();
+        for detail in wsc_details {
+            match detail {
+                WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),
+                WriteSetChangeDetail::Resource(resource) => move_resources.push(resource.clone()),
+                WriteSetChangeDetail::Table(item, metadata) => {
+                    table_items.push(item.clone());
+                    if let Some(meta) = metadata {
+                        table_metadata.insert(meta.handle.clone(), meta.clone());
+                    }
+                }
+            }
+        }
+        let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
+        table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+
         let mut conn = self.get_conn();
         let tx_result = insert_to_db(
             &mut conn,
@@ -394,10 +436,9 @@ impl TransactionProcessor for DefaultTransactionProcessor {
             start_version,
             end_version,
             txns,
-            txn_details,
-            events,
+            (user_transactions, signatures, block_metadata_transactions),
             write_set_changes,
-            wsc_details,
+            (move_modules, move_resources, table_items, table_metadata),
         );
         match tx_result {
             Ok(_) => Ok(ProcessingResult::new(

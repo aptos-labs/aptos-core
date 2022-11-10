@@ -27,7 +27,7 @@ use super::{
     write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel, WriteSetChangeQuery},
 };
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(version))]
 #[diesel(table_name = transactions)]
 pub struct Transaction {
