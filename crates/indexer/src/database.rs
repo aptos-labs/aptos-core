@@ -10,6 +10,7 @@ use diesel::{
     r2d2::{ConnectionManager, PoolError, PooledConnection},
     QueryResult, RunQueryDsl,
 };
+use itertools::Itertools;
 use std::{cmp::min, sync::Arc};
 
 pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
@@ -41,6 +42,20 @@ pub fn get_chunks(num_items_to_insert: usize, column_count: usize) -> Vec<(usize
         chunks.push(chunk);
     }
     chunks
+}
+
+pub fn get_chunks_v2<T>(
+    // items: Vec<T>,
+    items: &[T],
+    column_count: usize,
+) -> Vec<Vec<T>> {
+    let size = MAX_DIESEL_PARAM_SIZE as usize / column_count;
+    items
+        .into_iter()
+        .chunks(size)
+        .into_iter()
+        .map(|chunk| chunk.collect())
+        .collect()
 }
 
 /// This function will clean the data for postgres. Currently it has support for removing

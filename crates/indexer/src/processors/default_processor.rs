@@ -3,7 +3,8 @@
 
 use crate::{
     database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+        clean_data_for_db, execute_with_better_error, get_chunks, get_chunks_v2, PgDbPool,
+        PgPoolConnection,
     },
     indexer::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,
@@ -48,6 +49,34 @@ impl Debug for DefaultTransactionProcessor {
             state.connections, state.idle_connections
         )
     }
+}
+
+fn prep_data(
+    txns: Vec<TransactionModel>,
+    txn_details: Vec<TransactionDetail>,
+    events: Vec<EventModel>,
+    wscs: Vec<WriteSetChangeModel>,
+    wsc_details: Vec<WriteSetChangeDetail>,
+) -> (
+    Vec<Vec<TransactionModel>>,
+    Vec<Vec<TransactionModel>>,
+    // Chunks<'static, UserTransactionModel>,
+    // Chunks<'static, BlockMetadataTransactionModel>,
+    // Chunks<'static, EventModel>,
+    // Chunks<'static, WriteSetChangeModel>,
+    // Chunks<'static, MoveModule>,
+    // Chunks<'static, MoveResource>,
+    // Chunks<'static, TableItem>,
+    // Chunks<'static, TableMetadata>,
+) {
+    (
+        get_chunks_v2(&txns, TransactionModel::field_count()),
+        get_chunks_v2(&txns, TransactionModel::field_count()),
+    )
+    // let txn_chunks = chunks
+    //     .into_iter()
+    //     .map(|(start, end)| txns[start..end])
+    //     .collect::<Vec<Vec<TransactionModel>>>();
 }
 
 fn insert_to_db(
@@ -355,7 +384,7 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         start_version: u64,
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
-        let (txns, user_txns, bm_txns, events, write_set_changes) =
+        let (txns, txn_details, events, write_set_changes, wsc_details) =
             TransactionModel::from_transactions(&transactions);
 
         let mut conn = self.get_conn();
@@ -365,10 +394,10 @@ impl TransactionProcessor for DefaultTransactionProcessor {
             start_version,
             end_version,
             txns,
-            user_txns,
-            bm_txns,
+            txn_details,
             events,
             write_set_changes,
+            wsc_details,
         );
         match tx_result {
             Ok(_) => Ok(ProcessingResult::new(
