@@ -144,14 +144,18 @@ With your development environment ready, now you can start to setup your validat
 
     ```bash
     cargo clean
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/validator.yaml
+    cargo build -p aptos-node --release
+    sudo mv $WORKSPACE/aptos-core/target/performance/aptos-node /usr/local/bin
+    aptos-node -f ~/$WORKSPACE/config/validator.yaml
     ```
 
     Run validator fullnode on **another machine**:
 
     ```bash
     cargo clean
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/fullnode.yaml
+    cargo build -p aptos-node --release
+    sudo mv $WORKSPACE/aptos-core/target/performance/aptos-node /usr/local/bin
+    aptos-node -f ~/$WORKSPACE/config/fullnode.yaml
     ```
 
 Now you have completed setting up your node.
