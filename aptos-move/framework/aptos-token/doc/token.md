@@ -38,6 +38,7 @@ Checkout our developer doc on our token standard https://aptos.dev/concepts/coin
 -  [Function `mutate_collection_description`](#0x3_token_mutate_collection_description)
 -  [Function `mutate_collection_uri`](#0x3_token_mutate_collection_uri)
 -  [Function `mutate_collection_maximum`](#0x3_token_mutate_collection_maximum)
+-  [Function `mutate_collection_frozen`](#0x3_token_mutate_collection_frozen)
 -  [Function `mutate_tokendata_maximum`](#0x3_token_mutate_tokendata_maximum)
 -  [Function `mutate_tokendata_uri`](#0x3_token_mutate_tokendata_uri)
 -  [Function `mutate_tokendata_royalty`](#0x3_token_mutate_tokendata_royalty)
@@ -64,6 +65,7 @@ Checkout our developer doc on our token standard https://aptos.dev/concepts/coin
 -  [Function `get_collection_description`](#0x3_token_get_collection_description)
 -  [Function `get_collection_uri`](#0x3_token_get_collection_uri)
 -  [Function `get_collection_maximum`](#0x3_token_get_collection_maximum)
+-  [Function `get_collection_frozen`](#0x3_token_get_collection_frozen)
 -  [Function `get_token_supply`](#0x3_token_get_token_supply)
 -  [Function `get_tokendata_largest_property_version`](#0x3_token_get_tokendata_largest_property_version)
 -  [Function `get_token_id`](#0x3_token_get_token_id)
@@ -486,6 +488,12 @@ This config specifies which fields in the Collection are mutable
 <dd>
 
 </dd>
+<dt>
+<code>frozen: bool</code>
+</dt>
+<dd>
+
+</dd>
 </dl>
 
 
@@ -586,6 +594,12 @@ Represent the collection metadata
 </dd>
 <dt>
 <code>maximum: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>frozen: bool</code>
 </dt>
 <dd>
 
@@ -974,6 +988,12 @@ create collection event with creator address and collection name
 <dd>
 
 </dd>
+<dt>
+<code>frozen: bool</code>
+</dt>
+<dd>
+
+</dd>
 </dl>
 
 
@@ -1136,6 +1156,16 @@ Collection or tokendata maximum must be larger than supply
 
 
 <pre><code><b>const</b> <a href="token.md#0x3_token_EINVALID_MAXIMUM">EINVALID_MAXIMUM</a>: u64 = 36;
+</code></pre>
+
+
+
+<a name="0x3_token_ECOLLECTION_IS_FROZEN"></a>
+
+Collection is frozen
+
+
+<pre><code><b>const</b> <a href="token.md#0x3_token_ECOLLECTION_IS_FROZEN">ECOLLECTION_IS_FROZEN</a>: u64 = 37;
 </code></pre>
 
 
@@ -1879,7 +1909,11 @@ Burn a token by the token owner
     <b>assert</b>!(burn_by_owner_flag, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EOWNER_CANNOT_BURN_TOKEN">EOWNER_CANNOT_BURN_TOKEN</a>));
 
     // Burn the tokens.
-    <b>let</b> <a href="token.md#0x3_token_Token">Token</a> { id: _, amount: burned_amount, token_properties: _ } = <a href="token.md#0x3_token_withdraw_token">withdraw_token</a>(owner, token_id, amount);
+    <b>let</b> <a href="token.md#0x3_token_Token">Token</a> { id: _, amount: burned_amount, token_properties: _ } = <a href="token.md#0x3_token_withdraw_with_event_internal">withdraw_with_event_internal</a>(
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner),
+        token_id,
+        amount
+    );
     <b>let</b> token_store = <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_TokenStore">TokenStore</a>&gt;(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_BurnTokenEvent">BurnTokenEvent</a>&gt;(
         &<b>mut</b> token_store.burn_events,
@@ -2005,6 +2039,34 @@ Burn a token by the token owner
     <b>assert</b>!(maximum &gt;= collection_data.supply, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EINVALID_MAXIMUM">EINVALID_MAXIMUM</a>));
     <b>assert</b>!(collection_data.mutability_config.maximum, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>));
     collection_data.maximum = maximum;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_mutate_collection_frozen"></a>
+
+## Function `mutate_collection_frozen`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_mutate_collection_frozen">mutate_collection_frozen</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, frozen: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_mutate_collection_frozen">mutate_collection_frozen</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: String, frozen: bool) <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <b>let</b> creator_address = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
+    <a href="token.md#0x3_token_assert_collection_exists">assert_collection_exists</a>(creator_address, collection_name);
+    <b>let</b> collection_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data, collection_name);
+    <b>assert</b>!(collection_data.mutability_config.frozen, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>));
+    collection_data.frozen = frozen;
 }
 </code></pre>
 
@@ -2589,6 +2651,14 @@ Withdraw the token with a capability
 ): <a href="token.md#0x3_token_Token">Token</a> <b>acquires</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a> {
     // verify the delegation hasn't expired yet
     <b>assert</b>!(<a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt;= *&withdraw_proof.expiration_sec, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EWITHDRAW_PROOF_EXPIRES">EWITHDRAW_PROOF_EXPIRES</a>));
+    // Make sure the collection is not frozen.
+    <b>assert</b>!(
+        !<a href="token.md#0x3_token_get_collection_frozen">get_collection_frozen</a>(
+            withdraw_proof.token_id.token_data_id.creator,
+            withdraw_proof.token_id.token_data_id.collection
+        ),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="token.md#0x3_token_ECOLLECTION_IS_FROZEN">ECOLLECTION_IS_FROZEN</a>),
+    );
 
     <a href="token.md#0x3_token_withdraw_with_event_internal">withdraw_with_event_internal</a>(
         withdraw_proof.token_owner,
@@ -2685,6 +2755,7 @@ Create a new collection to hold tokens
         uri,
         supply: 0,
         maximum,
+        frozen: false,
         mutability_config
     };
 
@@ -2698,6 +2769,7 @@ Create a new collection to hold tokens
             uri,
             description,
             maximum,
+            frozen: false,
         }
     );
 }
@@ -2984,6 +3056,32 @@ return the number of distinct token_data_id created under this collection
 
 </details>
 
+<a name="0x3_token_get_collection_frozen"></a>
+
+## Function `get_collection_frozen`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_frozen">get_collection_frozen</a>(creator_address: <b>address</b>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_frozen">get_collection_frozen</a>(creator_address: <b>address</b>, collection_name: String): bool <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <a href="token.md#0x3_token_assert_collection_exists">assert_collection_exists</a>(creator_address, collection_name);
+    <b>let</b> collection_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data, collection_name);
+    collection_data.frozen
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x3_token_get_token_supply"></a>
 
 ## Function `get_token_supply`
@@ -3121,6 +3219,7 @@ return the TokenId for a given Token
         description: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(mutate_setting, <a href="token.md#0x3_token_COLLECTION_DESCRIPTION_MUTABLE_IND">COLLECTION_DESCRIPTION_MUTABLE_IND</a>),
         uri: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(mutate_setting, <a href="token.md#0x3_token_COLLECTION_URI_MUTABLE_IND">COLLECTION_URI_MUTABLE_IND</a>),
         maximum: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(mutate_setting, <a href="token.md#0x3_token_COLLECTION_MAX_MUTABLE_IND">COLLECTION_MAX_MUTABLE_IND</a>),
+        frozen: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(mutate_setting, <a href="token.md#0x3_token_COLLECTION_FROZEN_MUTABLE_IND">COLLECTION_FROZEN_MUTABLE_IND</a>),
     }
 }
 </code></pre>
@@ -3785,6 +3884,7 @@ if property_version > 0, return the property value stored at owner's token store
         uri: _,
         supply: _,
         maximum: _,
+        frozen: _,
         mutability_config: _,
     } = collection_data;
 }

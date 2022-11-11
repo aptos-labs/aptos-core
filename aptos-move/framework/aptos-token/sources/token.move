@@ -336,6 +336,7 @@ module aptos_token::token {
         uri: String,
         description: String,
         maximum: u64,
+        frozen: bool,
     }
 
     //
@@ -1013,6 +1014,7 @@ module aptos_token::token {
                 uri,
                 description,
                 maximum,
+                frozen: false,
             }
         );
     }
