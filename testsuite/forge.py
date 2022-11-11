@@ -4,8 +4,6 @@ import asyncio
 import difflib
 import json
 import os
-from pprint import pprint
-import pwd
 import random
 import re
 import resource
@@ -15,7 +13,7 @@ import time
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import (
     Any,
@@ -82,10 +80,6 @@ try:
 except ImportError:
     install_dependency("psutil")
     import psutil
-
-
-def get_current_user() -> str:
-    return pwd.getpwuid(os.getuid())[0]
 
 
 @click.group()
@@ -835,14 +829,14 @@ def get_current_cluster_name(shell: Shell) -> str:
 def assert_provided_image_tags_has_profile_or_features(
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
-    enable_testing_image: bool,
+    enable_failpoints: bool,
     enable_performance_profile: bool,
 ):
     for tag in [image_tag, upgrade_image_tag]:
         if not tag:
             continue
         if (
-            enable_testing_image
+            enable_failpoints
         ):  # testing image requires the tag to be prefixed with failpoints_
             assert tag.startswith(
                 "failpoints"
@@ -857,19 +851,19 @@ def find_recent_images_by_profile_or_features(
     shell: Shell,
     git: Git,
     num_images: int,
-    enable_testing_image: Optional[bool],
+    enable_failpoints: Optional[bool],
     enable_performance_profile: Optional[bool],
 ) -> Generator[str, None, None]:
     image_name = "aptos/validator"
     image_tag_prefix = ""
-    if enable_testing_image and enable_performance_profile:
+    if enable_failpoints and enable_performance_profile:
         raise Exception(
             "Cannot yet set both testing (failpoints) image and performance"
         )
 
     if enable_performance_profile:
         image_tag_prefix = "performance_"
-    if enable_testing_image:
+    if enable_failpoints:
         image_tag_prefix = "failpoints_"
 
     return find_recent_images(
@@ -1127,7 +1121,7 @@ async def run_multiple(
 @envoption("FORGE_NAMESPACE_KEEP")
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
-@envoption("FORGE_ENABLE_TESTING_IMAGE")
+@envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
 @envoption("FORGE_TEST_SUITE")
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
@@ -1166,7 +1160,7 @@ def test(
     forge_num_validator_fullnodes: Optional[str],
     forge_namespace_keep: Optional[str],
     forge_namespace_reuse: Optional[str],
-    forge_enable_testing_image: Optional[str],
+    forge_enable_failpoints: Optional[str],
     forge_enable_performance: Optional[str],
     forge_enable_haproxy: Optional[str],
     forge_test_suite: str,
@@ -1259,13 +1253,13 @@ def test(
     assert forge_cluster_name, "Forge cluster name is required"
 
     # These features and profile flags are set as strings
-    enable_testing_image = forge_enable_testing_image == "true"
+    enable_failpoints = forge_enable_failpoints == "true"
     enable_performance_profile = forge_enable_performance == "true"
 
     assert_provided_image_tags_has_profile_or_features(
         image_tag,
         upgrade_image_tag,
-        enable_testing_image=enable_testing_image,
+        enable_failpoints=enable_failpoints,
         enable_performance_profile=enable_performance_profile,
     )
 
@@ -1276,7 +1270,7 @@ def test(
                 shell,
                 git,
                 2,
-                enable_testing_image=enable_testing_image,
+                enable_failpoints=enable_failpoints,
                 enable_performance_profile=enable_performance_profile,
             )
         )
@@ -1293,7 +1287,7 @@ def test(
                 shell,
                 git,
                 1,
-                enable_testing_image=enable_testing_image,
+                enable_failpoints=enable_failpoints,
                 enable_performance_profile=enable_performance_profile,
             )
         )
@@ -1304,7 +1298,7 @@ def test(
     assert_provided_image_tags_has_profile_or_features(
         image_tag,
         upgrade_image_tag,
-        enable_testing_image=enable_testing_image,
+        enable_failpoints=enable_failpoints,
         enable_performance_profile=enable_performance_profile,
     )
 
