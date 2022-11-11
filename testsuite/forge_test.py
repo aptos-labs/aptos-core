@@ -468,7 +468,7 @@ class TestFindRecentImage(unittest.TestCase):
         )
         git = Git(shell)
         image_tags = find_recent_images_by_profile_or_features(
-            shell, git, 1, enable_performance_profile=False, enable_testing_image=True
+            shell, git, 1, enable_performance_profile=False, enable_failpoints=True
         )
         self.assertEqual(list(image_tags), ["failpoints_tomato"])
         shell.assert_commands(self)
@@ -491,7 +491,7 @@ class TestFindRecentImage(unittest.TestCase):
             git,
             1,
             enable_performance_profile=True,
-            enable_testing_image=False,
+            enable_failpoints=False,
         )
         self.assertEqual(list(image_tags), ["performance_potato"])
         shell.assert_commands(self)
@@ -505,7 +505,7 @@ class TestFindRecentImage(unittest.TestCase):
                 git,
                 1,
                 enable_performance_profile=True,
-                enable_testing_image=True,
+                enable_failpoints=True,
             )
 
     def testDidntFindRecentImage(self) -> None:
@@ -531,7 +531,7 @@ class TestFindRecentImage(unittest.TestCase):
             assert_provided_image_tags_has_profile_or_features(
                 "potato_tomato",
                 "failpoints_performance_potato",
-                enable_testing_image=True,
+                enable_failpoints=True,
                 enable_performance_profile=False,
             )
 
@@ -539,7 +539,7 @@ class TestFindRecentImage(unittest.TestCase):
         assert_provided_image_tags_has_profile_or_features(
             None,
             None,
-            enable_testing_image=True,
+            enable_failpoints=True,
             enable_performance_profile=False,
         )
 
