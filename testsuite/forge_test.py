@@ -56,7 +56,7 @@ from forge import (
     validate_forge_config,
 )
 
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
 from forge_wrapper_core.filesystem import Filesystem
 from forge_wrapper_core.git import Git
 from forge_wrapper_core.process import Process, Processes
@@ -65,7 +65,7 @@ from forge_wrapper_core.shell import Shell
 from forge_wrapper_core.time import Time
 
 # Show the entire diff when unittest fails assertion
-unittest.util._MAX_LENGTH = 2000
+unittest.util._MAX_LENGTH = 2000  # type: ignore
 
 
 class HasAssertMultiLineEqual(Protocol):
@@ -1071,7 +1071,7 @@ class ForgeConfigTests(unittest.TestCase):
             stack.enter_context(
                 patch.object(forge, "LocalFilesystem", lambda: filesystem)
             )
-            result_helm_config_not_present = runner.invoke(
+            result_helm_config_not_present: Result = runner.invoke(
                 main,
                 ["config", "helm", "get", "aptos-node"],
                 catch_exceptions=True,
@@ -1093,24 +1093,28 @@ class ForgeConfigTests(unittest.TestCase):
 
             # assert that we error with a message when the config is not present
             self.assertEqual(result_helm_config_not_present.exit_code, 1)
+            self.assertIsNotNone(result_helm_config_not_present.exception)
             self.assertEqual(
-                result_helm_config_not_present.exception.args,
+                result_helm_config_not_present.exception.args,  # type: ignore
                 Exception("Missing key default_helm_values in Forge config").args,
             )
 
             # assert that we error with a message when the config is missing partial information
             self.assertEqual(result_helm_config_present_missing.exit_code, 1)
+            self.assertIsNotNone(result_helm_config_present_missing.exception)
             self.assertEqual(
-                result_helm_config_present_missing.exception.args,
+                result_helm_config_present_missing.exception.args,  # type: ignore
                 Exception("No helm values found for chart aptos-genesis").args,
             )
 
             # we successfully get the config
             self.assertEqual(result_helm_config_present_complete.exit_code, 0)
+            self.assertIsNotNone(helm_after_complete.get("default_helm_values"))
+            self.assertIsNotNone(helm_after_complete.get("default_helm_values").get("aptos-node"))  # type: ignore
             # the output config is printed with an extra newline
             self.assertEqual(
                 result_helm_config_present_complete.stdout_bytes,
-                f'{json.dumps(helm_after_complete.get("default_helm_values").get("aptos-node"), indent=2)}\n'.encode(),
+                f'{json.dumps(helm_after_complete.get("default_helm_values").get("aptos-node"), indent=2)}\n'.encode(),  # type: ignore
             )
 
     def testHelmSetConfig(self) -> None:

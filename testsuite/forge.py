@@ -18,7 +18,8 @@ from enum import Enum
 from typing import (
     Any,
     Callable,
-    Dict,
+    Iterator,
+    Mapping,
     Generator,
     List,
     Optional,
@@ -351,9 +352,9 @@ def milliseconds(timestamp: datetime) -> int:
 
 
 def apply_humio_time_filter(
-    urlparts: Dict[str, Union[str, bool, int]],
+    urlparts: Mapping[str, Union[str, bool, int]],
     time_filter: Union[bool, Tuple[datetime, datetime]],
-) -> Dict:
+) -> Mapping:
     if time_filter is True:
         urlparts = {
             **urlparts,
@@ -1609,23 +1610,23 @@ class TestConfig(TypedDict):
 
 class TestSuite(TypedDict):
     name: str
-    all_tests: Dict[str, TestConfig]
-    enabled_tests: Dict[str, TestConfig]
+    all_tests: Mapping[str, TestConfig]
+    enabled_tests: Mapping[str, TestConfig]
 
 
 # All changes to this struct must be backwards compatible
 # i.e. its ok to add a new field, but not to remove one
-
-
 class ForgeConfigValue(TypedDict):
     enabled_clusters: List[str]
     all_clusters: List[str]
-    test_suites: Dict[str, TestSuite]
-    default_helm_values: Dict
+    test_suites: Mapping[str, TestSuite]
+    default_helm_values: Mapping
 
 
 def default_forge_config() -> ForgeConfigValue:
-    return {
+    # Return a default config with not all the fields, as they are not mandatory
+    # This ensures we check for backwards compatibility
+    return {  # type: ignore
         "enabled_clusters": [],
         "all_clusters": [],
     }
@@ -1672,8 +1673,10 @@ def ensure_forge_config(value: Any) -> ForgeConfigValue:
 
 
 def get_forge_config_diff(
-    old_config: dict, new_config: dict, full_diff: Optional[bool] = False
-) -> list:
+    old_config: ForgeConfigValue,
+    new_config: ForgeConfigValue,
+    full_diff: Optional[bool] = False,
+) -> Iterator[str]:
     """Returns a list of diffs between the old and new config"""
     config_string = json.dumps(new_config, indent=2)
     old_config_string = json.dumps(old_config, indent=2)
@@ -1891,7 +1894,7 @@ def config_edit(ctx: click.Context) -> None:
     shell = LocalShell(True)
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes, time)
+    context = SystemContext(shell, filesystem, processes, SystemTime())
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
 
@@ -2003,7 +2006,7 @@ def cluster_config_delete(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes, time)
+    context = SystemContext(shell, filesystem, processes, SystemTime())
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2180,7 +2183,7 @@ def test_config_add(
         raise Exception(f"Test {test_name} already exists")
 
     if test_name:
-        test_suite["all_tests"][test_name]: TestConfig = {
+        test_suite["all_tests"][test_name] = {
             "name": test_name,
         }
 
