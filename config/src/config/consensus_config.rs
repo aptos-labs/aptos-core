@@ -42,6 +42,8 @@ pub struct ConsensusConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ChainHealthBackoffValues {
     pub backoff_if_below_participating_voting_power_percentage: usize,
+    pub proposer_create_proposal_backoff_ms: u64,
+    pub round_timeout_backoff_ms: u64,
 
     pub max_sending_block_txns_override: u64,
     pub max_sending_block_bytes_override: u64,
@@ -79,21 +81,29 @@ impl Default for ConsensusConfig {
                     backoff_if_below_participating_voting_power_percentage: 80,
                     max_sending_block_txns_override: 2000,
                     max_sending_block_bytes_override: 500 * 1024,
+                    proposer_create_proposal_backoff_ms: 100,
+                    round_timeout_backoff_ms: 200,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 77,
                     max_sending_block_txns_override: 1000,
                     max_sending_block_bytes_override: 250 * 1024,
+                    proposer_create_proposal_backoff_ms: 200,
+                    round_timeout_backoff_ms: 400,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 75,
                     max_sending_block_txns_override: 400,
                     max_sending_block_bytes_override: 100 * 1024,
+                    proposer_create_proposal_backoff_ms: 300,
+                    round_timeout_backoff_ms: 600,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 72,
                     max_sending_block_txns_override: 200,
                     max_sending_block_bytes_override: 50 * 1024,
+                    proposer_create_proposal_backoff_ms: 500,
+                    round_timeout_backoff_ms: 1000,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 69,
@@ -101,6 +111,8 @@ impl Default for ConsensusConfig {
                     // meaning that most aggressively we limit to ~200-400 TPS
                     max_sending_block_txns_override: 100,
                     max_sending_block_bytes_override: 25 * 1024,
+                    proposer_create_proposal_backoff_ms: 1000,
+                    round_timeout_backoff_ms: 2000,
                 },
             ],
         }

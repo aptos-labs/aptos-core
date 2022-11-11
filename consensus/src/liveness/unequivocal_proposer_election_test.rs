@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use aptos_types::validator_signer::ValidatorSigner;
 use consensus_types::{
@@ -85,11 +85,9 @@ fn test_is_valid_proposal() {
     )
     .unwrap();
 
-    let pe =
-        UnequivocalProposerElection::new(Box::new(MockProposerElection::new(HashMap::from([
-            (1, chosen_author),
-            (2, chosen_author),
-        ]))));
+    let pe = UnequivocalProposerElection::new(Arc::new(Box::new(MockProposerElection::new(
+        HashMap::from([(1, chosen_author), (2, chosen_author)]),
+    ))));
 
     assert!(pe.is_valid_proposer(chosen_author, 1));
     assert!(pe.is_valid_proposal(&good_proposal));
