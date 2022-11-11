@@ -32,9 +32,13 @@ jobs:
           python testsuite/determinator.py changed-files --github-output-key SHOULD_RUN --pattern 'testsuite/.*py' ${{steps.changed-files.outputs.all_changed_files }}
         id: should-run-tests
 
-      - name: Run python lint
+      - name: Install Python Dev Dependencies
         if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
-        run: flake8 --filename testsuite/**/*.py
+        run: pip install pyright black
+
+      - name: Run python static type checker
+        if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
+        run: pyright testsuite/**/*.py
 
       - name: Run python fmt
         if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
