@@ -21,13 +21,13 @@ spec aptos_framework::aptos_account {
         aborts_if length_judgment(auth_key);
         aborts_if auth_key == @vm_reserved || auth_key == @aptos_framework || auth_key == @aptos_token;
         aborts_if exists<coin::CoinStore<AptosCoin>>(auth_key);
-    } 
+    }
 
     spec fun length_judgment(auth_key: address): bool {
         use std::bcs;
 
         let authentication_key = bcs::to_bytes(auth_key);
-        len(authentication_key) != 32        
+        len(authentication_key) != 32
     }
 
     spec transfer(source: &signer, to: address, amount: u64) {
@@ -45,4 +45,3 @@ spec aptos_framework::aptos_account {
         aborts_if !coin::is_account_registered<AptosCoin>(addr);
     }
 }
-
