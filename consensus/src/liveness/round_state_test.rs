@@ -24,6 +24,8 @@ use consensus_types::{
 use futures::StreamExt;
 use std::{sync::Arc, time::Duration};
 
+use super::proposal_generator::ChainHealthBackoffConfig;
+
 #[test]
 fn test_round_time_interval() {
     let interval = ExponentialTimeInterval::new(Duration::from_millis(3000), 1.5, 2);
@@ -87,7 +89,12 @@ fn make_round_state() -> (RoundState, channel::Receiver<Round>) {
     let simulated_time = SimulatedTimeService::auto_advance_until(Duration::from_millis(4));
     let (timeout_tx, timeout_rx) = channel::new_test(1_024);
     (
-        RoundState::new(time_interval, Arc::new(simulated_time), timeout_tx),
+        RoundState::new(
+            time_interval,
+            Arc::new(simulated_time),
+            timeout_tx,
+            ChainHealthBackoffConfig::new_no_backoff(),
+        ),
         timeout_rx,
     )
 }

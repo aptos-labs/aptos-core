@@ -175,13 +175,19 @@ impl EpochManager {
         &self,
         time_service: Arc<dyn TimeService>,
         timeout_sender: channel::Sender<Round>,
+        chain_health_backoff_config: ChainHealthBackoffConfig,
     ) -> RoundState {
         let time_interval = Box::new(ExponentialTimeInterval::new(
             Duration::from_millis(self.config.round_initial_timeout_ms),
             self.config.round_timeout_backoff_exponent_base,
             self.config.round_timeout_backoff_max_exponent,
         ));
-        RoundState::new(time_interval, time_service, timeout_sender)
+        RoundState::new(
+            time_interval,
+            time_service,
+            timeout_sender,
+            chain_health_backoff_config,
+        )
     }
 
     /// Create a proposer election handler based on proposers
@@ -596,20 +602,27 @@ impl EpochManager {
             );
         }
 
-        info!(epoch = epoch, "Create RoundState");
-        let round_state =
-            self.create_round_state(self.time_service.clone(), self.timeout_sender.clone());
-
         info!(epoch = epoch, "Create ProposerElection");
-        let proposer_election = self.create_proposer_election(&epoch_state, &onchain_config);
+        let proposer_election =
+            Arc::new(self.create_proposer_election(&epoch_state, &onchain_config));
         let network_sender = NetworkSender::new(
             self.author,
             self.network_sender.clone(),
             self.self_sender.clone(),
             epoch_state.verifier.clone(),
         );
-        let chain_health_backoff_config =
-            ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
+        let chain_health_backoff_config = ChainHealthBackoffConfig::new(
+            self.config.chain_health_backoff.clone(),
+            proposer_election.clone(),
+        );
+
+        info!(epoch = epoch, "Create RoundState");
+        let round_state = self.create_round_state(
+            self.time_service.clone(),
+            self.timeout_sender.clone(),
+            chain_health_backoff_config.clone(),
+        );
+
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
         let (consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =

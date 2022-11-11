@@ -42,6 +42,8 @@ pub struct ConsensusConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ChainHealthBackoffValues {
     pub backoff_if_below_participating_voting_power_percentage: usize,
+    pub proposer_create_proposal_backoff_ms: u64,
+    pub round_timeout_backoff_ms: u64,
 
     pub max_sending_block_txns_override: u64,
     pub max_sending_block_bytes_override: u64,
@@ -77,21 +79,29 @@ impl Default for ConsensusConfig {
             chain_health_backoff: vec![
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 80,
+                    proposer_create_proposal_backoff_ms: 100,
+                    round_timeout_backoff_ms: 200,
                     max_sending_block_txns_override: 2000,
                     max_sending_block_bytes_override: 500 * 1024,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 75,
+                    proposer_create_proposal_backoff_ms: 300,
+                    round_timeout_backoff_ms: 600,
                     max_sending_block_txns_override: 1000,
                     max_sending_block_bytes_override: 400 * 1024,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 72,
+                    proposer_create_proposal_backoff_ms: 500,
+                    round_timeout_backoff_ms: 1000,
                     max_sending_block_txns_override: 400,
                     max_sending_block_bytes_override: 200 * 1024,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 69,
+                    proposer_create_proposal_backoff_ms: 1000,
+                    round_timeout_backoff_ms: 2000,
                     max_sending_block_txns_override: 200,
                     max_sending_block_bytes_override: 100 * 1024,
                 },

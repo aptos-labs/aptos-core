@@ -37,8 +37,9 @@ async fn test_proposal_generation_empty_tree() {
         10,
         ChainHealthBackoffConfig::new_no_backoff(),
     );
-    let mut proposer_election =
-        UnequivocalProposerElection::new(Box::new(RotatingProposer::new(vec![signer.author()], 1)));
+    let mut proposer_election = UnequivocalProposerElection::new(Arc::new(Box::new(
+        RotatingProposer::new(vec![signer.author()], 1),
+    )));
     let genesis = block_store.ordered_root();
 
     // Generate proposals for an empty tree.
@@ -74,9 +75,8 @@ async fn test_proposal_generation_parent() {
         10,
         ChainHealthBackoffConfig::new_no_backoff(),
     );
-    let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
-        vec![inserter.signer().author()],
-        1,
+    let mut proposer_election = UnequivocalProposerElection::new(Arc::new(Box::new(
+        RotatingProposer::new(vec![inserter.signer().author()], 1),
     )));
     let genesis = block_store.ordered_root();
     let a1 = inserter
@@ -143,9 +143,8 @@ async fn test_old_proposal_generation() {
         10,
         ChainHealthBackoffConfig::new_no_backoff(),
     );
-    let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
-        vec![inserter.signer().author()],
-        1,
+    let mut proposer_election = UnequivocalProposerElection::new(Arc::new(Box::new(
+        RotatingProposer::new(vec![inserter.signer().author()], 1),
     )));
     let genesis = block_store.ordered_root();
     let a1 = inserter
@@ -177,9 +176,8 @@ async fn test_correct_failed_authors() {
         10,
         ChainHealthBackoffConfig::new_no_backoff(),
     );
-    let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
-        vec![author, peer1, peer2],
-        1,
+    let mut proposer_election = UnequivocalProposerElection::new(Arc::new(Box::new(
+        RotatingProposer::new(vec![author, peer1, peer2], 1),
     )));
     let genesis = block_store.ordered_root();
 

@@ -17,7 +17,7 @@ use consensus_types::{
 use consensus_types::common::{Payload, PayloadFilter};
 use futures::future::BoxFuture;
 use num_traits::ToPrimitive;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use super::{
     proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
@@ -30,37 +30,45 @@ mod proposal_generator_test;
 #[derive(Clone)]
 pub struct ChainHealthBackoffConfig {
     backoffs: BTreeMap<usize, ChainHealthBackoffValues>,
+    proposer_election: Option<Arc<Box<dyn ProposerElection + Send + Sync>>>,
 }
 
 impl ChainHealthBackoffConfig {
-    pub fn new(backoffs: Vec<ChainHealthBackoffValues>) -> Self {
+    pub fn new(
+        backoffs: Vec<ChainHealthBackoffValues>,
+        proposer_election: Arc<Box<dyn ProposerElection + Send + Sync>>,
+    ) -> Self {
         let original_len = backoffs.len();
         let backoffs = backoffs
             .into_iter()
             .map(|v| (v.backoff_if_below_participating_voting_power_percentage, v))
             .collect::<BTreeMap<_, _>>();
         assert_eq!(original_len, backoffs.len());
-        Self { backoffs }
+        Self {
+            backoffs,
+            proposer_election: Some(proposer_election),
+        }
     }
 
     pub fn new_no_backoff() -> Self {
         Self {
             backoffs: BTreeMap::new(),
+            proposer_election: None,
         }
     }
 
-    pub fn get_backoff(
-        &self,
-        round: Round,
-        proposer_election: &dyn ProposerElection,
-    ) -> Option<&ChainHealthBackoffValues> {
+    pub fn get_backoff(&self, round: Round) -> Option<&ChainHealthBackoffValues> {
         if self.backoffs.is_empty() {
             None
         } else {
-            let voting_power_ratio =
-                (proposer_election.get_voting_power_participation_ratio(round) * 100.0)
-                    .to_usize()
-                    .unwrap();
+            let voting_power_ratio = (self
+                .proposer_election
+                .as_ref()
+                .unwrap()
+                .get_voting_power_participation_ratio(round)
+                * 100.0)
+                .to_usize()
+                .unwrap();
             self.backoffs
                 .range(voting_power_ratio..)
                 .next()
@@ -175,9 +183,17 @@ impl ProposalGenerator {
             bail!("Already proposed in the round {}", round);
         }
 
-        let chain_health_backoff = self
-            .chain_health_backoff_config
-            .get_backoff(round, proposer_election);
+        let chain_health_backoff = self.chain_health_backoff_config.get_backoff(round);
+        if let Some(value) = chain_health_backoff {
+            warn!(
+                "Generating proposal sleeping for {}, due to chain health backoff",
+                value.proposer_create_proposal_backoff_ms
+            );
+            tokio::time::sleep(Duration::from_millis(
+                value.proposer_create_proposal_backoff_ms,
+            ))
+            .await;
+        }
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
