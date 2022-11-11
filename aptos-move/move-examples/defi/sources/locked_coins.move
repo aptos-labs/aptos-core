@@ -1,3 +1,14 @@
+/**
+ * This provides an example for sending locked coins to recipients to be unlocked after a specific time.
+ *
+ * Locked coins flow:
+ * 1. Deploy the lockup contract. Deployer can decide if the contract is upgradable or not.
+ * 2. Sponsor accounts add locked APTs for custom expiration time + amount for recipients.
+ * 3. Sponsor accounts can revoke a lock or change lockup (reduce or extend) anytime. This gives flexibility in case of
+ * contract violation or special circumstances. If this is not desired, the deployer can remove these functionalities
+ * before deploying.
+ * 4. Once the lockup has expired, the recipient can call claim to get the unlocked tokens.
+ **/
 module defi::locked_coins {
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};
@@ -17,7 +28,15 @@ module defi::locked_coins {
     /// There can be at most one lock per recipient.
     struct Locks<phantom CoinType> has key {
         locks: Table<address, Lock<CoinType>>,
+        cancel_lockup_events: EventHandle<CancelLockupEvent>,
         claim_events: EventHandle<ClaimEvent>,
+        update_lockup_events: EventHandle<UpdateLockupEvent>,
+    }
+
+    /// Event emitted when a lock is canceled.
+    struct CancelLockupEvent has drop, store {
+        recipient: address,
+        amount: u64,
     }
 
     /// Event emitted when a recipient claims unlocked coins.
@@ -25,6 +44,13 @@ module defi::locked_coins {
         recipient: address,
         amount: u64,
         claimed_time_secs: u64,
+    }
+
+    /// Event emitted when lockup is updated for an existing lock.
+    struct UpdateLockupEvent has drop, store {
+        recipient: address,
+        old_unlock_time_secs: u64,
+        new_unlock_time_secs: u64,
     }
 
     /// No locked coins found to claim.
@@ -43,7 +69,9 @@ module defi::locked_coins {
         if (!exists<Locks<CoinType>>(sponsor_address)) {
             move_to(sponsor, Locks {
                 locks: table::new<address, Lock<CoinType>>(),
+                cancel_lockup_events: account::new_event_handle<CancelLockupEvent>(sponsor),
                 claim_events: account::new_event_handle<ClaimEvent>(sponsor),
+                update_lockup_events: account::new_event_handle<UpdateLockupEvent>(sponsor),
             })
         };
 
@@ -61,11 +89,13 @@ module defi::locked_coins {
         let locks = borrow_global_mut<Locks<CoinType>>(sponsor);
         let recipient_address = signer::address_of(recipient);
         assert!(table::contains(&locks.locks, recipient_address), error::not_found(ELOCK_NOT_FOUND));
-        let lock = table::borrow_mut(&mut locks.locks, recipient_address);
-        let now_secs = timestamp::now_seconds();
-        assert!(now_secs >= lock.unlock_time_secs, error::invalid_state(ELOCKUP_HAS_NOT_EXPIRED));
+
         // Delete the lock entry both to keep records clean and keep storage usage minimal.
-        let Lock { coins, unlock_time_secs: _ } = table::remove(&mut locks.locks, recipient_address);
+        // This would be reverted if validations fail later (transaction atomicity).
+        let Lock { coins, unlock_time_secs } = table::remove(&mut locks.locks, recipient_address);
+        let now_secs = timestamp::now_seconds();
+        assert!(now_secs >= unlock_time_secs, error::invalid_state(ELOCKUP_HAS_NOT_EXPIRED));
+
         let amount = coin::value(&coins);
         // This would fail if the recipient account is not registered to receive CoinType.
         coin::deposit(recipient_address, coins);
@@ -77,12 +107,52 @@ module defi::locked_coins {
         });
     }
 
+    /// Sponsor can update the lockup of an existing lock.
+    public entry fun update_lockup<CoinType>(
+        sponsor: &signer, recipient: address, new_unlock_time_secs: u64) acquires Locks {
+        let sponsor_address = signer::address_of(sponsor);
+        assert!(exists<Locks<CoinType>>(sponsor_address), error::not_found(ELOCK_NOT_FOUND));
+        let locks = borrow_global_mut<Locks<CoinType>>(sponsor_address);
+        assert!(table::contains(&locks.locks, recipient), error::not_found(ELOCK_NOT_FOUND));
+
+        let lock = table::borrow_mut(&mut locks.locks, recipient);
+        let old_unlock_time_secs = lock.unlock_time_secs;
+        lock.unlock_time_secs = new_unlock_time_secs;
+
+        event::emit_event(&mut locks.update_lockup_events, UpdateLockupEvent {
+            recipient,
+            old_unlock_time_secs,
+            new_unlock_time_secs,
+        });
+    }
+
+    /// Sponsor can cancel an existing lock.
+    public entry fun cancel_lockup<CoinType>(sponsor: &signer, recipient: address) acquires Locks {
+        let sponsor_address = signer::address_of(sponsor);
+        assert!(exists<Locks<CoinType>>(sponsor_address), error::not_found(ELOCK_NOT_FOUND));
+        let locks = borrow_global_mut<Locks<CoinType>>(sponsor_address);
+        assert!(table::contains(&locks.locks, recipient), error::not_found(ELOCK_NOT_FOUND));
+
+        // Remove the lock and deposit coins backed into the sponsor account.
+        let Lock { coins, unlock_time_secs: _ } = table::remove(&mut locks.locks, recipient);
+        let amount = coin::value(&coins);
+        coin::deposit(sponsor_address, coins);
+
+        event::emit_event(&mut locks.cancel_lockup_events, CancelLockupEvent { recipient, amount });
+    }
+
     #[test_only]
     use std::string;
     #[test_only]
     use aptos_framework::coin::BurnCapability;
     #[test_only]
     use aptos_framework::aptos_coin::AptosCoin;
+
+    #[test_only]
+    fun get_unlock_time(sponsor: address, recipient: address): u64 acquires Locks {
+        let locks = borrow_global_mut<Locks<AptosCoin>>(sponsor);
+        table::borrow(&locks.locks, recipient).unlock_time_secs
+    }
 
     #[test_only]
     fun setup(aptos_framework: &signer, sponsor: &signer, recipient: &signer): BurnCapability<AptosCoin> {
@@ -140,6 +210,36 @@ module defi::locked_coins {
         timestamp::fast_forward_seconds(1000);
         claim<AptosCoin>(recipient, signer::address_of(sponsor));
         claim<AptosCoin>(recipient, signer::address_of(sponsor));
+        coin::destroy_burn_cap(burn_cap);
+    }
+
+    #[test(aptos_framework = @0x1, sponsor = @0x123, recipient = @0x234)]
+    public entry fun test_sponsor_can_update_lockup(
+        aptos_framework: &signer, sponsor: &signer, recipient: &signer) acquires Locks {
+        let burn_cap = setup(aptos_framework, sponsor, recipient);
+        let sponsor_addr = signer::address_of(sponsor);
+        let recipient_addr = signer::address_of(recipient);
+        add_locked_coins<AptosCoin>(sponsor, recipient_addr, 1000, 1000);
+        assert!(get_unlock_time(sponsor_addr, recipient_addr) == 1000, 0);
+        // Extend lockup.
+        update_lockup<AptosCoin>(sponsor, recipient_addr, 2000);
+        assert!(get_unlock_time(sponsor_addr, recipient_addr) == 2000, 1);
+        // Reduce lockup.
+        update_lockup<AptosCoin>(sponsor, recipient_addr, 1500);
+        assert!(get_unlock_time(sponsor_addr, recipient_addr) == 1500, 2);
+
+        coin::destroy_burn_cap(burn_cap);
+    }
+
+    #[test(aptos_framework = @0x1, sponsor = @0x123, recipient = @0x234)]
+    public entry fun test_sponsor_can_cancel_lockup(
+        aptos_framework: &signer, sponsor: &signer, recipient: &signer) acquires Locks {
+        let burn_cap = setup(aptos_framework, sponsor, recipient);
+        let recipient_addr = signer::address_of(recipient);
+        add_locked_coins<AptosCoin>(sponsor, recipient_addr, 1000, 1000);
+        cancel_lockup<AptosCoin>(sponsor, recipient_addr);
+        let locks = borrow_global_mut<Locks<AptosCoin>>(signer::address_of(sponsor));
+        assert!(!table::contains(&locks.locks, recipient_addr), 0);
         coin::destroy_burn_cap(burn_cap);
     }
 }
