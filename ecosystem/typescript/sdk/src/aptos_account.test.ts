@@ -65,3 +65,12 @@ test("Signs Strings", () => {
     "0xc5de9e40ac00b371cd83b1c197fa5b665b7449b33cd3cdd305bb78222e06a671a49625ab9aea8a039d4bb70e275768084d62b094bc1b31964f2357b7c1af7e0d",
   );
 });
+
+test("Gets the resource account address", () => {
+  const sourceAddress = "0xca843279e3427144cead5e4d5999a3d0";
+  const seed = new Uint8Array([1]);
+
+  expect(AptosAccount.getResourceAccountAddress(sourceAddress, seed).hex()).toBe(
+    "0xcbed05b37b6981a57f535c1f5d136734df822abaf4cd30c51c9b4d60eae79d5d",
+  );
+});
