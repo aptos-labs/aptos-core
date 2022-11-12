@@ -52,14 +52,31 @@ jobs:
           name: cli-builds
           path: aptos-cli-*.zip
 
-  build-os-x-binary:
-    name: "Build OS X binary"
+  build-os-x-x64-binary:
+    name: "Build OS X x64 binary"
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - name: Build CLI
+        run: scripts/cli/build_cli_release.sh "MacOSX"
+      - name: Upload Binary
+        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
+        with:
+          name: cli-builds
+          path: aptos-cli-*.zip
+
+  build-os-x-arm64-binary:
+    name: "Build OS X ARM64 binary"
+    runs-on: buildjet-8vcpu-ubuntu-2204-arm
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - name: Build CLI
+        env:
+          CARGO_BUILD_JOBS: 2 # limit threads to less than number of vCPU, otherwise it'll run out of memory on the buildjet machine
         run: scripts/cli/build_cli_release.sh "MacOSX"
       - name: Upload Binary
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3
@@ -87,7 +104,8 @@ jobs:
     needs:
       - build-ubuntu20-binary
       - build-ubuntu22-binary
-      - build-os-x-binary
+      - build-os-x-arm64-binary
+      - build-os-x-x64-binary
       - build-windows-binary
     runs-on: ubuntu-latest
     permissions:
