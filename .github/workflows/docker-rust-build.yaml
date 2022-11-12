@@ -51,8 +51,12 @@ jobs:
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - uses: ./.github/actions/docker-buildx-setup
-
-      - uses: imjasonh/setup-crane@v0.1
+      - uses: imjasonh/setup-crane@5146f708a817ea23476677995bf2133943b9be0b # pin@v0.1
+      - name: Setup git credentials
+        shell: bash
+        run: |
+          git config --global credential.helper store
+          echo "https://${{ secrets.EMERGENCY_BUILD_USER }}:${{ secrets.EMERGENCY_BUILD_TOKEN }}@github.com" > ~/.git-credentials
 
       - name: Build and Push Rust images
         run: docker/docker-bake-rust-all.sh
