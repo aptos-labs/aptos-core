@@ -8,13 +8,13 @@ spec aptos_framework::aptos_account {
     /// The Account does not exist under the auth_key before creating the account.
     /// Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_toke.
     spec create_account(auth_key: address) {
-        include Create_account;
+        include CreateAccount;
 
         ensures exists<account::Account>(auth_key);
         ensures exists<coin::CoinStore<AptosCoin>>(auth_key);
     }
 
-    spec schema Create_account {
+    spec schema CreateAccount {
         auth_key: address;
 
         aborts_if exists<account::Account>(auth_key);

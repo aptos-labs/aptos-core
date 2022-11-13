@@ -50,7 +50,7 @@ spec aptos_framework::block {
     /// The number of new events created does not exceed MAX_U64.
     spec initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
         include Initialize;
-        include New_event_handle;
+        include NewEventHandle;
     }
 
     spec schema Initialize {
@@ -65,7 +65,7 @@ spec aptos_framework::block {
         ensures exists<BlockResource>(addr);
     }
 
-    spec schema New_event_handle {
+    spec schema NewEventHandle {
         use std::signer;
         aptos_framework: signer;
 
@@ -82,10 +82,10 @@ spec aptos_framework::block {
         aptos_framework: &signer,
         new_epoch_interval: u64,
     ) {
-        include Update_epoch_interval_microsecs;
+        include UpdateEpochIntervalMicrosecs;
     }
 
-    spec schema Update_epoch_interval_microsecs {
+    spec schema UpdateEpochIntervalMicrosecs {
         use std::signer;
         aptos_framework: signer;
         new_epoch_interval: u64;
@@ -111,10 +111,10 @@ spec aptos_framework::block {
     /// The Configuration existed under the @aptos_framework.
     /// The CurrentTimeMicroseconds existed under the @aptos_framework.
     spec emit_writeset_block_event(vm_signer: &signer, fake_block_hash: address) {
-        include Emit_writeset_block_event;
+        include EmitWritesetBlockEvent;
     }
 
-    spec schema Emit_writeset_block_event {
+    spec schema EmitWritesetBlockEvent {
         use std::signer;
         vm_signer: signer;
 
