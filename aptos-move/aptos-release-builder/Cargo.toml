@@ -20,6 +20,8 @@ clap = { version = "3.1.17", features = ["derive"] }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 tempfile = "3.3.0"
+serde = { version = "1.0.137", features = ["derive"], default-features = false }
+serde_yaml = "0.8.24"
 
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-types = { path = "../../types" }
