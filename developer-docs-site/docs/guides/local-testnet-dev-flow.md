@@ -1,5 +1,5 @@
 ---
-title: "Local testnet development flow"
+title: "Develop in Local Testnet"
 slug: "local-testnet-dev-flow"
 ---
 

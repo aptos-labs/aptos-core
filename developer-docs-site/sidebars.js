@@ -85,7 +85,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Follow Tutorials",
+      label: "Conduct Tutorials",
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
@@ -153,7 +153,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Node Overview",
+      label: "Find Nodes",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/nodes-landing" },
@@ -164,27 +164,6 @@ const sidebars = {
         "nodes/node-health-checker/index",
         "nodes/node-health-checker/node-health-checker-faq",
 
-      ],
-    },
-    {
-      type: "category",
-      label: "Node Configuration",
-      collapsible: true,
-      collapsed: true,
-      link: { type: "doc", id: "nodes/identity-and-configuration" },
-      items: [
-        "guides/indexing",
-        "reference/telemetry",
-        "guides/state-sync",
-        "guides/data-pruning",
-        {
-          type: "category",
-          label: "Node Files For Mainnet",
-          collapsible: true,
-          collapsed: true,
-          link: { type: "doc", id: "nodes/node-files-all-networks/node-files" },
-          items: ["nodes/node-files-all-networks/node-files-devnet", "nodes/node-files-all-networks/node-files-testnet"],
-        },
       ],
     },
     /** Delete during clean up
@@ -202,7 +181,7 @@ const sidebars = {
     },  */
     {
       type: "category",
-      label: "Validators",
+      label: "Install Validators",
       link: { type: "doc", id: "nodes/validator-node/index" },
       collapsible: true,
       collapsed: true,
@@ -256,7 +235,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Public Fullnode",
+      label: "Install Fullnodes",
       link: { type: "doc", id: "nodes/full-node/index" },
       collapsible: true,
       collapsed: true,
@@ -269,6 +248,27 @@ const sidebars = {
         "nodes/full-node/run-a-fullnode-on-gcp",
         "nodes/full-node/bootstrap-fullnode",
         "nodes/indexer-fullnode",
+      ],
+    },
+    {
+      type: "category",
+      label: "Configure Nodes",
+      collapsible: true,
+      collapsed: true,
+      link: { type: "doc", id: "nodes/identity-and-configuration" },
+      items: [
+        "guides/indexing",
+        "reference/telemetry",
+        "guides/state-sync",
+        "guides/data-pruning",
+        {
+          type: "category",
+          label: "Node Files For Mainnet",
+          collapsible: true,
+          collapsed: true,
+          link: { type: "doc", id: "nodes/node-files-all-networks/node-files" },
+          items: ["nodes/node-files-all-networks/node-files-devnet", "nodes/node-files-all-networks/node-files-testnet"],
+        },
       ],
     },
         /** Delete after clean up

@@ -1,12 +1,12 @@
 ---
-title: "Upgrading Move Code"
+title: "Upgrade Move Code"
 slug: "upgrading-move-code"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Upgrading Move Code
+# Upgrade Move Code
 
 The Aptos chain supports _code upgrade_, which means already deployed Move
 code can be replaced with newer code. If a code upgrade happens, all 

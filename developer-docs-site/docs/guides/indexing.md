@@ -6,9 +6,7 @@ slug: "indexing"
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Indexing
-
-## Concept
+# Index the Aptos blockchain data
 
 An application built on the Aptos blockchain, on any blockchain for that matter, requires that the raw data from the blockchain be shaped by the application-specific data model before the application can consume it. The [Aptos Node API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), using which a client can interact with the Aptos blockchain, is not designed to support data shaping. Moreover, the ledger data you get back using this API contains the data only for the transactions **initiated by you**. It does not provide the data for the transactions initiated by the others. This data is insufficient and too slow for an application that must access the blockchain data in an omniscient way to serve multiple users of the application. 
 
@@ -23,8 +21,6 @@ sources={{
   }}
 />
 </center>
-
-## Indexing the Aptos blockchain data
 
 Indexing on the Aptos blockchain works like this:
 

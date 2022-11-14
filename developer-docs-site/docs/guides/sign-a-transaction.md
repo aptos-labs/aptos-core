@@ -1,5 +1,5 @@
 ---
-title: "Create Signed Transaction"
+title: "Create a Signed Transaction"
 slug: "creating-a-signed-transaction"
 ---
 
