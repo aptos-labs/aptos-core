@@ -1,9 +1,9 @@
 ---
-title: "Whats New in Docs"
+title: "See Whats New"
 slug: "whats-new-in-docs"
 ---
 
-# Whats New in Docs
+# Whats New in Aptos
 
 This page shows the key updates to the developer documentation on this site.
 
