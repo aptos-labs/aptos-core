@@ -1,10 +1,10 @@
 ---
-title: "Aptos Concepts"
+title: "Learn Aptos Concepts"
 slug: "aptos-concepts"
 hidden: false
 ---
 
-# Aptos Concepts
+# Learn Aptos Concepts
 
 Start here to get into the core concepts of the Aptos blockchain.
 

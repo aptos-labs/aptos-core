@@ -1,12 +1,12 @@
 ---
-title: "Guides"
+title: "Interact with Blockchain"
 slug: "aptos-guides"
 hidden: false
 ---
 
-# Guides
+# Interact with the Aptos Blockchain
 
-Start here to get into the core concepts of the Aptos blockchain.
+Follow these guides to work with the Aptos blockchain.
 
 - ### [Life of a Transaction](basics-life-of-txn.md)
 - ### [Creating a Signed Transaction](sign-a-transaction.md)

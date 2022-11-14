@@ -1,9 +1,11 @@
 ---
-title: "Move Guides"
+title: "Write Move Smart Contracts"
 slug: "aptos-move-guides"
 ---
 
-# Move Guides
+# Write Smart Contracts with Move
+
+## Aptos Move guides
 
 Start here to learn how the Move language works on the Aptos blockchain. 
 
@@ -12,7 +14,7 @@ Start here to learn how the Move language works on the Aptos blockchain.
 - ### [Your First Move module](../../tutorials/first-move-module.md)
 - ### [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
 
-## Aptos Move documentation
+## Aptos Move reference
 
 Please note, the `mainnet` versions of the documents below are not yet available. The `main` branch shows the latest development upstream and likely contains functionality not yet available in a *net release.
 

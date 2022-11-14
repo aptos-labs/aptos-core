@@ -1,5 +1,5 @@
 ---
-title: "Build Aptos CLI from Source"
+title: "Build CLI from Source"
 id: "build-aptos-cli"
 ---
 

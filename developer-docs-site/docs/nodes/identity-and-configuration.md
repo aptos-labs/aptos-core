@@ -7,7 +7,7 @@ import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
 
-# Identity and Configuration
+# Node Identity and Configuration
 
 When installing a node on an Aptos network, the installation steps require you to work with identities and configurations. This document describes how to interpret the terms **identity** and **configuration**, and presents a description of the identity YAML files.
 
