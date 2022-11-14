@@ -24,7 +24,7 @@ pub struct Nibble(usize);
 impl Nibble {
     pub(crate) fn get_bit(&self, i: usize) -> bool {
         assert!(i < NIBBLE_SIZE_IN_BITS);
-        let mask = 1 << (7 - i);
+        let mask = 1 << (NIBBLE_SIZE_IN_BITS - 1 - i);
         self.0 & mask != 0
     }
 }
