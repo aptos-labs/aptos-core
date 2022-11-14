@@ -38,6 +38,7 @@ tokio = { version = "1.21.0", features = ["full"] }
 tokio-util = { version = "0.7.2", features = ["compat"] }
 toml = "0.5.9"
 walkdir = "2.3.2"
+convert_case = "0.6.0"
 
 aptos-bitvec = { path = "../../crates/aptos-bitvec" }
 aptos-build-info = { path = "../../crates/aptos-build-info" }

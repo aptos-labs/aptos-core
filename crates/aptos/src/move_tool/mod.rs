@@ -13,7 +13,8 @@ pub use stored_package::*;
 use crate::common::types::MoveManifestAccountWrapper;
 use crate::common::types::{CliConfig, ConfigSearchMode, ProfileOptions, RestOptions};
 use crate::common::utils::{
-    create_dir_if_not_exist, dir_default_to_current, prompt_yes_with_override, write_to_file,
+    create_dir_if_not_exist, dir_default_to_current, prompt_yes_with_override, read_line,
+    write_to_file,
 };
 use crate::governance::CompileScriptFunction;
 use crate::move_tool::manifest::{
@@ -37,6 +38,7 @@ use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_types::transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
+use convert_case::Casing;
 use framework::docgen::DocgenOptions;
 use framework::natives::code::UpgradePolicy;
 use framework::prover::ProverOptions;
@@ -48,6 +50,7 @@ use std::fmt::{Display, Formatter};
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
+    fs,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -245,6 +248,191 @@ impl CliCommand<()> for InitPackage {
             addresses,
             self.prompt_options,
         )
+    }
+}
+
+/// @todo
+/// Creates a new Move package at the given location
+///
+/// This will create a directory for a Move package and a corresponding
+/// <PROJECT_NAME>
+/// ─┐
+///  ├📂 `tests` folder
+///  │ └─ `tests/<PACKAGE_NAME>_tests.move`
+///  ├📂 `sources` folder
+///  │ └─ `sources/<PACKAGE_NAME>.move`
+///  └─  `Move.toml` file.
+///
+/// Examples:
+/// $ aptos new ~/my_project
+/// $ aptos new ~/my_project --named_addresses self=_,std=0x1
+/// $ aptos new ~/my_project --name DemoProject --assume-yes
+#[derive(Parser)]
+#[clap(verbatim_doc_comment)]
+pub struct NewPackage {
+    /// Directory to create the new Move package
+    /// The folder name can be used as the project name.
+    /// If the directory does not exist, it will be created
+    ///
+    /// Example:
+    /// ~/path/to/my_new_project
+    /// ./MyNewProject
+    #[clap(verbatim_doc_comment, value_parser)]
+    pub(crate) package_dir: PathBuf,
+
+    /// Name of the new Move package
+    #[clap(long, display_order = 1)]
+    pub(crate) name: Option<String>,
+
+    /// Named addresses for the move binary.
+    /// Allows for an address to be put into the Move.toml, or a placeholder `_`
+    ///
+    /// Example: alice=0x1234,bob=0x5678,greg=_
+    ///
+    /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
+    #[clap(verbatim_doc_comment, long, parse(try_from_str = crate::common::utils::parse_map), default_value = "", display_order=2)]
+    pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
+
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
+
+    #[clap(flatten)]
+    pub(crate) framework_package_args: FrameworkPackageArgs,
+}
+
+#[async_trait]
+impl CliCommand<()> for NewPackage {
+    fn command_name(&self) -> &'static str {
+        "NewPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        let project_dir = &self.package_dir;
+
+        if project_dir.exists() {
+            let is_empty = project_dir
+                .read_dir()
+                .map_err(|_| {
+                    CliError::CommandArgumentError(format!(
+                        "Couldn't read the catalog {project_dir:?}"
+                    ))
+                })?
+                .filter_map(|item| item.ok())
+                .next()
+                .is_none();
+            if !is_empty {
+                return Err(CliError::CommandArgumentError(format!(
+                    "The directory is not empty {project_dir:?}"
+                )));
+            }
+        }
+
+        let project_name = match self.name {
+            Some(name) => name.clone(),
+            None => {
+                let default = project_dir
+                    .file_name()
+                    .map(|name| {
+                        name.to_string_lossy()
+                            .to_case(convert_case::Case::UpperCamel)
+                    })
+                    .unwrap_or_default();
+
+                if self.prompt_options.assume_yes {
+                    default
+                } else {
+                    eprintln!("Enter the project name: [defaults to {default}]");
+                    let project_name = read_line("Project name")?.trim().to_string();
+
+                    if project_name.is_empty() {
+                        default
+                    } else {
+                        project_name
+                    }
+                }
+            }
+        };
+
+        let named_addresses = if self.named_addresses.is_empty() && !self.prompt_options.assume_yes
+        {
+            loop {
+                println!("Named addresses for the move binary. Allows for an address to be put into the Move.toml or a placeholder `_`:");
+                let name_addresses_string = match read_line("Named addresses") {
+                    Ok(value) => value,
+                    Err(err) => {
+                        println!("{err:?}\n\nPlease try again\n");
+                        continue;
+                    }
+                };
+                match crate::common::utils::parse_map(name_addresses_string.trim()) {
+                    Ok(value) => break value,
+                    Err(err) => {
+                        println!("{err:?}\n\nPlease try again\n");
+                        continue;
+                    }
+                }
+            }
+        } else {
+            self.named_addresses.clone()
+        };
+
+        if !project_dir.exists() {
+            if !self.prompt_options.assume_yes {
+                loop {
+                    println!(r#"Create a project at {project_dir:?} [Expected: yes | no ]"#);
+                    match read_line("Create")?.trim().to_lowercase().as_str() {
+                        "yes" | "y" => break,
+                        "no" | "n" => {
+                            return Err(CliError::CommandArgumentError(
+                                "Canceling project creation".to_string(),
+                            ))
+                        }
+                        _ => println!("Incorrect input. Please try again"),
+                    }
+                }
+            }
+            fs::create_dir_all(project_dir).map_err(|err| {
+                CliError::CommandArgumentError(format!(
+                    "Failed to create a directory {project_dir:?}.\n{err:?}"
+                ))
+            })?;
+        }
+
+        InitPackage {
+            name: project_name.clone(),
+            package_dir: Some(self.package_dir.clone()),
+            named_addresses,
+            prompt_options: self.prompt_options,
+            framework_package_args: self.framework_package_args,
+        }
+        .execute()
+        .await?;
+
+        let move_module_path = project_dir.join(format!("sources/{project_name}.move"));
+        fs::write(&move_module_path, format!("module _::{project_name} {{}}")).map_err(|err| {
+            CliError::UnexpectedError(format!(
+                "Failed to create a file with the module {move_module_path:?}.\n{err:?}"
+            ))
+        })?;
+
+        let tests_dir = project_dir.join("tests");
+        let move_module_path = tests_dir.join(format!("{project_name}_test.move"));
+        fs::create_dir(&tests_dir).map_err(|err| {
+            CliError::UnexpectedError(format!(
+                "Failed to create a directory for tests {tests_dir:?}.\n{err:?}"
+            ))
+        })?;
+        fs::write(
+            &move_module_path,
+            format!("#[test_only]\n\nmodule _::{project_name}_test {{}}"),
+        )
+        .map_err(|err| {
+            CliError::UnexpectedError(format!(
+                "Failed to create a file with test {move_module_path:?}.\n{err:?}"
+            ))
+        })?;
+
+        Ok(())
     }
 }
 
