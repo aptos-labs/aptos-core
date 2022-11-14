@@ -644,10 +644,11 @@ module aptos_std::bls12381 {
     #[test]
     /// Tests verification of random BLS proofs-of-possession (PoPs)
     fun test_verify_pop() {
-        let (sk, validated_pk) = generate_keys();
-        let pk_bytes = public_key_with_pop_to_bytes(&validated_pk);
+        let (sk, pk) = generate_keys();
+        let pk_bytes = public_key_with_pop_to_bytes(&pk);
         let pop = generate_proof_of_possession(&sk);
         assert!(option::is_some(&public_key_from_bytes_with_pop(pk_bytes, &pop)), 1);
         assert!(option::is_none(&public_key_from_bytes_with_pop(pk_bytes, &maul_proof_of_possession(&pop))), 1);
+        assert!(option::is_none(&public_key_from_bytes_with_pop(maul_bytes(&pk_bytes), &pop)), 1);
     }
 }
