@@ -3,7 +3,7 @@
 
 use crate::components::feature_flags::Features;
 use anyhow::{anyhow, Result};
-use aptos_types::on_chain_config::{GasScheduleV2, Version};
+use aptos_types::on_chain_config::{GasScheduleV2, OnChainConsensusConfig, Version};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
@@ -11,6 +11,7 @@ use std::{
     path::Path,
 };
 
+pub mod consensus_config;
 pub mod feature_flags;
 pub mod framework;
 pub mod gas;
@@ -26,6 +27,8 @@ pub struct ReleaseConfig {
     pub version: Option<Version>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feature_flags: Option<Features>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub consensus_config: Option<OnChainConsensusConfig>,
 }
 
 impl ReleaseConfig {
@@ -54,6 +57,13 @@ impl ReleaseConfig {
         if let Some(feature_flags) = &self.feature_flags {
             result.append(&mut feature_flags::generate_feature_upgrade_proposal(
                 feature_flags,
+                self.testnet,
+            )?);
+        }
+
+        if let Some(consensus_config) = &self.consensus_config {
+            result.append(&mut consensus_config::generate_consensus_upgrade_proposal(
+                consensus_config,
                 self.testnet,
             )?);
         }
@@ -116,6 +126,7 @@ impl Default for ReleaseConfig {
             gas_schedule: Some(aptos_gas::gen::current_gas_schedule()),
             version: None,
             feature_flags: None,
+            consensus_config: Some(OnChainConsensusConfig::default()),
         }
     }
 }
