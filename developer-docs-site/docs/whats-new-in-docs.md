@@ -29,7 +29,7 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 03 November 2022
 
-- Added [Aptos API reference files](https://aptos.dev/nodes/aptos-api-spec/#/) directly to Aptos.dev for ease of search and use and clarified available information at various endpoints.
+- Added [Aptos API reference files](https://aptos.dev/nodes/aptos-api-spec/#/) directly to Aptos.dev for easy access and clarified available information at various endpoints.
 
 ## 02 November 2022
 
