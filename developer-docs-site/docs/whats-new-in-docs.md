@@ -1,5 +1,5 @@
 ---
-title: "Whats New in Docs"
+title: "What is New in Docs"
 slug: "whats-new-in-docs"
 ---
 
