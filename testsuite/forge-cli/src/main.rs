@@ -607,6 +607,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             60,
             100,
             80,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 10,
@@ -625,6 +626,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 15,
                 always_healthy_nodes: 0,
@@ -643,6 +645,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             500,
             300,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 0,
@@ -662,6 +665,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 40,
@@ -676,6 +680,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 6,
@@ -685,11 +690,12 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 check_period_s: 27,
             },
         ),
-        "slow_processing_catching_up" => changing_working_quorum_test(
+        "state_sync_slow_processing_catching_up" => changing_working_quorum_test(
             10,
             300,
             3000,
             2500,
+            true,
             &ChangingWorkingQuorumTest {
                 min_tps: 1500,
                 always_healthy_nodes: 2,
@@ -699,11 +705,12 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 check_period_s: 57,
             },
         ),
-        "failures_catching_up" => changing_working_quorum_test(
+        "state_sync_failures_catching_up" => changing_working_quorum_test(
             10,
             300,
             3000,
             2500,
+            true,
             &ChangingWorkingQuorumTest {
                 min_tps: 1500,
                 always_healthy_nodes: 2,
@@ -903,6 +910,7 @@ fn changing_working_quorum_test(
     epoch_duration: usize,
     target_tps: usize,
     min_avg_tps: usize,
+    apply_txn_outputs: bool,
     test: &'static ChangingWorkingQuorumTest,
 ) -> ForgeConfig<'static> {
     let config = ForgeConfig::default();
@@ -931,6 +939,20 @@ fn changing_working_quorum_test(
             helm_values["validator"]["config"]["consensus"]
                 ["round_timeout_backoff_exponent_base"] = 1.0.into();
             helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] = 1.into();
+
+            // Override the syncing mode of all nodes to use transaction output syncing.
+            // TODO(joshlind): remove me once we move back to output syncing by default.
+            if apply_txn_outputs {
+                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+            }
         }))
         .with_emit_job(
             EmitJobRequest::default()
