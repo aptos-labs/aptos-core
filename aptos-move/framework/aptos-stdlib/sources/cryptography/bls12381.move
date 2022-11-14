@@ -518,7 +518,7 @@ module aptos_std::bls12381 {
     }
 
     #[test]
-    fun test_gen_sign_verify_normal_signature_or_signature_share() {
+    fun test_verify_normal_signature_or_signature_share() {
         let (sk, pkpop) = generate_keys();
         let pk = public_key_with_pop_to_normal(&pkpop);
 
@@ -536,52 +536,104 @@ module aptos_std::bls12381 {
     }
 
     #[test]
-    fun test_gen_sign_verify_multi_signature() {
-        let (sk_a, pk_a) = generate_keys();
-        let (sk_b, pk_b) = generate_keys();
-        let signing_keys = vector[sk_a, sk_b];
-        let aggr_pk = aggregate_pubkeys(vector[pk_a, pk_b]);
-
+    fun test_verify_multisignature() {
+        let signer_count = 1;
+        let max_signer_count = 5;
         let msg = b"hello world";
+        while (signer_count <= max_signer_count) {
+            // Generate key pairs.
+            let signing_keys = vector[];
+            let public_keys = vector[];
+            let i = 0;
+            while (i < signer_count) {
+                let (sk, pk) = generate_keys();
+                std::vector::push_back(&mut signing_keys, sk);
+                std::vector::push_back(&mut public_keys, pk);
+                i = i + 1;
+            };
 
-        let multisig = multi_sign_arbitrary_bytes(&signing_keys, msg);
+            // Generate multi-signature.
+            let aggr_pk = aggregate_pubkeys(public_keys);
+            let multisig = multi_sign_arbitrary_bytes(&signing_keys, msg);
 
-        assert!(verify_multisignature(&multisig, &aggr_pk, msg), 1);
-        assert!(!verify_multisignature(&maul_aggr_or_multi_signature(&multisig), &aggr_pk, msg), 1);
-        assert!(!verify_multisignature(&multisig, &maul_aggregated_public_key(&aggr_pk), msg), 1);
-        assert!(!verify_multisignature(&multisig, &aggr_pk, maul_bytes(&msg)), 1);
+            // Test signature verification.
+            assert!(verify_multisignature(&multisig, &aggr_pk, msg), 1);
+            assert!(!verify_multisignature(&maul_aggr_or_multi_signature(&multisig), &aggr_pk, msg), 1);
+            assert!(!verify_multisignature(&multisig, &maul_aggregated_public_key(&aggr_pk), msg), 1);
+            assert!(!verify_multisignature(&multisig, &aggr_pk, maul_bytes(&msg)), 1);
 
-        // Also test signature aggregation.
-        let sig_a = sign_arbitrary_bytes(&sk_a, msg);
-        let sig_b = sign_arbitrary_bytes(&sk_b, msg);
-        let sig_a_b = option::extract(&mut aggregate_signatures(vector[sig_a, sig_b]));
-        assert!(aggr_or_multi_signature_subgroup_check(&sig_a_b), 1);
-        assert!(aggr_or_multi_signature_to_bytes(&sig_a_b) == aggr_or_multi_signature_to_bytes(&multisig), 1);
+            // Also test signature aggregation.
+            let signatures = vector[];
+            let i = 0;
+            while (i < signer_count) {
+                let sk = std::vector::borrow(&signing_keys, i);
+                let sig = sign_arbitrary_bytes(sk, msg);
+                std::vector::push_back(&mut signatures, sig);
+                i = i + 1;
+            };
+            let aggregated_signature = option::extract(&mut aggregate_signatures(signatures));
+            assert!(aggr_or_multi_signature_subgroup_check(&aggregated_signature), 1);
+            assert!(aggr_or_multi_signature_to_bytes(&aggregated_signature) == aggr_or_multi_signature_to_bytes(&multisig), 1);
+
+            signer_count = signer_count + 1;
+        }
     }
 
     #[test]
-    fun test_gen_sign_verify_aggregated_signature() {
-        let (sk_a,pk_a) = generate_keys();
-        let (sk_b,pk_b) = generate_keys();
-        let signing_keys = vector[sk_a, sk_b];
-        let public_keys = vector[pk_a, pk_b];
-        let mauled_public_keys = vector[maul_public_key_with_pop(&pk_a), pk_b];
+    fun test_verify_aggregated_signature() {
+        let signer_count = 1;
+        let max_signer_count = 5;
+        while (signer_count <= max_signer_count) {
+            // Generate key pairs and messages.
+            let signing_keys = vector[];
+            let public_keys = vector[];
+            let messages: vector<vector<u8>> = vector[];
+            let i = 0;
+            while (i < signer_count) {
+                let (sk, pk) = generate_keys();
+                std::vector::push_back(&mut signing_keys, sk);
+                std::vector::push_back(&mut public_keys, pk);
+                let msg: vector<u8> = vector[104, 101, 108, 108, 111, 32, 97, 112, 116, 111, 115, 32, 117, 115, 101, 114, 32, 48+(i as u8)]; //"hello aptos user {i}"
+                std::vector::push_back(&mut messages, msg);
+                i = i + 1;
+            };
 
-        let message_1 = b"hello world";
-        let message_2 = b"hello aptos";
-        let messages = vector[message_1, message_2];
-        let mauled_messages = vector[maul_bytes(&message_1), message_2];
-        let aggrsig = aggr_sign_arbitrary_bytes(&signing_keys, &messages);
-        assert!(verify_aggregate_signature(&aggrsig, public_keys, messages), 1);
-        assert!(!verify_aggregate_signature(&maul_aggr_or_multi_signature(&aggrsig), public_keys, messages), 1);
-        assert!(!verify_aggregate_signature(&aggrsig, mauled_public_keys, messages), 1);
-        assert!(!verify_aggregate_signature(&aggrsig, public_keys, mauled_messages), 1);
+            // Maul messages and public keys.
+            let mauled_public_keys = vector[maul_public_key_with_pop(std::vector::borrow(&public_keys, 0))];
+            let mauled_messages = vector[maul_bytes(std::vector::borrow(&messages, 0))];
+            let i = 1;
+            while (i < signer_count) {
+                let pk = std::vector::borrow(&public_keys, i);
+                let msg = std::vector::borrow(&messages, i);
+                std::vector::push_back(&mut mauled_public_keys, *pk);
+                std::vector::push_back(&mut mauled_messages, *msg);
+                i = i + 1;
+            };
 
-        // Also test signature aggregation.
-        let sig_a_1 = sign_arbitrary_bytes(&sk_a, message_1);
-        let sig_b_2 = sign_arbitrary_bytes(&sk_b, message_2);
-        let sig_a_1_b_2 = option::extract(&mut aggregate_signatures(vector[sig_a_1, sig_b_2]));
-        assert!(aggr_or_multi_signature_to_bytes(&sig_a_1_b_2) == aggr_or_multi_signature_to_bytes(&aggrsig), 1);
+            // Generate aggregated signature.
+            let aggrsig = aggr_sign_arbitrary_bytes(&signing_keys, &messages);
+
+            // Test signature verification.
+            assert!(verify_aggregate_signature(&aggrsig, public_keys, messages), 1);
+            assert!(!verify_aggregate_signature(&maul_aggr_or_multi_signature(&aggrsig), public_keys, messages), 1);
+            assert!(!verify_aggregate_signature(&aggrsig, mauled_public_keys, messages), 1);
+            assert!(!verify_aggregate_signature(&aggrsig, public_keys, mauled_messages), 1);
+
+            // Also test signature aggregation.
+            let signatures = vector[];
+            let i = 0;
+            while (i < signer_count) {
+                let sk = std::vector::borrow(&signing_keys, i);
+                let msg = std::vector::borrow(&messages, i);
+                let sig = sign_arbitrary_bytes(sk, *msg);
+                std::vector::push_back(&mut signatures, sig);
+                i = i + 1;
+            };
+            let aggrsig_another = option::extract(&mut aggregate_signatures(signatures));
+            assert!(aggr_or_multi_signature_to_bytes(&aggrsig_another) == aggr_or_multi_signature_to_bytes(&aggrsig), 1);
+
+            signer_count = signer_count + 1;
+        }
     }
 
     #[test]
