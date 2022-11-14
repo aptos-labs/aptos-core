@@ -1,11 +1,11 @@
 ---
-title: "Building Your Own Wallet"
-slug: "building-your-own-wallet"
+title: "Wallet Standard"
+slug: "wallet-standard"
 ---
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Building Your Own Wallet
+# Wallet Standard
 
 In order to allow for Aptos' wallet interoperability, the following is required:
 1. Mnemonics - a set of words that can derive account private keys

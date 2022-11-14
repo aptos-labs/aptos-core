@@ -3162,18 +3162,19 @@ return the TokenId for a given Token
 
     // we add more tokens <b>with</b> property_version 0
     <b>let</b> token_id = <a href="token.md#0x3_token_create_token_id">create_token_id</a>(token_data_id, 0);
-    <a href="token.md#0x3_token_deposit_token">deposit_token</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-        <a href="token.md#0x3_token_Token">Token</a> {
-            id: token_id,
-            amount,
-            token_properties: <a href="property_map.md#0x3_property_map_empty">property_map::empty</a>(), // same <b>as</b> default properties no need <b>to</b> store
-        }
-    );
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_MintTokenEvent">MintTokenEvent</a>&gt;(
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_addr).mint_token_events,
         <a href="token.md#0x3_token_MintTokenEvent">MintTokenEvent</a> {
             id: token_data_id,
             amount,
+        }
+    );
+
+    <a href="token.md#0x3_token_deposit_token">deposit_token</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        <a href="token.md#0x3_token_Token">Token</a> {
+            id: token_id,
+            amount,
+            token_properties: <a href="property_map.md#0x3_property_map_empty">property_map::empty</a>(), // same <b>as</b> default properties no need <b>to</b> store
         }
     );
 
@@ -3224,19 +3225,20 @@ create tokens and directly deposite to receiver's address. The receiver should o
 
     // we add more tokens <b>with</b> property_version 0
     <b>let</b> token_id = <a href="token.md#0x3_token_create_token_id">create_token_id</a>(token_data_id, 0);
-    <a href="token.md#0x3_token_direct_deposit">direct_deposit</a>(receiver,
-        <a href="token.md#0x3_token_Token">Token</a> {
-            id: token_id,
-            amount,
-            token_properties: <a href="property_map.md#0x3_property_map_empty">property_map::empty</a>(), // same <b>as</b> default properties no need <b>to</b> store
-        }
-    );
 
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_MintTokenEvent">MintTokenEvent</a>&gt;(
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_addr).mint_token_events,
         <a href="token.md#0x3_token_MintTokenEvent">MintTokenEvent</a> {
             id: token_data_id,
             amount,
+        }
+    );
+
+    <a href="token.md#0x3_token_direct_deposit">direct_deposit</a>(receiver,
+        <a href="token.md#0x3_token_Token">Token</a> {
+            id: token_id,
+            amount,
+            token_properties: <a href="property_map.md#0x3_property_map_empty">property_map::empty</a>(), // same <b>as</b> default properties no need <b>to</b> store
         }
     );
 }
