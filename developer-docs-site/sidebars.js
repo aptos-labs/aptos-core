@@ -18,6 +18,11 @@ const sidebars = {
   aptosSidebar: [
     "index",
     {
+      type: "html",
+      value: "Get Aptos",
+      className: "sidebar-title",
+    },
+    {
       type: "category",
       label: "Start Aptos",
       link: { type: "doc", id: "guides/getting-started" },
@@ -30,6 +35,7 @@ const sidebars = {
         "cli-tools/build-aptos-cli",
         "cli-tools/aptos-cli-tool/use-aptos-cli",
         "cli-tools/install-move-prover",
+        "nodes/local-testnet/using-cli-to-run-a-local-testnet",
         {
           type: "category",
           label: "Follow Token Standard",
@@ -121,13 +127,25 @@ const sidebars = {
     },
     {
       type: "html",
-      value: "Nodes",
+      value: "Run Nodes",
       className: "sidebar-title",
     },
-    "nodes/nodes-landing",
-    "nodes/aptos-deployments",
-    "nodes/aptos-api-spec",
-    "nodes/leaderboard-metrics",
+    {
+      type: "category",
+      label: "Node Overview",
+      collapsible: true,
+      collapsed: true,
+      link: { type: "doc", id: "nodes/nodes-landing" },
+      items: [
+        "nodes/aptos-deployments",
+        "nodes/leaderboard-metrics",
+        "nodes/node-health-checker/index",
+        "nodes/node-health-checker/node-health-checker-faq",
+        "reference/telemetry",
+        "nodes/identity-and-configuration",
+
+      ],
+    },
     {
       type: "category",
       label: "Node Files For Mainnet",
@@ -136,7 +154,6 @@ const sidebars = {
       link: { type: "doc", id: "nodes/node-files-all-networks/node-files" },
       items: ["nodes/node-files-all-networks/node-files-devnet", "nodes/node-files-all-networks/node-files-testnet"],
     },
-    "nodes/identity-and-configuration",
     /** Delete during clean up
     {
       type: "category",
@@ -216,37 +233,19 @@ const sidebars = {
         "nodes/full-node/fullnode-network-connections",
         "nodes/full-node/run-a-fullnode-on-gcp",
         "nodes/full-node/bootstrap-fullnode",
+        "nodes/indexer-fullnode",
       ],
     },
-    "nodes/indexer-fullnode",
-    {
-      type: "category",
-      label: "Local Testnet",
-      link: { type: "doc", id: "nodes/local-testnet/index" },
-      collapsible: true,
-      collapsed: true,
-      items: ["nodes/local-testnet/using-cli-to-run-a-local-testnet", "nodes/local-testnet/run-a-local-testnet"],
-    },
-    {
-      type: "category",
-      label: "Node Health Checker",
-      link: { type: "doc", id: "nodes/node-health-checker/index" },
-      collapsible: true,
-      collapsed: true,
-      items: ["nodes/node-health-checker/node-health-checker-faq"],
-    },
-    "nodes/leaderboard-metrics",
-    "reference/telemetry",
-    {
-      type: "html",
-      value: "Tools",
-      className: "sidebar-title",
-    },
+        /** Delete after clean up
+         * "nodes/local-testnet/index"
+         *  "nodes/local-testnet/run-a-local-testnet"
+         */
     {
       type: "html",
       value: "Reference",
       className: "sidebar-title",
     },
+    "nodes/aptos-api-spec",
     "issues-and-workarounds",
     "reference/glossary",
     {
