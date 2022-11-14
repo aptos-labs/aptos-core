@@ -165,7 +165,65 @@ repository = "https://github.com/aptos-labs/aptos-core"
 rust-version = "1.64"
 
 [workspace.dependencies]
-# BEGIN MOVE DEPENDENCIES
+# Internal crate dependencies
+aptos-bitvec = { path = "crates/aptos-bitvec" }
+aptos-compression = { path = "crates/aptos-compression" }
+aptos-config = { path = "config" }
+aptos-crypto = { path = "crates/aptos-crypto" }
+aptos-data-client = { path = "state-sync/aptos-data-client" }
+aptos-genesis = { path = "crates/aptos-genesis" }
+aptos-id-generator = { path = "crates/aptos-id-generator" }
+aptos-infallible = { path = "crates/aptos-infallible" }
+aptos-logger = { path = "crates/aptos-logger" }
+aptos-metrics-core = { path = "crates/aptos-metrics-core" }
+aptos-state-view = { path = "storage/state-view" }
+aptos-temppath = { path = "crates/aptos-temppath" }
+aptos-time-service = { path = "crates/aptos-time-service" }
+aptos-types = { path = "types" }
+aptos-vm = { path = "aptos-move/aptos-vm" }
+aptosdb = { path = "storage/aptosdb" }
+bounded-executor = { path = "crates/bounded-executor" }
+channel = { path = "crates/channel" }
+consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
+data-streaming-service = { path = "state-sync/state-sync-v2/data-streaming-service" }
+event-notifications = { path = "state-sync/inter-component/event-notifications" }
+executor = { path = "execution/executor" }
+executor-test-helpers = { path = "execution/executor-test-helpers" }
+executor-types = { path = "execution/executor-types" }
+mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
+netcore = { path = "network/netcore" }
+network = { path = "network" }
+schemadb = { path = "storage/schemadb" }
+scratchpad = { path = "storage/scratchpad" }
+short-hex-str = { path = "crates/short-hex-str" }
+storage-interface = { path = "storage/storage-interface" }
+storage-service-client = { path = "state-sync/storage-service/client" }
+storage-service-server = { path = "state-sync/storage-service/server" }
+storage-service-types = { path = "state-sync/storage-service/types" }
+vm-genesis = { path = "aptos-move/vm-genesis" }
+
+# External crate dependencies
+anyhow = "1.0.57"
+async-trait = "0.1.53"
+bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
+bytes = "1.1.0"
+claims = "0.7"
+enum_dispatch = "0.3.8"
+futures = "0.3.21"
+itertools = "0.10.0"
+lru = "0.7.5"
+maplit = "1.0.2"
+mockall = "0.11.0"
+num-traits = "0.2.15"
+once_cell = "1.10.0"
+proptest = "1.0.0"
+rand = "0.7.3"
+serde = "1.0.137"
+thiserror = "1.0.31"
+tokio = { version = "1.21.0", features = ["full"] }
+tokio-stream = "0.1.8"
+
+# External Move dependencies
 move-abigen = { git = "https://github.com/move-language/move", rev = "f7137eabc2046f76fdad3ded2c51e03a3b1fbd01" }
 move-binary-format = { git = "https://github.com/move-language/move", rev = "f7137eabc2046f76fdad3ded2c51e03a3b1fbd01" }
 move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "f7137eabc2046f76fdad3ded2c51e03a3b1fbd01" }
@@ -194,7 +252,6 @@ move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "f71
 move-vm-types = { git = "https://github.com/move-language/move", rev = "f7137eabc2046f76fdad3ded2c51e03a3b1fbd01" }
 read-write-set = { git = "https://github.com/move-language/move", rev = "f7137eabc2046f76fdad3ded2c51e03a3b1fbd01" }
 read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "f7137eabc2046f76fdad3ded2c51e03a3b1fbd01" }
-# END MOVE DEPENDENCIES
 
 [profile.release]
 debug = true
