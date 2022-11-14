@@ -844,15 +844,17 @@ pub struct Ed25519Signature {
 
 impl VerifyInput for Ed25519Signature {
     fn verify(&self) -> anyhow::Result<()> {
-        if self.public_key.inner().len() != ED25519_PUBLIC_KEY_LENGTH {
+        let public_key_len = self.public_key.inner().len();
+        let signature_len = self.signature.inner().len();
+        if public_key_len != ED25519_PUBLIC_KEY_LENGTH {
             bail!(
-                "Ed25519 signature's public key is an invalid number of bytes, should be {} bytes",
-                ED25519_PUBLIC_KEY_LENGTH
+                "Ed25519 signature's public key is an invalid number of bytes, should be {} bytes but found {}",
+                ED25519_PUBLIC_KEY_LENGTH, public_key_len
             )
-        } else if self.signature.inner().len() != ED25519_SIGNATURE_LENGTH {
+        } else if signature_len != ED25519_SIGNATURE_LENGTH {
             bail!(
-                "Ed25519 signature length is an invalid number of bytes, should be {} bytes",
-                ED25519_SIGNATURE_LENGTH
+                "Ed25519 signature length is an invalid number of bytes, should be {} bytes but found {}",
+                ED25519_SIGNATURE_LENGTH, signature_len
             )
         } else {
             // TODO: Check if they match / parse correctly?
