@@ -104,30 +104,39 @@ pub struct StoragePricingV2 {
 
 impl StoragePricingV2 {
     pub fn zeros() -> Self {
-        Self::new(LATEST_GAS_FEATURE_VERSION, &StorageGasSchedule::zeros())
+        Self::new(
+            LATEST_GAS_FEATURE_VERSION,
+            &StorageGasSchedule::zeros(),
+            &AptosGasParameters::zeros(),
+        )
     }
 
-    pub fn new(feature_version: u64, gas_schedule: &StorageGasSchedule) -> Self {
+    pub fn new(
+        feature_version: u64,
+        storage_gas_schedule: &StorageGasSchedule,
+        gas_params: &AptosGasParameters,
+    ) -> Self {
         assert!(feature_version > 0);
 
-        let free_write_bytes_quota = if feature_version >= 3 {
-            1024
+        let free_write_bytes_quota = if feature_version >= 5 {
+            gas_params.txn.free_write_bytes_quota
+        } else if feature_version >= 3 {
+            1024.into()
         } else {
             // for feature_version 2 and below `free_write_bytes_quota` won't be used anyway
             // but let's set it properly to reduce confusion.
-            0
-        }
-        .into();
+            0.into()
+        };
 
         Self {
             feature_version,
             free_write_bytes_quota,
-            per_item_read: gas_schedule.per_item_read.into(),
-            per_item_create: gas_schedule.per_item_create.into(),
-            per_item_write: gas_schedule.per_item_write.into(),
-            per_byte_read: gas_schedule.per_byte_read.into(),
-            per_byte_create: gas_schedule.per_byte_create.into(),
-            per_byte_write: gas_schedule.per_byte_write.into(),
+            per_item_read: storage_gas_schedule.per_item_read.into(),
+            per_item_create: storage_gas_schedule.per_item_create.into(),
+            per_item_write: storage_gas_schedule.per_item_write.into(),
+            per_byte_read: storage_gas_schedule.per_byte_read.into(),
+            per_byte_create: storage_gas_schedule.per_byte_create.into(),
+            per_byte_write: storage_gas_schedule.per_byte_write.into(),
         }
     }
 
@@ -235,7 +244,7 @@ impl StorageGasParameters {
         let gas_params = gas_params.unwrap();
 
         let pricing = match storage_gas_schedule {
-            Some(schedule) => StoragePricing::V2(StoragePricingV2::new(feature_version, schedule)),
+            Some(schedule) => StoragePricing::V2(StoragePricingV2::new(feature_version, schedule, gas_params)),
             None => StoragePricing::V1(StoragePricingV1::new(gas_params)),
         };
 

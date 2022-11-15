@@ -29,6 +29,7 @@ use std::collections::BTreeMap;
 // Change log:
 // - V5
 //   - u16, u32, u256
+//   - free_write_bytes_quota
 // - V4
 //   - Consider memory leaked for event natives
 // - V3
