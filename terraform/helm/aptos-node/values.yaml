@@ -78,8 +78,6 @@ validator:
     size: 2048Gi
   # -- Log level for the validator
   rust_log: info
-  # -- Remote log level for the validator
-  rust_log_remote: debug,hyper=off
   # -- Address for remote logging. See `logger` helm chart
   remoteLogAddress:
   # -- Flag to force enable telemetry service (useful for forge tests)
@@ -112,8 +110,6 @@ fullnode:
     size: 2048Gi
   # -- Log level for the fullnode
   rust_log: info
-  # -- Remote log level for the fullnode
-  rust_log_remote: debug,hyper=off
   # -- Flag to force enable telemetry service (useful for forge tests)
   force_enable_telemetry: false
   nodeSelector: {}
