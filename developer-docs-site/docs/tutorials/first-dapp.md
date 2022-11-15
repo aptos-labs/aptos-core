@@ -12,7 +12,7 @@ For this tutorial, we will use the Move module `HelloBlockchain` described in [Y
 We will use:
 
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Aptos Wallet Extension](../guides/building-your-own-wallet.md)
+* [Petra Wallet](../guides/install-petra-wallet-extension)
 * [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
 
 The end result is a dapp that lets users publish and share snippets of text on the Aptos blockchain.
@@ -26,7 +26,7 @@ The full source code for this tutorial is being updated. Meanwhile, the older on
 
 ### Aptos Wallet
 
-Before starting this tutorial, install the [Aptos Wallet extension](../guides/building-wallet-extension.md).
+Before starting this tutorial, install the [Petra extension](../guides/install-petra-wallet-extension).
 
 After you install it:
 
@@ -160,7 +160,7 @@ First, add the SDK to the project's dependencies:
 npm install --save aptos
 ```
 
-You will now see `"aptos": "^0.0.20"` (or similar) in your `package.json`.
+You will now see `"aptos": "^1.3.15"` (or similar) in your `package.json`.
 
 ### Create an `AptosClient`
 
@@ -240,7 +240,7 @@ You can also verify that the module was published by going to the [Aptos Explore
 ```json
 {
   "address": "0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481",
-  "name": "Message",
+  "name": "message",
   "friends": [],
   "exposedFunctions": [
     {
@@ -307,11 +307,11 @@ You can also verify that the module was published by going to the [Aptos Explore
 }
 ```
 
-Make a note of `"name": "Message"`, we will use it in the next section.
+Make a note of `"name": "message"`, we will use it in the next section.
 
 ### Add module publishing instructions to the dapp
 
-As a convenience to the users, we can have the app display the `aptos move publish` command if the module does not exist. To do so, we will use the Aptos SDK to retrieve the account modules and look for one where `module.abi.name` equals `"Message"` (i.e., the `"name": "Message"` we saw in the Aptos Explorer).
+As a convenience to the users, we can have the app display the `aptos move publish` command if the module does not exist. To do so, we will use the Aptos SDK to retrieve the account modules and look for one where `module.abi.name` equals `"message"` (i.e., the `"name": "message"` we saw in the Aptos Explorer).
 
 Update `src/App.tsx`:
 
@@ -320,13 +320,13 @@ function App() {
   // ...
 
   // Check for the module; show publish instructions if not present.
-  const [modules, setModules] = React.useState<Types.MoveModule[]>([]);
+  const [modules, setModules] = React.useState<Types.MoveModuleBytecode[]>([]);
   React.useEffect(() => {
     if (!address) return;
     client.getAccountModules(address).then(setModules);
   }, [address]);
 
-  const hasModule = modules.some((m) => m.abi?.name === 'Message');
+  const hasModule = modules.some((m) => m.abi?.name === 'message');
   const publishInstructions = (
     <pre>
       Run this command to publish the module:
@@ -481,7 +481,7 @@ function App() {
   // ...
 
   // Get the message from account resources.
-  const [resources, setResources] = React.useState<Types.AccountResource[]>([]);
+  const [resources, setResources] = React.useState<Types.MoveResource[]>([]);
   React.useEffect(() => {
     if (!address) return;
     client.getAccountResources(address).then(setResources);
@@ -554,4 +554,4 @@ That concludes this tutorial.
 
 * [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Building Wallet Extension](../guides/building-your-own-wallet.md)
+* [Wallet Standard](../guides/wallet-standard.md)

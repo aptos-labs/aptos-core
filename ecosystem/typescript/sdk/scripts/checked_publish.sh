@@ -6,8 +6,11 @@
 
 set -e
 
+cd "$(dirname "$0")"
+cd ..
+
 # Make sure everything is valid.
-. ./check.sh
+. scripts/check.sh
 
 # Finally, publish the package. We assume it has been built
 pnpm publish --non-interactive

@@ -337,7 +337,6 @@ impl CliCommand<&'static str> for TestPackage {
             config,
             UnitTestingConfig {
                 filter: self.filter,
-                instruction_execution_bound: Some(self.instruction_execution_bound),
                 report_stacktrace_on_abort: true,
                 ..UnitTestingConfig::default_with_bound(None)
             },
@@ -346,6 +345,7 @@ impl CliCommand<&'static str> for TestPackage {
                 NativeGasParameters::zeros(),
                 AbstractValueSizeGasParameters::zeros(),
             ),
+            None,
             false,
             &mut std::io::stdout(),
         )
