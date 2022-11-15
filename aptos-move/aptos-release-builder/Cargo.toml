@@ -1,0 +1,29 @@
+[package]
+name = "aptos-release-builder"
+description = "Tooling for building the governance proposal script used for the network"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = "1.0.57"
+aptos-gas = { path = "../aptos-gas" }
+bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
+clap = { version = "3.1.17", features = ["derive"] }
+move-core-types = { workspace = true }
+move-model = { workspace = true }
+tempfile = "3.3.0"
+
+aptos-temppath = { path = "../../crates/aptos-temppath" }
+aptos-types = { path = "../../types" }
+
+[[bin]]
+name = "aptos-release-builder"
+path = "src/main.rs"

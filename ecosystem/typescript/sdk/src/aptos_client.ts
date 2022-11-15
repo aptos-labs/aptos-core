@@ -20,6 +20,7 @@ import {
   TransactionBuilderEd25519,
   TransactionBuilderRemoteABI,
   RemoteABIBuilderConfig,
+  TransactionBuilderMultiEd25519,
 } from "./transaction_builder";
 import {
   bcsSerializeBytes,
@@ -32,7 +33,7 @@ import {
   Uint64,
   AnyNumber,
 } from "./bcs";
-import { Ed25519PublicKey } from "./aptos_types";
+import { Ed25519PublicKey, MultiEd25519PublicKey } from "./aptos_types";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
@@ -384,7 +385,7 @@ export class AptosClient {
    *
    */
   async simulateTransaction(
-    accountOrPubkey: AptosAccount | Ed25519PublicKey,
+    accountOrPubkey: AptosAccount | Ed25519PublicKey | MultiEd25519PublicKey,
     rawTransaction: TxnBuilderTypes.RawTransaction,
     query?: {
       estimateGasUnitPrice?: boolean;
@@ -396,6 +397,20 @@ export class AptosClient {
 
     if (accountOrPubkey instanceof AptosAccount) {
       signedTxn = AptosClient.generateBCSSimulation(accountOrPubkey, rawTransaction);
+    } else if (accountOrPubkey instanceof MultiEd25519PublicKey) {
+      const txnBuilder = new TransactionBuilderMultiEd25519(() => {
+        const { threshold } = accountOrPubkey;
+        const bits: Seq<number> = [];
+        const signatures: TxnBuilderTypes.Ed25519Signature[] = [];
+        for (let i = 0; i < threshold; i += 1) {
+          bits.push(i);
+          signatures.push(new TxnBuilderTypes.Ed25519Signature(new Uint8Array(64)));
+        }
+        const bitmap = TxnBuilderTypes.MultiEd25519Signature.createBitmap(bits);
+        return new TxnBuilderTypes.MultiEd25519Signature(signatures, bitmap);
+      }, accountOrPubkey);
+
+      signedTxn = txnBuilder.sign(rawTransaction);
     } else {
       const txnBuilder = new TransactionBuilderEd25519(() => {
         const invalidSigBytes = new Uint8Array(64);

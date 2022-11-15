@@ -17,9 +17,12 @@ In a distributed system like blockchain, executing a transaction is distinct fro
 
 A validator can participate in the consensus process. However, the validator can acquire the voting power only when they stake, i.e., place their utility coin into escrow. To encourage validators to participate in the consensus process, each validator's vote weight is made proportionate to the amount of validator's stake. In exchange, the validator is rewarded in proportion to the amount of validator's stake. Hence, the performance of the network, i.e., consensus, is aligned with the validator's interest, i.e., rewards.  
 
-Note that currently no slashing is implemented. 
+Note that currently no slashing is implemented. See the data currently on-chain at:
+https://mainnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::staking_config::StakingConfig
 
-The rest of this document presents how staking works on the Aptos blockchain.
+With the configuration set in [staking_config.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/configs/staking_config.move).
+
+The rest of this document presents how staking works on the Aptos blockchain. See [Supporting documentation](#supporting-documentation) at the bottom for related resources.
 
 ## Staking on the Aptos blockchain
 
@@ -40,7 +43,7 @@ Below is a summary flow diagram of how staking on the Aptos blockchain works. Th
 The Aptos staking module defines a capability that represents ownership. 
 
 :::tip Ownership
-See the `OwnerCapability` defined in  [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/stake.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/stake.move).
+See the `OwnerCapability` defined in [stake.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/stake.move).
 :::
 
 The `OwnerCapability` resource can be used to control the stake pool. Three personas are supported: 
@@ -173,7 +176,7 @@ Participating as a validator node on the Aptos network works like this:
 2. Owner deposits her Aptos coins funds as stake, or have funds assigned by a staking service. The stake must be at least the minimum amount required.
 3. **The validator node cannot sync until the stake pool becomes active.**
 4. Operator validates and gains rewards. 
-5. The staked pool is automatically be locked up for a fixed duration (set by the Aptos governance) and will be automatically renewed at expiration. You cannot withdraw any of your staked amount until your lockup period expires. See [https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728](https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728).
+5. The staked pool is automatically be locked up for a fixed duration (set by the Aptos governance) and will be automatically renewed at expiration. You cannot withdraw any of your staked amount until your lockup period expires. See [stake.move#L728](https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728).
 6.  Operator must wait until the new epoch starts before their validator becomes active.
 
 :::tip Joining the validator set
@@ -220,7 +223,7 @@ The Aptos mainnet epoch is set as 7200 seconds (two hours).
 ### Triggers at the epoch start
 
 :::tip
-See [https://github.com/aptos-labs/aptos-core/blob/0daade4f734d1ba29a896b00d7ddde2249e87970/aptos-move/framework/aptos-framework/sources/configs/stake.move#L862](https://github.com/aptos-labs/aptos-core/blob/0daade4f734d1ba29a896b00d7ddde2249e87970/aptos-move/framework/aptos-framework/sources/configs/stake.move#L862) for the full code.
+See the [Triggers at epoch boundary section of `stake.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/stake.move#L982) for the full code.
 :::
 
 At the start of each epoch, the following key events are triggered:
@@ -269,7 +272,7 @@ All the validator rewards are also subject to lockup period as they are added to
 ## Leaving the validator set
 
 :::tip
-See the Aptos Stake module in Move language here: [https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move](https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move)
+See the Aptos Stake module in the Move language at [stake.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/stake.move).
 :::
 
 - At any time you can call the following sequence of functions to leave the validator set:
@@ -277,10 +280,17 @@ See the Aptos Stake module in Move language here: [https://github.com/aptos-labs
     - Either call `Stake::withdraw` to withdraw your staked amount at the next epoch, or call `Stake::leave_validator_set`.
 
 :::tip Leaving the validator set
-For step-by-step instructions on how to leave the validator set, see: [Leaving Validator Set](https://aptos.dev/nodes/ait/connect-to-testnet#leaving-validator-set).
+For step-by-step instructions on how to leave the validator set, see: [Leaving Validator Set](/nodes/ait/connect-to-testnet#leaving-validator-set).
 :::
 
 ## Rejoining the validator set
 
 When you leave a validator set, you can rejoin by depositing the minimum required stake amount.
 
+## Supporting documentation
+
+* [Current on-chain data](https://mainnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::staking_config::StakingConfig)
+* [Staking Pool Operations](../nodes/validator-node/operator/staking-pool-operations.md)
+* [Configuration file `staking_config.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/configs/staking_config.move)
+* [Contract file `staking_contract.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/staking_contract.move) covering requesting commissions
+* [All staking-related `.move files](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/framework/aptos-framework/sources)

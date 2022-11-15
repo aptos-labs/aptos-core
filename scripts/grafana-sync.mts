@@ -13,9 +13,9 @@ import "zx/globals";
 
 $.verbose = false;
 
-const GRAFANA_URL = "https://o11y.aptosdev.com";
-const GRAFANA_DASHBOARD_FOLDER_NAME_TO_SYNC = "aptos-core";
-const LOCAL_DASHBOARD_FOLDER_TO_SYNC = "dashboards";
+const GRAFANA_URL = process.env.GRAFANA_URL ?? "https://o11y.aptosdev.com";
+const GRAFANA_DASHBOARD_FOLDER_NAME_TO_SYNC = process.env.GRAFANA_DASHBOARD_FOLDER_NAME_TO_SYNC ?? "aptos-core";
+const LOCAL_DASHBOARD_FOLDER_TO_SYNC = process.env.LOCAL_DASHBOARD_FOLDER_TO_SYNC ?? "dashboards";
 
 enum Action {
   Download = "download",

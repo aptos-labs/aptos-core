@@ -12,11 +12,11 @@ module aptos_std::comparator {
     }
 
     public fun is_equal(result: &Result): bool {
-        return result.inner == EQUAL
+        result.inner == EQUAL
     }
 
     public fun is_smaller_than(result: &Result): bool {
-        return result.inner == SMALLER
+        result.inner == SMALLER
     }
 
     public fun is_greater_than(result: &Result): bool {

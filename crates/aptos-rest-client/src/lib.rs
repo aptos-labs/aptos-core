@@ -985,6 +985,21 @@ impl Client {
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
+    pub async fn get_account_resource_at_version_bytes(
+        &self,
+        address: AccountAddress,
+        resource_type: &str,
+        version: u64,
+    ) -> AptosResult<Response<Vec<u8>>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/resource/{}?ledger_version={}",
+            address, resource_type, version
+        ))?;
+
+        let response = self.get_bcs(url).await?;
+        Ok(response.map(|inner| inner.to_vec()))
+    }
+
     pub async fn get_account_resource_at_version(
         &self,
         address: AccountAddress,
@@ -1167,6 +1182,24 @@ impl Client {
 
         let response = self.post_bcs(url, data).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_raw_table_item(
+        &self,
+        table_handle: AccountAddress,
+        key: &[u8],
+        version: u64,
+    ) -> AptosResult<Response<Vec<u8>>> {
+        let url = self.build_path(&format!(
+            "tables/{}/raw_item?ledger_version={}",
+            table_handle, version
+        ))?;
+        let data = json!({
+            "key": hex::encode(key),
+        });
+
+        let response = self.post_bcs(url, data).await?;
+        Ok(response.map(|inner| inner.to_vec()))
     }
 
     pub async fn get_account(&self, address: AccountAddress) -> AptosResult<Response<Account>> {
