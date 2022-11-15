@@ -12,4 +12,5 @@ Aptos provides a fully supported TypeScript SDK with the source code in the [Apt
 - ### [TypeScript SDK Installation](typescript-sdk.md)
 - ### [TypeScript SDK Overview](typescript-sdk-overview.md)
 - ### [TypeScript SDK Reference](https://aptos-labs.github.io/ts-sdk-doc/)
+- ### [TypeScript SDK Reference Source](https://github.com/aptos-labs/ts-sdk-doc)
 - ### [TypeScript SDK at NPM](https://www.npmjs.com/package/aptos)
