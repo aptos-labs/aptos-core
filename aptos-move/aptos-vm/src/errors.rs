@@ -55,8 +55,7 @@ pub fn convert_prologue_error(
             if !transaction_validation.is_account_module_abort(&location) =>
         {
             let (category, reason) = error_split(code);
-            log_context.alert();
-            error!(
+            warn!(
                 *log_context,
                 "[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
                 location, code, category, reason,
@@ -87,8 +86,7 @@ pub fn convert_prologue_error(
                     StatusCode::SECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH
                 }
                 (category, reason) => {
-                    log_context.alert();
-                    error!(
+                    warn!(
                         *log_context,
                         "[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
                         location, code, category, reason,
@@ -101,8 +99,7 @@ pub fn convert_prologue_error(
             VMStatus::Error(new_major_status)
         }
         status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error(_) => {
-            log_context.alert();
-            error!(
+            warn!(
                 *log_context,
                 "[aptos_vm] Unexpected prologue error: {:?}", status
             );
@@ -172,8 +169,9 @@ pub fn expect_only_successful_execution(
         VMStatus::Executed => VMStatus::Executed,
 
         status => {
-            log_context.alert();
-            error!(
+            // Only trigger a warning here as some errors could be a result of the speculative parallel execution.
+            // We will report the errors after we obtained the final transaction output in `update_counters_for_processed_chunk`.
+            warn!(
                 *log_context,
                 "[aptos_vm] Unexpected error from known Move function, '{}'. Error: {:?}",
                 function_name,

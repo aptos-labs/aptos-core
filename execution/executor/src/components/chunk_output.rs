@@ -5,7 +5,7 @@
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
-use aptos_logger::{trace, warn};
+use aptos_logger::{error, trace, warn};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
@@ -13,6 +13,7 @@ use aptos_types::{
 use aptos_vm::{AptosVM, VMExecutor};
 use executor_types::ExecutedChunk;
 use fail::fail_point;
+use move_core_types::vm_status::StatusCode;
 use storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     ExecutedTrees,
@@ -177,7 +178,31 @@ pub fn update_counters_for_processed_chunk(
                 .inc();
         }
 
+        if let Transaction::BlockMetadata(_) = txn {
+            match output.status() {
+                TransactionStatus::Discard(status) => {
+                    metrics::APTOS_EXECUTOR_ERRORS.inc();
+                    error!(
+                        "Unexpected Failure from BlockMetadata transaction with status: {:?}",
+                        status
+                    );
+                }
+                TransactionStatus::Keep(_) | TransactionStatus::Retry => (),
+            }
+        }
+
         if let Transaction::UserTransaction(user_txn) = txn {
+            match output.status() {
+                TransactionStatus::Discard(err)
+                    if *err == StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION =>
+                {
+                    metrics::APTOS_EXECUTOR_ERRORS.inc();
+                    error!(
+                        "Unexpected Failure from prologue/epilogue function in user transaction"
+                    );
+                }
+                _ => (),
+            };
             match user_txn.payload() {
                 aptos_types::transaction::TransactionPayload::Script(_script) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
