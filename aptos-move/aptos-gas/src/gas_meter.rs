@@ -8,8 +8,7 @@ use crate::{
     algebra::{AbstractValueSize, Gas},
     instr::InstructionGasParameters,
     misc::MiscGasParameters,
-    transaction::StorageGasParameters,
-    transaction::TransactionGasParameters,
+    transaction::{StorageGasParameters, TransactionGasParameters},
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey, write_set::WriteOp,
