@@ -1,40 +1,43 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 // @generated
 /// Transaction is a simplified representation for the transaction
 /// happened on the chain. Mainly built for streaming into BigQuery.
 /// It matches with the structure defined for the transaction in Indexer.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Transaction {
-    #[prost(int64, required, tag="1")]
+    #[prost(int64, required, tag = "1")]
     pub version: i64,
-    #[prost(int64, required, tag="2")]
+    #[prost(int64, required, tag = "2")]
     pub block_height: i64,
-    #[prost(string, required, tag="3")]
+    #[prost(string, required, tag = "3")]
     pub hash: ::prost::alloc::string::String,
-    #[prost(string, required, tag="4")]
+    #[prost(string, required, tag = "4")]
     pub type_str: ::prost::alloc::string::String,
-    #[prost(string, optional, tag="5")]
+    #[prost(string, optional, tag = "5")]
     pub payload: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, required, tag="6")]
+    #[prost(string, required, tag = "6")]
     pub state_change_hash: ::prost::alloc::string::String,
-    #[prost(string, required, tag="7")]
+    #[prost(string, required, tag = "7")]
     pub event_root_hash: ::prost::alloc::string::String,
-    #[prost(string, optional, tag="8")]
+    #[prost(string, optional, tag = "8")]
     pub state_checkpoint_hash: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(uint64, required, tag="9")]
+    #[prost(uint64, required, tag = "9")]
     pub gas_used: u64,
-    #[prost(bool, required, tag="10")]
+    #[prost(bool, required, tag = "10")]
     pub success: bool,
-    #[prost(string, required, tag="11")]
+    #[prost(string, required, tag = "11")]
     pub vm_status: ::prost::alloc::string::String,
-    #[prost(string, required, tag="12")]
+    #[prost(string, required, tag = "12")]
     pub accumulator_root_hash: ::prost::alloc::string::String,
-    #[prost(int64, required, tag="13")]
+    #[prost(int64, required, tag = "13")]
     pub num_events: i64,
-    #[prost(int64, required, tag="14")]
+    #[prost(int64, required, tag = "14")]
     pub num_write_set_changes: i64,
-    #[prost(int64, required, tag="15")]
+    #[prost(int64, required, tag = "15")]
     pub epoch: i64,
-    #[prost(int64, required, tag="16")]
+    #[prost(int64, required, tag = "16")]
     pub inserted_at: i64,
 }
 /// Encoded file descriptor set for the `aptos.indexer.transaction.v1` package

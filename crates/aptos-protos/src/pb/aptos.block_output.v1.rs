@@ -1,238 +1,241 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 // @generated
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockOutput {
-    #[prost(uint64, tag="1")]
+    #[prost(uint64, tag = "1")]
     pub height: u64,
-    #[prost(message, repeated, tag="2")]
+    #[prost(message, repeated, tag = "2")]
     pub transactions: ::prost::alloc::vec::Vec<TransactionOutput>,
-    #[prost(uint32, tag="3")]
+    #[prost(uint32, tag = "3")]
     pub chain_id: u32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransactionOutput {
-    #[prost(message, optional, tag="1")]
+    #[prost(message, optional, tag = "1")]
     pub transaction_info_output: ::core::option::Option<TransactionInfoOutput>,
-    #[prost(message, repeated, tag="5")]
+    #[prost(message, repeated, tag = "5")]
     pub events: ::prost::alloc::vec::Vec<EventOutput>,
-    #[prost(message, repeated, tag="6")]
+    #[prost(message, repeated, tag = "6")]
     pub write_set_changes: ::prost::alloc::vec::Vec<WriteSetChangeOutput>,
-    #[prost(oneof="transaction_output::TxnData", tags="2, 3, 4")]
+    #[prost(oneof = "transaction_output::TxnData", tags = "2, 3, 4")]
     pub txn_data: ::core::option::Option<transaction_output::TxnData>,
 }
 /// Nested message and enum types in `TransactionOutput`.
 pub mod transaction_output {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum TxnData {
-        #[prost(message, tag="2")]
+        #[prost(message, tag = "2")]
         BlockMetadata(super::BlockMetadataTransactionOutput),
-        #[prost(message, tag="3")]
+        #[prost(message, tag = "3")]
         User(super::UserTransactionOutput),
-        #[prost(message, tag="4")]
+        #[prost(message, tag = "4")]
         Genesis(super::GenesisTransactionOutput),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransactionInfoOutput {
-    #[prost(bytes="vec", tag="1")]
+    #[prost(bytes = "vec", tag = "1")]
     pub hash: ::prost::alloc::vec::Vec<u8>,
-    #[prost(string, tag="2")]
+    #[prost(string, tag = "2")]
     pub r#type: ::prost::alloc::string::String,
-    #[prost(uint64, tag="3")]
+    #[prost(uint64, tag = "3")]
     pub version: u64,
-    #[prost(bytes="vec", tag="4")]
+    #[prost(bytes = "vec", tag = "4")]
     pub state_change_hash: ::prost::alloc::vec::Vec<u8>,
-    #[prost(bytes="vec", tag="5")]
+    #[prost(bytes = "vec", tag = "5")]
     pub event_root_hash: ::prost::alloc::vec::Vec<u8>,
-    #[prost(bytes="vec", optional, tag="13")]
+    #[prost(bytes = "vec", optional, tag = "13")]
     pub state_checkpoint_hash: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
-    #[prost(uint64, tag="6")]
+    #[prost(uint64, tag = "6")]
     pub gas_used: u64,
-    #[prost(bool, tag="7")]
+    #[prost(bool, tag = "7")]
     pub success: bool,
-    #[prost(uint64, tag="8")]
+    #[prost(uint64, tag = "8")]
     pub epoch: u64,
-    #[prost(uint64, tag="9")]
+    #[prost(uint64, tag = "9")]
     pub block_height: u64,
-    #[prost(string, tag="10")]
+    #[prost(string, tag = "10")]
     pub vm_status: ::prost::alloc::string::String,
-    #[prost(bytes="vec", tag="11")]
+    #[prost(bytes = "vec", tag = "11")]
     pub accumulator_root_hash: ::prost::alloc::vec::Vec<u8>,
-    #[prost(message, optional, tag="12")]
+    #[prost(message, optional, tag = "12")]
     pub timestamp: ::core::option::Option<super::super::util::timestamp::Timestamp>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockMetadataTransactionOutput {
-    #[prost(uint64, tag="1")]
+    #[prost(uint64, tag = "1")]
     pub version: u64,
-    #[prost(string, tag="2")]
+    #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
-    #[prost(uint64, tag="3")]
+    #[prost(uint64, tag = "3")]
     pub round: u64,
-    #[prost(bytes="vec", tag="4")]
+    #[prost(bytes = "vec", tag = "4")]
     pub previous_block_votes_bitvec: ::prost::alloc::vec::Vec<u8>,
-    #[prost(string, tag="5")]
+    #[prost(string, tag = "5")]
     pub proposer: ::prost::alloc::string::String,
-    #[prost(uint32, repeated, tag="6")]
+    #[prost(uint32, repeated, tag = "6")]
     pub failed_proposer_indices: ::prost::alloc::vec::Vec<u32>,
-    #[prost(message, optional, tag="7")]
+    #[prost(message, optional, tag = "7")]
     pub timestamp: ::core::option::Option<super::super::util::timestamp::Timestamp>,
-    #[prost(uint64, tag="8")]
+    #[prost(uint64, tag = "8")]
     pub epoch: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UserTransactionOutput {
-    #[prost(uint64, tag="1")]
+    #[prost(uint64, tag = "1")]
     pub version: u64,
-    #[prost(string, tag="2")]
+    #[prost(string, tag = "2")]
     pub parent_signature_type: ::prost::alloc::string::String,
-    #[prost(string, tag="3")]
+    #[prost(string, tag = "3")]
     pub sender: ::prost::alloc::string::String,
-    #[prost(uint64, tag="4")]
+    #[prost(uint64, tag = "4")]
     pub sequence_number: u64,
-    #[prost(uint64, tag="5")]
+    #[prost(uint64, tag = "5")]
     pub max_gas_amount: u64,
-    #[prost(message, optional, tag="6")]
+    #[prost(message, optional, tag = "6")]
     pub expiration_timestamp_secs: ::core::option::Option<super::super::util::timestamp::Timestamp>,
-    #[prost(uint64, tag="7")]
+    #[prost(uint64, tag = "7")]
     pub gas_unit_price: u64,
-    #[prost(message, optional, tag="8")]
+    #[prost(message, optional, tag = "8")]
     pub timestamp: ::core::option::Option<super::super::util::timestamp::Timestamp>,
-    #[prost(message, repeated, tag="9")]
+    #[prost(message, repeated, tag = "9")]
     pub signatures: ::prost::alloc::vec::Vec<SignatureOutput>,
-    #[prost(string, tag="10")]
+    #[prost(string, tag = "10")]
     pub payload: ::prost::alloc::string::String,
-    #[prost(string, tag="11")]
+    #[prost(string, tag = "11")]
     pub entry_function_id_str: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GenesisTransactionOutput {
-    #[prost(string, tag="1")]
+    #[prost(string, tag = "1")]
     pub payload: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SignatureOutput {
-    #[prost(uint64, tag="1")]
+    #[prost(uint64, tag = "1")]
     pub version: u64,
-    #[prost(string, tag="2")]
+    #[prost(string, tag = "2")]
     pub signer: ::prost::alloc::string::String,
-    #[prost(bool, tag="3")]
+    #[prost(bool, tag = "3")]
     pub is_sender_primary: bool,
-    #[prost(string, tag="4")]
+    #[prost(string, tag = "4")]
     pub signature_type: ::prost::alloc::string::String,
-    #[prost(bytes="vec", tag="5")]
+    #[prost(bytes = "vec", tag = "5")]
     pub public_key: ::prost::alloc::vec::Vec<u8>,
-    #[prost(bytes="vec", tag="6")]
+    #[prost(bytes = "vec", tag = "6")]
     pub signature: ::prost::alloc::vec::Vec<u8>,
-    #[prost(uint32, tag="7")]
+    #[prost(uint32, tag = "7")]
     pub threshold: u32,
-    #[prost(uint32, repeated, tag="8")]
+    #[prost(uint32, repeated, tag = "8")]
     pub public_key_indices: ::prost::alloc::vec::Vec<u32>,
-    #[prost(uint32, tag="9")]
+    #[prost(uint32, tag = "9")]
     pub multi_agent_index: u32,
-    #[prost(uint32, tag="10")]
+    #[prost(uint32, tag = "10")]
     pub multi_sig_index: u32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EventOutput {
-    #[prost(uint64, tag="1")]
+    #[prost(uint64, tag = "1")]
     pub version: u64,
-    #[prost(message, optional, tag="2")]
+    #[prost(message, optional, tag = "2")]
     pub key: ::core::option::Option<EventKeyOutput>,
-    #[prost(uint64, tag="3")]
+    #[prost(uint64, tag = "3")]
     pub sequence_number: u64,
-    #[prost(string, tag="4")]
+    #[prost(string, tag = "4")]
     pub r#type: ::prost::alloc::string::String,
-    #[prost(string, tag="5")]
+    #[prost(string, tag = "5")]
     pub type_str: ::prost::alloc::string::String,
-    #[prost(string, tag="6")]
+    #[prost(string, tag = "6")]
     pub data: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EventKeyOutput {
-    #[prost(uint64, tag="1")]
+    #[prost(uint64, tag = "1")]
     pub creation_number: u64,
-    #[prost(string, tag="2")]
+    #[prost(string, tag = "2")]
     pub account_address: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct WriteSetChangeOutput {
-    #[prost(uint64, tag="1")]
+    #[prost(uint64, tag = "1")]
     pub version: u64,
-    #[prost(bytes="vec", tag="2")]
+    #[prost(bytes = "vec", tag = "2")]
     pub hash: ::prost::alloc::vec::Vec<u8>,
-    #[prost(string, tag="3")]
+    #[prost(string, tag = "3")]
     pub r#type: ::prost::alloc::string::String,
-    #[prost(oneof="write_set_change_output::Change", tags="4, 5, 6")]
+    #[prost(oneof = "write_set_change_output::Change", tags = "4, 5, 6")]
     pub change: ::core::option::Option<write_set_change_output::Change>,
 }
 /// Nested message and enum types in `WriteSetChangeOutput`.
 pub mod write_set_change_output {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Change {
-        #[prost(message, tag="4")]
+        #[prost(message, tag = "4")]
         MoveModule(super::MoveModuleOutput),
-        #[prost(message, tag="5")]
+        #[prost(message, tag = "5")]
         MoveResource(super::MoveResourceOutput),
-        #[prost(message, tag="6")]
+        #[prost(message, tag = "6")]
         TableItem(super::TableItemOutput),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MoveModuleOutput {
-    #[prost(string, tag="1")]
+    #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
+    #[prost(string, tag = "2")]
     pub address: ::prost::alloc::string::String,
-    #[prost(bytes="vec", tag="3")]
+    #[prost(bytes = "vec", tag = "3")]
     pub bytecode: ::prost::alloc::vec::Vec<u8>,
-    #[prost(string, repeated, tag="4")]
+    #[prost(string, repeated, tag = "4")]
     pub friends: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// this can be better
-    #[prost(string, repeated, tag="5")]
+    #[prost(string, repeated, tag = "5")]
     pub exposed_functions: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(string, repeated, tag="6")]
+    #[prost(string, repeated, tag = "6")]
     pub structs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(bool, tag="7")]
+    #[prost(bool, tag = "7")]
     pub is_deleted: bool,
-    #[prost(uint64, tag="8")]
+    #[prost(uint64, tag = "8")]
     pub wsc_index: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MoveResourceOutput {
-    #[prost(string, tag="1")]
+    #[prost(string, tag = "1")]
     pub address: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
+    #[prost(string, tag = "2")]
     pub module: ::prost::alloc::string::String,
-    #[prost(string, tag="3")]
+    #[prost(string, tag = "3")]
     pub type_str: ::prost::alloc::string::String,
-    #[prost(string, tag="4")]
+    #[prost(string, tag = "4")]
     pub name: ::prost::alloc::string::String,
-    #[prost(string, repeated, tag="5")]
+    #[prost(string, repeated, tag = "5")]
     pub generic_type_params: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(string, tag="6")]
+    #[prost(string, tag = "6")]
     pub data: ::prost::alloc::string::String,
-    #[prost(bool, tag="7")]
+    #[prost(bool, tag = "7")]
     pub is_deleted: bool,
-    #[prost(uint64, tag="8")]
+    #[prost(uint64, tag = "8")]
     pub wsc_index: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TableItemOutput {
-    #[prost(string, tag="1")]
+    #[prost(string, tag = "1")]
     pub handle: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
+    #[prost(string, tag = "2")]
     pub key: ::prost::alloc::string::String,
-    #[prost(string, tag="3")]
+    #[prost(string, tag = "3")]
     pub decoded_key: ::prost::alloc::string::String,
-    #[prost(string, tag="4")]
+    #[prost(string, tag = "4")]
     pub key_type: ::prost::alloc::string::String,
-    #[prost(string, tag="5")]
+    #[prost(string, tag = "5")]
     pub decoded_value: ::prost::alloc::string::String,
-    #[prost(string, tag="6")]
+    #[prost(string, tag = "6")]
     pub value_type: ::prost::alloc::string::String,
-    #[prost(bool, tag="7")]
+    #[prost(bool, tag = "7")]
     pub is_deleted: bool,
-    #[prost(uint64, tag="8")]
+    #[prost(uint64, tag = "8")]
     pub wsc_index: u64,
 }
 /// Encoded file descriptor set for the `aptos.block_output.v1` package
