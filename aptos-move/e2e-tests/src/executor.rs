@@ -26,6 +26,7 @@ use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::chain_id::ChainId;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::transaction::ChangeSetLimits;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -602,7 +603,10 @@ impl FakeExecutor {
             let session_out = session.finish().expect("Failed to generate txn effects");
             // TODO: Support deltas in fake executor.
             let (_, change_set) = session_out
-                .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+                .into_change_set(
+                    &mut (),
+                    ChangeSetLimits::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+                )
                 .expect("Failed to generate writeset")
                 .into_inner();
             let (write_set, _events) = change_set.into_inner();
@@ -642,7 +646,10 @@ impl FakeExecutor {
         let session_out = session.finish().expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
         let (_, change_set) = session_out
-            .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+            .into_change_set(
+                &mut (),
+                ChangeSetLimits::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+            )
             .expect("Failed to generate writeset")
             .into_inner();
         let (writeset, _events) = change_set.into_inner();

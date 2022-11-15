@@ -214,6 +214,7 @@ enum MempoolNotificationResponse {
 mod tests {
     use crate::{CommittedTransaction, Error, MempoolNotificationSender};
     use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+    use aptos_types::transaction::ChangeSetLimits;
     use aptos_types::{
         account_address::AccountAddress,
         block_metadata::BlockMetadata,
@@ -388,7 +389,8 @@ mod tests {
                     .freeze()
                     .expect("freeze cannot fail"),
                 vec![],
-                3,
+                // TODO(gas): probably move LATEST_GAS_FEATURE_VERSION to global-constants
+                &ChangeSetLimits::unlimited_at_gas_feature_version(3),
             )
             .unwrap(),
         ))

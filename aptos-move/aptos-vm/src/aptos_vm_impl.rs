@@ -19,7 +19,7 @@ use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
 use aptos_types::chain_id::ChainId;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_types::transaction::AbortInfo;
+use aptos_types::transaction::{AbortInfo, ChangeSetLimits};
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     on_chain_config::{
@@ -592,7 +592,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     gas_left: Gas,
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
-    gas_feature_version: u64,
+    change_set_limits: ChangeSetLimits,
 ) -> Result<TransactionOutputExt, VMStatus> {
     let gas_used = txn_data
         .max_gas_amount()
@@ -600,7 +600,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
         .expect("Balance should always be less than or equal to max gas amount");
 
     let session_out = session.finish().map_err(|e| e.into_vm_status())?;
-    let change_set_ext = session_out.into_change_set(ap_cache, gas_feature_version)?;
+    let change_set_ext = session_out.into_change_set(ap_cache, change_set_limits)?;
     let (delta_change_set, change_set) = change_set_ext.into_inner();
     let (write_set, events) = change_set.into_inner();
 

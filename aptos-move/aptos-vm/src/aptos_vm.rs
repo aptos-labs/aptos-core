@@ -29,6 +29,7 @@ use aptos_gas::AptosGasMeter;
 use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
+use aptos_types::transaction::ChangeSetLimits;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
@@ -250,7 +251,7 @@ impl AptosVM {
                     gas_meter.balance(),
                     txn_data,
                     status,
-                    gas_meter.feature_version(),
+                    gas_meter.change_set_limits(),
                 )
                 .unwrap_or_else(|e| discard_error_vm_status(e).1);
                 (error_code, txn_output)
@@ -301,7 +302,7 @@ impl AptosVM {
         let epilogue_change_set_ext = session
             .finish()
             .map_err(|e| e.into_vm_status())?
-            .into_change_set(&mut (), gas_meter.feature_version())?;
+            .into_change_set(&mut (), gas_meter.change_set_limits())?;
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
@@ -401,7 +402,7 @@ impl AptosVM {
 
             let session_output = session.finish().map_err(|e| e.into_vm_status())?;
             let change_set_ext =
-                session_output.into_change_set(&mut (), gas_meter.feature_version())?;
+                session_output.into_change_set(&mut (), gas_meter.change_set_limits())?;
 
             // Charge gas for write set
             gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -542,7 +543,7 @@ impl AptosVM {
 
         let session_output = session.finish().map_err(|e| e.into_vm_status())?;
         let change_set_ext =
-            session_output.into_change_set(&mut (), gas_meter.feature_version())?;
+            session_output.into_change_set(&mut (), gas_meter.change_set_limits())?;
 
         // Charge gas for write set
         gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -748,12 +749,14 @@ impl AptosVM {
         session_id: SessionId,
     ) -> Result<ChangeSetExt, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
         let mut gas_meter = UnmeteredGasMeter;
+        let change_set_limits =
+            ChangeSetLimits::unlimited_at_gas_feature_version(self.0.get_gas_feature_version());
 
         Ok(match writeset_payload {
             WriteSetPayload::Direct(change_set) => ChangeSetExt::new(
                 DeltaChangeSet::empty(),
                 change_set.clone(),
-                self.0.get_gas_feature_version(),
+                change_set_limits,
             ),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage, session_id);
@@ -785,7 +788,7 @@ impl AptosVM {
 
                 match execution_result {
                     Ok(session_out) => session_out
-                        .into_change_set(&mut (), self.0.get_gas_feature_version())
+                        .into_change_set(&mut (), change_set_limits)
                         .map_err(Err)?,
                     Err(e) => {
                         return Err(Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET))));
@@ -907,7 +910,7 @@ impl AptosVM {
             0.into(),
             &txn_data,
             ExecutionStatus::Success,
-            self.0.get_gas_feature_version(),
+            self.0.get_storage_gas_parameters(log_context)?.limits,
         )?;
         Ok((VMStatus::Executed, output))
     }

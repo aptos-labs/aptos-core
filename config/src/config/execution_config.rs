@@ -119,7 +119,7 @@ mod test {
     use super::*;
     use aptos_temppath::TempPath;
     use aptos_types::{
-        transaction::{ChangeSet, Transaction, WriteSetPayload},
+        transaction::{ChangeSet, ChangeSetLimits, Transaction, WriteSetPayload},
         write_set::WriteSetMut,
     };
 
@@ -136,7 +136,13 @@ mod test {
     #[test]
     fn test_some_and_load_genesis() {
         let fake_genesis = Transaction::GenesisTransaction(WriteSetPayload::Direct(
-            ChangeSet::new(WriteSetMut::new(vec![]).freeze().unwrap(), vec![], 3).unwrap(),
+            ChangeSet::new(
+                WriteSetMut::new(vec![]).freeze().unwrap(),
+                vec![],
+                // TODO(gas): probably move LATEST_GAS_FEATURE_VERSION to global-constants
+                &ChangeSetLimits::unlimited_at_gas_feature_version(3),
+            )
+            .unwrap(),
         ));
         let (mut config, path) = generate_config();
         config.genesis = Some(fake_genesis.clone());

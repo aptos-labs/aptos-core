@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::transaction::ChangeSetLimits;
 use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
@@ -105,8 +106,13 @@ impl Arbitrary for ChangeSet {
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         (any::<WriteSet>(), vec(any::<ContractEvent>(), 0..10))
             .prop_map(|(ws, events)| {
-                // TODO(gas): probably move LATEST_GAS_FEATURE_VERSION to global-constants
-                ChangeSet::new(ws, events, 3).unwrap()
+                ChangeSet::new(
+                    ws,
+                    events,
+                    // TODO(gas): probably move LATEST_GAS_FEATURE_VERSION to global-constants
+                    &ChangeSetLimits::unlimited_at_gas_feature_version(3),
+                )
+                .unwrap()
             })
             .boxed()
     }

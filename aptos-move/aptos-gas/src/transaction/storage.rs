@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_types::transaction::ChangeSetLimits;
 use aptos_types::{
     on_chain_config::StorageGasSchedule, state_store::state_key::StateKey, write_set::WriteOp,
 };
@@ -209,9 +210,46 @@ impl StoragePricingTrait for StoragePricingV2 {
     }
 }
 
+struct ChangeSetLimitsBuilder;
+
+impl ChangeSetLimitsBuilder {
+    pub fn build(feature_version: u64, gas_params: &AptosGasParameters) -> ChangeSetLimits {
+        if feature_version >= 5 {
+            Self::from_gas_params(feature_version, gas_params)
+        } else if feature_version >= 3 {
+            Self::for_feature_version_3()
+        } else {
+            ChangeSetLimits::unlimited_at_gas_feature_version(feature_version)
+        }
+    }
+
+    fn for_feature_version_3() -> ChangeSetLimits {
+        const MB: u64 = 1 << 20;
+
+        ChangeSetLimits::new(3, MB, u64::MAX, MB, MB << 10)
+    }
+
+    fn from_gas_params(
+        gas_feature_version: u64,
+        gas_params: &AptosGasParameters,
+    ) -> ChangeSetLimits {
+        ChangeSetLimits::new(
+            gas_feature_version,
+            gas_params.txn.max_bytes_per_write_op.into(),
+            gas_params
+                .txn
+                .max_bytes_all_write_ops_per_transaction
+                .into(),
+            gas_params.txn.max_bytes_per_event.into(),
+            gas_params.txn.max_bytes_all_events_per_transaction.into(),
+        )
+    }
+}
+
 #[derive(Clone)]
 pub struct StorageGasParameters {
     pub pricing: Arc<dyn StoragePricingTrait>,
+    pub limits: ChangeSetLimits,
 }
 
 impl StorageGasParameters {
@@ -232,12 +270,15 @@ impl StorageGasParameters {
             None => Arc::new(StoragePricingV1::new(gas_params)),
         };
 
-        Some(Self { pricing })
+        let limits = ChangeSetLimitsBuilder::build(feature_version, gas_params);
+
+        Some(Self { pricing, limits })
     }
 
-    pub fn zeros() -> Self {
+    pub fn free_and_unlimited() -> Self {
         Self {
             pricing: Arc::new(StoragePricingV2::zeros()),
+            limits: ChangeSetLimits::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         }
     }
 }

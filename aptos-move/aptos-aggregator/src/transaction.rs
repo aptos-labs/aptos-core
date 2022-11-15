@@ -4,6 +4,7 @@
 use crate::delta_change_set::{deserialize, DeltaChangeSet};
 use anyhow::bail;
 use aptos_state_view::StateView;
+use aptos_types::transaction::ChangeSetLimits;
 use aptos_types::{
     transaction::{ChangeSet, TransactionOutput},
     write_set::{TransactionWrite, WriteOp, WriteSet, WriteSetMut},
@@ -31,19 +32,19 @@ impl AggregatorValue {
 pub struct ChangeSetExt {
     delta_change_set: DeltaChangeSet,
     change_set: ChangeSet,
-    gas_feature_version: u64,
+    limits: ChangeSetLimits,
 }
 
 impl ChangeSetExt {
     pub fn new(
         delta_change_set: DeltaChangeSet,
         change_set: ChangeSet,
-        gas_feature_version: u64,
+        limits: ChangeSetLimits,
     ) -> Self {
         ChangeSetExt {
             delta_change_set,
             change_set,
-            gas_feature_version,
+            limits,
         }
     }
 
@@ -63,7 +64,7 @@ impl ChangeSetExt {
         use btree_map::Entry::*;
         use WriteOp::*;
 
-        let gas_feature_version = self.gas_feature_version;
+        let limits = self.limits;
         let (mut delta_set, change_set) = self.into_inner();
         let (write_set, events) = change_set.into_inner();
         let mut write_set = write_set.into_mut();
@@ -103,8 +104,8 @@ impl ChangeSetExt {
 
         Ok(Self {
             delta_change_set: delta_set,
-            change_set: ChangeSet::new(write_set.freeze()?, events, gas_feature_version)?,
-            gas_feature_version,
+            change_set: ChangeSet::new(write_set.freeze()?, events, &limits)?,
+            limits,
         })
     }
 
@@ -112,7 +113,7 @@ impl ChangeSetExt {
         use btree_map::Entry::*;
         use WriteOp::*;
 
-        let gas_feature_version = self.gas_feature_version;
+        let limits = self.limits;
         let (mut delta, change_set) = self.into_inner();
         let (write_set, mut events) = change_set.into_inner();
         let mut write_set = write_set.into_mut();
@@ -149,8 +150,8 @@ impl ChangeSetExt {
 
         Ok(Self {
             delta_change_set: delta,
-            change_set: ChangeSet::new(write_set.freeze()?, events, gas_feature_version)?,
-            gas_feature_version,
+            change_set: ChangeSet::new(write_set.freeze()?, events, &limits)?,
+            limits,
         })
     }
 
