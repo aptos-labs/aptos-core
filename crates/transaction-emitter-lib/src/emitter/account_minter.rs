@@ -374,26 +374,26 @@ where
             gen_reusable_accounts(&client, batch_size, &mut rng).await?
         } else {
             let batch = gen_random_accounts(batch_size, &mut rng);
-            let creation_requests = batch
-                .as_slice()
-                .iter()
-                .map(|account| {
-                    create_and_fund_account_request(
-                        &mut source_account,
-                        coins_per_new_account,
-                        account.public_key(),
-                        txn_factory,
-                    )
-                })
-                .collect();
-            execute_and_wait_transactions(
-                &client,
-                &mut source_account,
-                creation_requests,
-                failed_requests,
-            )
-            .await
-            .with_context(|| format!("Account {} couldn't mint", source_account.address()))?;
+            // let creation_requests = batch
+            //     .as_slice()
+            //     .iter()
+            //     .map(|account| {
+            //         create_and_fund_account_request(
+            //             &mut source_account,
+            //             coins_per_new_account,
+            //             account.public_key(),
+            //             txn_factory,
+            //         )
+            //     })
+            //     .collect();
+            // execute_and_wait_transactions(
+            //     &client,
+            //     &mut source_account,
+            //     creation_requests,
+            //     failed_requests,
+            // )
+            // .await
+            // .with_context(|| format!("Account {} couldn't mint", source_account.address()))?;
             batch
         };
 
