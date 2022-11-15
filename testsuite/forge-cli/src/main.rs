@@ -32,6 +32,10 @@ use testcases::{
 use tokio::runtime::Runtime;
 use url::Url;
 
+#[cfg(unix)]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 #[derive(StructOpt, Debug)]
 struct Args {
     #[structopt(long, default_value = "300")]

@@ -239,7 +239,7 @@ fn buffer_manager_happy_path_test() {
         msg_tx,
         mut self_loop_rx,
         _hash_val,
-        mut runtime,
+        runtime,
         signers,
         mut result_rx,
         verifier,
@@ -270,7 +270,7 @@ fn buffer_manager_happy_path_test() {
         last_proposal = Some(proposal.last().unwrap().clone());
     }
 
-    timed_block_on(&mut runtime, async move {
+    timed_block_on(&runtime, async move {
         for i in 0..num_batches {
             block_tx
                 .send(OrderedBlocks {
@@ -301,7 +301,7 @@ fn buffer_manager_sync_test() {
         msg_tx,
         mut self_loop_rx,
         _hash_val,
-        mut runtime,
+        runtime,
         signers,
         mut result_rx,
         verifier,
@@ -334,7 +334,7 @@ fn buffer_manager_sync_test() {
 
     let dropped_batches = 42;
 
-    timed_block_on(&mut runtime, async move {
+    timed_block_on(&runtime, async move {
         for i in 0..dropped_batches {
             block_tx
                 .send(OrderedBlocks {

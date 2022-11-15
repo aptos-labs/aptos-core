@@ -16,8 +16,8 @@ use consensus_types::{
 use dashmap::DashMap;
 use executor_types::*;
 use futures::channel::mpsc::Sender;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::sync::oneshot;
 
 // /// Notification of execution committed logical time for QuorumStore to clean.
@@ -173,7 +173,6 @@ impl DataManager {
         }
         if self.quorum_store_enabled.load(Ordering::Relaxed) {
             if let Payload::InQuorumStore(proofs) = block.payload().unwrap() {
-
                 // let data_status = self.digest_status.entry(block.id());
                 match self.digest_status.entry(block.id()) {
                     dashmap::mapref::entry::Entry::Occupied(mut entry) => match entry.get_mut() {

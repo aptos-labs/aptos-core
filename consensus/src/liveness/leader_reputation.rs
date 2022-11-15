@@ -219,13 +219,19 @@ pub struct NewBlockEventAggregation {
     // dependig on how many failures we have.
     voter_window_size: usize,
     proposer_window_size: usize,
+    reputation_window_from_stale_end: bool,
 }
 
 impl NewBlockEventAggregation {
-    pub fn new(voter_window_size: usize, proposer_window_size: usize) -> Self {
+    pub fn new(
+        voter_window_size: usize,
+        proposer_window_size: usize,
+        reputation_window_from_stale_end: bool,
+    ) -> Self {
         Self {
             voter_window_size,
             proposer_window_size,
+            reputation_window_from_stale_end,
         }
     }
 
@@ -343,7 +349,12 @@ impl NewBlockEventAggregation {
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::count_votes_custom(epoch_to_candidates, history, self.voter_window_size, true)
+        Self::count_votes_custom(
+            epoch_to_candidates,
+            history,
+            self.voter_window_size,
+            self.reputation_window_from_stale_end,
+        )
     }
 
     pub fn count_votes_custom(
@@ -388,7 +399,7 @@ impl NewBlockEventAggregation {
             epoch_to_candidates,
             history,
             self.proposer_window_size,
-            true,
+            self.reputation_window_from_stale_end,
         )
     }
 
@@ -417,7 +428,7 @@ impl NewBlockEventAggregation {
             history,
             epoch_to_candidates,
             self.proposer_window_size,
-            true,
+            self.reputation_window_from_stale_end,
         )
         .fold(HashMap::new(), |mut map, meta| {
             match Self::indices_to_validators(
@@ -484,6 +495,7 @@ impl ProposerAndVoterHeuristic {
         failure_threshold_percent: u32,
         voter_window_size: usize,
         proposer_window_size: usize,
+        reputation_window_from_stale_end: bool,
     ) -> Self {
         Self {
             author,
@@ -491,7 +503,11 @@ impl ProposerAndVoterHeuristic {
             inactive_weight,
             failed_weight,
             failure_threshold_percent,
-            aggregation: NewBlockEventAggregation::new(voter_window_size, proposer_window_size),
+            aggregation: NewBlockEventAggregation::new(
+                voter_window_size,
+                proposer_window_size,
+                reputation_window_from_stale_end,
+            ),
         }
     }
 }
