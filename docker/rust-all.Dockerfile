@@ -279,6 +279,7 @@ FROM validator AS validator-testing
 RUN apt-get update && apt-get install -y \
     # Extra goodies for debugging
     less \
+    git \
     vim \
     nano \
     libjemalloc-dev \
@@ -292,7 +293,17 @@ RUN apt-get update && apt-get install -y \
     python3-bpfcc \
     libbpfcc \
     libbpfcc-dev \
+    linux-headers-5.10.0-19-cloud-amd64
+
+RUN apt-get update && apt-get install -y \
+		arping bison clang-format cmake dh-python \
+		dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
+		libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
+		libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
+		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
     && apt-get clean && rm -r /var/lib/apt/lists/*
+
+RUN git clone https://github.com/iovisor/bcc.git --depth 1
 
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1
