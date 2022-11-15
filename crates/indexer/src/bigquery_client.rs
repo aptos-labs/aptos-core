@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! BigQuery-related functions
-use crate::indexer::errors::TransactionProcessingError;
-use crate::util::u64_to_bigdecimal_str;
-use aptos_api_types::{Transaction as APITransaction, TransactionInfo};
+use anyhow::bail;
+use aptos_protos::indexer::transaction::v1::FILE_DESCRIPTOR_SET;
 use futures_util::stream;
-use gcloud_sdk::google::cloud::bigquery::storage::v1::append_rows_request::{ProtoData, Rows};
 use gcloud_sdk::google::cloud::bigquery::storage::v1::{
+    append_rows_request::{ProtoData, Rows},
     write_stream, AppendRowsRequest, CreateWriteStreamRequest, ProtoRows, ProtoSchema, WriteStream,
 };
 use gcloud_sdk::{
@@ -18,14 +17,9 @@ use once_cell::sync::Lazy;
 use prost::Message;
 use prost_types::{DescriptorProto, FileDescriptorSet};
 use std::collections::HashMap;
-use streaming_proto::Transaction as TransactionProto;
 use tokio::sync::Mutex;
 
 const BIGQUERY_DATASET_NAME: &str = "aptos_indexer_bigquery_data";
-
-pub mod streaming_proto {
-    include!(concat!("./pb", "/aptos.indexer.proto.v1.rs"));
-}
 
 /// Typed AppendRowsRequest, which facilitates the table name(data destination) resolution.
 pub enum TypedAppendRowsRequest {
@@ -90,89 +84,31 @@ impl BigQueryClient {
         }
     }
 
-    /// Sends the data.
-    pub async fn send_data(
-        &self,
-        append_row_req: TypedAppendRowsRequest,
-        start_version: u64,
-        end_version: u64,
-    ) -> Result<(), TransactionProcessingError> {
+    /// Sends the data to bigquery streaming api.
+    pub async fn send_data(&self, append_row_req: TypedAppendRowsRequest) -> anyhow::Result<()> {
         let req = match append_row_req {
             TypedAppendRowsRequest::Transactions(mut data) => {
                 data.write_stream = self.get_stream("transactions".to_string()).await;
                 data
             }
         };
-        let mut current = self.sender_counter.lock().await;
+        // let mut current = self.sender_counter.lock().await;
         match self
             .client
             .get()
             .append_rows(tonic::Request::new(stream::iter(vec![req])))
             .await
         {
-            Ok(resp) => {
-                match resp.into_inner().message().await {
-                    Ok(res) => {
-                        match res {
-                            Some(data) => {
-                                match data.row_errors.len() {
-                                0 => {
-                                    *current += end_version - start_version;
-                                    Ok(())
-                                },
-                                // For any row insertion error, we need to abort the insertion and
-                                // retry. Handle the data duplication downstream.
-                                _ => {
-                                    Err(TransactionProcessingError::BigQueryTransactionCommitError(
-                                        (anyhow::Error::msg("Failed to insert one of more rows into BigQuery."), start_version, end_version, "transactions"),
-                                    ))
-                                }
-                            }
-                            }
-                            None => Err(
-                                TransactionProcessingError::BigQueryTransactionCommitError((
-                                    anyhow::Error::msg(
-                                        "No Response received for current insertion.",
-                                    ),
-                                    start_version,
-                                    end_version,
-                                    "transactions",
-                                )),
-                            ),
-                        }
-                    }
-                    Err(err) => Err(TransactionProcessingError::BigQueryTransactionCommitError(
-                        (
-                            anyhow::Error::msg(format!(
-                                "Failed to connect to BigQuery for ingesting data. {}",
-                                err.message()
-                            )),
-                            start_version,
-                            end_version,
-                            "transactions",
-                        ),
-                    )),
-                }
-            }
-            Err(err) => Err(TransactionProcessingError::BigQueryTransactionCommitError(
-                (
-                    anyhow::Error::msg(format!(
-                        "Failed to connect to BigQuery for ingesting data. {}",
-                        err.message()
-                    )),
-                    start_version,
-                    end_version,
-                    "transactions",
-                ),
-            )),
+            Ok(_) => Ok(()),
+            Err(_) => bail!("Failed to send data to BigQuery."),
         }
     }
 }
 
 /// The Protobuf descriptor for Transaction.
 static TRANSACTION_DESCRIPTOR: Lazy<DescriptorProto> = Lazy::new(|| {
-    let node_set = FileDescriptorSet::decode(&streaming_proto::FILE_DESCRIPTOR_SET[..])
-        .expect("Decode Proto successfully.");
+    let node_set =
+        FileDescriptorSet::decode(FILE_DESCRIPTOR_SET).expect("Decode Proto successfully.");
     node_set
         .file
         // First one in file set.
@@ -185,106 +121,14 @@ static TRANSACTION_DESCRIPTOR: Lazy<DescriptorProto> = Lazy::new(|| {
         .clone()
 });
 
-// Deprecated; separate this out from bigquery client module.
-fn from_transaction_info(
-    info: &TransactionInfo,
-    // Serialized Json string.
-    payload: Option<String>,
-    type_: String,
-    num_events: i64,
-    block_height: i64,
-    epoch: i64,
-) -> TransactionProto {
-    TransactionProto {
-        type_str: type_,
-        payload,
-        version: info.version.0 as i64,
-        block_height,
-        hash: info.hash.to_string().as_bytes().to_vec(),
-        state_change_hash: info.state_change_hash.to_string().as_bytes().to_vec(),
-        event_root_hash: info.event_root_hash.to_string().as_bytes().to_vec(),
-        state_checkpoint_hash: match info.state_checkpoint_hash.map(|h| h.to_string()) {
-            Some(hash) => Some(hash.as_bytes().to_vec()),
-            None => None,
-        },
-        gas_used: u64_to_bigdecimal_str(info.gas_used.0),
-        success: info.success,
-        vm_status: info.vm_status.clone(),
-        accumulator_root_hash: info.accumulator_root_hash.to_string().as_bytes().to_vec(),
-        num_events,
-        num_write_set_changes: info.changes.len() as i64,
-        epoch,
-    }
-}
-
-pub fn extract_from_api_transactions(transactions: &[APITransaction]) -> AppendRowsRequest {
-    let a = transactions
-        .iter()
-        .map(|transaction| {
-            let block_height = transaction
-                .transaction_info()
-                .unwrap()
-                .block_height
-                .unwrap()
-                .0 as i64;
-            let epoch = transaction.transaction_info().unwrap().epoch.unwrap().0 as i64;
-            let transaction_proto = match transaction {
-                APITransaction::UserTransaction(user_txn) => from_transaction_info(
-                    &user_txn.info,
-                    Some(
-                        serde_json::to_string(&user_txn.request.payload)
-                            .expect("Unable to deserialize transaction payload"),
-                    ),
-                    transaction.type_str().to_string(),
-                    user_txn.events.len() as i64,
-                    block_height,
-                    epoch,
-                ),
-                APITransaction::GenesisTransaction(genesis_txn) => from_transaction_info(
-                    &genesis_txn.info,
-                    Some(
-                        serde_json::to_string(&genesis_txn.payload)
-                            .expect("Unable to deserialize Genesis transaction"),
-                    ),
-                    transaction.type_str().to_string(),
-                    0,
-                    block_height,
-                    epoch,
-                ),
-                APITransaction::BlockMetadataTransaction(block_metadata_txn) => {
-                    from_transaction_info(
-                        &block_metadata_txn.info,
-                        None,
-                        transaction.type_str().to_string(),
-                        0,
-                        block_height,
-                        epoch,
-                    )
-                }
-                APITransaction::StateCheckpointTransaction(state_checkpoint_txn) => {
-                    from_transaction_info(
-                        &state_checkpoint_txn.info,
-                        None,
-                        transaction.type_str().to_string(),
-                        0,
-                        block_height,
-                        epoch,
-                    )
-                }
-                APITransaction::PendingTransaction(..) => {
-                    unreachable!()
-                }
-            };
-            let mut buf1 = Vec::new();
-            transaction_proto.encode(&mut buf1);
-            buf1
-        })
-        .collect();
+pub fn get_request(protos: Vec<Vec<u8>>) -> AppendRowsRequest {
     AppendRowsRequest {
         offset: None,
         trace_id: String::new(),
         rows: Some(Rows::ProtoRows(ProtoData {
-            rows: Some(ProtoRows { serialized_rows: a }),
+            rows: Some(ProtoRows {
+                serialized_rows: protos,
+            }),
             writer_schema: Some(ProtoSchema {
                 proto_descriptor: Some((*TRANSACTION_DESCRIPTOR).clone()),
             }),

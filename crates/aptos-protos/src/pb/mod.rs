@@ -17,6 +17,15 @@ pub mod aptos {
             // @@protoc_insertion_point(aptos.extractor.v1)
         }
     }
+    pub mod indexer {
+        pub mod transaction {
+            // @@protoc_insertion_point(attribute:aptos.indexer.transaction.v1)
+            pub mod v1 {
+                include!("aptos.indexer.transaction.v1.rs");
+                // @@protoc_insertion_point(aptos.indexer.transaction.v1)
+            }
+        }
+    }
     pub mod tokens {
         // @@protoc_insertion_point(attribute:aptos.tokens.v1)
         pub mod v1 {

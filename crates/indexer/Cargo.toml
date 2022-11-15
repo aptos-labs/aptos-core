@@ -18,6 +18,7 @@ aptos-api = { path = "../../api", package = "aptos-api" }
 aptos-api-types = { path = "../../api/types" }
 aptos-bitvec = { path = "../aptos-bitvec" }
 aptos-config = { path = "../../config" }
+aptos-protos = { path = "../aptos-protos" }
 async-trait = "0.1.53"
 bcs = "0.1.3"
 bigdecimal = { version = "0.3.0", features = ["serde"] }
@@ -37,12 +38,14 @@ diesel_migrations = { version = "2.0.0", features = ["postgres"] }
 field_count = "0.1.1"
 futures = "0.3.21"
 futures-util = "0.3.24"
-gcloud-sdk = { version = "0.14.4", features = ["google-cloud-bigquery-storage-v1"] }
+gcloud-sdk = { version = "0.14.4", features = [
+  "google-cloud-bigquery-storage-v1",
+] }
 hex = "0.4.3"
+itertools = "0.10.0"
 once_cell = "1.10.0"
 prost = "0.10.1"
 prost-types = "0.10.1"
-protoc-gen-prost = "0.1.3"
 regex = "1.5.5"
 reqwest = { version = "0.11.10", features = ["json", "cookies"] }
 reqwest-middleware = { version = "0.1.6" }
