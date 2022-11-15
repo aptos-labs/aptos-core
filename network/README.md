@@ -141,5 +141,5 @@ configurable static timeout.
 [`NoiseIK`]: ../specifications/network/noise.md
 [`PeerManager`]: ./src/peer_manager/mod.rs
 [`Peer`]: ./src/peer/mod.rs
-[`ValidatorConfig`]: ../aptos-move/framework/core/doc/ValidatorConfig.md#struct-config
+[`ValidatorConfig`]: ../documentation/specifications/network/onchain-discovery.md#on-chain-config
 [`validator-set-discovery`]: discovery/src/lib.rs
