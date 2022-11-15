@@ -109,6 +109,11 @@ const config = {
                 type: "doc",
                 docId: "concepts/index",
               },
+              {
+                label: "Prepare Environment",
+                type: "doc",
+                docId: "guides/getting-started",
+              },
             ],
           },
           {
