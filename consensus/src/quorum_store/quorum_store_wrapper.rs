@@ -356,8 +356,9 @@ impl QuorumStoreWrapper {
                     );
                     Payload::InQuorumStore(proof_block)
                 });
-                if let err = callback.send(Ok(res)) {
-                    debug!("BlockResponse receiver not available! error {:?}", err);
+                match callback.send(Ok(res)) {
+                    Ok(_) => (),
+                    Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),
                 }
             }
             WrapperCommand::CleanRequest(logical_time, digests) => {
