@@ -32,10 +32,6 @@ pub fn u64_to_bigdecimal(val: u64) -> BigDecimal {
     BigDecimal::from(val)
 }
 
-pub fn u64_to_bigdecimal_str(val: u64) -> String {
-    BigDecimal::from(val).to_string()
-}
-
 #[allow(dead_code)]
 pub fn bigdecimal_to_u64(val: &BigDecimal) -> u64 {
     val.to_u64().expect("Unable to convert big decimal to u64")

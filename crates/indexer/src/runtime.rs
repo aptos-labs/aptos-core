@@ -8,9 +8,10 @@ use crate::{
         transaction_processor::TransactionProcessor,
     },
     processors::{
-        coin_processor::CoinTransactionProcessor, data_ingestion_processor::DataIngestionProcessor,
-        default_processor::DefaultTransactionProcessor, stake_processor::StakeTransactionProcessor,
-        token_processor::TokenTransactionProcessor, Processor,
+        coin_processor::CoinTransactionProcessor, default_processor::DefaultTransactionProcessor,
+        default_processor_bq::DefaultTransactionProcessorBq,
+        stake_processor::StakeTransactionProcessor, token_processor::TokenTransactionProcessor,
+        Processor,
     },
 };
 use aptos_api::context::Context;
@@ -135,16 +136,19 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         Processor::DefaultProcessor => {
             Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
         }
+        Processor::DefaultProcessorBq => Arc::new(
+            DefaultTransactionProcessorBq::new(
+                conn_pool.clone(),
+                config.bigquery_project_id.unwrap(),
+            )
+            .await,
+        ),
         Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
             conn_pool.clone(),
             config.ans_contract_address,
         )),
         Processor::CoinProcessor => Arc::new(CoinTransactionProcessor::new(conn_pool.clone())),
         Processor::StakeProcessor => Arc::new(StakeTransactionProcessor::new(conn_pool.clone())),
-        Processor::DataIngestionProcessor => Arc::new(
-            DataIngestionProcessor::new(conn_pool.clone(), config.bigquery_project_id.unwrap())
-                .await,
-        ),
     };
 
     let options =

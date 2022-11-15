@@ -723,6 +723,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-protos",
  "aptos-types",
  "aptos-vm",
  "async-trait",
@@ -737,10 +738,10 @@ dependencies = [
  "futures-util",
  "gcloud-sdk",
  "hex",
+ "itertools",
  "once_cell",
  "prost 0.10.4",
  "prost-types 0.10.1",
- "protoc-gen-prost",
  "regex",
  "reqwest",
  "reqwest-middleware",
@@ -2582,15 +2583,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2850f2f5a82cbf437dd5af4d49848fbdfc27c157c3d010345776f952765261c5"
 dependencies = [
  "os_str_bytes",
-]
-
-[[package]]
-name = "cmake"
-version = "0.1.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db34956e100b30725f2eb215f90d4871051239535632f84fea3bc92722c66b7c"
-dependencies = [
- "cc",
 ]
 
 [[package]]
@@ -6440,12 +6432,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "multimap"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
-
-[[package]]
 name = "multipart"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7662,28 +7648,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prost-build"
-version = "0.10.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ae5a4388762d5815a9fc0dea33c56b021cdc8dde0c55e0c9ca57197254b0cab"
-dependencies = [
- "bytes 1.2.1",
- "cfg-if",
- "cmake",
- "heck 0.4.0",
- "itertools",
- "lazy_static 1.4.0",
- "log",
- "multimap",
- "petgraph 0.6.2",
- "prost 0.10.4",
- "prost-types 0.10.1",
- "regex",
- "tempfile",
- "which",
-]
-
-[[package]]
 name = "prost-derive"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7727,19 +7691,6 @@ checksum = "4dfaa718ad76a44b3415e6c4d53b17c8f99160dcb3a99b10470fce8ad43f6e3e"
 dependencies = [
  "bytes 1.2.1",
  "prost 0.11.0",
-]
-
-[[package]]
-name = "protoc-gen-prost"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b30e1abc742921f2514adb2b4e565d1f2a71ede6e5605ca1bf1c61480975ef8"
-dependencies = [
- "once_cell",
- "prost 0.10.4",
- "prost-build",
- "prost-types 0.10.1",
- "regex",
 ]
 
 [[package]]

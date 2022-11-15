@@ -11,7 +11,7 @@
   },
   {
     "name": "hash",
-    "type": "BYTES",
+    "type": "STRING",
     "mode": "REQUIRED"
   },
   {
@@ -26,22 +26,22 @@
   },
   {
     "name": "state_change_hash",
-    "type": "BYTES",
+    "type": "STRING",
     "mode": "REQUIRED"
   },
   {
     "name": "event_root_hash",
-    "type": "BYTES",
+    "type": "STRING",
     "mode": "REQUIRED"
   },
   {
     "name": "state_checkpoint_hash",
-    "type": "BYTES",
+    "type": "STRING",
     "mode": "NULLABLE"
   },
   {
     "name": "gas_used",
-    "type": "STRING",
+    "type": "BIGNUMERIC",
     "mode": "REQUIRED"
   },
   {
@@ -56,7 +56,7 @@
   },
   {
     "name": "accumulator_root_hash",
-    "type": "BYTES",
+    "type": "STRING",
     "mode": "REQUIRED"
   },
   {
@@ -71,6 +71,11 @@
   },
   {
     "name": "epoch",
+    "type": "INTEGER",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "inserted_at",
     "type": "INTEGER",
     "mode": "REQUIRED"
   }

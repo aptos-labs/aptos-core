@@ -8,7 +8,7 @@
 // To avoid any analytics hassle, proto2 is required here.
 syntax = "proto2";
 
-package aptos.indexer.proto.v1;
+package aptos.indexer.transaction.v1;
 
 // Transaction is a simplified representation for the transaction
 // happened on the chain. Mainly built for streaming into BigQuery.
@@ -16,17 +16,18 @@ package aptos.indexer.proto.v1;
 message Transaction {
     required int64 version = 1;
     required int64 block_height = 2;
-    required bytes hash = 3;
+    required string hash = 3;
     required string type_str = 4;
     optional string payload = 5;
-    required bytes state_change_hash = 6;
-    required bytes event_root_hash = 7;
-    optional bytes state_checkpoint_hash = 8;
-    required string gas_used = 9;
+    required string state_change_hash = 6;
+    required string event_root_hash = 7;
+    optional string state_checkpoint_hash = 8;
+    required uint64 gas_used = 9;
     required bool success = 10;
     required string vm_status = 11;
-    required bytes accumulator_root_hash = 12;
+    required string accumulator_root_hash = 12;
     required int64 num_events = 13;
     required int64 num_write_set_changes = 14;
     required int64 epoch = 15;
+    required int64 inserted_at = 16;
 }

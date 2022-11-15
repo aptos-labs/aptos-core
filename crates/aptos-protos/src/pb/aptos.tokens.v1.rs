@@ -1,107 +1,104 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 // @generated
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Tokens {
-    #[prost(uint64, tag = "1")]
+    #[prost(uint64, tag="1")]
     pub block_height: u64,
-    #[prost(uint32, tag = "2")]
+    #[prost(uint32, tag="2")]
     pub chain_id: u32,
-    #[prost(message, repeated, tag = "3")]
+    #[prost(message, repeated, tag="3")]
     pub tokens: ::prost::alloc::vec::Vec<Token>,
-    #[prost(message, repeated, tag = "4")]
+    #[prost(message, repeated, tag="4")]
     pub token_datas: ::prost::alloc::vec::Vec<TokenData>,
-    #[prost(message, repeated, tag = "5")]
+    #[prost(message, repeated, tag="5")]
     pub collection_datas: ::prost::alloc::vec::Vec<CollectionData>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Token {
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub token_id: ::core::option::Option<TokenId>,
-    #[prost(uint64, tag = "2")]
+    #[prost(uint64, tag="2")]
     pub transaction_version: u64,
-    #[prost(string, tag = "3")]
+    #[prost(string, tag="3")]
     pub token_properties: ::prost::alloc::string::String,
-    #[prost(uint64, tag = "4")]
+    #[prost(uint64, tag="4")]
     pub amount: u64,
-    #[prost(string, optional, tag = "5")]
+    #[prost(string, optional, tag="5")]
     pub owner_address: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, tag = "6")]
+    #[prost(string, tag="6")]
     pub table_handle: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "7")]
+    #[prost(string, optional, tag="7")]
     pub table_type: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TokenData {
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub token_data_id: ::core::option::Option<TokenDataId>,
-    #[prost(uint64, tag = "2")]
+    #[prost(uint64, tag="2")]
     pub transaction_version: u64,
-    #[prost(uint64, tag = "3")]
+    #[prost(uint64, tag="3")]
     pub maximum: u64,
-    #[prost(uint64, tag = "4")]
+    #[prost(uint64, tag="4")]
     pub supply: u64,
-    #[prost(uint64, tag = "5")]
+    #[prost(uint64, tag="5")]
     pub largest_property_version: u64,
-    #[prost(string, tag = "6")]
+    #[prost(string, tag="6")]
     pub metadata_uri: ::prost::alloc::string::String,
-    #[prost(string, tag = "7")]
+    #[prost(string, tag="7")]
     pub payee_address: ::prost::alloc::string::String,
-    #[prost(uint64, tag = "8")]
+    #[prost(uint64, tag="8")]
     pub royalty_points_numerator: u64,
-    #[prost(uint64, tag = "9")]
+    #[prost(uint64, tag="9")]
     pub royalty_points_denominator: u64,
-    #[prost(bool, tag = "10")]
+    #[prost(bool, tag="10")]
     pub maximum_mutable: bool,
-    #[prost(bool, tag = "11")]
+    #[prost(bool, tag="11")]
     pub uri_mutable: bool,
-    #[prost(bool, tag = "12")]
+    #[prost(bool, tag="12")]
     pub description_mutable: bool,
-    #[prost(bool, tag = "13")]
+    #[prost(bool, tag="13")]
     pub properties_mutable: bool,
-    #[prost(bool, tag = "14")]
+    #[prost(bool, tag="14")]
     pub royalty_mutable: bool,
-    #[prost(string, tag = "15")]
+    #[prost(string, tag="15")]
     pub default_properties: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TokenId {
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub token_data_id: ::core::option::Option<TokenDataId>,
-    #[prost(uint64, tag = "2")]
+    #[prost(uint64, tag="2")]
     pub property_version: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TokenDataId {
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub creator_address: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub collection_name: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
+    #[prost(string, tag="3")]
     pub name: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CollectionData {
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub creator_address: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub collection_name: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
+    #[prost(string, tag="3")]
     pub description: ::prost::alloc::string::String,
-    #[prost(uint64, tag = "4")]
+    #[prost(uint64, tag="4")]
     pub transaction_version: u64,
-    #[prost(string, tag = "5")]
+    #[prost(string, tag="5")]
     pub metadata_uri: ::prost::alloc::string::String,
-    #[prost(uint64, tag = "6")]
+    #[prost(uint64, tag="6")]
     pub supply: u64,
-    #[prost(uint64, tag = "7")]
+    #[prost(uint64, tag="7")]
     pub maximum: u64,
-    #[prost(bool, tag = "8")]
+    #[prost(bool, tag="8")]
     pub maximum_mutable: bool,
-    #[prost(bool, tag = "9")]
+    #[prost(bool, tag="9")]
     pub uri_mutable: bool,
-    #[prost(bool, tag = "10")]
+    #[prost(bool, tag="10")]
     pub description_mutable: bool,
 }
 /// Encoded file descriptor set for the `aptos.tokens.v1` package
@@ -393,5 +390,4 @@ pub const FILE_DESCRIPTOR_SET: &[u8] = &[
     0x01, 0x12, 0x03, 0x41, 0x07, 0x1a, 0x0a, 0x0c, 0x0a, 0x05, 0x04, 0x05, 0x02, 0x09, 0x03, 0x12,
     0x03, 0x41, 0x1d, 0x1f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 ];
-include!("aptos.tokens.v1.serde.rs");
 // @@protoc_insertion_point(module)
