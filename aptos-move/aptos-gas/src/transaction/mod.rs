@@ -100,6 +100,11 @@ crate::params::define_gas_parameters!(
             10_000
         ],
         [memory_quota: AbstractValueSize, optional "memory_quota", 10_000_000],
+        [
+            free_write_bytes_quota: NumBytes,
+            optional "free_write_bytes_quota",
+            1024, // 1KB free per state write
+        ],
     ]
 );
 

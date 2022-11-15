@@ -27,6 +27,8 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V5
+//   - free_write_bytes_quota
 // - V4
 //   - Consider memory leaked for event natives
 // - V3
@@ -41,7 +43,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 4;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 5;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
