@@ -15,7 +15,7 @@ use std::fmt;
 
 /// The hardcoded maximum height of a state merkle tree in nibbles.
 pub const ROOT_NIBBLE_HEIGHT: usize = HashValue::LENGTH * 8 / NIBBLE_SIZE_IN_BITS;
-pub const NIBBLE_SIZE_IN_BITS: usize = 4;
+pub const NIBBLE_SIZE_IN_BITS: usize = 8;
 pub const MAX_NIBBLE: usize = 1 << NIBBLE_SIZE_IN_BITS;
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]

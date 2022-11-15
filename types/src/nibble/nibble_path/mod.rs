@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::{fmt, iter::FromIterator};
 
 /// NibblePath defines a path in Merkle tree in the unit of nibble (4 bits).
-#[derive(Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct NibblePath {
     nibbles: Vec<Nibble>,
 }
@@ -33,11 +33,11 @@ impl Default for NibblePath {
 }
 /// Supports debug format by concatenating nibbles literally. For example, [0x12, 0xa0] with 3
 /// nibbles will be printed as "12a".
-impl fmt::Debug for NibblePath {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.nibbles().try_for_each(|x| write!(f, "{:x}", x))
-    }
-}
+// impl fmt::Debug for NibblePath {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         self.nibbles().try_for_each(|x| write!(f, "{:0.2x}", x))
+//     }
+// }
 
 /// Convert a vector of bytes into `NibblePath` using the lower 4 bits of each byte as nibble.
 impl FromIterator<Nibble> for NibblePath {
@@ -62,16 +62,9 @@ impl Arbitrary for NibblePath {
 #[cfg(any(test, feature = "fuzzing"))]
 prop_compose! {
     fn arb_nibble_path()(
-        mut bytes in vec(any::<u8>(), 0..=ROOT_NIBBLE_HEIGHT/2),
-        is_odd in any::<bool>()
+        mut bytes in vec(any::<u8>(), 0..=ROOT_NIBBLE_HEIGHT*NIBBLE_SIZE_IN_BITS/8)
     ) -> NibblePath {
-        if let Some(last_byte) = bytes.last_mut() {
-            if is_odd {
-                *last_byte &= 0xf0;
-                return NibblePath::new_odd(bytes);
-            }
-        }
-        NibblePath::new_even(bytes)
+        NibblePath::new_from_bytes(bytes.as_slice(), ROOT_NIBBLE_HEIGHT)
     }
 }
 

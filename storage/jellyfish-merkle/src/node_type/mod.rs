@@ -33,6 +33,7 @@ use proptest::{collection::hash_map, prelude::*};
 use proptest_derive::Arbitrary;
 
 use crate::TreeReader;
+use aptos_logger::info;
 use aptos_types::misc::one_positions;
 use aptos_types::nibble::{MAX_NIBBLE, NIBBLE_SIZE_IN_BITS};
 use aptos_types::proof::definition::NodeInProof;
@@ -104,8 +105,10 @@ impl NodeKey {
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut out = vec![];
         out.write_u64::<BigEndian>(self.version())?;
-        out.write_u64::<BigEndian>(self.nibble_path().num_nibbles() as u64)?;
+        assert!(self.nibble_path().num_nibbles() < 256);
+        out.write_u8(self.nibble_path().num_nibbles() as u8)?;
         let bytes: Vec<u8> = self.nibble_path().bytes().collect();
+        info!("NodeKey encoding, node={self:?}, encoded={bytes:x?}");
         out.write_all(bytes.as_slice())?;
         Ok(out)
     }
@@ -114,7 +117,7 @@ impl NodeKey {
     pub fn decode(val: &[u8]) -> Result<NodeKey> {
         let mut reader = Cursor::new(val);
         let version = reader.read_u64::<BigEndian>()?;
-        let num_nibbles = reader.read_u64::<BigEndian>()? as usize;
+        let num_nibbles = reader.read_u8()? as usize;
         ensure!(
             num_nibbles <= ROOT_NIBBLE_HEIGHT,
             "Invalid number of nibbles: {}",
@@ -131,7 +134,9 @@ impl NodeKey {
             nibble_bytes
         );
         let nibble_path = NibblePath::new_from_bytes(nibble_bytes.as_slice(), num_nibbles);
-        Ok(NodeKey::new(version, nibble_path))
+        let node_key = NodeKey::new(version, nibble_path);
+        info!("NodeKey decoded, raw={val:x?}, decoded={node_key:?}");
+        Ok(node_key)
     }
 
     pub fn unpack(self) -> (Version, NibblePath) {
@@ -201,14 +206,14 @@ impl Child {
     }
 }
 
-/// [`Children`] is just a collection of children belonging to a [`InternalNode`], indexed from 0 to
-/// 15, inclusive.
+/// [`Children`] is just a collection of children belonging to a [`InternalNode`],
+/// indexed from 0 to 2^x, inclusive.
 pub(crate) type Children = HashMap<Nibble, Child>;
 
-/// Represents a 4-level subtree with 16 children at the bottom level. Theoretically, this reduces
-/// IOPS to query a tree by 4x since we compress 4 levels in a standard Merkle tree into 1 node.
+/// Represents a x-level subtree with 2^x children at the bottom level. Theoretically, this reduces
+/// IOPS to query a tree by ?x since we compress x levels in a standard Merkle tree into 1 node.
 /// Though we choose the same internal node structure as that of Patricia Merkle tree, the root hash
-/// computation logic is similar to a 4-level sparse Merkle tree except for some customizations. See
+/// computation logic is similar to a x-level sparse Merkle tree except for some customizations. See
 /// the `CryptoHash` trait implementation below for details.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InternalNode {
@@ -324,8 +329,8 @@ impl InternalNode {
     pub fn hash(&self) -> HashValue {
         let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
         self.merkle_hash(
-            0,  /* start index */
-            16, /* the number of leaves in the subtree of which we want the hash of root */
+            0,          /* start index */
+            MAX_NIBBLE, /* the number of leaves in the subtree of which we want the hash of root */
             (existence_bitmap.as_slice(), leaf_bitmap.as_slice()),
         )
     }
@@ -373,17 +378,17 @@ impl InternalNode {
                 existence_positions.push(i);
             }
         }
-        // match existence_bitmap {
-        //     0 => return Err(NodeDecodeError::NoChildren.into()),
-        //     _ if (existence_bitmap & leaf_bitmap) != leaf_bitmap => {
-        //         return Err(NodeDecodeError::ExtraLeaves {
-        //             existing: existence_bitmap,
-        //             leaves: leaf_bitmap,
-        //         }
-        //         .into())
-        //     }
-        //     _ => (),
-        // }
+        match existence_positions.len() {
+            0 => return Err(NodeDecodeError::NoChildren.into()),
+            _ if (0..MAX_NIBBLE).any(|i| !existence_bitmap[i] && leaf_bitmap[i]) => {
+                return Err(NodeDecodeError::ExtraLeaves {
+                    existing: existence_bitmap.clone(),
+                    leaves: leaf_bitmap.clone(),
+                }
+                .into())
+            }
+            _ => (),
+        }
 
         // Reconstruct children
         let mut children = HashMap::new();
@@ -881,11 +886,14 @@ pub enum NodeDecodeError {
 
     /// Extra leaf bits set
     #[error(
-        "Non-existent leaf bits set, existing: {}, leaves: {}",
+        "Non-existent leaf bits set, existing: {:?}, leaves: {:?}",
         existing,
         leaves
     )]
-    ExtraLeaves { existing: u16, leaves: u16 },
+    ExtraLeaves {
+        existing: Vec<bool>,
+        leaves: Vec<bool>,
+    },
 }
 
 /// Helper function to serialize version in a more efficient encoding.

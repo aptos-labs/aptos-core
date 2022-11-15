@@ -89,7 +89,8 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_infallible::Mutex;
-use aptos_types::nibble::ROOT_NIBBLE_HEIGHT;
+use aptos_logger::prelude::*;
+use aptos_types::nibble::{NIBBLE_SIZE_IN_BITS, ROOT_NIBBLE_HEIGHT};
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt};
 use std::sync::MutexGuard;
@@ -101,8 +102,6 @@ use std::{
 use thiserror::Error;
 
 type NodePosition = bitvec::vec::BitVec<bitvec::order::Msb0, u8>;
-const BITS_IN_NIBBLE: usize = 4;
-const BITS_IN_BYTE: usize = 8;
 
 /// To help finding the oldest ancestor of any SMT, a branch tracker is created each time
 /// the chain of SMTs forked (two or more SMTs updating the same parent).
@@ -573,8 +572,9 @@ where
                     let mut path =
                         NibblePath::new_from_bytes(leaf_node.key.as_slice(), ROOT_NIBBLE_HEIGHT);
                     if !is_nibble {
-                        path.truncate(pos.len() as usize / BITS_IN_NIBBLE + 1);
+                        path.truncate(pos.len() as usize / NIBBLE_SIZE_IN_BITS + 1);
                     }
+                    info!("Adding into node hash, path={path:?}.");
                     node_hashes.insert(path, subtree.hash());
                 }
             }
@@ -584,11 +584,11 @@ where
     fn maybe_to_nibble_path(pos: &NodePosition) -> Option<NibblePath> {
         assert!(pos.len() <= HashValue::LENGTH_IN_BITS);
 
-        if pos.len() % BITS_IN_NIBBLE == 0 {
+        if pos.len() % NIBBLE_SIZE_IN_BITS == 0 {
             let bits: Vec<bool> = pos.iter().map(|&x| x).collect();
             Some(NibblePath::new_from_bits(
                 bits.as_slice(),
-                pos.len() / BITS_IN_NIBBLE,
+                pos.len() / NIBBLE_SIZE_IN_BITS,
             ))
         } else {
             None

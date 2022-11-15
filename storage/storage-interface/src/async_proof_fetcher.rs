@@ -6,7 +6,7 @@ use crate::{proof_fetcher::ProofFetcher, DbReader};
 use crate::metrics::TIMER;
 use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_logger::{error, sample, sample::SampleRate};
+use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -15,6 +15,7 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use once_cell::sync::Lazy;
+use std::ptr::hash;
 use std::{
     collections::HashMap,
     sync::{
@@ -92,13 +93,16 @@ impl AsyncProofFetcher {
         self.num_proofs_to_read.fetch_add(1, Ordering::SeqCst);
         let reader = self.reader.clone();
         let data_sender = self.data_sender.clone();
+        let skh = state_key.hash();
+        let rth = root_hash.clone().unwrap();
+        info!("Verifying proof, skh={skh:x}, root_hash={rth:x}");
         IO_POOL.spawn(move || {
             let proof = reader
                 .get_state_proof_by_version_ext(&state_key, version)
                 .expect("Proof reading should succeed.");
             if let Some(root_hash) = root_hash {
                 proof
-                    .verify_by_hash(root_hash, state_key.hash(), value_hash)
+                    .verify_by_hash(root_hash, skh, value_hash)
                     .map_err(|err| {
                         anyhow!(
                             "Proof is invalid for key {:?} with state root hash {:?}, at version {}: {}.",

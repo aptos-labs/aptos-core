@@ -8318,6 +8318,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-crypto",
  "aptos-infallible",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
  "bitvec",

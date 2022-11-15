@@ -85,6 +85,8 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_logger::info;
+use aptos_types::nibble::NIBBLE_SIZE_IN_BITS;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -258,6 +260,7 @@ where
     }
 
     pub fn put_node(&mut self, node_key: NodeKey, node: Node<K>) {
+        info!("New node update, node_key={node_key:?}");
         if node.is_leaf() {
             self.inc_num_new_leaves();
         }
@@ -270,6 +273,7 @@ where
         stale_since_version: Version,
         node: &Node<K>,
     ) {
+        info!("New stale node, since_version={stale_since_version}, node_key={node_key:?}");
         if node.is_leaf() {
             self.inc_num_stale_leaves();
         }
@@ -306,12 +310,17 @@ impl<'a, K> std::iter::Iterator for NibbleRangeIterator<'a, K> {
     fn next(&mut self) -> Option<Self::Item> {
         let left = self.pos;
         if self.pos < self.sorted_kvs.len() {
-            let cur_nibble: u8 = self.sorted_kvs[left].0.nibble(self.nibble_idx);
+            let cur_nibble =
+                NibblePath::new_from_bytes(self.sorted_kvs[left].0.as_slice(), ROOT_NIBBLE_HEIGHT)
+                    .get_nibble(self.nibble_idx);
             let (mut i, mut j) = (left, self.sorted_kvs.len() - 1);
             // Find the last index of the cur_nibble.
             while i < j {
                 let mid = j - (j - i) / 2;
-                if self.sorted_kvs[mid].0.nibble(self.nibble_idx) > cur_nibble {
+                if NibblePath::new_from_bytes(self.sorted_kvs[mid].0.as_slice(), ROOT_NIBBLE_HEIGHT)
+                    .get_nibble(self.nibble_idx)
+                    > cur_nibble
+                {
                     j = mid - 1;
                 } else {
                     i = mid;
@@ -450,6 +459,7 @@ where
             *SPARSE_MERKLE_PLACEHOLDER_HASH
         };
 
+        info!("Batch update done, root_hash={root_hash:x}");
         Ok((root_hash, batch))
     }
 
@@ -954,16 +964,13 @@ trait NibbleExt {
 impl NibbleExt for HashValue {
     /// Returns the `index`-th nibble.
     fn get_nibble(&self, index: usize) -> Nibble {
-        Nibble::from(if index % 2 == 0 {
-            self[index / 2] >> 4
-        } else {
-            self[index / 2] & 0x0F
-        })
+        let nibble_path = NibblePath::new_from_bytes(self.as_slice(), ROOT_NIBBLE_HEIGHT);
+        nibble_path.get_nibble(index)
     }
 
     /// Returns the length of common prefix of `self` and `other` in nibbles.
     fn common_prefix_nibbles_len(&self, other: HashValue) -> usize {
-        self.common_prefix_bits_len(other) / 4
+        self.common_prefix_bits_len(other) / NIBBLE_SIZE_IN_BITS
     }
 }
 
