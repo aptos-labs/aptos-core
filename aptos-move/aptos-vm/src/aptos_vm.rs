@@ -710,7 +710,7 @@ impl AptosVM {
         let mut gas_meter = AptosGasMeter::new(
             self.0.get_gas_feature_version(),
             gas_params.clone(),
-            storage_gas_params.cloned(),
+            storage_gas_params.clone(),
             txn_data.max_gas_amount(),
         );
 
@@ -1213,7 +1213,7 @@ impl AptosSimulationVM {
         let mut gas_meter = AptosGasMeter::new(
             self.0 .0.get_gas_feature_version(),
             gas_params.clone(),
-            storage_gas_params.cloned(),
+            storage_gas_params.clone(),
             txn_data.max_gas_amount(),
         );
 
