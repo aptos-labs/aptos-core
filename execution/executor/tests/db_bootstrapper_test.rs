@@ -13,7 +13,7 @@ use aptos_executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_gas::LATEST_GAS_FEATURE_VERSION;
+use aptos_gas::{ChangeSetConfigs, LATEST_GAS_FEATURE_VERSION};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -264,7 +264,7 @@ fn test_new_genesis() {
                     vec![],
                 ),
             ],
-            LATEST_GAS_FEATURE_VERSION,
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
         .unwrap(),
     ));
