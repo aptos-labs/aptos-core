@@ -40,7 +40,9 @@ mod module;
 mod script;
 mod transaction_argument;
 
-pub use change_set::ChangeSet;
+#[cfg(any(test, feature = "fuzzing"))]
+pub use change_set::NoOpChangeSetChecker;
+pub use change_set::{ChangeSet, CheckChangeSet};
 pub use module::{Module, ModuleBundle};
 pub use script::{
     ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,

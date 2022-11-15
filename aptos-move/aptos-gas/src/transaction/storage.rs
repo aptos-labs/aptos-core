@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_types::transaction::{ChangeSet, CheckChangeSet};
 use aptos_types::{
     on_chain_config::StorageGasSchedule, state_store::state_key::StateKey, write_set::WriteOp,
 };
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
 };
+use move_core_types::vm_status::{StatusCode, VMStatus};
 use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
@@ -228,8 +230,110 @@ impl StoragePricing {
 }
 
 #[derive(Clone)]
+pub struct ChangeSetConfigs {
+    gas_feature_version: u64,
+    max_bytes_per_write_op: u64,
+    max_bytes_all_write_ops_per_transaction: u64,
+    max_bytes_per_event: u64,
+    max_bytes_all_events_per_transaction: u64,
+}
+
+impl ChangeSetConfigs {
+    pub fn unlimited_at_gas_feature_version(gas_feature_version: u64) -> Self {
+        Self::new_impl(gas_feature_version, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+    }
+
+    pub fn new(feature_version: u64, gas_params: &AptosGasParameters) -> Self {
+        if feature_version >= 5 {
+            Self::from_gas_params(feature_version, gas_params)
+        } else if feature_version >= 3 {
+            Self::for_feature_version_3()
+        } else {
+            Self::unlimited_at_gas_feature_version(feature_version)
+        }
+    }
+
+    fn new_impl(
+        gas_feature_version: u64,
+        max_bytes_per_write_op: u64,
+        max_bytes_all_write_ops_per_transaction: u64,
+        max_bytes_per_event: u64,
+        max_bytes_all_events_per_transaction: u64,
+    ) -> Self {
+        Self {
+            gas_feature_version,
+            max_bytes_per_write_op,
+            max_bytes_all_write_ops_per_transaction,
+            max_bytes_per_event,
+            max_bytes_all_events_per_transaction,
+        }
+    }
+
+    pub fn creation_as_modification(&self) -> bool {
+        self.gas_feature_version < 3
+    }
+
+    fn for_feature_version_3() -> Self {
+        const MB: u64 = 1 << 20;
+
+        Self::new_impl(3, MB, u64::MAX, MB, MB << 10)
+    }
+
+    fn from_gas_params(gas_feature_version: u64, gas_params: &AptosGasParameters) -> Self {
+        Self::new_impl(
+            gas_feature_version,
+            gas_params.txn.max_bytes_per_write_op.into(),
+            gas_params
+                .txn
+                .max_bytes_all_write_ops_per_transaction
+                .into(),
+            gas_params.txn.max_bytes_per_event.into(),
+            gas_params.txn.max_bytes_all_events_per_transaction.into(),
+        )
+    }
+}
+
+impl CheckChangeSet for ChangeSetConfigs {
+    fn check_change_set(&self, change_set: &ChangeSet) -> Result<(), VMStatus> {
+        const ERR: StatusCode = StatusCode::STORAGE_WRITE_LIMIT_REACHED;
+
+        let mut write_set_size = 0;
+        for (key, op) in change_set.write_set() {
+            match op {
+                WriteOp::Creation(data) | WriteOp::Modification(data) => {
+                    let write_op_size = (data.len() + key.size()) as u64;
+                    if write_op_size > self.max_bytes_per_write_op {
+                        return Err(VMStatus::Error(ERR));
+                    }
+                    write_set_size += write_op_size;
+                }
+                WriteOp::Deletion => (),
+            }
+            if write_set_size > self.max_bytes_all_write_ops_per_transaction {
+                return Err(VMStatus::Error(ERR));
+            }
+        }
+
+        let mut total_event_size = 0;
+        for event in change_set.events() {
+            let size = event.event_data().len() as u64;
+            if size > self.max_bytes_per_event {
+                return Err(VMStatus::Error(ERR));
+            }
+            total_event_size += size;
+            if total_event_size > self.max_bytes_all_events_per_transaction {
+                return Err(VMStatus::Error(ERR));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
 pub struct StorageGasParameters {
     pub pricing: StoragePricing,
+    pub change_set_configs: ChangeSetConfigs,
 }
 
 impl StorageGasParameters {
@@ -244,16 +348,26 @@ impl StorageGasParameters {
         let gas_params = gas_params.unwrap();
 
         let pricing = match storage_gas_schedule {
-            Some(schedule) => StoragePricing::V2(StoragePricingV2::new(feature_version, schedule, gas_params)),
+            Some(schedule) => {
+                StoragePricing::V2(StoragePricingV2::new(feature_version, schedule, gas_params))
+            }
             None => StoragePricing::V1(StoragePricingV1::new(gas_params)),
         };
 
-        Some(Self { pricing })
+        let change_set_configs = ChangeSetConfigs::new(feature_version, gas_params);
+
+        Some(Self {
+            pricing,
+            change_set_configs,
+        })
     }
 
-    pub fn zeros() -> Self {
+    pub fn free_and_unlimited() -> Self {
         Self {
             pricing: StoragePricing::V2(StoragePricingV2::zeros()),
+            change_set_configs: ChangeSetConfigs::unlimited_at_gas_feature_version(
+                LATEST_GAS_FEATURE_VERSION,
+            ),
         }
     }
 }
