@@ -50,7 +50,7 @@
 | logging.address | string | `nil` | Address for remote logging |
 | nodeSelector | object | `{}` |  |
 | resources.limits.cpu | int | `14` |  |
-| resources.limits.memory | string | `"30Gi"` |  |
+| resources.limits.memory | string | `"26Gi"` |  |
 | resources.requests.cpu | int | `14` |  |
 | resources.requests.memory | string | `"26Gi"` |  |
 | restore.affinity | object | `{}` |  |

@@ -22,11 +22,10 @@ Aptos blockchain node deployment
 | fullnode.groups | list | `[{"name":"fullnode","replicas":1}]` | Specify fullnode groups by `name` and number of `replicas` |
 | fullnode.nodeSelector | object | `{}` |  |
 | fullnode.resources.limits.cpu | float | `15.5` |  |
-| fullnode.resources.limits.memory | string | `"30Gi"` |  |
+| fullnode.resources.limits.memory | string | `"26Gi"` |  |
 | fullnode.resources.requests.cpu | int | `15` |  |
 | fullnode.resources.requests.memory | string | `"26Gi"` |  |
 | fullnode.rust_log | string | `"info"` | Log level for the fullnode |
-| fullnode.rust_log_remote | string | `"debug,hyper=off"` | Remote log level for the fullnode |
 | fullnode.storage.class | string | `nil` | Kubernetes storage class to use for fullnode persistent storage |
 | fullnode.storage.size | string | `"1000Gi"` | Size of fullnode persistent storage |
 | fullnode.tolerations | list | `[]` |  |
@@ -75,11 +74,10 @@ Aptos blockchain node deployment
 | validator.nodeSelector | object | `{}` |  |
 | validator.remoteLogAddress | string | `nil` | Address for remote logging. See `logger` helm chart |
 | validator.resources.limits.cpu | float | `15.5` |  |
-| validator.resources.limits.memory | string | `"30Gi"` |  |
+| validator.resources.limits.memory | string | `"26Gi"` |  |
 | validator.resources.requests.cpu | int | `15` |  |
 | validator.resources.requests.memory | string | `"26Gi"` |  |
 | validator.rust_log | string | `"info"` | Log level for the validator |
-| validator.rust_log_remote | string | `"debug,hyper=off"` | Remote log level for the validator |
 | validator.storage.class | string | `nil` | Kubernetes storage class to use for validator persistent storage |
 | validator.storage.size | string | `"1000Gi"` | Size of validator persistent storage |
 | validator.tolerations | list | `[]` |  |
