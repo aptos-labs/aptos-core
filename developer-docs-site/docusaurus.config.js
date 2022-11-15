@@ -96,7 +96,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Start",
+            label: "Start Aptos",
             position: "left",
             items: [
               {
@@ -113,7 +113,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Build",
+            label: "Build Apps",
             position: "left",
             items: [
               {
@@ -135,7 +135,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Move",
+            label: "Write Move",
             position: "left",
             items: [
               {
@@ -162,7 +162,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Run",
+            label: "Run Nodes",
             position: "left",
             items: [
               {
