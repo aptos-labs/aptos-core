@@ -130,6 +130,8 @@ export default App;
 
 Refresh the page and you will see your account address.
 
+Note - You will have to authorize the application once from your wallet. For that use `window.aptos.connect()` on console, and sign the transaction for approval. 
+
 ### Add some CSS
 
 Next, replace the contents of `src/App.css`:
