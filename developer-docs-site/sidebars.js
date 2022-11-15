@@ -64,7 +64,6 @@ const sidebars = {
           items: [
             "cli-tools/build-aptos-cli",
             "cli-tools/aptos-cli-tool/use-aptos-cli",
-            "nodes/local-testnet/using-cli-to-run-a-local-testnet",
           ],
         },
         {
@@ -76,7 +75,6 @@ const sidebars = {
           items: ["concepts/coin-and-token/aptos-coin", "concepts/coin-and-token/aptos-token"],
         },
         "cli-tools/install-move-prover",
-        "guides/system-integrators-guide",
       ],
     },
     {
@@ -84,6 +82,7 @@ const sidebars = {
       value: "Build Apps",
       className: "sidebar-title",
     },
+    "guides/system-integrators-guide",
     {
       type: "category",
       label: "Conduct Tutorials",
@@ -118,6 +117,19 @@ const sidebars = {
     },
     {
       type: "category",
+      label: "Develop Locally",
+      link: { type: "doc", id: "nodes/local-testnet/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "guides/local-testnet-dev-flow",
+        "nodes/local-testnet/run-a-local-testnet",
+        "nodes/local-testnet/using-cli-to-run-a-local-testnet",
+        "guides/running-a-local-multi-node-network",
+      ],
+    },
+    {
+      type: "category",
       label: "Interact with Blockchain",
       link: { type: "doc", id: "guides/index" },
       collapsible: true,
@@ -126,8 +138,6 @@ const sidebars = {
         "guides/sign-a-transaction",
         "guides/resource-accounts",
         "guides/wallet-standard",
-        "guides/local-testnet-dev-flow",
-        "guides/running-a-local-multi-node-network",
         "guides/handle-aptos-errors",
       ],
     },
@@ -271,10 +281,6 @@ const sidebars = {
         },
       ],
     },
-        /** Delete after clean up
-         * "nodes/local-testnet/index"
-         *  "nodes/local-testnet/run-a-local-testnet"
-         */
     {
       type: "html",
       value: "Reference",
