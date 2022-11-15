@@ -23,7 +23,7 @@ The network component uses:
 
 * TCP for reliable transport.
 * [NoiseIK] for authentication and full end-to-end encryption.
-* On-chain [`NetworkAddress`](./network-address/src/lib.rs) set for discovery, with
+* On-chain [`NetworkAddress`](../types/src/network_address/mod.rs) set for discovery, with
   optional seed peers in the [`NetworkConfig`]
   as a fallback.
 
