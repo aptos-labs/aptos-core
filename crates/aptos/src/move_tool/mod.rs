@@ -317,7 +317,6 @@ impl CliCommand<&'static str> for TestPackage {
             config,
             UnitTestingConfig {
                 filter: self.filter,
-                instruction_execution_bound: Some(self.instruction_execution_bound),
                 ..UnitTestingConfig::default_with_bound(None)
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
@@ -325,6 +324,7 @@ impl CliCommand<&'static str> for TestPackage {
                 NativeGasParameters::zeros(),
                 AbstractValueSizeGasParameters::zeros(),
             ),
+            None,
             false,
             &mut std::io::stdout(),
         )

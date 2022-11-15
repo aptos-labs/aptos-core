@@ -37,6 +37,7 @@ pub fn run_tests_for_pkg(
         UnitTestingConfig::default_with_bound(Some(100_000)),
         // TODO(Gas): we may want to switch to non-zero costs in the future
         aptos_test_natives(),
+        None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
     )
