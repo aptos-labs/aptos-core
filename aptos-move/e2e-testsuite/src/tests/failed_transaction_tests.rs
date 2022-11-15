@@ -42,7 +42,7 @@ fn failed_transaction_cleanup_test() {
     let mut gas_meter = AptosGasMeter::new(
         LATEST_GAS_FEATURE_VERSION,
         gas_params,
-        Some(storage_gas_params),
+        storage_gas_params,
         10_000,
     );
 

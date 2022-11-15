@@ -82,23 +82,26 @@ impl AptosVMImpl {
                 },
             };
 
-        let storage_gas_params: Option<StorageGasParameters> = match gas_feature_version {
+        let storage_gas_schedule = match gas_feature_version {
             0 => None,
-            _ => StorageGasSchedule::fetch_config(&storage)
-                .map(|storage_gas_schedule| storage_gas_schedule.into()),
+            _ => StorageGasSchedule::fetch_config(&storage),
         };
-
         if gas_feature_version >= 2 {
-            if let (Some(gas_params), Some(storage_gas_params)) =
-                (&mut gas_params, &storage_gas_params)
+            if let (Some(gas_params), Some(storage_gas_schedule)) =
+                (&mut gas_params, &storage_gas_schedule)
             {
                 gas_params.natives.table.common.load_base =
-                    u64::from(storage_gas_params.per_item_read).into();
+                    storage_gas_schedule.per_item_read.into();
                 gas_params.natives.table.common.load_per_byte =
-                    u64::from(storage_gas_params.per_byte_read).into();
+                    storage_gas_schedule.per_byte_read.into();
                 gas_params.natives.table.common.load_failure = 0.into();
             }
         }
+        let storage_gas_params = StorageGasParameters::new(
+            gas_feature_version,
+            gas_params.as_ref(),
+            storage_gas_schedule.as_ref(),
+        );
 
         // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
         //            This only happens in a edge case that is probably related to write set transactions or genesis,
@@ -182,18 +185,15 @@ impl AptosVMImpl {
     pub fn get_storage_gas_parameters(
         &self,
         log_context: &AdapterLogSchema,
-    ) -> Result<Option<&StorageGasParameters>, VMStatus> {
-        match self.gas_feature_version {
-            0 => Ok(None),
-            _ => Ok(Some(self.storage_gas_params.as_ref().ok_or_else(|| {
-                log_context.alert();
-                error!(
-                    *log_context,
-                    "VM Startup Failed. Storage Gas Parameters Not Found"
-                );
-                VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
-            })?)),
-        }
+    ) -> Result<&StorageGasParameters, VMStatus> {
+        self.storage_gas_params.as_ref().ok_or_else(|| {
+            log_context.alert();
+            error!(
+                *log_context,
+                "VM Startup Failed. Storage Gas Parameters Not Found"
+            );
+            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
+        })
     }
 
     pub fn get_gas_feature_version(&self) -> u64 {
