@@ -31,11 +31,7 @@ use std::process::exit;
 #[tokio::main]
 async fn main() {
     let mut logger = aptos_logger::Logger::new();
-    logger
-        .channel_size(1000)
-        .is_async(false)
-        .level(Level::Warn)
-        .read_env();
+    logger.channel_size(1000).is_async(false).level(Level::Warn);
     logger.build();
 
     let args: RosettaCliArgs = RosettaCliArgs::parse();
