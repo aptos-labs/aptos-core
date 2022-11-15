@@ -5,6 +5,7 @@ use anyhow::{format_err, Result};
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_resource_viewer::{AnnotatedAccountStateBlob, AptosValueAnnotator};
 use aptos_rest_client::Client;
+use aptos_types::transaction::ChangeSetLimits;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
@@ -166,7 +167,7 @@ impl AptosDebugger {
         session
             .finish()
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?
-            .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+            .into_change_set(&mut (), ChangeSetLimits::loose())
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
             .map(|res| res.into_inner().1)
     }

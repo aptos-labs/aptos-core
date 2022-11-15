@@ -17,6 +17,7 @@ use aptos_gas::{
 };
 use aptos_types::account_config::aptos_test_root_address;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::transaction::ChangeSetLimits;
 use aptos_types::{
     account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
@@ -137,7 +138,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     session1_out.squash(session2_out).unwrap();
 
     let change_set_ext = session1_out
-        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+        .into_change_set(&mut (), ChangeSetLimits::loose())
         .unwrap();
     let (delta_change_set, change_set) = change_set_ext.into_inner();
 
@@ -237,7 +238,7 @@ pub fn encode_genesis_change_set(
     session1_out.squash(session2_out).unwrap();
 
     let change_set_ext = session1_out
-        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+        .into_change_set(&mut (), ChangeSetLimits::loose())
         .unwrap();
     let (delta_change_set, change_set) = change_set_ext.into_inner();
 

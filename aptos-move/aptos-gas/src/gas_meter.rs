@@ -11,6 +11,7 @@ use crate::{
     transaction::TransactionGasParameters,
     StorageGasParameters,
 };
+use aptos_types::transaction::ChangeSetLimits;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey, write_set::WriteOp,
 };
@@ -29,6 +30,7 @@ use std::collections::BTreeMap;
 // Change log:
 // - V5
 //   - free_write_bytes_quota
+//   - configurable change set limits
 // - V3
 //   - Add memory quota
 //   - Storage charges:
@@ -246,6 +248,10 @@ impl AptosGasMeter {
 
     pub fn feature_version(&self) -> u64 {
         self.feature_version
+    }
+
+    pub fn change_set_limits(&self) -> ChangeSetLimits {
+        self.storage_gas_params.limits
     }
 }
 

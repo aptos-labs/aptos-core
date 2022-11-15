@@ -38,7 +38,7 @@ fn failed_transaction_cleanup_test() {
     };
 
     let gas_params = AptosGasParameters::zeros();
-    let storage_gas_params = StorageGasParameters::zeros();
+    let storage_gas_params = StorageGasParameters::free_and_unlimited();
     let mut gas_meter = AptosGasMeter::new(
         LATEST_GAS_FEATURE_VERSION,
         gas_params,

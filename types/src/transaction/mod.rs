@@ -40,7 +40,7 @@ mod module;
 mod script;
 mod transaction_argument;
 
-pub use change_set::ChangeSet;
+pub use change_set::{ChangeSet, ChangeSetLimits};
 pub use module::{Module, ModuleBundle};
 pub use script::{
     ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,

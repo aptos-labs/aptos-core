@@ -12,6 +12,7 @@ use aptos_aggregator::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_types::transaction::ChangeSetLimits;
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
@@ -170,7 +171,7 @@ impl SessionOutput {
     pub fn into_change_set<C: AccessPathCache>(
         self,
         ap_cache: &mut C,
-        gas_feature_version: u64,
+        limits: ChangeSetLimits,
     ) -> Result<ChangeSetExt, VMStatus> {
         use MoveStorageOp::*;
         let Self {
@@ -190,7 +191,7 @@ impl SessionOutput {
                 let op = match blob_op {
                     Delete => WriteOp::Deletion,
                     New(blob) => {
-                        if gas_feature_version < 3 {
+                        if limits.creation_as_modify {
                             WriteOp::Modification(blob)
                         } else {
                             WriteOp::Creation(blob)
@@ -257,12 +258,8 @@ impl SessionOutput {
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
-        let change_set = ChangeSet::new(write_set, events, gas_feature_version)?;
-        Ok(ChangeSetExt::new(
-            delta_change_set,
-            change_set,
-            gas_feature_version,
-        ))
+        let change_set = ChangeSet::new(write_set, events, &limits)?;
+        Ok(ChangeSetExt::new(delta_change_set, change_set, limits))
     }
 
     pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {
