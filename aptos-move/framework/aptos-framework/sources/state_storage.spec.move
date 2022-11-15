@@ -30,7 +30,6 @@ spec aptos_framework::state_storage {
     spec get_state_storage_usage_only_at_epoch_beginning(): Usage {
         // TODO: temporary mockup.
         pragma opaque;
-        aborts_if false;
     }
 
     spec on_reconfig {

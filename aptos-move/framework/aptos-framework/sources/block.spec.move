@@ -95,7 +95,8 @@ spec aptos_framework::block {
         aborts_if addr != @aptos_framework;
         aborts_if new_epoch_interval <= 0;
         aborts_if !exists<BlockResource>(addr);
-        ensures exists<BlockResource>(addr);
+        let post block_resource = global<BlockResource>(addr);
+        ensures block_resource.epoch_interval == new_epoch_interval;
     }
 
     spec get_epoch_interval_secs(): u64 {
