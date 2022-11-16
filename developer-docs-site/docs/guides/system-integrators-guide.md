@@ -32,7 +32,7 @@ See [Aptos Blockchain Deployments](../nodes/aptos-deployments.md) for full detai
 ### Local testnet
 
 There are two options to run a local testnet:
-* Directly [run a local testnet](../nodes/local-testnet/run-a-local-testnet.md) using either the [Aptos-core source code](/nodes/local-testnet/run-a-local-testnet/#using-the-aptos-core-source-code) or a [Docker image](/nodes/local-testnet/run-a-local-testnet/#using-docker). These paths are useful for testing changes to the Aptos-core codebase or ramework, or for building services on top of the Aptos blockchain, respectively.
+* Directly [run a local testnet](../nodes/local-testnet/run-a-local-testnet.md) using either the [Aptos-core source code](/nodes/local-testnet/run-a-local-testnet/#using-the-aptos-core-source-code) or a [Docker image](/nodes/local-testnet/run-a-local-testnet/#using-docker). These paths are useful for testing changes to the Aptos-core codebase or framework, or for building services on top of the Aptos blockchain, respectively.
 * [Install the Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli) and 2) start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet). This path is useful for developing on the Aptos blockchain, debugging Move contracts, and testing node operations.
 
 Either of these methods will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.0.1:8000` for option 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.

@@ -67,9 +67,9 @@ The resulting [Transaction details](#transaction-details) page appears.
 
 ### Find account address
 
-The simplest way to find your addess is to use the [Aptos Petra Wallet](https://petra.app/docs/use).
+The simplest way to find your address is to use the [Aptos Petra Wallet](https://petra.app/docs/use).
 
-Then simply append it to the following URL to load its details in th Aptos Explorer:
+Then simply append it to the following URL to load its details in the Aptos Explorer:
 https://explorer.aptoslabs.com/account/
 
 Like so:
@@ -79,7 +79,7 @@ See [Accounts](#accounts) for instructions on use.
 
 ## Explorer pages
 
-This secton walks you through the available screens in Aptos Explorer to help you find the information you need.
+This section walks you through the available screens in Aptos Explorer to help you find the information you need.
 
 ### Explorer home
 
@@ -161,7 +161,7 @@ sources={{
 />
 </center>
 
-You can load your acccount page by apending your account addresss to:
+You can load your account page by appending your account address to:
 https://explorer.aptoslabs.com/account/
 
 See [Find account address](#find-account-address) for more help.
@@ -181,7 +181,7 @@ The *Tokens* tab presents any assets owned by the account, as well as details ab
 The *Token details* page contains:
 
   * *Overview* tab including token name, owner, collection, creator, royalty, and more.
-  * *Actitivies* tab showing all transfer types, the addresses involved, property version, and amount.
+  * *Activities* tab showing all transfer types, the addresses involved, property version, and amount.
 
 <center>
 <ThemedImage
