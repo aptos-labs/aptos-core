@@ -32,7 +32,8 @@ pub use self::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
     consensus_config::{
-        ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerElectionType,
+        ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
+        ProposerElectionType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
     validator_set::{ConsensusScheme, ValidatorSet},
