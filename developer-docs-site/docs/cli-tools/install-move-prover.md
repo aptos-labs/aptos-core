@@ -7,6 +7,9 @@ id: "install-move-prover"
 
 If you want to use the [Move Prover](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/prover-guide.md) to validate your Move code, install the Move Prover dependencies after [installing the CLI binary](aptos-cli-tool/install-aptos-cli.md).
 
+For some sweet examples, see:
+https://github.com/Zellic/move-prover-examples
+
 :::tip
 Currently, Windows is not supported by the Move Prover.
 :::
