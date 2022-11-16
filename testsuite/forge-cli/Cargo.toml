@@ -18,6 +18,7 @@ async-trait = "0.1.53"
 structopt = "0.3.21"
 tokio = { version = "1.21.0", features = ["full"] }
 url = "2.2.2"
+aptos-config = { path = "../../config" }
 
 aptos-global-constants = { path = "../../config/global-constants" }
 aptos-logger = { path = "../../crates/aptos-logger" }
