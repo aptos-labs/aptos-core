@@ -35,9 +35,6 @@ pub struct BigQueryClient {
     /// BigQuery path to the data set.
     ///   Example: "projects/YOUR_PROJECT_ID/datasets/YOUR_DATASET/tables/"
     pub data_set_path: String,
-    /// TODO(laliu): move this to an event-driven approach. This is to avoid concurrent operations
-    /// for the stream.
-    pub sender_counter: Mutex<u64>,
 }
 
 impl BigQueryClient {
@@ -59,7 +56,6 @@ impl BigQueryClient {
             client,
             stream_map: Mutex::new(HashMap::new()),
             data_set_path,
-            sender_counter: Mutex::new(0),
         }
     }
     /// Returns the default stream for the data; if not present, create one.
@@ -92,7 +88,6 @@ impl BigQueryClient {
                 data
             }
         };
-        // let mut current = self.sender_counter.lock().await;
         match self
             .client
             .get()
@@ -121,7 +116,7 @@ static TRANSACTION_DESCRIPTOR: Lazy<DescriptorProto> = Lazy::new(|| {
         .clone()
 });
 
-pub fn get_request(protos: Vec<Vec<u8>>) -> AppendRowsRequest {
+pub fn get_txn_request(protos: Vec<Vec<u8>>) -> AppendRowsRequest {
     AppendRowsRequest {
         offset: None,
         trace_id: String::new(),
@@ -134,5 +129,26 @@ pub fn get_request(protos: Vec<Vec<u8>>) -> AppendRowsRequest {
             }),
         })),
         ..AppendRowsRequest::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transaction_proto_consistent_with_parsing_logic() {
+        let node_set = FileDescriptorSet::decode(FILE_DESCRIPTOR_SET).unwrap();
+        let file_name = node_set
+            .file
+            .get(0)
+            .unwrap()
+            .message_type
+            .get(0)
+            .unwrap()
+            .name
+            .as_ref()
+            .unwrap();
+        assert!(file_name == "Transaction");
     }
 }

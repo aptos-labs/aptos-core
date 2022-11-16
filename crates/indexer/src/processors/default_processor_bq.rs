@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    bigquery_client::{get_request, BigQueryClient, TypedAppendRowsRequest},
+    bigquery_client::{get_txn_request, BigQueryClient, TypedAppendRowsRequest},
     database::PgDbPool,
     indexer::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,
@@ -95,7 +95,7 @@ impl TransactionProcessor for DefaultTransactionProcessorBq {
             })
             .collect();
 
-        let append_row_request = get_request(txn_protos);
+        let append_row_request = get_txn_request(txn_protos);
 
         match self
             .bigquery_client
