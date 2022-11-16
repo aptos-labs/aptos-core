@@ -284,9 +284,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                                 }
                             }
                         }
-                        Ok(None) => unreachable!(
-                            "Could not read persisted value (according to BatchReader) from DB"
-                        ),
+                        Ok(None) => {}
                         Err(_) => {
                             // TODO: handle error, e.g. from self or not, log, panic.
                         }
