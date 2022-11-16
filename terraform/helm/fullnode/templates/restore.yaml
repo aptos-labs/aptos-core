@@ -41,8 +41,6 @@ spec:
           value: "debug"
         - name: RUST_BACKTRACE
           value: "1"
-        - name: STRUCT_LOG_TCP_ADDR
-          value: {{ include "backup.loggingAddress" $ | quote }}
         {{- if (include "backup.pushMetricsEndpoint" $) }}
         - name: KUBERNETES_POD_NAME
           valueFrom:
