@@ -68,3 +68,21 @@ pub(crate) fn finish_with_footer(writer: &CodeWriter) -> String {
 
     writer.process_result(|s| s.to_string())
 }
+
+pub(crate) fn generate_governance_proposal<F>(
+    writer: &CodeWriter,
+    is_testnet: bool,
+    deps_name: &str,
+    body: F,
+) -> String
+where
+    F: FnOnce(&CodeWriter),
+{
+    if is_testnet {
+        generate_testnet_header(writer, deps_name);
+    } else {
+        generate_governance_proposal_header(writer, deps_name);
+    }
+    body(writer);
+    finish_with_footer(writer)
+}
