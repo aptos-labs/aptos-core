@@ -69,8 +69,7 @@ impl Payload {
     pub fn is_direct(&self) -> bool {
         match self {
             Payload::DirectMempool(_) => true,
-            Payload::InQuorumStore(_) => false,
-            Payload::Empty => false,
+           _ => false,
         }
     }
 
@@ -122,7 +121,6 @@ impl fmt::Display for Payload {
 pub enum PayloadFilter {
     DirectMempool(Vec<TransactionSummary>),
     InQuorumStore(HashSet<HashValue>),
-    //
     Empty,
 }
 
