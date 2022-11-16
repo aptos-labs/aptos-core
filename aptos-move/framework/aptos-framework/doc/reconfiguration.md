@@ -476,13 +476,13 @@ reconfiguration event.
 </code></pre>
 
 
-A schem to ensure caller is admin
+Make sure the signer address is @aptos_framework.
 
 
-<a name="0x1_reconfiguration_Init"></a>
+<a name="0x1_reconfiguration_AbortsIfNotAptosFramework"></a>
 
 
-<pre><code><b>schema</b> <a href="reconfiguration.md#0x1_reconfiguration_Init">Init</a> {
+<pre><code><b>schema</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a> {
     aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
     <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
@@ -500,12 +500,12 @@ A schem to ensure caller is admin
 </code></pre>
 
 
-requires Account and Configuration
-already exists in frameword account
-guid_creation_num should be 2 according to logic
+Address @aptos_framework must exist resource Account and Configuration.
+Already exists in framework account.
+Guid_creation_num should be 2 according to logic.
 
 
-<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_Init">Init</a>;
+<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>requires</b> <b>exists</b>&lt;Account&gt;(addr);
 <b>aborts_if</b> !(<b>global</b>&lt;Account&gt;(addr).guid_creation_num == 2);
@@ -525,7 +525,7 @@ guid_creation_num should be 2 according to logic
 
 
 
-<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_Init">Init</a>;
+<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a>;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_DisableReconfiguration">DisableReconfiguration</a>&gt;(@aptos_framework);
 </code></pre>
 
@@ -540,10 +540,10 @@ guid_creation_num should be 2 according to logic
 </code></pre>
 
 
-Make sure the caller is admin and check the resource DisableReconfiguration
+Make sure the caller is admin and check the resource DisableReconfiguration.
 
 
-<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_Init">Init</a>;
+<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_DisableReconfiguration">DisableReconfiguration</a>&gt;(@aptos_framework);
 </code></pre>
 
@@ -606,8 +606,8 @@ Make sure the caller is admin and check the resource DisableReconfiguration
 </code></pre>
 
 
-When genesis_event emit the epoch and the <code>last_reconfiguration_time</code>
-should equal to 0
+When genesis_event emit the epoch and the <code>last_reconfiguration_time</code> .
+Should equal to 0
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework);

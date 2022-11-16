@@ -1312,7 +1312,7 @@ target utilization.
 
 
 
-<pre><code><b>include</b> <a href="storage_gas.md#0x1_storage_gas_AbortsIfNewGasCurve">AbortsIfNewGasCurve</a>;
+<pre><code><b>include</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a>;
 </code></pre>
 
 
@@ -1347,8 +1347,8 @@ target utilization.
 A non decreasing curve must ensure that next is greater than cur.
 
 
-<pre><code><b>include</b> <a href="storage_gas.md#0x1_storage_gas_AbortsIfNewGasCurve">AbortsIfNewGasCurve</a>;
-<b>include</b> <a href="storage_gas.md#0x1_storage_gas_AbortsIfValidatePoints">AbortsIfValidatePoints</a>;
+<pre><code><b>include</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a>;
+<b>include</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a>;
 </code></pre>
 
 
@@ -1443,7 +1443,7 @@ A non decreasing curve must ensure that next is greater than cur.
 
 <pre><code><b>pragma</b> aborts_if_is_strict = <b>false</b>;
 <b>pragma</b> opaque;
-<b>include</b> <a href="storage_gas.md#0x1_storage_gas_AbortsIfValidatePoints">AbortsIfValidatePoints</a>;
+<b>include</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a>;
 </code></pre>
 
 
@@ -1516,10 +1516,10 @@ Address @aptos_framework must exist StorageGasConfig and StorageGas and StateSto
 
 
 
-<a name="0x1_storage_gas_AbortsIfNewGasCurve"></a>
+<a name="0x1_storage_gas_NewGasCurveAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="storage_gas.md#0x1_storage_gas_AbortsIfNewGasCurve">AbortsIfNewGasCurve</a> {
+<pre><code><b>schema</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a> {
     min_gas: u64;
     max_gas: u64;
     <b>aborts_if</b> max_gas &lt; min_gas;
@@ -1531,10 +1531,10 @@ Address @aptos_framework must exist StorageGasConfig and StorageGas and StateSto
 A non decreasing curve must ensure that next is greater than cur.
 
 
-<a name="0x1_storage_gas_AbortsIfValidatePoints"></a>
+<a name="0x1_storage_gas_ValidatePointsAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="storage_gas.md#0x1_storage_gas_AbortsIfValidatePoints">AbortsIfValidatePoints</a> {
+<pre><code><b>schema</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a> {
     points: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="storage_gas.md#0x1_storage_gas_Point">Point</a>&gt;;
     <b>aborts_if</b> <b>exists</b> i in 0..len(points) - 1: (
         points[i].x &gt;= points[i + 1].x || points[i].y &gt; points[i + 1].y

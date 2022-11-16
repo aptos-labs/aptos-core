@@ -9,22 +9,22 @@ spec aptos_framework::reconfiguration {
             (timestamp::spec_now_microseconds() >= last_reconfiguration_time());
     }
     
-    /// A schem to ensure caller is admin
-    spec schema Init {
+    /// Make sure the signer address is @aptos_framework.
+    spec schema AbortsIfNotAptosFramework {
         aptos_framework: &signer;
 
         let addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(addr);
     }
 
-    /// requires Account and Configuration 
-    /// already exists in frameword account
-    /// guid_creation_num should be 2 according to logic 
+    /// Address @aptos_framework must exist resource Account and Configuration.
+    /// Already exists in framework account.
+    /// Guid_creation_num should be 2 according to logic.
     spec initialize(aptos_framework: &signer) {
         use std::signer;
         use aptos_framework::account::{Account};
 
-        include Init;
+        include AbortsIfNotAptosFramework;
         let addr = signer::address_of(aptos_framework);
         requires exists<Account>(addr);
         aborts_if !(global<Account>(addr).guid_creation_num == 2);
@@ -36,19 +36,19 @@ spec aptos_framework::reconfiguration {
     }
 
     spec disable_reconfiguration(aptos_framework: &signer) {
-        include Init;
+        include AbortsIfNotAptosFramework;
         aborts_if exists<DisableReconfiguration>(@aptos_framework);
     }
 
-    /// Make sure the caller is admin and check the resource DisableReconfiguration
+    /// Make sure the caller is admin and check the resource DisableReconfiguration.
     spec enable_reconfiguration(aptos_framework: &signer) {
         use aptos_framework::reconfiguration::{DisableReconfiguration};
-        include Init;
+        include AbortsIfNotAptosFramework;
         aborts_if !exists<DisableReconfiguration>(@aptos_framework);
     }
 
-    /// When genesis_event emit the epoch and the `last_reconfiguration_time` 
-    /// should equal to 0
+    /// When genesis_event emit the epoch and the `last_reconfiguration_time` .
+    /// Should equal to 0
     spec emit_genesis_reconfiguration_event {
         use aptos_framework::reconfiguration::{Configuration};
 

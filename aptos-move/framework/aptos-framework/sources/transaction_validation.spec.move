@@ -1,10 +1,10 @@
 spec aptos_framework::transaction_validation {
     spec module {
         pragma verify = true;
-        // pragma aborts_if_is_strict;
+        pragma aborts_if_is_strict;
     }
 
-    /// Ensure caller is admin.
+    /// Ensure caller is `aptos_framework`.
     /// Aborts if TransactionValidation already exists.
     spec initialize(
         aptos_framework: &signer,
@@ -21,7 +21,7 @@ spec aptos_framework::transaction_validation {
 
     /// Create a schema to reuse some code.
     /// Give some constraints that may abort according to the conditions.
-    spec schema PrologueCommon {
+    spec schema PrologueCommonAbortsIf {
         use aptos_framework::timestamp::{CurrentTimeMicroseconds};
         use aptos_framework::chain_id::{ChainId};
         use aptos_framework::account::{Account};
@@ -61,7 +61,7 @@ spec aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        include PrologueCommon;
+        include PrologueCommonAbortsIf;
     }
 
     spec module_prologue(
@@ -73,7 +73,7 @@ spec aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        include PrologueCommon {
+        include PrologueCommonAbortsIf {
             txn_authentication_key: txn_public_key
         };
     }
@@ -88,11 +88,37 @@ spec aptos_framework::transaction_validation {
         chain_id: u8,
         _script_hash: vector<u8>,
     ) {
-        include PrologueCommon{
+        include PrologueCommonAbortsIf{
             txn_authentication_key: txn_public_key
         };
     }
 
+    /// Aborts if length of public key hashed vector
+    /// not equal the number of singers.
+    spec multi_agent_script_prologue (
+        sender: signer,
+        txn_sequence_number: u64,
+        txn_sender_public_key: vector<u8>,
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<vector<u8>>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+    ) {
+        /// TODO: complex while loop condition.
+        pragma aborts_if_is_partial;
+    
+        include PrologueCommonAbortsIf{
+            txn_authentication_key: txn_sender_public_key
+        };
+        let num_secondary_signers = len(secondary_signer_addresses);
+        aborts_if !(len(secondary_signer_public_key_hashes) == num_secondary_signers);
+    }
+
+    /// Abort according to the conditions.
+    /// `AptosCoinCapabilities` and `CoinInfo` should exists.
+    /// Skip transaction_fee::burn_fee verification.
     spec epilogue(
         account: signer,
         _txn_sequence_number: u64,
@@ -100,16 +126,29 @@ spec aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         gas_units_remaining: u64
     ) {
-        use std::signer;
+        use aptos_framework::coin::{CoinStore};
+        use aptos_framework::account::{Account};
+        use aptos_framework::aptos_coin::{AptosCoin};
+        // TODO: call burn_fee, complex aborts conditions.
+        pragma aborts_if_is_partial;
 
-        let owner = signer::address_of(account);
+        aborts_if !(txn_max_gas_units >= gas_units_remaining);
         let gas_used = txn_max_gas_units - gas_units_remaining;
+
+        aborts_if !(txn_gas_price * gas_used <= MAX_U64);
         let transaction_fee_amount = txn_gas_price * gas_used;
 
-        let pre_balance = global<coin::CoinStore<AptosCoin>>(owner).coin.value;
-        let post balance = global<coin::CoinStore<AptosCoin>>(owner).coin.value;
-        let pre_account = global<account::Account>(owner);
-        let post account = global<account::Account>(owner);
+        let addr = signer::address_of(account);
+        aborts_if !exists<CoinStore<AptosCoin>>(addr);
+        aborts_if !(global<CoinStore<AptosCoin>>(addr).coin.value >= transaction_fee_amount);
+
+        aborts_if !exists<Account>(addr);
+        aborts_if !(global<Account>(addr).sequence_number < MAX_U64);
+
+        let pre_balance = global<coin::CoinStore<AptosCoin>>(addr).coin.value;
+        let post balance = global<coin::CoinStore<AptosCoin>>(addr).coin.value;
+        let pre_account = global<account::Account>(addr);
+        let post account = global<account::Account>(addr);
         ensures balance == pre_balance - transaction_fee_amount;
         ensures account.sequence_number == pre_account.sequence_number + 1;
     }

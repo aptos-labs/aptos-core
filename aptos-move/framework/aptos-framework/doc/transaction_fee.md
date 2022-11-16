@@ -9,6 +9,7 @@
 -  [Function `burn_fee`](#0x1_transaction_fee_burn_fee)
 -  [Function `store_aptos_coin_burn_cap`](#0x1_transaction_fee_store_aptos_coin_burn_cap)
 -  [Specification](#@Specification_0)
+    -  [Function `burn_fee`](#@Specification_0_burn_fee)
     -  [Function `store_aptos_coin_burn_cap`](#@Specification_0_store_aptos_coin_burn_cap)
 
 
@@ -108,6 +109,25 @@ Only called during genesis.
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_strict;
+</code></pre>
+
+
+
+<a name="@Specification_0_burn_fee"></a>
+
+### Function `burn_fee`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">burn_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64)
+</code></pre>
+
+
+<code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a></code> should be exists.
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -122,7 +142,7 @@ Only called during genesis.
 
 
 Ensure caller is admin.
-Aborts if AptosCoinCapabilities already exists.
+Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a></code> already exists.
 
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);

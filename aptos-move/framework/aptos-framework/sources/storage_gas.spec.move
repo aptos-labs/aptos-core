@@ -41,7 +41,7 @@ spec aptos_framework::storage_gas {
     // -----------------------
 
     spec base_8192_exponential_curve(min_gas: u64, max_gas: u64): GasCurve {
-        include AbortsIfNewGasCurve;
+        include NewGasCurveAbortsIf;
     }
 
     spec new_point(x: u64, y: u64): Point {
@@ -53,8 +53,8 @@ spec aptos_framework::storage_gas {
 
     /// A non decreasing curve must ensure that next is greater than cur.
     spec new_gas_curve(min_gas: u64, max_gas: u64, points: vector<Point>): GasCurve {
-        include AbortsIfNewGasCurve;
-        include AbortsIfValidatePoints;
+        include NewGasCurveAbortsIf;
+        include ValidatePointsAbortsIf;
     }
 
     spec new_usage_gas_config(target_usage: u64, read_curve: GasCurve, create_curve: GasCurve, write_curve: GasCurve): UsageGasConfig {
@@ -91,7 +91,7 @@ spec aptos_framework::storage_gas {
     spec validate_points(points: &vector<Point>) {
         pragma aborts_if_is_strict = false;
         pragma opaque;
-        include AbortsIfValidatePoints;
+        include ValidatePointsAbortsIf;
     }
 
     spec calculate_gas(max_usage: u64, current_usage: u64, curve: &GasCurve): u64 {
@@ -125,7 +125,7 @@ spec aptos_framework::storage_gas {
 
     spec fun spec_calculate_gas(max_usage: u64, current_usage: u64, curve: GasCurve): u64;
 
-    spec schema AbortsIfNewGasCurve {
+    spec schema NewGasCurveAbortsIf {
         min_gas: u64;
         max_gas: u64;
 
@@ -134,7 +134,7 @@ spec aptos_framework::storage_gas {
     }
 
     /// A non decreasing curve must ensure that next is greater than cur.
-    spec schema AbortsIfValidatePoints {
+    spec schema ValidatePointsAbortsIf {
         points: vector<Point>;
 
         aborts_if exists i in 0..len(points) - 1: (
