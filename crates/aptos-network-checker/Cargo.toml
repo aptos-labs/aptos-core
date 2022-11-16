@@ -18,7 +18,7 @@ aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-types = { path = "../../types" }
-clap = "3.2.17"
+clap = { version = "3.2.17", features = ["derive"] }
 futures = "0.3.21"
 network = { path = "../../network" }
 serde = { version = "1.0.137", features = ["derive"] }

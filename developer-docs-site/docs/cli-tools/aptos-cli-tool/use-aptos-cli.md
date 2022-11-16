@@ -262,7 +262,7 @@ $ aptos account fund-with-faucet --account default
 
 ### View an account's balance and transfer events
 
-You can view the balance and transfer events (deposits and withdrawals) either by explicity specying the accound address, as below:
+You can view the balance and transfer events (deposits and withdrawals) either by explicitly specifying the account address, as below:
 
 ```bash
 $ aptos account list --query balance --account 00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696
@@ -1094,7 +1094,7 @@ The framework will be stored within the `aptos-framework-release` directory.
 
 The `ValidatorConfiguration` file contains:
 
-* `account_address`: The account that manages this validator. This must be derived from the `account_key` provided within te `ValidatorConfiguration` file.
+* `account_address`: The account that manages this validator. This must be derived from the `account_key` provided within the `ValidatorConfiguration` file.
 * `consensus_key`: The public key for authenticating consensus messages from the validator
 * `account_key`: The public key for the account that manages this validator. This is used to derive the `account_address`.
 * `network_key`: The public key for both validator and fullnode network authentication and encryption.
