@@ -13,12 +13,13 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_infallible::{Mutex, RwLock};
+use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{
     account_config::AccountSequenceInfo, mempool_status::MempoolStatusCode,
-    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, transaction::SignedTransaction,
+    transaction::SignedTransaction,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use event_notifications::EventSubscriptionService;
+use event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use futures::channel::mpsc;
 use mempool_notifications::{self, MempoolNotifier};
 use network::{
@@ -26,6 +27,7 @@ use network::{
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::network::{NewNetworkEvents, NewNetworkSender},
 };
+use std::collections::HashMap;
 use std::{collections::HashSet, sync::Arc};
 use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use tokio::runtime::{Builder, Handle, Runtime};
@@ -115,11 +117,19 @@ impl MockSharedMempool {
         let (quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
         let (mempool_notifier, mempool_listener) =
             mempool_notifications::new_mempool_notifier_listener_pair();
-        let mut event_subscriber = EventSubscriptionService::new(
-            ON_CHAIN_CONFIG_REGISTRY,
-            Arc::new(RwLock::new(db.clone())),
-        );
-        let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
+        let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+        let reconfig_event_subscriber = ReconfigNotificationListener {
+            notification_receiver: reconfig_events,
+        };
+        reconfig_sender
+            .push(
+                (),
+                ReconfigNotification {
+                    version: 1,
+                    on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+                },
+            )
+            .unwrap();
         let network_handles = vec![(NetworkId::Validator, network_sender, network_events)];
         let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
 

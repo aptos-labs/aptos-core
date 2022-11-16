@@ -6,7 +6,7 @@
 
 use crate::util::{
     deserialize_property_map_from_bcs_hexstring, deserialize_string_from_hexstring, hash_str,
-    truncate_str,
+    standardize_address, truncate_str,
 };
 use anyhow::{Context, Result};
 use aptos_api_types::deserialize_from_string;
@@ -52,7 +52,13 @@ impl TokenDataIdType {
 
 impl fmt::Display for TokenDataIdType {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}::{}::{}", self.creator, self.collection, self.name)
+        write!(
+            f,
+            "{}::{}::{}",
+            standardize_address(self.creator.as_str()),
+            self.collection,
+            self.name
+        )
     }
 }
 
@@ -77,7 +83,12 @@ impl CollectionDataIdType {
 
 impl fmt::Display for CollectionDataIdType {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}::{}", self.creator, self.name)
+        write!(
+            f,
+            "{}::{}",
+            standardize_address(self.creator.as_str()),
+            self.name
+        )
     }
 }
 

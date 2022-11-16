@@ -1,11 +1,23 @@
 ---
-title: "Whats New in Docs"
+title: "What is New in Docs"
 slug: "whats-new-in-docs"
 ---
 
 # Whats New in Docs
 
 This page shows the key updates to the developer documentation on this site.
+
+## 12 November 2022
+
+- Recommended performance improvements to [validator source code](/docs/nodes/validator-node/operator/running-validator-node/run-validator-node-using-source) startup instructions by suggesting building the `aptos-node` binary and running it directly instead of using `cargo run`.
+
+## 09 November 2022
+
+- Improved [indexer fullnode](/docs/nodes/indexer-fullnode) setup instructions to standardize on one package manager and explain how to restart the database.
+
+## 08 November 2022
+
+- Published links to new auto-generated Move reference files [for all available versions](/docs/guides/move-guides/aptos-move-guides#aptos-move-documentation).
 
 ## 07 November 2022
 
@@ -14,6 +26,10 @@ This page shows the key updates to the developer documentation on this site.
 ## 04 November 2022
 
 - Added a guide on [Resource Accounts](/docs/guides/resource-accounts.md) used by developers to publish modules and automatically sign transactions.
+
+## 03 November 2022
+
+- Added [Aptos API reference files](https://aptos.dev/nodes/aptos-api-spec/#/) directly to Aptos.dev for easy access and clarified available information at various endpoints.
 
 ## 02 November 2022
 

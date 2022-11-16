@@ -155,7 +155,6 @@ pub mod telemetry_log_writer;
 pub mod tracing_adapter;
 
 mod security;
-mod struct_log;
 
 pub use crate::aptos_logger::{
     AptosData as Logger, AptosDataBuilder, LoggerFilterUpdater, Writer, CHANNEL_SIZE,

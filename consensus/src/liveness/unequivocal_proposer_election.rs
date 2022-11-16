@@ -26,6 +26,11 @@ impl ProposerElection for UnequivocalProposerElection {
     fn get_valid_proposer(&self, round: Round) -> Author {
         self.proposer_election.get_valid_proposer(round)
     }
+
+    fn get_voting_power_participation_ratio(&self, round: Round) -> f64 {
+        self.proposer_election
+            .get_voting_power_participation_ratio(round)
+    }
 }
 
 impl UnequivocalProposerElection {
