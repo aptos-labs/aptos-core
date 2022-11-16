@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::batch_reader::BatchReader;
-use crate::quorum_store::utils::RoundExpirations;
+use crate::quorum_store::{batch_reader::BatchReader, utils::RoundExpirations};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, warn};
@@ -14,7 +13,11 @@ use consensus_types::{
     proof_of_store::{LogicalTime, ProofOfStore},
     request_response::WrapperCommand,
 };
-use dashmap::DashMap;
+use dashmap::{
+    mapref::entry::Entry::{Occupied, Vacant},
+    DashMap,
+};
+use executor_types::Error::BlockNotFound;
 use executor_types::*;
 use futures::channel::mpsc::Sender;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -91,8 +94,6 @@ impl DataManager {
                 .update_certified_round(logical_time)
                 .await;
 
-            let payload_is_empty = payloads.is_empty();
-
             let digests: Vec<HashValue> = payloads
                 .into_iter()
                 .flat_map(|payload| match payload {
@@ -114,11 +115,9 @@ impl DataManager {
                 .clone()
                 .try_send(WrapperCommand::CleanRequest(logical_time, digests));
 
-            if !payload_is_empty {
-                let expired_set = self.expiration_status.lock().expire(logical_time.round());
-                for expired in expired_set {
-                    self.digest_status.remove(&expired);
-                }
+            let expired_set = self.expiration_status.lock().expire(logical_time.round());
+            for expired in expired_set {
+                self.digest_status.remove(&expired);
             }
         }
     }
@@ -154,25 +153,26 @@ impl DataManager {
             return Ok(Vec::new());
         }
         if self.quorum_store_enabled.load(Ordering::Relaxed) {
-            if let Payload::InQuorumStore(proofs) = block.payload().unwrap() {
-                // let data_status = self.digest_status.entry(block.id());
-                match self.digest_status.entry(block.id()) {
-                    dashmap::mapref::entry::Entry::Occupied(mut entry) => match entry.get_mut() {
-                        DataStatus::Cached(data) => Ok(data.clone()),
-                        DataStatus::Requested(receivers) => {
-                            let mut vec_ret = Vec::new();
-                            debug!("QSE: waiting for data on {} receivers", receivers.len());
-                            for rx in receivers {
-                                match rx.await {
-                                    Err(_) => {
-                                        debug!("Oneshot channel to get a batch was dropped");
-                                    }
-                                    Ok(result) => match result {
-                                        Ok(data) => {
+            match block.payload().unwrap() {
+                Payload::InQuorumStore(proofs) => {
+                    match self.digest_status.entry(block.id()) {
+                        Occupied(mut entry) => match entry.get_mut() {
+                            DataStatus::Cached(data) => Ok(data.clone()),
+                            DataStatus::Requested(receivers) => {
+                                let mut vec_ret = Vec::new();
+                                debug!("QSE: waiting for data on {} receivers", receivers.len());
+                                for rx in receivers {
+                                    match rx.await {
+                                        Err(_) => {
+                                            debug!("Oneshot channel to get a batch was dropped");
+                                            // We probably advanced epoch already.
+                                            return Err(BlockNotFound(block.id()));
+                                        }
+                                        Ok(Ok(data)) => {
                                             debug!("QSE: got data, len {}", data.len());
                                             vec_ret.push(data);
                                         }
-                                        Err(e) => {
+                                        Ok(Err(e)) => {
                                             debug!("QS: got error from receiver {:?}", e);
                                             let new_receivers = self
                                                 .request_data(
@@ -180,36 +180,45 @@ impl DataManager {
                                                     LogicalTime::new(block.epoch(), block.round()),
                                                 )
                                                 .await;
+                                            // Could not get all data so requested again
                                             entry.replace_entry(DataStatus::Requested(
                                                 new_receivers,
                                             ));
                                             return Err(e);
                                         }
-                                    },
+                                    }
                                 }
-                            }
-                            let ret: Vec<SignedTransaction> =
-                                vec_ret.into_iter().flatten().collect();
-                            entry.replace_entry(DataStatus::Cached(ret.clone()));
+                                let ret: Vec<SignedTransaction> =
+                                    vec_ret.into_iter().flatten().collect();
+                                // execution asks for the data twice, so data is cached here for the second time.
+                                entry.replace_entry(DataStatus::Cached(ret.clone()));
 
-                            Ok(ret)
+                                Ok(ret)
+                            }
+                        },
+                        Vacant(_) => {
+                            unreachable!("digest_status entry must exist!");
                         }
-                    },
-                    dashmap::mapref::entry::Entry::Vacant(_) => {
-                        unreachable!("digest_status entry must exist!");
                     }
                 }
-            } else {
-                warn!("should use QuorumStore");
-                Ok(Vec::new())
+                _ => {
+                    // the Empty case is checked in the beginning
+                    warn!("should use QuorumStore");
+                    Ok(Vec::new())
+                }
             }
-        } else if let Payload::DirectMempool(txns) = block.payload().unwrap() {
-            Ok(txns.clone())
         } else {
-            warn!("should not use QuorumStore");
-            Ok(Vec::new())
+            match block.payload().unwrap() {
+                Payload::DirectMempool(txns) => Ok(txns.clone()),
+                _ => {
+                    // the Empty case is checked in the beginning
+                    warn!("should not use QuorumStore");
+                    Ok(Vec::new())
+                }
+            }
         }
     }
+
     #[allow(dead_code)]
     pub fn new_epoch(
         &self,

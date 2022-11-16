@@ -49,7 +49,11 @@ impl Payload {
     pub fn len(&self) -> usize {
         match self {
             Payload::DirectMempool(txns) => txns.len(),
-            Payload::InQuorumStore(pos) => pos.len(), // quorum store TODO
+            Payload::InQuorumStore(proofs) => proofs
+                .par_iter()
+                .with_min_len(100)
+                .map(|proof| proof.info().num_txns as usize)
+                .sum(),
             Payload::Empty => 0,
         }
     }
@@ -78,7 +82,11 @@ impl Payload {
                 .with_min_len(100)
                 .map(|txn| txn.raw_txn_bytes_len())
                 .sum(),
-            Payload::InQuorumStore(_) => 0, // quorum store TODO
+            Payload::InQuorumStore(proofs) => proofs
+                .par_iter()
+                .with_min_len(100)
+                .map(|proof| proof.info().num_bytes as usize)
+                .sum(),
             Payload::Empty => 0,
         }
     }
@@ -103,7 +111,7 @@ impl fmt::Display for Payload {
                 write!(f, "InMemory txns: {}", txns.len())
             }
             Payload::InQuorumStore(proofs) => {
-                write!(f, "InMemory poavs: {}", proofs.len())
+                write!(f, "InMemory poss: {}", proofs.len())
             }
             Payload::Empty => write!(f, "Empty payload"),
         }
@@ -162,11 +170,11 @@ impl fmt::Display for PayloadFilter {
                 write!(f, "{}", txns_str)
             }
             PayloadFilter::InQuorumStore(excluded_proofs) => {
-                let mut txns_str = "".to_string();
+                let mut poss_str = "".to_string();
                 for proof in excluded_proofs.iter() {
-                    write!(txns_str, "{} ", proof)?;
+                    write!(poss_str, "{} ", proof)?;
                 }
-                write!(f, "{}", txns_str)
+                write!(f, "{}", poss_str)
             }
             PayloadFilter::Empty => {
                 write!(f, "Empty filter")

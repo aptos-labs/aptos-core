@@ -14,6 +14,7 @@ impl BatchReader {
         _proof: ProofOfStore,
     ) -> oneshot::Receiver<Result<Vec<SignedTransaction>, Error>> {
         let (_tx, rx) = oneshot::channel();
+        // TODO: verify expiration
 
         // TODO: coming soon
 

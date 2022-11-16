@@ -56,8 +56,7 @@ impl MockStateComputer {
         // mock sending commit notif to state sync
         let mut txns = vec![];
         for block in &ordered_blocks {
-            let _payload = self
-                .block_cache
+            self.block_cache
                 .lock()
                 .remove(&block.id())
                 .ok_or_else(|| format_err!("Cannot find block"))?;
