@@ -6,7 +6,10 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
-N/A
+- add missing fields to TokenData class
+- add PropertyMap and PropertyValue type to match on-chain data
+- support token property map deseralizer to read the property map in the original data format.
+
 
 ## 1.3.17 (2022-11-08)
 
