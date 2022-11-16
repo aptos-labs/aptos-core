@@ -133,6 +133,11 @@ const config = {
               },
               {
                 type: "doc",
+                label: "Develop Locally",
+                docId: "nodes/local-testnet/index",
+              },
+              {
+                type: "doc",
                 label: "Interact with Blockchain",
                 docId: "guides/index",
               },
