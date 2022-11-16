@@ -837,7 +837,7 @@ impl EpochManager {
                 batch_expiry_round_gap_behind_latest_certified: 500,
                 batch_expiry_round_gap_beyond_latest_certified: 500,
                 batch_expiry_grace_rounds: 5,
-                memory_quota: 100000000,
+                memory_quota: 0,
                 db_quota: 10000000000,
                 mempool_txn_pull_max_count: 2000,
                 mempool_txn_pull_max_bytes: 1000000,
