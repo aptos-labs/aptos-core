@@ -12,7 +12,7 @@ import { TransactionBuilder, TransactionBuilderABI, TxnBuilderTypes } from "./tr
 import { MAX_U64_BIG_INT } from "./bcs/consts";
 import { TOKEN_ABIS, TOKEN_TRANSFER_OPT_IN } from "./abis";
 import { AnyNumber, bcsToBytes, Bytes } from "./bcs";
-import { getPropertyValueRaw } from "./utils/property_map_serializer";
+import { getPropertyValueRaw } from "./utils/property_map_serde";
 import {
   Script,
   TransactionArgumentAddress,
@@ -635,7 +635,7 @@ export class TokenClient {
         return {
           id: tokenId,
           amount: "0",
-          token_properties: {},
+          token_properties: { map: { data: [] } },
         };
       }
       return error;

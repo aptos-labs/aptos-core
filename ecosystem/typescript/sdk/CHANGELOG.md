@@ -8,6 +8,9 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 N/A
 
+## 1.3.18 (2022-11-15)
+- support token property map deseralizer to read the property map in the original data format.
+
 ## 1.3.17 (2022-11-08)
 
 - Support computing resource account address based off a source address and a seed
