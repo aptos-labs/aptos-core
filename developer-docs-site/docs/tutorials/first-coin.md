@@ -256,7 +256,7 @@ public entry fun registerCoinType(account: &signer) {
 MoonCoin uses `ManagedCoin` that provides an entry function wrapper: `managed_coin::register`. Here is an example script for registration:
 
 ```rust
-:!: static/move-examples/moon_coin/scripts/register.move
+:!: static/move-examples/moon_coin/scripts/register.move moon
 ```
 
 ---
