@@ -5,13 +5,14 @@
 use anyhow::bail;
 use aptos_protos::indexer::transaction::v1::FILE_DESCRIPTOR_SET;
 use futures_util::stream;
-use gcloud_sdk::google::cloud::bigquery::storage::v1::{
-    append_rows_request::{ProtoData, Rows},
-    write_stream, AppendRowsRequest, CreateWriteStreamRequest, ProtoRows, ProtoSchema, WriteStream,
-};
 use gcloud_sdk::{
-    google::cloud::bigquery::storage::v1::big_query_write_client::BigQueryWriteClient, GoogleApi,
-    GoogleAuthMiddleware,
+    google::cloud::bigquery::storage::v1::{
+        append_rows_request::{ProtoData, Rows},
+        big_query_write_client::BigQueryWriteClient,
+        write_stream, AppendRowsRequest, CreateWriteStreamRequest, ProtoRows, ProtoSchema,
+        WriteStream,
+    },
+    GoogleApi, GoogleAuthMiddleware,
 };
 use once_cell::sync::Lazy;
 use prost::Message;
