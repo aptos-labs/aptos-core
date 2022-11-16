@@ -61,26 +61,22 @@ pub fn generate_feature_upgrade_proposal(
 
     let writer = CodeWriter::new(Loc::default());
 
-    if is_testnet {
-        generate_testnet_header(&writer, "std::features");
-    } else {
-        generate_governance_proposal_header(&writer, "std::features");
-    }
+    let proposal = generate_governance_proposal(&writer, is_testnet, "std::features", |writer| {
+        emit!(writer, "let enabled_blob: vector<u64> = ");
+        generate_features_blob(writer, &enabled);
+        emitln!(writer, ";\n");
 
-    emit!(writer, "let enabled_blob: vector<u64> = ");
-    generate_features_blob(&writer, &enabled);
-    emitln!(writer, ";\n");
+        emit!(writer, "let disabled_blob: vector<u64> = ");
+        generate_features_blob(writer, &disabled);
+        emitln!(writer, ";\n");
 
-    emit!(writer, "let disabled_blob: vector<u64> = ");
-    generate_features_blob(&writer, &disabled);
-    emitln!(writer, ";\n");
+        emitln!(
+            writer,
+            "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
+        );
+    });
 
-    emitln!(
-        writer,
-        "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
-    );
-
-    result.push(("features".to_string(), finish_with_footer(&writer)));
+    result.push(("features".to_string(), proposal));
     Ok(result)
 }
 
