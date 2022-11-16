@@ -113,7 +113,6 @@ impl fmt::Display for Payload {
 pub enum PayloadFilter {
     DirectMempool(Vec<TransactionSummary>),
     InQuorumStore(HashSet<HashValue>),
-    //
     Empty,
 }
 
