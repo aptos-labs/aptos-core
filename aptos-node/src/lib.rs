@@ -197,8 +197,7 @@ pub fn start(
         .level(config.logger.level)
         .telemetry_level(config.logger.telemetry_level)
         .enable_telemetry_flush(config.logger.enable_telemetry_flush)
-        .console_port(config.logger.console_port)
-        .read_env();
+        .console_port(config.logger.console_port);
     if config.logger.enable_backtrace {
         logger_builder.enable_backtrace();
     }

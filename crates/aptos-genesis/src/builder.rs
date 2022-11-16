@@ -24,7 +24,12 @@ use aptos_crypto::{
 };
 use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
-use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
+use aptos_types::{
+    chain_id::ChainId,
+    on_chain_config::{GasScheduleV2, OnChainConsensusConfig},
+    transaction::Transaction,
+    waypoint::Waypoint,
+};
 use framework::ReleaseBundle;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
@@ -36,6 +41,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use vm_genesis::default_gas_schedule;
 
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
 const VFN_IDENTITY: &str = "vfn-identity.yaml";
@@ -401,6 +407,8 @@ pub struct GenesisConfiguration {
     pub voting_power_increase_limit: u64,
     pub employee_vesting_start: Option<u64>,
     pub employee_vesting_period_duration: Option<u64>,
+    pub consensus_config: OnChainConsensusConfig,
+    pub gas_schedule: GasScheduleV2,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut u64) + Send + Sync>;
@@ -598,6 +606,8 @@ impl Builder {
             voting_power_increase_limit: 50,
             employee_vesting_start: None,
             employee_vesting_period_duration: None,
+            consensus_config: OnChainConsensusConfig::default(),
+            gas_schedule: default_gas_schedule(),
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);

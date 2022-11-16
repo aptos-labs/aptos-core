@@ -6,14 +6,17 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+N/A
+
+## 1.3.17 (2022-11-08)
+
+- Support computing resource account address based off a source address and a seed
+- Exported ABI types
 - `getAccountModules` and `getAccountResources` now use pagination under the hood. This addresses the issue raised here: https://github.com/aptos-labs/aptos-core/issues/5298. The changes are non-breaking, if you use these functions with an older node that hasn't updated to include the relevant support in its API service, it will still work as it did before.
 - To support the above, the generated client has been updated to attach the headers to the response object, as per the changes here: https://github.com/aptos-labs/openapi-typescript-codegen/compare/v0.23.0...aptos-labs:openapi-typescript-codegen:0.24.0?expand=1. Consider this an implementation detail, not a supported part of the SDK interface.
-
-## 1.3.17 (2022-11-04)
-
 - Add functions to token client support
   - direct transfer with opt-in
-  - burn token by owner 
+  - burn token by owner
   - burn token by creator
   - mutate token properties
 - Add property map serializer to serialize input to BCS encode

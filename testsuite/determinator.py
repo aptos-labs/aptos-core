@@ -14,11 +14,14 @@ class Verdict:
     subverdicts: Sequence[Verdict]
 
     def format(self, indent=0) -> str:
-        return "\n".join([
-            (indent * "  ") + ("PASS" if self.verdict else "FAIL") + f"ED because {self.reason}",
-        ] + [
-            verdict.format(indent+1) for verdict in self.subverdicts
-        ])
+        return "\n".join(
+            [
+                (indent * "  ")
+                + ("PASS" if self.verdict else "FAIL")
+                + f"ED because {self.reason}",
+            ]
+            + [verdict.format(indent + 1) for verdict in self.subverdicts]
+        )
 
 
 TEvaluationContext = TypeVar("TEvaluationContext")
@@ -97,10 +100,7 @@ def changed_files(
     print(verdict.format())
 
     if github_output_key:
-        output = GithubOutput(
-            github_output_key,
-            "true" if verdict.verdict else "false"
-        )
+        output = GithubOutput(github_output_key, "true" if verdict.verdict else "false")
         print(output.format())
     else:
         if not verdict.verdict:

@@ -140,18 +140,49 @@ With your development environment ready, now you can start to setup your validat
     - `waypoint.txt`: The waypoint for the genesis transaction (from step 9).
     - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 9).
 
-12. Start your validator by running the below command:
+12. Start your validator by running the below commands, with the paths assuming you are in the root of the `aptos-core` directory:
 
     ```bash
     cargo clean
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/validator.yaml
+    cargo build -p aptos-node --release
+    sudo mv target/release/aptos-node /usr/local/bin
+    aptos-node -f ~/$WORKSPACE/config/validator.yaml
     ```
 
     Run validator fullnode on **another machine**:
 
     ```bash
     cargo clean
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/fullnode.yaml
+    cargo build -p aptos-node --release
+    sudo mv target/release/aptos-node /usr/local/bin
+    aptos-node -f ~/$WORKSPACE/config/fullnode.yaml
     ```
+
+Optionally, you may set up `aptos-node` to run as a service controlled by `systemctl` in a file resembling:
+
+```bash
+[Unit]
+Description=Aptos Node Service
+
+[Service]
+User=nodeuser
+Group=nodeuser
+
+LimitNOFILE=500000
+
+#Environment="RUST_LOG=error"
+WorkingDirectory=/home/nodeuser/aptos-core
+ExecStart=/usr/local/bin/aptos-node -f /home/nodeuser/aptos-mainnet/config/validator.yaml
+
+Restart=on-failure
+RestartSec=3s
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aptos-node
+
+[Install]
+WantedBy=multi-user.target
+```
 
 Now you have completed setting up your node.
