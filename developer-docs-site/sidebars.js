@@ -48,7 +48,7 @@ const sidebars = {
   },
     {
       type: "category",
-      label: "Prepare Environment",
+      label: "Get Started",
       link: { type: "doc", id: "guides/getting-started" },
       collapsible: true,
       collapsed: true,
@@ -85,7 +85,7 @@ const sidebars = {
     "guides/system-integrators-guide",
     {
       type: "category",
-      label: "Conduct Tutorials",
+      label: "Developer Tutorials",
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
