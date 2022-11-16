@@ -641,7 +641,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             500,
             300,
-            false,
+            true,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 0,
@@ -676,7 +676,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
-            false,
+            true,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 6,
@@ -926,15 +926,27 @@ fn changing_working_quorum_test(
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
+            let block_size = target_tps / 4;
             helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
-                (target_tps / 4).into();
+                block_size.into();
             helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                (target_tps / 4).into();
+                block_size.into();
             helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
                 500.into();
             helm_values["validator"]["config"]["consensus"]
                 ["round_timeout_backoff_exponent_base"] = 1.0.into();
             helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] = 1.into();
+
+            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"]["0"]
+                ["max_sending_block_txns_override"] = block_size.into();
+            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"]["1"]
+                ["max_sending_block_txns_override"] = (block_size / 2).max(10).into();
+            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"]["2"]
+                ["max_sending_block_txns_override"] = (block_size / 4).max(10).into();
+            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"]["3"]
+                ["max_sending_block_txns_override"] = (block_size / 8).max(10).into();
+            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"]["4"]
+                ["max_sending_block_txns_override"] = (block_size / 16).max(10).into();
 
             // Override the syncing mode of all nodes to use transaction output syncing.
             // TODO(joshlind): remove me once we move back to output syncing by default.
