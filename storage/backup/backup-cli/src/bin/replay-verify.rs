@@ -57,7 +57,7 @@ async fn main() -> Result<()> {
 }
 
 async fn main_impl() -> Result<()> {
-    Logger::new().level(Level::Info).read_env().init();
+    Logger::new().level(Level::Info).init();
 
     let opt = Opt::from_args();
     let restore_handler = Arc::new(AptosDB::open(
