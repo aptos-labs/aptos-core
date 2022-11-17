@@ -32,6 +32,7 @@ Please note, the `mainnet` versions of the documents below are not yet available
 
 Use these external resources to learn about the core Move programming language.
 
+* [IMCODING Move Tutorials](https://imcoding.online/courses/move-language)
 * [Pontem Move Playground](https://playground.pontem.network/)
 * [Collection of nestable Move resources](https://github.com/taoheorg/taohe)
 * [Move-Lang tag on Stack Overflow](https://stackoverflow.com/questions/tagged/move-lang)
