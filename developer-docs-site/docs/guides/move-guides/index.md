@@ -28,7 +28,7 @@ Please note, the `mainnet` versions of the documents below are not yet available
 * *Aptos stdlib* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/aptos-stdlib/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-stdlib/doc/overview.md)
 * *Move stdlib* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/move-stdlib/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/move-stdlib/doc/overview.md)
 
-## Supporting Move documentation
+## Supporting Move resources
 
 Use these external resources to learn about the core Move programming language.
 
