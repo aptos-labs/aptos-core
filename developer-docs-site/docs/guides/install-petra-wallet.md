@@ -1,9 +1,9 @@
 ---
-title: "Install Petra Extension"
+title: "Install Wallet Extension"
 slug: "install-petra-wallet-extension"
 ---
 
-# Install Petra Extension
+# Install Wallet Extension
 
 [Petra (Aptos Wallet)](https://petra.app/) is now available on the Chrome store. To install the Petra extension on your Chrome browser, you can chose either of the following options:
 
