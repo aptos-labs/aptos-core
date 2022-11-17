@@ -526,20 +526,20 @@ module aptos_std::bls12381 {
     #[test]
     fun test_pubkey_aggregation() {
         let pks = vector[
-        PublicKeyWithPoP { bytes: x"92e201a806af246f805f460fbdc6fc90dd16a18d6accc236e85d3578671d6f6690dde22134d19596c58ce9d63252410a" },
-        PublicKeyWithPoP { bytes: x"ab9df801c6f96ade1c0490c938c87d5bcc2e52ccb8768e1b5d14197c5e8bfa562783b96711b702dda411a1a9f08ebbfa" },
-        PublicKeyWithPoP { bytes: x"b698c932cf7097d99c17bd6e9c9dc4eeba84278c621700a8f80ec726b1daa11e3ab55fc045b4dbadefbeef05c4182494" },
-        PublicKeyWithPoP { bytes: x"934706a8b876d47a996d427e1526ce52c952d5ec0858d49cd262efb785b62b1972d06270b0a7adda1addc98433ad1843" },
-        PublicKeyWithPoP { bytes: x"a4cd352daad3a0651c1998dfbaa7a748e08d248a54347544bfedd51a197e016bb6008e9b8e45a744e1a030cc3b27d2da" },
+            PublicKeyWithPoP { bytes: x"92e201a806af246f805f460fbdc6fc90dd16a18d6accc236e85d3578671d6f6690dde22134d19596c58ce9d63252410a" },
+            PublicKeyWithPoP { bytes: x"ab9df801c6f96ade1c0490c938c87d5bcc2e52ccb8768e1b5d14197c5e8bfa562783b96711b702dda411a1a9f08ebbfa" },
+            PublicKeyWithPoP { bytes: x"b698c932cf7097d99c17bd6e9c9dc4eeba84278c621700a8f80ec726b1daa11e3ab55fc045b4dbadefbeef05c4182494" },
+            PublicKeyWithPoP { bytes: x"934706a8b876d47a996d427e1526ce52c952d5ec0858d49cd262efb785b62b1972d06270b0a7adda1addc98433ad1843" },
+            PublicKeyWithPoP { bytes: x"a4cd352daad3a0651c1998dfbaa7a748e08d248a54347544bfedd51a197e016bb6008e9b8e45a744e1a030cc3b27d2da" },
         ];
 
         // agg_pks[i] = \sum_{j <= i}  pk[j]
         let agg_pks = vector[
-        AggrPublicKeysWithPoP { bytes: x"92e201a806af246f805f460fbdc6fc90dd16a18d6accc236e85d3578671d6f6690dde22134d19596c58ce9d63252410a" },
-        AggrPublicKeysWithPoP { bytes: x"b79ad47abb441d7eda9b220a626df2e4e4910738c5f777947f0213398ecafae044ec0c20d552d1348347e9abfcf3eca1" },
-        AggrPublicKeysWithPoP { bytes: x"b5f5eb6153ab5388a1a76343d714e4a2dcf224c5d0722d1e8e90c6bcead05c573fffe986460bd4000645a655bf52bc60" },
-        AggrPublicKeysWithPoP { bytes: x"b922006ec14c183572a8864c31dc6632dccffa9f9c86411796f8b1b5a93a2457762c8e2f5ef0a2303506c4bca9a4e0bf" },
-        AggrPublicKeysWithPoP { bytes: x"b53df1cfee2168f59e5792e710bf22928dc0553e6531dae5c7656c0a66fc12cb82fbb04863938c953dc901a5a79cc0f3" },
+            AggrPublicKeysWithPoP { bytes: x"92e201a806af246f805f460fbdc6fc90dd16a18d6accc236e85d3578671d6f6690dde22134d19596c58ce9d63252410a" },
+            AggrPublicKeysWithPoP { bytes: x"b79ad47abb441d7eda9b220a626df2e4e4910738c5f777947f0213398ecafae044ec0c20d552d1348347e9abfcf3eca1" },
+            AggrPublicKeysWithPoP { bytes: x"b5f5eb6153ab5388a1a76343d714e4a2dcf224c5d0722d1e8e90c6bcead05c573fffe986460bd4000645a655bf52bc60" },
+            AggrPublicKeysWithPoP { bytes: x"b922006ec14c183572a8864c31dc6632dccffa9f9c86411796f8b1b5a93a2457762c8e2f5ef0a2303506c4bca9a4e0bf" },
+            AggrPublicKeysWithPoP { bytes: x"b53df1cfee2168f59e5792e710bf22928dc0553e6531dae5c7656c0a66fc12cb82fbb04863938c953dc901a5a79cc0f3" },
         ];
 
         let i = 0;
