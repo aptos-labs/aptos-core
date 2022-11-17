@@ -1,9 +1,9 @@
 ---
-title: "Building Aptos CLI from Source"
+title: "Build CLI from Source"
 id: "build-aptos-cli"
 ---
 
-# (Advanced users only) Build the CLI binary from the source code
+# Build Aptos CLI from Source Code
 
 If you are an advanced user and would like to build the CLI binary by downloading the source code, follow the below steps. **This is not recommended** unless you are on a platform unsupported by the prebuilt binaries. Otherwise, [install the prebuilt CLI binaries](aptos-cli-tool/install-aptos-cli.md) to ease ramp up and reduce variables in your environment.
 

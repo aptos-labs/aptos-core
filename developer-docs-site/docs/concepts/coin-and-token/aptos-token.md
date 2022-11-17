@@ -33,7 +33,7 @@ Additionally, most NFTs are part of a collection or a set of NFTs with a common 
 
 The [Aptos token standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) is developed with the following principles:
 
-- **Interoperability**: Provide a standard implementation to improve interoperability across the ecosystem projects. Morever, Move being a static language without dynamic dispatch makes this principle even more imperative.
+- **Interoperability**: Provide a standard implementation to improve interoperability across the ecosystem projects. Moreover, Move being a static language without dynamic dispatch makes this principle even more imperative.
 - **Liquidity**: Achieve maximal liquidity by defining the NFT, fungible (non-decimal) and semi-fungible tokens in one contract. These different types of tokens can be easily stored, transferred and transacted in the same way. As a consequence, it becomes easier to achieve maximal interoperability across the marketplaces, exchanges, and other methods of exchange.
 - **Rich on-chain token properties**: Enable the customization of on-chain token properties. Users can define their own properties and store them on-chain. This can potentially eliminate the need for the off-chain metadata.
 - **Reduced overhead**: Reduce the cost of creating large amounts of NFTs from fungible tokens. This can lead to, for example, reduced overhead for similar tokens by the reuse of on-chain metadata for certain fungible tokens.

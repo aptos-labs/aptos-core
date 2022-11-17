@@ -13,54 +13,50 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-async-trait = "0.1.53"
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-bytes = "1.1.0"
-fail = "0.5.0"
-futures = "0.3.21"
-hex = "0.4.3"
-hyper = "0.14.18"
-itertools = "0.10.3"
-mime = "0.3.16"
-once_cell = "1.10.0"
-paste = "1.0.7"
-poem = { version = "1.3.40", features = ["anyhow", "rustls"] }
-poem-openapi = { version = "2.0.10", features = ["url"] }
-serde = { version = "1.0.137", features = ["derive"], default-features = false }
-serde_json = { version = "1.0.81", features = ["preserve_order"] }
-tokio = { version = "1.21.0", features = ["full"] }
-url = "2.2.2"
-
-aptos-api-types = { path = "./types", package = "aptos-api-types" }
-aptos-build-info = { path = "../crates/aptos-build-info" }
-aptos-config = { path = "../config" }
-aptos-crypto = { path = "../crates/aptos-crypto" }
-aptos-gas = { path = "../aptos-move/aptos-gas" }
-aptos-logger = { path = "../crates/aptos-logger" }
-aptos-mempool = { path = "../mempool" }
-aptos-metrics-core = { path = "../crates/aptos-metrics-core" }
-aptos-state-view = { path = "../storage/state-view" }
-aptos-types = { path = "../types" }
-aptos-vm = { path = "../aptos-move/aptos-vm" }
-
-storage-interface = { path = "../storage/storage-interface" }
-
+anyhow = { workspace = true }
+aptos-api-types = { workspace = true }
+aptos-build-info = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-gas = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-mempool = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-state-view = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+async-trait = { workspace = true }
+bcs = { workspace = true }
+bytes = { workspace = true }
+fail = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+hyper = { workspace = true }
+itertools = { workspace = true }
+mime = { workspace = true }
 move-core-types = { workspace = true }
+once_cell = { workspace = true }
+paste = { workspace = true }
+poem = { workspace = true }
+poem-openapi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+storage-interface = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
-aptos-api-test-context = { path = "./test-context", package = "aptos-api-test-context" }
-aptos-gas = { path = "../aptos-move/aptos-gas", features = ["testing"] }
-aptos-proptest-helpers = { path = "../crates/aptos-proptest-helpers" }
-aptos-sdk = { path = "../sdk" }
-percent-encoding = "2.1.0"
-proptest = { version = "1.0.0", default-features = true }
-rand = "0.7.3"
-regex = "1.5.5"
-reqwest = { version = "0.11.10", features = ["blocking", "json"], default_features = false }
-warp = { version = "0.3.2", features = ["default"] }
-
+aptos-api-test-context = { workspace = true }
+aptos-gas = { workspace = true, features = ["testing"] }
+aptos-proptest-helpers = { workspace = true }
+aptos-sdk = { workspace = true }
 move-package = { workspace = true }
+percent-encoding = { workspace = true }
+proptest = { workspace = true }
+rand = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+warp = { workspace = true }
 
 [features]
 failpoints = ["fail/failpoints"]

@@ -1,11 +1,11 @@
 ---
-title: "Wallet Standard"
+title: "Adhere to Wallet Standard"
 slug: "wallet-standard"
 ---
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Wallet Standard
+# Adhere to Wallet Standard
 
 In order to allow for Aptos' wallet interoperability, the following is required:
 1. Mnemonics - a set of words that can derive account private keys
