@@ -590,7 +590,7 @@ Give some constraints that may abort according to the conditions.
 
 
 
-<pre><code><b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a>{
+<pre><code><b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
     txn_authentication_key: txn_public_key
 };
 </code></pre>
@@ -613,7 +613,7 @@ TODO: complex while loop condition.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a>{
+<b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
     txn_authentication_key: txn_sender_public_key
 };
 <b>let</b> num_secondary_signers = len(secondary_signer_addresses);
