@@ -32,6 +32,7 @@ Please note, the `mainnet` versions of the documents below are not yet available
 
 Use these external resources to learn about the core Move programming language.
 
+* [Pontem Move Playground](https://playground.pontem.network/)
 * [Move-Lang tag on Stack Overflow](https://stackoverflow.com/questions/tagged/move-lang)
 * [Move Book](https://move-language.github.io/move/)
 * [Move Tutorial](https://github.com/move-language/move/tree/main/language/documentation/tutorial)
