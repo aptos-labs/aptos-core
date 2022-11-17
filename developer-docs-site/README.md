@@ -79,3 +79,11 @@ This command generates static html content and places it in the `build` director
   ```
   pnpm run serve
   ```
+
+## Debugging
+
+Fix formatting issues by running:
+
+```
+pnpm fmt
+```
