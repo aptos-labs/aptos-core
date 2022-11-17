@@ -62,9 +62,9 @@ const config = {
       crossorigin: "anonymous",
     },
     {
-      href: "https://unpkg.com/@stoplight/elements/styles.min.css",
+      href: "https://unpkg.com/@stoplight/elements@7.7.5/styles.min.css",
       type: "text/css",
-      integrity: "sha384-mS2+08UV7BvSC96l6SGdnZv1SexFzKSJnHwTETEb4+97GyWualVrW9nAU2MwDu16",
+      integrity: "sha384-1lLf7J28IOR7k5RlItk6Y+G3hDgVB3y4RCgWNq6ZSwjYfvJXPtZAdW0uklsAZbGW",
       crossorigin: "anonymous",
     },
   ],

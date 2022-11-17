@@ -75,7 +75,7 @@ impl TransactionValidation for MockVMValidator {
     }
 
     fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {
-        unimplemented!();
+        Ok(())
     }
 
     fn notify_commit(&mut self) {}

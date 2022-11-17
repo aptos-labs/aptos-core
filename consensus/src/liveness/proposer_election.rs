@@ -19,6 +19,21 @@ pub trait ProposerElection {
     /// Return the valid proposer for a given round (this information can be
     /// used by e.g., voters for choosing the destinations for sending their votes to).
     fn get_valid_proposer(&self, round: Round) -> Author;
+
+    /// Return the chain health: a ratio of voting power participating in the consensus.
+    fn get_voting_power_participation_ratio(&self, _round: Round) -> f64 {
+        1.0
+    }
+
+    fn get_valid_proposer_and_voting_power_participation_ratio(
+        &self,
+        round: Round,
+    ) -> (Author, f64) {
+        (
+            self.get_valid_proposer(round),
+            self.get_voting_power_participation_ratio(round),
+        )
+    }
 }
 
 // next consumes seed and returns random deterministic u64 value in [0, max) range

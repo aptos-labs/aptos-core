@@ -237,15 +237,29 @@ pub trait SwarmExt: Swarm {
         Ok(())
     }
 
-    /// Waits for all nodes to have caught up to the specified `verison`.
+    /// Waits for all nodes to have caught up to the specified `target_version`.
     async fn wait_for_all_nodes_to_catchup_to_version(
         &self,
-        version: u64,
+        target_version: u64,
         timeout: Duration,
     ) -> Result<()> {
         wait_for_all_nodes_to_catchup_to_version(
             &self.get_all_nodes_clients_with_names(),
-            version,
+            target_version,
+            timeout,
+        )
+        .await
+    }
+
+    /// Waits for all nodes to have caught up to the specified `target_epoch`.
+    async fn wait_for_all_nodes_to_catchup_to_epoch(
+        &self,
+        target_epoch: u64,
+        timeout: Duration,
+    ) -> Result<()> {
+        wait_for_all_nodes_to_catchup_to_epoch(
+            &self.get_all_nodes_clients_with_names(),
+            target_epoch,
             timeout,
         )
         .await
@@ -257,6 +271,19 @@ pub trait SwarmExt: Swarm {
     /// of this function are available at all the nodes in the swarm
     async fn wait_for_all_nodes_to_catchup(&self, timeout: Duration) -> Result<()> {
         wait_for_all_nodes_to_catchup(&self.get_all_nodes_clients_with_names(), timeout).await
+    }
+
+    /// Wait for all nodes in the network to change epochs. This is done by first querying each node
+    /// for its current epoch, selecting the max epoch, then waiting for all nodes to sync to max
+    /// epoch + 1.
+    async fn wait_for_all_nodes_to_change_epoch(&self, timeout: Duration) -> Result<()> {
+        let clients = &self.get_all_nodes_clients_with_names();
+        if clients.is_empty() {
+            bail!("No nodes are available!")
+        }
+
+        let highest_synced_epoch = get_highest_synced_epoch(clients).await?;
+        wait_for_all_nodes_to_catchup_to_epoch(clients, highest_synced_epoch + 1, timeout).await
     }
 
     async fn wait_for_all_nodes_to_catchup_to_next(&self, timeout: Duration) -> Result<()> {
@@ -323,42 +350,107 @@ pub trait SwarmExt: Swarm {
     }
 }
 
-/// Waits for all nodes to have caught up to the specified `verison`.
+/// Waits for all nodes to have caught up to the specified `target_version`.
 pub async fn wait_for_all_nodes_to_catchup_to_version(
     clients: &[(String, RestClient)],
-    version: u64,
+    target_version: u64,
     timeout: Duration,
 ) -> Result<()> {
+    wait_for_all_nodes_to_catchup_to_target_version_or_epoch(
+        clients,
+        Some(target_version),
+        None,
+        timeout,
+    )
+    .await
+}
+
+/// Waits for all nodes to have caught up to the specified `target_epoch`.
+pub async fn wait_for_all_nodes_to_catchup_to_epoch(
+    clients: &[(String, RestClient)],
+    target_epoch: u64,
+    timeout: Duration,
+) -> Result<()> {
+    wait_for_all_nodes_to_catchup_to_target_version_or_epoch(
+        clients,
+        None,
+        Some(target_epoch),
+        timeout,
+    )
+    .await
+}
+
+/// Waits for all nodes to have caught up to the specified `target_version` or `target_epoch`.
+async fn wait_for_all_nodes_to_catchup_to_target_version_or_epoch(
+    clients: &[(String, RestClient)],
+    target_version: Option<u64>,
+    target_epoch: Option<u64>,
+    timeout: Duration,
+) -> Result<()> {
+    if target_version.is_none() && target_epoch.is_none() {
+        bail!("No target version or epoch was specified!")
+    }
+
     let start_time = Instant::now();
     loop {
-        let results: Result<Vec<_>> = try_join_all(clients.iter().map(|(name, node)| async move {
-            Ok((
-                name,
-                node.get_ledger_information().await?.into_inner().version,
-            ))
-        }))
-        .await;
-        let versions = results
-            .map(|resps| resps.into_iter().collect::<Vec<_>>())
+        // Fetch the current versions and epochs of all nodes
+        let version_and_epoch_results: Result<Vec<_>> =
+            try_join_all(clients.iter().map(|(node_name, node)| async move {
+                let node_ledger_info_response = node.get_ledger_information().await?.into_inner();
+                Ok((
+                    node_name,
+                    node_ledger_info_response.version,
+                    node_ledger_info_response.epoch,
+                ))
+            }))
+            .await;
+        let node_versions_and_epochs = version_and_epoch_results
+            .map(|results| results.into_iter().collect::<Vec<_>>())
             .ok();
-        let all_caught_up = versions
-            .clone()
-            .map(|resps| resps.iter().all(|(_, v)| *v >= version))
-            .unwrap_or(false);
-        if all_caught_up {
+
+        // Check if all nodes are caught up to the target version
+        let all_caught_up_to_version = target_version
+            .map(|target_version| {
+                node_versions_and_epochs
+                    .clone()
+                    .map(|responses| {
+                        responses
+                            .iter()
+                            .all(|(_, version, _)| *version >= target_version)
+                    })
+                    .unwrap_or(false) // No version found
+            })
+            .unwrap_or(true); // No target version was specified
+
+        // Check if all nodes are caught up to the target epoch
+        let all_caught_up_to_epoch = target_epoch
+            .map(|target_epoch| {
+                node_versions_and_epochs
+                    .clone()
+                    .map(|responses| responses.iter().all(|(_, _, epoch)| *epoch >= target_epoch))
+                    .unwrap_or(false) // No epoch found
+            })
+            .unwrap_or(true); // No target epoch was specified
+
+        // Check if all targets have been met
+        if all_caught_up_to_version && all_caught_up_to_epoch {
             info!(
-                "All nodes caught up successfully in {}s",
+                "All nodes caught up to target version and epoch ({:?}, {:?}) successfully, in {} seconds",
+                target_version,
+                target_epoch,
                 start_time.elapsed().as_secs()
             );
             return Ok(());
         }
 
+        // Check if we've timed out while waiting
         if start_time.elapsed() > timeout {
             return Err(anyhow!(
-                "Waiting for nodes to catch up to version {} timed out after {}s, current status: {:?}",
-                version,
+                "Waiting for nodes to catch up to target version and epoch ({:?}, {:?}) timed out after {} seconds, current status: {:?}",
+                target_version,
+                target_epoch,
                 start_time.elapsed().as_secs(),
-                versions.unwrap_or_default()
+                node_versions_and_epochs.unwrap_or_default()
             ));
         }
 
@@ -375,7 +467,7 @@ pub async fn wait_for_all_nodes_to_catchup(
     timeout: Duration,
 ) -> Result<()> {
     if clients.is_empty() {
-        bail!("no nodes available")
+        bail!("No nodes are available!")
     }
     let highest_synced_version = get_highest_synced_version(clients).await?;
     wait_for_all_nodes_to_catchup_to_version(clients, highest_synced_version, timeout).await
@@ -383,14 +475,29 @@ pub async fn wait_for_all_nodes_to_catchup(
 
 /// Returns the highest synced version of the given clients
 pub async fn get_highest_synced_version(clients: &[(String, RestClient)]) -> Result<u64> {
-    let mut latest_version = 0u64;
-    for (_, c) in clients {
-        latest_version = latest_version.max(
-            c.get_ledger_information()
+    let (highest_synced_version, _) = get_highest_synced_version_and_epoch(clients).await?;
+    Ok(highest_synced_version)
+}
+
+/// Returns the highest synced epoch of the given clients
+pub async fn get_highest_synced_epoch(clients: &[(String, RestClient)]) -> Result<u64> {
+    let (_, highest_synced_epoch) = get_highest_synced_version_and_epoch(clients).await?;
+    Ok(highest_synced_epoch)
+}
+
+/// Returns the highest synced version and epoch of the given clients
+async fn get_highest_synced_version_and_epoch(
+    clients: &[(String, RestClient)],
+) -> Result<(u64, u64)> {
+    let mut latest_version_and_epoch = (0, 0);
+    for (_, client) in clients {
+        latest_version_and_epoch = latest_version_and_epoch.max(
+            client
+                .get_ledger_information()
                 .await
-                .map(|r| r.into_inner().version)
-                .unwrap_or(0),
+                .map(|r| (r.inner().version, r.inner().epoch))
+                .unwrap_or((0, 0)),
         );
     }
-    Ok(latest_version)
+    Ok(latest_version_and_epoch)
 }
