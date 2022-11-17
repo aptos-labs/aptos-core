@@ -1,11 +1,20 @@
 ---
-title: "What is New in Docs"
+title: "See What's New"
 slug: "whats-new-in-docs"
 ---
 
-# Whats New in Docs
+# See What's New in Aptos
 
 This page shows the key updates to the developer documentation on this site.
+
+## 16 November 2022
+
+Completely overhauled the navigation of Aptos.dev to better reflect our users and their feedback. Here are the highlights:
+ * Introduced new *Start Aptos* and *Build Apps* sections to contain information related to setup and app development, respectively.
+ * Shifted key concepts up in navigation, included the Aptos White Paper, moved nodes-related materials to the *Run Nodes* section, and gas-related pages to a new *Build Apps > [Write Move Smart Contracts](/guides/move-guides/aptos-move-guides)* section.
+ * Placed instructions for the Aptos CLI and other tools under *Start Aptos > [Set Environment](/guides/getting-started)*.
+ * Recategorized previous *Guides* across several new subsections, including *Build Apps > [Develop Locally](/nodes/local-testnet/local-testnet-index)*, *[Interact with Blockchain](/guides/aptos-guides)*, and *Run Nodes > [Configure Nodes](/nodes/identity-and-configuration).
+ * Integrated the [Aptos Node API specification](/nodes/aptos-api-spec#/), [Issues and Workarounds](/issues-and-workarounds) and [Aptos Glossary](/reference/glossary) into a new *Reference* section.
 
 ## 12 November 2022
 
@@ -37,7 +46,7 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 01 November 2022
 
-- Expanded the previous Coin and Token documentation into the [Aptos Token Standard](/docs/concepts/coin-and-token/index.md) with new field descriptions and more and moved it to the [Getting Started](/docs/guides/getting-started.md) section for greater visilibity.
+- Expanded the previous Coin and Token documentation into the [Aptos Token Standard](/docs/concepts/coin-and-token/index.md) with new field descriptions and more and moved it to the [Getting Started](/docs/guides/getting-started.md) section for greater visibility.
 
 ## 25 October 2022
 

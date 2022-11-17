@@ -1,18 +1,23 @@
 ---
-title: "Move Guides"
+title: "Write Move Smart Contracts"
 slug: "aptos-move-guides"
 ---
 
-# Move Guides
+# Write Smart Contracts with Move
+
+## Aptos Move guides
 
 Start here to learn how the Move language works on the Aptos blockchain. 
 
 - ### [Move on Aptos](move-on-aptos.md)
-- ### [Upgrading Move Code](upgrading-move-code.md)
+- ### [Gas and Transaction Fees](../../concepts/basics-gas-txn-fee.md)
+- ### [How Base Gas Works](../../concepts/base-gas.md)
+- ### [Interact with the Move VM](../interacting-with-the-blockchain.md)
 - ### [Your First Move module](../../tutorials/first-move-module.md)
+- ### [Upgrading Move Code](upgrading-move-code.md)
 - ### [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
 
-## Aptos Move documentation
+## Aptos Move reference
 
 Then review our auto-generated contents for more Move documentation.
 

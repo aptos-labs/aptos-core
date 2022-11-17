@@ -7,8 +7,6 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Staking
 
-## Concept
-
 :::tip Consensus
 We strongly recommend that you read the consensus section of the [Life of a Transaction](/guides/basics-life-of-txn#consensus) before proceeding further. 
 :::
