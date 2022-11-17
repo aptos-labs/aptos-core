@@ -299,14 +299,18 @@ Payload:
     2:
       InQuorumStore:
         NEWTYPE:
-          SEQ:
-            TYPENAME: ProofOfStore
+          TYPENAME: ProofWithStatus
 ProofOfStore:
   STRUCT:
     - info:
         TYPENAME: SignedDigestInfo
     - multi_signature:
         TYPENAME: AggregateSignature
+ProofWithStatus:
+  STRUCT:
+    - proofs:
+        SEQ:
+          TYPENAME: ProofOfStore
 ProposalMsg:
   STRUCT:
     - proposal:

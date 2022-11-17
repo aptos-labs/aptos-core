@@ -109,10 +109,7 @@ impl Payload {
     }
 
     pub fn is_direct(&self) -> bool {
-        match self {
-            Payload::DirectMempool(_) => true,
-            _ => false,
-        }
+        matches!(self, Payload::DirectMempool(_))
     }
 
     /// This is computationally expensive on the first call
