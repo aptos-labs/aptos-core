@@ -101,6 +101,10 @@ audio,canvas,embed,iframe,img,object,svg,video {
     display:inline;
 }
 
+ol, ul {
+    list-style: disc;
+}
+
 footer.footer {
   background-color: var(--ifm-background-color);
   color:var(--ifm-navbar-link-color);
