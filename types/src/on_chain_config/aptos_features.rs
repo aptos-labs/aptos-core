@@ -11,6 +11,7 @@ pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
     TREAT_FRIEND_AS_PRIVATE = 2,
     VM_BINARY_FORMAT_V6 = 5,
+    INIT_LINKING_FAILURE_REPORTED = 9,
 }
 
 /// Representation of features on chain as a bitset.

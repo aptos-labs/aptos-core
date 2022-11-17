@@ -159,6 +159,10 @@ impl FakeExecutor {
         }
     }
 
+    pub fn get_features(&self) -> &Features {
+        &self.features
+    }
+
     pub fn set_golden_file(&mut self, test_name: &str) {
         // 'test_name' includes ':' in the names, lets re-write these to be '_'s so that these
         // files can persist on windows machines.

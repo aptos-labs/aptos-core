@@ -457,23 +457,36 @@ impl AptosVM {
             // Note that for historic reasons, verification here is treated
             // as StatusCode::CONSTRAINT_NOT_SATISFIED, there this cannot be unified
             // with the general verify_module above.
-            if init_function.is_ok() {
-                if verifier::module_init::verify_module_init_function(module).is_ok() {
-                    let args: Vec<Vec<u8>> = senders
-                        .iter()
-                        .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
-                        .collect();
-                    session.execute_function_bypass_visibility(
-                        &module.self_id(),
-                        init_func_name,
-                        vec![],
-                        args,
-                        gas_meter,
-                    )?;
-                } else {
-                    return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
-                        .finish(Location::Undefined));
-                }
+            match init_function {
+                Ok(_) => {
+                    if verifier::module_init::verify_module_init_function(module).is_ok() {
+                        let args: Vec<Vec<u8>> = senders
+                            .iter()
+                            .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
+                            .collect();
+                        session.execute_function_bypass_visibility(
+                            &module.self_id(),
+                            init_func_name,
+                            vec![],
+                            args,
+                            gas_meter,
+                        )?;
+                    } else {
+                        return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+                            .finish(Location::Undefined));
+                    }
+                },
+                Err(err) => {
+                    if err.major_status() != StatusCode::FUNCTION_RESOLUTION_FAILURE
+                        && self
+                            .0
+                            .get_features()
+                            .is_enabled(FeatureFlag::INIT_LINKING_FAILURE_REPORTED)
+                    {
+                        return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+                            .finish(err.location().clone()));
+                    }
+                },
             }
         }
         Ok(())

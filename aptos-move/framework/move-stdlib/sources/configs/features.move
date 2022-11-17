@@ -111,6 +111,14 @@ module std::features {
         is_enabled(BLAKE2B_256_NATIVE)
     }
 
+    /// Whether during upgrade compatibility checking, friend functions should be treated similar like
+    /// private functions.
+    /// Lifetime: ephemeral
+    const INIT_LINKING_FAILURE_REPORTED: u64 = 9;
+    public fun init_linking_failure_reported(): bool acquires Features {
+        is_enabled(INIT_LINKING_FAILURE_REPORTED)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

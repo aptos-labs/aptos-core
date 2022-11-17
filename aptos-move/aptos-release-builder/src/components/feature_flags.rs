@@ -20,6 +20,7 @@ pub enum FeatureFlag {
     CodeDependencyCheck,
     TreatFriendAsPrivate,
     VMBinaryFormatV6,
+    InitLinkingFailureReported,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -94,6 +95,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CodeDependencyCheck => AptosFeatureFlag::CODE_DEPENDENCY_CHECK,
             FeatureFlag::TreatFriendAsPrivate => AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::VMBinaryFormatV6 => AptosFeatureFlag::VM_BINARY_FORMAT_V6,
+            FeatureFlag::InitLinkingFailureReported => {
+                AptosFeatureFlag::INIT_LINKING_FAILURE_REPORTED
+            },
         }
     }
 }
@@ -105,6 +109,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::CODE_DEPENDENCY_CHECK => FeatureFlag::CodeDependencyCheck,
             AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE => FeatureFlag::TreatFriendAsPrivate,
             AptosFeatureFlag::VM_BINARY_FORMAT_V6 => FeatureFlag::VMBinaryFormatV6,
+            AptosFeatureFlag::INIT_LINKING_FAILURE_REPORTED => {
+                FeatureFlag::InitLinkingFailureReported
+            },
         }
     }
 }

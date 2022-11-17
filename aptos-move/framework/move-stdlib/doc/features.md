@@ -23,6 +23,7 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `multi_ed25519_pk_validate_v2_enabled`](#0x1_features_multi_ed25519_pk_validate_v2_enabled)
 -  [Function `get_blake2b_256_feature`](#0x1_features_get_blake2b_256_feature)
 -  [Function `blake2b_256_enabled`](#0x1_features_blake2b_256_enabled)
+-  [Function `init_linking_failure_reported`](#0x1_features_init_linking_failure_reported)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -127,6 +128,18 @@ The provided signer has not a framework address.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_features_INIT_LINKING_FAILURE_REPORTED"></a>
+
+Whether during upgrade compatibility checking, friend functions should be treated similar like
+private functions.
+Lifetime: ephemeral
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_INIT_LINKING_FAILURE_REPORTED">INIT_LINKING_FAILURE_REPORTED</a>: u64 = 9;
 </code></pre>
 
 
@@ -495,6 +508,30 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_blake2b_256_enabled">blake2b_256_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLAKE2B_256_NATIVE">BLAKE2B_256_NATIVE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_init_linking_failure_reported"></a>
+
+## Function `init_linking_failure_reported`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_init_linking_failure_reported">init_linking_failure_reported</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_init_linking_failure_reported">init_linking_failure_reported</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_INIT_LINKING_FAILURE_REPORTED">INIT_LINKING_FAILURE_REPORTED</a>)
 }
 </code></pre>
 
