@@ -6,7 +6,6 @@ extern crate core;
 pub mod aptos;
 pub mod error;
 pub mod faucet;
-
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
@@ -58,6 +57,8 @@ const DEFAULT_INTERVAL_MS: u64 = 1000;
 static DEFAULT_MAX_WAIT_DURATION: Duration = Duration::from_millis(DEFAULT_MAX_WAIT_MS);
 static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTERVAL_MS);
 const DEFAULT_MAX_SERVER_LAG_WAIT_DURATION: Duration = Duration::from_secs(60);
+const RESOURCES_PER_CALL_PAGINATION: u64 = 9999;
+const MODULES_PER_CALL_PAGINATION: u64 = 1000;
 
 type AptosResult<T> = Result<T, RestError>;
 
@@ -287,6 +288,7 @@ impl Client {
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
+    // TODO: Remove this, just use `get_index`: https://github.com/aptos-labs/aptos-core/issues/5597.
     pub async fn get_ledger_information(&self) -> AptosResult<Response<State>> {
         let response = self.get_index_bcs().await?.map(|r| State {
             chain_id: r.chain_id,
@@ -296,6 +298,7 @@ impl Client {
             oldest_ledger_version: r.oldest_ledger_version.into(),
             oldest_block_height: r.oldest_block_height.into(),
             block_height: r.block_height.into(),
+            cursor: None,
         });
         assert_eq!(response.inner().chain_id, response.state().chain_id);
         assert_eq!(response.inner().epoch, response.state().epoch);
@@ -879,20 +882,24 @@ impl Client {
         &self,
         address: AccountAddress,
     ) -> AptosResult<Response<Vec<Resource>>> {
-        let url = self.build_path(&format!("accounts/{}/resources", address))?;
-
-        let response = self.inner.get(url).send().await?;
-
-        self.json(response).await
+        self.paginate_with_cursor(
+            &format!("accounts/{}/resources", address),
+            RESOURCES_PER_CALL_PAGINATION,
+            None,
+        )
+        .await
     }
 
     pub async fn get_account_resources_bcs(
         &self,
         address: AccountAddress,
     ) -> AptosResult<Response<BTreeMap<StructTag, Vec<u8>>>> {
-        let url = self.build_path(&format!("accounts/{}/resources", address))?;
-        let response = self.get_bcs(url).await?;
-        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+        self.paginate_with_cursor_bcs(
+            &format!("accounts/{}/resources", address),
+            RESOURCES_PER_CALL_PAGINATION,
+            None,
+        )
+        .await
     }
 
     pub async fn get_account_resources_at_version(
@@ -900,14 +907,12 @@ impl Client {
         address: AccountAddress,
         version: u64,
     ) -> AptosResult<Response<Vec<Resource>>> {
-        let url = self.build_path(&format!(
-            "accounts/{}/resources?ledger_version={}",
-            address, version
-        ))?;
-
-        let response = self.inner.get(url).send().await?;
-
-        self.json(response).await
+        self.paginate_with_cursor(
+            &format!("accounts/{}/resources", address),
+            RESOURCES_PER_CALL_PAGINATION,
+            Some(version),
+        )
+        .await
     }
 
     pub async fn get_account_resources_at_version_bcs(
@@ -915,12 +920,12 @@ impl Client {
         address: AccountAddress,
         version: u64,
     ) -> AptosResult<Response<BTreeMap<StructTag, Vec<u8>>>> {
-        let url = self.build_path(&format!(
-            "accounts/{}/resources?ledger_version={}",
-            address, version
-        ))?;
-        let response = self.get_bcs(url).await?;
-        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+        self.paginate_with_cursor_bcs(
+            &format!("accounts/{}/resources", address),
+            RESOURCES_PER_CALL_PAGINATION,
+            Some(version),
+        )
+        .await
     }
 
     pub async fn get_resource<T: DeserializeOwned>(
@@ -1019,19 +1024,24 @@ impl Client {
         &self,
         address: AccountAddress,
     ) -> AptosResult<Response<Vec<MoveModuleBytecode>>> {
-        let url = self.build_path(&format!("accounts/{}/modules", address))?;
-
-        let response = self.inner.get(url).send().await?;
-        self.json(response).await
+        self.paginate_with_cursor(
+            &format!("accounts/{}/modules", address),
+            MODULES_PER_CALL_PAGINATION,
+            None,
+        )
+        .await
     }
 
     pub async fn get_account_modules_bcs(
         &self,
         address: AccountAddress,
     ) -> AptosResult<Response<BTreeMap<MoveModuleId, Vec<u8>>>> {
-        let url = self.build_path(&format!("accounts/{}/modules", address))?;
-        let response = self.get_bcs(url).await?;
-        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+        self.paginate_with_cursor_bcs(
+            &format!("accounts/{}/modules", address),
+            MODULES_PER_CALL_PAGINATION,
+            None,
+        )
+        .await
     }
 
     pub async fn get_account_module(
@@ -1381,6 +1391,96 @@ impl Client {
         }
 
         result
+    }
+
+    /// This function builds a URL for use in pagination. It handles setting a limit,
+    /// adding the cursor, and adding a ledger version if given.
+    pub fn build_url_for_pagination(
+        &self,
+        base: &str,
+        limit_per_request: u64,
+        ledger_version: Option<u64>,
+        cursor: Option<String>,
+    ) -> AptosResult<Url> {
+        let mut path = format!("{}?limit={}", base, limit_per_request);
+        if let Some(ledger_version) = ledger_version {
+            path = format!("{}&ledger_version={}", path, ledger_version);
+        }
+        if let Some(cursor) = cursor {
+            path = format!("{}&start={}", path, cursor);
+        }
+        self.build_path(&path)
+    }
+
+    /// This function calls an endpoint that has pagination support and paginates
+    /// using the cursor the API returns. It keeps paginating until the API doesn't
+    /// return a cursor anymore. Since the functions calling this function are
+    /// expected to return the data wrapped in a Response (exactly one), we return
+    /// the full results merged together wrapped in the Response we received from
+    /// the final call.
+    pub async fn paginate_with_cursor<T: for<'a> Deserialize<'a>>(
+        &self,
+        base_path: &str,
+        limit_per_request: u64,
+        ledger_version: Option<u64>,
+    ) -> AptosResult<Response<Vec<T>>> {
+        let mut result = Vec::new();
+        let mut cursor: Option<String> = None;
+
+        loop {
+            let url = self.build_url_for_pagination(
+                base_path,
+                limit_per_request,
+                ledger_version,
+                cursor,
+            )?;
+            let raw_response = self.inner.get(url).send().await?;
+            let response: Response<Vec<T>> = self.json(raw_response).await?;
+            cursor = response.state().cursor.clone();
+            if cursor.is_none() {
+                break Ok(response.map(|mut v| {
+                    result.append(&mut v);
+                    result
+                }));
+            } else {
+                result.extend(response.into_inner());
+            }
+        }
+    }
+
+    /// This function works just like `paginate_with_cursor`, but it calls the internal
+    /// helper functions for dealing with BCS data and collects data in the format we
+    /// use for BCS endpoint functions.
+    pub async fn paginate_with_cursor_bcs<T: for<'a> Deserialize<'a> + Ord>(
+        &self,
+        base_path: &str,
+        limit_per_request: u64,
+        ledger_version: Option<u64>,
+    ) -> AptosResult<Response<BTreeMap<T, Vec<u8>>>> {
+        let mut result = BTreeMap::new();
+        let mut cursor: Option<String> = None;
+
+        loop {
+            let url = self.build_url_for_pagination(
+                base_path,
+                limit_per_request,
+                ledger_version,
+                cursor,
+            )?;
+            let response: Response<BTreeMap<T, Vec<u8>>> = self
+                .get_bcs(url)
+                .await?
+                .and_then(|inner| bcs::from_bytes(&inner))?;
+            cursor = response.state().cursor.clone();
+            if cursor.is_none() {
+                break Ok(response.map(|mut v| {
+                    result.append(&mut v);
+                    result
+                }));
+            } else {
+                result.extend(response.into_inner());
+            }
+        }
     }
 }
 
