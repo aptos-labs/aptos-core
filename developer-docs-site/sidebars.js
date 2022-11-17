@@ -48,7 +48,7 @@ const sidebars = {
   },
     {
       type: "category",
-      label: "Get Started",
+      label: "Set Environment",
       link: { type: "doc", id: "guides/getting-started" },
       collapsible: true,
       collapsed: true,
@@ -82,10 +82,9 @@ const sidebars = {
       value: "Build Apps",
       className: "sidebar-title",
     },
-    "guides/system-integrators-guide",
     {
       type: "category",
-      label: "Developer Tutorials",
+      label: "Develop by Tutorial",
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
@@ -135,6 +134,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
+        "guides/indexing",
         "guides/sign-a-transaction",
         "guides/resource-accounts",
         "guides/wallet-standard",
@@ -267,7 +267,6 @@ const sidebars = {
       collapsed: true,
       link: { type: "doc", id: "nodes/identity-and-configuration" },
       items: [
-        "guides/indexing",
         "reference/telemetry",
         "guides/state-sync",
         "guides/data-pruning",

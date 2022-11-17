@@ -1,5 +1,5 @@
 ---
-title: "Build on Aptos"
+title: "Integrate Aptos"
 slug: "system-integrators-guide"
 ---
 

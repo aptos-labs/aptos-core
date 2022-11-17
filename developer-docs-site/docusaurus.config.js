@@ -110,7 +110,7 @@ const config = {
                 docId: "concepts/index",
               },
               {
-                label: "Prepare Environment",
+                label: "Set Environment",
                 type: "doc",
                 docId: "guides/getting-started",
               },
@@ -123,7 +123,7 @@ const config = {
             items: [
               {
                 type: "doc",
-                label: "Conduct Tutorials",
+                label: "Develop by Tutorial",
                 docId: "tutorials/index",
               },
               {
