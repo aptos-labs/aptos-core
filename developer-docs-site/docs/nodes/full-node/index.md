@@ -1,9 +1,9 @@
 ---
-title: "Public Fullnode"
+title: "Install Public Fullnodes"
 slug: "public-fullnode"
 ---
 
-# Public Fullnode
+# Install Aptos Fullnodes
 
 This section explains how to install a public fullnode to connect to the Aptos networks. 
 

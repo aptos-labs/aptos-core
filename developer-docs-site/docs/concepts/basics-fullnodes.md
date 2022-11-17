@@ -1,5 +1,5 @@
 ---
-title: "Fullnodes"
+title: "Fullnodes Overview"
 slug: "basics-fullnodes"
 ---
 An Aptos node is an entity of the Aptos ecosystem that tracks the [state](/reference/glossary#state) of the Aptos blockchain. Clients interact with the blockchain via Aptos nodes. There are two types of nodes:

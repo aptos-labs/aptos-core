@@ -165,17 +165,27 @@ repository = "https://github.com/aptos-labs/aptos-core"
 rust-version = "1.64"
 
 [workspace.dependencies]
-# Internal crate dependencies
+# Internal crate dependencies.
+# Please do not add any test features here: they should be declared by the individual crate.
+aptos-api = { path = "api" }
+aptos-api-test-context = { path = "api/test-context" }
+aptos-api-types = { path = "api/types" }
 aptos-bitvec = { path = "crates/aptos-bitvec" }
+aptos-build-info = { path = "crates/aptos-build-info" }
 aptos-compression = { path = "crates/aptos-compression" }
 aptos-config = { path = "config" }
 aptos-crypto = { path = "crates/aptos-crypto" }
 aptos-data-client = { path = "state-sync/aptos-data-client" }
+aptos-gas = { path = "aptos-move/aptos-gas" }
 aptos-genesis = { path = "crates/aptos-genesis" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-logger = { path = "crates/aptos-logger" }
+aptos-mempool = { path = "mempool" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
+aptos-openapi = { path = "crates/aptos-openapi" }
+aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
+aptos-sdk = { path = "sdk" }
 aptos-state-view = { path = "storage/state-view" }
 aptos-temppath = { path = "crates/aptos-temppath" }
 aptos-time-service = { path = "crates/aptos-time-service" }
@@ -183,6 +193,7 @@ aptos-types = { path = "types" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
 aptosdb = { path = "storage/aptosdb" }
 bounded-executor = { path = "crates/bounded-executor" }
+cached-packages = { path = "aptos-move/framework/cached-packages" }
 channel = { path = "crates/channel" }
 consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
 data-streaming-service = { path = "state-sync/state-sync-v2/data-streaming-service" }
@@ -201,27 +212,46 @@ storage-service-client = { path = "state-sync/storage-service/client" }
 storage-service-server = { path = "state-sync/storage-service/server" }
 storage-service-types = { path = "state-sync/storage-service/types" }
 vm-genesis = { path = "aptos-move/vm-genesis" }
+vm-validator = { path = "vm-validator" }
 
-# External crate dependencies
+# External crate dependencies.
+# Please do not add any test features here: they should be declared by the individual crate.
 anyhow = "1.0.57"
 async-trait = "0.1.53"
 bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
 bytes = "1.1.0"
 claims = "0.7"
+clap = "3.1.17"
 enum_dispatch = "0.3.8"
+fail = "0.5.0"
 futures = "0.3.21"
-itertools = "0.10.0"
+goldenfile = "1.1.0"
+hex = "0.4.3"
+hyper = "0.14.18"
+indoc = "1.0.6"
+itertools = "0.10.3"
 lru = "0.7.5"
 maplit = "1.0.2"
+mime = "0.3.16"
 mockall = "0.11.0"
 num-traits = "0.2.15"
 once_cell = "1.10.0"
+paste = "1.0.7"
+percent-encoding = "2.1.0"
+poem = { version = "1.3.40", features = ["anyhow", "rustls"] }
+poem-openapi = { version = "2.0.10", features = ["url"] }
 proptest = "1.0.0"
 rand = "0.7.3"
-serde = "1.0.137"
+regex = "1.5.5"
+reqwest = { version = "0.11.10", features = ["blocking", "json"] }
+serde = { version = "1.0.137", features = ["derive"] }
+serde_json = { version = "1.0.81", features = ["preserve_order"] }
 thiserror = "1.0.31"
 tokio = { version = "1.21.0", features = ["full"] }
 tokio-stream = "0.1.8"
+url = "2.2.2"
+warp = { version = "0.3.2" }
+warp-reverse-proxy = "0.5.0"
 
 # Note: the BEGIN and END comments below are required for external tooling. Do not remove.
 # BEGIN MOVE DEPENDENCIES
