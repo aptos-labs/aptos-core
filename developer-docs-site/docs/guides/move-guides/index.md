@@ -32,6 +32,7 @@ Please note, the `mainnet` versions of the documents below are not yet available
 
 Use these external resources to learn about the core Move programming language.
 
+* [Move-Lang tag on Stack Overflow](https://stackoverflow.com/questions/tagged/move-lang)
 * [Move Book](https://move-language.github.io/move/)
 * [Move Tutorial](https://github.com/move-language/move/tree/main/language/documentation/tutorial)
 * [Move language repository](https://github.com/move-language/move)
