@@ -27,6 +27,8 @@ module aptos_std::type_info {
 
     /// Return the BCS size, in bytes, of value at `val_ref`.
     ///
+    /// See the [BCS spec](https://github.com/diem/bcs)
+    ///
     /// See `test_size_of_val()` for an analysis of common types and
     /// nesting patterns, as well as `test_size_of_val_vectors()` for an
     /// analysis of vector size dynamism.
