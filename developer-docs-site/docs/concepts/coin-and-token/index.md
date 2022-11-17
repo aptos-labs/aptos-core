@@ -1,9 +1,9 @@
 ---
-title: "Aptos Token Standard"
+title: "Follow Aptos Token Standard"
 slug: "index"
 ---
 
-# Aptos Token Standard
+# Follow Aptos Token Standard
 
 Token standards define how digital assets are created and used on their respective blockchains. These standards consist of rules to ensure your coins and tokens are compatible with the Aptos blockchain.
 

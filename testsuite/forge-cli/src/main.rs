@@ -18,7 +18,9 @@ use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
 use testcases::network_loss_test::NetworkLossTest;
 use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
-use testcases::state_sync_performance::StateSyncValidatorPerformance;
+use testcases::state_sync_performance::{
+    StateSyncFullnodeFastSyncPerformance, StateSyncValidatorPerformance,
+};
 use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
 use testcases::twin_validator_test::TwinValidatorTest;
 use testcases::validator_join_leave_test::ValidatorJoinLeaveTest;
@@ -179,11 +181,7 @@ struct Resize {
 
 fn main() -> Result<()> {
     let mut logger = aptos_logger::Logger::new();
-    logger
-        .channel_size(1000)
-        .is_async(false)
-        .level(Level::Info)
-        .read_env();
+    logger.channel_size(1000).is_async(false).level(Level::Info);
     logger.build();
 
     let args = Args::from_args();
@@ -441,6 +439,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "state_sync_perf_fullnodes_execute_transactions" => {
             state_sync_perf_fullnodes_execute_transactions(config)
         }
+        "state_sync_perf_fullnodes_fast_sync" => state_sync_perf_fullnodes_fast_sync(config),
         "state_sync_perf_validators" => state_sync_perf_validators(config),
         "validators_join_and_leave" => validators_join_and_leave(config),
         "compat" => config
@@ -607,6 +606,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             60,
             100,
             80,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 10,
@@ -625,6 +625,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 15,
                 always_healthy_nodes: 0,
@@ -643,6 +644,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             500,
             300,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 0,
@@ -662,6 +664,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 40,
@@ -676,6 +679,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 6,
@@ -685,11 +689,12 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 check_period_s: 27,
             },
         ),
-        "slow_processing_catching_up" => changing_working_quorum_test(
+        "state_sync_slow_processing_catching_up" => changing_working_quorum_test(
             10,
             300,
             3000,
             2500,
+            true,
             &ChangingWorkingQuorumTest {
                 min_tps: 1500,
                 always_healthy_nodes: 2,
@@ -699,11 +704,12 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 check_period_s: 57,
             },
         ),
-        "failures_catching_up" => changing_working_quorum_test(
+        "state_sync_failures_catching_up" => changing_working_quorum_test(
             10,
             300,
             3000,
             2500,
+            true,
             &ChangingWorkingQuorumTest {
                 min_tps: 1500,
                 always_healthy_nodes: 2,
@@ -746,7 +752,6 @@ fn state_sync_perf_fullnodes_config(forge_config: ForgeConfig<'static>) -> Forge
     forge_config
         .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .with_initial_fullnode_count(4)
-        .with_network_tests(vec![&StateSyncFullnodePerformance])
 }
 
 /// The config for running a state sync performance test when applying
@@ -755,6 +760,7 @@ fn state_sync_perf_fullnodes_apply_outputs(
     forge_config: ForgeConfig<'static>,
 ) -> ForgeConfig<'static> {
     state_sync_perf_fullnodes_config(forge_config)
+        .with_network_tests(vec![&StateSyncFullnodePerformance])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
@@ -773,6 +779,7 @@ fn state_sync_perf_fullnodes_execute_transactions(
     forge_config: ForgeConfig<'static>,
 ) -> ForgeConfig<'static> {
     state_sync_perf_fullnodes_config(forge_config)
+        .with_network_tests(vec![&StateSyncFullnodePerformance])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
@@ -783,6 +790,29 @@ fn state_sync_perf_fullnodes_execute_transactions(
                 ["continuous_syncing_mode"] = "ExecuteTransactions".into();
         }))
         .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None, None))
+}
+
+/// The config for running a state sync performance test when fast syncing
+/// to the latest epoch.
+fn state_sync_perf_fullnodes_fast_sync(forge_config: ForgeConfig<'static>) -> ForgeConfig<'static> {
+    state_sync_perf_fullnodes_config(forge_config)
+        .with_network_tests(vec![&StateSyncFullnodeFastSyncPerformance])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 180.into(); // Frequent epochs
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 30000,
+                })
+                .transaction_type(TransactionType::AccountGeneration), // Create many state values
+        )
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "DownloadLatestStates".into();
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+        }))
 }
 
 /// The config for running a state sync performance test when applying
@@ -903,6 +933,7 @@ fn changing_working_quorum_test(
     epoch_duration: usize,
     target_tps: usize,
     min_avg_tps: usize,
+    apply_txn_outputs: bool,
     test: &'static ChangingWorkingQuorumTest,
 ) -> ForgeConfig<'static> {
     let config = ForgeConfig::default();
@@ -931,6 +962,20 @@ fn changing_working_quorum_test(
             helm_values["validator"]["config"]["consensus"]
                 ["round_timeout_backoff_exponent_base"] = 1.0.into();
             helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] = 1.into();
+
+            // Override the syncing mode of all nodes to use transaction output syncing.
+            // TODO(joshlind): remove me once we move back to output syncing by default.
+            if apply_txn_outputs {
+                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+            }
         }))
         .with_emit_job(
             EmitJobRequest::default()

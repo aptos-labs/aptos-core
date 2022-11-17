@@ -372,6 +372,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
+ "byteorder",
  "get_if_addrs",
  "mirai-annotations",
  "poem-openapi",
@@ -458,6 +459,28 @@ dependencies = [
  "storage-service-types",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "aptos-debugger"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-gas",
+ "aptos-resource-viewer",
+ "aptos-rest-client",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-validator-interface",
+ "aptos-vm",
+ "move-binary-format",
+ "move-cli",
+ "move-compiler",
+ "move-core-types",
+ "move-resource-viewer",
+ "move-table-extension",
+ "move-vm-runtime",
+ "move-vm-test-utils",
 ]
 
 [[package]]
@@ -704,6 +727,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "async-trait",
+ "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "bigdecimal",
  "chrono",
  "clap 3.2.17",
@@ -1050,6 +1074,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-release-builder"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-gas",
+ "aptos-temppath",
+ "aptos-types",
+ "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
+ "clap 3.2.17",
+ "move-core-types",
+ "move-model",
+ "serde 1.0.144",
+ "serde_yaml 0.8.26",
+ "tempfile",
+]
+
+[[package]]
 name = "aptos-resource-viewer"
 version = "0.1.0"
 dependencies = [
@@ -1290,17 +1331,21 @@ dependencies = [
  "aptos-crypto-derive",
  "aptos-infallible",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-rest-client",
  "aptos-types",
  "base64 0.13.0",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
  "chrono",
  "clap 3.2.17",
+ "debug-ignore",
  "flate2",
+ "futures",
  "gcp-bigquery-client",
  "hex",
  "httpmock",
  "jsonwebtoken",
+ "once_cell",
  "prometheus",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -1421,12 +1466,16 @@ name = "aptos-validator-interface"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-api-types",
  "aptos-config",
+ "aptos-rest-client",
  "aptos-state-view",
  "aptos-types",
  "aptosdb",
+ "async-trait",
  "move-binary-format",
  "storage-interface",
+ "tokio",
 ]
 
 [[package]]
@@ -2257,7 +2306,7 @@ checksum = "c1ad822118d20d2c234f427000d5acc36eabe1e29a348c89b63dd60b13f28e5d"
 [[package]]
 name = "bytecode-interpreter-crypto"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "curve25519-dalek-fiat",
@@ -3238,6 +3287,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "debug-ignore"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b48b0b49e2f473c499ddcd133e78f0f2629aaa997ee61adadb2d1753e6af4cf"
+dependencies = [
+ "serde 1.0.144",
+]
+
+[[package]]
 name = "derive_arbitrary"
 version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3339,9 +3397,9 @@ dependencies = [
 
 [[package]]
 name = "digest"
-version = "0.10.3"
+version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2fb860ca6fafa5552fb6d0e816a69c8e49f0908bf524e30a90d97c85892d506"
+checksum = "adfbc57365a37acbd2ebf2b64d7e69bb766e2fea813521ed536f5d0520dcf86c"
 dependencies = [
  "block-buffer 0.10.2",
  "crypto-common",
@@ -4484,7 +4542,7 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
- "digest 0.10.3",
+ "digest 0.10.5",
 ]
 
 [[package]]
@@ -5589,7 +5647,7 @@ checksum = "5474f8732dc7e0635ae9df6595bcd39cd30e3cfe8479850d4fa3e69306c19712"
 [[package]]
 name = "move-abigen"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -5606,7 +5664,7 @@ dependencies = [
 [[package]]
 name = "move-binary-format"
 version = "0.0.3"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "arbitrary 1.1.7",
@@ -5622,12 +5680,12 @@ dependencies = [
 [[package]]
 name = "move-borrow-graph"
 version = "0.0.1"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 
 [[package]]
 name = "move-bytecode-source-map"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -5642,7 +5700,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-utils"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "move-binary-format",
@@ -5654,7 +5712,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-verifier"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "move-binary-format",
@@ -5666,7 +5724,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-viewer"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "clap 3.2.17",
@@ -5683,7 +5741,7 @@ dependencies = [
 [[package]]
 name = "move-cli"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -5729,7 +5787,7 @@ dependencies = [
 [[package]]
 name = "move-command-line-common"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "difference",
@@ -5746,7 +5804,7 @@ dependencies = [
 [[package]]
 name = "move-compiler"
 version = "0.0.1"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -5775,7 +5833,7 @@ dependencies = [
 [[package]]
 name = "move-core-types"
 version = "0.0.4"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "arbitrary 1.1.7",
@@ -5793,7 +5851,7 @@ dependencies = [
 [[package]]
 name = "move-coverage"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -5813,7 +5871,7 @@ dependencies = [
 [[package]]
 name = "move-disassembler"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "clap 3.2.17",
@@ -5831,7 +5889,7 @@ dependencies = [
 [[package]]
 name = "move-docgen"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "codespan",
@@ -5849,7 +5907,7 @@ dependencies = [
 [[package]]
 name = "move-errmapgen"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -5879,7 +5937,7 @@ dependencies = [
 [[package]]
 name = "move-ir-compiler"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -5898,7 +5956,7 @@ dependencies = [
 [[package]]
 name = "move-ir-to-bytecode"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "codespan-reporting",
@@ -5917,7 +5975,7 @@ dependencies = [
 [[package]]
 name = "move-ir-to-bytecode-syntax"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "hex",
@@ -5930,7 +5988,7 @@ dependencies = [
 [[package]]
 name = "move-ir-types"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "hex",
@@ -5944,7 +6002,7 @@ dependencies = [
 [[package]]
 name = "move-model"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "codespan",
@@ -5970,7 +6028,7 @@ dependencies = [
 [[package]]
 name = "move-package"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -6006,7 +6064,7 @@ dependencies = [
 [[package]]
 name = "move-prover"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6043,7 +6101,7 @@ dependencies = [
 [[package]]
 name = "move-prover-boogie-backend"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6071,7 +6129,7 @@ dependencies = [
 [[package]]
 name = "move-read-write-set-types"
 version = "0.0.3"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "move-binary-format",
@@ -6082,7 +6140,7 @@ dependencies = [
 [[package]]
 name = "move-resource-viewer"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -6097,7 +6155,7 @@ dependencies = [
 [[package]]
 name = "move-stackless-bytecode"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "codespan",
  "codespan-reporting",
@@ -6124,7 +6182,7 @@ dependencies = [
 [[package]]
 name = "move-stackless-bytecode-interpreter"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "bytecode-interpreter-crypto",
@@ -6142,9 +6200,10 @@ dependencies = [
 [[package]]
 name = "move-stdlib"
 version = "0.1.1"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
+ "hex",
  "log",
  "move-binary-format",
  "move-command-line-common",
@@ -6164,7 +6223,7 @@ dependencies = [
 [[package]]
 name = "move-symbol-pool"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "once_cell",
  "serde 1.0.144",
@@ -6173,7 +6232,7 @@ dependencies = [
 [[package]]
 name = "move-table-extension"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -6190,7 +6249,7 @@ dependencies = [
 [[package]]
 name = "move-transactional-test-runner"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "clap 3.2.17",
@@ -6221,7 +6280,7 @@ dependencies = [
 [[package]]
 name = "move-unit-test"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "better_any",
@@ -6252,7 +6311,7 @@ dependencies = [
 [[package]]
 name = "move-vm-runtime"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "better_any",
  "fail 0.4.0",
@@ -6269,7 +6328,7 @@ dependencies = [
 [[package]]
 name = "move-vm-test-utils"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "move-binary-format",
@@ -6283,7 +6342,7 @@ dependencies = [
 [[package]]
 name = "move-vm-types"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "move-binary-format",
@@ -7791,7 +7850,7 @@ dependencies = [
 [[package]]
 name = "read-write-set"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "move-binary-format",
@@ -7806,7 +7865,7 @@ dependencies = [
 [[package]]
 name = "read-write-set-dynamic"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b#a6e1ffba1dab6b5d9f2804a91cd48e6b928e1b3b"
+source = "git+https://github.com/move-language/move?rev=f22af5038c4edd09ae2f7e9e7ff576a4b1118743#f22af5038c4edd09ae2f7e9e7ff576a4b1118743"
 dependencies = [
  "anyhow",
  "move-binary-format",
@@ -8010,11 +8069,11 @@ dependencies = [
 
 [[package]]
 name = "ripemd"
-version = "0.1.1"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1facec54cb5e0dc08553501fa740091086d0259ad0067e0d4103448e4cb22ed3"
+checksum = "bd124222d17ad93a644ed9d011a40f4fb64aa54275c08cc216524a9ea82fb09f"
 dependencies = [
- "digest 0.10.3",
+ "digest 0.10.5",
 ]
 
 [[package]]
@@ -8540,7 +8599,7 @@ checksum = "028f48d513f9678cda28f6e4064755b3fbb2af6acd672f2c209b62323f7aea0f"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "digest 0.10.3",
+ "digest 0.10.5",
 ]
 
 [[package]]
@@ -8564,7 +8623,7 @@ checksum = "55deaec60f81eefe3cce0dc50bda92d6d8e88f2a27df7c5033b42afeb1ed2676"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "digest 0.10.3",
+ "digest 0.10.5",
 ]
 
 [[package]]
@@ -8763,6 +8822,7 @@ dependencies = [
  "aptos",
  "aptos-config",
  "aptos-crypto",
+ "aptos-debugger",
  "aptos-faucet",
  "aptos-gas",
  "aptos-genesis",
@@ -8771,6 +8831,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-keygen",
  "aptos-logger",
+ "aptos-release-builder",
  "aptos-rest-client",
  "aptos-rosetta",
  "aptos-sdk",

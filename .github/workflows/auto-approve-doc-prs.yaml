@@ -1,0 +1,29 @@
+name: Auto add another approval for Doc PRs with 1 approval
+
+# This action will automatically add one more approval if a doc-change PR was approved.
+# The intention here is to reduce the number of approvals that are required (generally 2 for our repo) to effectively 1
+# for doc-change-only PRs.
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  auto-approve-doc-pr:
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+
+      - name: Get changed files in the docs folder
+        id: doc-changes
+        uses: tj-actions/changed-files@ef0a29048c50f844e30fac9fef80956f9765aab8 # pinned to v34.4.2
+        with:
+          files: |
+            developer-docs-site/**
+
+      - name: Auto add 1 approval if only docs have changed
+        if: steps.doc-changes.outputs.only_changed == 'true'
+        uses: hmarr/auto-approve-action@de8ae18c173c131e182d4adf2c874d8d2308a85b # pinned to v3.1.0

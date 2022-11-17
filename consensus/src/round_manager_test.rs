@@ -6,7 +6,7 @@ use crate::{
     data_manager::DataManager,
     experimental::buffer_manager::OrderedBlocks,
     liveness::{
-        proposal_generator::ProposalGenerator,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
         proposer_election::ProposerElection,
         rotating_proposer_election::RotatingProposer,
         round_state::{ExponentialTimeInterval, RoundState},
@@ -229,6 +229,7 @@ impl NodeSetup {
             10,
             1000,
             10,
+            ChainHealthBackoffConfig::new_no_backoff(),
         );
 
         let round_state = Self::create_round_state(time_service);
