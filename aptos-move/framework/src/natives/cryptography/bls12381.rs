@@ -6,7 +6,6 @@ use crate::natives::util::make_test_only_native_from_func;
 use crate::{natives::util::make_native_from_func, pop_vec_arg};
 #[cfg(feature = "testing")]
 use aptos_crypto::bls12381::ProofOfPossession;
-use aptos_crypto::bls12381::Signature;
 #[cfg(feature = "testing")]
 use aptos_crypto::bls12381::{PrivateKey, PublicKey};
 #[cfg(feature = "testing")]
