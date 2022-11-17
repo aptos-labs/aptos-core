@@ -4,7 +4,7 @@
 use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use consensus_types::{
-    common::{Payload, PayloadFilter},
+    common::PayloadFilter,
     request_response::{ConsensusResponse, WrapperCommand},
 };
 use futures::{
