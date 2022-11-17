@@ -512,7 +512,7 @@ pub fn native_bls12381_verify_aggregate_signature(
         return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
     }
 
-    let aggsig: Signature = match gas_params.bls12381_deserialize_sig(aggsig_bytes, &mut cost) {
+    let aggsig = match gas_params.bls12381_deserialize_sig(aggsig_bytes, &mut cost) {
         Some(aggsig) => aggsig,
         None => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
     };
