@@ -26,7 +26,6 @@ html[data-theme='dark'] {
   --ifm-background-color: #121616;
   --ifm-color-primary: #ffffff;
   --ifm-color-primary-inverse: black;
-
   --ifm-color-primary-dark: #06f7f7;
   --ifm-color-primary-darker: #00dadc;
   --ifm-color-primary-darkest: #00adb2;
@@ -55,7 +54,7 @@ img.deep-dive-image {
 }
 
 [data-theme='light'] .DocSearch {
-  --docsearch-primary-color: var(--ifm-color-primary-light);
+  --docsearch-primary-color: var(--ifm-color-primary-dark);
   /* --docsearch-text-color: var(--ifm-font-color-base); */
   --docsearch-muted-color: var(--ifm-color-secondary-darkest);
   --docsearch-container-background: rgba(94, 100, 112, 0.7);

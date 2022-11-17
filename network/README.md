@@ -23,7 +23,7 @@ The network component uses:
 
 * TCP for reliable transport.
 * [NoiseIK] for authentication and full end-to-end encryption.
-* On-chain [`NetworkAddress`](./network-address/src/lib.rs) set for discovery, with
+* On-chain [`NetworkAddress`](../types/src/network_address/mod.rs) set for discovery, with
   optional seed peers in the [`NetworkConfig`]
   as a fallback.
 
@@ -96,7 +96,7 @@ on updates to known peers via Discovery updates.
 * [`validator-set-discovery`] &mdash; Discovers the set of peers to connect to
 via on-chain configuration. These are the `validator_network_addresses` and
 `fullnode_network_addresses` of each [`ValidatorConfig`] in the
-[`ValidatorSet::validators`] set. Notifies the [`ConnectivityManager`] of updates
+[`ValidatorSet`] set. Notifies the [`ConnectivityManager`] of updates
 to the known peer set.
 
 * [`HealthChecker`] &mdash; Performs periodic liveness probes to ensure the
@@ -133,7 +133,7 @@ configurable static timeout.
 [`NetworkConfig`]:../config/src/config/network_config.rs
 [`ConnectivityManager`]: ./src/connectivity_manager/mod.rs
 [`AptosNet Handshake Protocol`]: ../specifications/network/handshake-v1.md
-[`ValidatorSet::validators`]: ../aptos-move/framework/core/doc/ValidatorSet.md#struct-ValidatorSet
+[`ValidatorSet`]: ../types/src/on_chain_config/validator_set.rs
 [`AptosTransport`]: ./src/transport/mod.rs
 [`HealthChecker`]: ./src/protocols/health_checker/mod.rs
 [`Network Interface`]: ./src/protocols/network/mod.rs
@@ -141,5 +141,5 @@ configurable static timeout.
 [`NoiseIK`]: ../specifications/network/noise.md
 [`PeerManager`]: ./src/peer_manager/mod.rs
 [`Peer`]: ./src/peer/mod.rs
-[`ValidatorConfig`]: ../aptos-move/framework/core/doc/ValidatorConfig.md#struct-config
+[`ValidatorConfig`]: ../documentation/specifications/network/onchain-discovery.md#on-chain-config
 [`validator-set-discovery`]: discovery/src/lib.rs

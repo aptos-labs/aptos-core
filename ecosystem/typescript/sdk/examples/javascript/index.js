@@ -15,7 +15,7 @@ const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
   await faucetClient.fundAccount(account1.address(), 100_000_000);
   let resources = await client.getAccountResources(account1.address());
   let accountResource = resources.find((r) => r.type === aptosCoin);
-  console.log(`account2 coins: ${accountResource.data.coin.value}. Should be 100_000_000!`);
+  console.log(`account1 coins: ${accountResource.data.coin.value}. Should be 100_000_000!`);
 
   const account2 = new aptos.AptosAccount();
   await faucetClient.fundAccount(account2.address(), 0);
