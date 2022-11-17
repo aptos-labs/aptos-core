@@ -49,6 +49,7 @@ where
     pub db: Arc<dyn DbReader>,
     pub validator: Arc<RwLock<V>>,
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
+    pub broadcast_within_validator_network: Arc<RwLock<bool>>,
 }
 
 impl<V: TransactionValidation + 'static> SharedMempool<V> {
@@ -75,11 +76,12 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
             db,
             validator,
             subscribers,
+            broadcast_within_validator_network: Arc::new(RwLock::new(true)),
         }
     }
 
     pub fn broadcast_within_validator_network(&self) -> bool {
-        self.config.shared_mempool_validator_broadcast
+        *self.broadcast_within_validator_network.read()
     }
 }
 
