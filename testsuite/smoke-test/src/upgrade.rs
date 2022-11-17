@@ -8,10 +8,10 @@ use crate::{
 use aptos_crypto::ValidCryptoMaterialStringExt;
 use aptos_gas::{AptosGasParameters, GasQuantity, InitialGasSchedule, ToOnChainGasSchedule};
 use aptos_release_builder::components::{
-    feature_flags::Features, gas::generate_gas_upgrade_proposal,
+    feature_flags::{FeatureFlag, Features},
+    gas::generate_gas_upgrade_proposal,
 };
 use aptos_temppath::TempPath;
-use aptos_types::on_chain_config::FeatureFlag;
 use forge::Swarm;
 use std::fs;
 use std::process::Command;
@@ -84,8 +84,8 @@ async fn test_upgrade_flow() {
     let config = aptos_release_builder::ReleaseConfig {
         feature_flags: Some(Features {
             enabled: vec![
-                FeatureFlag::CODE_DEPENDENCY_CHECK,
-                FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
+                FeatureFlag::CodeDependencyCheck,
+                FeatureFlag::TreatFriendAsPrivate,
             ],
             disabled: vec![],
         }),
@@ -93,7 +93,7 @@ async fn test_upgrade_flow() {
     };
 
     config
-        .generate_release_proposal_scripts(upgrade_scripts_folder.path(), true)
+        .generate_release_proposal_scripts(upgrade_scripts_folder.path())
         .unwrap();
     let mut scripts = fs::read_dir(upgrade_scripts_folder.path())
         .unwrap()

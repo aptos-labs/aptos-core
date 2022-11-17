@@ -1,9 +1,9 @@
 ---
-title: "Using CLI to Run a Local Testnet"
+title: "Run Local Testnet with CLI"
 id: "using-cli-to-run-a-local-testnet"
 ---
 
-# Using CLI to Run a Local Testnet
+# Run a Local Testnet with Aptos CLI
 
 :::tip Using source or Docker run a local testnet
 

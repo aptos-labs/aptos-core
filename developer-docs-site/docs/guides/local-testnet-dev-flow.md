@@ -1,9 +1,9 @@
 ---
-title: "Local testnet development flow"
+title: "Develop in Local Testnet from Source"
 slug: "local-testnet-dev-flow"
 ---
 
-This guide describes the end-to-end flow for developing with a local testnet.
+This guide describes the end-to-end flow for developing with a local testnet from Aptos source code.
 
 :::caution CLI from source, not from GitHub
 This guide is not correct if you're using the `aptos` CLI from a GitHub release or from `cargo install`, only if you build it yourself from `aptos-core` as described below.

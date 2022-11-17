@@ -1,9 +1,9 @@
 ---
-title: "Running a Local Multi-node Network"
+title: "Run a Local Multinode Network"
 slug: "running-a-local-multi-node-network"
 ---
 
-# Running a Local Multi-node Network
+# Run a Local Multinode Network
 
 This guide describes how to run a local network with multiple validator nodes and validator fullnodes. You will use the [Aptos Forge CLI](https://github.com/aptos-labs/aptos-core/tree/main/testsuite/forge-cli/src) for this.
 

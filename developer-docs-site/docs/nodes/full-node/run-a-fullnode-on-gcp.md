@@ -45,7 +45,7 @@ Google Cloud offers a [90 day $300 free trial for every new user](https://cloud.
 
 #### Create a new GCP project
 
-- Create a new project on the GCP Console or using the glcoud command from the Google Cloud CLI. Before you do that, familiarize yourself with the [resource hierarchy on GCP](https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy).
+- Create a new project on the GCP Console or using the gcloud command from the Google Cloud CLI. Before you do that, familiarize yourself with the [resource hierarchy on GCP](https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy).
 - [Follow these instructions to setup a new project.](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project).
 
 #### Enable billing, upgrade your account
@@ -56,7 +56,7 @@ You will still be able to use the free trial credits, but enabling billing allow
 
 #### Additional GCP resources
 
-This should be enough to get your GCP setup ready to start deploying your fullnod. But if you are brand new to GCP, you may want to check out some of our [quickstart guides](https://cloud.google.com/docs/get-started/quickstarts) and [Google Cloud Skills Boost](https://www.cloudskillsboost.google/catalog).
+This should be enough to get your GCP setup ready to start deploying your fullnode. But if you are brand new to GCP, you may want to check out some of our [quickstart guides](https://cloud.google.com/docs/get-started/quickstarts) and [Google Cloud Skills Boost](https://www.cloudskillsboost.google/catalog).
 
 
 ## Getting started
@@ -197,8 +197,8 @@ Once Terraform apply finished, you can follow this section to validate your depl
 ## Update public fullnode with new releases
 
 Aptos devnet releases can be of two types: 
-- One with a data wipe to startover the Aptos blockchain
-- Second type is only a software update without a data wipe.
+- One with a data wipe to start over the Aptos blockchain
+- Second type is only a software update without a data wipe
 
 ### Upgrade with data wipe
 
