@@ -462,22 +462,30 @@ impl AptosVM {
             let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
-            if init_function.is_ok() {
-                if verify_module_init_function(module).is_ok() {
-                    let args: Vec<Vec<u8>> = senders
-                        .iter()
-                        .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
-                        .collect();
-                    session.execute_function_bypass_visibility(
-                        &module.self_id(),
-                        init_func_name,
-                        vec![],
-                        args,
-                        gas_meter,
-                    )?;
-                } else {
-                    return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
-                        .finish(Location::Undefined));
+            match init_function {
+                Ok(_) => {
+                    if verify_module_init_function(module).is_ok() {
+                        let args: Vec<Vec<u8>> = senders
+                            .iter()
+                            .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
+                            .collect();
+                        session.execute_function_bypass_visibility(
+                            &module.self_id(),
+                            init_func_name,
+                            vec![],
+                            args,
+                            gas_meter,
+                        )?;
+                    } else {
+                        return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+                            .finish(Location::Undefined));
+                    }
+                }
+                Err(err) => {
+                    if err.major_status() != StatusCode::FUNCTION_RESOLUTION_FAILURE {
+                        return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+                            .finish(err.location().clone()));
+                    }
                 }
             }
         }
