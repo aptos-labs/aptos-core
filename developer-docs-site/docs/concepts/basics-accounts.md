@@ -10,31 +10,31 @@ scarce and must be access-controlled. Any such asset is represented in the block
 A resource is a Move language primitive that emphasizes access control and scarcity in its representation.
 However, a resource can also be used to represent other on-chain capabilities, identifying information, and access control.
 
-Each account on the Aptos blockchain is identified by a 32-byte account address. An account can store data and it stores
+Each account on the Aptos blockchain is identified by a 32-byte account address. An account can store data, and the account stores
 this data in resources. The initial resource is the account data itself (authentication key and sequence number).
 Additional resources like currency or NFTs are added after creating the account.
 
 Different from other blockchains where accounts and addresses are implicit, accounts on Aptos are explicit and need to be
-created before it can hold resources and modules. The account can be created explicitly or implicitly by transferring APT there.
-See the later Create an Account section for more details. In a way, this is similar to other chains where an address needs
+created before they can hold resources and modules. The account can be created explicitly or implicitly by transferring Aptos tokens (APT) there.
+See the [Creating an account](#creating-an-account) section for more details. In a way, this is similar to other chains where an address needs
 to be sent funds for gas before it can send transactions.
 
 Explicit accounts allow first-class features that are not available on other networks such as:
 * Rotating authentication key. The account's authentication key can be changed to be controlled via a different private 
 key. This is similar to changing passwords in the web2 world.
-* Native multisig support. Accounts on Aptos support multi-ed25519 which allows for multisig authentication scheme when
+* Native multisig support. Accounts on Aptos support multi-ed25519 which allows for a multisig authentication scheme when
 constructing the authentication key. In the future, more authentication schemes can be introduced easily.
 * More integration with the rest of ecosystem to bring in features such as profiles, domain names, etc. that can be seamlessly
 integrated with the Aptos account.
 
-There are three types of accounts in Aptos:
-  * *Normal account* - This is an account corresponding to an address with a corresponding pair of public/private keys.
+There are two types of accounts in Aptos:
+  * *Address account* - This is a typical account corresponding to an address with a corresponding pair of public/private keys.
   * *Resource account* - An autonomous account without a corresponding private key used by developers to store resources or publish modules on chain.
 
 :::tip Account address example
 Account addresses are 32-bytes. They are usually shown as 64 hex characters, with each hex character a nibble.
-Sometimes it's prefixed with a 0x See the [Your First Transaction](/tutorials/first-transaction.md#output) for an example
-of how an address looks like, reproduced below:
+Sometimes the address is prefixed with a 0x. See the [Your First Transaction](/tutorials/first-transaction#output) for an example
+of how an address appears, reproduced below:
 
 ```text
 Alice: 0xeeff357ea5c1a4e7bc11b2b17ff2dc2dcca69750bfef1e1ebcaccf8c8018175b
@@ -51,7 +51,7 @@ Dan: 0x357ea5c1a4e7bc11b2b17ff2dc2dcca69750bfef1e1ebcaccf8c8018175b
 
 ## Account identifiers
 Currently, Aptos supports only a single, unified identifier for an account. Accounts on Aptos are universally
-represented as a 32-byte hex string. A hex string shorter than 32-bytes is also valid: in those scenarios,
+represented as a 32-byte hex string. A hex string shorter than 32-bytes is also valid; in those scenarios,
 the hex string can be padded with leading zeroes, e.g., 0x1 => 0x0000000000000...01.
 
 ## Creating an account
@@ -59,7 +59,7 @@ the hex string can be padded with leading zeroes, e.g., 0x1 => 0x0000000000000..
 When a user requests to create an account, for example by using the [Aptos SDK](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosAccount.html), the following cryptographic steps are executed:
 
 - Start by generating a new private key, public key pair.
-- From the user get the preferred signature scheme for the account: If the account should use a single signature or if
+- From the user, get the preferred signature scheme for the account: If the account should use a single signature or if
 it should require multiple signatures for signing a transaction. 
 - Combine the public key with the user's signature scheme to generate a 32-byte authentication key. 
 - Initialize the account sequence number to 0. Both the authentication key and the sequence number are stored in the
@@ -77,8 +77,8 @@ the blockchain.
 Every transaction submitted must contain the current sequence number for the sender account. When the Aptos blockchain
 processes the transaction, it looks at the sequence number in the transaction and compares it with the sequence number in
 the account (as stored on the blockchain at the current ledger version). The transaction is executed only if the sequence
-number in the transaction is the same as the sequence number for the sender account, and rejects if they do not match.
-In this way past transactions, which necessarily contain older sequence numbers, cannot be replayed, hence preventing replay attacks. 
+number in the transaction is the same as the sequence number for the sender account; and it is rejected if they do not match.
+In this way, past transactions - which necessarily contain older sequence numbers - cannot be replayed, hence preventing replay attacks. 
 
 These transactions will be held in mempool until they are the next sequence number for that account (or until they expire).
 When the transaction is applied, the sequence number of the account will be incremented by 1. The account has a strictly
@@ -86,11 +86,11 @@ increasing sequence number.
 
 ## Account address
 
-During the new account creation process, a 32-byte authentication key comes to exist first. This authentication key is
+During the account creation process, a 32-byte authentication key comes to exist first. This authentication key is
 then returned as it is as the 32-byte account address. 
 
-However, the authentication key may subsequently change, for example, when you generate a new pair of private key,
-public keys, to rotate the keys. But the account address will not change. Hence, **only initially** the 32-byte authentication key will be the same as the 32-byte account address. After an account is created, the account address will remain unchanged even though the private key, public key and authentication keys may change. There is nothing called changing the address of the existing account. 
+However, the authentication key may subsequently change, for example when you generate a new public-private key pair,
+public keys to rotate the keys. But the account address will not change. Hence, **only initially** the 32-byte authentication key will be the same as the 32-byte account address. After an account is created, the account address will remain unchanged even though the private key, public key and authentication keys may change. There is nothing called that changes the address of the existing account. 
 
 ## Signature schemes
 
@@ -187,7 +187,7 @@ module Test::Coin {
 The state of each account comprises both the code (Move modules) and the data (Move resources). An account may contain an
 arbitrary number of Move modules and Move resources:
 
-- **Move modules**: Move modules contain code, for example, type and procedure declarations, but they do not contain data.
+- **Move modules**: Move modules contain code, for example, type and procedure declarations; but they do not contain data.
 A Move module encodes the rules for updating the Aptos blockchain's global state.
 - **Move resources**: Move resources contain data but no code. Every resource value has a type that is declared in a module
 published in the Aptos blockchain's distributed database.
@@ -195,17 +195,20 @@ published in the Aptos blockchain's distributed database.
 ## Preventing replay attacks
 When the Aptos blockchain processes the transaction, it looks at the sequence number in the transaction and compares it
 with the sequence number in the sender’s account (as stored on the blockchain at the current ledger version).
+
 The transaction is executed only if the sequence number in the transaction is the same as the sequence number for the
-sender account, and the transaction is rejected if those two numbers do not match. In this way past transactions, which
-necessarily contain older sequence numbers, cannot be replayed, hence preventing replay attacks.
+sender account; and the transaction is rejected if those two numbers do not match. In this way, past transactions - which
+necessarily contain older sequence numbers - cannot be replayed, hence preventing replay attacks.
 
 ## Resource accounts
 A resource account is a developer feature used to manage resources independent of an account managed by a user, specifically
 publishing modules and automatically signing for transactions.
+
 For example, a developer may use a resource account to manage an account for module publishing, say managing a contract. The contract itself does not require a signer post initialization. A resource account gives you the means for the module to provide a signer to other modules and sign transactions on behalf of the module.
 
 Typically, a resource account is used for two main purposes:
-Store and isolate resources; a module creates a resource account just to host specific resources.
-Publish module as a standalone (resource) account, a building block in a decentralized design where no private keys can control the resource account. The ownership (SignerCap) can be kept in another module, such as governance.
 
-More details on creating and using resource accounts are available [here](../guides/resource-accounts.md).
+- Store and isolate resources; a module creates a resource account just to host specific resources.
+- Publish module as a standalone (resource) account, a building block in a decentralized design where no private keys can control the resource account. The ownership (SignerCap) can be kept in another module, such as governance.
+
+Find more details on creating and using these at [using resource accounts in your app](../guides/resource-accounts.md).
