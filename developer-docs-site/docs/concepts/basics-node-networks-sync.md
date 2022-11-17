@@ -1,9 +1,9 @@
 ---
-title: "Node Networks and Synchronization"
+title: "Node Networks and Sync"
 slug: "basics-node-networks-sync"
 ---
 
-# Node network topology
+# Node Networks and Synchronization
 
 Validator nodes and fullnodes form a hierarchical structure with validator nodes at the root and fullnodes everywhere else. The Aptos blockchain distinguishes two types of fullnodes: validator fullnodes and public fullnodes. Validator fullnodes connect directly to validator nodes and offer scalability alongside DDoS mitigation. Public fullnodes connect to validator fullnodes (or other public fullnodes) to gain low-latency access to the Aptos network.
 

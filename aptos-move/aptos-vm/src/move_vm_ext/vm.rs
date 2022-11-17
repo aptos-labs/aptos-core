@@ -40,6 +40,9 @@ impl MoveVmExt {
                 VerifierConfig {
                     max_loop_depth: Some(5),
                     treat_friend_as_private,
+                    max_generic_instantiation_length: Some(32),
+                    max_function_parameters: Some(128),
+                    max_basic_blocks: Some(1024),
                 },
                 crate::AptosVM::get_runtime_config(),
             )?,

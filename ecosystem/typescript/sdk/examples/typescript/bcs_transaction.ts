@@ -34,7 +34,7 @@ const {
   let accountResource = resources.find((r) => r.type === aptosCoinStore);
   let balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 100_000_000);
-  console.log(`account2 coins: ${balance}. Should be 100000000!`);
+  console.log(`account1 coins: ${balance}. Should be 100000000!`);
 
   const account2 = new AptosAccount();
   // Creates the second account and fund the account with 0 AptosCoin

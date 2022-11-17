@@ -14,18 +14,15 @@ pub fn generate_version_upgrade_proposal(
 
     let writer = CodeWriter::new(Loc::default());
 
-    if is_testnet {
-        generate_testnet_header(&writer, "aptos_framework::version");
-    } else {
-        generate_governance_proposal_header(&writer, "aptos_framework::version");
-    }
+    let proposal =
+        generate_governance_proposal(&writer, is_testnet, "aptos_framework::version", |writer| {
+            emitln!(
+                writer,
+                "version::set_version(framework_signer, {});",
+                version.major,
+            );
+        });
 
-    emitln!(
-        writer,
-        "version::set_version(framework_signer, {});",
-        version.major,
-    );
-
-    result.push(("version".to_string(), finish_with_footer(&writer)));
+    result.push(("version".to_string(), proposal));
     Ok(result)
 }

@@ -4,7 +4,7 @@
 use crate::{
     block_storage::BlockStore,
     liveness::{
-        proposal_generator::ProposalGenerator,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
         rotating_proposer_election::RotatingProposer,
         round_state::{ExponentialTimeInterval, NewRoundEvent, NewRoundReason, RoundState},
     },
@@ -151,6 +151,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         1,
         1024,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
     );
 
     //

@@ -1,5 +1,5 @@
 ---
-title: "Creating a Signed Transaction"
+title: "Create a Signed Transaction"
 slug: "creating-a-signed-transaction"
 ---
 
@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Creating a Signed Transaction
+# Create a Signed Transaction
 
 All transactions executed on the Aptos blockchain must be signed. This requirement is enforced by the chain for security reasons.
 

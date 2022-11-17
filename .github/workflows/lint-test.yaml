@@ -142,8 +142,8 @@ jobs:
       - uses: ./.github/actions/rust-setup
       - run: cargo test --locked --features check-vm-features -p aptos-node
 
-  python-unit-test:
-    uses: ./.github/workflows/python-unit-test.yaml
+  python-lint-test:
+    uses: ./.github/workflows/python-lint-test.yaml
 
   helm-lint:
     uses: ./.github/workflows/helm-lint.yaml

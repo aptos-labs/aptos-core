@@ -1,9 +1,9 @@
 ---
-title: "Installing Aptos CLI Binaries"
+title: "Download CLI Binaries"
 id: "install-aptos-cli"
 ---
 
-# Installing Aptos CLI
+# Download Aptos CLI Binaries
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging Move contracts, and conducting node operations. This document describes how to install the `aptos` CLI tool using precompiled binaries that reduce variables in setting up your environment. Also see:
 
@@ -17,11 +17,10 @@ To download the Aptos source code, related tools, and IDE plugins for the Move p
 Aptos offers the [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) script for establishing your development environment. This script currently supports macOS and Ubuntu Linux with other Linux distributions working but untested. The script does not support Windows. See the instructions below to manually install necessary dependencies. 
 :::
 
-## Download precompiled binary
 <details>
 <summary>macOS</summary>
 
-### macOS
+## macOS
 :::tip
 These instructions have been tested on macOS Monterey (12.6)
 :::
@@ -47,7 +46,7 @@ These instructions have been tested on macOS Monterey (12.6)
 <details>
 <summary>Linux</summary>
 
-### Linux
+## Linux
 :::tip
 These instructions have been tested on Ubuntu 20.04.
 :::
@@ -72,7 +71,7 @@ These instructions have been tested on Ubuntu 20.04.
 <details>
 <summary>Windows 10, 11 and Windows Server 2022+</summary>
 
-### Windows 10, 11 and Windows Server 2022+
+## Windows 10, 11 and Windows Server 2022+
 
 :::tip
 These instructions have been tested on Windows 11 and Windows Server 2022. Windows support is new and some features may be not complete. Open [Github issues](https://github.com/aptos-labs/aptos-core/issues) for bugs.
