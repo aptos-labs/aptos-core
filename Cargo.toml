@@ -131,7 +131,7 @@ members = [
     "vm-validator",
 ]
 
-exclude = ["crates/aptos-protos", "ecosystem/sf-indexer"]
+exclude = ["crates/aptos-protos"]
 
 # NOTE: default-members is the complete list of binaries that form the "production Aptos codebase". These members should
 # never include crates that require fuzzing features or test features. These are the crates we want built with no extra
