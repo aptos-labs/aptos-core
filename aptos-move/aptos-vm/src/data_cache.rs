@@ -23,14 +23,10 @@ use move_core_types::{
 };
 use move_table_extension::{TableHandle, TableResolver};
 use std::{
+    borrow::Cow,
     collections::btree_map::BTreeMap,
     ops::{Deref, DerefMut},
 };
-
-enum DataMapKind<'a> {
-    MapValue(BTreeMap<StateKey, WriteOp>),
-    MapRef(&'a BTreeMap<StateKey, WriteOp>),
-}
 
 /// A local cache for a given a `StateView`. The cache is private to the Aptos layer
 /// but can be used as a one shot cache for systems that need a simple `RemoteCache`
@@ -47,14 +43,14 @@ enum DataMapKind<'a> {
 /// track of incremental changes is vital to the consistency of the data store and the system.
 pub struct StateViewCache<'a, S> {
     data_view: &'a S,
-    data_map: DataMapKind<'a>,
+    data_map: Cow<'a, BTreeMap<StateKey, WriteOp>>,
 }
 
 impl<'a, S: StateView> StateViewCache<'a, S> {
     pub fn from_map_ref(data_view: &'a S, data_map_ref: &'a BTreeMap<StateKey, WriteOp>) -> Self {
         Self {
             data_view,
-            data_map: DataMapKind::MapRef(data_map_ref),
+            data_map: Cow::Borrowed(data_map_ref),
         }
     }
 
@@ -63,7 +59,7 @@ impl<'a, S: StateView> StateViewCache<'a, S> {
     pub fn new(data_view: &'a S) -> Self {
         StateViewCache {
             data_view,
-            data_map: DataMapKind::MapValue(BTreeMap::new()),
+            data_map: Cow::Owned(BTreeMap::new()),
         }
     }
 }
@@ -75,12 +71,7 @@ impl<'block, S: StateView> StateView for StateViewCache<'block, S> {
             "Injected failure in data_cache::get"
         )));
 
-        let data_map = match &self.data_map {
-            DataMapKind::MapValue(data_map) => data_map,
-            DataMapKind::MapRef(data_ref) => data_ref,
-        };
-
-        match data_map.get(state_key) {
+        match self.data_map.get(state_key) {
             Some(write_op) => Ok(match write_op {
                 WriteOp::Modification(blob) | WriteOp::Creation(blob) => Some(blob.clone()),
                 WriteOp::Deletion => None,
