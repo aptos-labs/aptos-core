@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use aptos_debugger::AptosDebugger;
+use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use cached_packages::aptos_stdlib;
 use forge::Swarm;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_mint_transfer() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
@@ -65,4 +67,26 @@ async fn test_mint_transfer() {
         txn_factory.payload(aptos_stdlib::aptos_coin_mint(account1.address(), 10000)),
     );
     info.client().submit_and_wait(&mint_txn).await.unwrap();
+
+    // Testing the AptosDebugger by reexecuting the transaction that has been published.
+    println!("Testing....");
+    let debugger = AptosDebugger::rest_client(info.client().clone()).unwrap();
+
+    let txn_ver = debugger
+        .get_version_by_account_sequence(account1.address(), 0)
+        .await
+        .unwrap()
+        .unwrap();
+
+    let output = debugger
+        .execute_past_transactions(txn_ver, 1)
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    assert_eq!(
+        output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success)
+    );
 }

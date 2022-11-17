@@ -1,11 +1,52 @@
 ---
-title: "Whats New in Docs"
+title: "See What's New"
 slug: "whats-new-in-docs"
 ---
 
-# Whats New in Docs
+# See What's New in Aptos
 
 This page shows the key updates to the developer documentation on this site.
+
+## 16 November 2022
+
+Completely overhauled the navigation of Aptos.dev to better reflect our users and their feedback. Here are the highlights:
+ * Introduced new *Start Aptos* and *Build Apps* sections to contain information related to setup and app development, respectively.
+ * Shifted key concepts up in navigation, included the Aptos White Paper, moved nodes-related materials to the *Run Nodes* section, and gas-related pages to a new *Build Apps > [Write Move Smart Contracts](/guides/move-guides/aptos-move-guides)* section.
+ * Placed instructions for the Aptos CLI and other tools under *Start Aptos > [Set Environment](/guides/getting-started)*.
+ * Recategorized previous *Guides* across several new subsections, including *Build Apps > [Develop Locally](/nodes/local-testnet/local-testnet-index)*, *[Interact with Blockchain](/guides/aptos-guides)*, and *Run Nodes > [Configure Nodes](/nodes/identity-and-configuration).
+ * Integrated the [Aptos Node API specification](/nodes/aptos-api-spec#/), [Issues and Workarounds](/issues-and-workarounds) and [Aptos Glossary](/reference/glossary) into a new *Reference* section.
+
+## 12 November 2022
+
+- Recommended performance improvements to [validator source code](/nodes/validator-node/operator/running-validator-node/run-validator-node-using-source) startup instructions by suggesting building the `aptos-node` binary and running it directly instead of using `cargo run`.
+
+## 09 November 2022
+
+- Improved [indexer fullnode](/docs/nodes/indexer-fullnode.md) setup instructions to standardize on one package manager and explain how to restart the database.
+
+## 08 November 2022
+
+- Published links to new auto-generated Move reference files [for all available versions](/guides/move-guides/aptos-move-guides#aptos-move-documentation).
+
+## 07 November 2022
+
+- Created an Aptos tag on [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos) and started populating it with common questions and answers.
+
+## 04 November 2022
+
+- Added a guide on [Resource Accounts](/docs/guides/resource-accounts.md) used by developers to publish modules and automatically sign transactions.
+
+## 03 November 2022
+
+- Added [Aptos API reference files](https://aptos.dev/nodes/aptos-api-spec/#/) directly to Aptos.dev for easy access and clarified available information at various endpoints.
+
+## 02 November 2022
+
+- Created a #docs-feedback channel on [Discord](https://discord.com/channels/945856774056083548/1034215378299133974) seeking input on Aptos.dev and taking action with updates to the documentation.
+
+## 01 November 2022
+
+- Expanded the previous Coin and Token documentation into the [Aptos Token Standard](/docs/concepts/coin-and-token/index.md) with new field descriptions and more and moved it to the [Getting Started](/docs/guides/getting-started.md) section for greater visibility.
 
 ## 25 October 2022
 

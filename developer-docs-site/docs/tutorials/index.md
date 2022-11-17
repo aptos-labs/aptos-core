@@ -1,9 +1,9 @@
 ---
-title: "Developer Tutorials"
+title: "Conduct Developer Tutorials"
 slug: "aptos-quickstarts"
 ---
 
-# Developer Tutorials
+# Conduct App Developer Tutorials
 
 If you are new to the Aptos blockchain, begin with these quickstarts before you get into in-depth development. These tutorials will help you become familiar with how to develop for the Aptos blockchain using the Aptos SDK.
 

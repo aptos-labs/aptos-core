@@ -125,7 +125,7 @@ pub struct EmitJobRequest {
     txn_expiration_time_secs: u64,
     expected_max_txns: u64,
     expected_gas_per_txn: u64,
-    promt_before_spending: bool,
+    prompt_before_spending: bool,
 }
 
 impl Default for EmitJobRequest {
@@ -145,7 +145,7 @@ impl Default for EmitJobRequest {
             txn_expiration_time_secs: 60,
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
-            promt_before_spending: false,
+            prompt_before_spending: false,
         }
     }
 }
@@ -175,8 +175,8 @@ impl EmitJobRequest {
         self
     }
 
-    pub fn promt_before_spending(mut self) -> Self {
-        self.promt_before_spending = true;
+    pub fn prompt_before_spending(mut self) -> Self {
+        self.prompt_before_spending = true;
         self
     }
 

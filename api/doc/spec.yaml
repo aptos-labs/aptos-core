@@ -32,10 +32,9 @@ paths:
       - Accounts
       summary: Get account
       description: |-
-        Retrieves high level information about an account such as its sequence number and
-        authentication key
-
-        Returns a 404 if the account doesn't exist
+        Return the authentication key and the sequence number for an account
+        address. Optionally, a ledger version can be specified. If the ledger
+        version is not specified in the request, the latest ledger version is used.
       parameters:
       - name: address
         schema:
@@ -119,6 +118,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -445,6 +452,32 @@ paths:
         required: false
         deprecated: false
         explode: true
+      - name: start
+        schema:
+          $ref: '#/components/schemas/StateKeyWrapper'
+        in: query
+        description: |-
+          Cursor specifying where to start for pagination
+
+          This cursor cannot be derived manually client-side. Instead, you must
+          call this endpoint once without this query parameter specified, and
+          then use the cursor returned in the X-Aptos-Cursor header in the
+          response.
+        required: false
+        deprecated: false
+        explode: true
+      - name: limit
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        description: |-
+          Max number of account resources to retrieve
+
+          If not provided, defaults to default page size.
+        required: false
+        deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -510,6 +543,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -836,6 +877,32 @@ paths:
         required: false
         deprecated: false
         explode: true
+      - name: start
+        schema:
+          $ref: '#/components/schemas/StateKeyWrapper'
+        in: query
+        description: |-
+          Cursor specifying where to start for pagination
+
+          This cursor cannot be derived manually client-side. Instead, you must
+          call this endpoint once without this query parameter specified, and
+          then use the cursor returned in the X-Aptos-Cursor header in the
+          response.
+        required: false
+        deprecated: false
+        explode: true
+      - name: limit
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        description: |-
+          Max number of account modules to retrieve
+
+          If not provided, defaults to default page size.
+        required: false
+        deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -901,6 +968,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -1301,6 +1376,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -1498,6 +1581,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -1891,6 +1982,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -2307,6 +2406,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -2728,6 +2835,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -3094,6 +3209,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -3393,6 +3516,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -3790,6 +3921,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -4190,6 +4329,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -4485,16 +4632,424 @@ paths:
                 type: integer
                 format: uint64
       operationId: get_table_item
+  /tables/{table_handle}/raw_item:
+    post:
+      tags:
+      - Tables
+      summary: Get raw table item
+      description: |-
+        Get a table item at a specific ledger version from the table identified by {table_handle}
+        in the path and the "key" (RawTableItemRequest) provided in the request body.
+
+        The `get_raw_table_item` requires only a serialized key comparing to the full move type information
+        comparing to the `get_table_item` api, and can only return the query in the bcs format.
+
+        The Aptos nodes prune account state history, via a configurable time window.
+        If the requested ledger version has been pruned, the server responds with a 410.
+      parameters:
+      - name: table_handle
+        schema:
+          $ref: '#/components/schemas/Address'
+        in: path
+        description: Table handle hex encoded 32-byte string
+        required: true
+        deprecated: false
+        explode: true
+      - name: ledger_version
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        description: |-
+          Ledger version to get state of account
+
+          If not provided, it will be the latest version
+        required: false
+        deprecated: false
+        explode: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RawTableItemRequest'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveValue'
+            application/x-bcs:
+              schema:
+                type: array
+                items:
+                  type: integer
+                  format: uint8
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
+        '400':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+        '403':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+        '404':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+        '410':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+        '500':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+        '503':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+      operationId: get_raw_table_item
   /transactions:
     get:
       tags:
       - Transactions
       summary: Get transactions
       description: |-
-        Retrieve on-chain committed transactions. The page size and start can be provided to
-        get a specific sequence of transactions.
+        Retrieve on-chain committed transactions. The page size and start ledger version
+        can be provided to get a specific sequence of transactions.
 
-        If the version has been pruned, then a 410 will be returned
+        If the version has been pruned, then a 410 will be returned.
+
+        To retrieve a pending transaction, use /transactions/by_hash.
       parameters:
       - name: start
         schema:
@@ -4584,6 +5139,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -4975,6 +5538,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -5359,6 +5930,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -5660,8 +6239,8 @@ paths:
       - Transactions
       summary: Get transaction by version
       description: |-
-        Retrieves a transaction by a given version.  If the version has been pruned, a 410 will
-        be returned.
+        Retrieves a transaction by a given version. If the version has been
+        pruned, a 410 will be returned.
       parameters:
       - name: txn_version
         schema:
@@ -5734,6 +6313,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -6035,10 +6622,12 @@ paths:
       - Transactions
       summary: Get account transactions
       description: |-
-        Retrieves transactions from an account.  If the start version is too far in the past
-        a 410 will be returned.
+        Retrieves on-chain committed transactions from an account. If the start
+        version is too far in the past, a 410 will be returned.
 
-        If no start version is given, it will start at 0
+        If no start version is given, it will start at version 0.
+
+        To retrieve a pending transaction, use /transactions/by_hash.
       parameters:
       - name: address
         schema:
@@ -6136,6 +6725,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -6534,6 +7131,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '206':
           description: ''
           content:
@@ -6596,6 +7201,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -7016,6 +7629,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -7402,6 +8023,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -7674,6 +8303,14 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -8802,6 +9439,14 @@ components:
           $ref: '#/components/schemas/TransactionPayload'
         signature:
           $ref: '#/components/schemas/TransactionSignature'
+    RawTableItemRequest:
+      type: object
+      description: Table Item request for the GetTableItemRaw API
+      required:
+      - key
+      properties:
+        key:
+          $ref: '#/components/schemas/HexEncodedBytes'
     RoleType:
       type: string
       enum:
@@ -8879,6 +9524,11 @@ components:
             $ref: '#/components/schemas/WriteSetChange'
         timestamp:
           $ref: '#/components/schemas/U64'
+    StateKeyWrapper:
+      type: string
+      description: |
+        Representation of a StateKey as a hex string. This is used for cursor based pagination.
+      example: 0000000000000000000000000000000000000000000000000000000000000000012f0000000000000000000000000000000000000000000000000000000000000000010d7374616b696e675f70726f7879
     SubmitTransactionRequest:
       type: object
       description: |-

@@ -20,7 +20,7 @@ use crate::{
             extract_epoch_to_proposers, AptosDBBackend, LeaderReputation,
             ProposerAndVoterHeuristic, ReputationHeuristic,
         },
-        proposal_generator::ProposalGenerator,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
         proposer_election::ProposerElection,
         rotating_proposer_election::{choose_leader, RotatingProposer},
         round_proposer_election::RoundProposer,
@@ -210,7 +210,8 @@ impl EpochManager {
                     weight_by_voting_power,
                     use_history_from_previous_epoch_max_count,
                 ) = match &leader_reputation_type {
-                    LeaderReputationType::ProposerAndVoter(proposer_and_voter_config) => {
+                    LeaderReputationType::ProposerAndVoter(proposer_and_voter_config)
+                    | LeaderReputationType::ProposerAndVoterV2(proposer_and_voter_config) => {
                         let proposer_window_size = proposers.len()
                             * proposer_and_voter_config.proposer_window_num_validators_multiplier;
                         let voter_window_size = proposers.len()
@@ -224,6 +225,7 @@ impl EpochManager {
                                 proposer_and_voter_config.failure_threshold_percent,
                                 voter_window_size,
                                 proposer_window_size,
+                                leader_reputation_type.use_reputation_window_from_stale_end(),
                             ));
                         (
                             heuristic,
@@ -293,6 +295,8 @@ impl EpochManager {
                     backend,
                     heuristic,
                     onchain_config.leader_reputation_exclude_round(),
+                    leader_reputation_type.use_root_hash_for_seed(),
+                    self.config.window_for_chain_health,
                 ));
                 // LeaderReputation is not cheap, so we can cache the amount of rounds round_manager needs.
                 Box::new(CachedProposerElection::new(
@@ -604,7 +608,8 @@ impl EpochManager {
             self.self_sender.clone(),
             epoch_state.verifier.clone(),
         );
-
+        let chain_health_backoff_config =
+            ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
         let (consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =
@@ -649,6 +654,7 @@ impl EpochManager {
             self.config.max_sending_block_txns,
             self.config.max_sending_block_bytes,
             onchain_config.max_failed_authors_to_store(),
+            chain_health_backoff_config,
         );
 
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(

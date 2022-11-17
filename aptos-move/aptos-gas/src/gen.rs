@@ -12,7 +12,7 @@ use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use package_builder::PackageBuilder;
 use std::path::{Path, PathBuf};
 
-fn current_gas_schedule() -> GasScheduleV2 {
+pub fn current_gas_schedule() -> GasScheduleV2 {
     GasScheduleV2 {
         feature_version: LATEST_GAS_FEATURE_VERSION,
         entries: AptosGasParameters::initial().to_on_chain_gas_schedule(),

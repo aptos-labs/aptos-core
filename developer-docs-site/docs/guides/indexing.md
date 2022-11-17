@@ -1,14 +1,12 @@
 ---
-title: "Indexing"
+title: "Index Aptos Data"
 slug: "indexing"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Indexing
-
-## Concept
+# Index the Aptos Blockchain Data
 
 An application built on the Aptos blockchain, on any blockchain for that matter, requires that the raw data from the blockchain be shaped by the application-specific data model before the application can consume it. The [Aptos Node API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), using which a client can interact with the Aptos blockchain, is not designed to support data shaping. Moreover, the ledger data you get back using this API contains the data only for the transactions **initiated by you**. It does not provide the data for the transactions initiated by the others. This data is insufficient and too slow for an application that must access the blockchain data in an omniscient way to serve multiple users of the application. 
 
@@ -23,8 +21,6 @@ sources={{
   }}
 />
 </center>
-
-## Indexing the Aptos blockchain data
 
 Indexing on the Aptos blockchain works like this:
 
@@ -53,10 +49,16 @@ Aptos provides a rate-limited GraphQL API for public use. See below a few exampl
 - **Mainnet:** https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql
 - **Testnet:** https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql
 
+### Format of the address
+
+Make sure that the address (either owner address or any Aptos blockchain account address) in the query contains a prefix of `0x` followed by the 64 hex characters, for example, `0xaa921481e07b82a26dbd5d3bc472b9ad82d3e5bfd248bacac160eac51687c2ff`.
+
 ### Running example queries
 
 - Click on [Mainnet GraphQL server](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql) or [Testnet GraphQL server](https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql).
 - On the server page, paste the **Query** code from an example into the main query section, and the **Query variables** code from the same example into the QUERY VARIABLES section (below the main query section).
+
+
 
 ### Example token queries
 
@@ -359,7 +361,7 @@ pub struct CurrentCoinBalance {
 
 We will also need to specify the parsing logic, where the input is a portion of the transaction. In the case of coin balances, we can find all the details in `WriteSetChanges`, specifically where the write set change type is `write_resources`.
 
-**Where to find the relevant data for parsing**: This requires a combination of understanding the Move module and the structure of the transaction. In the example of coin balance, the contract lives in [coin.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move), specifically the coin struct (search for `struct Coin`) that has a `value` field. We then calook at an [example transaction](https://fullnode.testnet.aptoslabs.com/v1/transactions/by_version/259518) where we find this exact structure in `write_resources`:
+**Where to find the relevant data for parsing**: This requires a combination of understanding the Move module and the structure of the transaction. In the example of coin balance, the contract lives in [coin.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move), specifically the coin struct (search for `struct Coin`) that has a `value` field. We then look at an [example transaction](https://fullnode.testnet.aptoslabs.com/v1/transactions/by_version/259518) where we find this exact structure in `write_resources`:
 
 ```json
 "changes": [
@@ -390,7 +392,7 @@ The `process_transactions` function takes in a vector of transactions with a sta
 See [coin_process.rs](https://github.com/aptos-labs/aptos-core/blob/main/crates/indexer/src/processors/coin_processor.rs) for a relatively straightforward example. You can search for `coin_balances` in the page for the specific code snippet related to coin balances. 
 :::
 
-**How to decide whether to create a new processor:** This is completely up to you. The benefit of creating a new processor is that you are starting from scratch so you will have full control over exactly what gets written to the indexed database. The downside is that you will have to maintain a new fullnode, ssince there is a 1-to-1 mapping between a fullnode and the processor. 
+**How to decide whether to create a new processor:** This is completely up to you. The benefit of creating a new processor is that you are starting from scratch so you will have full control over exactly what gets written to the indexed database. The downside is that you will have to maintain a new fullnode, since there is a 1-to-1 mapping between a fullnode and the processor. 
 
 ### 4. Integrate the new processor
 

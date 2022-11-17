@@ -121,7 +121,7 @@ impl<'t> AccountMinter<'t> {
                 coins_for_source
             );
 
-            if req.promt_before_spending {
+            if req.prompt_before_spending {
                 if !prompt_yes(&format!(
                     "plan will consume in total {} balance, are you sure you want to proceed",
                     coins_for_source

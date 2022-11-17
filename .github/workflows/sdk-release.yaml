@@ -53,9 +53,11 @@ jobs:
           node-version-file: .node-version
           registry-url: "https://registry.npmjs.org"
 
-      # Self hosted runners don't have yarn preinstalled.
+      # Self hosted runners don't have pnpm preinstalled.
       # https://github.com/actions/setup-node/issues/182
-      - run: npm install -g yarn
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 7.14.2
 
       # When using high-perf-docker, the CI is actually run with two containers
       # in a k8s pod, one for docker commands run in the CI steps (docker), and
@@ -94,12 +96,12 @@ jobs:
 
       # Run package install. If install fails, it probably means the lockfile
       # was not included in the commit.
-      - run: cd ./ecosystem/typescript/sdk && yarn install --frozen-lockfile
+      - run: cd ./ecosystem/typescript/sdk && pnpm install --frozen-lockfile
 
       # Ensure any changes to the generated client were checked in.
-      - run: cd ./ecosystem/typescript/sdk && yarn generate-client -o /tmp/generated_client
+      - run: cd ./ecosystem/typescript/sdk && pnpm generate-client -o /tmp/generated_client
       - run: echo "If this step fails, run the following command locally to fix it:"
-      - run: echo "cd ecosystem/typescript/sdk && yarn generate-client"
+      - run: echo "cd ecosystem/typescript/sdk && pnpm generate-client"
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/
 
       # Run a local testnet built from the same commit.
@@ -112,12 +114,12 @@ jobs:
 
       # Test and build.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
-        name: sdk-yarn-test
+        name: sdk-pnpm-test
         with:
           max_attempts: 3
           timeout_minutes: 15
-          command: cd ./ecosystem/typescript/sdk && yarn test
-      - run: cd ./ecosystem/typescript/sdk && yarn build
+          command: cd ./ecosystem/typescript/sdk && pnpm test
+      - run: cd ./ecosystem/typescript/sdk && pnpm build
 
       # Ensure the version, changelog, etc. are valid.
       - run: cd ./ecosystem/typescript/sdk && ./check.sh
@@ -128,7 +130,7 @@ jobs:
       # this works, see ecosystem/typescript/sdk/checked_publish.sh. The package
       # we publish to npmjs is meant to work with devnet, so we only release
       # from that branch. See ecosystem/typescript/sdk/README.md for more.
-      - run: cd ./ecosystem/typescript/sdk && yarn checked-publish
+      - run: cd ./ecosystem/typescript/sdk && pnpm checked-publish
         if: github.event_name == 'push' && github.ref_name == 'devnet'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}

@@ -1,9 +1,9 @@
 ---
-title: "Using Aptos CLI"
+title: "Use CLI for Configuration"
 id: "use-aptos-cli"
 ---
 
-# Using Aptos CLI
+# Use Aptos CLI for Configuration
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To install the CLI, see [Install Aptos CLI](install-aptos-cli).
 
@@ -262,7 +262,7 @@ $ aptos account fund-with-faucet --account default
 
 ### View an account's balance and transfer events
 
-You can view the balance and transfer events (deposits and withdrawals) either by explicity specying the accound address, as below:
+You can view the balance and transfer events (deposits and withdrawals) either by explicitly specifying the account address, as below:
 
 ```bash
 $ aptos account list --query balance --account 00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696
@@ -806,6 +806,14 @@ Operand Stack:
 
 In this example, we'll use the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 
+:::important
+As an open source project, the source code as well as compiled code published to the Aptos blockchain is inherently open by default. This means code you upload may be downloaded from on-chain data. Even without source access, it is possible to regenerate Move source from Move bytecode. To disable source access, publish with the `--included-artifacts none` argument, like so:
+
+```
+aptos move publish --included-artifacts none
+```
+:::
+
 Publish the package with your account address set for `HelloBlockchain`.
 
 Here, you need to change 8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71 to your account address.
@@ -1086,7 +1094,7 @@ The framework will be stored within the `aptos-framework-release` directory.
 
 The `ValidatorConfiguration` file contains:
 
-* `account_address`: The account that manages this validator. This must be derived from the `account_key` provided within te `ValidatorConfiguration` file.
+* `account_address`: The account that manages this validator. This must be derived from the `account_key` provided within the `ValidatorConfiguration` file.
 * `consensus_key`: The public key for authenticating consensus messages from the validator
 * `account_key`: The public key for the account that manages this validator. This is used to derive the `account_address`.
 * `network_key`: The public key for both validator and fullnode network authentication and encryption.

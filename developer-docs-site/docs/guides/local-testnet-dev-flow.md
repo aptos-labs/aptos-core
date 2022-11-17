@@ -1,9 +1,9 @@
 ---
-title: "Local testnet development flow"
+title: "Develop in Local Testnet from Source"
 slug: "local-testnet-dev-flow"
 ---
 
-This guide describes the end-to-end flow for developing with a local testnet.
+This guide describes the end-to-end flow for developing with a local testnet from Aptos source code.
 
 :::caution CLI from source, not from GitHub
 This guide is not correct if you're using the `aptos` CLI from a GitHub release or from `cargo install`, only if you build it yourself from `aptos-core` as described below.
@@ -29,30 +29,30 @@ You are now running a local testnet built from `aptos-core` main.
 ## Typescript: Use the SDK from `aptos-core`
 **Important**: With this development flow, it is essential that you do not use the SDK from npmjs. Instead, you must use the same SDK as the `aptos` CLI is built from, which we describe below.
 
-This guide assumes you have done the previous local testnet step. We also assume you have `yarn` installed.
+This guide assumes you have done the previous local testnet step. We also assume you have `pnpm` installed.
 
 First, go into `aptos-core` and build the SDK:
 ```
 cd ~/aptos-core/ecosystem/typescript/sdk
-yarn install
-yarn build
+ install
+pnpm build
 ```
 
 Make a new project if you don't have one already:
 ```
 mkdir ~/project && cd ~/project
-yarn init
+pnpm init
 ```
 
 Make your project target the SDK from your local `aptos-core`:
 ```
-yarn add ../aptos-core/ecosystem/typescript/sdk
+pnpm add ../aptos-core/ecosystem/typescript/sdk
 ```
 You could also use the absolute path, e.g. `/home/daniel/aptos-core/ecosystem/typescript/sdk`.
 
 Install everything:
 ```
-yarn install
+pnpm install
 ```
 
 Now you're set up! You should see in `package.json` that your project targets your local `aptos-core`:

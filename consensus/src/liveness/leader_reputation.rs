@@ -4,6 +4,7 @@
 use crate::{
     counters::{
         CHAIN_HEALTH_PARTICIPATING_NUM_VALIDATORS, CHAIN_HEALTH_PARTICIPATING_VOTING_POWER,
+        CHAIN_HEALTH_REPUTATION_PARTICIPATING_VOTING_POWER_FRACTION,
         CHAIN_HEALTH_TOTAL_NUM_VALIDATORS, CHAIN_HEALTH_TOTAL_VOTING_POWER,
         CHAIN_HEALTH_WINDOW_SIZES, COMMITTED_PROPOSALS_IN_WINDOW, COMMITTED_VOTES_IN_WINDOW,
         FAILED_PROPOSALS_IN_WINDOW, LEADER_REPUTATION_ROUND_HISTORY_SIZE,
@@ -12,6 +13,7 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
+use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -31,14 +33,26 @@ use storage_interface::{DbReader, Order};
 pub trait MetadataBackend: Send + Sync {
     /// Return a contiguous NewBlockEvent window in which last one is at target_round or
     /// latest committed, return all previous one if not enough.
-    fn get_block_metadata(&self, target_epoch: u64, target_round: Round) -> Vec<NewBlockEvent>;
+    fn get_block_metadata(
+        &self,
+        target_epoch: u64,
+        target_round: Round,
+    ) -> (Vec<NewBlockEvent>, HashValue);
+}
+
+#[derive(Debug, Clone)]
+pub struct VersionedNewBlockEvent {
+    /// event
+    pub event: NewBlockEvent,
+    /// version
+    pub version: u64,
 }
 
 pub struct AptosDBBackend {
     window_size: usize,
     seek_len: usize,
     aptos_db: Arc<dyn DbReader>,
-    db_result: Mutex<(Vec<NewBlockEvent>, u64, bool)>,
+    db_result: Mutex<(Vec<VersionedNewBlockEvent>, u64, bool)>,
 }
 
 impl AptosDBBackend {
@@ -53,9 +67,9 @@ impl AptosDBBackend {
 
     fn refresh_db_result(
         &self,
-        mut locked: MutexGuard<'_, (Vec<NewBlockEvent>, u64, bool)>,
+        mut locked: MutexGuard<'_, (Vec<VersionedNewBlockEvent>, u64, bool)>,
         latest_db_version: u64,
-    ) -> Result<(Vec<NewBlockEvent>, u64, bool)> {
+    ) -> Result<(Vec<VersionedNewBlockEvent>, u64, bool)> {
         // assumes target round is not too far from latest commit
         let limit = self.window_size + self.seek_len;
 
@@ -79,8 +93,13 @@ impl AptosDBBackend {
 
         let new_block_events = events
             .into_iter()
-            .map(|event| bcs::from_bytes::<NewBlockEvent>(event.event.event_data()))
-            .collect::<Result<Vec<NewBlockEvent>, bcs::Error>>()?;
+            .map(|event| {
+                Ok(VersionedNewBlockEvent {
+                    event: bcs::from_bytes::<NewBlockEvent>(event.event.event_data())?,
+                    version: event.transaction_version,
+                })
+            })
+            .collect::<Result<Vec<VersionedNewBlockEvent>, bcs::Error>>()?;
 
         let hit_end = new_block_events.len() < limit;
 
@@ -97,30 +116,32 @@ impl AptosDBBackend {
         &self,
         target_epoch: u64,
         target_round: Round,
-        events: &Vec<NewBlockEvent>,
+        events: &Vec<VersionedNewBlockEvent>,
         hit_end: bool,
-    ) -> Vec<NewBlockEvent> {
+    ) -> (Vec<NewBlockEvent>, HashValue) {
         // Do not warn when round==0, because check will always be unsure of whether we have
         // all events from the previous epoch. If there is an actual issue, next round will log it.
         if target_round != 0 {
             let has_larger = events.first().map_or(false, |e| {
-                (e.epoch(), e.round()) >= (target_epoch, target_round)
+                (e.event.epoch(), e.event.round()) >= (target_epoch, target_round)
             });
             if !has_larger {
                 // error, and not a fatal, in an unlikely scenario that we have many failed consecutive rounds,
                 // and nobody has any newer successful blocks.
                 warn!(
                     "Local history is too old, asking for {} epoch and {} round, and latest from db is {} epoch and {} round! Elected proposers are unlikely to match!!",
-                    target_epoch, target_round, events.first().map_or(0, |e| e.epoch()), events.first().map_or(0, |e| e.round()))
+                    target_epoch, target_round, events.first().map_or(0, |e| e.event.epoch()), events.first().map_or(0, |e| e.event.round()))
             }
         }
 
+        let mut max_version = 0;
         let mut result = vec![];
         for event in events {
-            if (event.epoch(), event.round()) <= (target_epoch, target_round)
+            if (event.event.epoch(), event.event.round()) <= (target_epoch, target_round)
                 && result.len() < self.window_size
             {
-                result.push(event.clone());
+                max_version = std::cmp::max(max_version, event.version);
+                result.push(event.event.clone());
             }
         }
 
@@ -132,20 +153,34 @@ impl AptosDBBackend {
                 self.window_size
             );
         }
-        result
+        let root_hash = self
+            .aptos_db
+            .get_accumulator_root_hash(max_version)
+            .unwrap_or_else(|_| {
+                error!(
+                    "We couldn't fetch accumulator hash for the {} version, for {} epoch, {} round",
+                    max_version, target_epoch, target_round,
+                );
+                HashValue::zero()
+            });
+        (result, root_hash)
     }
 }
 
 impl MetadataBackend for AptosDBBackend {
     // assume the target_round only increases
-    fn get_block_metadata(&self, target_epoch: u64, target_round: Round) -> Vec<NewBlockEvent> {
+    fn get_block_metadata(
+        &self,
+        target_epoch: u64,
+        target_round: Round,
+    ) -> (Vec<NewBlockEvent>, HashValue) {
         let locked = self.db_result.lock();
         let events = &locked.0;
         let version = locked.1;
         let hit_end = locked.2;
 
         let has_larger = events.first().map_or(false, |e| {
-            (e.epoch(), e.round()) >= (target_epoch, target_round)
+            (e.event.epoch(), e.event.round()) >= (target_epoch, target_round)
         });
         let latest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         // check if fresher data has potential to give us different result
@@ -159,7 +194,7 @@ impl MetadataBackend for AptosDBBackend {
                     error!(
                         error = ?e, "[leader reputation] Fail to refresh window",
                     );
-                    vec![]
+                    (vec![], HashValue::zero())
                 }
             }
         } else {
@@ -185,13 +220,19 @@ pub struct NewBlockEventAggregation {
     // dependig on how many failures we have.
     voter_window_size: usize,
     proposer_window_size: usize,
+    reputation_window_from_stale_end: bool,
 }
 
 impl NewBlockEventAggregation {
-    pub fn new(voter_window_size: usize, proposer_window_size: usize) -> Self {
+    pub fn new(
+        voter_window_size: usize,
+        proposer_window_size: usize,
+        reputation_window_from_stale_end: bool,
+    ) -> Self {
         Self {
             voter_window_size,
             proposer_window_size,
+            reputation_window_from_stale_end,
         }
     }
 
@@ -309,7 +350,12 @@ impl NewBlockEventAggregation {
         epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::count_votes_custom(epoch_to_candidates, history, self.voter_window_size, true)
+        Self::count_votes_custom(
+            epoch_to_candidates,
+            history,
+            self.voter_window_size,
+            self.reputation_window_from_stale_end,
+        )
     }
 
     pub fn count_votes_custom(
@@ -354,7 +400,7 @@ impl NewBlockEventAggregation {
             epoch_to_candidates,
             history,
             self.proposer_window_size,
-            true,
+            self.reputation_window_from_stale_end,
         )
     }
 
@@ -383,7 +429,7 @@ impl NewBlockEventAggregation {
             history,
             epoch_to_candidates,
             self.proposer_window_size,
-            true,
+            self.reputation_window_from_stale_end,
         )
         .fold(HashMap::new(), |mut map, meta| {
             match Self::indices_to_validators(
@@ -450,6 +496,7 @@ impl ProposerAndVoterHeuristic {
         failure_threshold_percent: u32,
         voter_window_size: usize,
         proposer_window_size: usize,
+        reputation_window_from_stale_end: bool,
     ) -> Self {
         Self {
             author,
@@ -457,7 +504,11 @@ impl ProposerAndVoterHeuristic {
             inactive_weight,
             failed_weight,
             failure_threshold_percent,
-            aggregation: NewBlockEventAggregation::new(voter_window_size, proposer_window_size),
+            aggregation: NewBlockEventAggregation::new(
+                voter_window_size,
+                proposer_window_size,
+                reputation_window_from_stale_end,
+            ),
         }
     }
 }
@@ -505,6 +556,8 @@ pub struct LeaderReputation {
     backend: Box<dyn MetadataBackend>,
     heuristic: Box<dyn ReputationHeuristic>,
     exclude_round: u64,
+    use_root_hash: bool,
+    window_for_chain_health: usize,
 }
 
 impl LeaderReputation {
@@ -515,6 +568,8 @@ impl LeaderReputation {
         backend: Box<dyn MetadataBackend>,
         heuristic: Box<dyn ReputationHeuristic>,
         exclude_round: u64,
+        use_root_hash: bool,
+        window_for_chain_health: usize,
     ) -> Self {
         assert!(epoch_to_proposers.contains_key(&epoch));
         assert_eq!(epoch_to_proposers[&epoch].len(), voting_powers.len());
@@ -526,21 +581,30 @@ impl LeaderReputation {
             backend,
             heuristic,
             exclude_round,
+            use_root_hash,
+            window_for_chain_health,
         }
     }
 
-    fn add_chain_health_metrics(&self, history: &[NewBlockEvent], round: Round) {
+    // Compute chain health metrics, and
+    // - return participating voting power percentage for the window_for_chain_health
+    // - update metric counters for different windows
+    fn compute_chain_health_and_add_metrics(&self, history: &[NewBlockEvent], round: Round) -> f64 {
         let candidates = self.epoch_to_proposers.get(&self.epoch).unwrap();
         // use f64 counter, as total voting power is u128
-        CHAIN_HEALTH_TOTAL_VOTING_POWER.set(self.voting_powers.iter().map(|v| *v as f64).sum());
+        let total_voting_power = self.voting_powers.iter().map(|v| *v as f64).sum();
+        CHAIN_HEALTH_TOTAL_VOTING_POWER.set(total_voting_power);
         CHAIN_HEALTH_TOTAL_NUM_VALIDATORS.set(candidates.len() as i64);
+
+        let mut result = None;
 
         for (counter_index, participants_window_size) in
             CHAIN_HEALTH_WINDOW_SIZES.iter().enumerate()
         {
+            let chosen = self.window_for_chain_health == *participants_window_size;
             let sample_fraction = participants_window_size / 10;
             // Sample longer durations
-            if sample_fraction <= 1 || (round % sample_fraction as u64) == 1 {
+            if chosen || sample_fraction <= 1 || (round % sample_fraction as u64) == 1 {
                 let participants: HashSet<_> = NewBlockEventAggregation::count_votes_custom(
                     &self.epoch_to_proposers,
                     history,
@@ -559,26 +623,57 @@ impl LeaderReputation {
                 )
                 .collect();
 
-                CHAIN_HEALTH_PARTICIPATING_VOTING_POWER[counter_index].set(
-                    candidates
-                        .iter()
-                        .zip(self.voting_powers.iter())
-                        .filter(|(c, _vp)| participants.contains(c))
-                        .map(|(_c, vp)| *vp as f64)
-                        .sum(),
-                );
+                let participating_voting_power = candidates
+                    .iter()
+                    .zip(self.voting_powers.iter())
+                    .filter(|(c, _vp)| participants.contains(c))
+                    .map(|(_c, vp)| *vp as f64)
+                    .sum();
+
+                CHAIN_HEALTH_PARTICIPATING_VOTING_POWER[counter_index]
+                    .set(participating_voting_power);
                 CHAIN_HEALTH_PARTICIPATING_NUM_VALIDATORS[counter_index]
                     .set(participants.len() as i64);
+
+                if chosen {
+                    // do not treat chain as unhealthy, if chain just started, and we don't have enough history to decide.
+                    let voting_power_participation_ratio =
+                        if history.len() < *participants_window_size && self.epoch <= 2 {
+                            1.0
+                        } else if total_voting_power >= 1.0 {
+                            participating_voting_power / total_voting_power
+                        } else {
+                            error!(
+                                "Total voting power is {}, should never happen",
+                                total_voting_power
+                            );
+                            1.0
+                        };
+                    CHAIN_HEALTH_REPUTATION_PARTICIPATING_VOTING_POWER_FRACTION
+                        .set(voting_power_participation_ratio);
+                    result = Some(voting_power_participation_ratio);
+                }
             }
         }
+
+        result.unwrap_or_else(|| {
+            panic!(
+                "asked window size {} not found in predefined window sizes: {:?}",
+                self.window_for_chain_health, CHAIN_HEALTH_WINDOW_SIZES
+            )
+        })
     }
 }
 
 impl ProposerElection for LeaderReputation {
-    fn get_valid_proposer(&self, round: Round) -> Author {
+    fn get_valid_proposer_and_voting_power_participation_ratio(
+        &self,
+        round: Round,
+    ) -> (Author, f64) {
         let target_round = round.saturating_sub(self.exclude_round);
-        let sliding_window = self.backend.get_block_metadata(self.epoch, target_round);
-        self.add_chain_health_metrics(&sliding_window, round);
+        let (sliding_window, root_hash) = self.backend.get_block_metadata(self.epoch, target_round);
+        let voting_power_participation_ratio =
+            self.compute_chain_health_and_add_metrics(&sliding_window, round);
         let mut weights =
             self.heuristic
                 .get_weights(self.epoch, &self.epoch_to_proposers, &sliding_window);
@@ -592,12 +687,33 @@ impl ProposerElection for LeaderReputation {
             .map(|(i, w)| *w as u128 * self.voting_powers[i] as u128)
             .collect();
 
-        let state = [self.epoch.to_le_bytes(), round.to_le_bytes()]
+        let state = if self.use_root_hash {
+            [
+                root_hash.to_vec(),
+                self.epoch.to_le_bytes().to_vec(),
+                round.to_le_bytes().to_vec(),
+            ]
             .concat()
-            .to_vec();
+        } else {
+            [
+                self.epoch.to_le_bytes().to_vec(),
+                round.to_le_bytes().to_vec(),
+            ]
+            .concat()
+        };
 
         let chosen_index = choose_index(stake_weights, state);
-        proposers[chosen_index]
+        (proposers[chosen_index], voting_power_participation_ratio)
+    }
+
+    fn get_valid_proposer(&self, round: Round) -> Author {
+        self.get_valid_proposer_and_voting_power_participation_ratio(round)
+            .0
+    }
+
+    fn get_voting_power_participation_ratio(&self, round: Round) -> f64 {
+        self.get_valid_proposer_and_voting_power_participation_ratio(round)
+            .1
     }
 }
 

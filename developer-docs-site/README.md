@@ -1,10 +1,11 @@
 # Developer Documentation
 
-   - [Installation](#installation)   
-      - [Requirements](#requirements)   
-   - [Fork and clone the Aptos repo](#fork-and-clone-the-aptos-repo)   
-   - [Build and serve the docs locally](#build-and-serve-the-docs-locally)   
-   - [Build static html files](#build-static-html-files)   
+   - [Installation](#installation)
+      - [Requirements](#requirements)
+   - [Fork and clone the Aptos repo](#fork-and-clone-the-aptos-repo)
+   - [Build and serve the docs locally](#build-and-serve-the-docs-locally)
+   - [Build static html files](#build-static-html-files)
+   - [Debug/Format files](#debugging)
 
 This Aptos Developer Documenatation is built using [Docusaurus 2](https://docusaurus.io/). Follow the below steps to build the docs locally to test your contribution.
 
@@ -22,10 +23,10 @@ Before you proceed, make sure you install the following tools.
 brew install node
 ```
 
-- Install the latest [Yarn](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable) by executing the below command on your Terminal:
+- Install the latest [pnpm](https://pnpm.io/installation) by executing the below command on your Terminal:
 
 ```
-brew install yarn
+curl -fsSL https://get.pnpm.io/install.sh | sh -
 ```
 
 ## Clone the Aptos repo
@@ -42,34 +43,34 @@ brew install yarn
   ```
   cd aptos-core/developer-docs-site
   ```
-2. Run `yarn`.
+2. Run `pnpm`.
 
   ```
-  yarn
+  pnpm install
   ```
 This step will configure the Docusaurus static site generator.
 
-3. Start the Yarn server locally. This will also open the locally built docs in your default browser.
+3. Start the server locally. This will also open the locally built docs in your default browser.
 
 > **NOTE**: This step will not generate static html files, but will render the docs dynamically.
 
   ```
-  yarn start
+  pnpm start
   ```
 
 ## (Optional) Build static html files
 
 Execute the below steps if you want to generate static html documentation files. A `build` directory will be created with the static html files and assets contained in it.
 
-1. Make sure you install Yarn dependencies.
+1. Make sure you install dependencies.
 
   ```
-  yarn install
+  pnpm install
   ```
-2. Build static html files with Yarn.
+2. Build static html files with pnpm.
 
   ```
-  $ yarn build
+  pnpm build
   ```
 
 This command generates static html content and places it in the `build` directory.
@@ -77,5 +78,13 @@ This command generates static html content and places it in the `build` director
 3. Finally, use the below command to start the documentation server on your localhost.
 
   ```
-  npm run serve
+  pnpm run serve
   ```
+
+## Debugging
+
+Fix formatting issues by running:
+
+```
+pnpm fmt
+```
