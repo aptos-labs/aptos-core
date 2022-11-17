@@ -8,7 +8,7 @@ spec aptos_framework::reconfiguration {
         invariant [suspendable] chain_status::is_operating() ==>
             (timestamp::spec_now_microseconds() >= last_reconfiguration_time());
     }
-    
+
     /// Make sure the signer address is @aptos_framework.
     spec schema AbortsIfNotAptosFramework {
         aptos_framework: &signer;

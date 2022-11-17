@@ -73,7 +73,7 @@ spec aptos_framework::stake {
 
         ensures stake_pool.locked_until_secs == lockup + now_seconds;
     }
-    
+
     spec update_network_and_fullnode_addresses(
         operator: &signer,
         pool_address: address,
@@ -99,7 +99,7 @@ spec aptos_framework::stake {
         modifies global<StakePool>(pool_address);
         ensures stake_pool.operator_address == new_operator;
     }
-    
+
     spec reactivate_stake_with_cap(owner_cap: &OwnerCapability, amount: u64) {
         let pool_address = owner_cap.pool_address;
         aborts_if !stake_pool_exists(pool_address);

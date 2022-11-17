@@ -105,7 +105,7 @@ spec aptos_framework::storage_gas {
     spec interpolate(x0: u64, x1: u64, y0: u64, y1: u64, x: u64): u64 {
         pragma opaque;
         pragma intrinsic;
-        
+
         aborts_if false;
     }
 

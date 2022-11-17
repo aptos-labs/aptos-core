@@ -88,7 +88,7 @@ spec aptos_framework::transaction_validation {
         chain_id: u8,
         _script_hash: vector<u8>,
     ) {
-        include PrologueCommonAbortsIf{
+        include PrologueCommonAbortsIf {
             txn_authentication_key: txn_public_key
         };
     }
@@ -108,8 +108,8 @@ spec aptos_framework::transaction_validation {
     ) {
         /// TODO: complex while loop condition.
         pragma aborts_if_is_partial;
-    
-        include PrologueCommonAbortsIf{
+
+        include PrologueCommonAbortsIf {
             txn_authentication_key: txn_sender_public_key
         };
         let num_secondary_signers = len(secondary_signer_addresses);
