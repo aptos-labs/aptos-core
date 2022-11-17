@@ -226,8 +226,11 @@ pub fn convert_move_type(move_type: &MoveType) -> extractor::MoveType {
     let r#type = match move_type {
         MoveType::Bool => extractor::MoveTypes::Bool,
         MoveType::U8 => extractor::MoveTypes::U8,
+        MoveType::U16 => extractor::MoveTypes::U16,
+        MoveType::U32 => extractor::MoveTypes::U32,
         MoveType::U64 => extractor::MoveTypes::U64,
         MoveType::U128 => extractor::MoveTypes::U128,
+        MoveType::U256 => extractor::MoveTypes::U256,
         MoveType::Address => extractor::MoveTypes::Address,
         MoveType::Signer => extractor::MoveTypes::Signer,
         MoveType::Vector { .. } => extractor::MoveTypes::Vector,
@@ -239,8 +242,11 @@ pub fn convert_move_type(move_type: &MoveType) -> extractor::MoveType {
     let content = match move_type {
         MoveType::Bool => None,
         MoveType::U8 => None,
+        MoveType::U16 => None,
+        MoveType::U32 => None,
         MoveType::U64 => None,
         MoveType::U128 => None,
+        MoveType::U256 => None,
         MoveType::Address => None,
         MoveType::Signer => None,
         MoveType::Vector { items } => Some(extractor::move_type::Content::Vector(Box::from(

@@ -56,7 +56,7 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::move_vm::RuntimeConfig;
+use move_vm_runtime::config::VMConfig;
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::OnceCell;
@@ -72,7 +72,8 @@ use std::{
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
-static RUNTIME_CHECKS: OnceCell<RuntimeConfig> = OnceCell::new();
+// TODO(U256): re-enable
+// static RUNTIME_CHECKS: OnceCell<RuntimeConfig> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 
 /// Remove this once the bundle is removed from the code.
@@ -115,6 +116,8 @@ impl AptosVM {
         }
     }
 
+    // TODO(U256): re-enable
+    /*
     /// Sets runtime config when invoked the first time.
     pub fn set_runtime_config(paranoid_type_checks: bool, paranoid_hot_potato_checks: bool) {
         // Only the first call succeeds, due to OnceCell semantics.
@@ -137,6 +140,7 @@ impl AptosVM {
             },
         }
     }
+    */
 
     /// Sets the # of async proof reading threads.
     pub fn set_num_proof_reading_threads_once(mut num_threads: usize) {

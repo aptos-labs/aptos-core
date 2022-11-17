@@ -833,7 +833,7 @@ impl TransactionsApi {
         match data {
             SubmitTransactionPost::Bcs(data) => {
                 let signed_transaction: SignedTransaction =
-                    bcs::from_bytes_with_limit(&data.0, MAX_RECURSIVE_TYPES_ALLOWED as usize)
+                    bcs::from_bytes(&data.0 /*, MAX_RECURSIVE_TYPES_ALLOWED as usize*/)
                         .context("Failed to deserialize input into SignedTransaction")
                         .map_err(|err| {
                             SubmitTransactionError::bad_request_with_code(

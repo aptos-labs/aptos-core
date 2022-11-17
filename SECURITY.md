@@ -41,7 +41,7 @@ Aptos Foundation offers bounties for security reports. Reports will be validated
 The scope includes code within
 
 - [Aptos Core — main branch](https://github.com/aptos-labs/aptos-core/tree/main)
-- [Move — Aptos branch](https://github.com/move-language/move/tree/aptos)
+- [Move — Aptos branch](https://github.com/vgao1996/move/tree/aptos)
 
 Aptos Foundation considers the following levels of severity:
 

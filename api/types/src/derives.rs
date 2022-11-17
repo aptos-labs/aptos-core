@@ -24,7 +24,7 @@ use serde_json::json;
 use crate::{
     move_types::{MoveAbility, MoveStructValue},
     Address, EntryFunctionId, HashValue, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
-    MoveStructTag, MoveType, StateKeyWrapper, U128, U64,
+    MoveStructTag, MoveType, StateKeyWrapper, U128, U16, U256, U32, U64,
 };
 use indoc::indoc;
 
@@ -241,6 +241,36 @@ impl_poem_type!(
 );
 
 impl_poem_type!(
+    U16,
+    "string",
+    (
+        example = Some(serde_json::Value::String("65534".to_string())),
+        format = Some("uint64"),
+        description = Some(indoc! {"
+      A string containing a 16-bit unsigned integer.
+
+      We represent u16 values as a string to ensure compatibility with languages such
+      as JavaScript that do not parse u64s in JSON natively.
+  "})
+    )
+);
+
+impl_poem_type!(
+    U32,
+    "string",
+    (
+        example = Some(serde_json::Value::String("2147483647".to_string())),
+        format = Some("uint64"),
+        description = Some(indoc! {"
+    A string containing a 32-bit unsigned integer.
+
+    We represent u32 values as a string to ensure compatibility with languages such
+    as JavaScript that do not parse u64s in JSON natively.
+"})
+    )
+);
+
+impl_poem_type!(
     U64,
     "string",
     (
@@ -269,6 +299,23 @@ impl_poem_type!(
         We represent u128 values as a string to ensure compatibility with languages such
         as JavaScript that do not parse u64s in JSON natively.
     "})
+    )
+);
+
+impl_poem_type!(
+    U256,
+    "string",
+    (
+        example = Some(serde_json::Value::String(
+            "340282366920938463463374607431768211454".to_string()
+        )),
+        format = Some("uint64"),
+        description = Some(indoc! {"
+      A string containing a 256-bit unsigned integer.
+
+      We represent u256 values as a string to ensure compatibility with languages such
+      as JavaScript that do not parse u64s in JSON natively.
+  "})
     )
 );
 

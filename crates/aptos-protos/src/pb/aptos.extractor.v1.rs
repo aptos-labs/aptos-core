@@ -707,6 +707,9 @@ pub enum MoveTypes {
     Reference = 9,
     /// (String),
     Unparsable = 10,
+    U16 = 11,
+    U32 = 12,
+    U256 = 13,
 }
 impl MoveTypes {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -717,8 +720,11 @@ impl MoveTypes {
         match self {
             MoveTypes::Bool => "Bool",
             MoveTypes::U8 => "U8",
+            MoveTypes::U16 => "U16",
+            MoveTypes::U32 => "U32",
             MoveTypes::U64 => "U64",
             MoveTypes::U128 => "U128",
+            MoveTypes::U256 => "U256",
             MoveTypes::Address => "Address",
             MoveTypes::Signer => "Signer",
             MoveTypes::Vector => "Vector",

@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use crate::algebra::{AbstractValueSize, AbstractValueSizePerArg};
 use crate::gas_meter::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
+use move_core_types::u256::U256;
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumArgs};
 use move_vm_types::views::{ValueView, ValueVisitor};
 
@@ -79,8 +80,11 @@ where
 {
     deref_visitor_delegate_simple!(
         [visit_u8, u8],
+        [visit_u16, u16],
+        [visit_u32, u32],
         [visit_u64, u64],
         [visit_u128, u128],
+        [visit_u256, U256],
         [visit_bool, bool],
         [visit_address, AccountAddress],
         [visit_vec_u8, &[u8]],
@@ -132,6 +136,16 @@ impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
     #[inline]
     fn visit_u8(&mut self, _depth: usize, _val: u8) {
         self.size += self.params.u8;
+    }
+
+    #[inline]
+    fn visit_u16(&mut self, depth: usize, val: u16) {
+        unimplemented!()
+    }
+
+    #[inline]
+    fn visit_u32(&mut self, depth: usize, val: u32) {
+        unimplemented!()
     }
 
     #[inline]
@@ -191,6 +205,11 @@ impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
             size += self.params.vector;
         }
         self.size += size;
+    }
+
+    #[inline]
+    fn visit_u256(&mut self, depth: usize, val: U256) {
+        unimplemented!()
     }
 
     #[inline]
@@ -262,6 +281,16 @@ impl AbstractValueSizeGasParameters {
             }
 
             #[inline]
+            fn visit_u16(&mut self, depth: usize, val: u16) {
+                unimplemented!()
+            }
+
+            #[inline]
+            fn visit_u32(&mut self, depth: usize, val: u32) {
+                unimplemented!()
+            }
+
+            #[inline]
             fn visit_u64(&mut self, _depth: usize, _val: u64) {
                 self.res = Some(self.params.u64);
             }
@@ -269,6 +298,11 @@ impl AbstractValueSizeGasParameters {
             #[inline]
             fn visit_u128(&mut self, _depth: usize, _val: u128) {
                 self.res = Some(self.params.u128);
+            }
+
+            #[inline]
+            fn visit_u256(&mut self, depth: usize, val: U256) {
+                unimplemented!()
             }
 
             #[inline]
@@ -369,6 +403,16 @@ impl AbstractValueSizeGasParameters {
             }
 
             #[inline]
+            fn visit_u16(&mut self, depth: usize, val: u16) {
+                unimplemented!()
+            }
+
+            #[inline]
+            fn visit_u32(&mut self, depth: usize, val: u32) {
+                unimplemented!()
+            }
+
+            #[inline]
             fn visit_u64(&mut self, _depth: usize, _val: u64) {
                 self.res = Some(self.params.per_u64_packed * NumArgs::from(1));
             }
@@ -376,6 +420,11 @@ impl AbstractValueSizeGasParameters {
             #[inline]
             fn visit_u128(&mut self, _depth: usize, _val: u128) {
                 self.res = Some(self.params.per_u128_packed * NumArgs::from(1));
+            }
+
+            #[inline]
+            fn visit_u256(&mut self, depth: usize, val: U256) {
+                unimplemented!()
             }
 
             #[inline]

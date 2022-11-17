@@ -218,8 +218,11 @@ impl InstructionGasParameters {
             Branch => self.branch,
 
             LdU8 => self.ld_u8,
+            LdU16 => unimplemented!(),
+            LdU32 => unimplemented!(),
             LdU64 => self.ld_u64,
             LdU128 => self.ld_u128,
+            LdU256 => unimplemented!(),
             LdTrue => self.ld_true,
             LdFalse => self.ld_false,
 
@@ -232,8 +235,11 @@ impl InstructionGasParameters {
             FreezeRef => self.freeze_ref,
 
             CastU8 => self.cast_u8,
+            CastU16 => unimplemented!(),
+            CastU32 => unimplemented!(),
             CastU64 => self.cast_u64,
             CastU128 => self.cast_u128,
+            CastU256 => unimplemented!(),
 
             Add => self.add,
             Sub => self.sub,

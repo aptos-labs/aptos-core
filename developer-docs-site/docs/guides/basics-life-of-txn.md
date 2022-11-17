@@ -200,7 +200,7 @@ It is important to understand that executing a transaction is different from upd
 
 When mempool receives a transaction from other validators via shared mempool or from the REST service, mempool invokes `VM::ValidateTransaction()` on the VM to validate the transaction.
 
-For implementation details refer to the [Virtual Machine README](https://github.com/move-language/move/tree/main/language/move-vm).
+For implementation details refer to the [Virtual Machine README](https://github.com/vgao1996/move/tree/main/language/move-vm).
 
 ## Mempool
 

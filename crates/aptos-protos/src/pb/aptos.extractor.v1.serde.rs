@@ -3875,8 +3875,11 @@ impl serde::Serialize for MoveTypes {
         let variant = match self {
             Self::Bool => "Bool",
             Self::U8 => "U8",
+            Self::U16 => "U16",
+            Self::U32 => "U32",
             Self::U64 => "U64",
             Self::U128 => "U128",
+            Self::U256 => "U256",
             Self::Address => "Address",
             Self::Signer => "Signer",
             Self::Vector => "Vector",

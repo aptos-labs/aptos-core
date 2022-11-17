@@ -174,11 +174,11 @@ impl ProtocolId {
     }
 
     fn bcs_encode<T: Serialize>(&self, value: &T, limit: usize) -> anyhow::Result<Vec<u8>> {
-        bcs::to_bytes_with_limit(value, limit).map_err(|e| anyhow!("{:?}", e))
+        bcs::to_bytes(value).map_err(|e| anyhow!("{:?}", e))
     }
 
     fn bcs_decode<T: DeserializeOwned>(&self, bytes: &[u8], limit: usize) -> anyhow::Result<T> {
-        bcs::from_bytes_with_limit(bytes, limit).map_err(|e| anyhow!("{:?}", e))
+        bcs::from_bytes(bytes).map_err(|e| anyhow!("{:?}", e))
     }
 }
 

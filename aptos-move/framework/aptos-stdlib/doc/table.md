@@ -4,7 +4,7 @@
 # Module `0x1::table`
 
 Type of large-scale storage tables.
-source: https://github.com/move-language/move/blob/1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e/language/extensions/move-table-extension/sources/Table.move#L1
+source: https://github.com/vgao1996/move/blob/1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e/language/extensions/move-table-extension/sources/Table.move#L1
 
 It implements the Table type which supports individual table items to be represented by
 separate global state items. The number of items and a unique handle are tracked on the table

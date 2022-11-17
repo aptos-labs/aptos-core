@@ -4,7 +4,7 @@
 # Module `0x1::aptos_coin`
 
 This module defines a minimal and generic Coin and Balance.
-modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
+modified from https://github.com/vgao1996/move/tree/main/language/documentation/tutorial
 
 
 -  [Resource `AptosCoin`](#0x1_aptos_coin_AptosCoin)

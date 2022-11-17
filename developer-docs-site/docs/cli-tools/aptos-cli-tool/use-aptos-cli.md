@@ -745,7 +745,7 @@ Test result: OK. Total tests: 2; passed: 2; failed: 0
 
 ### Proving Move
 
-The `aptos` CLI can be used to run [Move Prover](https://github.com/move-language/move/tree/main/language/move-prover) which is a formal verification tool for the Move language. The below example proves the `hello_prover` package in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
+The `aptos` CLI can be used to run [Move Prover](https://github.com/vgao1996/move/tree/main/language/move-prover) which is a formal verification tool for the Move language. The below example proves the `hello_prover` package in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 ```bash
 aptos move prove --package-dir aptos-move/move-examples/hello_prover/
 ```

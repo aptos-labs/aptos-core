@@ -14,6 +14,7 @@ use framework::natives::{
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_table_extension::NativeTableContext;
+use move_vm_runtime::config::VMConfig;
 use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
 use std::ops::Deref;
 
@@ -31,20 +32,23 @@ impl MoveVmExt {
         chain_id: u8,
     ) -> VMResult<Self> {
         Ok(Self {
-            inner: MoveVM::new_with_configs(
+            inner: MoveVM::new_with_config(
                 aptos_natives(
                     native_gas_params,
                     abs_val_size_gas_params,
                     gas_feature_version,
                 ),
-                VerifierConfig {
-                    max_loop_depth: Some(5),
-                    treat_friend_as_private,
-                    max_generic_instantiation_length: Some(32),
-                    max_function_parameters: Some(128),
-                    max_basic_blocks: Some(1024),
+                VMConfig {
+                    verifier: VerifierConfig {
+                        max_loop_depth: Some(5),
+                        treat_friend_as_private,
+                        max_generic_instantiation_length: Some(32),
+                        max_function_parameters: Some(128),
+                        max_basic_blocks: Some(1024),
+                    },
+                    // TODO(U256): implement proper versioning
+                    max_binary_format_version: 5,
                 },
-                crate::AptosVM::get_runtime_config(),
             )?,
             chain_id,
         })

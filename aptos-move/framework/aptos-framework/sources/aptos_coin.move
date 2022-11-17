@@ -1,5 +1,5 @@
 /// This module defines a minimal and generic Coin and Balance.
-/// modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
+/// modified from https://github.com/vgao1996/move/tree/main/language/documentation/tutorial
 module aptos_framework::aptos_coin {
     use std::string;
     use std::error;

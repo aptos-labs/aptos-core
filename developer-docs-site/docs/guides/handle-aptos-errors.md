@@ -11,7 +11,7 @@ This page catalogs common errors encountered in the Aptos blockchain and explain
 
 For the sources of these errors, see:
 
-  * [vm_status.rs](https://github.com/move-language/move/blob/main/language/move-core/types/src/vm_status.rs)
+  * [vm_status.rs](https://github.com/vgao1996/move/blob/main/language/move-core/types/src/vm_status.rs)
   * [error.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/sources/error.move)
   * [account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/account.move)
   * [coin.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move)

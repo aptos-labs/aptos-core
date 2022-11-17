@@ -5,7 +5,7 @@ slug: "interacting-with-the-aptos-blockchain"
 
 # Interact with the Move VM
 
-The Aptos blockchain uses the [Move](https://github.com/move-language/move) virtual machine (VM) for executing operations. While many blockchains implement a set of
+The Aptos blockchain uses the [Move](https://github.com/vgao1996/move) virtual machine (VM) for executing operations. While many blockchains implement a set of
 native operations, Aptos delegates all operations to Move, including: account creation, fund transfer and publishing Move modules.
 To support these operations, blockchains built on top of Move must provide a framework (akin to
 an operating system for a computer or a minimal viable set of functions) for interacting with the blockchain. In this section, we discuss
