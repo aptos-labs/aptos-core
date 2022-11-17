@@ -13,21 +13,19 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-bytes = "1.0.1"
-futures = "0.3.12"
-once_cell = "1.7.2"
-serde = { version = "1.0.124", default-features = false }
-thiserror = "1.0.24"
-tokio = { version = "1.8.1", features = ["rt", "macros"], default-features = false }
-
-aptos-config = { path = "../../../config" }
-aptos-logger = { path = "../../../crates/aptos-logger" }
-aptos-metrics-core = { path = "../../../crates/aptos-metrics-core" }
-aptos-types = { path = "../../../types" }
-
-bounded-executor = { path = "../../../crates/bounded-executor" }
-channel = { path = "../../../crates/channel" }
-netcore = { path = "../../netcore" }
-network = { path = "../../../network" }
-peer-monitoring-service-types = { path = "../types" }
+aptos-config = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+bounded-executor = { workspace = true }
+bytes = { workspace = true }
+channel = { workspace = true }
+futures = { workspace = true }
+netcore = { workspace = true }
+network = { workspace = true }
+once_cell = { workspace = true }
+peer-monitoring-service-types = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
