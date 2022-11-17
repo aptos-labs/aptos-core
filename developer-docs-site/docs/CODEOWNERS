@@ -12,6 +12,6 @@
 ## Dev Guides
 /guides/** @movekevin
 ## Nodes
-/nodes/** @rustielin @prod-eng
+/nodes/** @rustielin @aptos-labs/@prod-eng
 ## Reference
 /reference/** @clay-aptos @gregnazario
