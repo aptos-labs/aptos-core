@@ -1,21 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{batch_reader::BatchReader, utils::RoundExpirations};
+use crate::quorum_store::batch_reader::BatchReader;
 use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
 use aptos_logger::{debug, warn};
 use aptos_types::transaction::SignedTransaction;
 use arc_swap::ArcSwapOption;
+use consensus_types::common::DataStatus;
 use consensus_types::{
     block::Block,
     common::Payload,
     proof_of_store::{LogicalTime, ProofOfStore},
     request_response::WrapperCommand,
-};
-use dashmap::{
-    mapref::entry::Entry::{Occupied, Vacant},
-    DashMap,
 };
 use executor_types::Error::BlockNotFound;
 use executor_types::*;
@@ -24,18 +20,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
-enum DataStatus {
-    Cached(Vec<SignedTransaction>),
-    Requested(Vec<oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>>),
-}
-
 /// Execution -> QuorumStore notification of commits.
 pub struct DataManager {
     quorum_store_enabled: AtomicBool,
     data_reader: ArcSwapOption<BatchReader>,
     quorum_store_wrapper_tx: ArcSwapOption<Sender<WrapperCommand>>,
-    digest_status: DashMap<HashValue, DataStatus>,
-    expiration_status: Mutex<RoundExpirations<HashValue>>,
 }
 
 impl DataManager {
@@ -45,8 +34,6 @@ impl DataManager {
             quorum_store_enabled: AtomicBool::new(false),
             data_reader: ArcSwapOption::from(None),
             quorum_store_wrapper_tx: ArcSwapOption::from(None),
-            digest_status: DashMap::new(),
-            expiration_status: Mutex::new(RoundExpirations::new()),
         }
     }
 
@@ -57,11 +44,11 @@ impl DataManager {
 
     async fn request_data(
         &self,
-        poss: Vec<ProofOfStore>,
+        proofs: Vec<ProofOfStore>,
         logical_time: LogicalTime,
     ) -> Vec<oneshot::Receiver<Result<Vec<SignedTransaction>, executor_types::Error>>> {
         let mut receivers = Vec::new();
-        for pos in poss {
+        for pos in proofs {
             debug!(
                 "QSE: requesting pos {:?}, digest {}, time = {:?}",
                 pos,
@@ -84,7 +71,6 @@ impl DataManager {
         receivers
     }
 
-    // Execution result has been certified (TODO: double check).
     pub async fn notify_commit(&self, logical_time: LogicalTime, payloads: Vec<Payload>) {
         if self.quorum_store_enabled.load(Ordering::Relaxed) {
             self.data_reader
@@ -100,7 +86,7 @@ impl DataManager {
                     Payload::DirectMempool(_) => {
                         unreachable!()
                     }
-                    Payload::InQuorumStore(proofs) => proofs,
+                    Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
                     Payload::Empty => Vec::new(),
                 })
                 .map(|proof| *proof.digest())
@@ -114,30 +100,24 @@ impl DataManager {
                 .as_ref()
                 .clone()
                 .try_send(WrapperCommand::CleanRequest(logical_time, digests));
-
-            let expired_set = self.expiration_status.lock().expire(logical_time.round());
-            for expired in expired_set {
-                self.digest_status.remove(&expired);
-            }
         }
     }
 
     pub async fn update_payload(&self, block: &Block) {
         if self.quorum_store_enabled.load(Ordering::Relaxed) && block.payload().is_some() {
             match block.payload().unwrap() {
-                Payload::InQuorumStore(proofs) => {
-                    if !self.digest_status.contains_key(&block.id()) {
+                Payload::InQuorumStore(proof_with_status) => {
+                    if proof_with_status.status.lock().is_none() {
                         let receivers = self
                             .request_data(
-                                proofs.clone(),
+                                proof_with_status.proofs.clone(),
                                 LogicalTime::new(block.epoch(), block.round()),
                             )
                             .await;
-                        self.digest_status
-                            .insert(block.id(), DataStatus::Requested(receivers));
-                        self.expiration_status
+                        proof_with_status
+                            .status
                             .lock()
-                            .add_item(block.id(), block.round());
+                            .replace(DataStatus::Requested(receivers));
                     }
                 }
                 Payload::Empty => {}
@@ -148,56 +128,73 @@ impl DataManager {
         }
     }
 
+    //Assumses it is never called for the same block concurrently. Otherwise status can be None.
     pub async fn get_data(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
         if block.payload().is_none() || block.payload().unwrap().is_empty() {
             return Ok(Vec::new());
         }
         if self.quorum_store_enabled.load(Ordering::Relaxed) {
             match block.payload().unwrap() {
-                Payload::InQuorumStore(proofs) => {
-                    match self.digest_status.entry(block.id()) {
-                        Occupied(mut entry) => match entry.get_mut() {
-                            DataStatus::Cached(data) => Ok(data.clone()),
-                            DataStatus::Requested(receivers) => {
-                                let mut vec_ret = Vec::new();
-                                debug!("QSE: waiting for data on {} receivers", receivers.len());
-                                for rx in receivers {
-                                    match rx.await {
-                                        Err(_) => {
-                                            debug!("Oneshot channel to get a batch was dropped");
-                                            // We probably advanced epoch already.
-                                            return Err(BlockNotFound(block.id()));
-                                        }
-                                        Ok(Ok(data)) => {
-                                            debug!("QSE: got data, len {}", data.len());
-                                            vec_ret.push(data);
-                                        }
-                                        Ok(Err(e)) => {
-                                            debug!("QS: got error from receiver {:?}", e);
-                                            let new_receivers = self
-                                                .request_data(
-                                                    proofs.clone(),
-                                                    LogicalTime::new(block.epoch(), block.round()),
-                                                )
-                                                .await;
-                                            // Could not get all data so requested again
-                                            entry.replace_entry(DataStatus::Requested(
-                                                new_receivers,
-                                            ));
-                                            return Err(e);
-                                        }
+                Payload::InQuorumStore(proof_with_status) => {
+                    let status = proof_with_status.status.lock().take();
+                    match status.expect("Should have been updated before") {
+                        DataStatus::Cached(data) => {
+                            proof_with_status
+                                .status
+                                .lock()
+                                .replace(DataStatus::Cached(data.clone()));
+                            Ok(data)
+                        }
+                        DataStatus::Requested(receivers) => {
+                            let mut vec_ret = Vec::new();
+                            debug!("QSE: waiting for data on {} receivers", receivers.len());
+                            for rx in receivers {
+                                match rx.await {
+                                    Err(_) => {
+                                        // We probably advanced epoch already.
+                                        warn!("Oneshot channel to get a batch was dropped");
+                                        let new_receivers = self
+                                            .request_data(
+                                                proof_with_status.proofs.clone(),
+                                                LogicalTime::new(block.epoch(), block.round()),
+                                            )
+                                            .await;
+                                        // Could not get all data so requested again
+                                        proof_with_status
+                                            .status
+                                            .lock()
+                                            .replace(DataStatus::Requested(new_receivers));
+                                        return Err(BlockNotFound(block.id()));
+                                    }
+                                    Ok(Ok(data)) => {
+                                        debug!("QSE: got data, len {}", data.len());
+                                        vec_ret.push(data);
+                                    }
+                                    Ok(Err(e)) => {
+                                        debug!("QS: got error from receiver {:?}", e);
+                                        let new_receivers = self
+                                            .request_data(
+                                                proof_with_status.proofs.clone(),
+                                                LogicalTime::new(block.epoch(), block.round()),
+                                            )
+                                            .await;
+                                        // Could not get all data so requested again
+                                        proof_with_status
+                                            .status
+                                            .lock()
+                                            .replace(DataStatus::Requested(new_receivers));
+                                        return Err(e);
                                     }
                                 }
-                                let ret: Vec<SignedTransaction> =
-                                    vec_ret.into_iter().flatten().collect();
-                                // execution asks for the data twice, so data is cached here for the second time.
-                                entry.replace_entry(DataStatus::Cached(ret.clone()));
-
-                                Ok(ret)
                             }
-                        },
-                        Vacant(_) => {
-                            unreachable!("digest_status entry must exist!");
+                            let ret: Vec<SignedTransaction> =
+                                vec_ret.into_iter().flatten().collect();
+                            // execution asks for the data twice, so data is cached here for the second time.
+                            proof_with_status
+                                .status
+                                .lock()
+                                .replace(DataStatus::Cached(ret.clone()));
+                            Ok(ret)
                         }
                     }
                 }

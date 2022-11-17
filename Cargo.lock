@@ -2672,6 +2672,7 @@ dependencies = [
  "serde 1.0.144",
  "serde_json",
  "short-hex-str",
+ "tokio",
 ]
 
 [[package]]
