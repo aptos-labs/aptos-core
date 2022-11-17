@@ -17,6 +17,7 @@ mod max_loop_depth;
 mod memory_quota;
 mod mint_nft;
 mod offer_signer_capability;
+mod publish_init_cases;
 mod rotate_auth_key;
 mod scripts;
 mod simple_defi;

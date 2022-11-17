@@ -574,7 +574,7 @@ The number of new events created does not exceed MAX_U64.
 
 
 <pre><code><b>include</b> <a href="block.md#0x1_block_Initialize">Initialize</a>;
-<b>include</b> <a href="block.md#0x1_block_New_event_handle">New_event_handle</a>;
+<b>include</b> <a href="block.md#0x1_block_NewEventHandle">NewEventHandle</a>;
 </code></pre>
 
 
@@ -597,10 +597,10 @@ The number of new events created does not exceed MAX_U64.
 
 
 
-<a name="0x1_block_New_event_handle"></a>
+<a name="0x1_block_NewEventHandle"></a>
 
 
-<pre><code><b>schema</b> <a href="block.md#0x1_block_New_event_handle">New_event_handle</a> {
+<pre><code><b>schema</b> <a href="block.md#0x1_block_NewEventHandle">NewEventHandle</a> {
     aptos_framework: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
     <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
@@ -625,23 +625,24 @@ The new_epoch_interval must be greater than 0.
 The BlockResource existed under the @aptos_framework.
 
 
-<pre><code><b>include</b> <a href="block.md#0x1_block_Update_epoch_interval_microsecs">Update_epoch_interval_microsecs</a>;
+<pre><code><b>include</b> <a href="block.md#0x1_block_UpdateEpochIntervalMicrosecs">UpdateEpochIntervalMicrosecs</a>;
 </code></pre>
 
 
 
 
-<a name="0x1_block_Update_epoch_interval_microsecs"></a>
+<a name="0x1_block_UpdateEpochIntervalMicrosecs"></a>
 
 
-<pre><code><b>schema</b> <a href="block.md#0x1_block_Update_epoch_interval_microsecs">Update_epoch_interval_microsecs</a> {
+<pre><code><b>schema</b> <a href="block.md#0x1_block_UpdateEpochIntervalMicrosecs">UpdateEpochIntervalMicrosecs</a> {
     aptos_framework: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     new_epoch_interval: u64;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
     <b>aborts_if</b> addr != @aptos_framework;
     <b>aborts_if</b> new_epoch_interval &lt;= 0;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
-    <b>ensures</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
+    <b>let</b> <b>post</b> block_resource = <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
+    <b>ensures</b> block_resource.epoch_interval == new_epoch_interval;
 }
 </code></pre>
 
@@ -759,16 +760,16 @@ The Configuration existed under the @aptos_framework.
 The CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
-<pre><code><b>include</b> <a href="block.md#0x1_block_Emit_writeset_block_event">Emit_writeset_block_event</a>;
+<pre><code><b>include</b> <a href="block.md#0x1_block_EmitWritesetBlockEvent">EmitWritesetBlockEvent</a>;
 </code></pre>
 
 
 
 
-<a name="0x1_block_Emit_writeset_block_event"></a>
+<a name="0x1_block_EmitWritesetBlockEvent"></a>
 
 
-<pre><code><b>schema</b> <a href="block.md#0x1_block_Emit_writeset_block_event">Emit_writeset_block_event</a> {
+<pre><code><b>schema</b> <a href="block.md#0x1_block_EmitWritesetBlockEvent">EmitWritesetBlockEvent</a> {
     vm_signer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(vm_signer);
     <b>aborts_if</b> addr != @vm_reserved;
