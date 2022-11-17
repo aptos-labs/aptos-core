@@ -575,20 +575,20 @@ module aptos_std::bls12381 {
 
         // Signatures of each signer i
         let sigs = vector[
-        signature_from_bytes(x"a55ac2d64b4c1d141b15d876d3e54ad1eea07ee488e8287cce7cdf3eec551458ab5795ab196f8c112590346f7bc7c97e0053cd5be0f9bd74b93a87cd44458e98d125d6d5c6950ea5e62666beb34422ead79121f8cb0815dae41a986688d03eaf"),
-        signature_from_bytes(x"90a639a44491191c46379a843266c293de3a46197714ead2ad3886233dd5c2b608b6437fa32fbf9d218b20f1cbfa7970182663beb9c148e2e9412b148e16abf283ffa51b8a536c0e55d61b2e5c849edc49f636c0ef07cb99f125cbcf602e22bb"),
-        signature_from_bytes(x"9527d81aa15863ef3a3bf96bea6d58157d5063a93a6d0eb9d8b4f4bbda3b31142ec4586cb519da2cd7600941283d1bad061b5439703fd584295b44037a969876962ae1897dcc7cadf909d06faae213c4fef8e015dfb33ec109af02ab0c3f6833"),
-        signature_from_bytes(x"a54d264f5cab9654b1744232c4650c42b29adf2b19bd00bbdaf4a4d792ee4dfd40a1fe1b067f298bcfd8ae4fdc8250660a2848bd4a80d96585afccec5c6cfa617033dd7913c9acfdf98a72467e8a5155d4cad589a72d6665be7cb410aebc0068"),
-        signature_from_bytes(x"8d22876bdf73e6ad36ed98546018f6258cd47e45904b87c071e774a6ef4b07cac323258cb920b2fe2b07cca1f2b24bcb0a3194ec76f32edb92391ed2c39e1ada8919f8ea755c5e39873d33ff3a8f4fba21b1261c1ddb9d1688c2b40b77e355d1"),
+            signature_from_bytes(x"a55ac2d64b4c1d141b15d876d3e54ad1eea07ee488e8287cce7cdf3eec551458ab5795ab196f8c112590346f7bc7c97e0053cd5be0f9bd74b93a87cd44458e98d125d6d5c6950ea5e62666beb34422ead79121f8cb0815dae41a986688d03eaf"),
+            signature_from_bytes(x"90a639a44491191c46379a843266c293de3a46197714ead2ad3886233dd5c2b608b6437fa32fbf9d218b20f1cbfa7970182663beb9c148e2e9412b148e16abf283ffa51b8a536c0e55d61b2e5c849edc49f636c0ef07cb99f125cbcf602e22bb"),
+            signature_from_bytes(x"9527d81aa15863ef3a3bf96bea6d58157d5063a93a6d0eb9d8b4f4bbda3b31142ec4586cb519da2cd7600941283d1bad061b5439703fd584295b44037a969876962ae1897dcc7cadf909d06faae213c4fef8e015dfb33ec109af02ab0c3f6833"),
+            signature_from_bytes(x"a54d264f5cab9654b1744232c4650c42b29adf2b19bd00bbdaf4a4d792ee4dfd40a1fe1b067f298bcfd8ae4fdc8250660a2848bd4a80d96585afccec5c6cfa617033dd7913c9acfdf98a72467e8a5155d4cad589a72d6665be7cb410aebc0068"),
+            signature_from_bytes(x"8d22876bdf73e6ad36ed98546018f6258cd47e45904b87c071e774a6ef4b07cac323258cb920b2fe2b07cca1f2b24bcb0a3194ec76f32edb92391ed2c39e1ada8919f8ea755c5e39873d33ff3a8f4fba21b1261c1ddb9d1688c2b40b77e355d1"),
         ];
 
         // multisigs[i] is a signature on "Hello, Aptoverse!" from signers 1 through i (inclusive)
         let multisigs = vector[
-        AggrOrMultiSignature { bytes: x"a55ac2d64b4c1d141b15d876d3e54ad1eea07ee488e8287cce7cdf3eec551458ab5795ab196f8c112590346f7bc7c97e0053cd5be0f9bd74b93a87cd44458e98d125d6d5c6950ea5e62666beb34422ead79121f8cb0815dae41a986688d03eaf" },
-        AggrOrMultiSignature { bytes: x"8f1949a06b95c3cb62898d861f889350c0d2cb740da513bfa195aa0ab8fa006ea2efe004a7bbbd9bb363637a279aed20132efd0846f520e7ee0e8ed847a1c6969bb986ad2239bcc9af561b6c2aa6d3016e1c722146471f1e28313de189fe7ebc" },
-        AggrOrMultiSignature { bytes: x"ab5ad42bb8f350f8a6b4ae897946a05dbe8f2b22db4f6c37eff6ff737aebd6c5d75bd1abdfc99345ac8ec38b9a449700026f98647752e1c99f69bb132340f063b8a989728e0a3d82a753740bf63e5d8f51e413ebd9a36f6acbe1407a00c4b3e7" },
-        AggrOrMultiSignature { bytes: x"ae307a0d055d3ba55ad6ec7094adef27ed821bdcf735fb509ab2c20b80952732394bc67ea1fd8c26ea963540df7448f8102509f7b8c694e4d75f30a43c455f251b6b3fd8b580b9228ffeeb9039834927aacefccd3069bef4b847180d036971cf" },
-        AggrOrMultiSignature { bytes: x"8284e4e3983f29cb45020c3e2d89066df2eae533a01cb6ca2c4d466b5e02dd22467f59640aa120db2b9cc49e931415c3097e3d54ff977fd9067b5bc6cfa1c885d9d8821aef20c028999a1d97e783ae049d8fa3d0bbac36ce4ca8e10e551d3461" },
+            AggrOrMultiSignature { bytes: x"a55ac2d64b4c1d141b15d876d3e54ad1eea07ee488e8287cce7cdf3eec551458ab5795ab196f8c112590346f7bc7c97e0053cd5be0f9bd74b93a87cd44458e98d125d6d5c6950ea5e62666beb34422ead79121f8cb0815dae41a986688d03eaf" },
+            AggrOrMultiSignature { bytes: x"8f1949a06b95c3cb62898d861f889350c0d2cb740da513bfa195aa0ab8fa006ea2efe004a7bbbd9bb363637a279aed20132efd0846f520e7ee0e8ed847a1c6969bb986ad2239bcc9af561b6c2aa6d3016e1c722146471f1e28313de189fe7ebc" },
+            AggrOrMultiSignature { bytes: x"ab5ad42bb8f350f8a6b4ae897946a05dbe8f2b22db4f6c37eff6ff737aebd6c5d75bd1abdfc99345ac8ec38b9a449700026f98647752e1c99f69bb132340f063b8a989728e0a3d82a753740bf63e5d8f51e413ebd9a36f6acbe1407a00c4b3e7" },
+            AggrOrMultiSignature { bytes: x"ae307a0d055d3ba55ad6ec7094adef27ed821bdcf735fb509ab2c20b80952732394bc67ea1fd8c26ea963540df7448f8102509f7b8c694e4d75f30a43c455f251b6b3fd8b580b9228ffeeb9039834927aacefccd3069bef4b847180d036971cf" },
+            AggrOrMultiSignature { bytes: x"8284e4e3983f29cb45020c3e2d89066df2eae533a01cb6ca2c4d466b5e02dd22467f59640aa120db2b9cc49e931415c3097e3d54ff977fd9067b5bc6cfa1c885d9d8821aef20c028999a1d97e783ae049d8fa3d0bbac36ce4ca8e10e551d3461" },
         ];
 
         let i = 0;
@@ -616,29 +616,29 @@ module aptos_std::bls12381 {
         // Second, try some test-cases generated by running the following command in `crates/aptos-crypto`:
         //  $ cargo test -- sample_aggregate_pk_and_multisig --nocapture --include-ignored
         let pks = vector[
-        PublicKeyWithPoP { bytes: x"92e201a806af246f805f460fbdc6fc90dd16a18d6accc236e85d3578671d6f6690dde22134d19596c58ce9d63252410a" },
-        PublicKeyWithPoP { bytes: x"ab9df801c6f96ade1c0490c938c87d5bcc2e52ccb8768e1b5d14197c5e8bfa562783b96711b702dda411a1a9f08ebbfa" },
-        PublicKeyWithPoP { bytes: x"b698c932cf7097d99c17bd6e9c9dc4eeba84278c621700a8f80ec726b1daa11e3ab55fc045b4dbadefbeef05c4182494" },
-        PublicKeyWithPoP { bytes: x"934706a8b876d47a996d427e1526ce52c952d5ec0858d49cd262efb785b62b1972d06270b0a7adda1addc98433ad1843" },
-        PublicKeyWithPoP { bytes: x"a4cd352daad3a0651c1998dfbaa7a748e08d248a54347544bfedd51a197e016bb6008e9b8e45a744e1a030cc3b27d2da" },
+            PublicKeyWithPoP { bytes: x"92e201a806af246f805f460fbdc6fc90dd16a18d6accc236e85d3578671d6f6690dde22134d19596c58ce9d63252410a" },
+            PublicKeyWithPoP { bytes: x"ab9df801c6f96ade1c0490c938c87d5bcc2e52ccb8768e1b5d14197c5e8bfa562783b96711b702dda411a1a9f08ebbfa" },
+            PublicKeyWithPoP { bytes: x"b698c932cf7097d99c17bd6e9c9dc4eeba84278c621700a8f80ec726b1daa11e3ab55fc045b4dbadefbeef05c4182494" },
+            PublicKeyWithPoP { bytes: x"934706a8b876d47a996d427e1526ce52c952d5ec0858d49cd262efb785b62b1972d06270b0a7adda1addc98433ad1843" },
+            PublicKeyWithPoP { bytes: x"a4cd352daad3a0651c1998dfbaa7a748e08d248a54347544bfedd51a197e016bb6008e9b8e45a744e1a030cc3b27d2da" },
         ];
 
         // agg_pks[i] = \sum_{j <= i}  pk[j]
         let agg_pks = vector[
-        AggrPublicKeysWithPoP { bytes: x"92e201a806af246f805f460fbdc6fc90dd16a18d6accc236e85d3578671d6f6690dde22134d19596c58ce9d63252410a" },
-        AggrPublicKeysWithPoP { bytes: x"b79ad47abb441d7eda9b220a626df2e4e4910738c5f777947f0213398ecafae044ec0c20d552d1348347e9abfcf3eca1" },
-        AggrPublicKeysWithPoP { bytes: x"b5f5eb6153ab5388a1a76343d714e4a2dcf224c5d0722d1e8e90c6bcead05c573fffe986460bd4000645a655bf52bc60" },
-        AggrPublicKeysWithPoP { bytes: x"b922006ec14c183572a8864c31dc6632dccffa9f9c86411796f8b1b5a93a2457762c8e2f5ef0a2303506c4bca9a4e0bf" },
-        AggrPublicKeysWithPoP { bytes: x"b53df1cfee2168f59e5792e710bf22928dc0553e6531dae5c7656c0a66fc12cb82fbb04863938c953dc901a5a79cc0f3" },
+            AggrPublicKeysWithPoP { bytes: x"92e201a806af246f805f460fbdc6fc90dd16a18d6accc236e85d3578671d6f6690dde22134d19596c58ce9d63252410a" },
+            AggrPublicKeysWithPoP { bytes: x"b79ad47abb441d7eda9b220a626df2e4e4910738c5f777947f0213398ecafae044ec0c20d552d1348347e9abfcf3eca1" },
+            AggrPublicKeysWithPoP { bytes: x"b5f5eb6153ab5388a1a76343d714e4a2dcf224c5d0722d1e8e90c6bcead05c573fffe986460bd4000645a655bf52bc60" },
+            AggrPublicKeysWithPoP { bytes: x"b922006ec14c183572a8864c31dc6632dccffa9f9c86411796f8b1b5a93a2457762c8e2f5ef0a2303506c4bca9a4e0bf" },
+            AggrPublicKeysWithPoP { bytes: x"b53df1cfee2168f59e5792e710bf22928dc0553e6531dae5c7656c0a66fc12cb82fbb04863938c953dc901a5a79cc0f3" },
         ];
 
         // multisigs[i] is a signature on "Hello, Aptoverse!" under agg_pks[i]
         let multisigs = vector[
-        AggrOrMultiSignature { bytes: x"ade45c67bff09ae57e0575feb0be870f2d351ce078e8033d847615099366da1299c69497027b77badb226ff1708543cd062597030c3f1553e0aef6c17e7af5dd0de63c1e4f1f9da68c966ea6c1dcade2cdc646bd5e8bcd4773931021ec5be3fd" },
-        AggrOrMultiSignature { bytes: x"964af3d83436f6a9a382f34590c0c14e4454dc1de536af205319ce1ed417b87a2374863d5df7b7d5ed900cf91dffa7a105d3f308831d698c0d74fb2259d4813434fb86425db0ded664ae8f85d02ec1d31734910317d4155cbf69017735900d4d" },
-        AggrOrMultiSignature { bytes: x"b523a31813e771e55aa0fc99a48db716ecc1085f9899ccadb64e759ecb481a2fb1cdcc0b266f036695f941361de773081729311f6a1bca9d47393f5359c8c87dc34a91f5dae335590aacbff974076ad1f910dd81750553a72ccbcad3c8cc0f07" },
-        AggrOrMultiSignature { bytes: x"a945f61699df58617d37530a85e67bd1181349678b89293951ed29d1fb7588b5c12ebb7917dfc9d674f3f4fde4d062740b85a5f4927f5a4f0091e46e1ac6e41bbd650a74dd49e91445339d741e3b10bdeb9bc8bba46833e0011ff91fa5c77bd2" },
-        AggrOrMultiSignature { bytes: x"b627b2cfd8ae59dcf5e58cc6c230ae369985fd096e1bc3be38da5deafcbed7d939f07cccc75383539940c56c6b6453db193f563f5b6e4fe54915afd9e1baea40a297fa7eda74abbdcd4cc5c667d6db3b9bd265782f7693798894400f2beb4637" },
+            AggrOrMultiSignature { bytes: x"ade45c67bff09ae57e0575feb0be870f2d351ce078e8033d847615099366da1299c69497027b77badb226ff1708543cd062597030c3f1553e0aef6c17e7af5dd0de63c1e4f1f9da68c966ea6c1dcade2cdc646bd5e8bcd4773931021ec5be3fd" },
+            AggrOrMultiSignature { bytes: x"964af3d83436f6a9a382f34590c0c14e4454dc1de536af205319ce1ed417b87a2374863d5df7b7d5ed900cf91dffa7a105d3f308831d698c0d74fb2259d4813434fb86425db0ded664ae8f85d02ec1d31734910317d4155cbf69017735900d4d" },
+            AggrOrMultiSignature { bytes: x"b523a31813e771e55aa0fc99a48db716ecc1085f9899ccadb64e759ecb481a2fb1cdcc0b266f036695f941361de773081729311f6a1bca9d47393f5359c8c87dc34a91f5dae335590aacbff974076ad1f910dd81750553a72ccbcad3c8cc0f07" },
+            AggrOrMultiSignature { bytes: x"a945f61699df58617d37530a85e67bd1181349678b89293951ed29d1fb7588b5c12ebb7917dfc9d674f3f4fde4d062740b85a5f4927f5a4f0091e46e1ac6e41bbd650a74dd49e91445339d741e3b10bdeb9bc8bba46833e0011ff91fa5c77bd2" },
+            AggrOrMultiSignature { bytes: x"b627b2cfd8ae59dcf5e58cc6c230ae369985fd096e1bc3be38da5deafcbed7d939f07cccc75383539940c56c6b6453db193f563f5b6e4fe54915afd9e1baea40a297fa7eda74abbdcd4cc5c667d6db3b9bd265782f7693798894400f2beb4637" },
         ];
 
         let i = 0;
