@@ -189,6 +189,13 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let suite_name = if suite_name == "compat" {
+        panic!("");
+    } else {
+        "changing_working_quorum_test_high_load"
+    };
+    let duration = Duration::from_secs(1800);
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
