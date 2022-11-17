@@ -79,6 +79,7 @@ const sidebars = {
       value: "Build Apps",
       className: "sidebar-title",
     },
+    "guides/system-integrators-guide",
     {
       type: "category",
       label: "Develop by Tutorial",
