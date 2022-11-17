@@ -16,6 +16,7 @@ mod lazy_natives;
 mod max_loop_depth;
 mod memory_quota;
 mod mint_nft;
+mod new_integer_types;
 mod offer_signer_capability;
 mod rotate_auth_key;
 mod scripts;

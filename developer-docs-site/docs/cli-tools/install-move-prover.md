@@ -39,7 +39,7 @@ These instructions have been tested on macOS Monterey (12.6)
     ```bash
     aptos move prove --package-dir aptos-move/move-examples/hello_prover/
     ```
-   
+
 </details>
 
 <details>
@@ -47,7 +47,7 @@ These instructions have been tested on macOS Monterey (12.6)
 
 ### Linux
 
-:::tip 
+:::tip
 Some Linux distributions are not supported. Currently, OpenSUSE and Amazon Linux do not support the automatic installation via the `dev_setup.sh` script.
 :::
 

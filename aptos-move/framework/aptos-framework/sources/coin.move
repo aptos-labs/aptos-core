@@ -638,7 +638,7 @@ module aptos_framework::coin {
     }
 
     #[test(source = @0x2, framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x10001)]
+    #[expected_failure(abort_code = 0x10001, location = Self)]
     public fun fail_initialize(source: signer, framework: signer) {
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
@@ -657,7 +657,7 @@ module aptos_framework::coin {
     }
 
     #[test(source = @0x1, destination = @0x2)]
-    #[expected_failure(abort_code = 0x60005)]
+    #[expected_failure(abort_code = 0x60005, location = Self)]
     public entry fun fail_transfer(
         source: signer,
         destination: signer,
@@ -706,7 +706,7 @@ module aptos_framework::coin {
     }
 
     #[test(source = @0x1)]
-    #[expected_failure(abort_code = 0x10007)]
+    #[expected_failure(abort_code = 0x10007, location = Self)]
     public fun test_destroy_non_zero(
         source: signer,
     ) acquires CoinInfo {
@@ -789,7 +789,7 @@ module aptos_framework::coin {
     }
 
     #[test(account = @0x1)]
-    #[expected_failure(abort_code = 0x5000A)]
+    #[expected_failure(abort_code = 0x5000A, location = Self)]
     public entry fun withdraw_frozen(account: signer) acquires CoinInfo, CoinStore {
         let account_addr = signer::address_of(&account);
         account::create_account_for_test(account_addr);
@@ -807,7 +807,7 @@ module aptos_framework::coin {
     }
 
     #[test(account = @0x1)]
-    #[expected_failure(abort_code = 0x5000A)]
+    #[expected_failure(abort_code = 0x5000A, location = Self)]
     public entry fun deposit_frozen(account: signer) acquires CoinInfo, CoinStore {
         let account_addr = signer::address_of(&account);
         account::create_account_for_test(account_addr);
@@ -880,7 +880,7 @@ module aptos_framework::coin {
     }
 
     #[test(framework = @aptos_framework, other = @0x123)]
-    #[expected_failure(abort_code = 0x50003)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
     fun test_supply_initialize_fails(framework: signer, other: signer) {
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_aggregator(&other);
@@ -904,7 +904,7 @@ module aptos_framework::coin {
     }
 
     #[test(framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x20001)]
+    #[expected_failure(abort_code = 0x20001, location = aptos_framework::aggregator)]
     fun test_supply_overflow(framework: signer) acquires CoinInfo {
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_aggregator(&framework);
@@ -918,7 +918,7 @@ module aptos_framework::coin {
     }
 
     #[test(framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x5000B)]
+    #[expected_failure(abort_code = 0x5000B, location = aptos_framework::coin)]
     fun test_supply_upgrade_fails(framework: signer) acquires CoinInfo, SupplyConfig {
         initialize_supply_config(&framework);
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);

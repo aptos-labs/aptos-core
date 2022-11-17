@@ -531,7 +531,7 @@ module aptos_framework::account {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x10007)]
+    #[expected_failure(abort_code = 0x10007, location = Self)]
     public entry fun test_cannot_control_resource_account_via_auth_key() acquires Account {
         let alice_pk = x"4141414141414141414141414141414141414141414141414141414141414145";
         let alice = create_account_from_ed25519_public_key(alice_pk);
@@ -597,7 +597,7 @@ module aptos_framework::account {
     }
 
     #[test(user = @0x1)]
-    #[expected_failure(abort_code = 0x8000f)]
+    #[expected_failure(abort_code = 0x8000f, location = Self)]
     public entry fun test_duplice_create_resource_account(user: signer) acquires Account {
         create_resource_account(&user, x"01");
         create_resource_account(&user, x"01");
@@ -651,7 +651,7 @@ module aptos_framework::account {
     ///////////////////////////////////////////////////////////////////////////
 
     #[test(alice = @0xa11ce)]
-    #[expected_failure(abort_code = 65537)]
+    #[expected_failure(abort_code = 65537, location = aptos_framework::ed25519)]
     public entry fun test_empty_public_key(alice: signer) acquires Account, OriginatingAddress {
         create_account(signer::address_of(&alice));
         let pk = vector::empty<u8>();
@@ -660,7 +660,7 @@ module aptos_framework::account {
     }
 
     #[test(alice = @0xa11ce)]
-    #[expected_failure(abort_code = 262151)]
+    #[expected_failure(abort_code = 262151, location = Self)]
     public entry fun test_empty_signature(alice: signer) acquires Account, OriginatingAddress {
         create_account(signer::address_of(&alice));
         let test_signature = vector::empty<u8>();
@@ -680,7 +680,7 @@ module aptos_framework::account {
     /*
     TODO bring back with generic rotation capability
         #[test(bob = @0x345)]
-        #[expected_failure(abort_code = 65544)]
+        #[expected_failure(abort_code = 65544, location = Self)]
         public entry fun test_invalid_offer_rotation_capability(bob: signer) acquires Account {
             let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
             let alice = create_account_from_ed25519_public_key(pk);
@@ -696,7 +696,7 @@ module aptos_framework::account {
     //
 
     #[test(bob = @0x345)]
-    #[expected_failure(abort_code = 65544)]
+    #[expected_failure(abort_code = 65544, location = Self)]
     public entry fun test_invalid_offer_signer_capability(bob: signer) acquires Account {
         let (_alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
@@ -749,7 +749,7 @@ module aptos_framework::account {
     }
 
     #[test(bob = @0x345, charlie = @0x567)]
-    #[expected_failure(abort_code = 393230)]
+    #[expected_failure(abort_code = 393230, location = Self)]
     public entry fun test_invalid_check_signer_capability_and_create_authorized_signer(bob: signer, charlie: signer) acquires Account {
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
@@ -798,7 +798,7 @@ module aptos_framework::account {
     }
 
     #[test(bob = @0x345, charlie = @0x567)]
-    #[expected_failure(abort_code = 393230)]
+    #[expected_failure(abort_code = 393230, location = Self)]
     public entry fun test_invalid_revoke_signer_capability(bob: signer, charlie: signer) acquires Account {
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
