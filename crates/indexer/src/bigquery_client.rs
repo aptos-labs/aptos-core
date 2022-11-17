@@ -41,7 +41,7 @@ pub struct BigQueryClient {
 impl BigQueryClient {
     /// Creates BigQuery client based on service account credential file(json).
     /// GOOGLE_APPLICATION_CREDENTIALS saves the absolute path pointing to the file.
-    pub async fn new(project_id: String) -> Self {
+    pub async fn new(project_id: String, dataset_prefix: String) -> Self {
         let client = GoogleApi::from_function(
             BigQueryWriteClient::new,
             "https://bigquerystorage.googleapis.com",
@@ -50,8 +50,8 @@ impl BigQueryClient {
         .await
         .expect("Create raw Bigquery Client successfully");
         let data_set_path = format!(
-            "projects/{}/datasets/{}/tables/",
-            project_id, BIGQUERY_DATASET_NAME
+            "projects/{}/datasets/{}_{}/tables/",
+            project_id, dataset_prefix, BIGQUERY_DATASET_NAME,
         );
         Self {
             client,

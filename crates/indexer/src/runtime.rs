@@ -140,6 +140,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
             DefaultTransactionProcessorBq::new(
                 conn_pool.clone(),
                 config.bigquery_project_id.unwrap(),
+                config.bigquery_dataset_prefix.unwrap(),
             )
             .await,
         ),
