@@ -18,7 +18,9 @@ use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
 use testcases::network_loss_test::NetworkLossTest;
 use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
-use testcases::state_sync_performance::StateSyncValidatorPerformance;
+use testcases::state_sync_performance::{
+    StateSyncFullnodeFastSyncPerformance, StateSyncValidatorPerformance,
+};
 use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
 use testcases::twin_validator_test::TwinValidatorTest;
 use testcases::validator_join_leave_test::ValidatorJoinLeaveTest;
@@ -437,6 +439,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "state_sync_perf_fullnodes_execute_transactions" => {
             state_sync_perf_fullnodes_execute_transactions(config)
         }
+        "state_sync_perf_fullnodes_fast_sync" => state_sync_perf_fullnodes_fast_sync(config),
         "state_sync_perf_validators" => state_sync_perf_validators(config),
         "validators_join_and_leave" => validators_join_and_leave(config),
         "compat" => config
@@ -749,7 +752,6 @@ fn state_sync_perf_fullnodes_config(forge_config: ForgeConfig<'static>) -> Forge
     forge_config
         .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .with_initial_fullnode_count(4)
-        .with_network_tests(vec![&StateSyncFullnodePerformance])
 }
 
 /// The config for running a state sync performance test when applying
@@ -758,6 +760,7 @@ fn state_sync_perf_fullnodes_apply_outputs(
     forge_config: ForgeConfig<'static>,
 ) -> ForgeConfig<'static> {
     state_sync_perf_fullnodes_config(forge_config)
+        .with_network_tests(vec![&StateSyncFullnodePerformance])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
@@ -776,6 +779,7 @@ fn state_sync_perf_fullnodes_execute_transactions(
     forge_config: ForgeConfig<'static>,
 ) -> ForgeConfig<'static> {
     state_sync_perf_fullnodes_config(forge_config)
+        .with_network_tests(vec![&StateSyncFullnodePerformance])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
@@ -786,6 +790,29 @@ fn state_sync_perf_fullnodes_execute_transactions(
                 ["continuous_syncing_mode"] = "ExecuteTransactions".into();
         }))
         .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None, None))
+}
+
+/// The config for running a state sync performance test when fast syncing
+/// to the latest epoch.
+fn state_sync_perf_fullnodes_fast_sync(forge_config: ForgeConfig<'static>) -> ForgeConfig<'static> {
+    state_sync_perf_fullnodes_config(forge_config)
+        .with_network_tests(vec![&StateSyncFullnodeFastSyncPerformance])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 180.into(); // Frequent epochs
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 30000,
+                })
+                .transaction_type(TransactionType::AccountGeneration), // Create many state values
+        )
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "DownloadLatestStates".into();
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+        }))
 }
 
 /// The config for running a state sync performance test when applying
