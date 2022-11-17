@@ -88,6 +88,12 @@ pub struct SetGlobalConfig {
     /// `Global` will put the `.aptos/` folder in your home directory
     #[clap(long)]
     config_type: Option<ConfigType>,
+    /// A configuration for how to expect the prompt response
+    ///
+    /// `true` will tail `--assume-yes` option
+    /// `false` will tail `--assume-no` option
+    #[clap(long)]
+    default_prompt_response: Option<PromptResponseType>,
 }
 
 #[async_trait]
@@ -103,6 +109,10 @@ impl CliCommand<GlobalConfig> for SetGlobalConfig {
         // Enable all features that are actually listed
         if let Some(config_type) = self.config_type {
             config.config_type = Some(config_type);
+        }
+
+        if let Some(default_prompt_response) = self.default_prompt_response {
+            config.default_prompt_response = Some(default_prompt_response);
         }
 
         config.save()?;
@@ -174,6 +184,9 @@ pub struct GlobalConfig {
     /// Whether to be using Global or Workspace mode
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config_type: Option<ConfigType>,
+    /// Whether to be attempting cli with `--assume-yes`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_prompt_response: Option<PromptResponseType>,
 }
 
 impl GlobalConfig {
@@ -181,6 +194,10 @@ impl GlobalConfig {
     pub fn display(mut self) -> CliTypedResult<Self> {
         if self.config_type.is_none() {
             self.config_type = Some(ConfigType::default());
+        }
+
+        if self.default_prompt_response.is_none() {
+            self.default_prompt_response = Some(PromptResponseType::default());
         }
 
         Ok(self)
@@ -287,6 +304,42 @@ impl FromStr for ConfigType {
             WORKSPACE => Ok(Self::Workspace),
             _ => Err(CliError::CommandArgumentError(
                 "Invalid config type, must be one of [global, workspace]".to_string(),
+            )),
+        }
+    }
+}
+
+const ASSUME_YES: &str = "yes";
+const ASSUME_NO: &str = "no";
+
+/// A configuration for how to expect the prompt response
+///
+/// `true` will tail `--assume-yes` option
+/// `false` will tail `--assume-no` option
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub struct PromptResponseType(bool);
+
+impl Default for PromptResponseType {
+    fn default() -> Self {
+        Self(true)
+    }
+}
+
+impl std::fmt::Display for PromptResponseType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(if self.0 { ASSUME_YES } else { ASSUME_NO })
+    }
+}
+
+impl FromStr for PromptResponseType {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().trim() {
+            ASSUME_YES => Ok(Self(true)),
+            ASSUME_NO => Ok(Self(false)),
+            _ => Err(CliError::CommandArgumentError(
+                "Invalid prompt response type, must be one of [yes, no]".to_string(),
             )),
         }
     }
