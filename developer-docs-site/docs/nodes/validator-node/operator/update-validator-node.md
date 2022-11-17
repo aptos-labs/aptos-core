@@ -9,7 +9,7 @@ You will likely have to upgrade or replace your validator node (VN) at some poin
 
 Since you are already running [a validator node and a validator fullnode](node-requirements.md), you have at your fingertips the means to replace your validator node immediately. Simply convert your validator fullnode to a validator node and then backfill the validator fullnode with either the updated validator node or an entirely new validator fullnode.
 
-This page explains how to make this swap, which largely amounts to switching out files and configuration settings between the two nodes.
+This page explains how to make this swap, which largely amounts to switching out files and configuration settings between the two nodes. For a community-provided version of this document for Docker setup, see [Failover and migrate Validator Nodes for less downtime](https://forum.aptoslabs.com/t/failover-and-migrate-validator-nodes-for-less-downtime/144846).
 
 ## Prepare
 

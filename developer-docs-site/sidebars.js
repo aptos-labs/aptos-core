@@ -79,6 +79,7 @@ const sidebars = {
       value: "Build Apps",
       className: "sidebar-title",
     },
+    "guides/system-integrators-guide",
     {
       type: "category",
       label: "Develop by Tutorial",
@@ -221,6 +222,7 @@ const sidebars = {
                 "nodes/validator-node/operator/running-validator-node/using-gcp",
                 "nodes/validator-node/operator/running-validator-node/using-docker",
                 "nodes/validator-node/operator/running-validator-node/using-source-code",
+                "nodes/validator-node/operator/update-validator-node",
               ],
             },
             "nodes/validator-node/operator/node-liveness-criteria",
@@ -248,11 +250,11 @@ const sidebars = {
       items: [
         "concepts/basics-fullnodes",
         "nodes/full-node/fullnode-source-code-or-docker",
+        "nodes/full-node/bootstrap-fullnode",
         "nodes/full-node/update-fullnode-with-new-releases",
         "nodes/full-node/network-identity-fullnode",
         "nodes/full-node/fullnode-network-connections",
         "nodes/full-node/run-a-fullnode-on-gcp",
-        "nodes/full-node/bootstrap-fullnode",
         "nodes/indexer-fullnode",
       ],
     },
