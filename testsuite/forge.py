@@ -1180,6 +1180,8 @@ def test(
     test_args: Optional[List[str]],
     test_suites: Tuple[str],
 ) -> None:
+    forge_enable_failpoints = "true"
+    
     """Run a forge test"""
 
     ### XXX: hack these arguments to force Forge to run with overrides
