@@ -77,9 +77,9 @@ impl Eq for ProofWithStatus {}
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
-    Empty,
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(ProofWithStatus),
+    Empty,
 }
 
 impl Payload {
