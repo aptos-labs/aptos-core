@@ -208,14 +208,27 @@ const config = {
                 docId: "nodes/aptos-api-spec",
               },
               {
-                label: "Issues and Workarounds",
+                href: "https://aptos-labs.github.io/ts-sdk-doc/",
+                label: "TypeScript SDK",
+              },
+              {
+                href: "https://pypi.org/project/aptos-sdk/",
+                label: "Python SDK",
+              },
+              {
+                label: "Rust SDK",
                 type: "doc",
-                docId: "issues-and-workarounds",
+                docId: "sdks/rust-sdk",
               },
               {
                 label: "Aptos Glossary",
                 type: "doc",
                 docId: "reference/glossary",
+              },
+              {
+                label: "Issues and Workarounds",
+                type: "doc",
+                docId: "issues-and-workarounds",
               },
             ],
           },

@@ -33,7 +33,7 @@ There are two types of accounts in Aptos:
 
 :::tip Account address example
 Account addresses are 32-bytes. They are usually shown as 64 hex characters, with each hex character a nibble.
-Sometimes the address is prefixed with a 0x. See the [Your First Transaction](/tutorials/first-transaction) for an example
+Sometimes the address is prefixed with a 0x. See the [Your First Transaction](../tutorials/first-transaction.md) for an example
 of how an address appears, reproduced below:
 
 ```text
