@@ -146,19 +146,6 @@
           {
             "matcher": { "id": "byName", "options": "latest" },
             "properties": [{ "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } }]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": ["latest", "gcp-mainnet-pfn-backup pfn0-aptos-fullnode-0 backed up"],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [{ "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } }]
           }
         ]
       },
@@ -184,6 +171,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "expr": "aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} and aptos_backup_handler_transaction_version",
+          "hide": true,
           "interval": "",
           "legendFormat": "{{cluster}} {{kubernetes_pod_name}} latest",
           "range": true,
@@ -319,6 +307,19 @@
           {
             "matcher": { "id": "byName", "options": "  total" },
             "properties": [{ "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } }]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": ["aws-mainnet-pfn-backup pfn0-aptos-fullnode-0-progress"],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [{ "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } }]
           }
         ]
       },
@@ -2207,6 +2208,6 @@
   "timezone": "",
   "title": "Storage (Backup and Restore)",
   "uid": "9oXpx4n4z",
-  "version": 33,
+  "version": 34,
   "weekStart": ""
 }
