@@ -12,7 +12,7 @@ assignees: 'clay-aptos'
 Use this template to report bugs and feature requests for the technical documentation and site found at Aptos.dev. All other requests should use the other Aptos bug templates:
 https://github.com/aptos-labs/aptos-core/issues/new/choose
 
-## Affected pages
+## Location
 
 What are the existing URLs containing the issue, if any?
 
