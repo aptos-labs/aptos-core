@@ -20,7 +20,7 @@ mod mock_payload_manager;
 mod mock_state_computer;
 mod mock_storage;
 
-use crate::{data_manager::DataManager, util::mock_time_service::SimulatedTimeService};
+use crate::{data_manager::QuorumStoreProxy, util::mock_time_service::SimulatedTimeService};
 use aptos_types::block_info::BlockInfo;
 use consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
 pub use mock_payload_manager::MockPayloadManager;
@@ -74,7 +74,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
-        Arc::new(DataManager::new()),
+        Arc::new(QuorumStoreProxy::new()),
     ))
 }
 

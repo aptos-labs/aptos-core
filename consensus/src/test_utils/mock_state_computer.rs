@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_manager::DataManager,
+    data_manager::QuorumStoreProxy,
     error::StateSyncError,
     experimental::buffer_manager::OrderedBlocks,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
@@ -26,7 +26,7 @@ pub struct MockStateComputer {
     executor_channel: UnboundedSender<OrderedBlocks>,
     consensus_db: Arc<MockStorage>,
     block_cache: Mutex<HashMap<HashValue, Payload>>,
-    data_manager: Arc<DataManager>,
+    data_manager: Arc<QuorumStoreProxy>,
 }
 
 impl MockStateComputer {
@@ -40,7 +40,7 @@ impl MockStateComputer {
             executor_channel,
             consensus_db,
             block_cache: Mutex::new(HashMap::new()),
-            data_manager: Arc::new(DataManager::new()),
+            data_manager: Arc::new(QuorumStoreProxy::new()),
         }
     }
 
@@ -60,7 +60,7 @@ impl MockStateComputer {
                 .lock()
                 .remove(&block.id())
                 .ok_or_else(|| format_err!("Cannot find block"))?;
-            let mut payload_txns = self.data_manager.get_data(block.block()).await?;
+            let mut payload_txns = self.data_manager.get_transactions(block.block()).await?;
             txns.append(&mut payload_txns);
         }
         // they may fail during shutdown

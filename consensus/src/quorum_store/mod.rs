@@ -8,4 +8,3 @@ pub(crate) mod batch_reader;
 mod counters;
 #[cfg(test)]
 mod tests;
-pub(crate) mod utils;

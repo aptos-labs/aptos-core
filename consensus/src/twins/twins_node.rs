@@ -3,7 +3,7 @@
 
 use crate::{
     counters,
-    data_manager::DataManager,
+    data_manager::QuorumStoreProxy,
     epoch_manager::EpochManager,
     experimental::buffer_manager::OrderedBlocks,
     network::NetworkTask,
@@ -95,7 +95,7 @@ impl SMRNode {
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
         };
-        let commit_notifier = Arc::new(DataManager::new());
+        let commit_notifier = Arc::new(QuorumStoreProxy::new());
         let mut configs = HashMap::new();
         configs.insert(
             ValidatorSet::CONFIG_ID,

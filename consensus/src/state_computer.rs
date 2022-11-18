@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_manager::DataManager;
+use crate::data_manager::QuorumStoreProxy;
 use crate::monitor;
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
@@ -50,7 +50,7 @@ pub struct ExecutionProxy {
     async_commit_notifier: channel::Sender<CommitType>,
     validators: Mutex<Vec<AccountAddress>>,
     write_mutex: AsyncMutex<()>,
-    data_manager: Arc<DataManager>,
+    data_manager: Arc<QuorumStoreProxy>,
 }
 
 impl ExecutionProxy {
@@ -58,7 +58,7 @@ impl ExecutionProxy {
         executor: Arc<dyn BlockExecutorTrait>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-        data_manager: Arc<DataManager>,
+        data_manager: Arc<QuorumStoreProxy>,
         handle: &tokio::runtime::Handle,
     ) -> Self {
         let (tx, mut rx) =
@@ -121,7 +121,7 @@ impl StateComputer for ExecutionProxy {
             "Executing block",
         );
 
-        let txns = self.data_manager.get_data(block).await?;
+        let txns = self.data_manager.get_transactions(block).await?;
 
         // TODO: figure out error handling for the prologue txn
         let executor = self.executor.clone();
@@ -177,7 +177,7 @@ impl StateComputer for ExecutionProxy {
             }
 
             debug!("QSE: getting data in commit, round {}", block.round());
-            let signed_txns = self.data_manager.get_data(block.block()).await?;
+            let signed_txns = self.data_manager.get_transactions(block.block()).await?;
 
             txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
             reconfig_events.extend(block.reconfig_event());

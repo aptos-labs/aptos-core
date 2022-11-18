@@ -3,7 +3,7 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
-    data_manager::DataManager,
+    data_manager::QuorumStoreProxy,
     experimental::buffer_manager::OrderedBlocks,
     liveness::{
         proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
@@ -217,7 +217,7 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
-            Arc::new(DataManager::new()),
+            Arc::new(QuorumStoreProxy::new()),
         ));
 
         let proposer_election = Self::create_proposer_election(proposers.clone());

@@ -20,15 +20,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
-/// Execution -> QuorumStore notification of commits.
-pub struct DataManager {
+/// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
+/// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
+pub struct QuorumStoreProxy {
     quorum_store_enabled: AtomicBool,
     data_reader: ArcSwapOption<BatchReader>,
     quorum_store_wrapper_tx: ArcSwapOption<Sender<WrapperCommand>>,
 }
 
-impl DataManager {
-    /// new
+impl QuorumStoreProxy {
     pub fn new() -> Self {
         Self {
             quorum_store_enabled: AtomicBool::new(false),
@@ -42,7 +42,7 @@ impl DataManager {
         self.quorum_store_enabled.store(true, Ordering::Relaxed)
     }
 
-    async fn request_data(
+    async fn request_transactions(
         &self,
         proofs: Vec<ProofOfStore>,
         logical_time: LogicalTime,
@@ -71,6 +71,7 @@ impl DataManager {
         receivers
     }
 
+    ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
     pub async fn notify_commit(&self, logical_time: LogicalTime, payloads: Vec<Payload>) {
         if self.quorum_store_enabled.load(Ordering::Relaxed) {
             self.data_reader
@@ -103,13 +104,14 @@ impl DataManager {
         }
     }
 
+    /// Called from consensus to pre-fetch the transaction behind the batches in the block.
     pub async fn update_payload(&self, block: &Block) {
         if self.quorum_store_enabled.load(Ordering::Relaxed) && block.payload().is_some() {
             match block.payload().unwrap() {
                 Payload::InQuorumStore(proof_with_status) => {
                     if proof_with_status.status.lock().is_none() {
                         let receivers = self
-                            .request_data(
+                            .request_transactions(
                                 proof_with_status.proofs.clone(),
                                 LogicalTime::new(block.epoch(), block.round()),
                             )
@@ -128,8 +130,9 @@ impl DataManager {
         }
     }
 
-    //Assumses it is never called for the same block concurrently. Otherwise status can be None.
-    pub async fn get_data(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
+    /// Extract transaction from a given block
+    /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
+    pub async fn get_transactions(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
         if block.payload().is_none() || block.payload().unwrap().is_empty() {
             return Ok(Vec::new());
         }
@@ -154,7 +157,7 @@ impl DataManager {
                                         // We probably advanced epoch already.
                                         warn!("Oneshot channel to get a batch was dropped");
                                         let new_receivers = self
-                                            .request_data(
+                                            .request_transactions(
                                                 proof_with_status.proofs.clone(),
                                                 LogicalTime::new(block.epoch(), block.round()),
                                             )
@@ -173,7 +176,7 @@ impl DataManager {
                                     Ok(Err(e)) => {
                                         debug!("QS: got error from receiver {:?}", e);
                                         let new_receivers = self
-                                            .request_data(
+                                            .request_transactions(
                                                 proof_with_status.proofs.clone(),
                                                 LogicalTime::new(block.epoch(), block.round()),
                                             )
@@ -216,6 +219,7 @@ impl DataManager {
         }
     }
 
+    /// Since QuorumStore restarts every epoch, new_epoch updates the relevant communication information
     #[allow(dead_code)]
     pub fn new_epoch(
         &self,
