@@ -192,7 +192,7 @@ network_private_key: "0x689c11c6e5405219b5eae1312086c801e3a044946afc74429e5157b4
 
 | validator-full-node-identity.yaml | Description |
 | --- | --- |
-| account_address | The Aptos blockchain account address for the operator, i.e., the persona who deployes the validator node. |
+| account_address | The Aptos blockchain account address for the operator, i.e., the persona who deploys the validator node. |
 | network_private_key | The private key for the fullnode. Whoever holds this private key will be able to establish the ownership of the VFN and PFN in the Aptos network. |
 
 
