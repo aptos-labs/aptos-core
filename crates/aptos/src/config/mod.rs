@@ -90,8 +90,8 @@ pub struct SetGlobalConfig {
     config_type: Option<ConfigType>,
     /// A configuration for how to expect the prompt response
     ///
-    /// `true` will tail `--assume-yes` option
-    /// `false` will tail `--assume-no` option
+    /// Option can be one of ["yes", "no", "prompt"], "yes" runs cli with "--assume-yes", where
+    /// "no" runs cli with "--assume-no", default: "prompt"
     #[clap(long)]
     default_prompt_response: Option<PromptResponseType>,
 }
@@ -184,7 +184,7 @@ pub struct GlobalConfig {
     /// Whether to be using Global or Workspace mode
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config_type: Option<ConfigType>,
-    /// Whether to be attempting cli with `--assume-yes`
+    /// Prompt response type
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_prompt_response: Option<PromptResponseType>,
 }
@@ -309,25 +309,37 @@ impl FromStr for ConfigType {
     }
 }
 
+const PROMPT: &str = "prompt";
 const ASSUME_YES: &str = "yes";
 const ASSUME_NO: &str = "no";
 
 /// A configuration for how to expect the prompt response
 ///
-/// `true` will tail `--assume-yes` option
-/// `false` will tail `--assume-no` option
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub struct PromptResponseType(bool);
+/// Option can be one of ["yes", "no", "prompt"], "yes" runs cli with "--assume-yes", where
+/// "no" runs cli with "--assume-no", default: "prompt"
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, ArgEnum)]
+pub enum PromptResponseType {
+    /// normal prompt
+    Prompt,
+    /// `--assume-yes`
+    Yes,
+    /// `--assume-no`
+    No,
+}
 
 impl Default for PromptResponseType {
     fn default() -> Self {
-        Self(true)
+        Self::Prompt
     }
 }
 
 impl std::fmt::Display for PromptResponseType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(if self.0 { ASSUME_YES } else { ASSUME_NO })
+        f.write_str(match self {
+            PromptResponseType::Prompt => PROMPT,
+            PromptResponseType::Yes => ASSUME_YES,
+            PromptResponseType::No => ASSUME_NO,
+        })
     }
 }
 
@@ -336,8 +348,9 @@ impl FromStr for PromptResponseType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().trim() {
-            ASSUME_YES => Ok(Self(true)),
-            ASSUME_NO => Ok(Self(false)),
+            PROMPT => Ok(Self::Prompt),
+            ASSUME_YES => Ok(Self::Yes),
+            ASSUME_NO => Ok(Self::No),
             _ => Err(CliError::CommandArgumentError(
                 "Invalid prompt response type, must be one of [yes, no]".to_string(),
             )),
