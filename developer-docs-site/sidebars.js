@@ -39,9 +39,9 @@ const sidebars = {
           items: ["aptos-white-paper/in-korean"],
         },
         "guides/basics-life-of-txn",
-        "concepts/basics-txns-states",
-        "concepts/basics-accounts",
-        "concepts/basics-events",
+        "concepts/txns-states",
+        "concepts/accounts",
+        "concepts/events",
         "concepts/staking",
         "concepts/governance",
       ],
@@ -147,7 +147,7 @@ const sidebars = {
       collapsed: true,
       items: [
         "guides/move-guides/move-on-aptos",
-        "concepts/basics-gas-txn-fee",
+        "concepts/gas-txn-fee",
         "concepts/base-gas",
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",
@@ -166,7 +166,7 @@ const sidebars = {
       collapsed: true,
       link: { type: "doc", id: "nodes/nodes-landing" },
       items: [
-        "concepts/basics-node-networks-sync",
+        "concepts/node-networks-sync",
         "nodes/aptos-deployments",
         "nodes/leaderboard-metrics",
         "nodes/node-health-checker/index",
@@ -193,7 +193,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "concepts/basics-validator-nodes",
+        "concepts/validator-nodes",
         {
           type: "category",
           label: "Owner",
@@ -248,7 +248,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "concepts/basics-fullnodes",
+        "concepts/fullnodes",
         "nodes/full-node/fullnode-source-code-or-docker",
         "nodes/full-node/bootstrap-fullnode",
         "nodes/full-node/update-fullnode-with-new-releases",

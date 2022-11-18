@@ -10,7 +10,7 @@ slug: "aptos-move-guides"
 Start here to learn how the Move language works on the Aptos blockchain. 
 
 - ### [Move on Aptos](move-on-aptos.md)
-- ### [Gas and Transaction Fees](../../concepts/basics-gas-txn-fee.md)
+- ### [Gas and Transaction Fees](../../concepts/gas-txn-fee.md)
 - ### [How Base Gas Works](../../concepts/base-gas.md)
 - ### [Interact with the Move VM](../interacting-with-the-blockchain.md)
 - ### [Your First Move module](../../tutorials/first-move-module.md)

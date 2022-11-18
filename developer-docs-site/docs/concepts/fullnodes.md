@@ -1,20 +1,20 @@
 ---
 title: "Fullnodes Overview"
-slug: "basics-fullnodes"
+slug: "fullnodes"
 ---
-An Aptos node is an entity of the Aptos ecosystem that tracks the [state](/reference/glossary#state) of the Aptos blockchain. Clients interact with the blockchain via Aptos nodes. There are two types of nodes:
-* [Validator nodes](basics-validator-nodes.md)
+An Aptos node is an entity of the Aptos ecosystem that tracks the [state](../reference/glossary#state) of the Aptos blockchain. Clients interact with the blockchain via Aptos nodes. There are two types of nodes:
+* [Validator nodes](./validator-nodes.md)
 * Fullnodes
 
 Each Aptos node comprises several logical components:
-* [REST service](/reference/glossary#rest-service)
-* [Mempool](basics-validator-nodes.md#mempool)
-* [Execution](basics-validator-nodes.md#execution)
-* [Virtual Machine](basics-validator-nodes.md#virtual-machine)
-* [Storage](basics-validator-nodes.md#storage)
-* [State synchronizer](basics-validator-nodes.md#state-synchronizer)
+* [REST service](../reference/glossary#rest-service)
+* [Mempool](./validator-nodes#mempool)
+* [Execution](./validator-nodes#execution)
+* [Virtual Machine](./validator-nodes#virtual-machine)
+* [Storage](./validator-nodes#storage)
+* [State synchronizer](./validator-nodes#state-synchronizer)
 
-The [Aptos-core](/reference/glossary#aptos-core) software can be configured to run as a validator node or as a fullnode.
+The [Aptos-core](../reference/glossary#aptos-core) software can be configured to run as a validator node or as a fullnode.
 
 ## Overview
 
@@ -24,7 +24,7 @@ Depending on the fullnode upstream, a fullnode can be called as a validator full
 * **Validator fullnode** state sync from a validator node directly.
 * **Public fullnode** state sync from other fullnodes.
 
-There's no difference in their functionality, only whether their upstream node is a validator or another fullnode. Read more details about network topology [here](basics-node-networks-sync.md)
+There's no difference in their functionality, only whether their upstream node is a validator or another fullnode. Read more details about network topology [here](./node-networks-sync.md)
 
 Third-party blockchain explorers, wallets, exchanges, and DApps may run a local fullnode to:
 * Leverage the REST interface for blockchain interactions.

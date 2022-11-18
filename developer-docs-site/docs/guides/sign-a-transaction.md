@@ -20,7 +20,7 @@ The first step in signing a transaction is to generate the signing message from 
   - Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md) that explains this approach.
 - However, you may prefer instead that your client application, for example, a hardware security module (HSM), be responsible for generating the signed transaction. In this approach, before submitting transactions, a client must:
   - Serialize the transactions into bytes, and
-  - Sign the bytes with the account private key. See [Accounts](../concepts/basics-accounts.md) for how accounts and private keys work.
+  - Sign the bytes with the account private key. See [Accounts](../concepts/accounts.md) for how accounts and private keys work.
 
 This guide will introduce the concepts behind constructing a transaction, generating the appropriate message to sign using the BCS-serialization, and various methods for signing within Aptos.
 
@@ -314,7 +314,7 @@ curl -X POST -H "Content-Type: application/x.aptos.signed_transaction+bcs" --dat
 ```
 
 [first_transaction]: /tutorials/first-transaction
-[account]: /concepts/basics-accounts
+[account]: /concepts/accounts
 [rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/
 [bcs]: https://docs.rs/bcs/latest/bcs/
 [sha3]: https://en.wikipedia.org/wiki/SHA-3
