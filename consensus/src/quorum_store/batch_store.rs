@@ -287,6 +287,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                         Ok(None) => {}
                         Err(_) => {
                             // TODO: handle error, e.g. from self or not, log, panic.
+                            debug!("QS: ERROR in BatchRequest!")
                         }
                     }
                 }
