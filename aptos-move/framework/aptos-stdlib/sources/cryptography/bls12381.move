@@ -292,8 +292,8 @@ module aptos_std::bls12381 {
             std::vector::push_back(&mut sigs, sig);
             i = i + 1;
         };
-        let multisig = aggregate_signatures(sigs);
-        option::extract(&mut multisig)
+        let aggr_sig = aggregate_signatures(sigs);
+        option::extract(&mut aggr_sig)
     }
 
     #[test_only]
