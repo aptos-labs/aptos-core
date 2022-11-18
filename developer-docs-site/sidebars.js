@@ -287,8 +287,8 @@ const sidebars = {
       className: "sidebar-title",
     },
     "nodes/aptos-api-spec",
-    "issues-and-workarounds",
     "reference/glossary",
+    "issues-and-workarounds",
   ],
 };
 
