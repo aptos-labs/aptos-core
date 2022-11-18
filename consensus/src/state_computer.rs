@@ -230,6 +230,8 @@ impl StateComputer for ExecutionProxy {
         // held by BlockExecutor to prevent memory leak.
         self.executor.finish();
 
+        // This is to update QuorumStore with the latest known commit in the system,
+        // so it can set batches expiration accordingly.
         self.async_commit_notifier
             .clone()
             .send((
