@@ -320,7 +320,7 @@ def get_dashboard_link(
         raise Exception(f"Invalid refresh argument: {time_filter}")
 
     return (
-        f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}"
+        f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}&var-metrics_source=All"
         f"&var-chain_name={forge_chain_name}{grafana_time_filter}"
     )
 
