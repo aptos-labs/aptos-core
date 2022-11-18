@@ -37,7 +37,7 @@ pub struct ConsensusConfig {
 impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
-            max_sending_block_txns: 1000000,
+            max_sending_block_txns: 20000,
             // defaulting to under 0.5s to broadcast the proposal to 100 validators
             // over 1gbps link
             max_sending_block_bytes: 1024 * 1024 * 1024 * 1024, // 600 KB
