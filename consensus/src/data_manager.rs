@@ -183,21 +183,16 @@ impl DataManager for QuorumStoreDataManager {
                             debug!("QSE: waiting for data on {} receivers", receivers.len());
                             for rx in receivers {
                                 match rx.await {
-                                    Err(_) => {
-                                        // We probably advanced epoch already.
-                                        warn!("Oneshot channel to get a batch was dropped");
+                                    Err(e) => {
+                                        debug!("QS: Oneshot channel to get a batch was dropped, got error from receiver {:?}", e);
                                         let new_receivers = self
                                             .request_data(
-                                                proof_with_status.proofs.clone(),
+                                                proofs.clone(),
                                                 LogicalTime::new(block.epoch(), block.round()),
                                             )
                                             .await;
-                                        // Could not get all data so requested again
-                                        proof_with_status
-                                            .status
-                                            .lock()
-                                            .replace(DataStatus::Requested(new_receivers));
-                                        return Err(BlockNotFound(block.id()));
+                                        entry.replace_entry(DataStatus::Requested(new_receivers));
+                                        return Err(Error::CouldNotGetData);
                                     }
                                     Ok(result) => match result {
                                         Ok(data) => {
