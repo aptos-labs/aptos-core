@@ -267,7 +267,7 @@ impl BlockStore {
                 .retrieve_block_for_qc(
                     highest_commit_cert,
                     1,
-                    highest_commit_cert.commit_info().id(),
+                    highest_commit_cert.certified_block().id(),
                 )
                 .await?;
 
@@ -498,7 +498,7 @@ impl BlockRetriever {
                 }
             }
         }
-        // assert_eq!(result_blocks.last().unwrap().id(), target_block_id);
+        assert_eq!(result_blocks.last().unwrap().id(), target_block_id);
         Ok(result_blocks)
     }
 
