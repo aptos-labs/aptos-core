@@ -13,34 +13,32 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-async-trait = "0.1.53"
-clap = { version = "3.1.17", features = ["derive"] }
-const_format = "0.2.26"
-env_logger = "0.8.4"
-futures = "0.3.21"
-log = "0.4"
-once_cell = "1.10.0"
-poem = { version = "1.3.40", features = ["anyhow"] }
-poem-openapi = { version = "2.0.10", features = ["swagger-ui", "url"] }
-prometheus-parse = "0.2.2"
-reqwest = { version = "0.11.10", features = ["cookies"] }
-serde = { version = "1.0.137", features = ["derive"] }
-serde_json = "1.0.81"
-serde_yaml = "0.8.24"
-thiserror = "1.0.31"
-tokio = { version = "1.21.0", features = ["full"] }
-url = { version = "2.2.2", features = ["serde"] }
-
-aptos-api = { path = "../../api" }
-aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-network-checker = { path = "../../crates/aptos-network-checker" }
-aptos-rest-client = { path = "../../crates/aptos-rest-client" }
-aptos-sdk = { path = "../../sdk" }
-
-transaction-emitter-lib = { path = "../../crates/transaction-emitter-lib" }
+anyhow = { workspace = true }
+aptos-api = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-network-checker = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-sdk = { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true }
+const_format = { workspace = true }
+env_logger = { workspace = true }
+futures = { workspace = true }
+log = { workspace = true }
+once_cell = { workspace = true }
+poem = { workspace = true }
+poem-openapi = { workspace = true }
+prometheus-parse = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+transaction-emitter-lib = { workspace = true }
+url = { workspace = true }
 
 [lib]
 name = "aptos_node_checker_lib"
