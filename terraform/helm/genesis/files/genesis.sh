@@ -22,6 +22,7 @@ NUM_VALIDATORS_WITH_LARGER_STAKE=${NUM_VALIDATORS_WITH_LARGER_STAKE:0}
 LARGER_STAKE_AMOUNT=${LARGER_STAKE_AMOUNT:-1}
 # TODO: Fix the usage of this below when not set
 RANDOM_SEED=${RANDOM_SEED:-$RANDOM}
+S3_BUCKET=${S3_BUCKET}
 
 if [ -z ${ERA} ] || [ -z ${NUM_VALIDATORS} ]; then
     echo "ERA (${ERA:-null}) and NUM_VALIDATORS (${NUM_VALIDATORS:-null}) must be set"
@@ -101,13 +102,23 @@ kubectl get pvc -o name | grep /fn- | grep -v "e${ERA}-" | xargs -r kubectl dele
 # delete all genesis secrets except for those from this era
 kubectl get secret -o name | grep "genesis-e" | grep -v "e${ERA}-" | xargs -r kubectl delete
 
+# prefix with era to be more searchable
+if [ -z "$S3_BUCKET" ]; then
+    echo "No S3_BUCKET set, not uploading genesis.blob and waypoint.txt to S3"
+    echo "Will attempt to upload to k8s secret"
+else
+    aws s3 cp ${WORKSPACE}/genesis.blob s3://${S3_BUCKET}/genesis/e${ERA}-genesis.blob
+    aws s3 cp ${WORKSPACE}/waypoint.txt s3://${S3_BUCKET}/genesis/e${ERA}-waypoint.txt
+fi
+
 # create genesis secrets for validators to startup
 for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
 username="${USERNAME_PREFIX}-${i}"
 user_dir="${WORKSPACE}/${username}"
-kubectl create secret generic "${username}-genesis-e${ERA}" \
-    --from-file=genesis.blob=${WORKSPACE}/genesis.blob \
-    --from-file=waypoint.txt=${WORKSPACE}/waypoint.txt \
+if [ -z "$S3_BUCKET" ]; then
+    extra_genesis_args="--from-file=genesis.blob=${WORKSPACE}/genesis.blob --from-file=waypoint.txt=${WORKSPACE}/waypoint.txt"
+fi
+kubectl create secret generic "${username}-genesis-e${ERA}" ${extra_genesis_args} \
     --from-file=validator-identity.yaml=${user_dir}/validator-identity.yaml \
     --from-file=validator-full-node-identity.yaml=${user_dir}/validator-full-node-identity.yaml
 done

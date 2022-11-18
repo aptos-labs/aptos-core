@@ -17,7 +17,7 @@ resource "helm_release" "forge" {
       }
       serviceAccount = {
         annotations = {
-          "eks.amazonaws.com/role-arn" = aws_iam_role.forge.arn
+          "eks.amazonaws.com/role-arn" = var.enable_forge ? aws_iam_role.forge[0].arn : null
         }
       }
     }),
@@ -71,6 +71,7 @@ data "aws_iam_policy_document" "forge" {
 }
 
 resource "aws_iam_role" "forge" {
+  count                = var.enable_forge ? 1 : 0
   name                 = "aptos-node-testnet-${local.workspace_name}-forge"
   path                 = var.iam_path
   permissions_boundary = var.permissions_boundary_policy
@@ -78,8 +79,9 @@ resource "aws_iam_role" "forge" {
 }
 
 resource "aws_iam_role_policy" "forge" {
+  count  = var.enable_forge ? 1 : 0
   name   = "Helm"
-  role   = aws_iam_role.forge.name
+  role   = aws_iam_role.forge[0].name
   policy = data.aws_iam_policy_document.forge.json
 }
 

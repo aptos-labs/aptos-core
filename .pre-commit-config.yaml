@@ -25,3 +25,10 @@ repos:
           - devtools/assets/license_header.txt
           - --comment-style
           - //
+  - repo: https://github.com/gruntwork-io/pre-commit
+    rev: v0.1.17
+    hooks:
+      - id: terraform-fmt
+        files: \.(tf)$
+      - id: terraform-validate
+        files: \.(tf)$

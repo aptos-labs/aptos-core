@@ -178,11 +178,11 @@ resource "helm_release" "validator" {
   max_history = 5
   wait        = false
 
-  values = [
+  values = concat([
     local.helm_values,
     var.helm_values_file != "" ? file(var.helm_values_file) : "{}",
     jsonencode(var.helm_values),
-  ]
+  ], [for vals in var.helm_values_list : jsonencode(vals)])
 
   # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {

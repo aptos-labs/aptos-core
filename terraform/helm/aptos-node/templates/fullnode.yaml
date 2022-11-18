@@ -68,6 +68,10 @@ spec:
         prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
+      {{- if $.Values.fullnode.extraInitContainers }}
+      initContainers:
+{{ toYaml $.Values.fullnode.extraInitContainers | indent 8 }}
+      {{- end }}
       containers:
       - name: fullnode
         image: {{ $.Values.validator.image.repo }}:{{ $.Values.validator.image.tag | default $.Values.imageTag }}
@@ -93,7 +97,13 @@ spec:
         volumeMounts:
         - name: aptos-config
           mountPath: /opt/aptos/etc
-        - name: genesis-config
+        - name: genesis-secret
+          mountPath: /opt/aptos/genesis/validator-identity.yaml
+          subPath: validator-identity.yaml
+        - name: genesis-secret
+          mountPath: /opt/aptos/genesis/validator-full-node-identity.yaml
+          subPath: validator-full-node-identity.yaml
+        - name: genesis-data
           mountPath: /opt/aptos/genesis
         - name: fn
           mountPath: /opt/aptos/data
@@ -144,9 +154,13 @@ spec:
       - name: aptos-config
         configMap:
           name: {{ include "aptos-validator.fullname" $ }}-{{$i}}
-      - name: genesis-config
+      - name: genesis-secret
         secret:
           secretName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
+      - name: genesis-data
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
       serviceAccountName: {{ include "aptos-validator.fullname" $ }}-fullnode
       {{- if $.Values.imagePullSecret }}
       imagePullSecrets:
