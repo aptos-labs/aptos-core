@@ -8,6 +8,7 @@ spec aptos_framework::optional_aggregator {
     spec add_integer(integer: &mut Integer, value: u128) {
         aborts_if value > (integer.limit - integer.value);
         aborts_if integer.value + value > MAX_U128;
+        ensures integer.value == old(integer.value) + value;
     }
 
     spec sub(optional_aggregator: &mut OptionalAggregator, value: u128) {
@@ -28,6 +29,7 @@ spec aptos_framework::optional_aggregator {
 
     spec sub_integer(integer: &mut Integer, value: u128) {
         aborts_if value > integer.value;
+        ensures integer.value == old(integer.value) - value;
     }
 
     spec new(limit: u128, parallelizable: bool): OptionalAggregator {
