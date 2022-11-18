@@ -178,7 +178,7 @@ The Account does not exist under the auth_key before creating the account.
 Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_toke.
 
 
-<pre><code><b>include</b> <a href="aptos_account.md#0x1_aptos_account_Create_account">Create_account</a>;
+<pre><code><b>include</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccount">CreateAccount</a>;
 <b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(auth_key);
 </code></pre>
@@ -186,10 +186,10 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="0x1_aptos_account_Create_account"></a>
+<a name="0x1_aptos_account_CreateAccount"></a>
 
 
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_Create_account">Create_account</a> {
+<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccount">CreateAccount</a> {
     auth_key: <b>address</b>;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
     <b>aborts_if</b> <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(auth_key);

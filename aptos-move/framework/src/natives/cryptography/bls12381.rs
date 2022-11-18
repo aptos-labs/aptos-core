@@ -1,7 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "testing")]
+use crate::natives::util::make_test_only_native_from_func;
 use crate::{natives::util::make_native_from_func, pop_vec_arg};
+#[cfg(feature = "testing")]
+use aptos_crypto::bls12381::ProofOfPossession;
+#[cfg(feature = "testing")]
+use aptos_crypto::bls12381::{PrivateKey, PublicKey};
+#[cfg(feature = "testing")]
+use aptos_crypto::test_utils::KeyPair;
+#[cfg(feature = "testing")]
+use aptos_crypto::SigningKey;
+#[cfg(feature = "testing")]
+use aptos_crypto::Uniform;
 use aptos_crypto::{bls12381, traits};
 use move_binary_format::errors::PartialVMError;
 use move_binary_format::errors::PartialVMResult;
@@ -14,6 +26,8 @@ use move_vm_types::values::Struct;
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
+#[cfg(feature = "testing")]
+use rand_core::OsRng;
 use smallvec::smallvec;
 use std::{collections::VecDeque, convert::TryFrom};
 
@@ -636,12 +650,60 @@ pub fn native_bls12381_verify_signature_share(
     gas_params.bls12381_verify_signature_helper(_context, _ty_args, arguments, check_pk_subgroup)
 }
 
+#[cfg(feature = "testing")]
+pub fn native_generate_keys(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut _arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut OsRng);
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![
+            Value::vector_u8(key_pair.private_key.to_bytes()),
+            Value::vector_u8(key_pair.public_key.to_bytes()),
+        ],
+    ))
+}
+
+#[cfg(feature = "testing")]
+pub fn native_sign(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    let msg = pop_arg!(arguments, Vec<u8>);
+    let sk_bytes = pop_arg!(arguments, Vec<u8>);
+    let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
+    let sig = sk.sign_arbitrary_message(msg.as_slice());
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![Value::vector_u8(sig.to_bytes()),],
+    ))
+}
+
+#[cfg(feature = "testing")]
+pub fn native_generate_proof_of_possession(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    let sk_bytes = pop_arg!(arguments, Vec<u8>);
+    let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
+    let pop = ProofOfPossession::create(&sk);
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![Value::vector_u8(pop.to_bytes()),],
+    ))
+}
+
 /***************************************************************************************************
  * module
  *
  **************************************************************************************************/
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [
+    let mut natives = vec![];
+    natives.append(&mut vec![
         // BLS over BLS12-381
         (
             "aggregate_pubkeys_internal",
@@ -685,7 +747,21 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             "verify_signature_share_internal",
             make_native_from_func(gas_params, native_bls12381_verify_signature_share),
         ),
-    ];
-
+    ]);
+    #[cfg(feature = "testing")]
+    natives.append(&mut vec![
+        (
+            "generate_keys_internal",
+            make_test_only_native_from_func(native_generate_keys),
+        ),
+        (
+            "sign_internal",
+            make_test_only_native_from_func(native_sign),
+        ),
+        (
+            "generate_proof_of_possession_internal",
+            make_test_only_native_from_func(native_generate_proof_of_possession),
+        ),
+    ]);
     crate::natives::helpers::make_module_natives(natives)
 }
