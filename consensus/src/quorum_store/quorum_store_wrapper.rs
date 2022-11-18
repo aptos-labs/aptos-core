@@ -149,8 +149,8 @@ impl QuorumStoreWrapper {
         exclude_txns.extend(self.batch_builder.summaries().clone());
 
         debug!("QS: excluding txs len: {:?}", exclude_txns.len());
-        let mut end_batch = true; // no fragments
-                                  // TODO: size and unwrap or not?
+        let mut end_batch = false;
+        // TODO: size and unwrap or not?
         let pulled_txns = self
             .mempool_proxy
             .pull_internal(
@@ -414,7 +414,7 @@ impl QuorumStoreWrapper {
 
         // TODO: parameter? bring back back-off?
         let mut interval = time::interval(Duration::from_millis(
-            500, // 50 is currently the end batch timer
+            100, // 50 is currently the end batch timer
         ));
 
         // this is the flag that records whether there is backpressure during last txn pulling from the mempool
