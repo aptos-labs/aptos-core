@@ -18,7 +18,7 @@ What are the existing URLs containing the issue, if any?
 
 Where should this information land if new? (Start Aptos, Build Apps, Run Nodes, Reference, etc.)
 
-## Description of issue
+## Description
 
 How would you describe the issue?
 
