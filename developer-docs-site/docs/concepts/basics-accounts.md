@@ -3,6 +3,8 @@ title: "Accounts"
 id: "basics-accounts"
 ---
 
+foo
+
 # Accounts
 
 An account on the Aptos blockchain contains blockchain assets. These assets, for example, coins and NFTs, are by nature
