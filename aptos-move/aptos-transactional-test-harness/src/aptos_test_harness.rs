@@ -25,7 +25,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     data_cache::{AsMoveResolver, IntoMoveResolver, StorageAdapterOwned},
-    AptosVM,
+    AptosVM, VMExecutor,
 };
 use clap::StructOpt;
 use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
@@ -472,23 +472,26 @@ impl<'a> AptosTestAdapter<'a> {
     /// Should error if the transaction ends up being discarded, or having a status other than
     /// EXECUTED.
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
-        let mut outputs = AptosVM::execute_block_and_keep_vm_status(vec![txn], &self.storage)?;
+        let mut outputs = AptosVM::execute_block(vec![txn], &self.storage)?;
 
         assert_eq!(outputs.len(), 1);
 
-        let (status, output) = outputs.pop().unwrap();
+        let output = outputs.pop().unwrap();
         match output.status() {
             TransactionStatus::Keep(kept_vm_status) => {
                 self.storage.add_write_set(output.write_set());
                 match kept_vm_status {
                     ExecutionStatus::Success => Ok(output),
                     _ => {
-                        bail!("Failed to execute transaction. ExecutionStatus: {}", status)
+                        bail!(
+                            "Failed to execute transaction. ExecutionStatus: {:?}",
+                            kept_vm_status
+                        )
                     }
                 }
             }
-            TransactionStatus::Discard(_) => {
-                bail!("Transaction discarded. VMStatus: {}", status)
+            TransactionStatus::Discard(status_code) => {
+                bail!("Transaction discarded. VM status code: {:?}", status_code)
             }
             TransactionStatus::Retry => panic!(),
         }

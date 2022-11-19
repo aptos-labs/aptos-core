@@ -50,7 +50,7 @@ fn run_transactions<K, V>(
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone())
+        .execute_transactions_parallel((), &transactions)
         .map(|(res, _)| res);
 
         if module_access.0 && module_access.1 {
@@ -170,7 +170,7 @@ fn deltas_writes_mixed() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone())
+        .execute_transactions_parallel((), &transactions)
         .map(|(res, _)| res);
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None);
@@ -206,7 +206,7 @@ fn deltas_resolver() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone());
+        .execute_transactions_parallel((), &transactions);
 
         let (output, delta_resolver) = output.unwrap();
         // Should not be possible to overflow or underflow, as each delta is at
@@ -351,7 +351,7 @@ fn publishing_fixed_params() {
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
     >::new(num_cpus::get())
-    .execute_transactions_parallel((), transactions.clone());
+    .execute_transactions_parallel((), &transactions);
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -386,7 +386,7 @@ fn publishing_fixed_params() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone())
+        .execute_transactions_parallel((), &transactions)
         .map(|(res, _)| res);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
