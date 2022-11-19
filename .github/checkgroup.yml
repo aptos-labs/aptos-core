@@ -12,6 +12,7 @@ subprojects:
       - developer-docs-site/**
     checks:
       - docs-lint
+      - netlify/aptos-developer-docs/deploy-preview
   # everything, but docs
   - id: catch_all
     paths:
