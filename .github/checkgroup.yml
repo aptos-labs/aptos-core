@@ -12,7 +12,7 @@ subprojects:
       - developer-docs-site/**
     checks:
       - docs-lint
-      - netlify/aptos-developer-docs/deploy-preview
+      # - netlify/aptos-developer-docs/deploy-preview # somehow checkgroup doesnt' recognize this check, so commenting it out for now
   # everything, but docs
   - id: catch_all
     paths:
