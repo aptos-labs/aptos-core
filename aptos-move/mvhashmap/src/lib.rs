@@ -106,8 +106,6 @@ pub enum MVHashMapOutput<V> {
     Version(Version, Arc<V>),
 }
 
-pub type Result<V> = anyhow::Result<MVHashMapOutput<V>, MVHashMapError>;
-
 impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
     pub fn new() -> MVHashMap<K, V> {
         MVHashMap {
@@ -168,7 +166,11 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
     }
 
     /// Read entry from transaction 'txn_idx' at access path 'key'.
-    pub fn read(&self, key: &K, txn_idx: TxnIndex) -> Result<V> {
+    pub fn read(
+        &self,
+        key: &K,
+        txn_idx: TxnIndex,
+    ) -> anyhow::Result<MVHashMapOutput<V>, MVHashMapError> {
         use MVHashMapError::*;
         use MVHashMapOutput::*;
 
@@ -179,7 +181,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                 // If read encounters a delta, it must traverse the block of transactions
                 // (top-down) until it encounters a write or reaches the end of the block.
                 // During traversal, all aggregator deltas have to be accumulated together.
-                let mut accumulator: Option<DeltaOp> = None;
+                let mut accumulator: Option<Result<DeltaOp, ()>> = None;
                 while let Some((idx, entry)) = iter.next_back() {
                     let flag = entry.flag();
 
@@ -207,30 +209,38 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
 
                             if maybe_value.is_none() {
                                 // Resolve to the write if the WriteOp was deletion
-                                // (MoveVM will observe 'deletion').
+                                // (MoveVM will observe 'deletion'). This takes precedence
+                                // over any speculative delta accumulation errors on top.
                                 let write_version = (*idx, *incarnation);
                                 return Ok(Version(write_version, data.clone()));
                             }
 
-                            return accumulator
-                                .apply_to(maybe_value.unwrap().into())
-                                .map_err(|_| DeltaApplicationFailure)
-                                .map(|result| Resolved(result));
+                            return accumulator.map_err(|_| DeltaApplicationFailure).and_then(
+                                |a| {
+                                    // Apply accumulated delta to resolve the aggregator value.
+                                    a.apply_to(maybe_value.unwrap().into())
+                                        .map(|result| Resolved(result))
+                                        .map_err(|_| DeltaApplicationFailure)
+                                },
+                            );
                         }
                         (EntryCell::Delta(delta), Some(accumulator)) => {
-                            // Read hit a delta during traversing the
-                            // block and aggregating other deltas. Merge
-                            // two deltas together. If Delta application
-                            // fails, we return a corresponding error, so that
-                            // the speculative execution can also fail.
-                            accumulator
-                                .merge_onto(*delta)
-                                .map_err(|_| DeltaApplicationFailure)?;
+                            *accumulator = accumulator.and_then(|mut a| {
+                                // Read hit a delta during traversing the block and aggregating
+                                // other deltas. Merge two deltas together. If Delta application
+                                // fails, we record an error, but continue processing (to e.g.
+                                // account for the case when the aggregator was deleted).
+                                if a.merge_onto(*delta).is_err() {
+                                    Err(())
+                                } else {
+                                    Ok(a)
+                                }
+                            });
                         }
                         (EntryCell::Delta(delta), None) => {
                             // Read hit a delta and must start accumulating.
                             // Initialize the accumulator and continue traversal.
-                            accumulator = Some(*delta)
+                            accumulator = Some(Ok(*delta))
                         }
                     }
                 }
@@ -239,7 +249,8 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                 // deltas the actual written value has not been seen yet (i.e.
                 // it is not added as an entry to the data-structure).
                 match accumulator {
-                    Some(accumulator) => Err(Unresolved(accumulator)),
+                    Some(Ok(accumulator)) => Err(Unresolved(accumulator)),
+                    Some(Err(_)) => Err(DeltaApplicationFailure),
                     None => Err(NotFound),
                 }
             }
