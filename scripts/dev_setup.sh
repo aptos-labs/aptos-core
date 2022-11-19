@@ -14,6 +14,11 @@
 # fast fail.
 set -eo pipefail
 
+PRE_COMMAND=()
+if [ "$(whoami)" != 'root' ]; then
+  PRE_COMMAND=(sudo)
+fi
+
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
 KUBECTL_VERSION=1.18.6
@@ -139,9 +144,9 @@ function install_protoc {
   (
     cd "$TMPFILE" || exit
     curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_PKG.zip"
-    sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local bin/protoc
-    sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local 'include/*'
-    sudo chmod +x "/usr/local/bin/protoc"
+    "${PRE_COMMAND[@]}" unzip -o "$PROTOC_PKG.zip" -d /usr/local bin/protoc
+    "${PRE_COMMAND[@]}" unzip -o "$PROTOC_PKG.zip" -d /usr/local 'include/*'
+    "${PRE_COMMAND[@]}" chmod +x "/usr/local/bin/protoc"
   )
   rm -rf "$TMPFILE"
 
@@ -292,10 +297,6 @@ function install_awscli {
 function install_pkg {
   package=$1
   PACKAGE_MANAGER=$2
-  PRE_COMMAND=()
-  if [ "$(whoami)" != 'root' ]; then
-    PRE_COMMAND=(sudo)
-  fi
   if command -v "$package" &>/dev/null; then
     echo "$package is already installed"
   else
