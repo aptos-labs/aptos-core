@@ -13,11 +13,9 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-itertools = "0.10.0"
-tempfile = "3.3.0"
-
+anyhow = { workspace = true }
+framework = { workspace = true }
+itertools = { workspace = true }
 move-command-line-common = { workspace = true }
 move-package = { workspace = true }
-
-framework = { path = "../framework" }
+tempfile = { workspace = true }
