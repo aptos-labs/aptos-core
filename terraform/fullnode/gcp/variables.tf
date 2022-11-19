@@ -161,7 +161,7 @@ variable "gke_enable_private_nodes" {
 
 variable "gke_enable_node_autoprovisioning" {
   description = "Enable node autoprovisioning for GKE cluster. See https://cloud.google.com/kubernetes-engine/docs/how-to/node-auto-provisioning"
-  default     = false
+  default     = true
 }
 
 variable "gke_node_autoprovisioning_max_cpu" {
