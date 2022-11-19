@@ -28,7 +28,7 @@ constructing the authentication key. In the future, more authentication schemes 
 integrated with the Aptos account.
 
 There are two types of accounts in Aptos:
-  * *Address account* - This is a typical account corresponding to an address with a corresponding pair of public/private keys.
+  * *Standard account* - This is a typical account corresponding to an address with a corresponding pair of public/private keys.
   * *Resource account* - An autonomous account without a corresponding private key used by developers to store resources or publish modules on chain.
 
 :::tip Account address example
