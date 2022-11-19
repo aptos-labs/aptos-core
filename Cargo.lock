@@ -3958,6 +3958,7 @@ name = "forge-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
  "aptos-global-constants",
  "aptos-logger",
  "aptos-rest-client",
