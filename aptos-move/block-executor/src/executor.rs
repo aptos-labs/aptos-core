@@ -147,14 +147,14 @@ impl<
     }
 }
 
-pub struct ParallelTransactionExecutor<T: Transaction, E: ExecutorTask> {
+pub struct BlockExecutor<T: Transaction, E: ExecutorTask> {
     // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     phantom: PhantomData<(T, E)>,
 }
 
-impl<T, E> ParallelTransactionExecutor<T, E>
+impl<T, E> BlockExecutor<T, E>
 where
     T: Transaction,
     E: ExecutorTask<T = T>,
@@ -359,7 +359,7 @@ where
     pub fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        signature_verified_block: &Vec<T>,
+        signature_verified_block: &[T],
     ) -> Result<
         (
             Vec<E::Output>,
@@ -439,7 +439,7 @@ where
     pub fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: &Vec<T>,
+        signature_verified_block: &[T],
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);

@@ -7,13 +7,13 @@ use crate::{
         validate_signed_transaction, PreprocessedTransaction, VMAdapter,
     },
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
+    block_executor::BlockAptosVM,
     counters::*,
     data_cache::{AsMoveResolver, IntoMoveResolver},
     delta_state_view::DeltaStateView,
     errors::expect_only_successful_execution,
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
-    parallel_executor::ParallelAptosVM,
     system_module_names::*,
     transaction_arg_validation,
     transaction_metadata::TransactionMetadata,
@@ -968,10 +968,21 @@ impl VMExecutor for AptosVM {
             ))
         });
 
-        // Record the histogram count for transactions per block.
-        BLOCK_TRANSACTION_COUNT.observe(transactions.len() as f64);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        info!(
+            log_context,
+            "Executing block, transaction count: {}",
+            transactions.len()
+        );
 
-        ParallelAptosVM::execute_block(transactions, state_view, Self::get_concurrency_level())
+        let count = transactions.len();
+        let ret =
+            BlockAptosVM::execute_block(transactions, state_view, Self::get_concurrency_level());
+        if ret.is_ok() {
+            // Record the histogram count for transactions per block.
+            BLOCK_TRANSACTION_COUNT.observe(count as f64);
+        }
+        ret
     }
 }
 

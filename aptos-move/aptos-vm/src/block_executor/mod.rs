@@ -2,33 +2,35 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod storage_wrapper;
-mod vm_wrapper;
+pub(crate) mod vm_wrapper;
 
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
-    aptos_vm::AptosVM,
-    logging::AdapterLogSchema,
-    parallel_executor::vm_wrapper::AptosVMWrapper,
+    block_executor::vm_wrapper::AptosExecutorTask,
+    AptosVM,
 };
 use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
-use aptos_logger::{debug, info};
-use aptos_parallel_executor::{
+use aptos_block_executor::{
     errors::Error,
-    executor::{ParallelTransactionExecutor, RAYON_EXEC_POOL},
+    executor::{BlockExecutor, RAYON_EXEC_POOL},
     output_delta_resolver::{OutputDeltaResolver, ResolvedData},
-    task::{Transaction as PTransaction, TransactionOutput as PTransactionOutput},
+    task::{
+        Transaction as BlockExecutorTransaction,
+        TransactionOutput as BlockExecutorTransactionOutput,
+    },
 };
+use aptos_logger::debug;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::vm_status::VMStatus;
 use rayon::prelude::*;
 use std::collections::HashMap;
 
-impl PTransaction for PreprocessedTransaction {
+impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
     type Value = WriteOp;
 }
@@ -50,7 +52,7 @@ impl AptosTransactionOutput {
     }
 }
 
-impl PTransactionOutput for AptosTransactionOutput {
+impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     type T = PreprocessedTransaction;
 
     fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
@@ -81,34 +83,34 @@ impl PTransactionOutput for AptosTransactionOutput {
     }
 }
 
-pub struct ParallelAptosVM();
+pub struct BlockAptosVM();
 
-impl ParallelAptosVM {
+impl BlockAptosVM {
     fn process_parallel_block_output<S: StateView>(
         results: Vec<AptosTransactionOutput>,
         delta_resolver: OutputDeltaResolver<StateKey, WriteOp>,
         state_view: &S,
     ) -> Vec<TransactionOutput> {
-        // TODO: MVHashmap, and then delta resolver should track aggregator keys.
-        let mut aggregator_keys: HashMap<StateKey, anyhow::Result<ResolvedData>> = HashMap::new();
+        // TODO: MVHashmap, and then delta resolver should track aggregator base values.
+        let mut aggregator_base_values: HashMap<StateKey, anyhow::Result<ResolvedData>> =
+            HashMap::new();
         for res in results.iter() {
-            let output_ext = AptosTransactionOutput::as_ref(res);
-            for (key, _) in output_ext.delta_change_set().iter() {
-                if !aggregator_keys.contains_key(key) {
-                    aggregator_keys.insert(key.clone(), state_view.get_state_value(key));
+            for (key, _) in res.as_ref().delta_change_set().iter() {
+                if !aggregator_base_values.contains_key(key) {
+                    aggregator_base_values.insert(key.clone(), state_view.get_state_value(key));
                 }
             }
         }
 
         let materialized_deltas =
-            delta_resolver.resolve(aggregator_keys.into_iter().collect(), results.len());
+            delta_resolver.resolve(aggregator_base_values.into_iter().collect(), results.len());
 
         results
             .into_iter()
             .zip(materialized_deltas.into_iter())
             .map(|(res, delta_writes)| {
-                let output_ext = AptosTransactionOutput::into(res);
-                output_ext.output_with_delta_writes(WriteSetMut::new(delta_writes))
+                res.into()
+                    .output_with_delta_writes(WriteSetMut::new(delta_writes))
             })
             .collect()
     }
@@ -119,8 +121,7 @@ impl ParallelAptosVM {
         results
             .into_iter()
             .map(|res| {
-                let output_ext = AptosTransactionOutput::into(res);
-                let (deltas, output) = output_ext.into();
+                let (deltas, output) = res.into().into();
                 debug_assert!(deltas.is_empty(), "[Execution] Deltas must be materialized");
                 output
             })
@@ -138,22 +139,13 @@ impl ParallelAptosVM {
         let signature_verified_block: Vec<PreprocessedTransaction> =
             RAYON_EXEC_POOL.install(|| {
                 transactions
-                    .par_iter()
-                    .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
+                    .into_par_iter()
+                    .map(preprocess_transaction::<AptosVM>)
                     .collect()
             });
 
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        info!(
-            log_context,
-            "Executing block, transaction count: {}",
-            transactions.len()
-        );
-
         let executor =
-            ParallelTransactionExecutor::<PreprocessedTransaction, AptosVMWrapper<S>>::new(
-                concurrency_level,
-            );
+            BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>>::new(concurrency_level);
 
         let mut ret = if concurrency_level > 1 {
             executor
@@ -175,8 +167,11 @@ impl ParallelAptosVM {
                 .map(Self::process_sequential_block_output);
         }
 
+        // Explicit async drop. Happens here because we can't currently move to
+        // BlockExecutor due to the Module publishing fallback. TODO: fix after
+        // module publishing fallback is removed.
         RAYON_EXEC_POOL.spawn(move || {
-            // Explicit async drop.
+            // Explicit async drops.
             drop(signature_verified_block);
         });
 
@@ -185,9 +180,6 @@ impl ParallelAptosVM {
             Err(Error::ModulePathReadWrite) => {
                 unreachable!("[Execution]: Must be handled by sequential fallback")
             }
-            Err(Error::InvariantViolation) => Err(VMStatus::Error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            )),
             Err(Error::UserError(err)) => Err(err),
         }
     }

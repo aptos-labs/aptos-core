@@ -43,9 +43,9 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
+    block_executor::BlockAptosVM,
     data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
-    parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
 use framework::ReleaseBundle;
@@ -380,7 +380,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        ParallelAptosVM::execute_block(txn_block, &self.data_store, usize::min(4, num_cpus::get()))
+        BlockAptosVM::execute_block(txn_block, &self.data_store, usize::min(4, num_cpus::get()))
     }
 
     pub fn execute_transaction_block(

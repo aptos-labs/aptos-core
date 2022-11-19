@@ -4,17 +4,17 @@
 use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
+    block_executor::{storage_wrapper::VersionedView, AptosTransactionOutput},
     data_cache::{AsMoveResolver, StateViewCache, StorageAdapter},
     logging::AdapterLogSchema,
     move_vm_ext::MoveResolverExt,
-    parallel_executor::{storage_wrapper::VersionedView, AptosTransactionOutput},
 };
 use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::TransactionOutputExt};
-use aptos_logger::prelude::*;
-use aptos_parallel_executor::{
+use aptos_block_executor::{
     executor::MVHashMapView,
     task::{ExecutionStatus, ExecutorTask},
 };
+use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use move_core_types::{
@@ -24,11 +24,14 @@ use move_core_types::{
 };
 use std::collections::btree_map::BTreeMap;
 
-pub(crate) struct AptosVMWrapper<'a, S> {
+pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
     base_view: &'a S,
 }
 
+// This function is called by the BlockExecutor for each transaction is intends
+// to execute (via the ExecutorTask trait). It can be as a part of sequential
+// execution, or speculatively as a part of a parallel execution.
 fn execute_transaction<S: MoveResolverExt + StateView>(
     vm: &AptosVM,
     txn: &PreprocessedTransaction,
@@ -70,7 +73,7 @@ fn execute_transaction<S: MoveResolverExt + StateView>(
     }
 }
 
-impl<'a, S: 'a + StateView> ExecutorTask for AptosVMWrapper<'a, S> {
+impl<'a, S: 'a + StateView> ExecutorTask for AptosExecutorTask<'a, S> {
     type T = PreprocessedTransaction;
     type Output = AptosTransactionOutput;
     type Error = VMStatus;

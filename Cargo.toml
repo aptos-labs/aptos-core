@@ -16,6 +16,7 @@ members = [
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
+    "aptos-move/block-executor",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
@@ -26,7 +27,6 @@ members = [
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
-    "aptos-move/parallel-executor",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
     "aptos-node",
@@ -173,6 +173,7 @@ aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
 aptos-api = { path = "api" }
 aptos-api-test-context = { path = "api/test-context" }
 aptos-api-types = { path = "api/types" }
+aptos-block-executor = { path = "aptos-move/block-executor" }
 aptos-bitvec = { path = "crates/aptos-bitvec" }
 aptos-build-info = { path = "crates/aptos-build-info" }
 aptos-compression = { path = "crates/aptos-compression" }
@@ -203,7 +204,6 @@ aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-openapi = { path = "crates/aptos-openapi" }
-aptos-parallel-executor = { path = "aptos-move/parallel-executor" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }

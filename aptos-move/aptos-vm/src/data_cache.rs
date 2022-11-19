@@ -32,10 +32,6 @@ use std::{
 /// but can be used as a one shot cache for systems that need a simple `RemoteCache`
 /// implementation (e.g. tests or benchmarks).
 ///
-/// The cache is responsible to track all changes to the `StateView` that are the result
-/// of transaction execution. Those side effects are published at the end of a transaction
-/// execution via `StateViewCache::push_write_set`.
-///
 /// `StateViewCache` is responsible to give an up to date view over the data store,
 /// so that changes executed but not yet committed are visible to subsequent transactions.
 ///

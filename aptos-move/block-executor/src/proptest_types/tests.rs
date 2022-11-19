@@ -3,7 +3,7 @@
 
 use crate::{
     errors::Error,
-    executor::ParallelTransactionExecutor,
+    executor::BlockExecutor,
     proptest_types::types::{
         ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams, ValueType,
     },
@@ -46,7 +46,7 @@ fn run_transactions<K, V>(
     }
 
     for _ in 0..num_repeat {
-        let output = ParallelTransactionExecutor::<
+        let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
@@ -166,7 +166,7 @@ fn deltas_writes_mixed() {
         .collect();
 
     for _ in 0..20 {
-        let output = ParallelTransactionExecutor::<
+        let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
@@ -202,7 +202,7 @@ fn deltas_resolver() {
         .collect();
 
     for _ in 0..20 {
-        let output = ParallelTransactionExecutor::<
+        let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
@@ -347,7 +347,7 @@ fn publishing_fixed_params() {
     };
 
     // Confirm still no intersection
-    let output = ParallelTransactionExecutor::<
+    let output = BlockExecutor::<
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
     >::new(num_cpus::get())
@@ -382,7 +382,7 @@ fn publishing_fixed_params() {
     };
 
     for _ in 0..200 {
-        let output = ParallelTransactionExecutor::<
+        let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
