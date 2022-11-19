@@ -127,6 +127,7 @@ pub use crate::aptos_vm::AptosVM;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
+    state_store::state_key::StateKey,
     transaction::{SignedTransaction, Transaction, TransactionOutput, VMValidatorResult},
     vm_status::VMStatus,
 };
@@ -141,7 +142,7 @@ pub trait VMValidator {
     fn validate_transaction(
         &self,
         transaction: SignedTransaction,
-        state_view: &impl StateView,
+        state_view: &impl StateView<StateKey>,
     ) -> VMValidatorResult;
 }
 
@@ -155,7 +156,7 @@ pub trait VMExecutor: Send + Sync {
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &impl StateView,
+        state_view: &impl StateView<StateKey>,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }
 

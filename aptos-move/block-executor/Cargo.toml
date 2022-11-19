@@ -25,6 +25,7 @@ criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 crossbeam-queue = { workspace = true }
 dashmap = { workspace = true }
+move-binary-format = { workspace = true }
 mvhashmap = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }

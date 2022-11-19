@@ -7,6 +7,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
     on_chain_config::OnChainConfigPayload,
+    state_store::state_key::StateKey,
     transaction::{SignedTransaction, VMValidatorResult},
     vm_status::StatusCode,
 };
@@ -34,7 +35,7 @@ impl VMValidator for MockVMValidator {
     fn validate_transaction(
         &self,
         _transaction: SignedTransaction,
-        _state_view: &impl StateView,
+        _state_view: &impl StateView<StateKey>,
     ) -> VMValidatorResult {
         VMValidatorResult::new(None, 0)
     }

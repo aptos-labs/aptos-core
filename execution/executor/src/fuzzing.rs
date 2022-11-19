@@ -7,6 +7,7 @@ use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_state_view::StateView;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
+    state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
     vm_status::VMStatus,
 };
@@ -44,7 +45,7 @@ pub struct FakeVM;
 impl VMExecutor for FakeVM {
     fn execute_block(
         _transactions: Vec<Transaction>,
-        _state_view: &impl StateView,
+        _state_view: &impl StateView<StateKey>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }

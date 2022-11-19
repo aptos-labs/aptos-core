@@ -7,11 +7,14 @@ use aptos_types::{
 
 pub struct AccountWithStateView<'a> {
     account_address: &'a AccountAddress,
-    state_view: &'a dyn StateView,
+    state_view: &'a dyn StateView<StateKey>,
 }
 
 impl<'a> AccountWithStateView<'a> {
-    pub fn new(account_address: &'a AccountAddress, state_view: &'a dyn StateView) -> Self {
+    pub fn new(
+        account_address: &'a AccountAddress,
+        state_view: &'a dyn StateView<StateKey>,
+    ) -> Self {
         Self {
             account_address,
             state_view,

@@ -4,7 +4,8 @@
 use crate::{
     executor::BlockExecutor,
     proptest_types::types::{
-        ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams, ValueType,
+        EmptyDataView, ExpectedOutput, KeyType, Task, Transaction, TransactionGen,
+        TransactionGenParams, ValueType,
     },
 };
 use criterion::{BatchSize, Bencher as CBencher};
@@ -23,8 +24,7 @@ pub struct Bencher<K, V> {
     transaction_size: usize,
     transaction_gen_param: TransactionGenParams,
     universe_size: usize,
-    phantom_key: PhantomData<K>,
-    phantom_value: PhantomData<V>,
+    phantom: PhantomData<(K, V)>,
 }
 
 pub(crate) struct BencherState<
@@ -48,8 +48,7 @@ where
             transaction_size,
             transaction_gen_param: TransactionGenParams::default(),
             universe_size,
-            phantom_key: PhantomData,
-            phantom_value: PhantomData,
+            phantom: PhantomData,
         }
     }
 
@@ -110,13 +109,17 @@ where
     }
 
     pub(crate) fn run(self) {
+        let data_view = EmptyDataView::<KeyType<K>, ValueType<V>> {
+            phantom: PhantomData,
+        };
+
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &self.transactions)
+        .execute_transactions_parallel((), &self.transactions, &data_view)
         .map(|(res, _)| res);
 
-        self.expected_output.assert_output(&output, None);
+        self.expected_output.assert_output(&output);
     }
 }

@@ -354,6 +354,7 @@ dependencies = [
  "crossbeam",
  "crossbeam-queue",
  "dashmap",
+ "move-binary-format",
  "mvhashmap",
  "num_cpus",
  "once_cell",

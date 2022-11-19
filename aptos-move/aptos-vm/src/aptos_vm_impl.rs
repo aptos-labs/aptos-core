@@ -17,15 +17,16 @@ use aptos_gas::{
 };
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
-use aptos_types::chain_id::ChainId;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
+    chain_id::ChainId,
     on_chain_config::{
         ApprovedExecutionHashes, GasSchedule, GasScheduleV2, OnChainConfig, StorageGasSchedule,
         Version,
     },
+    on_chain_config::{FeatureFlag, Features},
+    state_store::state_key::StateKey,
+    transaction::AbortInfo,
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
@@ -59,7 +60,7 @@ pub struct AptosVMImpl {
 
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
-    pub fn new<S: StateView>(state: &S) -> Self {
+    pub fn new<S: StateView<StateKey>>(state: &S) -> Self {
         let storage = StorageAdapter::new(state);
 
         // Get the gas parameters
@@ -574,7 +575,7 @@ impl<'a> AptosVMInternals<'a> {
     /// The `TransactionDataCache` can be used as a `ChainState`.
     ///
     /// If you don't care about the transaction metadata, use `TransactionMetadata::default()`.
-    pub fn with_txn_data_cache<T, S: StateView>(
+    pub fn with_txn_data_cache<T, S: StateView<StateKey>>(
         self,
         state_view: &S,
         f: impl for<'txn, 'r> FnOnce(SessionExt<'txn, 'r, StorageAdapter<S>>) -> T,

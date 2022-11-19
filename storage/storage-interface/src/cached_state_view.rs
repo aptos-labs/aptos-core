@@ -185,7 +185,7 @@ pub struct StateCache {
     pub proofs: HashMap<HashValue, SparseMerkleProofExt>,
 }
 
-impl StateView for CachedStateView {
+impl StateView<StateKey> for CachedStateView {
     fn id(&self) -> StateViewId {
         self.id
     }
@@ -226,7 +226,7 @@ impl From<DbStateView> for CachedDbStateView {
     }
 }
 
-impl StateView for CachedDbStateView {
+impl StateView<StateKey> for CachedDbStateView {
     fn id(&self) -> StateViewId {
         self.db_state_view.id()
     }

@@ -5,10 +5,11 @@ use anyhow::format_err;
 use aptos_crypto::HashValue;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_state_view::StateView;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
+    on_chain_config::{FeatureFlag, Features},
+    state_store::state_key::StateKey,
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
@@ -102,7 +103,11 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
     }
 }
 
-pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: u8) -> ChangeSet
+pub fn build_changeset<S: StateView<StateKey>, F>(
+    state_view: &S,
+    procedure: F,
+    chain_id: u8,
+) -> ChangeSet
 where
     F: FnOnce(&mut GenesisSession<StorageAdapter<S>>),
 {

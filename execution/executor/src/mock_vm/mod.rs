@@ -57,7 +57,7 @@ pub struct MockVM;
 impl VMExecutor for MockVM {
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &impl StateView,
+        state_view: &impl StateView<StateKey>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         if state_view.is_genesis() {
             assert_eq!(
@@ -190,7 +190,7 @@ impl VMExecutor for MockVM {
 
 fn read_balance(
     output_cache: &HashMap<AccessPath, u64>,
-    state_view: &impl StateView,
+    state_view: &impl StateView<StateKey>,
     account: AccountAddress,
 ) -> u64 {
     let balance_access_path = balance_ap(account);
@@ -202,7 +202,7 @@ fn read_balance(
 
 fn read_seqnum(
     output_cache: &HashMap<AccessPath, u64>,
-    state_view: &impl StateView,
+    state_view: &impl StateView<StateKey>,
     account: AccountAddress,
 ) -> u64 {
     let seqnum_access_path = seqnum_ap(account);
@@ -212,15 +212,21 @@ fn read_seqnum(
     }
 }
 
-fn read_balance_from_storage(state_view: &impl StateView, balance_access_path: &AccessPath) -> u64 {
+fn read_balance_from_storage(
+    state_view: &impl StateView<StateKey>,
+    balance_access_path: &AccessPath,
+) -> u64 {
     read_u64_from_storage(state_view, balance_access_path)
 }
 
-fn read_seqnum_from_storage(state_view: &impl StateView, seqnum_access_path: &AccessPath) -> u64 {
+fn read_seqnum_from_storage(
+    state_view: &impl StateView<StateKey>,
+    seqnum_access_path: &AccessPath,
+) -> u64 {
     read_u64_from_storage(state_view, seqnum_access_path)
 }
 
-fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) -> u64 {
+fn read_u64_from_storage(state_view: &impl StateView<StateKey>, access_path: &AccessPath) -> u64 {
     state_view
         .get_state_value(&StateKey::AccessPath(access_path.clone()))
         .expect("Failed to query storage.")
@@ -228,7 +234,7 @@ fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) 
 }
 
 fn read_state_value_from_storage(
-    state_view: &impl StateView,
+    state_view: &impl StateView<StateKey>,
     access_path: &AccessPath,
 ) -> Option<Vec<u8>> {
     state_view

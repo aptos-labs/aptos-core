@@ -5,6 +5,7 @@ use crate::delta_change_set::{deserialize, DeltaChangeSet};
 use anyhow::bail;
 use aptos_state_view::StateView;
 use aptos_types::{
+    state_store::state_key::StateKey,
     transaction::{ChangeSet, TransactionOutput},
     write_set::{TransactionWrite, WriteOp, WriteSet, WriteSetMut},
 };
@@ -193,7 +194,10 @@ impl TransactionOutputExt {
     /// TODO: ideally, we may want to expose this function to VM instead. Since
     /// we do not care about rerunning the epilogue - it sufficies to have it
     /// here for now.
-    pub fn into_transaction_output(self, state_view: &impl StateView) -> TransactionOutput {
+    pub fn into_transaction_output<S: StateView<StateKey> + ?Sized>(
+        self,
+        state_view: &S,
+    ) -> TransactionOutput {
         let (delta_change_set, txn_output) = self.into();
 
         // First, check if output of transaction should be discarded or delta

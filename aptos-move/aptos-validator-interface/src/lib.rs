@@ -9,13 +9,13 @@ pub use crate::storage_interface::DBDebuggerInterface;
 
 use anyhow::{anyhow, Result};
 use aptos_state_view::StateView;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
     account_state::AccountState,
     account_view::AccountView,
     on_chain_config::ValidatorSet,
+    state_store::state_storage_usage::StateStorageUsage,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, Version},
 };
@@ -170,7 +170,7 @@ impl DebuggerStateView {
     }
 }
 
-impl StateView for DebuggerStateView {
+impl StateView<StateKey> for DebuggerStateView {
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         self.get_state_value_internal(state_key, self.version)
     }

@@ -3,7 +3,7 @@
 
 use crate::{
     executor::BlockExecutor,
-    proptest_types::types::{ExpectedOutput, KeyType, Task, Transaction, ValueType},
+    proptest_types::types::{DeltaDataView, ExpectedOutput, KeyType, Task, Transaction, ValueType},
     scheduler::{Scheduler, SchedulerTask, TaskGuard},
     task::ModulePath,
 };
@@ -13,6 +13,7 @@ use rand::random;
 use std::{
     fmt::Debug,
     hash::Hash,
+    marker::PhantomData,
     sync::{atomic::AtomicUsize, Arc},
 };
 
@@ -21,13 +22,17 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + Eq + TransactionWrite + 'static,
 {
+    let data_view = DeltaDataView::<K, V> {
+        phantom: PhantomData,
+    };
+
     let output = BlockExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions)
+        .execute_transactions_parallel((), &transactions, &data_view)
         .map(|(res, _)| res);
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None);
 
-    baseline.assert_output(&output, None);
+    baseline.assert_output(&output);
 }
 
 fn random_value(delete_value: bool) -> ValueType<Vec<u8>> {
@@ -64,45 +69,6 @@ fn delta_counters() {
             writes_and_deltas: vec![(vec![], vec![(key, delta_sub(2, u128::MAX))])],
         });
     }
-
-    run_and_assert(transactions)
-}
-
-#[test]
-fn deleted_aggregator() {
-    let key = KeyType(random::<[u8; 32]>(), false);
-    let transactions = vec![
-        Transaction::Write {
-            incarnation: Arc::new(AtomicUsize::new(0)),
-            reads: vec![vec![]],
-            writes_and_deltas: vec![(vec![(key, random_value(true))], vec![])],
-        },
-        Transaction::Write {
-            incarnation: Arc::new(AtomicUsize::new(0)),
-            reads: vec![vec![key]],
-            writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
-        },
-        Transaction::Write {
-            incarnation: Arc::new(AtomicUsize::new(0)),
-            reads: vec![vec![]],
-            writes_and_deltas: vec![(vec![(key, random_value(true))], vec![])],
-        },
-        Transaction::Write {
-            incarnation: Arc::new(AtomicUsize::new(0)),
-            reads: vec![vec![key]],
-            writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
-        },
-        Transaction::Write {
-            incarnation: Arc::new(AtomicUsize::new(0)),
-            reads: vec![vec![]],
-            writes_and_deltas: vec![(vec![(key, random_value(false))], vec![])],
-        },
-        Transaction::Write {
-            incarnation: Arc::new(AtomicUsize::new(0)),
-            reads: vec![vec![key]],
-            writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
-        },
-    ];
 
     run_and_assert(transactions)
 }

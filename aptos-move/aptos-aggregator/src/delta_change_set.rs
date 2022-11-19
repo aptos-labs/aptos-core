@@ -165,9 +165,9 @@ impl DeltaOp {
     /// Consumes a single delta and tries to materialize it with a given state
     /// key. If materialization succeeds, a write op is produced. Otherwise, an
     /// error VM status is returned.
-    pub fn try_into_write_op(
+    pub fn try_into_write_op<S: StateView<StateKey> + ?Sized>(
         self,
-        state_view: &impl StateView,
+        state_view: &S,
         state_key: &StateKey,
     ) -> anyhow::Result<WriteOp, VMStatus> {
         state_view
@@ -316,9 +316,9 @@ impl DeltaChangeSet {
     /// Consumes the delta change set and tries to materialize it. Returns a
     /// mutable write set if materialization succeeds (mutability since we want
     /// to merge these writes with transaction outputs).
-    pub fn try_into_write_set_mut(
+    pub fn try_into_write_set_mut<S: StateView<StateKey> + ?Sized>(
         self,
-        state_view: &impl StateView,
+        state_view: &S,
     ) -> anyhow::Result<WriteSetMut, VMStatus> {
         let mut materialized_write_set = vec![];
         for (state_key, delta_op) in self.delta_change_set {
@@ -537,7 +537,7 @@ mod tests {
         data: HashMap<StateKey, Vec<u8>>,
     }
 
-    impl StateView for FakeView {
+    impl StateView<StateKey> for FakeView {
         fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
             Ok(self.data.get(state_key).cloned())
         }

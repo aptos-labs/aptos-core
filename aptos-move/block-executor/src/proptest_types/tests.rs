@@ -5,7 +5,8 @@ use crate::{
     errors::Error,
     executor::BlockExecutor,
     proptest_types::types::{
-        ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams, ValueType,
+        DeltaDataView, EmptyDataView, ExpectedOutput, KeyType, Task, Transaction, TransactionGen,
+        TransactionGenParams, ValueType, STORAGE_AGGREGATOR_VALUE,
     },
 };
 use aptos_aggregator::delta_change_set::serialize;
@@ -18,7 +19,7 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 fn run_transactions<K, V>(
     key_universe: &[K],
@@ -45,12 +46,16 @@ fn run_transactions<K, V>(
         *transactions.get_mut(i.index(length)).unwrap() = Transaction::SkipRest;
     }
 
+    let data_view = EmptyDataView::<KeyType<K>, ValueType<V>> {
+        phantom: PhantomData,
+    };
+
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions)
+        .execute_transactions_parallel((), &transactions, &data_view)
         .map(|(res, _)| res);
 
         if module_access.0 && module_access.1 {
@@ -60,7 +65,7 @@ fn run_transactions<K, V>(
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None);
 
-        baseline.assert_output(&output, None);
+        baseline.assert_output(&output);
     }
 }
 
@@ -165,16 +170,20 @@ fn deltas_writes_mixed() {
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, true))
         .collect();
 
+    let data_view = DeltaDataView::<KeyType<[u8; 32]>, ValueType<[u8; 32]>> {
+        phantom: PhantomData,
+    };
+
     for _ in 0..20 {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions)
+        .execute_transactions_parallel((), &transactions, &data_view)
         .map(|(res, _)| res);
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None);
-        baseline.assert_output(&output, None);
+        baseline.assert_output(&output);
     }
 }
 
@@ -195,6 +204,10 @@ fn deltas_resolver() {
     .expect("creating a new value should succeed")
     .current();
 
+    let data_view = DeltaDataView::<KeyType<[u8; 32]>, ValueType<[u8; 32]>> {
+        phantom: PhantomData,
+    };
+
     // Do not allow deletes as that would panic in resolver.
     let transactions: Vec<_> = transaction_gen
         .into_iter()
@@ -206,18 +219,15 @@ fn deltas_resolver() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions);
+        .execute_transactions_parallel((), &transactions, &data_view);
 
         let (output, delta_resolver) = output.unwrap();
-        // Should not be possible to overflow or underflow, as each delta is at
-        // most 100 in the tests.
-        let storage_delta_val = 100001;
         let resolved = delta_resolver.resolve(
             (15..50)
                 .map(|i| {
                     (
                         KeyType(universe[i], false),
-                        Ok(Some(serialize(&storage_delta_val))),
+                        Ok(Some(serialize(&STORAGE_AGGREGATOR_VALUE))),
                     )
                 })
                 .collect(),
@@ -225,7 +235,7 @@ fn deltas_resolver() {
         );
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, Some(resolved));
-        baseline.assert_output(&Ok(output), Some(storage_delta_val));
+        baseline.assert_output(&Ok(output));
     }
 }
 
@@ -346,12 +356,16 @@ fn publishing_fixed_params() {
         }
     };
 
+    let data_view = DeltaDataView::<KeyType<[u8; 32]>, ValueType<[u8; 32]>> {
+        phantom: PhantomData,
+    };
+
     // Confirm still no intersection
     let output = BlockExecutor::<
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
     >::new(num_cpus::get())
-    .execute_transactions_parallel((), &transactions);
+    .execute_transactions_parallel((), &transactions, &data_view);
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -386,7 +400,7 @@ fn publishing_fixed_params() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions)
+        .execute_transactions_parallel((), &transactions, &data_view)
         .map(|(res, _)| res);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);

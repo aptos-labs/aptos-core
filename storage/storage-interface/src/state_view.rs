@@ -25,7 +25,7 @@ impl DbStateView {
     }
 }
 
-impl StateView for DbStateView {
+impl StateView<StateKey> for DbStateView {
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         self.get(state_key)
     }

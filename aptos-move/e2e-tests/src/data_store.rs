@@ -104,7 +104,7 @@ impl FakeDataStore {
 }
 
 // This is used by the `execute_block` API.
-impl StateView for FakeDataStore {
+impl StateView<StateKey> for FakeDataStore {
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         Ok(self.state_data.get(state_key).cloned())
     }

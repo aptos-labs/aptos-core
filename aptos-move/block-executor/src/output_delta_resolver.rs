@@ -1,13 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::view::ResolvedData;
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_types::write_set::{TransactionWrite, WriteOp};
 use mvhashmap::{EntryCell, MVHashMap};
 use std::{hash::Hash, thread::spawn};
-
-/// Resolved and serialized data for WriteOps, None means deletion.
-pub type ResolvedData = Option<Vec<u8>>;
 
 pub struct OutputDeltaResolver<K, V> {
     versioned_outputs: MVHashMap<K, V>,

@@ -34,6 +34,7 @@ use aptos_types::{
     account_config::new_block_event_key,
     block_metadata::BlockMetadata,
     on_chain_config::new_epoch_event_key,
+    state_store::state_key::StateKey,
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -87,11 +88,11 @@ pub struct AptosVM(pub(crate) AptosVMImpl);
 struct AptosSimulationVM(AptosVM);
 
 impl AptosVM {
-    pub fn new<S: StateView>(state: &S) -> Self {
+    pub fn new<S: StateView<StateKey>>(state: &S) -> Self {
         Self(AptosVMImpl::new(state))
     }
 
-    pub fn new_for_validation<S: StateView>(state: &S) -> Self {
+    pub fn new_for_validation<S: StateView<StateKey>>(state: &S) -> Self {
         info!(
             AdapterLogSchema::new(state.id(), 0),
             "Adapter created for Validation"
@@ -262,7 +263,7 @@ impl AptosVM {
         }
     }
 
-    fn success_transaction_cleanup<S: MoveResolverExt + StateView>(
+    fn success_transaction_cleanup<S: MoveResolverExt + StateView<StateKey>>(
         &self,
         storage: &S,
         user_txn_change_set_ext: ChangeSetExt,
@@ -327,7 +328,7 @@ impl AptosVM {
         ))
     }
 
-    fn execute_script_or_entry_function<S: MoveResolverExt + StateView>(
+    fn execute_script_or_entry_function<S: MoveResolverExt + StateView<StateKey>>(
         &self,
         storage: &S,
         mut session: SessionExt<S>,
@@ -504,7 +505,7 @@ impl AptosVM {
     /// Execute a module bundle load request.
     /// TODO: this is going to be deprecated and removed in favor of code publishing via
     /// NativeCodeContext
-    fn execute_modules<S: MoveResolverExt + StateView>(
+    fn execute_modules<S: MoveResolverExt + StateView<StateKey>>(
         &self,
         storage: &S,
         mut session: SessionExt<S>,
@@ -652,7 +653,7 @@ impl AptosVM {
             .finish(Location::Undefined)
     }
 
-    pub(crate) fn execute_user_transaction<S: MoveResolverExt + StateView>(
+    pub(crate) fn execute_user_transaction<S: MoveResolverExt + StateView<StateKey>>(
         &self,
         storage: &S,
         txn: &SignatureCheckedTransaction,
@@ -797,7 +798,7 @@ impl AptosVM {
 
     fn read_writeset(
         &self,
-        state_view: &impl StateView,
+        state_view: &impl StateView<StateKey>,
         write_set: &WriteSet,
     ) -> Result<(), VMStatus> {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
@@ -833,7 +834,7 @@ impl AptosVM {
         }
     }
 
-    pub(crate) fn process_waypoint_change_set<S: MoveResolverExt + StateView>(
+    pub(crate) fn process_waypoint_change_set<S: MoveResolverExt + StateView<StateKey>>(
         &self,
         storage: &S,
         writeset_payload: WriteSetPayload,
@@ -914,7 +915,7 @@ impl AptosVM {
 
     pub fn simulate_signed_transaction(
         txn: &SignedTransaction,
-        state_view: &impl StateView,
+        state_view: &impl StateView<StateKey>,
     ) -> (VMStatus, TransactionOutputExt) {
         let vm = AptosVM::new(state_view);
         let simulation_vm = AptosSimulationVM(vm);
@@ -960,7 +961,7 @@ impl VMExecutor for AptosVM {
     /// transaction output.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &impl StateView,
+        state_view: &impl StateView<StateKey>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::Error(
@@ -1002,7 +1003,7 @@ impl VMValidator for AptosVM {
     fn validate_transaction(
         &self,
         transaction: SignedTransaction,
-        state_view: &impl StateView,
+        state_view: &impl StateView<StateKey>,
     ) -> VMValidatorResult {
         validate_signed_transaction(self, transaction, state_view)
     }
@@ -1055,7 +1056,7 @@ impl VMAdapter for AptosVM {
             .any(|event| *event.key() == new_epoch_event_key)
     }
 
-    fn execute_single_transaction<S: MoveResolverExt + StateView>(
+    fn execute_single_transaction<S: MoveResolverExt + StateView<StateKey>>(
         &self,
         txn: &PreprocessedTransaction,
         data_cache: &S,
@@ -1161,7 +1162,7 @@ impl AptosSimulationVM {
     /*
     Executes a SignedTransaction without performing signature verification
      */
-    fn simulate_signed_transaction<S: MoveResolverExt + StateView>(
+    fn simulate_signed_transaction<S: MoveResolverExt + StateView<StateKey>>(
         &self,
         storage: &S,
         txn: &SignedTransaction,

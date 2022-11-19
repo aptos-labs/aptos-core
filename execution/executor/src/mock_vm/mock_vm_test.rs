@@ -18,7 +18,7 @@ fn gen_address(index: u8) -> AccountAddress {
 
 struct MockStateView;
 
-impl StateView for MockStateView {
+impl StateView<StateKey> for MockStateView {
     fn get_state_value(&self, _state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         Ok(None)
     }

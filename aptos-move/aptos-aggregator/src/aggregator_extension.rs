@@ -391,7 +391,7 @@ mod test {
         }
     }
 
-    impl StateView for FakeTestStorage {
+    impl StateView<StateKey> for FakeTestStorage {
         fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
             Ok(self.data.get(state_key).cloned())
         }
