@@ -6,8 +6,6 @@ pull_request_rules:
       - base=main
       - or:
           - and:
-              - check-success=check-a
-              - check-success=check-b
               - check-success=docs-lint
               - check-success=rust-lint
               - check-success=ecosystem-lint
