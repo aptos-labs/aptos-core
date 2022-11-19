@@ -20,7 +20,7 @@ use aptos_api_types::{
     MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawTableItemRequest,
     TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
 };
-use aptos_state_view::StateView;
+use aptos_state_view::TStateView;
 use aptos_storage_interface::state_view::DbStateView;
 use aptos_types::{
     access_path::AccessPath,

@@ -5,17 +5,16 @@ use crate::{
     counters,
     errors::*,
     output_delta_resolver::OutputDeltaResolver,
-    scheduler::{Scheduler, SchedulerTask, TaskGuard, TxnIndex, Version},
-    task::{ExecutionStatus, ExecutorTask, ModulePath, Transaction, TransactionOutput},
-    txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
+    scheduler::{Scheduler, SchedulerTask, TaskGuard, Version},
+    task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
+    txn_last_input_output::TxnLastInputOutput,
+    view::{LatestView, MVHashMapView},
 };
-use aptos_aggregator::delta_change_set::DeltaOp;
-use aptos_infallible::Mutex;
 use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
-use aptos_types::write_set::TransactionWrite;
+use aptos_state_view::TStateView;
 use num_cpus;
 use once_cell::sync::Lazy;
-use std::{collections::btree_map::BTreeMap, hash::Hash, marker::PhantomData, sync::Arc};
+use std::{collections::btree_map::BTreeMap, marker::PhantomData};
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -25,140 +24,18 @@ pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-/// A struct that is always used by a single thread performing an execution task. The struct is
-/// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
-/// data-structure. It also allows the caller to track the read-set and any dependencies.
-///
-/// TODO(issue 10177): MvHashMapView currently needs to be sync due to trait bounds, but should
-/// not be. In this case, the read_dependency member can have a RefCell<bool> type and the
-/// captured_reads member can have RefCell<Vec<ReadDescriptor<K>>> type.
-pub struct MVHashMapView<'a, K, V> {
-    versioned_map: &'a MVHashMap<K, V>,
-    txn_idx: TxnIndex,
-    scheduler: &'a Scheduler,
-    captured_reads: Mutex<Vec<ReadDescriptor<K>>>,
-}
-
-/// A struct which describes the result of the read from the proxy. The client
-/// can interpret these types to further resolve the reads.
-#[derive(Debug)]
-pub enum ReadResult<V> {
-    // Successful read of a value.
-    Value(Arc<V>),
-    // Similar to above, but the value was aggregated and is an integer.
-    U128(u128),
-    // Read failed while resolving a delta.
-    Unresolved(DeltaOp),
-    // Read did not return anything.
-    None,
-}
-
-impl<
-        'a,
-        K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq,
-        V: TransactionWrite + Send + Sync,
-    > MVHashMapView<'a, K, V>
-{
-    /// Drains the captured reads.
-    pub fn take_reads(&self) -> Vec<ReadDescriptor<K>> {
-        let mut reads = self.captured_reads.lock();
-        std::mem::take(&mut reads)
-    }
-
-    /// Captures a read from the VM execution.
-    pub fn read(&self, key: &K) -> ReadResult<V> {
-        use MVHashMapError::*;
-        use MVHashMapOutput::*;
-
-        loop {
-            match self.versioned_map.read(key, self.txn_idx) {
-                Ok(Version(version, v)) => {
-                    let (txn_idx, incarnation) = version;
-                    self.captured_reads
-                        .lock()
-                        .push(ReadDescriptor::from_version(
-                            key.clone(),
-                            txn_idx,
-                            incarnation,
-                        ));
-                    return ReadResult::Value(v);
-                }
-                Ok(Resolved(value)) => {
-                    self.captured_reads
-                        .lock()
-                        .push(ReadDescriptor::from_resolved(key.clone(), value));
-                    return ReadResult::U128(value);
-                }
-                Err(NotFound) => {
-                    self.captured_reads
-                        .lock()
-                        .push(ReadDescriptor::from_storage(key.clone()));
-                    return ReadResult::None;
-                }
-                Err(Unresolved(delta)) => {
-                    self.captured_reads
-                        .lock()
-                        .push(ReadDescriptor::from_unresolved(key.clone(), delta));
-                    return ReadResult::Unresolved(delta);
-                }
-                Err(Dependency(dep_idx)) => {
-                    // `self.txn_idx` estimated to depend on a write from `dep_idx`.
-                    match self.scheduler.wait_for_dependency(self.txn_idx, dep_idx) {
-                        Some(dep_condition) => {
-                            counters::DEPENDENCY_SUSPEND_COUNT.inc();
-                            // Wait on a condition variable corresponding to the encountered
-                            // read dependency. Once the dep_idx finishes re-execution, scheduler
-                            // will mark the dependency as resolved, and then the txn_idx will be
-                            // scheduled for re-execution, which will re-awaken cvar here.
-                            // A deadlock is not possible due to these condition variables:
-                            // suppose all threads are waiting on read dependency, and consider
-                            // one with lowest txn_idx. It observed a dependency, so some thread
-                            // aborted dep_idx. If that abort returned execution task, by
-                            // minimality (lower transactions aren't waiting), that thread would
-                            // finish execution unblock txn_idx, contradiction. Otherwise,
-                            // execution_idx in scheduler was lower at a time when at least the
-                            // thread that aborted dep_idx was alive, and again, since lower txns
-                            // than txn_idx are not blocked, so the execution of dep_idx will
-                            // eventually finish and lead to unblocking txn_idx, contradiction.
-                            let (lock, cvar) = &*dep_condition;
-                            let mut dep_resolved = lock.lock();
-                            while !*dep_resolved {
-                                dep_resolved = cvar.wait(dep_resolved).unwrap();
-                            }
-                        }
-                        None => continue,
-                    }
-                }
-                Err(DeltaApplicationFailure) => {
-                    // Delta application failure currently should never happen. Here, we assume it
-                    // happened because of speculation and return 0 to the Move-VM. Validation will
-                    // ensure the transaction re-executes if 0 wasn't the right number.
-                    self.captured_reads
-                        .lock()
-                        .push(ReadDescriptor::from_delta_application_failure(key.clone()));
-                    return ReadResult::U128(0);
-                }
-            };
-        }
-    }
-
-    /// Return txn_idx associated with the MVHashMapView
-    pub fn txn_idx(&self) -> TxnIndex {
-        self.txn_idx
-    }
-}
-
-pub struct BlockExecutor<T: Transaction, E: ExecutorTask> {
+pub struct BlockExecutor<T, E, S> {
     // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
-    phantom: PhantomData<(T, E)>,
+    phantom: PhantomData<(T, E, S)>,
 }
 
-impl<T, E> BlockExecutor<T, E>
+impl<T, E, S> BlockExecutor<T, E, S>
 where
     T: Transaction,
-    E: ExecutorTask<T = T>,
+    E: ExecutorTask<Txn = T>,
+    S: TStateView<Key = T::Key>,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -179,27 +56,24 @@ where
         version: Version,
         guard: TaskGuard<'a>,
         signature_verified_block: &[T],
-        last_input_output: &TxnLastInputOutput<
-            <T as Transaction>::Key,
-            <E as ExecutorTask>::Output,
-            <E as ExecutorTask>::Error,
-        >,
-        versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
         scheduler: &'a Scheduler,
         executor: &E,
+        base_view: &S,
     ) -> SchedulerTask<'a> {
         let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute];
 
-        let state_view = MVHashMapView {
-            versioned_map: versioned_data_cache,
-            txn_idx: idx_to_execute,
-            scheduler,
-            captured_reads: Mutex::new(Vec::new()),
-        };
+        let speculative_view = MVHashMapView::new(versioned_data_cache, scheduler);
 
         // VM execution.
-        let execute_result = executor.execute_transaction_mvhashmap_view(&state_view, txn);
+        let execute_result = executor.execute_transaction(
+            &LatestView::<T, S>::new_mv_view(base_view, &speculative_view, idx_to_execute),
+            txn,
+            idx_to_execute,
+            false,
+        );
         let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
@@ -249,7 +123,7 @@ where
             versioned_data_cache.delete(&k, idx_to_execute);
         }
 
-        last_input_output.record(idx_to_execute, state_view.take_reads(), result);
+        last_input_output.record(idx_to_execute, speculative_view.take_reads(), result);
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside, guard)
     }
 
@@ -257,12 +131,8 @@ where
         &self,
         version_to_validate: Version,
         guard: TaskGuard<'a>,
-        last_input_output: &TxnLastInputOutput<
-            <T as Transaction>::Key,
-            <E as ExecutorTask>::Output,
-            <E as ExecutorTask>::Error,
-        >,
-        versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
         scheduler: &'a Scheduler,
     ) -> SchedulerTask<'a> {
         use MVHashMapError::*;
@@ -310,13 +180,10 @@ where
         &self,
         executor_arguments: &E::Argument,
         block: &[T],
-        last_input_output: &TxnLastInputOutput<
-            <T as Transaction>::Key,
-            <E as ExecutorTask>::Output,
-            <E as ExecutorTask>::Error,
-        >,
-        versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
         scheduler: &Scheduler,
+        base_view: &S,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let executor = E::init(*executor_arguments);
@@ -339,6 +206,7 @@ where
                     versioned_data_cache,
                     scheduler,
                     &executor,
+                    base_view,
                 ),
                 SchedulerTask::ExecutionTask(_, Some(condvar), _guard) => {
                     let (lock, cvar) = &*condvar;
@@ -360,14 +228,9 @@ where
     pub fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        signature_verified_block: &[T],
-    ) -> Result<
-        (
-            Vec<E::Output>,
-            OutputDeltaResolver<<T as Transaction>::Key, <T as Transaction>::Value>,
-        ),
-        E::Error,
-    > {
+        signature_verified_block: &Vec<T>,
+        base_view: &S,
+    ) -> Result<(Vec<E::Output>, OutputDeltaResolver<T::Key, T::Value>), E::Error> {
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_data_cache = MVHashMap::new();
@@ -389,6 +252,7 @@ where
                         &last_input_output,
                         &versioned_data_cache,
                         &scheduler,
+                        base_view,
                     );
                 });
             }
@@ -441,6 +305,7 @@ where
         &self,
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
+        base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
@@ -448,8 +313,12 @@ where
 
         let mut ret = Vec::with_capacity(num_txns);
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            // this call internally materializes deltas.
-            let res = executor.execute_transaction_btree_view(&data_map, txn, idx);
+            let res = executor.execute_transaction(
+                &LatestView::<T, S>::new_btree_view(base_view, &data_map, idx),
+                txn,
+                idx,
+                true,
+            );
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
 

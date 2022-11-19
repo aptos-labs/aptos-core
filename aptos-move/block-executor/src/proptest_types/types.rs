@@ -3,26 +3,28 @@
 
 use crate::{
     errors::{Error, Result},
-    executor::{MVHashMapView, ReadResult},
+    scheduler::TxnIndex,
     task::{
         ExecutionStatus, ExecutorTask, ModulePath, Transaction as TransactionType,
         TransactionOutput,
     },
 };
 use aptos_aggregator::{
-    delta_change_set::{delta_add, delta_sub, DeltaOp},
+    delta_change_set::{delta_add, delta_sub, deserialize, serialize, DeltaOp},
     transaction::AggregatorValue,
 };
+use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
+    state_store::state_storage_usage::StateStorageUsage,
     write_set::{TransactionWrite, WriteOp},
 };
+use claims::assert_none;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
-use std::collections::hash_map::DefaultHasher;
 use std::{
-    collections::{btree_map::BTreeMap, BTreeSet, HashMap},
+    collections::{hash_map::DefaultHasher, BTreeSet, HashMap},
     convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -33,8 +35,68 @@ use std::{
     },
 };
 
-// When aggregator value has to be resolved from storage, pretend it is this number.
-const STORAGE_DELTA_VAL: u128 = 100;
+// Should not be possible to overflow or underflow, as each delta is at
+// most 100 in the tests.
+pub(crate) const STORAGE_AGGREGATOR_VALUE: u128 = 100001;
+
+pub(crate) struct DeltaDataView<K, V> {
+    pub(crate) phantom: PhantomData<(K, V)>,
+}
+
+impl<K, V> TStateView for DeltaDataView<K, V>
+where
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
+{
+    type Key = K;
+
+    /// Gets the state value for a given state key.
+    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<Vec<u8>>> {
+        // When aggregator value has to be resolved from storage, pretend it is 100.
+        Ok(Some(serialize(&STORAGE_AGGREGATOR_VALUE)))
+    }
+
+    fn id(&self) -> StateViewId {
+        StateViewId::Miscellaneous
+    }
+
+    fn is_genesis(&self) -> bool {
+        unreachable!();
+    }
+
+    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        unreachable!();
+    }
+}
+
+pub(crate) struct EmptyDataView<K, V> {
+    pub(crate) phantom: PhantomData<(K, V)>,
+}
+
+impl<K, V> TStateView for EmptyDataView<K, V>
+where
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
+{
+    type Key = K;
+
+    /// Gets the state value for a given state key.
+    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<Vec<u8>>> {
+        Ok(None)
+    }
+
+    fn id(&self) -> StateViewId {
+        StateViewId::Miscellaneous
+    }
+
+    fn is_genesis(&self) -> bool {
+        unreachable!();
+    }
+
+    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        unreachable!();
+    }
+}
 
 ///////////////////////////////////////////////////////////////////////////
 // Generation of transactions
@@ -321,7 +383,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 impl<K, V> TransactionType for Transaction<K, V>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Key = K;
     type Value = V;
@@ -344,7 +406,7 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
-    type T = Transaction<K, V>;
+    type Txn = Transaction<K, V>;
     type Output = Output<K, V>;
     type Error = usize;
     type Argument = ();
@@ -353,20 +415,12 @@ where
         Self::new()
     }
 
-    fn execute_transaction_btree_view(
+    fn execute_transaction(
         &self,
-        _view: &BTreeMap<K, V>,
-        _txn: &Self::T,
-        _txn_idx: usize,
-    ) -> ExecutionStatus<Self::Output, Self::Error> {
-        // Separate PR to proptest sequential execution flow.
-        unreachable!();
-    }
-
-    fn execute_transaction_mvhashmap_view(
-        &self,
-        view: &MVHashMapView<K, V>,
-        txn: &Self::T,
+        view: &impl TStateView<Key = K>,
+        txn: &Self::Txn,
+        txn_idx: TxnIndex,
+        _materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
             Transaction::Write {
@@ -385,7 +439,8 @@ where
                 // Reads
                 let mut reads_result = vec![];
                 for k in reads[read_idx].iter() {
-                    reads_result.push(view.read(k));
+                    // TODO: later test errors as well? (by fixing state_view behavior).
+                    reads_result.push(view.get_state_value(k).unwrap());
                 }
                 ExecutionStatus::Success(Output(
                     writes_and_deltas[write_idx].0.clone(),
@@ -394,20 +449,20 @@ where
                 ))
             }
             Transaction::SkipRest => ExecutionStatus::SkipRest(Output(vec![], vec![], vec![])),
-            Transaction::Abort => ExecutionStatus::Abort(view.txn_idx()),
+            Transaction::Abort => ExecutionStatus::Abort(txn_idx),
         }
     }
 }
 
 #[derive(Debug)]
-pub struct Output<K, V>(Vec<(K, V)>, Vec<(K, DeltaOp)>, Vec<ReadResult<V>>);
+pub struct Output<K, V>(Vec<(K, V)>, Vec<(K, DeltaOp)>, Vec<Option<Vec<u8>>>);
 
 impl<K, V> TransactionOutput for Output<K, V>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
-    type T = Transaction<K, V>;
+    type Txn = Transaction<K, V>;
 
     fn get_writes(&self) -> Vec<(K, V)> {
         self.0.clone()
@@ -443,7 +498,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
         let mut current_world = HashMap::new();
         // Delta world stores the latest u128 value of delta aggregator. When empty, the
         // value is derived based on deserializing current_world, or falling back to
-        // STORAGE_DELTA_VAL.
+        // STORAGE_AGGREGATOR_VAL.
         let mut delta_world = HashMap::new();
 
         let mut result_vec = vec![];
@@ -516,7 +571,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                                     // Get base value from latest resolved aggregator value.
                                     (None, Some(value)) => Some(value),
                                     // Storage always gets resolved to a default constant.
-                                    (None, None) => Some(STORAGE_DELTA_VAL),
+                                    (None, None) => Some(STORAGE_AGGREGATOR_VALUE),
                                 };
 
                                 match base {
@@ -545,57 +600,35 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
         Self::Success(result_vec)
     }
 
-    fn check_result(
-        expected_results: &[(Option<V>, Option<u128>)],
-        results: &[ReadResult<V>],
-        delta_fail: bool,
-        storage_delta_val: Option<u128>,
-    ) {
-        let mut delta_failed = false;
+    fn check_result(expected_results: &[(Option<V>, Option<u128>)], results: &[Option<Vec<u8>>]) {
         expected_results
             .iter()
             .zip(results.iter())
-            .for_each(|(expected_result, result)| {
-                // failure should happen at the last index.
-                assert!(!delta_failed);
-                match result {
-                    ReadResult::Value(v) => {
-                        assert_eq!(**v, expected_result.0.clone().unwrap());
-                        assert_eq!(expected_result.1, None);
+            .for_each(|(expected_result, result)| match result {
+                Some(value) => match expected_result {
+                    (Some(v), None) => {
+                        assert_eq!(v.extract_raw_bytes().unwrap(), *value);
                     }
-                    ReadResult::U128(v) => {
-                        assert_eq!(expected_result.0, None);
-                        assert_eq!(*v, expected_result.1.unwrap());
+                    (None, Some(v)) => {
+                        assert_eq!(serialize(v), *value);
                     }
-                    ReadResult::Unresolved(delta) => {
-                        assert_eq!(expected_result.0, None);
-                        let applied_delta =
-                            delta.apply_to(storage_delta_val.unwrap_or(STORAGE_DELTA_VAL));
-                        if applied_delta.is_err() {
-                            delta_failed = true;
-                        }
-                        if delta_failed {
-                            // Should be expected to fail.
-                            assert!(delta_fail);
-                        } else {
-                            assert_eq!(applied_delta.unwrap(), expected_result.1.unwrap());
-                        }
+                    (Some(_), Some(_)) => unreachable!("A"),
+                    (None, None) => {
+                        assert_eq!(deserialize(value), STORAGE_AGGREGATOR_VALUE);
                     }
-                    ReadResult::None => {
-                        assert_eq!(expected_result.0, None);
-                        assert_eq!(expected_result.1, None);
+                },
+                None => {
+                    if let Some(val) = &expected_result.0 {
+                        assert_none!(val.extract_raw_bytes());
                     }
+                    assert_eq!(expected_result.1, None);
                 }
             })
     }
 
     // Used for testing, hence the function asserts the correctness conditions within
     // itself to be easily traceable in case of an error.
-    pub fn assert_output<K>(
-        &self,
-        results: &Result<Vec<Output<K, V>>, usize>,
-        storage_delta_val: Option<u128>,
-    ) {
+    pub fn assert_output<K>(&self, results: &Result<Vec<Output<K, V>>, usize>) {
         match (self, results) {
             (Self::Aborted(i), Err(Error::UserError(idx))) => {
                 assert_eq!(i, idx);
@@ -607,7 +640,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .take(*skip_at)
                     .zip(expected_results.iter())
                     .for_each(|(Output(_, _, result), expected_results)| {
-                        Self::check_result(expected_results, result, false, storage_delta_val)
+                        Self::check_result(expected_results, result)
                     });
 
                 results
@@ -622,14 +655,14 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .take(*fail_idx)
                     .zip(expected_results.iter())
                     .for_each(|(Output(_, _, result), expected_results)| {
-                        Self::check_result(expected_results, result, true, storage_delta_val)
+                        Self::check_result(expected_results, result)
                     });
             }
             (Self::Success(expected_results), Ok(results)) => results
                 .iter()
                 .zip(expected_results.iter())
                 .for_each(|(Output(_, _, result), expected_result)| {
-                    Self::check_result(expected_result, result, false, storage_delta_val);
+                    Self::check_result(expected_result, result);
                 }),
             _ => panic!("Incomparable execution outcomes"),
         }
