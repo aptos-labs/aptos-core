@@ -1,7 +1,3 @@
-
-# This is temporarily not used due to a bug in check-group with evaluating checks that have been triggered by both pull_request and pull_request_target (duplicate checks).
-# Using mergify instead.
-
 # This file leverages https://github.com/tianhaoz95/check-group
 # to define groups of status checks which are required depending on the files changed in a PR.
 # This allows us to make certain checks required/optional depending on the PR content,
@@ -23,7 +19,6 @@ subprojects:
     checks:
       - rust-lint
       - ecosystem-lint
-      - permission-check
       - scripts-lint
       - rust-unit-test
       - rust-doc-test
