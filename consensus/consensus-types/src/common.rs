@@ -151,7 +151,7 @@ impl fmt::Display for Payload {
                 write!(f, "InMemory txns: {}", txns.len())
             }
             Payload::InQuorumStore(proof_with_status) => {
-                write!(f, "InMemory poss: {}", proof_with_status.proofs.len())
+                write!(f, "InMemory proofs: {}", proof_with_status.proofs.len())
             }
             Payload::Empty => write!(f, "Empty payload"),
         }
@@ -211,11 +211,11 @@ impl fmt::Display for PayloadFilter {
                 write!(f, "{}", txns_str)
             }
             PayloadFilter::InQuorumStore(excluded_proofs) => {
-                let mut poss_str = "".to_string();
+                let mut proofs_str = "".to_string();
                 for proof in excluded_proofs.iter() {
-                    write!(poss_str, "{} ", proof)?;
+                    write!(proofs_str, "{} ", proof)?;
                 }
-                write!(f, "{}", poss_str)
+                write!(f, "{}", proofs_str)
             }
             PayloadFilter::Empty => {
                 write!(f, "Empty filter")
