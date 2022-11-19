@@ -3,7 +3,7 @@
 
 use crate::{
     block_storage::BlockStore,
-    data_manager::QuorumStoreProxy,
+    data_manager::PayloadManager,
     liveness::{
         proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
         rotating_proposer_election::RotatingProposer,
@@ -77,7 +77,7 @@ fn build_empty_store(
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
-        Arc::new(QuorumStoreProxy::new()),
+        Arc::new(PayloadManager::new()),
     ))
 }
 

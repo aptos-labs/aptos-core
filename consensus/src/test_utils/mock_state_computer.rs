@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_manager::QuorumStoreProxy,
+    data_manager::PayloadManager,
     error::StateSyncError,
     experimental::buffer_manager::OrderedBlocks,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
@@ -26,7 +26,7 @@ pub struct MockStateComputer {
     executor_channel: UnboundedSender<OrderedBlocks>,
     consensus_db: Arc<MockStorage>,
     block_cache: Mutex<HashMap<HashValue, Payload>>,
-    data_manager: Arc<QuorumStoreProxy>,
+    data_manager: Arc<PayloadManager>,
 }
 
 impl MockStateComputer {
@@ -40,7 +40,7 @@ impl MockStateComputer {
             executor_channel,
             consensus_db,
             block_cache: Mutex::new(HashMap::new()),
-            data_manager: Arc::new(QuorumStoreProxy::new()),
+            data_manager: Arc::new(PayloadManager::new()),
         }
     }
 

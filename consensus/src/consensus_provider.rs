@@ -3,7 +3,7 @@
 
 use crate::{
     counters,
-    data_manager::QuorumStoreProxy,
+    data_manager::PayloadManager,
     epoch_manager::EpochManager,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
@@ -54,7 +54,7 @@ pub fn start_consensus(
         consensus_to_mempool_sender.clone(),
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
-    let data_manager: Arc<QuorumStoreProxy> = Arc::new(QuorumStoreProxy::new());
+    let data_manager: Arc<PayloadManager> = Arc::new(PayloadManager::new());
 
     let state_computer = Arc::new(ExecutionProxy::new(
         Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),

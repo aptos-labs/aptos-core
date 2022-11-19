@@ -249,6 +249,7 @@ vm-validator = { path = "vm-validator" }
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
 anyhow = "1.0.62"
+arc-swap = "1.5.0"
 async-stream = "0.3"
 async-trait = "0.1.53"
 base64 = "0.13.0"

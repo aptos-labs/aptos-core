@@ -290,16 +290,16 @@ MultiEd25519Signature:
 Payload:
   ENUM:
     0:
-      Empty: UNIT
-    1:
       DirectMempool:
         NEWTYPE:
           SEQ:
             TYPENAME: SignedTransaction
-    2:
+    1:
       InQuorumStore:
         NEWTYPE:
           TYPENAME: ProofWithStatus
+    2:
+      Empty: UNIT
 ProofOfStore:
   STRUCT:
     - info:

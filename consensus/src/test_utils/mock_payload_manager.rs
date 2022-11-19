@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::QuorumStoreError, payload_manager::QuorumStoreClient, state_replication::PayloadManager,
+    error::QuorumStoreError, payload_client::QuorumStoreClient, state_replication::PayloadClient,
 };
 use anyhow::Result;
 use aptos_types::{
@@ -48,7 +48,7 @@ fn _mock_transaction_status(count: usize) -> Vec<TransactionStatus> {
 }
 
 #[async_trait::async_trait]
-impl PayloadManager for MockPayloadManager {
+impl PayloadClient for MockPayloadManager {
     /// The returned future is fulfilled with the vector of SignedTransactions
     async fn pull_payload(
         &self,

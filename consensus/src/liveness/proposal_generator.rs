@@ -3,7 +3,7 @@
 
 use crate::{
     block_storage::BlockReader, counters::CHAIN_HEALTH_BACKOFF_TRIGGERED,
-    state_replication::PayloadManager, util::time_service::TimeService,
+    state_replication::PayloadClient, util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::ChainHealthBackoffValues;
@@ -101,7 +101,7 @@ pub struct ProposalGenerator {
     // proposed block.
     block_store: Arc<dyn BlockReader + Send + Sync>,
     // ProofOfStore manager is delivering the ProofOfStores.
-    payload_manager: Arc<dyn PayloadManager>,
+    payload_manager: Arc<dyn PayloadClient>,
     // Transaction manager is delivering the transactions.
     // Time service to generate block timestamps
     time_service: Arc<dyn TimeService>,
@@ -122,7 +122,7 @@ impl ProposalGenerator {
     pub fn new(
         author: Author,
         block_store: Arc<dyn BlockReader + Send + Sync>,
-        payload_manager: Arc<dyn PayloadManager>,
+        payload_manager: Arc<dyn PayloadClient>,
         time_service: Arc<dyn TimeService>,
         max_block_txns: u64,
         max_block_bytes: u64,

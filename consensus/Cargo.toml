@@ -25,7 +25,7 @@ aptos-secure-storage = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-arc-swap = "1.5.0"
+arc-swap = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
@@ -33,7 +33,6 @@ bytes = { workspace = true }
 channel = { workspace = true }
 consensus-notifications = { workspace = true }
 consensus-types = { workspace = true }
-dashmap = "5.2.0"
 event-notifications = { workspace = true }
 executor = { workspace = true }
 executor-types = { workspace = true }

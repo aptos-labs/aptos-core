@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::QuorumStoreError, monitor, state_replication::PayloadManager};
+use crate::{error::QuorumStoreError, monitor, state_replication::PayloadClient};
 use anyhow::Result;
 use aptos_logger::prelude::*;
 use consensus_types::common::Round;
@@ -81,7 +81,7 @@ impl QuorumStoreClient {
 }
 
 #[async_trait::async_trait]
-impl PayloadManager for QuorumStoreClient {
+impl PayloadClient for QuorumStoreClient {
     async fn pull_payload(
         &self,
         round: Round,

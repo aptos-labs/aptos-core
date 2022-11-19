@@ -22,13 +22,13 @@ use tokio::sync::oneshot;
 
 /// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
-pub struct QuorumStoreProxy {
+pub struct PayloadManager {
     quorum_store_enabled: AtomicBool,
     data_reader: ArcSwapOption<BatchReader>,
     quorum_store_wrapper_tx: ArcSwapOption<Sender<WrapperCommand>>,
 }
 
-impl QuorumStoreProxy {
+impl PayloadManager {
     pub fn new() -> Self {
         Self {
             quorum_store_enabled: AtomicBool::new(false),

@@ -30,7 +30,6 @@ serde = { workspace = true }
 short-hex-str = { workspace = true }
 tokio = { workspace = true }
 
-
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }

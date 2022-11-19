@@ -2653,7 +2653,6 @@ dependencies = [
  "claims",
  "consensus-notifications",
  "consensus-types",
- "dashmap",
  "event-notifications",
  "executor",
  "executor-test-helpers",

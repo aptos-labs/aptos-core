@@ -19,7 +19,7 @@ pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<ExecutedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
 
 #[async_trait::async_trait]
-pub trait PayloadManager: Send + Sync {
+pub trait PayloadClient: Send + Sync {
     async fn pull_payload(
         &self,
         round: Round,

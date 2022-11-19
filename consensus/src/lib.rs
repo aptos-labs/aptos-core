@@ -25,7 +25,7 @@ mod metrics_safety_rules;
 mod network;
 #[cfg(test)]
 mod network_tests;
-mod payload_manager;
+mod payload_client;
 mod pending_votes;
 mod persistent_liveness_storage;
 mod quorum_store;
