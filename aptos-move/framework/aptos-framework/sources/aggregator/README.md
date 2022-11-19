@@ -11,14 +11,14 @@ Both additions and subtractions are executed speculatively, and thus can be
 easily parallelized. On underflow or overflow, these operations are guaranteed
 to abort. Using these operations is encouraged.
 
-Reading an aggregator's value "materializes" the speculative value, as it
-can involve reading from the storage or underflow and overflow checks. In
-general, using this operation is discouraged, or at least it should be used
+Reading an aggregator's value "materializes" the speculative value, and it
+can involve reading from the storage or checking for underflow or overflow.
+In general, using this operation is discouraged, or at least it should be used
 as rarely as possible.
 
 ## Aggregator factory
 
-Unfortuantely, aggregators cannot be part of a resource. At the moment, Move
+Unfortunately, aggregators cannot be part of a resource. At the moment, Move
 does not allow fine-grained access to resource fields, which ruins perfromance
 benefits aggregators can provide. In addition, getting the value of the field of
 a resource from storage is not possible without hardcoding the struct layout.
@@ -31,12 +31,12 @@ struct Foo<A> has key {
 }
 ```
 
-there is no clean way of getting a value of `Foo::a` without knowing that the
+there is no clean way of getting the value of `Foo::a` without knowing that the
 offset is 0.
 
 To mitigate the problem, we store aggregators as table items. Recall that every
-item stored in the table is uniqely identified by `(handle, key)` pair: `handle` 
-dentifies a table instance, and `key` identifies an item within the table. Now,
+item stored in the table is uniquely identified by `(handle, key)` pair: `handle` 
+identifies a table instance, and `key` identifies an item within the table. Now,
 if aggregator is a table item, it can be easily queried from storage and has a
 fine-grained access.
 
