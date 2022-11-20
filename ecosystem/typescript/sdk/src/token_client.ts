@@ -356,7 +356,7 @@ export class TokenClient {
   }
 
   /**
-   * User opt-in or out direct transfer through a boolean flag
+   * Directly transfer token to a receiver. The receiver should have opt-in direct transfer
    *
    * @param sender AptosAccount where the token will be transferred
    * @param creator  address of the token creator
