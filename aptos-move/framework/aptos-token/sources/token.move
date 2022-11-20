@@ -146,51 +146,51 @@ module aptos_token::token {
     //
     struct Token has store {
         id: TokenId,
-        // the amount of tokens. Only property_version = 0 can have a value bigger than 1.
+        /// the amount of tokens. Only property_version = 0 can have a value bigger than 1.
         amount: u64,
-        // The properties with this token.
-        // when property_version = 0, the token_properties are the same as default_properties in TokenData, we don't store it.
-        // when the property_map mutates, a new property_version is assigned to the token.
+        /// The properties with this token.
+        /// when property_version = 0, the token_properties are the same as default_properties in TokenData, we don't store it.
+        /// when the property_map mutates, a new property_version is assigned to the token.
         token_properties: PropertyMap,
     }
 
     /// global unique identifier of a token
     struct TokenId has store, copy, drop {
-        // the id to the common token data shared by token with different property_version
+        /// the id to the common token data shared by token with different property_version
         token_data_id: TokenDataId,
-        // The version of the property map; when a fungible token is mutated, a new property version is created and assigned to the token to make it an NFT
+        /// The version of the property map; when a fungible token is mutated, a new property version is created and assigned to the token to make it an NFT
         property_version: u64,
     }
 
     /// globally unique identifier of tokendata
     struct TokenDataId has copy, drop, store {
-        // The address of the creator, eg: 0xcafe
+        /// The address of the creator, eg: 0xcafe
         creator: address,
-        // The name of collection; this is unique under the same account, eg: "Aptos Animal Collection"
+        /// The name of collection; this is unique under the same account, eg: "Aptos Animal Collection"
         collection: String,
-        // The name of the token; this is the same as the name field of TokenData
+        /// The name of the token; this is the same as the name field of TokenData
         name: String,
     }
 
     /// The shared TokenData by tokens with different property_version
     struct TokenData has store {
-        // The maximal number of tokens that can be minted under this TokenData; if the maximum is 0, there is no limit
+        /// The maximal number of tokens that can be minted under this TokenData; if the maximum is 0, there is no limit
         maximum: u64,
-        // The current largest property version of all tokens with this TokenData
+        /// The current largest property version of all tokens with this TokenData
         largest_property_version: u64,
-        // The number of tokens with this TokenData. Supply is only tracked for the limited token whose maximum is not 0
+        /// The number of tokens with this TokenData. Supply is only tracked for the limited token whose maximum is not 0
         supply: u64,
-        // The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain storage; the URL length should be less than 512 characters, eg: https://arweave.net/Fmmn4ul-7Mv6vzm7JwE69O-I-vd6Bz2QriJO1niwCh4
+        /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain storage; the URL length should be less than 512 characters, eg: https://arweave.net/Fmmn4ul-7Mv6vzm7JwE69O-I-vd6Bz2QriJO1niwCh4
         uri: String,
-        // The denominator and numerator for calculating the royalty fee; it also contains payee account address for depositing the Royalty
+        /// The denominator and numerator for calculating the royalty fee; it also contains payee account address for depositing the Royalty
         royalty: Royalty,
-        // The name of the token, which should be unique within the collection; the length of name should be smaller than 128, characters, eg: "Aptos Animal #1234"
+        /// The name of the token, which should be unique within the collection; the length of name should be smaller than 128, characters, eg: "Aptos Animal #1234"
         name: String,
-        // Describes this Token
+        /// Describes this Token
         description: String,
-        // The properties are stored in the TokenData that are shared by all tokens
+        /// The properties are stored in the TokenData that are shared by all tokens
         default_properties: PropertyMap,
-        // Control the TokenData field mutability
+        /// Control the TokenData field mutability
         mutability_config: TokenMutabilityConfig,
     }
 
@@ -198,28 +198,28 @@ module aptos_token::token {
     struct Royalty has copy, drop, store {
         royalty_points_numerator: u64,
         royalty_points_denominator: u64,
-        // if the token is jointly owned by multiple creators, the group of creators should create a shared account.
-        // the payee_address will be the shared account address.
+        /// if the token is jointly owned by multiple creators, the group of creators should create a shared account.
+        /// the payee_address will be the shared account address.
         payee_address: address,
     }
 
     /// This config specifies which fields in the TokenData are mutable
     struct TokenMutabilityConfig has copy, store, drop {
-        // control if the token maximum is mutable
+        /// control if the token maximum is mutable
         maximum: bool,
-        // control if the token uri is mutable
+        /// control if the token uri is mutable
         uri: bool,
-        // control if the token royalty is mutable
+        /// control if the token royalty is mutable
         royalty: bool,
-        // control if the token description is mutable
+        /// control if the token description is mutable
         description: bool,
-        // control if the property map is mutable
+        /// control if the property map is mutable
         properties: bool,
     }
 
     /// Represents token resources owned by token owner
     struct TokenStore has key {
-        // the tokens owned by a token owner
+        /// the tokens owned by a token owner
         tokens: Table<TokenId, Token>,
         direct_transfer: bool,
         deposit_events: EventHandle<DepositEvent>,
@@ -230,11 +230,11 @@ module aptos_token::token {
 
     /// This config specifies which fields in the Collection are mutable
     struct CollectionMutabilityConfig has copy, store, drop {
-        // control if description is mutable
+        /// control if description is mutable
         description: bool,
-        // control if uri is mutable
+        /// control if uri is mutable
         uri: bool,
-        // control if collection maxium is mutable
+        /// control if collection maxium is mutable
         maximum: bool,
     }
 
@@ -249,18 +249,18 @@ module aptos_token::token {
 
     /// Represent the collection metadata
     struct CollectionData has store {
-        // A description for the token collection Eg: "Aptos Toad Overload"
+        /// A description for the token collection Eg: "Aptos Toad Overload"
         description: String,
-        // The collection name, which should be unique among all collections by the creator; the name should also be smaller than 128 characters, eg: "Animal Collection"
+        /// The collection name, which should be unique among all collections by the creator; the name should also be smaller than 128 characters, eg: "Animal Collection"
         name: String,
-        // The URI for the collection; its length should be smaller than 512 characters
+        /// The URI for the collection; its length should be smaller than 512 characters
         uri: String,
-        // The number of different TokenData entries in this collection
+        /// The number of different TokenData entries in this collection
         supply: u64,
-        // If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum
-        // If maximal is 0, Aptos doesn't track the supply of this collection, and there is no limit
+        /// If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum
+        /// If maximal is 0, Aptos doesn't track the supply of this collection, and there is no limit
         maximum: u64,
-        // control which collectionData field is mutable
+        /// control which collectionData field is mutable
         mutability_config: CollectionMutabilityConfig,
     }
 
