@@ -12,6 +12,7 @@ subprojects:
       - developer-docs-site/**
     checks:
       - docs-lint
+      # - netlify/aptos-developer-docs/deploy-preview # somehow checkgroup doesnt' recognize this check, so commenting it out for now
   # everything, but docs
   - id: catch_all
     paths:
@@ -19,7 +20,6 @@ subprojects:
     checks:
       - rust-lint
       - ecosystem-lint
-      - permission-check
       - scripts-lint
       - rust-unit-test
       - rust-doc-test

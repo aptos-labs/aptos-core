@@ -13,21 +13,20 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-bytes = "1.1.0"
-futures = "0.3.21"
-pin-project = "1.0.10"
-serde = { version = "1.0.137", default-features = false }
-tokio = { version = "1.21.0", features = ["full"] }
-tokio-util = { version = "0.7.2", features = ["compat"] }
-url = { version = "2.2.2" }
-
-aptos-types = { path = "../../types" }
-
-memsocket = { path = "../memsocket", optional = true }
-proxy = { path = "../../crates/proxy" }
+aptos-types = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
+memsocket = { workspace = true }
+pin-project = { workspace = true }
+proxy = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
-memsocket = { path = "../memsocket" }
+aptos-types = { workspace = true, features = ["fuzzing"] }
+memsocket = { workspace = true }
 
 [features]
 default = []

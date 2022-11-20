@@ -13,9 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-serde = { version = "1.0.124", default-features = false }
-thiserror = "1.0.24"
-
-aptos-config = { path = "../../../config" }
-
-network = { path = "../../../network" }
+aptos-config = { workspace = true }
+network = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
