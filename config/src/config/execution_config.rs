@@ -19,6 +19,7 @@ pub struct ExecutionConfig {
     pub genesis: Option<Transaction>,
     pub genesis_file_location: PathBuf,
     pub concurrency_level: u16,
+    pub min_block_len_for_parallel: u16,
     pub num_proof_reading_threads: u16,
     pub paranoid_type_verification: bool,
     pub paranoid_hot_potato_verification: bool,
@@ -48,6 +49,8 @@ impl Default for ExecutionConfig {
             genesis_file_location: PathBuf::new(),
             // Parallel execution by default.
             concurrency_level: 8,
+            // Run blocks smaller than 10 txns sequentially.
+            min_block_len_for_parallel: 10,
             num_proof_reading_threads: 32,
             paranoid_type_verification: true,
             paranoid_hot_potato_verification: true,

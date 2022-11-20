@@ -611,6 +611,9 @@ pub fn setup_environment(
         node_config.execution.paranoid_hot_potato_verification,
     );
     AptosVM::set_concurrency_level_once(node_config.execution.concurrency_level as usize);
+    AptosVM::set_min_block_len_for_parallel_once(
+        node_config.execution.min_block_len_for_parallel as usize,
+    );
     AptosVM::set_num_proof_reading_threads_once(
         node_config.execution.num_proof_reading_threads as usize,
     );

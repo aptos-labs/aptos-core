@@ -71,6 +71,7 @@ use std::{
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
+static EXECUTION_MIN_BLOCK_LEN_FOR_PARALLEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static RUNTIME_CHECKS: OnceCell<RuntimeConfig> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
@@ -97,6 +98,23 @@ impl AptosVM {
             "Adapter created for Validation"
         );
         Self::new(state)
+    }
+
+    /// When invoked first time, sets the minimum block size that will be
+    /// considered for parallel execution (smaller blocks executed sequentially).
+    pub fn set_min_block_len_for_parallel_once(min_block_size: usize) {
+        // Only the first call succeeds, due to OnceCell semantics.
+        EXECUTION_MIN_BLOCK_LEN_FOR_PARALLEL
+            .set(min_block_size)
+            .ok();
+    }
+
+    /// Get the min length of a block to be considered for parallel execution.
+    pub fn get_min_block_len_for_parallel() -> usize {
+        match EXECUTION_MIN_BLOCK_LEN_FOR_PARALLEL.get() {
+            Some(min_block_len) => *min_block_len,
+            None => 1,
+        }
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -983,7 +1001,11 @@ impl VMExecutor for AptosVM {
             ))
         });
 
-        let concurrency_level = Self::get_concurrency_level();
+        let concurrency_level = if Self::get_min_block_len_for_parallel() > transactions.len() {
+            1
+        } else {
+            Self::get_concurrency_level()
+        };
         if concurrency_level > 1 {
             let (result, err) = crate::parallel_executor::ParallelAptosVM::execute_block(
                 transactions,
