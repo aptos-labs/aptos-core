@@ -7,14 +7,14 @@ An Aptos node is an entity of the Aptos ecosystem that tracks the [state](../ref
 * Fullnodes
 
 Each Aptos node comprises several logical components:
-* [REST service](../reference/glossary#rest-service)
-* [Mempool](./validator-nodes#mempool)
-* [Execution](./validator-nodes#execution)
-* [Virtual Machine](./validator-nodes#virtual-machine)
-* [Storage](./validator-nodes#storage)
-* [State synchronizer](./validator-nodes#state-synchronizer)
+* [REST service](../reference/glossary.md#rest-service)
+* [Mempool](./validator-nodes.md#mempool)
+* [Execution](./validator-nodes.md#execution)
+* [Virtual Machine](./validator-nodes.md#virtual-machine)
+* [Storage](./validator-nodes.md#storage)
+* [State synchronizer](./validator-nodes.md#state-synchronizer)
 
-The [Aptos-core](../reference/glossary#aptos-core) software can be configured to run as a validator node or as a fullnode.
+The [Aptos-core](../reference/glossary.md#aptos-core) software can be configured to run as a validator node or as a fullnode.
 
 ## Overview
 
