@@ -5,7 +5,7 @@ id: "resources"
 
 # Resources
 
-On Aptos, smart contract states are sharded by accounts. All on chain states have to be organized into resources and associated
+On Aptos, smart contract states are sharded by accounts. All on-chain states have to be organized into resources and associated
 with specific accounts. This is different from other blockchains, such as Ethereum, where each smart contract maintains
 their own storage space. Accounts on Aptos can contain associated modules and resources. [Events](./basics-events.md) are stored
 inside resources.
@@ -45,16 +45,16 @@ Objects (including resources) on Aptos are owned by both:
 2. The module that defines the object.
 
 Creating a new resource and storing it into an account requires both the owning account's signature and the module's code.
-But modifying and deleting the resource/object only requires the module's code and the owning account's address. The fields of
-an object also can only be read directly by the module's code, which can be offered as public utilities for other modules.
+But modifying and deleting the resource/object requires only the module's code and the owning account's address. The fields of
+an object also can be read only directly by the module's code, which can be offered as public utilities for other modules.
 
-This dual ownership design is one of the basis of state safety in Aptos Move and enable powerful but safe functionalities to
+This dual-ownership design is one of the bases of state safety in Aptos Move and enables powerful but safe functionalities to
 be built around resources and objects.
 
 ## Viewing a resource
 Resources are stored within specific accounts. To locate a resource, the owning account must first be identified.
-Resources can be viewed on the Explorer UI by searching for the owning account or directly fetched from a fullnode's API.
-See [Interacting with the blockchain](../guides/interacting-with-the-blockchain.md) for more information.
+Resources can be viewed on the [Aptos Explorer](https://explorer.aptoslabs.com/) by searching for the owning account or be directly
+fetched from a fullnode's API. See [Interacting with the blockchain](../guides/interacting-with-the-blockchain.md) for more information.
 
 ## How resources are stored
 It's up to the smart contract developers to decide how and where a specific state is stored. For example, events for depositing
