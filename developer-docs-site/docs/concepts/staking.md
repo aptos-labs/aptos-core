@@ -178,7 +178,7 @@ Participating as a validator node on the Aptos network works like this:
 6.  Operator must wait until the new epoch starts before their validator becomes active.
 
 :::tip Joining the validator set
-For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](../nodes/validator-node/operator/staking-pool-operations#joining-validator-set).
+For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](../nodes/validator-node/operator/staking-pool-operations.md#joining-validator-set).
 :::
 
 ### Minimum and maximum stake
