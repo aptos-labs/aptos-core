@@ -7,26 +7,34 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 18 November 2002
+
+- Increased [Aptos Indexer](/guides/indexing) rate limits from 300 requests per IP per hour to 400 requests every five minutes.
+
+## 17 November 2022
+
+- Published instructions for [updating validator nodes](/nodes/validator-node/operator/update-validator-node) by configuring and failing over to validator fullnode.
+
 ## 16 November 2022
 
 Completely overhauled the navigation of Aptos.dev to better reflect our users and their feedback. Here are the highlights:
  * Introduced new *Start Aptos* and *Build Apps* sections to contain information related to setup and app development, respectively.
  * Shifted key concepts up in navigation, included the Aptos White Paper, moved nodes-related materials to the *Run Nodes* section, and gas-related pages to a new *Build Apps > [Write Move Smart Contracts](/guides/move-guides/aptos-move-guides)* section.
  * Placed instructions for the Aptos CLI and other tools under *Start Aptos > [Set Environment](/guides/getting-started)*.
- * Recategorized previous *Guides* across several new subsections, including *Build Apps > [Develop Locally](/nodes/local-testnet/local-testnet-index)*, *[Interact with Blockchain](/guides/aptos-guides)*, and *Run Nodes > [Configure Nodes](/nodes/identity-and-configuration).
+ * Recategorized previous *Guides* across several new subsections, including *Build Apps > [Develop Locally](/nodes/local-testnet/local-testnet-index)*, *[Interact with Blockchain](/guides/aptos-guides)*, and *Run Nodes > [Configure Nodes](/nodes/identity-and-configuration)*.
  * Integrated the [Aptos Node API specification](/nodes/aptos-api-spec#/), [Issues and Workarounds](/issues-and-workarounds) and [Aptos Glossary](/reference/glossary) into a new *Reference* section.
 
 ## 12 November 2022
 
-- Recommended performance improvements to [validator source code](/docs/nodes/validator-node/operator/running-validator-node/run-validator-node-using-source) startup instructions by suggesting building the `aptos-node` binary and running it directly instead of using `cargo run`.
+- Recommended performance improvements to [validator source code](/nodes/validator-node/operator/running-validator-node/run-validator-node-using-source) startup instructions by suggesting building the `aptos-node` binary and running it directly instead of using `cargo run`.
 
 ## 09 November 2022
 
-- Improved [indexer fullnode](/docs/nodes/indexer-fullnode) setup instructions to standardize on one package manager and explain how to restart the database.
+- Improved [indexer fullnode](/docs/nodes/indexer-fullnode.md) setup instructions to standardize on one package manager and explain how to restart the database.
 
 ## 08 November 2022
 
-- Published links to new auto-generated Move reference files [for all available versions](/docs/guides/move-guides/aptos-move-guides#aptos-move-documentation).
+- Published links to new auto-generated Move reference files [for all available versions](/guides/move-guides/aptos-move-guides#aptos-move-documentation).
 
 ## 07 November 2022
 

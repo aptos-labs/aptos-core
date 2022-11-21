@@ -5,6 +5,7 @@
    - [Fork and clone the Aptos repo](#fork-and-clone-the-aptos-repo)
    - [Build and serve the docs locally](#build-and-serve-the-docs-locally)
    - [Build static html files](#build-static-html-files)
+   - [Debug/Format files](#debugging)
 
 This Aptos Developer Documenatation is built using [Docusaurus 2](https://docusaurus.io/). Follow the below steps to build the docs locally to test your contribution.
 
@@ -79,3 +80,11 @@ This command generates static html content and places it in the `build` director
   ```
   pnpm run serve
   ```
+
+## Debugging
+
+Fix formatting issues by running:
+
+```
+pnpm fmt
+```

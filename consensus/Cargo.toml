@@ -13,66 +13,61 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-async-trait = "0.1.53"
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-byteorder = { version = "1.4.3" }
-bytes = "1.1.0"
-fail = "0.5.0"
-# Previously: Pinning futures to 0.3.21, since release v0.3.23 is causing the network_tests to fail because messages are not received in the channel.
-# Now: Some futures crates were using 0.3.23 as well, which is not a good idea. 0.3.23 has a known issues, so moving to 0.3.24.
-futures = "= 0.3.24"
-futures-channel = "= 0.3.24"
-itertools = { version = "0.10.3", default-features = false }
-mirai-annotations = { version = "1.12.0", default-features = false }
-num-derive = { version = "0.3.3", default-features = false }
-num-traits = { version = "0.2.15", default-features = false }
-once_cell = "1.10.0"
-rand = { version = "0.7.3", default-features = false }
-serde = { version = "1.0.137", default-features = false }
-serde_json = "1.0.81"
-thiserror = "1.0.31"
-tokio = { version = "1.21.0", features = ["full"] }
-
-aptos-bitvec = { path = "../crates/aptos-bitvec" }
-aptos-config = { path = "../config" }
-aptos-crypto = { path = "../crates/aptos-crypto" }
-aptos-infallible = { path = "../crates/aptos-infallible" }
-aptos-logger = { path = "../crates/aptos-logger" }
-aptos-mempool = { path = "../mempool" }
-aptos-metrics-core = { path = "../crates/aptos-metrics-core" }
-aptos-secure-storage = { path = "../secure/storage" }
-aptos-temppath = { path = "../crates/aptos-temppath" }
-aptos-types = { path = "../types" }
-aptos-vm = { path = "../aptos-move/aptos-vm" }
-
-channel = { path = "../crates/channel" }
-consensus-notifications = { path = "../state-sync/inter-component/consensus-notifications" }
-consensus-types = { path = "consensus-types", default-features = false }
-event-notifications = { path = "../state-sync/inter-component/event-notifications" }
-executor = { path = "../execution/executor" }
-executor-types = { path = "../execution/executor-types" }
-fallible = { path = "../crates/fallible" }
-network = { path = "../network" }
-safety-rules = { path = "safety-rules" }
-schemadb = { path = "../storage/schemadb" }
-short-hex-str = { path = "../crates/short-hex-str" }
-storage-interface = { path = "../storage/storage-interface" }
+anyhow = { workspace = true }
+aptos-bitvec = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-mempool = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-secure-storage = { workspace = true }
+aptos-temppath = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+async-trait = { workspace = true }
+bcs = { workspace = true }
+byteorder = { workspace = true }
+bytes = { workspace = true }
+channel = { workspace = true }
+consensus-notifications = { workspace = true }
+consensus-types = { workspace = true }
+event-notifications = { workspace = true }
+executor = { workspace = true }
+executor-types = { workspace = true }
+fail = { workspace = true }
+fallible = { workspace = true }
+futures = { workspace = true }
+futures-channel = { workspace = true }
+itertools = { workspace = true }
+mirai-annotations = { workspace = true }
+network = { workspace = true }
+num-derive = { workspace = true }
+num-traits = { workspace = true }
+once_cell = { workspace = true }
+rand = { workspace = true }
+safety-rules = { workspace = true }
+schemadb = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+short-hex-str = { workspace = true }
+storage-interface = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
-claims = "0.7"
-proptest = "1.0.0"
-tempfile = "3.3.0"
-
-aptos-config = { path = "../config", features = ["fuzzing"] }
-aptos-keygen = { path = "../crates/aptos-keygen" }
-aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
-consensus-types = { path = "consensus-types", default-features = false, features = ["fuzzing"] }
-executor-test-helpers = { path = "../execution/executor-test-helpers" }
+aptos-config = { workspace = true, features = ["fuzzing"] }
+aptos-keygen = { workspace = true }
+aptos-mempool = { workspace = true, features = ["fuzzing"] }
+claims = { workspace = true }
+consensus-types = { workspace = true, features = ["fuzzing"] }
+executor-test-helpers = { workspace = true }
 move-core-types = { workspace = true }
-network = { path = "../network", features = ["fuzzing"] }
-safety-rules = { path = "safety-rules", features = ["testing"] }
-vm-validator = { path = "../vm-validator" }
+network = { workspace = true, features = ["fuzzing"] }
+proptest = { workspace = true }
+safety-rules = { workspace = true, features = ["testing"] }
+tempfile = { workspace = true }
+vm-validator = { workspace = true }
 
 [features]
 default = []

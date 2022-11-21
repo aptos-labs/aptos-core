@@ -23,29 +23,29 @@ const sidebars = {
       className: "sidebar-title",
     },
     "whats-new-in-docs",
-  {
-    type: "category",
-    label: "Learn Aptos Concepts",
-    link: { type: "doc", id: "concepts/index" },
-    collapsible: true,
-    collapsed: true,
-    items: [
-      {
-        type: "category",
-        label: "Aptos White Paper",
-        collapsible: true,
-        collapsed: true,
-        link: { type: "doc", id: "aptos-white-paper/index" },
-        items: ["aptos-white-paper/in-korean"],
-      },
-      "guides/basics-life-of-txn",
-      "concepts/basics-txns-states",
-      "concepts/basics-accounts",
-      "concepts/basics-events",
-      "concepts/staking",
-      "concepts/governance",
-    ],
-  },
+    {
+      type: "category",
+      label: "Learn Aptos Concepts",
+      link: { type: "doc", id: "concepts/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        {
+          type: "category",
+          label: "Aptos White Paper",
+          collapsible: true,
+          collapsed: true,
+          link: { type: "doc", id: "aptos-white-paper/index" },
+          items: ["aptos-white-paper/in-korean"],
+        },
+        "guides/basics-life-of-txn",
+        "concepts/basics-txns-states",
+        "concepts/basics-accounts",
+        "concepts/basics-events",
+        "concepts/staking",
+        "concepts/governance",
+      ],
+    },
     {
       type: "category",
       label: "Set Environment",
@@ -61,10 +61,7 @@ const sidebars = {
           link: { type: "doc", id: "cli-tools/aptos-cli-tool/install-aptos-cli" },
           collapsible: true,
           collapsed: true,
-          items: [
-            "cli-tools/build-aptos-cli",
-            "cli-tools/aptos-cli-tool/use-aptos-cli",
-          ],
+          items: ["cli-tools/build-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
         },
         {
           type: "category",
@@ -82,6 +79,7 @@ const sidebars = {
       value: "Build Apps",
       className: "sidebar-title",
     },
+    "guides/system-integrators-guide",
     {
       type: "category",
       label: "Develop by Tutorial",
@@ -173,7 +171,6 @@ const sidebars = {
         "nodes/leaderboard-metrics",
         "nodes/node-health-checker/index",
         "nodes/node-health-checker/node-health-checker-faq",
-
       ],
     },
     /** Delete during clean up
@@ -225,6 +222,7 @@ const sidebars = {
                 "nodes/validator-node/operator/running-validator-node/using-gcp",
                 "nodes/validator-node/operator/running-validator-node/using-docker",
                 "nodes/validator-node/operator/running-validator-node/using-source-code",
+                "nodes/validator-node/operator/update-validator-node",
               ],
             },
             "nodes/validator-node/operator/node-liveness-criteria",
@@ -252,11 +250,11 @@ const sidebars = {
       items: [
         "concepts/basics-fullnodes",
         "nodes/full-node/fullnode-source-code-or-docker",
+        "nodes/full-node/bootstrap-fullnode",
         "nodes/full-node/update-fullnode-with-new-releases",
         "nodes/full-node/network-identity-fullnode",
         "nodes/full-node/fullnode-network-connections",
         "nodes/full-node/run-a-fullnode-on-gcp",
-        "nodes/full-node/bootstrap-fullnode",
         "nodes/indexer-fullnode",
       ],
     },
@@ -276,7 +274,10 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           link: { type: "doc", id: "nodes/node-files-all-networks/node-files" },
-          items: ["nodes/node-files-all-networks/node-files-devnet", "nodes/node-files-all-networks/node-files-testnet"],
+          items: [
+            "nodes/node-files-all-networks/node-files-devnet",
+            "nodes/node-files-all-networks/node-files-testnet",
+          ],
         },
       ],
     },
@@ -286,8 +287,8 @@ const sidebars = {
       className: "sidebar-title",
     },
     "nodes/aptos-api-spec",
-    "issues-and-workarounds",
     "reference/glossary",
+    "issues-and-workarounds",
   ],
 };
 

@@ -41,7 +41,7 @@ tokio-stream = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-genesis = { workspace = true }
+aptos-genesis = { workspace = true, features = ["testing"] }
 aptos-temppath = { workspace = true }
 aptos-time-service = { workspace = true, features = ["async", "testing"] }
 aptos-vm = { workspace = true }
