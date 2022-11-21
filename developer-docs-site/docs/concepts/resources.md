@@ -49,7 +49,6 @@ But modifying and deleting the resource/object requires only the module's code a
 an object also can be read only directly by the module's code, which can be offered as public utilities for other modules.
 
 This dual-ownership design is one of the bases of state safety in Aptos Move and enables powerful but safe functionalities to
-be built around resources and objects.
 
 ## Viewing a resource
 Resources are stored within specific accounts. To locate a resource, the owning account must first be identified.

@@ -42,6 +42,7 @@ const sidebars = {
         "concepts/resources",
         "concepts/events",
         "concepts/txns-states",
+        "concepts/gas",
         "concepts/blocks",
         "guides/basics-life-of-txn",
         "concepts/staking",

@@ -9,11 +9,12 @@ hidden: false
 Start here to get into the core concepts of the Aptos blockchain.
 
 - ### [Aptos White Paper](../aptos-white-paper/index.md)
-- ### [Life of a Transaction](../guides/basics-life-of-txn.md)
-- ### [Transactions and States](./txns-states.md)
-- ### [Blocks](./blocks.md)
 - ### [Accounts](./accounts.md)
 - ### [Resources](./resources.md)
 - ### [Events](./events.md)
+- ### [Transactions and States](./txns-states.md)
+- ### [Gas](./gas.md)
+- ### [Blocks](./blocks.md)
+- ### [Life of a Transaction](../guides/basics-life-of-txn.md)
 - ### [Staking](./staking)
 - ### [Governance](./governance)
