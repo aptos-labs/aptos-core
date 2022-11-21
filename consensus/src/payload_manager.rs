@@ -13,7 +13,7 @@ use consensus_types::{
     proof_of_store::{LogicalTime, ProofOfStore},
     request_response::PayloadRequest,
 };
-use executor_types::Error::BlockNotFound;
+use executor_types::Error::{DataNotFound};
 use executor_types::*;
 use futures::channel::mpsc::Sender;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -171,7 +171,7 @@ impl PayloadManager {
                                             .status
                                             .lock()
                                             .replace(DataStatus::Requested(new_receivers));
-                                        return Err(BlockNotFound(block.id()));
+                                        return Err(DataNotFound(block.id()));
                                     }
                                     Ok(Ok(data)) => {
                                         debug!("QSE: got data, len {}", data.len());
