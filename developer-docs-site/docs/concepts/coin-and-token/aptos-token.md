@@ -181,7 +181,8 @@ The following tables describe fields at the struct level. For the definitive lis
 | [`Token`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_Token) | The amount is the number of tokens. |
 | [`TokenId`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_TokenId) | `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated `PropertyMap` from `default_properties` in the `TokenData`. |
 
-For struct field definion, fee 
+For more detailed description, see [move doc](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md)
+
 ## Token lifecycle
 
 ### Token creation
@@ -236,3 +237,4 @@ The user can also turn off this direct transfer behavior by calling the same `op
 :::
 
 Multi-agent transfer: the sender and receiver can both sign a transfer transaction to directly transfer a token from the sender to receiver [`direct_transfer_script`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#function-direct_transfer_script). For example, once Alice and Bob both sign the transfer transaction, the token will be directly transferred from Alice's account to Bob.
+
