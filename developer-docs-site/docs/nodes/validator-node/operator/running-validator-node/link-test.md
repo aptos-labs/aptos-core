@@ -21,3 +21,16 @@ But what about named anchors?
 How Base Gas Works [No Operation table](../../../../concepts/base-gas.md#no-operation) in relative link with Markdown extension should work in both
 
 How Base Gas Works [No Operation table](/concepts/base-gas#no-operation) in absolute link with no Markdown extension works only in our content system
+
+What doesn't work?
+
+In the Repo, links that are relative yet don't have the Markdown extension - [How Base Gas Works](../../../../concepts/base-gas):
+
+```
+../nodes/validator-node/operator/staking-pool-operations#joining-validator-set)
+```
+
+In the website, links that are absolute and have the Markdown extension - [How Base Gas Works](/concepts/base-gas.md):
+```
+/nodes/validator-node/operator/staking-pool-operations.md#joining-validator-set
+```
