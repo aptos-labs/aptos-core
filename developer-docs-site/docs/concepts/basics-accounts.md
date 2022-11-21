@@ -28,12 +28,12 @@ constructing the authentication key. In the future, more authentication schemes 
 integrated with the Aptos account.
 
 There are two types of accounts in Aptos:
-  * *Address account* - This is a typical account corresponding to an address with a corresponding pair of public/private keys.
+  * *Standard account* - This is a typical account corresponding to an address with a corresponding pair of public/private keys.
   * *Resource account* - An autonomous account without a corresponding private key used by developers to store resources or publish modules on chain.
 
 :::tip Account address example
 Account addresses are 32-bytes. They are usually shown as 64 hex characters, with each hex character a nibble.
-Sometimes the address is prefixed with a 0x. See the [Your First Transaction](/tutorials/first-transaction) for an example
+Sometimes the address is prefixed with a 0x. See the [Your First Transaction](../tutorials/first-transaction.md) for an example
 of how an address appears, reproduced below:
 
 ```text
