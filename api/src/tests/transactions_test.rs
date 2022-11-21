@@ -36,7 +36,7 @@ async fn test_deserialize_genesis_transaction() {
     aptos_api_types::Transaction::parse_from_json(Some(resp)).unwrap();
 }
 
-// Unstable due to framework changes
+// Unstable due to framework changes.
 #[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_transactions_output_genesis_transaction() {
