@@ -394,7 +394,7 @@ The runtime always runs this before executing the transactions in a block.
     };
     <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(&vm, &<b>mut</b> block_metadata_ref.new_block_events, new_block_event);
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_gas_fees">features::collect_gas_fees</a>()) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
         // Distribute fees collected from the previous <a href="block.md#0x1_block">block</a>. Nothing happens <b>if</b> there are no
         // fees or it is the first <a href="block.md#0x1_block">block</a>.
         <a href="fee_distribution.md#0x1_fee_destribution_maybe_distribute_fees">fee_destribution::maybe_distribute_fees</a>(&vm);

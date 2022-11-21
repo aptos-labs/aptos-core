@@ -465,7 +465,7 @@ Called by the Adapter
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>),
     );
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_gas_fees">features::collect_gas_fees</a>()) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
         <a href="fee_distribution.md#0x1_fee_destribution_collect_fee">fee_destribution::collect_fee</a>(addr, transaction_fee_amount);
     } <b>else</b> {
         <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(addr, transaction_fee_amount);
