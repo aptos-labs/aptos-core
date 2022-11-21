@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Context, Result};
+use aptos_config::config::ConsensusConfig;
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
@@ -644,18 +645,18 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             500,
             300,
-            false,
+            true,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 0,
                 max_down_nodes: 20,
                 num_large_validators: 0,
                 add_execution_delay: false,
-                // Check that every 27s all nodes make progress,
+                // Check that every 53s all nodes make progress,
                 // without any failures.
-                // (make epoch length (120s) and this duration (27s) not be multiples of one another,
+                // (make epoch length (120s) and this duration (53s) not be multiples of one another,
                 // to test different timings)
-                check_period_s: 27,
+                check_period_s: 53,
             },
         ),
         // not scheduled on continuous
@@ -679,7 +680,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
-            false,
+            true,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 6,
@@ -953,15 +954,26 @@ fn changing_working_quorum_test(
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
+            let block_size = (target_tps / 4) as u64;
             helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
-                (target_tps / 4).into();
+                block_size.into();
             helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                (target_tps / 4).into();
+                block_size.into();
             helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
                 500.into();
             helm_values["validator"]["config"]["consensus"]
                 ["round_timeout_backoff_exponent_base"] = 1.0.into();
             helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] = 1.into();
+
+            let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
+            chain_health_backoff[0].max_sending_block_txns_override = block_size;
+            chain_health_backoff[1].max_sending_block_txns_override = (block_size / 2).max(10);
+            chain_health_backoff[2].max_sending_block_txns_override = (block_size / 4).max(10);
+            chain_health_backoff[3].max_sending_block_txns_override = (block_size / 8).max(10);
+            chain_health_backoff[4].max_sending_block_txns_override = (block_size / 16).max(10);
+
+            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
+                serde_yaml::to_value(chain_health_backoff).unwrap();
 
             // Override the syncing mode of all nodes to use transaction output syncing.
             // TODO(joshlind): remove me once we move back to output syncing by default.
