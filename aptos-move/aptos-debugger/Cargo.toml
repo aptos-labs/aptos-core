@@ -10,16 +10,14 @@ publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.57"
-
-aptos-gas = { path = "../../aptos-move/aptos-gas" }
-aptos-resource-viewer = { path = "../../aptos-move/aptos-resource-viewer" }
-aptos-rest-client = { path = "../../crates/aptos-rest-client" }
-aptos-state-view = { path = "../../storage/state-view" }
-aptos-types = { path = "../../types" }
-aptos-validator-interface = { path = "../../aptos-move/aptos-validator-interface" }
-aptos-vm = { path = "../../aptos-move/aptos-vm" }
-
+anyhow = { workspace = true }
+aptos-gas = { workspace = true }
+aptos-resource-viewer = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-state-view = { workspace = true }
+aptos-types = { workspace = true }
+aptos-validator-interface = { workspace = true }
+aptos-vm = { workspace = true }
 move-binary-format = { workspace = true }
 move-cli = { workspace = true }
 move-compiler = { workspace = true }

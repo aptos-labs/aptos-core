@@ -96,93 +96,141 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Move",
+            label: "Start Aptos",
             position: "left",
             items: [
               {
-                label: "Move Guides",
+                label: "See What's New",
+                type: "doc",
+                docId: "whats-new-in-docs",
+              },
+              {
+                label: "Learn Aptos Concepts",
+                type: "doc",
+                docId: "concepts/index",
+              },
+              {
+                label: "Set Environment",
+                type: "doc",
+                docId: "guides/getting-started",
+              },
+            ],
+          },
+          {
+            type: "dropdown",
+            label: "Build Apps",
+            position: "left",
+            items: [
+              {
+                type: "doc",
+                label: "Develop by Tutorial",
+                docId: "tutorials/index",
+              },
+              {
+                type: "doc",
+                label: "Use Aptos SDKs",
+                docId: "sdks/index",
+              },
+              {
+                type: "doc",
+                label: "Develop Locally",
+                docId: "nodes/local-testnet/index",
+              },
+              {
+                type: "doc",
+                label: "Interact with Blockchain",
+                docId: "guides/index",
+              },
+            ],
+          },
+          {
+            type: "dropdown",
+            label: "Write Move",
+            position: "left",
+            items: [
+              {
+                label: "Write Smart Contracts with Move",
                 type: "doc",
                 docId: "guides/move-guides/index",
+              },
+              {
+                label: "Move on Aptos",
+                type: "doc",
+                docId: "guides/move-guides/move-on-aptos",
               },
               {
                 label: "Your First Move Module",
                 type: "doc",
                 docId: "tutorials/first-move-module",
               },
-            ],
-          },
-          {
-            type: "dropdown",
-            label: "Applications",
-            position: "left",
-            items: [
               {
+                label: "Upgrade Move Code",
                 type: "doc",
-                label: "Your First Transaction",
-                docId: "tutorials/first-transaction",
-              },
-              {
-                type: "doc",
-                label: "Your First DApp",
-                docId: "tutorials/first-dapp",
-              },
-              /*
-              {
-                type: "doc",
-                label: "Your First Coin",
-                docId: "tutorials/first-coin",
-              },
-              */
-              {
-                type: "doc",
-                label: "Your First NFT",
-                docId: "tutorials/your-first-nft",
+                docId: "guides/move-guides/upgrading-move-code",
               },
             ],
           },
           {
             type: "dropdown",
-            label: "Nodes",
+            label: "Run Nodes",
             position: "left",
             items: [
               {
-                label: "Aptos Blockchain Deployments",
+                label: "Find Nodes",
                 type: "doc",
-                docId: "nodes/aptos-deployments",
+                docId: "nodes/nodes-landing",
               },
               {
-                label: "Validators",
+                label: "Install Validators",
                 type: "doc",
                 docId: "nodes/validator-node/index",
               },
               {
-                label: "FullNodes",
+                label: "Install FullNodes",
                 type: "doc",
                 docId: "nodes/full-node/index",
               },
               {
-                label: "Local Testnet",
+                label: "Configure Nodes",
                 type: "doc",
-                docId: "nodes/local-testnet/index",
-              },
-              {
-                label: "Node Health Checker",
-                type: "doc",
-                docId: "nodes/node-health-checker/index",
+                docId: "nodes/identity-and-configuration",
               },
             ],
           },
           {
+            type: "dropdown",
+            label: "Reference",
             position: "left",
-            type: "doc",
-            docId: "nodes/aptos-api-spec",
-            label: "REST API",
-          },
-          {
-            position: "left",
-            type: "doc",
-            docId: "aptos-white-paper/index",
-            label: "Aptos White Paper",
+            items: [
+              {
+                label: "REST API",
+                type: "doc",
+                docId: "nodes/aptos-api-spec",
+              },
+              {
+                href: "https://aptos-labs.github.io/ts-sdk-doc/",
+                label: "TypeScript SDK",
+              },
+              {
+                href: "https://pypi.org/project/aptos-sdk/",
+                label: "Python SDK",
+              },
+              {
+                label: "Rust SDK",
+                type: "doc",
+                docId: "sdks/rust-sdk",
+              },
+              {
+                label: "Aptos Glossary",
+                type: "doc",
+                docId: "reference/glossary",
+              },
+              {
+                label: "Issues and Workarounds",
+                type: "doc",
+                docId: "issues-and-workarounds",
+              },
+            ],
           },
         ],
       },

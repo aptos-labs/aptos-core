@@ -1,12 +1,12 @@
 ---
-title: "Upgrading Move Code"
+title: "Upgrade Move Code"
 slug: "upgrading-move-code"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Upgrading Move Code
+# Upgrade Move Code
 
 The Aptos chain supports _code upgrade_, which means already deployed Move
 code can be replaced with newer code. If a code upgrade happens, all 
@@ -24,7 +24,7 @@ those upgrades are accepted which guarantee that no existing public APIs
 and/or existing resource storage is broken by the upgrade. This compatibility
 checking is technical complete and possible because of Move's strongly typed 
 byte code semantics. However, even a compatible upgrade can have 
-hazardous effects on applications so depending on upgradable code on chain 
+hazardous effects on applications so depending on upgradeable code on chain 
 should be carefully considered on a case-by-case basis (see also below
 discussion of security aspects).
 
@@ -54,8 +54,8 @@ Currently, two different upgrade policies are supported:
     the new code. This ensures that the existing state of storage is 
     correctly interpreted by the new code. However, new struct declarations 
     can be added.
-  - For APIs, all public functions must have the same signature as 
-    before. New functions can be added.
+  - For APIs, all existing public functions must have the same signature as 
+    before. New functions, incl. public and entry functions, can be added.
 - `immutable`: the code is not upgradable and guaranteed to stay the same 
   forever.
 
@@ -78,7 +78,7 @@ from bugs but can also be the result of malicious upgrades. For example, an
 upgraded dependency can suddenly make all functions
 abort, breaking operation of your contract, or suddenly cost much more
 gas to execute then before the upgrade. Because you cannot control
-the upgrade, dependencies to upgradable packages need to be handled with
+the upgrade, dependencies to upgradeable packages need to be handled with
 care.
 
 - The safest dependency is, of course, to an `immutable` package. This is 

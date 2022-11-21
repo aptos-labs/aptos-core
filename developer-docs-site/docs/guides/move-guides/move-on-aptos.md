@@ -86,11 +86,11 @@ This makes ownership explicit.
 
 ### Data flow
 
-Data flow should have minimal constraints with an emphasis on ecosystem usability
+Data flow should have minimal constraints with an emphasis on ecosystem usability.
 
-Assets can be programmed to be entirely constrained within a module by making it such that no interface ever presents the struct in a value form and instead only provides functions for manipulating the data defined within the module. This constrains the data's availability to only within a module and makes it unexportable, which in turn prevents interoperability with other modules. Specifically, one could imagine a purchase contract that takes as input some `Coin<T>` and returns a `Ticket`. If `Coin<T>` is only defined within the module and is not exportable outside, then the applications for that `Coin<T>` are limited to whatever the module has defined.
+Assets can be programmed to be only accessible within a module by making it such that no interface ever presents the struct in a value form and instead only provides functions for manipulating the data defined within the module (encapsulation). This constrains direct read+write access of the struct to the defining module, which in turn prevents interoperability with other modules. Specifically, one could imagine a purchase contract that takes as input some `Coin<T>` and returns a `Ticket`. If `Coin<T>` is only defined within the module and is not exportable outside, then the applications for that `Coin<T>` are limited to whatever the module has defined.
 
-Contrast the following two functions of implementing a coins transfer using deposit and withdraw:
+Contrast the following two functions of implementing a coin transfer using deposit and withdraw:
 
 ```rust
 public fun transfer<T>(sender: &signer, recipient: address, amount: u64) {
@@ -119,11 +119,11 @@ In Move, given a specific struct, say `A`, different instances can be made disti
 
 Internal identifiers can be convenient due to their simplicity and easier programmability. Generics, however, provide much higher guarantees including explicit compile or validation time checks though with some costs.
 
-Generics allow for completely distinct types and resources and interfaces that expects those types. For example, an order book can state that they expect two currencies for all orders but one of them must be fixed, e.g., `buy<T>(coin: Coin<Aptos>): Coin<T>`. This explicitly states that a user can buy any coin `<T>` but must pay for it with `Coin<Aptos>`.
+Generics allow for completely distinct types and resources and interfaces that expects those types. For example, an order book can state that they expect two currencies for all orders but one of them must be fixed, e.g., `buy<T>(coin: Coin<APT>): Coin<T>`. This explicitly states that a user can buy any coin `<T>` but must pay for it with `Coin<APT>`.
 
-The complexity with generics arises when it would be desirable to store data on `T`. Move does not support static dispatch on generics, hence in a function like `create<T>(...) : Coin<T>`, T must either be a phantom type, i.e., only used as a type parameter in `Coin` or it must be specified as an input into `Create`. No functions can be called on a `T`, such as `T::function` even if every `T` implements said function.
+The complexity with generics arises when it would be desirable to store data on `T`. Move does not support static dispatch on generics, hence in a function like `create<T>(...) : Coin<T>`, T must either be a phantom type, i.e., only used as a type parameter in `Coin` or it must be specified as an input into `create`. No functions can be called on a `T`, such as `T::function` even if every `T` implements said function.
 
-In addition for structs that may be created in mass, generics results in the creation of a lot of new stores and resources associated with tracking the data and event emitting, which arguably is a lesser concern.
+In addition for structs that may be created in mass, generics result in the creation of a lot of new stores and resources associated with tracking the data and event emitting, which arguably is a lesser concern.
 
 Because of this, we made the difficult choice of creating two "Token" standards, one for tokens associated with currency called `Coin` and another for tokens associated with assets or NFTs called `Token`. `Coin` leverages static type safety via generics but is a far simpler contract. While `Token` leverages dynamic type safety via its own universal identifier and eschews generics due to complexity that impacts the ergonomics of its use.
 
@@ -131,32 +131,20 @@ Because of this, we made the difficult choice of creating two "Token" standards,
 
 * A *signer* should be required to restrict access to adding or removing assets to an account unless it is explicitly clear
 
-In Move, a module can define how resources can be access and their contents modified regardless of the presence of the account owner's signer. This means that a programmer could accidentally create a resource that allows other users to arbitrarily insert or remove assets from another user's account.
+In Move, a module can define how resources can be accessed and their contents modified regardless of the presence of the account owner's signer. This means that a programmer could accidentally create a resource that allows other users to arbitrarily insert or remove assets from another user's account.
 
-In our development, we have several examples of where we have allowed permission to access and where we have prevented it:
+In our development of the Aptos Core Framework, we have several examples of where we have allowed permission to access and where we have prevented it:
 
-* A Token cannot be directly inserted into another user's account unless they already have some of that Token
-* TokenTransfers allows a user to explicitly claim a token stored in another user's resource effectively using an access control list to gain that access
-* In Coin a user can directly transfer into another user's account so long as they have a resource for storing that coin
+* A `Token` cannot be directly inserted into another user's account unless they already have some of that `Token`
+* `TokenTransfers` allows a user to explicitly claim a token stored in another user's resource effectively using an access control list to gain that access
+* In `Coin` a user can directly transfer a `Coint<T>` into another user's account as long as the receiving user has already a `CoinStore<Coin<T>>` resource to store that coin.
 
-A less rigorous effort on our Token may have allowed users to airdrop tokens directly into another users account that would add additional storage to their accounts as well as make them owners of content that they did not first approve.
+A less rigorous effort on our `Token` may have allowed users to airdrop tokens directly into another users account, which would add additional storage to their accounts as well as make them owners of content that they did not first approve.
 
-As a concrete example, return to the previous Coin case with the withdraw function. If the withdraw function instead were defined like this:
+As a concrete example, return to the previous Coin case with the withdraw function. If the withdraw function instead were defined like this (notice the lack of a `signer` argument):
 ```rust
 public fun withdraw<T>(account: address, amount: u64): Coin<T>
 ```
-anyone would be able to remove coins from the `account`
+Anyone would be able to remove coins from the `account`.
 
-## Aptos Move documentation
-
-* *Aptos tokens* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/aptos-token/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-token/doc/overview.md)
-* *Aptos framework* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/aptos-framework/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-framework/doc/overview.md)
-* *Aptos stdlib* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/aptos-stdlib/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-stdlib/doc/overview.md)
-* *Move stdlib* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/move-stdlib/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/move-stdlib/doc/overview.md)
-
-## Supporting Move documentation
-
-* [Move Book](https://move-language.github.io/move/)
-* [Move Tutorial](https://github.com/move-language/move/tree/main/language/documentation/tutorial)
-* [Move language repository](https://github.com/move-language/move)
-* [Move by example](https://move-book.com/)
+Find out more about the Move programming language among the [Move Guides](index.md).
