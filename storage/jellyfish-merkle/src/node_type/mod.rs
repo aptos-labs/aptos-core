@@ -134,7 +134,6 @@ impl NodeKey {
         );
         let nibble_path = NibblePath::new_from_bytes(nibble_bytes.as_slice(), num_nibbles);
         let node_key = NodeKey::new(version, nibble_path);
-        info!("NodeKey decoded, raw={val:x?}, decoded={node_key:?}");
         Ok(node_key)
     }
 
