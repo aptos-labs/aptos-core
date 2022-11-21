@@ -5,9 +5,9 @@ id: "link-test"
 
 # Link Test
 
-This is a temporary page for determining how to successfully link to files in both GitHub and our content system without error.
+This is a temporary page for determining how to successfully link to files in both our repository and our content system without error.
 
-In short, when linking to absolute files (code, reference) In github.com, always use the fully qualified domain.
+In short, when linking to absolute files (code, reference) not on Aptos.dev, always use the fully qualified domain.
 Else, use relative links.
 
 > **Tip**: Each page can have an ID at the top that can override the path of the file. Best to check when linking or always use the recommended Markdown path (assuming we can get named anchors working).
