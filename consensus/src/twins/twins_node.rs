@@ -3,7 +3,7 @@
 
 use crate::{
     counters,
-    data_manager::PayloadManager,
+    payload_manager::PayloadManager,
     epoch_manager::EpochManager,
     experimental::buffer_manager::OrderedBlocks,
     network::NetworkTask,

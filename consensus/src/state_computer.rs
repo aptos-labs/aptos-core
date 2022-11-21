@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_manager::PayloadManager;
+use crate::payload_manager::PayloadManager;
 use crate::monitor;
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
@@ -50,7 +50,7 @@ pub struct ExecutionProxy {
     async_commit_notifier: channel::Sender<CommitType>,
     validators: Mutex<Vec<AccountAddress>>,
     write_mutex: AsyncMutex<()>,
-    data_manager: Arc<PayloadManager>,
+    payload_manager: Arc<PayloadManager>,
 }
 
 impl ExecutionProxy {
@@ -58,7 +58,7 @@ impl ExecutionProxy {
         executor: Arc<dyn BlockExecutorTrait>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-        data_manager: Arc<PayloadManager>,
+        payload_manager: Arc<PayloadManager>,
         handle: &tokio::runtime::Handle,
     ) -> Self {
         let (tx, mut rx) =
@@ -78,11 +78,11 @@ impl ExecutionProxy {
         });
         let (commit_tx, mut commit_rx) =
             channel::new::<CommitType>(10, &counters::PENDING_QUORUM_STORE_COMMIT_NOTIFICATION);
-        let data_manager_clone = data_manager.clone();
+        let payload_manager_clone = payload_manager.clone();
         handle.spawn(async move {
             while let Some((epoch, round, payloads)) = commit_rx.next().await {
                 debug!("notifying commit for round: {}", round);
-                data_manager_clone
+                payload_manager_clone
                     .notify_commit(LogicalTime::new(epoch, round), payloads)
                     .await;
             }
@@ -95,7 +95,7 @@ impl ExecutionProxy {
             async_commit_notifier: commit_tx,
             validators: Mutex::new(vec![]),
             write_mutex: AsyncMutex::new(()),
-            data_manager,
+            payload_manager,
         }
     }
 }
@@ -121,7 +121,7 @@ impl StateComputer for ExecutionProxy {
             "Executing block",
         );
 
-        let txns = self.data_manager.get_transactions(block).await?;
+        let txns = self.payload_manager.get_transactions(block).await?;
 
         // TODO: figure out error handling for the prologue txn
         let executor = self.executor.clone();
@@ -177,7 +177,7 @@ impl StateComputer for ExecutionProxy {
             }
 
             debug!("QSE: getting data in commit, round {}", block.round());
-            let signed_txns = self.data_manager.get_transactions(block.block()).await?;
+            let signed_txns = self.payload_manager.get_transactions(block.block()).await?;
 
             txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
             reconfig_events.extend(block.reconfig_event());

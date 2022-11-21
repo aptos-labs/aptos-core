@@ -47,38 +47,26 @@ pub enum DataStatus {
     Requested(Vec<oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>>),
 }
 
-// impl PartialEq for DataStatus {
-//     fn eq(&self, other: &Self) -> bool {
-//         match (self, other) {
-//             (DataStatus::Cached(ltxn), DataStatus::Cached(rtxn)) => ltxn == rtxn,
-//             (DataStatus::Requested(lchannels), DataStatus::Requested(rchannels)) => Arc::as_ptr(&lchannels) == Arc::as_ptr(&rchannels),
-//             (_, _) => false,
-//         }
-//     }
-// }
-//
-// impl Eq for DataStatus {}
-
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct ProofWithStatus {
+pub struct ProofWithData {
     pub proofs: Vec<ProofOfStore>,
     #[serde(skip)]
     pub status: Arc<Mutex<Option<DataStatus>>>,
 }
 
-impl PartialEq for ProofWithStatus {
+impl PartialEq for ProofWithData {
     fn eq(&self, other: &Self) -> bool {
         self.proofs == other.proofs && Arc::as_ptr(&self.status) == Arc::as_ptr(&other.status)
     }
 }
 
-impl Eq for ProofWithStatus {}
+impl Eq for ProofWithData {}
 
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
-    InQuorumStore(ProofWithStatus),
+    InQuorumStore(ProofWithData),
     Empty,
 }
 
@@ -92,8 +80,7 @@ impl Payload {
             Payload::DirectMempool(txns) => txns.len(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status
                 .proofs
-                .par_iter()
-                .with_min_len(100)
+                .iter()
                 .map(|proof| proof.info().num_txns as usize)
                 .sum(),
             Payload::Empty => 0,
@@ -122,8 +109,7 @@ impl Payload {
                 .sum(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status
                 .proofs
-                .par_iter()
-                .with_min_len(100)
+                .iter()
                 .map(|proof| proof.info().num_bytes as usize)
                 .sum(),
             Payload::Empty => 0,

@@ -3,7 +3,7 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
-    data_manager::PayloadManager,
+    payload_manager::PayloadManager,
     experimental::buffer_manager::OrderedBlocks,
     liveness::{
         proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},

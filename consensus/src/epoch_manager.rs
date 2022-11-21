@@ -7,7 +7,7 @@ use crate::{
         BlockStore,
     },
     counters,
-    data_manager::PayloadManager,
+    payload_manager::PayloadManager,
     error::{error_kind, DbError},
     experimental::{
         buffer_manager::{OrderedBlocks, ResetRequest},
@@ -58,7 +58,7 @@ use channel::{aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
-    request_response::WrapperCommand,
+    request_response::PayloadRequest,
 };
 use event_notifications::ReconfigNotificationListener;
 use fail::fail_point;
@@ -108,7 +108,7 @@ pub struct EpochManager {
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener,
-    data_manager: Arc<PayloadManager>,
+    payload_manager: Arc<PayloadManager>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
@@ -133,7 +133,7 @@ impl EpochManager {
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         reconfig_events: ReconfigNotificationListener,
-        data_manager: Arc<PayloadManager>,
+        payload_manager: Arc<PayloadManager>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -151,7 +151,7 @@ impl EpochManager {
             storage,
             safety_rules_manager,
             reconfig_events,
-            data_manager,
+            payload_manager,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
@@ -427,7 +427,7 @@ impl EpochManager {
 
     fn spawn_direct_mempool_quorum_store(
         &mut self,
-        consensus_to_quorum_store_receiver: Receiver<WrapperCommand>,
+        consensus_to_quorum_store_receiver: Receiver<PayloadRequest>,
     ) {
         let quorum_store = DirectMempoolQuorumStore::new(
             consensus_to_quorum_store_receiver,
@@ -630,7 +630,7 @@ impl EpochManager {
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             onchain_config.back_pressure_limit(),
-            self.data_manager.clone(),
+            self.payload_manager.clone(),
         ));
 
         // Start QuorumStore

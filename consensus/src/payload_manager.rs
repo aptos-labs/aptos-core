@@ -11,13 +11,14 @@ use consensus_types::{
     block::Block,
     common::Payload,
     proof_of_store::{LogicalTime, ProofOfStore},
-    request_response::WrapperCommand,
+    request_response::PayloadRequest,
 };
 use executor_types::Error::BlockNotFound;
 use executor_types::*;
 use futures::channel::mpsc::Sender;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use futures::SinkExt;
 use tokio::sync::oneshot;
 
 /// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
@@ -25,7 +26,7 @@ use tokio::sync::oneshot;
 pub struct PayloadManager {
     quorum_store_enabled: AtomicBool,
     data_reader: ArcSwapOption<BatchReader>,
-    quorum_store_wrapper_tx: ArcSwapOption<Sender<WrapperCommand>>,
+    quorum_store_wrapper_tx: ArcSwapOption<Sender<PayloadRequest>>,
 }
 
 impl PayloadManager {
@@ -85,7 +86,8 @@ impl PayloadManager {
                 .into_iter()
                 .flat_map(|payload| match payload {
                     Payload::DirectMempool(_) => {
-                        unreachable!()
+                        warn!("InQuorumStore should be used");
+                        Vec::new()
                     }
                     Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
                     Payload::Empty => Vec::new(),
@@ -100,12 +102,12 @@ impl PayloadManager {
                 .unwrap()
                 .as_ref()
                 .clone()
-                .try_send(WrapperCommand::CleanRequest(logical_time, digests));
+                .send(PayloadRequest::CleanRequest(logical_time, digests));
         }
     }
 
     /// Called from consensus to pre-fetch the transaction behind the batches in the block.
-    pub async fn update_payload(&self, block: &Block) {
+    pub async fn prefetch_payload_data(&self, block: &Block) {
         if self.quorum_store_enabled.load(Ordering::Relaxed) && block.payload().is_some() {
             match block.payload().unwrap() {
                 Payload::InQuorumStore(proof_with_status) => {
@@ -133,16 +135,18 @@ impl PayloadManager {
     /// Extract transaction from a given block
     /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
     pub async fn get_transactions(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
-        if block.payload().is_none() || block.payload().unwrap().is_empty() {
+
+        if block.payload().map_or(true, |p| p.is_empty()){
             return Ok(Vec::new());
         }
+
         if self.quorum_store_enabled.load(Ordering::Relaxed) {
             match block.payload().unwrap() {
-                Payload::InQuorumStore(proof_with_status) => {
-                    let status = proof_with_status.status.lock().take();
+                Payload::InQuorumStore(proof_with_data) => {
+                    let status = proof_with_data.status.lock().take();
                     match status.expect("Should have been updated before") {
                         DataStatus::Cached(data) => {
-                            proof_with_status
+                            proof_with_data
                                 .status
                                 .lock()
                                 .replace(DataStatus::Cached(data.clone()));
@@ -158,12 +162,12 @@ impl PayloadManager {
                                         warn!("Oneshot channel to get a batch was dropped");
                                         let new_receivers = self
                                             .request_transactions(
-                                                proof_with_status.proofs.clone(),
+                                                proof_with_data.proofs.clone(),
                                                 LogicalTime::new(block.epoch(), block.round()),
                                             )
                                             .await;
                                         // Could not get all data so requested again
-                                        proof_with_status
+                                        proof_with_data
                                             .status
                                             .lock()
                                             .replace(DataStatus::Requested(new_receivers));
@@ -177,12 +181,12 @@ impl PayloadManager {
                                         debug!("QS: got error from receiver {:?}", e);
                                         let new_receivers = self
                                             .request_transactions(
-                                                proof_with_status.proofs.clone(),
+                                                proof_with_data.proofs.clone(),
                                                 LogicalTime::new(block.epoch(), block.round()),
                                             )
                                             .await;
                                         // Could not get all data so requested again
-                                        proof_with_status
+                                        proof_with_data
                                             .status
                                             .lock()
                                             .replace(DataStatus::Requested(new_receivers));
@@ -193,7 +197,7 @@ impl PayloadManager {
                             let ret: Vec<SignedTransaction> =
                                 vec_ret.into_iter().flatten().collect();
                             // execution asks for the data twice, so data is cached here for the second time.
-                            proof_with_status
+                            proof_with_data
                                 .status
                                 .lock()
                                 .replace(DataStatus::Cached(ret.clone()));
@@ -224,7 +228,7 @@ impl PayloadManager {
     pub fn new_epoch(
         &self,
         data_reader: Arc<BatchReader>,
-        quorum_store_wrapper_tx: Sender<WrapperCommand>,
+        quorum_store_wrapper_tx: Sender<PayloadRequest>,
     ) {
         if self.quorum_store_enabled.load(Ordering::Relaxed) {
             self.data_reader.swap(Some(data_reader));

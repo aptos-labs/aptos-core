@@ -9,7 +9,7 @@ use futures::channel::oneshot;
 use std::{fmt, fmt::Formatter};
 
 /// Message sent from Consensus to QuorumStore.
-pub enum WrapperCommand {
+pub enum PayloadRequest {
     /// Request to pull block to submit to consensus.
     GetBlockRequest(
         Round,
@@ -26,17 +26,17 @@ pub enum WrapperCommand {
     CleanRequest(LogicalTime, Vec<HashValue>),
 }
 
-impl fmt::Display for WrapperCommand {
+impl fmt::Display for PayloadRequest {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            WrapperCommand::GetBlockRequest(round, max_txns, max_bytes, excluded, _) => {
+            PayloadRequest::GetBlockRequest(round, max_txns, max_bytes, excluded, _) => {
                 write!(
                     f,
                     "GetBlockRequest [round: {}, max_txns: {}, max_bytes: {} excluded: {}]",
                     round, max_txns, max_bytes, excluded
                 )
             }
-            WrapperCommand::CleanRequest(logical_time, digests) => {
+            PayloadRequest::CleanRequest(logical_time, digests) => {
                 write!(
                     f,
                     "CleanRequest [epoch: {}, round: {}, digests: {:?}]",

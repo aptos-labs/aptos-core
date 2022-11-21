@@ -7,7 +7,7 @@ use aptos_logger::prelude::*;
 use consensus_types::common::Round;
 use consensus_types::{
     common::{Payload, PayloadFilter},
-    request_response::{ConsensusResponse, WrapperCommand},
+    request_response::{ConsensusResponse, PayloadRequest},
 };
 use fail::fail_point;
 use futures::{
@@ -22,7 +22,7 @@ const NO_TXN_DELAY: u64 = 30;
 /// Client that pulls blocks from Quorum Store
 #[derive(Clone)]
 pub struct QuorumStoreClient {
-    consensus_to_quorum_store_sender: mpsc::Sender<WrapperCommand>,
+    consensus_to_quorum_store_sender: mpsc::Sender<PayloadRequest>,
     poll_count: u64,
     /// Timeout for consensus to pull transactions from quorum store and get a response (in milliseconds)
     pull_timeout_ms: u64,
@@ -30,7 +30,7 @@ pub struct QuorumStoreClient {
 
 impl QuorumStoreClient {
     pub fn new(
-        consensus_to_quorum_store_sender: mpsc::Sender<WrapperCommand>,
+        consensus_to_quorum_store_sender: mpsc::Sender<PayloadRequest>,
         poll_count: u64,
         pull_timeout_ms: u64,
     ) -> Self {
@@ -53,7 +53,7 @@ impl QuorumStoreClient {
         exclude_payloads: PayloadFilter,
     ) -> Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
-        let req = WrapperCommand::GetBlockRequest(
+        let req = PayloadRequest::GetBlockRequest(
             round,
             max_items,
             max_bytes,

@@ -3,7 +3,7 @@
 
 use crate::{
     block_storage::BlockStore,
-    data_manager::PayloadManager,
+    payload_manager::PayloadManager,
     liveness::{
         proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
         rotating_proposer_election::RotatingProposer,
