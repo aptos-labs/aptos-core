@@ -7,9 +7,9 @@ id: "resources"
 
 On Aptos, smart contract states are sharded by accounts. All on-chain states have to be organized into resources and associated
 with specific accounts. This is different from other blockchains, such as Ethereum, where each smart contract maintains
-their own storage space. Accounts on Aptos can contain associated modules and resources. [Events](./basics-events.md) are stored
+their own storage space. Accounts on Aptos can contain associated modules and resources. [Events](./events.md) are stored
 inside resources.
-See [Accounts](./basics-accounts.md) for more details on accounts.
+See [Accounts](./accounts.md) for more details on accounts.
 
 ## Resources vs Objects
 Resources refer to top-level objects that are stored directly with an account on the blockchain. Objects can be resources but
