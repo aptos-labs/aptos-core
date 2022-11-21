@@ -13,10 +13,10 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-dir-diff = "0.3.2"
-framework = { path = ".." }
-fs_extra = "1.2.0"
-tempfile = "3.3.0"
+dir-diff = { workspace = true }
+framework = { workspace = true }
+fs_extra = { workspace = true }
+tempfile = { workspace = true }
 
 [lib]
 doctest = false

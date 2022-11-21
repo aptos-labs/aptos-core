@@ -1,13 +1,13 @@
 ---
 title: "Node Networks and Sync"
-slug: "basics-node-networks-sync"
+slug: "node-networks-sync"
 ---
 
 # Node Networks and Synchronization
 
 Validator nodes and fullnodes form a hierarchical structure with validator nodes at the root and fullnodes everywhere else. The Aptos blockchain distinguishes two types of fullnodes: validator fullnodes and public fullnodes. Validator fullnodes connect directly to validator nodes and offer scalability alongside DDoS mitigation. Public fullnodes connect to validator fullnodes (or other public fullnodes) to gain low-latency access to the Aptos network.
 
-![v-fn-network.svg](/img/docs/v-fn-network.svg)
+![v-fn-network.svg](../../static/img/docs/v-fn-network.svg)
 
 ## Separate network stacks
 The Aptos blockchain supports distinct networking stacks for various network topologies. For example, the validator network is independent of the fullnode network. The advantages of having separate network stacks include:
@@ -22,5 +22,5 @@ For example, a validator node will invoke state synchronization when it comes on
 
 ## State synchronizer
 
-Each Aptos node contains a [State Synchronizer](/guides/state-sync.md) component which is used to synchronize the state of the node with its peers. This component has the same functionality for all types of Aptos nodes: it utilizes the dedicated peer-to-peer network to continuously request and disseminate blockchain data. Validator nodes distribute blockchain data within the validator node network, while fullnodes rely on other fullnodes (i.e., validator nodes or public fullnodes).
+Each Aptos node contains a [State Synchronizer](../guides/state-sync.md) component which is used to synchronize the state of the node with its peers. This component has the same functionality for all types of Aptos nodes: it utilizes the dedicated peer-to-peer network to continuously request and disseminate blockchain data. Validator nodes distribute blockchain data within the validator node network, while fullnodes rely on other fullnodes (i.e., validator nodes or public fullnodes).
 

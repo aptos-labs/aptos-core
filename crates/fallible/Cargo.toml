@@ -13,6 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-thiserror = "1.0.31"
+thiserror = { workspace = true }
 
 

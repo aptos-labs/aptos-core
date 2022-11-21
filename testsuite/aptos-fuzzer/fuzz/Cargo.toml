@@ -16,10 +16,9 @@ rust-version = { workspace = true }
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "=0.3.2"
-once_cell = "1.10.0"
-
-aptos-fuzzer = { path = ".." }
+aptos-fuzzer = { workspace = true }
+libfuzzer-sys = { workspace = true }
+once_cell = { workspace = true }
 
 [[bin]]
 name = "fuzz_runner"
