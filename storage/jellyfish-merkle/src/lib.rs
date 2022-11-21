@@ -260,7 +260,6 @@ where
     }
 
     pub fn put_node(&mut self, node_key: NodeKey, node: Node<K>) {
-        info!("New node update, node_key={node_key:?}");
         if node.is_leaf() {
             self.inc_num_new_leaves();
         }
@@ -273,7 +272,6 @@ where
         stale_since_version: Version,
         node: &Node<K>,
     ) {
-        info!("New stale node, since_version={stale_since_version}, node_key={node_key:?}");
         if node.is_leaf() {
             self.inc_num_stale_leaves();
         }
@@ -459,7 +457,6 @@ where
             *SPARSE_MERKLE_PLACEHOLDER_HASH
         };
 
-        info!("Batch update done, root_hash={root_hash:x}");
         Ok((root_hash, batch))
     }
 

@@ -108,7 +108,6 @@ impl NodeKey {
         assert!(self.nibble_path().num_nibbles() < 256);
         out.write_u8(self.nibble_path().num_nibbles() as u8)?;
         let bytes: Vec<u8> = self.nibble_path().bytes().collect();
-        info!("NodeKey encoding, node={self:?}, encoded={bytes:x?}");
         out.write_all(bytes.as_slice())?;
         Ok(out)
     }

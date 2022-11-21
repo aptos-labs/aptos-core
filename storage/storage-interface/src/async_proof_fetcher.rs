@@ -95,7 +95,6 @@ impl AsyncProofFetcher {
         let data_sender = self.data_sender.clone();
         let skh = state_key.hash();
         let rth = root_hash.clone().unwrap();
-        info!("Verifying proof, skh={skh:x}, root_hash={rth:x}");
         IO_POOL.spawn(move || {
             let proof = reader
                 .get_state_proof_by_version_ext(&state_key, version)

@@ -574,7 +574,6 @@ where
                     if !is_nibble {
                         path.truncate(pos.len() as usize / NIBBLE_SIZE_IN_BITS + 1);
                     }
-                    info!("Adding into node hash, path={path:?}.");
                     node_hashes.insert(path, subtree.hash());
                 }
             }
