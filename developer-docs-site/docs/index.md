@@ -8,7 +8,7 @@ hide_table_of_contents: true
 
 # Aptos Developer Documentation
 
-Welcome! At Aptos Labs, we are building a Layer 1 for everyone. In the [Ohlone language](https://en.wikipedia.org/wiki/Ohlone_languages), ["Aptos"](https://en.wikipedia.org/wiki/Aptos,_California) means "The People." And we at Aptos Labs are here to help you grow a [web3 ecosystem](https://github.com/aptos-foundation/ecosystem-projects) that benefits the entire world through easier development, more reliable services, faster transactions, and a supportive, decentralized family. 
+Welcome! At Aptos Labs, we are building a Layer 1 for everyone. In the [Ohlone language](https://en.wikipedia.org/wiki/Ohlone_languages), ["Aptos"](https://en.wikipedia.org/wiki/Aptos,_California) means "The People." We at Aptos Labs are here to help you grow a [web3 ecosystem](https://github.com/aptos-foundation/ecosystem-projects) that benefits the entire world through easier development, more reliable services, faster transactions, and a supportive, decentralized family. 
 
 This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
 
