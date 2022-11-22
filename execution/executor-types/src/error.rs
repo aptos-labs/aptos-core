@@ -13,7 +13,7 @@ pub enum Error {
     #[error("Cannot find speculation result for block id {0}")]
     BlockNotFound(HashValue),
 
-    #[error("Cannot get data for block id {0}")]
+    #[error("Cannot get data for batch id {0}")]
     DataNotFound(HashValue),
 
     #[error(

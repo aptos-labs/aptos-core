@@ -44,7 +44,7 @@ pub struct RejectedTransactionSummary {
 #[derive(Debug)]
 pub enum DataStatus {
     Cached(Vec<SignedTransaction>),
-    Requested(Vec<oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>>),
+    Requested(Vec<(HashValue, oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>)>),
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]

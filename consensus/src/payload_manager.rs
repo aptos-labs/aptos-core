@@ -47,7 +47,7 @@ impl PayloadManager {
         &self,
         proofs: Vec<ProofOfStore>,
         logical_time: LogicalTime,
-    ) -> Vec<oneshot::Receiver<Result<Vec<SignedTransaction>, executor_types::Error>>> {
+    ) -> Vec<(HashValue, oneshot::Receiver<Result<Vec<SignedTransaction>, executor_types::Error>>)> {
         let mut receivers = Vec::new();
         for pos in proofs {
             debug!(
@@ -58,12 +58,15 @@ impl PayloadManager {
             );
             if logical_time <= pos.expiration() {
                 receivers.push(
-                    self.data_reader
-                        .load()
-                        .as_ref()
-                        .unwrap() //TODO: can this be None? Need to make sure we call new_epoch() first.
-                        .get_batch(pos)
-                        .await,
+                    (
+                        pos.digest().clone(),
+                        self.data_reader
+                            .load()
+                            .as_ref()
+                            .unwrap() //TODO: can this be None? Need to make sure we call new_epoch() first.
+                            .get_batch(pos)
+                            .await
+                    )
                 );
             } else {
                 debug!("QS: skipped expired pos");
@@ -135,8 +138,7 @@ impl PayloadManager {
     /// Extract transaction from a given block
     /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
     pub async fn get_transactions(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
-
-        if block.payload().map_or(true, |p| p.is_empty()){
+        if block.payload().map_or(true, |p| p.is_empty()) {
             return Ok(Vec::new());
         }
 
@@ -155,7 +157,7 @@ impl PayloadManager {
                         DataStatus::Requested(receivers) => {
                             let mut vec_ret = Vec::new();
                             debug!("QSE: waiting for data on {} receivers", receivers.len());
-                            for rx in receivers {
+                            for (digest, rx) in receivers {
                                 match rx.await {
                                     Err(_) => {
                                         // We probably advanced epoch already.
@@ -171,7 +173,7 @@ impl PayloadManager {
                                             .status
                                             .lock()
                                             .replace(DataStatus::Requested(new_receivers));
-                                        return Err(DataNotFound(block.id()));
+                                        return Err(DataNotFound(digest));
                                     }
                                     Ok(Ok(data)) => {
                                         debug!("QSE: got data, len {}", data.len());
