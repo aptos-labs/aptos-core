@@ -167,6 +167,9 @@ rust-version = "1.64"
 [workspace.dependencies]
 # Internal crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
+accumulator = { path = "storage/accumulator" }
+aptos = { path = "crates/aptos" }
+aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
 aptos-api = { path = "api" }
 aptos-api-test-context = { path = "api/test-context" }
 aptos-api-types = { path = "api/types" }
@@ -177,37 +180,58 @@ aptos-config = { path = "config" }
 aptos-crypto = { path = "crates/aptos-crypto" }
 aptos-crypto-derive = { path = "crates/aptos-crypto-derive" }
 aptos-data-client = { path = "state-sync/aptos-data-client" }
+aptosdb-indexer = { path = "storage/indexer" }
+aptos-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-fh-stream = { path = "ecosystem/sf-indexer/firehose-stream" }
+aptos-faucet = { path = "crates/aptos-faucet" }
+aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
 aptos-gas = { path = "aptos-move/aptos-gas" }
 aptos-genesis = { path = "crates/aptos-genesis" }
+aptos-github-client = { path = "secure/storage/github" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
 aptos-keygen = { path = "crates/aptos-keygen" }
+aptos-log-derive = { path = "crates/aptos-log-derive" }
 aptos-logger = { path = "crates/aptos-logger" }
 aptos-mempool = { path = "mempool" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
+aptos-module-verifier = { path = "aptos-move/aptos-module-verifier" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
+aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-openapi = { path = "crates/aptos-openapi" }
+aptos-parallel-executor = { path = "aptos-move/parallel-executor" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }
 aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }
+aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
+aptos-resource-viewer = { path = "aptos-move/aptos-resource-viewer" }
 aptos-rest-client = { path = "crates/aptos-rest-client" }
+aptos-retrier = { path = "crates/aptos-retrier" }
+aptos-rocksdb-options = { path = "storage/rocksdb-options" }
+aptos-rosetta = { path = "crates/aptos-rosetta" }
 aptos-sdk = { path = "sdk" }
+aptos-sdk-builder = { path = "aptos-move/aptos-sdk-builder" }
 aptos-secure-net = { path = "secure/net" }
 aptos-secure-storage = { path = "secure/storage" }
 aptos-state-view = { path = "storage/state-view" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
+aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }
 aptos-time-service = { path = "crates/aptos-time-service", features = ["async"] }
+aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
+aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
+aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
+aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
 aptosdb = { path = "storage/aptosdb" }
+backup-cli = { path = "storage/backup/backup-cli" }
 backup-service = { path = "storage/backup/backup-service" }
 bounded-executor = { path = "crates/bounded-executor" }
 cached-packages = { path = "aptos-move/framework/cached-packages" }
@@ -222,15 +246,23 @@ executor = { path = "execution/executor" }
 executor-test-helpers = { path = "execution/executor-test-helpers" }
 executor-types = { path = "execution/executor-types" }
 fallible = { path = "crates/fallible" }
+forge = { path = "testsuite/forge" }
 framework = { path = "aptos-move/framework" }
+gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
+handlebars = "4.2.2"
 inspection-service = { path = "crates/inspection-service" }
+language-e2e-tests = { path = "aptos-move/e2e-tests" }
 mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 memsocket = { path = "network/memsocket" }
+move-examples = { path = "aptos-move/move-examples" }
+mvhashmap = { path = "aptos-move/mvhashmap" }
 netcore = { path = "network/netcore" }
 network = { path = "network" }
 network-builder = { path = "network/builder" }
 network-discovery = { path = "network/discovery" }
+node-resource-metrics = { path = "crates/node-resource-metrics" }
 num-variants = { path = "crates/num-variants" }
+package-builder = { path = "aptos-move/package-builder" }
 peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
 proxy = { path = "crates/proxy" }
 safety-rules = { path = "consensus/safety-rules" }
@@ -243,89 +275,178 @@ storage-service-client = { path = "state-sync/storage-service/client" }
 storage-service-server = { path = "state-sync/storage-service/server" }
 storage-service-types = { path = "state-sync/storage-service/types" }
 transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
+testcases = { path = "testsuite/testcases" }
 vm-genesis = { path = "aptos-move/vm-genesis" }
 vm-validator = { path = "vm-validator" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
+again = "0.1.2"
 anyhow = "1.0.62"
+arc-swap = "1.5.0"
+arr_macro = "0.1.3"
+assert_approx_eq = "1.1.0"
+assert_unordered = "0.1.1"
 async-stream = "0.3"
 async-trait = "0.1.53"
+axum = "0.5.16"
 base64 = "0.13.0"
+backtrace = "0.3.58"
 bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
+better_any = "0.1.1"
 bigdecimal = { version = "0.3.0", features = ["serde"] }
+bitvec = "0.19.4"
+blst = "0.3.7"
 byteorder = "1.4.3"
 bytes = "1.1.0"
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
+cfg-if = "1.0.0"
 claims = "0.7"
-clap = "3.2.17"
+clap = { version = "3.2.17", features = ["derive", "env", "suggestions"] }
+clap_complete = "3.2.3"
+codespan-reporting = "0.11.1"
+console-subscriber = "0.1.6"
 const_format = "0.2.26"
 criterion = "0.3.5"
-diesel = { version = "1.4.8", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
-diesel_migrations = { version = "1.4.0", features = ["postgres"] }
+criterion-cpu-time = "0.1.0"
+crossbeam = "0.8.1"
+crossbeam-channel = "0.5.4"
+crossbeam-queue = "0.3.5"
+curve25519-dalek = "3"
+dashmap = "5.2.0"
+datatest-stable = "0.1.1"
+debug-ignore = { version = "1.0.3", features = ["serde"] }
+diesel = { version = "2.0.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
+diesel_migrations = { version = "2.0.0", features = ["postgres"] }
+digest = "0.9.0"
+dir-diff = "0.3.2"
+dirs = "4.0.0"
+ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
+either = "1.6.1"
 enum_dispatch = "0.3.8"
 env_logger = "0.9.0"
+erased-serde = "0.3.13"
+event-listener = "2.5.3"
 fail = "0.5.0"
 field_count = "0.1.1"
+flate2 = "1.0.24"
+fs_extra = "1.2.0"
 futures = "= 0.3.24" # Previously futures v0.3.23 caused some consensus network_tests to fail. We now pin the dependency to v0.3.24.
 futures-channel = "= 0.3.24"
 futures-util = "0.3.21"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
 goldenfile = "1.1.0"
+heck = "0.3.2"
 hex = "0.4.3"
+hkdf = "0.10.0"
+hostname = "0.3.1"
 http = "0.2.3"
+httpmock = "0.6"
 hyper = { version = "0.14.18", features = ["full"] }
+hyper-tls = "0.5.0"
+include_dir = { version = "0.7.2", features = ["glob"] }
 indicatif = "0.15.0"
 indoc = "1.0.6"
+ipnet = "2.5.0"
 itertools = "0.10.3"
 jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
+json-patch = "0.2.6"
+jsonwebtoken = "8.1"
+k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_15"] }
+kube = { version = "0.51.0", features = ["jsonpatch"] }
+libfuzzer-sys = "=0.3.2"
+libsecp256k1 = "0.7.0"
 log = "0.4.17"
 lru = "0.7.5"
+lz4 = "1.24.0"
 maplit = "1.0.2"
 mime = "0.3.16"
 mirai-annotations = "1.12.0"
 mockall = "0.11.0"
+more-asserts = "0.3.0"
+native-tls = "0.2.10"
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 once_cell = "1.10.0"
+parking_lot = "0.12.0"
 paste = "1.0.7"
 pbjson = "0.4.0"
 percent-encoding = "2.1.0"
 pin-project = "1.0.10"
 poem = { version = "1.3.40", features = ["anyhow", "rustls"] }
 poem-openapi = { version = "2.0.10", features = ["swagger-ui", "url"] }
+pretty_assertions = "1.2.1"
+procfs = "0.14.1"
+proc-macro2 = "1.0.38"
+project-root = "0.2.2"
+prometheus = { version = "0.13.0", default-features = false }
+prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.2"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 prost = "0.10.4"
 prost-types = "0.10.1"
+quanta = "0.10.1"
+quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
 rayon = "1.5.2"
 regex = "1.5.5"
-reqwest = { version = "0.11.11", features = ["blocking", "cookies", "json"] }
+reqwest = { version = "0.11.11", features = ["blocking", "cookies", "json", "stream"] }
 reqwest-middleware = "0.1.6"
 reqwest-retry = "0.1.5"
+ring = { version = "0.16.20", features = ["std"] }
+ripemd = "0.1.1"
+rocksdb = { version = "0.19.0", features = ["lz4"] }
+rstest = "0.15.0"
 rusty-fork = "0.3.0"
+sha-1 = "0.10.0"
+sha2 = "0.9.3"
+sha3 = "0.9.1"
+siphasher = "0.3.10"
 serde = { version = "1.0.137", features = ["derive", "rc"] }
 serde_bytes = "0.11.6"
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
+serde_repr = "0.1"
+serde-name = "0.1.1"
+serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
+serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 serde_yaml = "0.8.24"
+shadow-rs = "0.16.2"
+smallvec = "1.8.0"
+static_assertions = "1.1.0"
+stats_alloc = "0.1.8"
+strum = "0.24.1"
+strum_macros = "0.24.2"
 structopt = "0.3.21"
 substreams = "0.0.17"
+syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
+sysinfo = "0.24.2"
 tempfile = "3.3.0"
+termcolor = "1.1.2"
+textwrap = "0.15.0"
 thiserror = "1.0.31"
+tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
+tracing = "0.1.34"
+tracing-subscriber = "0.3.11"
+trybuild = "1.0.41"
 tokio = { version = "1.21.0", features = ["full"] }
 tokio-retry = "0.3.0"
 tokio-stream = "0.1.8"
+tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.5.9"
 tonic = { version = "0.7.2", features = ["tls-roots", "transport", "prost", "compression", "codegen"] }
+ureq = { version = "1.5.4", features = ["json", "native-tls"], default_features = false }
 url = { version = "2.2.2", features = ["serde"] }
-warp = { version = "0.3.2" }
+uuid = { version = "1.0.0", features = ["v4", "serde"] }
+walkdir = "2.3.2"
+warp = { version = "0.3.2", features = ["tls"] }
 warp-reverse-proxy = "0.5.0"
+which = "4.2.5"
+x25519-dalek = "1.2.0"
 
 # Note: the BEGIN and END comments below are required for external tooling. Do not remove.
 # BEGIN MOVE DEPENDENCIES
