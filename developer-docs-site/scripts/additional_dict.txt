@@ -21,6 +21,8 @@ BCS
 BFT
 BIP
 Bitwise
+BlockMetadata
+BlockMetadataTransaction
 BlockQuote
 CANCELLED
 CDN
@@ -163,6 +165,7 @@ SignMessagePayload
 SignerCap
 Skylake
 Solana
+StateCheckpointTransaction
 TCP
 TPS
 TXT
@@ -330,6 +333,7 @@ schema
 schemas
 sdk
 sdks
+sharded
 sharding
 signAndSubmitTransaction
 signMessage
