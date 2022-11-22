@@ -42,7 +42,7 @@ const sidebars = {
         "concepts/resources",
         "concepts/events",
         "concepts/txns-states",
-        "concepts/gas",
+        "concepts/gas-txn-fee",
         "concepts/blocks",
         "guides/basics-life-of-txn",
         "concepts/staking",
@@ -85,13 +85,9 @@ const sidebars = {
     {
       type: "category",
       label: "Reading blockchain data",
-      link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
-      items: [
-        "guides/system-integrators-guide",
-        "guides/indexing",
-      ],
+      items: ["guides/system-integrators-guide", "guides/indexing"],
     },
     {
       type: "category",
@@ -122,7 +118,6 @@ const sidebars = {
     {
       type: "category",
       label: "Develop Locally",
-      link: { type: "doc", id: "nodes/local-testnet/index" },
       collapsible: true,
       collapsed: true,
       items: [
@@ -133,6 +128,20 @@ const sidebars = {
       ],
     },
     {
+      type: "html",
+      value: "Reference",
+      className: "sidebar-title",
+    },
+    "reference/glossary",
+    "issues-and-workarounds",
+    {
+      type: "category",
+      label: "API Reference",
+      collapsible: true,
+      collapsed: true,
+      items: ["nodes/aptos-api-spec", "guides/try-out-api"],
+    },
+    {
       type: "category",
       label: "Move Reference",
       link: { type: "doc", id: "guides/move-guides/index" },
@@ -140,7 +149,6 @@ const sidebars = {
       collapsed: true,
       items: [
         "guides/move-guides/move-on-aptos",
-        "concepts/gas-txn-fee",
         "concepts/base-gas",
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",
@@ -293,14 +301,6 @@ const sidebars = {
         },
       ],
     },
-    {
-      type: "html",
-      value: "Reference",
-      className: "sidebar-title",
-    },
-    "nodes/aptos-api-spec",
-    "reference/glossary",
-    "issues-and-workarounds",
   ],
 };
 
