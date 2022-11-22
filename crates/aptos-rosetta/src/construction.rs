@@ -546,8 +546,13 @@ async fn construction_parse(
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER_FUNCTION) => {
                     parse_set_voter_operation(sender, &type_args, &args)?
                 }
-                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, CREATE_STAKING_CONTRACT) => {
-                    parse_create_stake_pool_operation(sender, &type_args, &args)?
+                (
+                    AccountAddress::ONE,
+                    STAKING_CONTRACT_MODULE,
+                    CREATE_STAKING_CONTRACT_FUNCTION,
+                ) => parse_create_stake_pool_operation(sender, &type_args, &args)?,
+                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, RESET_LOCKUP_FUNCTION) => {
+                    parse_reset_lockup_operation(sender, &type_args, &args)?
                 }
                 _ => {
                     return Err(ApiError::TransactionParseError(Some(format!(
@@ -802,6 +807,27 @@ pub fn parse_create_stake_pool_operation(
     )])
 }
 
+pub fn parse_reset_lockup_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Reset lockup should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+
+    let operator: AccountAddress = parse_function_arg("reset_lockup", args, 0)?;
+    Ok(vec![Operation::reset_lockup(
+        0,
+        None,
+        sender,
+        Some(AccountIdentifier::base_account(operator)),
+    )])
+}
+
 /// Construction payloads command (OFFLINE)
 ///
 /// Constructs payloads for given known operations
@@ -885,6 +911,21 @@ async fn construction_payloads(
                 return Err(ApiError::InvalidInput(Some(format!(
                     "Initialize stake pool doesn't match metadata {:?} vs {:?}",
                     operation, metadata.internal_operation
+                ))));
+            }
+        }
+        InternalOperation::ResetLockup(inner) => {
+            if let InternalOperation::ResetLockup(ref metadata_op) = metadata.internal_operation {
+                if inner.owner != metadata_op.owner || inner.operator != metadata_op.operator {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Reset lockup operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Reset lockup operation doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
                 ))));
             }
         }
