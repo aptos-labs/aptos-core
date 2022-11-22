@@ -92,6 +92,7 @@
 -  [Function `is_current_epoch_validator`](#0x1_stake_is_current_epoch_validator)
 -  [Function `update_performance_statistics`](#0x1_stake_update_performance_statistics)
 -  [Function `on_new_epoch`](#0x1_stake_on_new_epoch)
+-  [Function `distribute_transaction_fees`](#0x1_stake_distribute_transaction_fees)
 -  [Function `update_stake_pool`](#0x1_stake_update_stake_pool)
 -  [Function `calculate_rewards_amount`](#0x1_stake_calculate_rewards_amount)
 -  [Function `distribute_rewards`](#0x1_stake_distribute_rewards)
@@ -126,6 +127,7 @@
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
@@ -2909,13 +2911,14 @@ This function cannot abort.
 
 Triggers at epoch boundary. This function shouldn't abort.
 
-1. Distribute rewards to stake pools of active and pending inactive validators (requested to leave but not yet
+1. Distribute transaction fees to stake pools of active and pending inactive validators.
+2. Distribute rewards to stake pools of active and pending inactive validators (requested to leave but not yet
 removed).
-2. Officially move pending active stake to active and move pending inactive stake to inactive.
+3. Officially move pending active stake to active and move pending inactive stake to inactive.
 The staking pool's voting power in this new epoch will be updated to the total active stake.
-3. Add pending active validators to the active set if they satisfy requirements so they can vote and remove
+4. Add pending active validators to the active set if they satisfy requirements so they can vote and remove
 pending inactive validators so they no longer can vote.
-4. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
+5. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
 power.
 
 
@@ -2928,10 +2931,33 @@ power.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_on_new_epoch">on_new_epoch</a>() <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>, <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>, <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_on_new_epoch">on_new_epoch</a>() <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>, <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>, <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>, <a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a> {
     <b>let</b> validator_set = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
     <b>let</b> config = <a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>();
     <b>let</b> validator_perf = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework);
+
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
+        <b>let</b> validator_fees = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a>&gt;(@aptos_framework);
+
+        // Distribute transaction fees for each currently active validator.
+        <b>let</b> i = 0;
+        <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&validator_set.active_validators);
+        <b>while</b> (i &lt; len) {
+            <b>let</b> validator = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&validator_set.active_validators, i);
+            <a href="stake.md#0x1_stake_distribute_transaction_fees">distribute_transaction_fees</a>(validator_fees, validator.addr);
+            i = i + 1;
+        };
+
+        // Distribute transaction fees for each currently pending_inactive validator (requested <b>to</b>
+        // leave but not removed yet).
+        <b>let</b> i = 0;
+        <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&validator_set.pending_inactive);
+        <b>while</b> (i &lt; len) {
+            <b>let</b> validator = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&validator_set.pending_inactive, i);
+            <a href="stake.md#0x1_stake_distribute_transaction_fees">distribute_transaction_fees</a>(validator_fees, validator.addr);
+            i = i + 1;
+        };
+    };
 
     // Process pending <a href="stake.md#0x1_stake">stake</a> and distribute rewards for each currently active validator.
     <b>let</b> i = 0;
@@ -3034,6 +3060,38 @@ power.
 
         validator_index = validator_index + 1;
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_stake_distribute_transaction_fees"></a>
+
+## Function `distribute_transaction_fees`
+
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_distribute_transaction_fees">distribute_transaction_fees</a>(validator_fees: &<b>mut</b> <a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>, pool_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_distribute_transaction_fees">distribute_transaction_fees</a>(
+    validator_fees: &<b>mut</b> <a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a>,
+    pool_address: <b>address</b>,
+) <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a> {
+    <b>let</b> fees_table = &<b>mut</b> validator_fees.fees_table;
+    <b>let</b> stake_pool = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
+    <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(fees_table, pool_address)) {
+        <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="../../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(fees_table, pool_address);
+        <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> stake_pool.active, <a href="coin.md#0x1_coin">coin</a>);
+    }
 }
 </code></pre>
 
