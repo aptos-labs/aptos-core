@@ -120,8 +120,8 @@ In the [previous section](#lifecycle-of-the-transaction), we described the typic
 * Are interested in eventually contributing to the Aptos blockchain.
 
 You can learn more about the different types of Aptos nodes here:
-* [Validator nodes](/concepts/basics-validator-nodes)
-* [Fullnodes](/concepts/basics-fullnodes)
+* [Validator nodes](/concepts/validator-nodes)
+* [Fullnodes](/concepts/fullnodes)
 
 For our narrative, we will assume that a client submits a transaction T<sub>N</sub> to a validator V<sub>X</sub>. For each validator component, we will describe each of its inter-component interactions in subsections under the respective component's section. Note that subsections describing the inter-component interactions are not listed strictly in the order in which they are performed. Most of the interactions are relevant to the processing of a transaction, and some are relevant to clients querying the blockchain (queries for existing information on the blockchain).
 

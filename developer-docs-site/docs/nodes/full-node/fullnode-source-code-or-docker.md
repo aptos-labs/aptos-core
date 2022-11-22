@@ -6,7 +6,7 @@ sidebar_position: 10
 
 # Public Fullnode Using Aptos Source or Docker
 
-You can run your own [public fullnode](/concepts/basics-fullnodes) to synchronize with the state of the Aptos blockchain and stay up-to-date. Public fullnodes replicate the entire state of the blockchain by querying other Aptos fullnodes (public fullnodes or validator fullnodes) or validators.
+You can run your own [public fullnode](/concepts/fullnodes) to synchronize with the state of the Aptos blockchain and stay up-to-date. Public fullnodes replicate the entire state of the blockchain by querying other Aptos fullnodes (public fullnodes or validator fullnodes) or validators.
 
 Alternatively, you can use the public fullnodes provided by Aptos Labs. However, such Aptos Labs-provided public fullnodes have rate limits, which can impede your development. By running your own public fullnode you can directly synchronize with the Aptos blockchain and avoid such rate limits.
 

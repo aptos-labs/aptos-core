@@ -13,15 +13,14 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-clap = "3.1.18"
-serde = { version = "1.0.137", features = ["derive"] }
-serde_yaml = "0.8.24"
-tokio = { version = "1.21.0", features = ["full"] }
-url = "2.2.2"
-
-aptos = { path = "../aptos" }
-aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../aptos-crypto" }
-aptos-faucet = { path = "../aptos-faucet" }
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-sdk = { path = "../../sdk" }
+aptos = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-faucet = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-sdk = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }

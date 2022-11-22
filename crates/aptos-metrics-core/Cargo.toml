@@ -13,8 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-prometheus = { version = "0.13.0", default-features = false }
+anyhow = { workspace = true }
+prometheus = { workspace = true }
 
 [dev-dependencies]
-claims = "0.7"
+claims = { workspace = true }

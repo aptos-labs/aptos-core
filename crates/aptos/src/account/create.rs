@@ -7,9 +7,8 @@ use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
 
-// TODO(Gas): double check if this is correct
-// TODO(greg): revisit after fixing gas estimation
-pub const DEFAULT_FUNDED_COINS: u64 = 500_000;
+// 1 APT
+pub const DEFAULT_FUNDED_COINS: u64 = 100_000_000;
 
 /// Create a new account on-chain
 ///
