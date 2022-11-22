@@ -136,7 +136,7 @@ jobs:
           path: |
             /tmp/.tmp*
             !/tmp/.tmp*/**/db/
-          retention-days: 1
+          retention-days: 14
 
   check-vm-features:
     runs-on: high-perf-docker
