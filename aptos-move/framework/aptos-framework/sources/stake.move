@@ -25,6 +25,7 @@ module aptos_framework::stake {
     use std::vector;
     use aptos_std::bls12381;
     use aptos_std::math64::min;
+    use aptos_std::table::{Self, Table};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin, MintCapability};
@@ -37,6 +38,7 @@ module aptos_framework::stake {
     friend aptos_framework::block;
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration;
+    friend aptos_framework::transaction_fee;
 
     /// Validator Config not published.
     const EVALIDATOR_CONFIG: u64 = 1;
@@ -74,6 +76,8 @@ module aptos_framework::stake {
     const EINELIGIBLE_VALIDATOR: u64 = 17;
     /// Cannot update stake pool's lockup to earlier than current lockup.
     const EINVALID_LOCKUP: u64 = 18;
+    /// Table to store collected transaction fees for each validator already exists.
+    const EFEES_TABLE_ALREADY_EXISTS: u64 = 19;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -252,6 +256,34 @@ module aptos_framework::stake {
 
     struct LeaveValidatorSetEvent has drop, store {
         pool_address: address,
+    }
+
+    /// Stores transaction fees assigned to validators. All fees are distributed at the
+    /// end of the epoch.
+    struct ValidatorFees has key {
+        fees_table: Table<address, Coin<AptosCoin>>,
+    }
+
+    /// Initializes the resource storing information about collected gas fees per validator.
+    /// Should be called by on-chain governance.
+    public(friend) fun initialize_fees_table(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(
+            !exists<ValidatorFees>(@aptos_framework),
+            error::already_exists(EFEES_TABLE_ALREADY_EXISTS)
+        );
+        move_to(aptos_framework, ValidatorFees { fees_table: table::new() });
+    }
+
+    /// Stores the coin collected from transaction fees to the specified address.
+    public(friend) fun add_transaction_fee(addr: address, coin: Coin<AptosCoin>) acquires ValidatorFees {
+        let fees_table = &mut borrow_global_mut<ValidatorFees>(@aptos_framework).fees_table;
+        if (!table::contains(fees_table, addr)) {
+            table::add(fees_table, addr, coin);
+        } else {
+            let stored_coin = table::borrow_mut(fees_table, addr);
+            coin::merge(stored_coin, coin);
+        }
     }
 
     /// Return the lockup expiration of the stake pool at `pool_address`.
@@ -2575,5 +2607,12 @@ module aptos_framework::stake {
     public fun with_rewards(amount: u64): u64 {
         let (numerator, denominator) = staking_config::get_reward_rate(&staking_config::get());
         amount + amount * numerator / denominator
+    }
+
+    #[test_only]
+    public fun get_validator_fee(validator_addr: address): u64 acquires ValidatorFees {
+        let fees_table = &borrow_global<ValidatorFees>(@aptos_framework).fees_table;
+        let coin = table::borrow(fees_table, validator_addr);
+        coin::value(coin)
     }
 }

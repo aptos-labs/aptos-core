@@ -2,6 +2,7 @@
 module aptos_framework::transaction_fee {
     use aptos_framework::coin::{Self, AggregatableCoin, BurnCapability, Coin};
     use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::stake;
     use aptos_framework::system_addresses;
     use std::error;
     use std::option::{Self, Option};
@@ -39,6 +40,9 @@ module aptos_framework::transaction_fee {
             error::already_exists(EALREADY_COLLECTING_FEES)
         );
         assert!(burn_percentage <= 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));
+
+        // Make sure stakng module is aware of transaction fees collection.
+        stake::initialize_fees_table(aptos_framework);
 
         // Initially, no fees are collected and the block proposer is not set.
         let zero = coin::initialize_aggregator_coin(aptos_framework);
@@ -86,8 +90,7 @@ module aptos_framework::transaction_fee {
             let proposer_addr = *option::borrow(&collected_fees.proposer);
             if (coin::is_account_registered<AptosCoin>(proposer_addr)) {
                 burn_coin_fraction(&mut coin, collected_fees.burn_percentage);
-                // TODO: change with stake::add_fee()
-                coin::deposit(proposer_addr, coin);
+                stake::add_transaction_fee(proposer_addr, coin);
                 return
             };
         };
@@ -185,6 +188,113 @@ module aptos_framework::transaction_fee {
         assert!(*option::borrow(&coin::supply<AptosCoin>()) == 10, 0);
 
         burn_collected_fee(c2);
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
+    }
+
+    #[test(aptos_framework = @aptos_framework, vm = @vm_reserved, alice = @0xa11ce, bob = @0xb0b, carol = @0xca101)]
+    fun test_fees_distribution(
+        aptos_framework: signer,
+        vm: signer,
+        alice: signer,
+        bob: signer,
+        carol: signer,
+    ) acquires AptosCoinCapabilities, CollectedFeesPerBlock {
+        use std::signer;
+        use aptos_framework::aptos_account;
+        use aptos_framework::aptos_coin;
+
+        // Initialization.
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        store_aptos_coin_burn_cap(&aptos_framework, burn_cap);
+        initialize_fee_collection_and_distribution(&aptos_framework, 10);
+
+        // Create dummy accounts.
+        let alice_addr = signer::address_of(&alice);
+        let bob_addr = signer::address_of(&bob);
+        let carol_addr = signer::address_of(&carol);
+        aptos_account::create_account(alice_addr);
+        aptos_account::create_account(bob_addr);
+        coin::deposit(alice_addr, coin::mint(10000, &mint_cap));
+        coin::deposit(bob_addr, coin::mint(10000, &mint_cap));
+        assert!(*option::borrow(&coin::supply<AptosCoin>()) == 20000, 0);
+
+        // Block 1 starts.
+        assign_or_burn_collected_fee(&vm);
+        register_proposer_for_fee_collection(&vm, alice_addr);
+
+        // Check that there was no fees distribution in the first block.
+        let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
+        assert!(coin::is_zero(&collected_fees.amount), 0);
+        assert!(*option::borrow(&collected_fees.proposer) == alice_addr, 0);
+        assert!(*option::borrow(&coin::supply<AptosCoin>()) == 20000, 0);
+
+        // Simulate transaction fee collection - here we simply collect some fees from Bob.
+        collect_fee(bob_addr, 100);
+        collect_fee(bob_addr, 500);
+        collect_fee(bob_addr, 400);
+
+        // Now Bob must have 1000 less in his account.
+        assert!(coin::balance<AptosCoin>(alice_addr) == 10000, 0);
+        assert!(coin::balance<AptosCoin>(bob_addr) == 9000, 0);
+
+        // Block 2 starts.
+        assign_or_burn_collected_fee(&vm);
+        register_proposer_for_fee_collection(&vm, bob_addr);
+
+        // Collected fees from Bob must have been assigned to Alice.
+        assert!(stake::get_validator_fee(alice_addr) == 900, 0);
+        assert!(coin::balance<AptosCoin>(alice_addr) == 10000, 0);
+        assert!(coin::balance<AptosCoin>(bob_addr) == 9000, 0);
+
+        // Also, aggregator coin is drained and total supply is slightly changed (10% of 1000 is burnt).
+        let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
+        assert!(coin::is_zero(&collected_fees.amount), 0);
+        assert!(*option::borrow(&collected_fees.proposer) == bob_addr, 0);
+        assert!(*option::borrow(&coin::supply<AptosCoin>()) == 19900, 0);
+
+        // Simulate transaction fee collection one more time.
+        collect_fee(bob_addr, 5000);
+        collect_fee(bob_addr, 4000);
+
+        assert!(coin::balance<AptosCoin>(alice_addr) == 10000, 0);
+        assert!(coin::balance<AptosCoin>(bob_addr) == 0, 0);
+
+        // Block 3 starts.
+        assign_or_burn_collected_fee(&vm);
+        register_proposer_for_fee_collection(&vm, carol_addr);
+
+        // Collected fees should have been assigned to Bob because he was the peoposer.
+        assert!(stake::get_validator_fee(alice_addr) == 900, 0);
+        assert!(coin::balance<AptosCoin>(alice_addr) == 10000, 0);
+        assert!(stake::get_validator_fee(bob_addr) == 8100, 0);
+        assert!(coin::balance<AptosCoin>(bob_addr) == 0, 0);
+
+        // Again, aggregator coin is drained and total supply is changed by 10% of 9000.
+        let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
+        assert!(coin::is_zero(&collected_fees.amount), 0);
+        assert!(*option::borrow(&collected_fees.proposer) == carol_addr, 0);
+        assert!(*option::borrow(&coin::supply<AptosCoin>()) == 19000, 0);
+
+        // Simulate transaction fee collection one last time.
+        collect_fee(alice_addr, 1000);
+        collect_fee(alice_addr, 1000);
+
+        // Block 4 starts.
+        assign_or_burn_collected_fee(&vm);
+        register_proposer_for_fee_collection(&vm, alice_addr);
+
+        // Check that 2000 was collected from Alice.
+        assert!(coin::balance<AptosCoin>(alice_addr) == 8000, 0);
+        assert!(coin::balance<AptosCoin>(bob_addr) == 0, 0);
+
+        // Since carol has no account registered, fees should be burnt and total supply
+        // should reflect that.
+        let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
+        assert!(coin::is_zero(&collected_fees.amount), 0);
+        assert!(*option::borrow(&collected_fees.proposer) == alice_addr, 0);
+        assert!(*option::borrow(&coin::supply<AptosCoin>()) == 17000, 0);
+
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
     }

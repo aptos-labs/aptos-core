@@ -23,6 +23,7 @@ This module provides an interface to burn or collect and redistribute transactio
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
 
@@ -149,6 +150,9 @@ distribution. Should be called by on-chain governance.
     );
     <b>assert</b>!(burn_percentage &lt;= 100, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>));
 
+    // Make sure stakng <b>module</b> is aware of transaction fees collection.
+    <a href="stake.md#0x1_stake_initialize_fees_table">stake::initialize_fees_table</a>(aptos_framework);
+
     // Initially, no fees are collected and the <a href="block.md#0x1_block">block</a> proposer is not set.
     <b>let</b> zero = <a href="coin.md#0x1_coin_initialize_aggregator_coin">coin::initialize_aggregator_coin</a>(aptos_framework);
     <b>let</b> info = <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
@@ -255,8 +259,7 @@ called by the VM and should be called at the beginning of the block.
         <b>let</b> proposer_addr = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&collected_fees.proposer);
         <b>if</b> (<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(proposer_addr)) {
             <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, collected_fees.burn_percentage);
-            // TODO: change <b>with</b> stake::add_fee()
-            <a href="coin.md#0x1_coin_deposit">coin::deposit</a>(proposer_addr, <a href="coin.md#0x1_coin">coin</a>);
+            <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(proposer_addr, <a href="coin.md#0x1_coin">coin</a>);
             <b>return</b>
         };
     };
