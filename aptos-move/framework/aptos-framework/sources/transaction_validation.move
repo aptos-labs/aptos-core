@@ -8,7 +8,6 @@ module aptos_framework::transaction_validation {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
-    use aptos_framework::fee_destribution;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
@@ -198,7 +197,7 @@ module aptos_framework::transaction_validation {
         );
 
         if (features::collect_and_distribute_gas_fees()) {
-            fee_destribution::collect_fee(addr, transaction_fee_amount);
+            transaction_fee::collect_fee(addr, transaction_fee_amount);
         } else {
             transaction_fee::burn_fee(addr, transaction_fee_amount);
         };

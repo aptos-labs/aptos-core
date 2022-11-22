@@ -33,13 +33,13 @@ This module defines a struct storing the metadata of the block and new block eve
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
-<b>use</b> <a href="fee_distribution.md#0x1_fee_destribution">0x1::fee_destribution</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="state_storage.md#0x1_state_storage">0x1::state_storage</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
+<b>use</b> <a href="transaction_fee.md#0x1_transaction_fee">0x1::transaction_fee</a>;
 </code></pre>
 
 
@@ -395,12 +395,12 @@ The runtime always runs this before executing the transactions in a block.
     <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(&vm, &<b>mut</b> block_metadata_ref.new_block_events, new_block_event);
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
-        // Distribute fees collected from the previous <a href="block.md#0x1_block">block</a>. Nothing happens <b>if</b> there are no
-        // fees or it is the first <a href="block.md#0x1_block">block</a>.
-        <a href="fee_distribution.md#0x1_fee_destribution_maybe_distribute_fees">fee_destribution::maybe_distribute_fees</a>(&vm);
-        // Set the receiver of the fees for this <a href="block.md#0x1_block">block</a>, so that the next time `block_prologue`
-        // is called the fees are sent <b>to</b> the right <a href="account.md#0x1_account">account</a>.
-        <a href="fee_distribution.md#0x1_fee_destribution_set_receiver">fee_destribution::set_receiver</a>(&vm, proposer);
+        // Assign the fees collected from the previous <a href="block.md#0x1_block">block</a> <b>to</b> the previous <a href="block.md#0x1_block">block</a> proposer.
+        // If for <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> reason the fees cannot be assigned, this burns collected coins.
+        <a href="transaction_fee.md#0x1_transaction_fee_assign_or_burn_collected_fee">transaction_fee::assign_or_burn_collected_fee</a>(&vm);
+        // Set the proposer of this <a href="block.md#0x1_block">block</a> <b>as</b> the receiver of the fees, so that the next time `block_prologue`
+        // is called the fees are assigned <b>to</b> the right <a href="account.md#0x1_account">account</a>.
+        <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">transaction_fee::register_proposer_for_fee_collection</a>(&vm, proposer);
     };
 
     // Performance scores have <b>to</b> be updated before the epoch transition <b>as</b> the transaction that triggers the

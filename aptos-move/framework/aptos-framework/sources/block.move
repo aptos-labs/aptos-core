@@ -7,12 +7,12 @@ module aptos_framework::block {
 
     use aptos_framework::account;
     use aptos_framework::event::{Self, EventHandle};
-    use aptos_framework::fee_destribution;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
     use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
+    use aptos_framework::transaction_fee;
 
     friend aptos_framework::genesis;
 
@@ -137,12 +137,12 @@ module aptos_framework::block {
         emit_new_block_event(&vm, &mut block_metadata_ref.new_block_events, new_block_event);
 
         if (features::collect_and_distribute_gas_fees()) {
-            // Distribute fees collected from the previous block. Nothing happens if there are no
-            // fees or it is the first block.
-            fee_destribution::maybe_distribute_fees(&vm);
-            // Set the receiver of the fees for this block, so that the next time `block_prologue`
-            // is called the fees are sent to the right account.
-            fee_destribution::set_receiver(&vm, proposer);
+            // Assign the fees collected from the previous block to the previous block proposer.
+            // If for any reason the fees cannot be assigned, this burns collected coins.
+            transaction_fee::assign_or_burn_collected_fee(&vm);
+            // Set the proposer of this block as the receiver of the fees, so that the next time `block_prologue`
+            // is called the fees are assigned to the right account.
+            transaction_fee::register_proposer_for_fee_collection(&vm, proposer);
         };
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the

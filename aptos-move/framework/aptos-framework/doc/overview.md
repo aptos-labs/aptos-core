@@ -25,7 +25,6 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::coin`](coin.md#0x1_coin)
 -  [`0x1::consensus_config`](consensus_config.md#0x1_consensus_config)
 -  [`0x1::event`](event.md#0x1_event)
--  [`0x1::fee_destribution`](fee_distribution.md#0x1_fee_destribution)
 -  [`0x1::gas_schedule`](gas_schedule.md#0x1_gas_schedule)
 -  [`0x1::genesis`](genesis.md#0x1_genesis)
 -  [`0x1::governance_proposal`](governance_proposal.md#0x1_governance_proposal)
