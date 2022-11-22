@@ -13,7 +13,7 @@ Start here to get into the core concepts of the Aptos blockchain.
 - ### [Resources](./resources.md)
 - ### [Events](./events.md)
 - ### [Transactions and States](./txns-states.md)
-- ### [Gas](./gas.md)
+- ### [Gas and Transaction Fees](./gas-txn-fee.md)
 - ### [Blocks](./blocks.md)
 - ### [Life of a Transaction](../guides/basics-life-of-txn.md)
 - ### [Staking](./staking)
