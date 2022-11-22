@@ -7,6 +7,8 @@ id: "link-test"
 
 This is a temporary page for determining how to successfully link to files in both our repository and our content system without error.
 
+## What works?
+
 In short, when linking to absolute files (code, reference) not on Aptos.dev, always use the fully qualified domain.
 Else, use relative links.
 
@@ -22,9 +24,9 @@ How Base Gas Works [No Operation table](../../../../concepts/base-gas.md#no-oper
 
 How Base Gas Works [No Operation table](/concepts/base-gas#no-operation) in absolute link with no Markdown extension works only in our content system
 
-What doesn't work?
+## What doesn't work?
 
-In the Repo, links that are relative yet don't have the Markdown extension - [How Base Gas Works](../../../../concepts/base-gas):
+Neither in the repo or website, links that are relative yet don't have the Markdown extension - [How Base Gas Works](../../../../concepts/base-gas):
 
 ```
 ../nodes/validator-node/operator/staking-pool-operations#joining-validator-set)
