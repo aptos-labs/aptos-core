@@ -22,7 +22,7 @@ use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use testcases::state_sync_performance::{
     StateSyncFullnodeFastSyncPerformance, StateSyncValidatorPerformance,
 };
-use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
+use testcases::three_region_simulation_test::{ExecutionDelayConfig, ThreeRegionSimulationTest};
 use testcases::twin_validator_test::TwinValidatorTest;
 use testcases::validator_join_leave_test::ValidatorJoinLeaveTest;
 use testcases::validator_reboot_stress_test::ValidatorRebootStressTest;
@@ -473,9 +473,44 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
             .with_initial_fullnode_count(12)
             .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-            .with_network_tests(vec![&ThreeRegionSimulationTest])
+            .with_network_tests(vec![&ThreeRegionSimulationTest {
+                add_execution_delay: None,
+            }])
             // TODO(rustielin): tune these success critiera after we have a better idea of the test behavior
             .with_success_criteria(SuccessCriteria::new(3000, 100000, true, None, None, None)),
+        "three_region_simulation_with_different_node_speed" => config
+            .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+            .with_initial_fullnode_count(30)
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+            .with_network_tests(vec![&ThreeRegionSimulationTest {
+                add_execution_delay: Some(ExecutionDelayConfig {
+                    inject_delay_node_fraction: 0.5,
+                    inject_delay_max_transaction_percentage: 40,
+                    inject_delay_per_transaction_ms: 2,
+                }),
+            }])
+            .with_node_helm_config_fn(Arc::new(move |helm_values| {
+                helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
+                // helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                //     4000.into();
+                // helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+                //     1000000.into();
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+            }))
+            .with_success_criteria(SuccessCriteria::new(
+                1000,
+                100000,
+                true,
+                None,
+                None,
+                Some(StateProgressThreshold {
+                    max_no_progress_secs: 30.0,
+                    max_round_gap: 10,
+                }),
+            )),
         "network_bandwidth" => config
             .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
             .with_network_tests(vec![&NetworkBandwidthTest]),
@@ -907,7 +942,9 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(vec![
             &NetworkBandwidthTest,
-            &ThreeRegionSimulationTest,
+            &ThreeRegionSimulationTest {
+                add_execution_delay: None,
+            },
             &NetworkLossTest,
         ])
         .with_success_criteria(SuccessCriteria::new(
