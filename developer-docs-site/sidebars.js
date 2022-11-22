@@ -76,7 +76,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Standards",
+      label: "Follow Standards",
       link: { type: "doc", id: "concepts/coin-and-token/index" },
       collapsible: true,
       collapsed: true,
@@ -84,7 +84,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Reading blockchain data",
+      label: "Read Blockchain Data",
       collapsible: true,
       collapsed: true,
       items: ["guides/system-integrators-guide", "guides/indexing"],
