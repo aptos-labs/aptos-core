@@ -90,6 +90,7 @@ const sidebars = {
       collapsed: true,
       items: [
         "guides/system-integrators-guide",
+        "guides/indexing",
       ],
     },
     {
@@ -99,7 +100,6 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "guides/indexing",
         "guides/sign-a-transaction",
         "guides/resource-accounts",
         "guides/wallet-standard",
