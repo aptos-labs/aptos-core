@@ -66,8 +66,6 @@ module aptos_std::aptos_hash {
     }
 
     /// Returns the BLAKE2B-256 hash of `bytes`.
-    ///
-    /// WARNING: TODO
     public fun blake2b_256(bytes: vector<u8>): vector<u8> {
         if(!features::blake2b_256_enabled()) {
             abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
@@ -94,8 +92,6 @@ module aptos_std::aptos_hash {
     native fun ripemd160_internal(bytes: vector<u8>): vector<u8>;
 
     /// Returns the BLAKE2B-256 hash of `bytes`.
-    ///
-    /// WARNING: TODO
     native fun blake2b_256_internal(bytes: vector<u8>): vector<u8>;
 
     //
