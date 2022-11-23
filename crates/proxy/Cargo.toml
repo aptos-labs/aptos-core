@@ -13,6 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-ipnet = "2.5.0"
+ipnet = { workspace = true }
 
 

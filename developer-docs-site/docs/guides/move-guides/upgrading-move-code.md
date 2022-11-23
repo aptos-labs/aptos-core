@@ -56,7 +56,7 @@ Currently, two different upgrade policies are supported:
     can be added.
   - For APIs, all existing public functions must have the same signature as 
     before. New functions, incl. public and entry functions, can be added.
-- `immutable`: the code is not upgradable and guaranteed to stay the same 
+- `immutable`: the code is not upgradeable and guaranteed to stay the same 
   forever.
 
 Those policies are ordered regarding strength such that `compatible < immutable`.

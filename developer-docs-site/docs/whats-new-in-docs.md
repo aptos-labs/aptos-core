@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 21 November 2002
+
+- Added conceptual overviews for [blocks](concepts/blocks.md) and [resources](concepts/resources.md) in Aptos, explaining how transactions are batched and resources relate to objects, respectively.
+
 ## 18 November 2002
 
 - Increased [Aptos Indexer](/guides/indexing) rate limits from 300 requests per IP per hour to 400 requests every five minutes.
@@ -102,11 +106,11 @@ Completely overhauled the navigation of Aptos.dev to better reflect our users an
 
 ## 25 September 2022
 
-- [Transactions and States](/docs/concepts/basics-txns-states.md) matches the [Aptos Blockchain whitepaper](/docs/aptos-white-paper/index.md) in structure and content.
+- [Transactions and States](/docs/concepts/txns-states.md) matches the [Aptos Blockchain whitepaper](/docs/aptos-white-paper/index.md) in structure and content.
 
 ## 23 September 2022
 
-- [Gas and Transaction Fees](/docs/concepts/basics-gas-txn-fee.md) contains sections on [prioritizing your transaction](/docs/concepts/basics-gas-txn-fee.md#prioritizing-your-transaction), [gas parameters set by governance](/docs/concepts/basics-gas-txn-fee.md#gas-parameters-set-by-governance), and [examples](/docs/concepts/basics-gas-txn-fee.md#examples) for understanding account balances, transaction fees, and transaction amounts.
+- [Gas and Transaction Fees](/docs/concepts/gas-txn-fee.md) contains sections on [prioritizing your transaction](/docs/concepts/gas-txn-fee.md#prioritizing-your-transaction), [gas parameters set by governance](/docs/concepts/gas-txn-fee.md#gas-parameters-set-by-governance), and [examples](/docs/concepts/gas-txn-fee.md#examples) for understanding account balances, transaction fees, and transaction amounts.
 
 ## 22 September 2022
 

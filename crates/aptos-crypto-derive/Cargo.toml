@@ -16,9 +16,9 @@ rust-version = { workspace = true }
 proc-macro = true
 
 [dependencies]
-proc-macro2 = "1.0.38"
-quote = "1.0.18"
-syn = { version = "1.0.92", features = ["derive"] }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
 
 [dev-dependencies]
-anyhow = "1.0.57"
+anyhow = { workspace = true }

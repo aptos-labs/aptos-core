@@ -1,0 +1,24 @@
+name: Continuous E2E Network Latency Test With Different Node Speed
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */8 * * *"
+
+jobs:
+  # Test under sub optimal circumstances (network delay and different node processing speed)
+  run-forge-three-region:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-three-region-with-different-node-speed
+      # Run for 30 minutes
+      FORGE_RUNNER_DURATION_SECS: 3600
+      # Pre release has chaos applied
+      FORGE_TEST_SUITE: three_region_simulation_with_different_node_speed
+      POST_TO_SLACK: true
+      FORGE_ENABLE_FAILPOINTS: true
