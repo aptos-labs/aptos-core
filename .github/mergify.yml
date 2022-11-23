@@ -11,8 +11,8 @@ pull_request_rules:
               - check-success=ecosystem-lint
               - check-success=permission-check
               - check-success=scripts-lint
-              - check-success=python-lint-test
-              - check-success=helm-lint
+              - check-success=python-lint-test / python-unit-test
+              - check-success=helm-lint / helm-lint
               - check-success=terraform-lint
               - check-success=rust-unit-test
               - check-success=rust-doc-test
