@@ -26,8 +26,26 @@ pull_request_rules:
               - check-success=docs-lint
               - -files~=^(?!developer-docs-site/)
     actions:
+      # Create an additional PR checklist item
+      # The title of which displays the test status, since mergify cannot distinguish between pending and failed
       post_check:
+        title: |
+          {% if not check_succeed %}
+          {% if check_pending|length > 0 %}
+          Some checks are still pending...
+          {% else %}
+          Tests failed
+          {% endif %}
+          {% else %}
+          Tests passed
+          {% endif %}
         summary: |
           {% if not check_succeed %}
           {{ check_conditions }}
           {% endif %}
+          {{ check_failure|length }} failure {{ check_failure }}
+          {{ check_neutral|length }} neutral {{ check_neutral }}
+          {{ check_pending|length }} pending {{ check_pending }}
+          {{ check_skipped|length }} skipped {{ check_skipped }}
+          {{ check_success|length }} success {{ check_success }}
+
