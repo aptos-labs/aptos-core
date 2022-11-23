@@ -1,7 +1,7 @@
 # This defines the rules used by https://mergify.com/
 
 pull_request_rules:
-  - name: required status checks
+  - name: required checks
     conditions:
       - base=main
       - or:
