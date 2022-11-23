@@ -6,13 +6,11 @@ spec aptos_framework::aggregator {
     spec add {
         // TODO: temporary mockup.
         pragma opaque;
-        aborts_if false;
     }
 
     spec sub {
         // TODO: temporary mockup.
         pragma opaque;
-        aborts_if false;
     }
 
     spec read {
