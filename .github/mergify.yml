@@ -11,13 +11,16 @@ pull_request_rules:
               - check-success=ecosystem-lint
               - check-success=permission-check
               - check-success=scripts-lint
+              - check-success=python-lint-test
+              - check-success=helm-lint
+              - check-success=terraform-lint
               - check-success=rust-unit-test
               - check-success=rust-doc-test
               - check-success=rust-smoke-test
               - check-success=forge-e2e-test / forge
+              - check-success=forge-compat-test / forge
               - check-success=sdk-release / test-sdk-confirm-client-generated-publish
               - check-success=rust-images / rust-all
-              - check-success=terraform-lint
           - and:
               # for doc-only changes we only require docs-lint to pass
               - check-success=docs-lint
