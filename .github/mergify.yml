@@ -21,7 +21,7 @@ pull_request_rules:
           - and:
               # for doc-only changes we only require docs-lint to pass
               - check-success=docs-lint
-              - -files~=^(!?developer-docs-site/)
+              - -files~=^(?!developer-docs-site/)
     actions:
       post_check:
         summary: |
