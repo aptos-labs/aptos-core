@@ -460,11 +460,12 @@ pub async fn execute_and_wait_transactions(
     txns: Vec<SignedTransaction>,
     failure_counter: &AtomicUsize,
 ) -> Result<()> {
+    let start_seq_num = account.sequence_number();
     debug!(
         "[{:?}] Submitting transactions {} - {} for {}",
         client.path_prefix_string(),
-        account.sequence_number() - txns.len() as u64,
-        account.sequence_number(),
+        start_seq_num - txns.len() as u64,
+        start_seq_num,
         account.address()
     );
 
@@ -591,7 +592,31 @@ pub async fn execute_and_wait_transactions(
                 None,
             )
             .await
-            .map_err(|e| format_err!("Failed to wait for transactions: {:?}", e))?;
+            .map_err(|e| {
+                warn!(
+                    "Failed to wait for transactions: {:?}, txn: {:?}. [{:?}] We were submitting transactions for account {}: from {} - {}, now at {}",
+                    e,
+                    txn,
+                    client.path_prefix_string(),
+                    account.address(),
+                    start_seq_num - state.txns.len() as u64,
+                    start_seq_num,
+                    account.sequence_number()
+                );
+
+                // We shouldn't be able to reach this point.
+                // This failure is unrecoverable, we end the test at this point.
+                // It it sporadically happens in forge, and we need to debug why.
+                // By default, we end the test and stop the nodes, before the next
+                // counters poll happens after this.
+                // Wait for 30s here, to make sure Grafana counters for expired transactions, etc,
+                // get pulled from all the nodes, so we can investigate.
+                std::thread::sleep(Duration::from_secs(30));
+                format_err!(
+                    "Failed to wait for transactions: {:?}",
+                    e,
+                )
+            })?;
     }
 
     debug!(

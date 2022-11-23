@@ -949,7 +949,7 @@ The last step of genesis.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

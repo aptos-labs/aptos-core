@@ -15,27 +15,26 @@ rust-version = { workspace = true }
 # Do NOT add any inter-project dependencies.
 # This is to avoid ever having a circular dependency with the aptos-logger crate.
 [dependencies]
-backtrace = { version = "0.3.58", features = ["serde"] }
-chrono = "0.4.19"
-console-subscriber = { version = "0.1.6", optional = true }
-erased-serde = "0.3.13"
-futures = "0.3.21"
-hostname = "0.3.1"
-once_cell = "1.10.0"
-prometheus = { version = "0.13.0", default-features = false }
-serde = { version = "1.0.137", features = ["derive"] }
-serde_json = "1.0.81"
-strum = "0.24.1"
-strum_macros = "0.24.2"
-tokio = { version = "1.21.0", features = ["time"] }
-tracing = "0.1.34"
-tracing-subscriber = "0.3.11"
-
-aptos-infallible = { path = "../aptos-infallible" }
-aptos-log-derive = { path = "../aptos-log-derive" }
+aptos-infallible = { workspace = true }
+aptos-log-derive = { workspace = true }
+backtrace = { workspace = true }
+chrono = { workspace = true }
+console-subscriber = { workspace = true, optional = true }
+erased-serde = { workspace = true }
+futures = { workspace = true }
+hostname = { workspace = true }
+once_cell = { workspace = true }
+prometheus = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
-pretty_assertions = "1.2.1"
+pretty_assertions = { workspace = true }
 
 [features]
 default = []
