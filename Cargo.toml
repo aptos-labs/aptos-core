@@ -296,6 +296,8 @@ bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1
 better_any = "0.1.1"
 bigdecimal = { version = "0.3.0", features = ["serde"] }
 bitvec = "0.19.4"
+blake2 = "0.10.4"
+blake2-rfc = "0.2.18"
 blst = "0.3.7"
 byteorder = "1.4.3"
 bytes = "1.1.0"

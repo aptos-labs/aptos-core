@@ -43,8 +43,8 @@ x25519-dalek = { workspace = true }
 [dev-dependencies]
 
 bitvec = { workspace = true }
-blake2 = "0.10.4"
-blake2-rfc = "0.2.18"
+blake2 = { workspace = true }
+blake2-rfc = { workspace = true }
 byteorder = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true }
