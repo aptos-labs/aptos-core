@@ -112,7 +112,7 @@ impl CliCommand<GlobalConfig> for SetGlobalConfig {
         }
 
         if let Some(default_prompt_response) = self.default_prompt_response {
-            config.default_prompt_response = Some(default_prompt_response);
+            config.default_prompt_response = default_prompt_response;
         }
 
         config.save()?;
@@ -185,8 +185,8 @@ pub struct GlobalConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config_type: Option<ConfigType>,
     /// Prompt response type
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub default_prompt_response: Option<PromptResponseType>,
+    #[serde(default)]
+    pub default_prompt_response: PromptResponseType,
 }
 
 impl GlobalConfig {
@@ -194,10 +194,6 @@ impl GlobalConfig {
     pub fn display(mut self) -> CliTypedResult<Self> {
         if self.config_type.is_none() {
             self.config_type = Some(ConfigType::default());
-        }
-
-        if self.default_prompt_response.is_none() {
-            self.default_prompt_response = Some(PromptResponseType::default());
         }
 
         Ok(self)
@@ -352,7 +348,7 @@ impl FromStr for PromptResponseType {
             ASSUME_YES => Ok(Self::Yes),
             ASSUME_NO => Ok(Self::No),
             _ => Err(CliError::CommandArgumentError(
-                "Invalid prompt response type, must be one of [yes, no]".to_string(),
+                "Invalid prompt response type, must be one of [yes, no, prompt]".to_string(),
             )),
         }
     }
