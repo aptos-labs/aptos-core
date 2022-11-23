@@ -642,6 +642,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             60,
             100,
             80,
+            true,
             false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
@@ -649,10 +650,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 max_down_nodes: 0,
                 num_large_validators: 0,
                 add_execution_delay: false,
-                // Check that every 27s all nodes make progress,
-                // without any failures.
-                // (make epoch length (120s) and this duration (27s) not be multiples of one another,
-                // to test different timings)
                 check_period_s: 27,
             },
         ),
@@ -661,6 +658,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
+            true,
             false,
             &ChangingWorkingQuorumTest {
                 min_tps: 15,
@@ -668,11 +666,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 max_down_nodes: 20,
                 num_large_validators: 0,
                 add_execution_delay: false,
-                // Check that every 27s all nodes make progress,
-                // without any failures.
-                // (make epoch length (120s) and this duration (27s) not be multiples of one another,
-                // to test different timings)
-                check_period_s: 27,
+                // Use longer check duration, as we are bringing enough nodes
+                // to require state-sync to catch up to have consensus.
+                check_period_s: 53,
             },
         ),
         "changing_working_quorum_test_high_load" => changing_working_quorum_test(
@@ -681,16 +677,15 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             500,
             300,
             true,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 0,
                 max_down_nodes: 20,
                 num_large_validators: 0,
                 add_execution_delay: false,
-                // Check that every 53s all nodes make progress,
-                // without any failures.
-                // (make epoch length (120s) and this duration (53s) not be multiples of one another,
-                // to test different timings)
+                // Use longer check duration, as we are bringing enough nodes
+                // to require state-sync to catch up to have consensus.
                 check_period_s: 53,
             },
         ),
@@ -700,6 +695,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
+            false,
             false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
@@ -716,6 +712,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             100,
             70,
             true,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 6,
@@ -731,6 +728,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             3000,
             2500,
             true,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 1500,
                 always_healthy_nodes: 2,
@@ -746,6 +744,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             3000,
             2500,
             true,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 1500,
                 always_healthy_nodes: 2,
@@ -913,11 +912,10 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             },
             10000,
             true,
-            Some(Duration::from_secs(if duration.as_secs() > 1200 {
-                240
-            } else {
-                60
-            })),
+            Some(Duration::from_secs(
+                // Give at least 60s for catchup, give 10% of the run for longer durations.
+                (duration.as_secs() / 10).max(60),
+            )),
             Some(SystemMetricsThreshold::new(
                 // Check that we don't use more than 12 CPU cores for 30% of the time.
                 MetricsThreshold::new(12, 30),
@@ -972,6 +970,7 @@ fn changing_working_quorum_test(
     target_tps: usize,
     min_avg_tps: usize,
     apply_txn_outputs: bool,
+    use_chain_backoff: bool,
     test: &'static ChangingWorkingQuorumTest,
 ) -> ForgeConfig<'static> {
     let config = ForgeConfig::default();
@@ -1003,11 +1002,18 @@ fn changing_working_quorum_test(
             helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] = 1.into();
 
             let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
-            chain_health_backoff[0].max_sending_block_txns_override = block_size;
-            chain_health_backoff[1].max_sending_block_txns_override = (block_size / 2).max(10);
-            chain_health_backoff[2].max_sending_block_txns_override = (block_size / 4).max(10);
-            chain_health_backoff[3].max_sending_block_txns_override = (block_size / 8).max(10);
-            chain_health_backoff[4].max_sending_block_txns_override = (block_size / 16).max(10);
+            if use_chain_backoff {
+                // Generally if we are stress testing the consensus, we don't want to slow it down.
+                chain_health_backoff = vec![];
+            } else {
+                for (i, item) in chain_health_backoff.iter_mut().enumerate() {
+                    // as we have lower TPS, make limits smaller
+                    item.max_sending_block_txns_override =
+                        (block_size / 2_u64.pow(i as u32 + 1)).max(2);
+                    // as we have fewer nodes, make backoff triggered earlier:
+                    item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
+                }
+            }
 
             helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
                 serde_yaml::to_value(chain_health_backoff).unwrap();
