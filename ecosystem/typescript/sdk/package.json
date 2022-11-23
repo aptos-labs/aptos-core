@@ -15,19 +15,20 @@
     }
   },
   "scripts": {
-    "prepack": "yarn build",
-    "build": "yarn build:clean && yarn _build:node && yarn _build:browser",
+    "prepack": "pnpm build",
+    "build": "pnpm build:clean && pnpm _build:node && pnpm _build:browser",
     "build:clean": "rm -rf dist",
     "_build:browser": "tsup --platform browser --format iife --global-name aptosSDK --minify",
     "_build:node": "tsup --format cjs,esm --dts",
     "lint": "eslint \"**/*.ts\"",
     "test": "jest",
     "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
-    "fmt": "yarn _fmt --write",
-    "fmt:check": "yarn _fmt --check",
+    "fmt": "pnpm _fmt --write",
+    "fmt:check": "pnpm _fmt --check",
     "cov:clean": "rm -rf coverage",
-    "generate-client": "yarn && openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
-    "checked-publish": "./checked_publish.sh"
+    "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
+    "checked-publish": "scripts/checked_publish.sh",
+    "generate-ts-docs": "scripts/generate_ts_docs.sh"
   },
   "repository": {
     "type": "git",
@@ -62,13 +63,14 @@
     "eslint-config-prettier": "8.5.0",
     "eslint-plugin-import": "2.26.0",
     "jest": "28.1.3",
-    "openapi-typescript-codegen": "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p5/openapi-typescript-codegen-v0.23.0-p5.tgz",
+    "openapi-typescript-codegen": "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz",
     "prettier": "2.6.2",
     "ts-jest": "28.0.8",
     "ts-loader": "9.3.1",
     "ts-node": "10.9.1",
     "tsup": "6.2.3",
+    "typedoc": "^0.23.20",
     "typescript": "4.8.2"
   },
-  "version": "1.3.16"
+  "version": "1.3.17"
 }

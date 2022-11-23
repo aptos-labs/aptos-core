@@ -12,8 +12,8 @@ Currently this is still in development and is unsuitable for directly interfacin
 We use [Poetry](https://python-poetry.org/docs/#installation) for packaging and dependency management:
 
 ```
-curl -sSL https://install.python-poetry.org | python3
-poetry update
+curl -sSL https://install.python-poetry.org | python3 -
+poetry install
 ```
 
 ## Unit testing

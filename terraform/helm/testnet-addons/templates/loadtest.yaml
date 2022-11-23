@@ -69,6 +69,10 @@ spec:
               value: "1"
             - name: REUSE_ACC
               value: "1"
+            {{- with .resources }}
+            resources:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
             securityContext:
               readOnlyRootFilesystem: true
               allowPrivilegeEscalation: false

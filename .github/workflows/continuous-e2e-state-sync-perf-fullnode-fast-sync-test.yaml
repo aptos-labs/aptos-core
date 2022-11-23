@@ -1,0 +1,22 @@
+name: Continuous E2E State Sync Performance Test For Fullnode Fast Sync
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */12 * * *"
+
+jobs:
+  # Performance test in an optimal setting
+  run-forge-state-sync-perf-fullnode-fast-sync-test:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-fast-sync
+      # Run for 40 minutes
+      FORGE_RUNNER_DURATION_SECS: 2400
+      FORGE_TEST_SUITE: state_sync_perf_fullnodes_fast_sync
+      POST_TO_SLACK: true

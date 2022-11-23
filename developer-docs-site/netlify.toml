@@ -8,3 +8,10 @@
 # More details can be found here https://docs.netlify.com/configure-builds/ignore-builds/ 
 # and here https://answers.netlify.com/t/builds-cancelled-for-a-new-branch-due-to-no-content-change/17169/4
 ignore = "if [ \"$PULL_REQUEST\" == \"true\" ]; then git diff --quiet main $COMMIT_REF . ; else git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF; fi"
+
+base = "developer-docs-site/"
+
+# This is relative to base.
+publish = "build/"
+
+command = "pnpm build"

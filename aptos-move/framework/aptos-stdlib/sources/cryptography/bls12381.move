@@ -6,6 +6,8 @@
 
 module aptos_std::bls12381 {
     use std::option::{Self, Option};
+    #[test_only]
+    use std::error::invalid_argument;
 
     /// The signature size, in bytes
     const SIGNATURE_SIZE: u64 = 96;
@@ -19,8 +21,16 @@ module aptos_std::bls12381 {
     /// One of the given inputs has the wrong size.s
     const EWRONG_SIZE: u64 = 2;
 
+    /// The number of signers does not match the number of messages to be signed.
+    const E_NUM_SIGNERS_MUST_EQ_NUM_MESSAGES: u64 = 3;
+
     // TODO: Performance would increase if structs in this module are implemented natively via handles (similar to Table and
     // RistrettoPoint). This will avoid unnecessary (de)serialization. We would need to allow storage of these structs too.
+
+    #[test_only]
+    struct SecretKey has copy, drop {
+        bytes: vector<u8>,
+    }
 
     /// A *validated* public key that:
     ///   (1) is a point in the prime-order subgroup of the BLS12-381 elliptic curve, and
@@ -109,6 +119,13 @@ module aptos_std::bls12381 {
             })
         } else {
             option::none<PublicKeyWithPoP>()
+        }
+    }
+
+    /// Creates a normal public key from a PoP'd public key.
+    public fun public_key_with_pop_to_normal(pkpop: &PublicKeyWithPoP): PublicKey {
+        PublicKey {
+            bytes: pkpop.bytes
         }
     }
 
@@ -226,6 +243,125 @@ module aptos_std::bls12381 {
         verify_signature_share_internal(signature_share.bytes, public_key.bytes, message)
     }
 
+    #[test_only]
+    /// Generates a BLS key-pair: a secret key with its corresponding public key.
+    public fun generate_keys(): (SecretKey, PublicKeyWithPoP) {
+        let (sk_bytes, pk_bytes) = generate_keys_internal();
+        let sk = SecretKey {
+            bytes: sk_bytes
+        };
+        let pkpop = PublicKeyWithPoP {
+            bytes: pk_bytes
+        };
+        (sk, pkpop)
+    }
+
+    #[test_only]
+    /// Generates a BLS signature for a message with a signing key.
+    public fun sign_arbitrary_bytes(signing_key: &SecretKey, message: vector<u8>): Signature {
+        Signature {
+            bytes: sign_internal(signing_key.bytes, message)
+        }
+    }
+
+    #[test_only]
+    /// Generates a multi-signature for a message with multiple signing keys.
+    public fun multi_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, message: vector<u8>): AggrOrMultiSignature {
+        let n = std::vector::length(signing_keys);
+        let sigs = vector[];
+        let i: u64 = 0;
+        while (i < n) {
+            let sig = sign_arbitrary_bytes(std::vector::borrow(signing_keys, i), message);
+            std::vector::push_back(&mut sigs, sig);
+            i = i + 1;
+        };
+        let multisig = aggregate_signatures(sigs);
+        option::extract(&mut multisig)
+    }
+
+    #[test_only]
+    /// Generates an aggregated signature over all messages in messages, where signing_keys[i] signs messages[i].
+    public fun aggr_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, messages: &vector<vector<u8>>): AggrOrMultiSignature {
+        let signing_key_count = std::vector::length(signing_keys);
+        let message_count = std::vector::length(messages);
+        assert!(signing_key_count == message_count, invalid_argument(E_NUM_SIGNERS_MUST_EQ_NUM_MESSAGES));
+        let sigs = vector[];
+        let i: u64 = 0;
+        while (i < signing_key_count) {
+            let sig = sign_arbitrary_bytes(std::vector::borrow(signing_keys, i), *std::vector::borrow(messages, i));
+            std::vector::push_back(&mut sigs, sig);
+            i = i + 1;
+        };
+        let aggr_sig = aggregate_signatures(sigs);
+        option::extract(&mut aggr_sig)
+    }
+
+    #[test_only]
+    /// Returns a mauled copy of a byte array.
+    public fun maul_bytes(bytes: &vector<u8>): vector<u8> {
+        let new_bytes = *bytes;
+        let first_byte = std::vector::borrow_mut(&mut new_bytes, 0);
+        *first_byte = *first_byte ^ 0xff;
+        new_bytes
+    }
+
+    #[test_only]
+    /// Returns a mauled copy of a normal signature.
+    public fun maul_signature(sig: &Signature): Signature {
+        Signature {
+            bytes: maul_bytes(&signature_to_bytes(sig))
+        }
+    }
+
+    #[test_only]
+    /// Returns a mauled copy of an aggregated signature or a multi-signature.
+    public fun maul_aggr_or_multi_signature(sig: &AggrOrMultiSignature): AggrOrMultiSignature {
+        AggrOrMultiSignature {
+            bytes: maul_bytes(&aggr_or_multi_signature_to_bytes(sig))
+        }
+    }
+
+    #[test_only]
+    /// Returns a mauled copy of a normal public key.
+    public fun maul_public_key(pk: &PublicKey): PublicKey {
+        PublicKey {
+            bytes: maul_bytes(&public_key_to_bytes(pk))
+        }
+    }
+
+    #[test_only]
+    /// Returns a mauled copy of a PoP'd public key.
+    public fun maul_public_key_with_pop(pk: &PublicKeyWithPoP): PublicKeyWithPoP {
+        PublicKeyWithPoP {
+            bytes: maul_bytes(&public_key_with_pop_to_bytes(pk))
+        }
+    }
+
+    #[test_only]
+    /// Returns a mauled copy of an aggregated public key.
+    public fun maul_aggregated_public_key(pk: &AggrPublicKeysWithPoP): AggrPublicKeysWithPoP {
+        AggrPublicKeysWithPoP {
+            bytes: maul_bytes(&aggregate_pubkey_to_bytes(pk))
+        }
+    }
+
+    #[test_only]
+    /// Returns a mauled copy of a proof-of-possession.
+    public fun maul_proof_of_possession(pop: &ProofOfPossession): ProofOfPossession {
+        ProofOfPossession {
+            bytes: maul_bytes(&proof_of_possession_to_bytes(pop))
+        }
+    }
+
+
+    #[test_only]
+    /// Generates a proof-of-possession (PoP) for the public key associated with the secret key `sk`.
+    public fun generate_proof_of_possession(sk: &SecretKey): ProofOfPossession {
+        ProofOfPossession {
+            bytes: generate_proof_of_possession_internal(sk.bytes)
+        }
+    }
+
     //
     // Native functions
     //
@@ -330,6 +466,15 @@ module aptos_std::bls12381 {
         message: vector<u8>
     ): bool;
 
+    #[test_only]
+    native fun generate_keys_internal(): (vector<u8>, vector<u8>);
+
+    #[test_only]
+    native fun sign_internal(sk: vector<u8>, msg: vector<u8>): vector<u8>;
+
+    #[test_only]
+    native fun generate_proof_of_possession_internal(sk: vector<u8>): vector<u8>;
+
     //
     // Constants and helpers for tests
     //
@@ -415,6 +560,14 @@ module aptos_std::bls12381 {
     }
 
     #[test]
+    fun test_pubkey_validation_against_invalid_keys() {
+        let (_sk, pk) = generate_keys();
+        let pk_bytes = public_key_with_pop_to_bytes(&pk);
+        assert!(option::is_some(&public_key_from_bytes(pk_bytes)), 1);
+        assert!(option::is_none(&public_key_from_bytes(maul_bytes(&pk_bytes))), 1);
+    }
+
+    #[test]
     fun test_signature_aggregation() {
         // First, test empty aggregation
         assert!(option::is_none(&mut aggregate_signatures(vector[])), 1);
@@ -453,6 +606,11 @@ module aptos_std::bls12381 {
 
             i = i + 1;
         };
+    }
+
+    #[test]
+    fun test_empty_signature_aggregation() {
+        assert!(option::is_none(&mut aggregate_signatures(vector[])), 1);
     }
 
     #[test]
@@ -498,6 +656,50 @@ module aptos_std::bls12381 {
 
             i = i + 1;
         };
+    }
+
+    #[test]
+    fun test_verify_multisignature_randomized() {
+        let signer_count = 1;
+        let max_signer_count = 5;
+        let msg = b"hello world";
+        while (signer_count <= max_signer_count) {
+            // Generate key pairs.
+            let signing_keys = vector[];
+            let public_keys = vector[];
+            let i = 0;
+            while (i < signer_count) {
+                let (sk, pk) = generate_keys();
+                std::vector::push_back(&mut signing_keys, sk);
+                std::vector::push_back(&mut public_keys, pk);
+                i = i + 1;
+            };
+
+            // Generate multi-signature.
+            let aggr_pk = aggregate_pubkeys(public_keys);
+            let multisig = multi_sign_arbitrary_bytes(&signing_keys, msg);
+
+            // Test signature verification.
+            assert!(verify_multisignature(&multisig, &aggr_pk, msg), 1);
+            assert!(!verify_multisignature(&maul_aggr_or_multi_signature(&multisig), &aggr_pk, msg), 1);
+            assert!(!verify_multisignature(&multisig, &maul_aggregated_public_key(&aggr_pk), msg), 1);
+            assert!(!verify_multisignature(&multisig, &aggr_pk, maul_bytes(&msg)), 1);
+
+            // Also test signature aggregation.
+            let signatures = vector[];
+            let i = 0;
+            while (i < signer_count) {
+                let sk = std::vector::borrow(&signing_keys, i);
+                let sig = sign_arbitrary_bytes(sk, msg);
+                std::vector::push_back(&mut signatures, sig);
+                i = i + 1;
+            };
+            let aggregated_signature = option::extract(&mut aggregate_signatures(signatures));
+            assert!(aggr_or_multi_signature_subgroup_check(&aggregated_signature), 1);
+            assert!(aggr_or_multi_signature_to_bytes(&aggregated_signature) == aggr_or_multi_signature_to_bytes(&multisig), 1);
+
+            signer_count = signer_count + 1;
+        }
     }
 
     #[test]
@@ -581,6 +783,63 @@ module aptos_std::bls12381 {
     }
 
     #[test]
+    fun test_verify_aggregated_signature_randomized() {
+        let signer_count = 1;
+        let max_signer_count = 5;
+        while (signer_count <= max_signer_count) {
+            // Generate key pairs and messages.
+            let signing_keys = vector[];
+            let public_keys = vector[];
+            let messages: vector<vector<u8>> = vector[];
+            let i = 0;
+            while (i < signer_count) {
+                let (sk, pk) = generate_keys();
+                std::vector::push_back(&mut signing_keys, sk);
+                std::vector::push_back(&mut public_keys, pk);
+                let msg: vector<u8> = vector[104, 101, 108, 108, 111, 32, 97, 112, 116, 111, 115, 32, 117, 115, 101, 114, 32, 48+(i as u8)]; //"hello aptos user {i}"
+                std::vector::push_back(&mut messages, msg);
+                i = i + 1;
+            };
+
+            // Maul messages and public keys.
+            let mauled_public_keys = vector[maul_public_key_with_pop(std::vector::borrow(&public_keys, 0))];
+            let mauled_messages = vector[maul_bytes(std::vector::borrow(&messages, 0))];
+            let i = 1;
+            while (i < signer_count) {
+                let pk = std::vector::borrow(&public_keys, i);
+                let msg = std::vector::borrow(&messages, i);
+                std::vector::push_back(&mut mauled_public_keys, *pk);
+                std::vector::push_back(&mut mauled_messages, *msg);
+                i = i + 1;
+            };
+
+            // Generate aggregated signature.
+            let aggrsig = aggr_sign_arbitrary_bytes(&signing_keys, &messages);
+
+            // Test signature verification.
+            assert!(verify_aggregate_signature(&aggrsig, public_keys, messages), 1);
+            assert!(!verify_aggregate_signature(&maul_aggr_or_multi_signature(&aggrsig), public_keys, messages), 1);
+            assert!(!verify_aggregate_signature(&aggrsig, mauled_public_keys, messages), 1);
+            assert!(!verify_aggregate_signature(&aggrsig, public_keys, mauled_messages), 1);
+
+            // Also test signature aggregation.
+            let signatures = vector[];
+            let i = 0;
+            while (i < signer_count) {
+                let sk = std::vector::borrow(&signing_keys, i);
+                let msg = std::vector::borrow(&messages, i);
+                let sig = sign_arbitrary_bytes(sk, *msg);
+                std::vector::push_back(&mut signatures, sig);
+                i = i + 1;
+            };
+            let aggrsig_another = option::extract(&mut aggregate_signatures(signatures));
+            assert!(aggr_or_multi_signature_to_bytes(&aggrsig_another) == aggr_or_multi_signature_to_bytes(&aggrsig), 1);
+
+            signer_count = signer_count + 1;
+        }
+    }
+
+    #[test]
     /// Tests verification of a random BLS signature created using sk = x""
     fun test_verify_normal_and_verify_sigshare() {
         // Test case generated by running `cargo test -- bls12381_sample_signature --nocapture --include-ignored` in
@@ -652,6 +911,24 @@ module aptos_std::bls12381 {
     }
 
     #[test]
+    fun test_verify_normal_signature_or_signature_share_randomized() {
+        let (sk, pkpop) = generate_keys();
+        let pk = public_key_with_pop_to_normal(&pkpop);
+
+        let msg = b"hello world";
+        let sig = sign_arbitrary_bytes(&sk, msg);
+        assert!(verify_normal_signature(&sig, &pk, msg), 1);
+        assert!(!verify_normal_signature(&maul_signature(&sig), &pk, msg), 1);
+        assert!(!verify_normal_signature(&sig, &maul_public_key(&pk), msg), 1);
+        assert!(!verify_normal_signature(&sig, &pk, maul_bytes(&msg)), 1);
+
+        assert!(verify_signature_share(&sig, &pkpop, msg), 1);
+        assert!(!verify_signature_share(&maul_signature(&sig), &pkpop, msg), 1);
+        assert!(!verify_signature_share(&sig, &maul_public_key_with_pop(&pkpop), msg), 1);
+        assert!(!verify_signature_share(&sig, &pkpop, maul_bytes(&msg)), 1);
+    }
+
+    #[test]
     /// Tests verification of random BLS proofs-of-possession (PoPs)
     fun test_verify_pop() {
         // Test case generated by running `cargo test -- sample_pop --nocapture --include-ignored` in `crates/aptos-crypto`
@@ -694,5 +971,15 @@ module aptos_std::bls12381 {
             x"808864c91ae7a9998b3f5ee71f447840864e56d79838e4785ff5126c51480198df3d972e1e0348c6da80d396983e42d7",
             &proof_of_possession_from_bytes(x"bb42afff92510034bf1232a37a0d31bc8abfc17e7ead9170d2d100f6cf6c75ccdcfedbd31699a112b4464a06fd636f3f190595863677d660b4c5d922268ace421f9e86e3a054946ee34ce29e1f88c1a10f27587cf5ec528d65ba7c0dc4863364"));
         assert!(option::is_none(&opt_pk), 1);
+    }
+
+    #[test]
+    fun test_verify_pop_randomized() {
+        let (sk, pk) = generate_keys();
+        let pk_bytes = public_key_with_pop_to_bytes(&pk);
+        let pop = generate_proof_of_possession(&sk);
+        assert!(option::is_some(&public_key_from_bytes_with_pop(pk_bytes, &pop)), 1);
+        assert!(option::is_none(&public_key_from_bytes_with_pop(pk_bytes, &maul_proof_of_possession(&pop))), 1);
+        assert!(option::is_none(&public_key_from_bytes_with_pop(maul_bytes(&pk_bytes), &pop)), 1);
     }
 }

@@ -1,0 +1,28 @@
+[package]
+name = "aptos-debugger"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "A tool to replay transactions on chain and to execute transactions locally with remote backend"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-gas = { workspace = true }
+aptos-resource-viewer = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-state-view = { workspace = true }
+aptos-types = { workspace = true }
+aptos-validator-interface = { workspace = true }
+aptos-vm = { workspace = true }
+move-binary-format = { workspace = true }
+move-cli = { workspace = true }
+move-compiler = { workspace = true }
+move-core-types = { workspace = true }
+move-resource-viewer = { workspace = true }
+move-table-extension = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-test-utils = { workspace = true }

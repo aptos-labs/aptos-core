@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import nacl from "tweetnacl";
-import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import * as bip39 from "@scure/bip39";
 import { bytesToHex } from "@noble/hashes/utils";
+import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import { derivePath } from "./utils/hd-key";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
 import { Memoize } from "./utils";
+import { AccountAddress, AuthenticationKey, Ed25519PublicKey } from "./aptos_types";
+import { bcsToBytes } from "./bcs";
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;
@@ -97,14 +99,31 @@ export class AptosAccount {
   /**
    * This key enables account owners to rotate their private key(s)
    * associated with the account without changing the address that hosts their account.
-   * See here for more info: {@link https://aptos.dev/basics/basics-accounts#single-signer-authentication}
+   * See here for more info: {@link https://aptos.dev/concepts/accounts#single-signer-authentication}
    * @returns Authentication key for the associated account
    */
   @Memoize()
   authKey(): HexString {
+    const pubKey = new Ed25519PublicKey(this.signingKey.publicKey);
+    const authKey = AuthenticationKey.fromEd25519PublicKey(pubKey);
+    return authKey.derivedAddress();
+  }
+
+  /**
+   * Takes source address and seeds and returns the resource account address
+   * @param sourceAddress Address used to derive the resource account
+   * @param seed The seed bytes
+   * @returns The resource account address
+   */
+
+  static getResourceAccountAddress(sourceAddress: MaybeHexString, seed: Uint8Array): HexString {
+    const source = bcsToBytes(AccountAddress.fromHex(sourceAddress));
+
+    const bytes = new Uint8Array([...source, ...seed, AuthenticationKey.DERIVE_RESOURCE_ACCOUNT_SCHEME]);
+
     const hash = sha3Hash.create();
-    hash.update(this.signingKey.publicKey);
-    hash.update("\x00");
+    hash.update(bytes);
+
     return HexString.fromUint8Array(hash.digest());
   }
 

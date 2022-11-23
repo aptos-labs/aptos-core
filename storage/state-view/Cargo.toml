@@ -13,14 +13,13 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-serde = { version = "1.0.137", default-features = false }
-serde_bytes = "0.11.6"
-serde_json = "1.0.81"
-
-aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-types = { path = "../../types" }
+anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+serde_json = { workspace = true }
 
 [features]
 default = []

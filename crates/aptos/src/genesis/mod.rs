@@ -33,13 +33,14 @@ use aptos_genesis::{
 };
 use aptos_logger::info;
 use aptos_types::account_address::{AccountAddress, AccountAddressWithChecks};
+use aptos_types::on_chain_config::OnChainConsensusConfig;
 use async_trait::async_trait;
 use clap::Parser;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
-use vm_genesis::{AccountBalance, EmployeePool};
+use vm_genesis::{default_gas_schedule, AccountBalance, EmployeePool};
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
@@ -249,6 +250,8 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             voting_power_increase_limit: layout.voting_power_increase_limit,
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
+            consensus_config: OnChainConsensusConfig::default(),
+            gas_schedule: default_gas_schedule(),
         },
     )?)
 }
@@ -286,6 +289,8 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             voting_power_increase_limit: layout.voting_power_increase_limit,
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
+            consensus_config: OnChainConsensusConfig::default(),
+            gas_schedule: default_gas_schedule(),
         },
     )?)
 }

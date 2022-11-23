@@ -412,10 +412,10 @@ module aptos_framework::account {
     /// A resource account is used to manage resources independent of an account managed by a user.
     /// In Aptos a resource account is created based upon the sha3 256 of the source's address and additional seed data.
     /// A resource account can only be created once, this is designated by setting the
-    /// `Account::signer_capbility_offer::for` to the address of the resource account. While an entity may call
+    /// `Account::signer_capability_offer::for` to the address of the resource account. While an entity may call
     /// `create_account` to attempt to claim an account ahead of the creation of a resource account, if found Aptos will
     /// transition ownership of the account over to the resource account. This is done by validating that the account has
-    /// yet to execute any transactions and that the `Account::signer_capbility_offer::for` is none. The probability of a
+    /// yet to execute any transactions and that the `Account::signer_capability_offer::for` is none. The probability of a
     /// collision where someone has legitimately produced a private key that maps to a resource account address is less
     /// than `(1/2)^(256)`.
     public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) acquires Account {

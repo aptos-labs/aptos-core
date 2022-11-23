@@ -4,7 +4,8 @@
 use crate::{
     block_storage::BlockReader,
     liveness::{
-        proposal_generator::ProposalGenerator, rotating_proposer_election::RotatingProposer,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
+        rotating_proposer_election::RotatingProposer,
         unequivocal_proposer_election::UnequivocalProposerElection,
     },
     test_utils::{build_empty_tree, MockPayloadManager, TreeInserter},
@@ -34,6 +35,7 @@ async fn test_proposal_generation_empty_tree() {
         1,
         10,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
     );
     let mut proposer_election =
         UnequivocalProposerElection::new(Box::new(RotatingProposer::new(vec![signer.author()], 1)));
@@ -70,6 +72,7 @@ async fn test_proposal_generation_parent() {
         1,
         1000,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -138,6 +141,7 @@ async fn test_old_proposal_generation() {
         1,
         1000,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -171,6 +175,7 @@ async fn test_correct_failed_authors() {
         1,
         1000,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![author, peer1, peer2],

@@ -37,13 +37,13 @@ git clone https://github.com/aptos-labs/aptos-core.git
 
   Install the necessary dependencies:
   ```bash
-  yarn install
+  pnpm install
   ```
 
   Run the [`transfer_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) example:
 
   ```bash
-  yarn run transfer_coin
+  pnpm run transfer_coin
   ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -209,7 +209,7 @@ By default, the URLs for both the services point to Aptos devnet services. Howev
 
 ### Step 4.2: Creating local accounts
 
-The next step is to create two accounts locally. [Accounts](../concepts/basics-accounts.md) represent both on and off-chain state. Off-chain state consists of an address and the public/private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
+The next step is to create two accounts locally. [Accounts](../concepts/accounts.md) represent both on and off-chain state. Off-chain state consists of an address and the public/private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -414,7 +414,7 @@ The transaction hash can be used to query the status of a transaction:
 
 ## Supporting documentation
 
-* [Account basics](../concepts/basics-accounts.md)
+* [Account basics](../concepts/accounts.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)

@@ -18,12 +18,15 @@ class PrivateKey:
     def __init__(self, key: SigningKey):
         self.key = key
 
-    def __eq__(self, other: PrivateKey):
+    def __eq__(self, other: object):
+        if not isinstance(other, PrivateKey):
+            return NotImplemented
         return self.key == other.key
 
     def __str__(self):
         return self.hex()
 
+    @staticmethod
     def from_hex(value: str) -> PrivateKey:
         if value[0:2] == "0x":
             value = value[2:]
@@ -35,21 +38,23 @@ class PrivateKey:
     def public_key(self) -> PublicKey:
         return PublicKey(self.key.verify_key)
 
+    @staticmethod
     def random() -> PrivateKey:
         return PrivateKey(SigningKey.generate())
 
     def sign(self, data: bytes) -> Signature:
         return Signature(self.key.sign(data).signature)
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> PrivateKey:
-        key = deserializer.bytes()
+        key = deserializer.to_bytes()
         if len(key) != PrivateKey.LENGTH:
             raise Exception("Length mismatch")
 
         return PrivateKey(SigningKey(key))
 
     def serialize(self, serializer: Serializer):
-        serializer.bytes(self.key.encode())
+        serializer.to_bytes(self.key.encode())
 
 
 class PublicKey:
@@ -60,7 +65,9 @@ class PublicKey:
     def __init__(self, key: VerifyKey):
         self.key = key
 
-    def __eq__(self, other: PrivateKey):
+    def __eq__(self, other: object):
+        if not isinstance(other, PublicKey):
+            return NotImplemented
         return self.key == other.key
 
     def __str__(self) -> str:
@@ -73,15 +80,16 @@ class PublicKey:
             return False
         return True
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> PublicKey:
-        key = deserializer.bytes()
+        key = deserializer.to_bytes()
         if len(key) != PublicKey.LENGTH:
             raise Exception("Length mismatch")
 
         return PublicKey(VerifyKey(key))
 
     def serialize(self, serializer: Serializer):
-        serializer.bytes(self.key.encode())
+        serializer.to_bytes(self.key.encode())
 
 
 class Signature:
@@ -92,7 +100,9 @@ class Signature:
     def __init__(self, signature: bytes):
         self.signature = signature
 
-    def __eq__(self, other: PrivateKey):
+    def __eq__(self, other: object):
+        if not isinstance(other, Signature):
+            return NotImplemented
         return self.signature == other.signature
 
     def __str__(self) -> str:
@@ -101,15 +111,16 @@ class Signature:
     def data(self) -> bytes:
         return self.signature
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> Signature:
-        signature = deserializer.bytes()
+        signature = deserializer.to_bytes()
         if len(signature) != Signature.LENGTH:
             raise Exception("Length mismatch")
 
         return Signature(signature)
 
     def serialize(self, serializer: Serializer):
-        serializer.bytes(self.signature)
+        serializer.to_bytes(self.signature)
 
 
 class Test(unittest.TestCase):

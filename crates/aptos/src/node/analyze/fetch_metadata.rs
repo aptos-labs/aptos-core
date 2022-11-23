@@ -15,7 +15,7 @@ const MAX_FETCH_BATCH_SIZE: u16 = 1000;
 pub struct ValidatorInfo {
     pub address: AccountAddress,
     pub voting_power: u64,
-    pub validator_index: u64,
+    pub validator_index: u16,
 }
 
 pub struct EpochInfo {

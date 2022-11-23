@@ -235,7 +235,7 @@ public entry fun transfer<CoinType>(
 ```
 
 :::tip
-This will emit both a `WithdrawEvent` and `DespositEvent` on the respective `CoinStore`s.
+This will emit both a `WithdrawEvent` and `DepositEvent` on the respective `CoinStore`s.
 :::
 
 ## Events

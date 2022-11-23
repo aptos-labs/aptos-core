@@ -1,11 +1,11 @@
 ---
-title: "Handling Errors in Aptos and Move"
+title: "Handle Errors in Aptos"
 slug: "handle-aptos-errors"
 ---
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Handling Errors in Aptos and Move
+# Handle Errors in Aptos
 
 This page catalogs common errors encountered in the Aptos blockchain and explains how to resolve them wherever possible. As with all software, the code itself is the source of truth for error handling and will always contain entries not found here. Instead, this matrix aims to help you address those errors most typically found, misunderstood, or both.
 
@@ -34,7 +34,7 @@ Help us update this list by sending pull requests containing the errors you enco
 |SENDING_ACCOUNT_DOES_NOT_EXIST|The sending account does not exist.|
 |REJECTED_WRITE_SET|This write set transaction was rejected because it did not meet the requirements for one.|
 |INVALID_WRITE_SET|This write set transaction cannot be applied to the current state.|
-|EXCEEDED_MAX_TRANSACTION_SIZE|ength of program field in raw transaction exceeded max length.|
+|EXCEEDED_MAX_TRANSACTION_SIZE|Length of program field in raw transaction exceeded max length.|
 |UNKNOWN_SCRIPT|This script is not in our allowlist of scripts.|
 |UNKNOWN_MODULE|Transaction is trying to publish a new module.|
 |MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND|Max gas units submitted with transaction exceeds max gas units bound in VM.|
@@ -138,7 +138,7 @@ Help us update this list by sending pull requests containing the errors you enco
 |ECREATE_WOULD_EXCEED_COLLECTION_MAXIMUM|Exceeds the collection's maximal number of token_data.|
 |EINSUFFICIENT_BALANCE|Insufficient token balance.|
 |EINVALID_TOKEN_MERGE|Cannot merge the two tokens with different token IDs.|
-|EMINT_WOULD_EXCEED_TOKEN_MAXIMUM|xceed the token data maximal allowed.|
+|EMINT_WOULD_EXCEED_TOKEN_MAXIMUM|Exceed the token data maximal allowed.|
 |ENO_BURN_CAPABILITY|No burn capability.|
 |ETOKEN_DATA_ALREADY_EXISTS|TokenData already exists.|
 |ETOKEN_DATA_NOT_PUBLISHED|TokenData not published.|

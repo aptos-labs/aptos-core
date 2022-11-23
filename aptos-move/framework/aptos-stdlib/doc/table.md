@@ -36,6 +36,7 @@ struct itself, while the operations are implemented as native functions. No trav
     -  [Function `add`](#@Specification_0_add)
     -  [Function `borrow`](#@Specification_0_borrow)
     -  [Function `borrow_mut`](#@Specification_0_borrow_mut)
+    -  [Function `upsert`](#@Specification_0_upsert)
     -  [Function `remove`](#@Specification_0_remove)
     -  [Function `contains`](#@Specification_0_contains)
     -  [Function `destroy`](#@Specification_0_destroy)
@@ -525,42 +526,6 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 ## Specification
 
 
-
-<a name="0x1_table_spec_contains"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_contains">spec_contains</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): bool;
-</code></pre>
-
-
-
-
-<a name="0x1_table_spec_add"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_add">spec_add</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K, v: V): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;;
-</code></pre>
-
-
-
-
-<a name="0x1_table_spec_remove"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_remove">spec_remove</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;;
-</code></pre>
-
-
-
-
-<a name="0x1_table_spec_get"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): V;
-</code></pre>
-
-
-
 <a name="@Specification_0_Table"></a>
 
 ### Struct `Table`
@@ -587,11 +552,12 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
     map_destroy_empty = destroy,
     map_has_key = contains,
     map_add_no_override = add,
+    map_add_override_if_exists = upsert,
     map_del_must_exist = remove,
     map_borrow = borrow,
     map_borrow_mut = borrow_mut,
     map_spec_get = spec_get,
-    map_spec_set = spec_add,
+    map_spec_set = spec_set,
     map_spec_del = spec_remove,
     map_spec_has_key = spec_contains;
 </code></pre>
@@ -662,6 +628,22 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
+<a name="@Specification_0_upsert"></a>
+
+### Function `upsert`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_upsert">upsert</a>&lt;K: <b>copy</b>, drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;, key: K, value: V)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
 <a name="@Specification_0_remove"></a>
 
 ### Function `remove`
@@ -690,6 +672,42 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 <pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+
+<a name="0x1_table_spec_contains"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_contains">spec_contains</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): bool;
+</code></pre>
+
+
+
+
+<a name="0x1_table_spec_remove"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_remove">spec_remove</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_table_spec_set"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_set">spec_set</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K, v: V): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_table_spec_get"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): V;
 </code></pre>
 
 
