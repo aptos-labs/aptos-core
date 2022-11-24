@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    COMMIT_ID, EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT, EXECUTOR_BENCHMARK_LATENCY,
+    BLOCK_SIZE, COMMIT_DESC, COMMIT_ID, CONCURRENCY_LEVEL,
+    EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT, EXECUTOR_BENCHMARK_LATENCY, NUM_ACCOUNTS,
 };
 use aptos_crypto::hash::HashValue;
 use aptos_logger::prelude::*;
@@ -117,10 +118,22 @@ fn report_block(
         .duration_since(execution_start_time)
         .as_millis();
     EXECUTOR_BENCHMARK_LATENCY
-        .with_label_values(&[COMMIT_ID.as_str()])
+        .with_label_values(&[
+            COMMIT_ID.as_str(),
+            COMMIT_DESC.as_str(),
+            NUM_ACCOUNTS.as_str(),
+            BLOCK_SIZE.as_str(),
+            CONCURRENCY_LEVEL.as_str(),
+        ])
         .set(latency as i64);
     EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT
-        .with_label_values(&[COMMIT_ID.as_str()])
+        .with_label_values(&[
+            COMMIT_ID.as_str(),
+            COMMIT_DESC.as_str(),
+            NUM_ACCOUNTS.as_str(),
+            BLOCK_SIZE.as_str(),
+            CONCURRENCY_LEVEL.as_str(),
+        ])
         .inc_by(block_size as u64);
     info!(
         "Version: {}. latency: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0}. Accumulative TPS: {:.0}",

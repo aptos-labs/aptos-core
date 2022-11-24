@@ -32,20 +32,49 @@ use std::{env, fs, path::Path};
 use storage_interface::DbReaderWriter;
 
 pub static EXECUTOR_BENCHMARK_LATENCY: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!("executor_benchmark_latency_ms", "blah", &["commit_id"]).unwrap()
+    register_int_gauge_vec!(
+        "executor_benchmark_latency_ms",
+        "blah",
+        &[
+            "commit_id",
+            "commit_desc",
+            "num_accounts",
+            "block_size",
+            "concurrency_level"
+        ]
+    )
+    .unwrap()
 });
 
 pub static EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "executor_benchmark_committed_txn_count",
         "blah",
-        &["commit_id"]
+        &[
+            "commit_id",
+            "commit_desc",
+            "num_accounts",
+            "block_size",
+            "concurrency_level"
+        ]
     )
     .unwrap()
 });
 
 pub static COMMIT_ID: Lazy<String> =
     Lazy::new(|| env::var("COMMIT_ID").expect("Envvar COMMIT_ID not set."));
+
+pub static COMMIT_DESC: Lazy<String> =
+    Lazy::new(|| env::var("COMMIT_DESC").expect("Envvar COMMIT_DESC not set."));
+
+pub static NUM_ACCOUNTS: Lazy<String> =
+    Lazy::new(|| env::var("ACCOUNT_COUNT").expect("Envvar ACCOUNT_COUNT not set."));
+
+pub static BLOCK_SIZE: Lazy<String> =
+    Lazy::new(|| env::var("BLOCK_SIZE").expect("Envvar BLOCK_SIZE not set."));
+
+pub static CONCURRENCY_LEVEL: Lazy<String> =
+    Lazy::new(|| env::var("CONCURRENCY_LEVEL").expect("Envvar CONCURRENCY_LEVEL not set."));
 
 pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<AptosVM>) {
     let db = DbReaderWriter::new(
