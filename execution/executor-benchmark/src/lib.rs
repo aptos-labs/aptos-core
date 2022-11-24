@@ -62,19 +62,19 @@ pub static EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT: Lazy<IntCounterVec> =
 });
 
 pub static COMMIT_ID: Lazy<String> =
-    Lazy::new(|| env::var("COMMIT_ID").expect("Envvar COMMIT_ID not set."));
+    Lazy::new(|| env::var("COMMIT_ID").unwrap_or(String::from("unknown")));
 
 pub static COMMIT_DESC: Lazy<String> =
-    Lazy::new(|| env::var("COMMIT_DESC").expect("Envvar COMMIT_DESC not set."));
+    Lazy::new(|| env::var("COMMIT_DESC").unwrap_or(String::from("unknown")));
 
 pub static NUM_ACCOUNTS: Lazy<String> =
-    Lazy::new(|| env::var("ACCOUNT_COUNT").expect("Envvar ACCOUNT_COUNT not set."));
+    Lazy::new(|| env::var("ACCOUNT_COUNT").unwrap_or(String::from("unknown")));
 
 pub static BLOCK_SIZE: Lazy<String> =
-    Lazy::new(|| env::var("BLOCK_SIZE").expect("Envvar BLOCK_SIZE not set."));
+    Lazy::new(|| env::var("BLOCK_SIZE").unwrap_or(String::from("unknown")));
 
 pub static CONCURRENCY_LEVEL: Lazy<String> =
-    Lazy::new(|| env::var("CONCURRENCY_LEVEL").expect("Envvar CONCURRENCY_LEVEL not set."));
+    Lazy::new(|| env::var("CONCURRENCY_LEVEL").unwrap_or(String::from("unknown")));
 
 pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<AptosVM>) {
     let db = DbReaderWriter::new(
