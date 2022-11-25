@@ -7,7 +7,6 @@ use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_types::misc::bits_to_byte;
 use aptos_types::{nibble::nibble_path::NibblePath, transaction::Version};
 use lru::LruCache;
-use std::cmp::min;
 
 const NUM_SHARDS: usize = 256;
 
