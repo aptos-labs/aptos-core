@@ -524,6 +524,9 @@ async fn test_validator_sync(swarm: &mut LocalSwarm, validator_index_to_test: us
         .await;
 }
 
+// Ignore this test because it's become increasingly flaky recently
+// and needs to be debugged.
+#[ignore]
 #[tokio::test]
 async fn test_validator_failure_bootstrap_outputs() {
     // Create a swarm of 4 validators with state snapshot bootstrapping and output syncing
@@ -542,6 +545,9 @@ async fn test_validator_failure_bootstrap_outputs() {
     test_all_validator_failures(swarm).await;
 }
 
+// Ignore this test because it's become increasingly flaky recently
+// and needs to be debugged.
+#[ignore]
 #[tokio::test]
 async fn test_validator_failure_bootstrap_execution() {
     // Create a swarm of 4 validators with state snapshot bootstrapping and transaction syncing
