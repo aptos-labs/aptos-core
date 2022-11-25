@@ -181,59 +181,7 @@ The following tables describe fields at the struct level. For the definitive lis
 | [`Token`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_Token) | The amount is the number of tokens. |
 | [`TokenId`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_TokenId) | `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated `PropertyMap` from `default_properties` in the `TokenData`. |
 
-### Coin and token field descriptions
-
-The following tables contain descriptions and examples on key token fields. Once again, see the [Move reference documentation](../../guides/move-guides/index.md#aptos-move-documentation) for the [Aptos Token Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md).
-
-#### Token module key struct
-
-##### [`Token`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move#L144)
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `id` | TokenId | Unique identification of the token |
-| `amount` | u64 | The number of tokens stored |
-| `token_properties` | PropertyMap | The properties of this token; PropertyMap is a key-value map used for storing different types in one map; the value of PropertyMap contains both the value and type information |
-
-##### `TokenId`
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `token_data_id` | TokenDataId | Identification for the metadata of the token |
-| `property_version` | u64 | The version of the property map; when a fungible token is mutated, a new property version is created and assigned to the token to make it an NFT |
-
-##### `TokenDataId`
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `creator` | address | The address of the creator, eg: 0xcafe |
-| `collection` | String | The name of collection; this is unique under the same account, eg: “Aptos Animal Collection” |
-| `name` | String | The name of the token; this is the same as the name field of TokenData |
-
-##### `TokenData`
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `maximum` | u64 | The maximal number of tokens that can be minted under this TokenData; if the maximum is 0, there is no limit |
-| `largest_property_version` | u64 | The current largest property version of all tokens with this TokenData |
-| `supply` | String | The number of tokens with this TokenData |
-| `uri` | String | The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain storage; the URL length should be less than 512 characters, eg: https://arweave.net/Fmmn4ul-7Mv6vzm7JwE69O-I-vd6Bz2QriJO1niwCh4 |
-| `royalty` | Royalty | The denominator and numerator for calculating the royalty fee; it also contains payee account address for depositing the Royalty |
-| `name` | String | The name of the token, which should be unique within the collection; the length of name should be smaller than 128, characters, eg: “Aptos Animal #1234” |
-| `description` | String | The description of the token |
-| `default_properties` | PropertyMap | The properties are stored in the TokenData that are shared by all tokens  |
-| `mutability_config` | TokenMutabilityConfig | Specifies which fields are mutable  |
-
-##### `CollectionData`
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `description` | String | A description for the token collection Eg: “Aptos Toad Overload” |
-| `name` | String | The collection name, which should be unique among all collections by the creator; the name should also be smaller than 128 characters, eg: “Animal Collection” |
-| `uri` | String | The URI for the collection; its length should be smaller than 512 characters |
-| `supply` | u64 | The number of different TokenData entries in this collection |
-| `maximum` | u64 | If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum If maximal is 0, Aptos doen’t track the supply of this collection, and there is no limit |
-| `mutability_config` | CollectionMutabilityConfig | Specifies which fields are mutable  |
+For more detailed descriptions, see [Aptos Token Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md).
 
 ## Token lifecycle
 
@@ -270,24 +218,23 @@ We provide `burn` and `burn_by_creator` functions for token owners and token cre
 Burn is allowed only when the `BURNABLE_BY_OWNER` property is set to `true` in `default_properties`. Burn by creator is allowed when `BURNABLE_BY_CREATOR` is `true` in `default_properties`.
 Once all the tokens belonging to a `TokenData` are burned, the `TokenData` will be removed from the creator’s account. Similarly, if all `TokenData` belonging to a collection are removed, the `CollectionData` will be removed from the creator’s account.
 
-## Token transfer
+### Token transfer
 
-To protect a user from receiving undesired NFTs, an Aptos user must be first offered an NFT, followed by the user claiming the offered NFTs. Then only these NFTs will be deposited in the user's token store. This is the default token transfer behavior. For example:
+We provide three different modes for transferring tokens between the sender and receiver.
 
-1. If Alice wants to send Bob an NFT, she must first offer Bob this NFT. This NFT is still stored under Alice’s account. 
-1. Only when Bob claims the NFT, this NFT will be removed from Alice’s account and stored in Bob’s token store. 
+Two-step transfer: to protect users from receiving undesired NFTs, they must be first offered NFTs, and then accept the offered NFTs. Then only the offered NFTs will be deposited in the users' token stores. This is the default token transfer behavior. For example:
+1. If Alice wants to send Bob an NFT, she must first offer Bob this NFT. This NFT is still stored under Alice’s account.
+2. Only when Bob claims the NFT, will the NFT be removed from Alice’s account and stored in Bob’s token store.
 
 :::tip Token transfer module
-The token transfer is implemented in the [`token_transfers`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token_transfers.move) module. 
+The token transfer is implemented in the [`token_transfers`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token_transfers.move) module.
 :::
 
-### Direct transfer
-
-On the other hand, if a user wants to receive direct transfer of the NFT, skipping the initial steps of offer and claim, then the user can call [`opt_in_direct_transfer`](https://github.com/aptos-labs/aptos-core/blob/283348c6ea4ce198fb27eb3ef1c1e471739aa1aa/aptos-move/framework/aptos-token/sources/token.move#L297) to allow other people to directly transfer the NFTs into the user's token store.  
-
-Note that in both the default token transfer and the direct transfer method, the user will receive the NFT into the user's token store. 
+Transfer with opt-in: if a user wants to receive direct transfer of the NFT, skipping the initial steps of offer and claim, then the user can call [`opt_in_direct_transfer`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_opt_in_direct_transfer) to allow other people to directly transfer the NFTs into the user's token store. After opting into direct transfer, the user can call [`transfer`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#0x3_token_transfer) to transfer tokens directly. For example, Alice and anyone can directly send a token to Bob's token store once Bob opts in.
 
 :::tip Turning off direct transfer
-The user can also turn off this direct transfer behavior by calling the same `opt_in_direct_transfer` function to reset the behavior to the default behavior. 
+The user can also turn off this direct transfer behavior by calling the same `opt_in_direct_transfer` function to reset to the default behavior.
 :::
+
+Multi-agent transfer: the sender and receiver can both sign a transfer transaction to directly transfer a token from the sender to receiver [`direct_transfer_script`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/token.md#function-direct_transfer_script). For example, once Alice and Bob both sign the transfer transaction, the token will be directly transferred from Alice's account to Bob.
 

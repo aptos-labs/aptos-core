@@ -58,7 +58,7 @@ The payload for instructing the blockchain to create a new account is:
 }
 ```
 
-This instructs the Move virtual machine to execute the `script` `0x1::aptos_account::create_account`. The first argument is the address of the account to create and the second is the authentication key pre-image (which is mentioned in [Accounts](../concepts/basics-accounts.md). For single signer authentication, this is the public key concatenated with the `0` byte (or `pubkey_A | 0x00`). This is required to prevent account address land grabbing. The execution of this instruction verifies that the 32-bytes of the authentication key are the same as the 32-byte account address. We are actively working on improving this API to support taking in a 32-byte account address that would eliminate concerns around land grabbing or account manipulation.
+This instructs the Move virtual machine to execute the `script` `0x1::aptos_account::create_account`. The first argument is the address of the account to create and the second is the authentication key pre-image (which is mentioned in [Accounts](../concepts/accounts.md). For single signer authentication, this is the public key concatenated with the `0` byte (or `pubkey_A | 0x00`). This is required to prevent account address land grabbing. The execution of this instruction verifies that the 32-bytes of the authentication key are the same as the 32-byte account address. We are actively working on improving this API to support taking in a 32-byte account address that would eliminate concerns around land grabbing or account manipulation.
 
 ## Publishing a new Move module
 
@@ -75,7 +75,7 @@ This instructs the VM to publish the module bytecode under the sender's account.
 
 It is important to note that the Move bytecode must specify the same address as the sender's account, otherwise the transaction will be rejected. For example, assuming account address `0xe110`, the Move module would need to be updated as such `module 0xe110::Message`, `module 0xbar::Message` would be rejected. Alternatively an aliased address could be used, such as `module HelloBlockchain::Message` but the `HelloBlockchain` alias would need to updated to `0xe110` in the `Move.toml` file. We are working with the Move team and planning on incorporating a compiler into our REST interface to mitigate this issue.
 
-[accounts]: /concepts/basics-accounts
+[accounts]: /concepts/accounts
 [your-first-coin]: /tutorials/your-first-coin
 [your-first-move-module]: /tutorials/first-move-module
 [your-first-transaction]: /tutorials/your-first-transaction
