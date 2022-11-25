@@ -33,9 +33,8 @@ use proptest::{collection::hash_map, prelude::*};
 use proptest_derive::Arbitrary;
 
 use crate::TreeReader;
-use aptos_logger::info;
-use aptos_types::misc::one_positions;
-use aptos_types::nibble::{MAX_NIBBLE, NIBBLE_SIZE_IN_BITS};
+use aptos_types::misc::{bits_to_bytes, bytes_to_bits, one_positions};
+use aptos_types::nibble::{JELLYFISH_MERKLE_ARITY, NIBBLE_SIZE_IN_BITS};
 use aptos_types::proof::definition::NodeInProof;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -327,8 +326,8 @@ impl InternalNode {
     pub fn hash(&self) -> HashValue {
         let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
         self.merkle_hash(
-            0,          /* start index */
-            MAX_NIBBLE, /* the number of leaves in the subtree of which we want the hash of root */
+            0, /* start index */
+            JELLYFISH_MERKLE_ARITY, /* the number of leaves in the subtree of which we want the hash of root */
             (existence_bitmap.as_slice(), leaf_bitmap.as_slice()),
         )
     }
@@ -338,12 +337,12 @@ impl InternalNode {
     }
 
     pub fn serialize(&self, binary: &mut Vec<u8>) -> Result<()> {
-        let (mut existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
-        binary.write_u64::<LittleEndian>(existence_bitmap.len() as u64)?;
-        for i in 0..existence_bitmap.len() {
-            binary.write_u8(existence_bitmap[i] as u8)?;
-            binary.write_u8(leaf_bitmap[i] as u8)?;
-        }
+        let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
+        let existence_bytes = bits_to_bytes(existence_bitmap.as_slice());
+        let leaf_bytes = bits_to_bytes(leaf_bitmap.as_slice());
+        binary.write_u16::<LittleEndian>(existence_bitmap.len() as u16)?;
+        binary.write_all(existence_bytes.as_slice())?;
+        binary.write_all(leaf_bytes.as_slice())?;
         let existence_positions = one_positions(existence_bitmap.as_slice());
         for next_child in existence_positions {
             let child = &self.children[&Nibble::from(next_child)];
@@ -363,22 +362,25 @@ impl InternalNode {
     pub fn deserialize(data: &[u8]) -> Result<Self> {
         let mut reader = Cursor::new(data);
         let len = data.len();
-        let bitmap_size = reader.read_u64::<LittleEndian>()? as usize;
+        let bitmap_size = reader.read_u16::<LittleEndian>()? as usize;
+        let byte_count = (bitmap_size + 7) / 8;
+        let mut existence_buffer = Vec::with_capacity(byte_count);
+        let mut leaf_buffer = Vec::with_capacity(byte_count);
+        for _i in 0..byte_count {
+            existence_buffer.push(reader.read_u8()?);
+        }
+        for _i in 0..byte_count {
+            leaf_buffer.push(reader.read_u8()?);
+        }
 
         // Read and validate existence and leaf bitmaps
-        let mut existence_bitmap = vec![false; bitmap_size];
-        let mut leaf_bitmap = vec![false; bitmap_size];
-        let mut existence_positions = vec![];
-        for i in 0..bitmap_size {
-            existence_bitmap[i] = reader.read_u8()? != 0;
-            leaf_bitmap[i] = reader.read_u8()? != 0;
-            if existence_bitmap[i] {
-                existence_positions.push(i);
-            }
-        }
+        let existence_bitmap = bytes_to_bits(existence_buffer.as_slice(), bitmap_size);
+        let leaf_bitmap = bytes_to_bits(leaf_buffer.as_slice(), bitmap_size);
+        let existence_positions = one_positions(existence_bitmap.as_slice());
+
         match existence_positions.len() {
             0 => return Err(NodeDecodeError::NoChildren.into()),
-            _ if (0..MAX_NIBBLE).any(|i| !existence_bitmap[i] && leaf_bitmap[i]) => {
+            _ if (0..JELLYFISH_MERKLE_ARITY).any(|i| !existence_bitmap[i] && leaf_bitmap[i]) => {
                 return Err(NodeDecodeError::ExtraLeaves {
                     existing: existence_bitmap.clone(),
                     leaves: leaf_bitmap.clone(),
@@ -429,8 +431,8 @@ impl InternalNode {
     /// exists if `existence_bitmap[i]` is set; child at index `i` is leaf node if
     /// `leaf_bitmap[i]` is set.
     pub fn generate_bitmaps(&self) -> (Vec<bool>, Vec<bool>) {
-        let mut existence_bitmap = vec![false; MAX_NIBBLE];
-        let mut leaf_bitmap = vec![false; MAX_NIBBLE];
+        let mut existence_bitmap = vec![false; JELLYFISH_MERKLE_ARITY];
+        let mut leaf_bitmap = vec![false; JELLYFISH_MERKLE_ARITY];
         for (nibble, child) in self.children.iter() {
             let i = usize::from(*nibble);
             existence_bitmap[i] = true;
@@ -445,15 +447,15 @@ impl InternalNode {
         width: usize,
         bitmaps: (&[bool], &[bool]),
     ) -> (Vec<bool>, Vec<bool>) {
-        assert!(start < MAX_NIBBLE && width.count_ones() == 1 && start % width == 0);
-        assert!(width <= MAX_NIBBLE && (start + width) <= MAX_NIBBLE);
-        let mut masked_bitmap_0 = [
+        assert!(start < JELLYFISH_MERKLE_ARITY && width.count_ones() == 1 && start % width == 0);
+        assert!(width <= JELLYFISH_MERKLE_ARITY && (start + width) <= JELLYFISH_MERKLE_ARITY);
+        let masked_bitmap_0 = [
             vec![false; start].as_slice(),
             &bitmaps.0[start..start + width],
             vec![false; bitmaps.0.len() - start - width].as_slice(),
         ]
         .concat();
-        let mut masked_bitmap_1 = [
+        let masked_bitmap_1 = [
             vec![false; start].as_slice(),
             &bitmaps.1[start..start + width],
             vec![false; bitmaps.1.len() - start - width].as_slice(),

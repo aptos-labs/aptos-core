@@ -4,6 +4,7 @@
 use crate::state_merkle_db::Node;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::node_type::NodeKey;
+use aptos_types::misc::bits_to_byte;
 use aptos_types::{nibble::nibble_path::NibblePath, transaction::Version};
 use lru::LruCache;
 use std::cmp::min;
@@ -13,24 +14,6 @@ const NUM_SHARDS: usize = 256;
 #[derive(Debug)]
 pub(crate) struct LruNodeCache {
     shards: [Mutex<LruCache<NibblePath, (Version, Node)>>; NUM_SHARDS],
-}
-
-pub fn bits_to_byte(bits: &[bool]) -> u8 {
-    let mut ret = 0;
-    assert_eq!(8, bits.len());
-    for &bit in bits {
-        ret = (ret << 1) + (bit as u8)
-    }
-    ret
-}
-
-pub fn bits_to_byte_optim(bits: &[bool]) -> u8 {
-    let mut ret = 0;
-    let valid_bit_count = min(8, bits.len());
-    for i in 0..valid_bit_count {
-        ret += (bits[i] as u8) << (7 - i);
-    }
-    ret
 }
 
 impl LruNodeCache {
@@ -47,7 +30,7 @@ impl LruNodeCache {
         } else {
             let bits = nibble_path.bits();
             let bits: Vec<bool> = bits.take(8).collect();
-            bits_to_byte_optim(bits.as_slice())
+            bits_to_byte(bits.as_slice())
         }
     }
 

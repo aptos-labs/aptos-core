@@ -8,15 +8,16 @@
 pub mod nibble_path;
 
 use aptos_crypto::HashValue;
+use konst::primitive::parse_usize;
+use konst::unwrap_ctx;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-
 /// The hardcoded maximum height of a state merkle tree in nibbles.
 pub const ROOT_NIBBLE_HEIGHT: usize = HashValue::LENGTH * 8 / NIBBLE_SIZE_IN_BITS;
-pub const NIBBLE_SIZE_IN_BITS: usize = 8;
-pub const MAX_NIBBLE: usize = 1 << NIBBLE_SIZE_IN_BITS;
+pub const JELLYFISH_MERKLE_ARITY: usize = unwrap_ctx!(parse_usize(env!("ARITY")));
+pub const NIBBLE_SIZE_IN_BITS: usize = JELLYFISH_MERKLE_ARITY.trailing_zeros() as usize;
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Nibble(usize);
@@ -44,7 +45,7 @@ impl From<usize> for Nibble {
 impl From<u8> for Nibble {
     fn from(nibble: u8) -> Self {
         assert!(
-            (nibble as usize) < MAX_NIBBLE,
+            (nibble as usize) < JELLYFISH_MERKLE_ARITY,
             "Nibble out of range: {}",
             nibble
         );
@@ -75,6 +76,6 @@ impl Arbitrary for Nibble {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        (0..MAX_NIBBLE).prop_map(Self::from).boxed()
+        (0..JELLYFISH_MERKLE_ARITY).prop_map(Self::from).boxed()
     }
 }

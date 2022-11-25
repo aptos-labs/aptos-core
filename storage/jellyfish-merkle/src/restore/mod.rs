@@ -640,7 +640,7 @@ where
                     Self::compute_left_sibling(
                         &self.partial_nodes[i / NIBBLE_SIZE_IN_BITS],
                         previous_key.get_nibble(i / NIBBLE_SIZE_IN_BITS),
-                        (NIBBLE_SIZE_IN_BITS - 1 - i % NIBBLE_SIZE_IN_BITS),
+                        NIBBLE_SIZE_IN_BITS - 1 - i % NIBBLE_SIZE_IN_BITS,
                     )
                 };
                 left_siblings.push(sibling);

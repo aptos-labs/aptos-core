@@ -38,6 +38,7 @@ pub static EXECUTOR_BENCHMARK_LATENCY: Lazy<IntGaugeVec> = Lazy::new(|| {
         &[
             "commit_id",
             "commit_desc",
+            "arity",
             "num_accounts",
             "block_size",
             "concurrency_level"
@@ -53,6 +54,7 @@ pub static EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT: Lazy<IntCounterVec> =
         &[
             "commit_id",
             "commit_desc",
+            "arity",
             "num_accounts",
             "block_size",
             "concurrency_level"
@@ -66,6 +68,8 @@ pub static COMMIT_ID: Lazy<String> =
 
 pub static COMMIT_DESC: Lazy<String> =
     Lazy::new(|| env::var("COMMIT_DESC").unwrap_or(String::from("unknown")));
+
+pub static ARITY: Lazy<String> = Lazy::new(|| env::var("ARITY").unwrap_or(String::from("unknown")));
 
 pub static NUM_ACCOUNTS: Lazy<String> =
     Lazy::new(|| env::var("ACCOUNT_COUNT").unwrap_or(String::from("unknown")));

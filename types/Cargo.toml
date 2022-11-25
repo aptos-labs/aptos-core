@@ -37,6 +37,7 @@ aptos-crypto-derive = { path = "../crates/aptos-crypto-derive" }
 move-core-types = { workspace = true }
 
 move-table-extension = { workspace = true }
+konst = "0.2.19"
 
 [dev-dependencies]
 claims = "0.7"

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    BLOCK_SIZE, COMMIT_DESC, COMMIT_ID, CONCURRENCY_LEVEL,
+    ARITY, BLOCK_SIZE, COMMIT_DESC, COMMIT_ID, CONCURRENCY_LEVEL,
     EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT, EXECUTOR_BENCHMARK_LATENCY, NUM_ACCOUNTS,
 };
 use aptos_crypto::hash::HashValue;
@@ -23,7 +23,6 @@ use executor::{
     },
 };
 use executor_types::BlockExecutorTrait;
-use once_cell::sync::Lazy;
 use std::{
     env,
     sync::{mpsc, Arc},
@@ -121,6 +120,7 @@ fn report_block(
         .with_label_values(&[
             COMMIT_ID.as_str(),
             COMMIT_DESC.as_str(),
+            ARITY.as_str(),
             NUM_ACCOUNTS.as_str(),
             BLOCK_SIZE.as_str(),
             CONCURRENCY_LEVEL.as_str(),
@@ -130,6 +130,7 @@ fn report_block(
         .with_label_values(&[
             COMMIT_ID.as_str(),
             COMMIT_DESC.as_str(),
+            ARITY.as_str(),
             NUM_ACCOUNTS.as_str(),
             BLOCK_SIZE.as_str(),
             CONCURRENCY_LEVEL.as_str(),

@@ -14,11 +14,10 @@ use crate::{
     state_store::state_key::StateKey,
 };
 use aptos_crypto::hash::CryptoHash;
-use move_core_types::gas_algebra::Byte;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{collection::vec, prelude::*};
 use serde::{Deserialize, Serialize};
-use std::{fmt, iter::FromIterator};
+use std::iter::FromIterator;
 
 /// NibblePath defines a path in Merkle tree in the unit of nibble (4 bits).
 #[derive(Clone, Hash, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]

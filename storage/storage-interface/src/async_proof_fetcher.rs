@@ -6,7 +6,7 @@ use crate::{proof_fetcher::ProofFetcher, DbReader};
 use crate::metrics::TIMER;
 use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_logger::{error, info, sample, sample::SampleRate};
+use aptos_logger::{error, sample, sample::SampleRate};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -15,7 +15,6 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use once_cell::sync::Lazy;
-use std::ptr::hash;
 use std::{
     collections::HashMap,
     sync::{
@@ -94,7 +93,7 @@ impl AsyncProofFetcher {
         let reader = self.reader.clone();
         let data_sender = self.data_sender.clone();
         let skh = state_key.hash();
-        let rth = root_hash.clone().unwrap();
+        // let _rth = root_hash.clone().unwrap();
         IO_POOL.spawn(move || {
             let proof = reader
                 .get_state_proof_by_version_ext(&state_key, version)
