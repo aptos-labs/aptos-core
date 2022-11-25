@@ -30,7 +30,6 @@ pub struct MetricsPusher {
 )]
 impl MetricsPusher {
     fn push(push_metrics_endpoint: &str) {
-        info!("Trying to push metrics.");
         let mut buffer = Vec::new();
 
         if let Err(e) = TextEncoder::new().encode(&aptos_metrics_core::gather(), &mut buffer) {
@@ -44,9 +43,11 @@ impl MetricsPusher {
                     "Failed to push metrics to {}. Error: {}",
                     push_metrics_endpoint, error
                 );
+            } else {
+                let status = response.status_line();
+                info!("Metric push result: {status}");
             }
         }
-        info!("Metric push attempt finished.");
     }
 
     fn worker(
