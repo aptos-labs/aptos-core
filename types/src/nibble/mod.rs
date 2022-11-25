@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 /// The hardcoded maximum height of a state merkle tree in nibbles.
 pub const ROOT_NIBBLE_HEIGHT: usize = HashValue::LENGTH * 8 / NIBBLE_SIZE_IN_BITS;
-pub const JELLYFISH_MERKLE_ARITY: usize = unwrap_ctx!(parse_usize(env!("ARITY")));
+pub const JELLYFISH_MERKLE_ARITY: usize = unwrap_ctx!(parse_usize(env!("JMTEXP_ARITY")));
 pub const NIBBLE_SIZE_IN_BITS: usize = JELLYFISH_MERKLE_ARITY.trailing_zeros() as usize;
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
