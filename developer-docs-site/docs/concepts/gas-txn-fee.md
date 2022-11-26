@@ -1,6 +1,6 @@
 ---
 title: "Gas and Transaction Fees"
-slug: "basics-gas-txn-fee"
+slug: "gas-txn-fee"
 ---
 
 # Gas and Transaction Fees
@@ -32,14 +32,14 @@ In the Aptos blockchain a **unit of gas** represents a basic unit of resource co
 
 When your transaction is executed on the blockchain, instead of separately presenting you an account of each unit of the specific resource consumed, the blockchain simply presents an account of the number of units of gas being consumed by the transaction. 
 
-See [How Base Gas Works](base-gas.md) for a detailed description of gas fee types and available optimizations.
+See [How Base Gas Works](./base-gas.md) for a detailed description of gas fee types and available optimizations.
 
 ### Gas price
 
 In the Aptos network, the Aptos governance sets the minimum gas unit price. However, the market determines the actual minimum gas unit price. See [Ethereum Gas Tracker](https://etherscan.io/gastracker), for example, which shows the market price movements of Ethereum gas price.
 
 :::tip Unit of gas
-👉 A **unit of gas** is a dimensionless number, expressed as an integer. The total gas units consumed by your transaction depends on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](/concepts/basics-txns-states) for how a transaction submitted to the Aptos blockchain looks like.
+👉 A **unit of gas** is a dimensionless number, expressed as an integer. The total gas units consumed by your transaction depends on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](/concepts/txns-states) for how a transaction submitted to the Aptos blockchain looks like.
 :::
 
 ## Gas and transaction fee on the Aptos blockchain

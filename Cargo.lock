@@ -727,7 +727,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "async-trait",
- "bcs 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
  "bigdecimal",
  "chrono",
  "clap 3.2.17",
@@ -2001,7 +2001,6 @@ dependencies = [
  "miniz_oxide",
  "object",
  "rustc-demangle",
- "serde 1.0.144",
 ]
 
 [[package]]
@@ -3958,6 +3957,7 @@ name = "forge-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
  "aptos-global-constants",
  "aptos-logger",
  "aptos-rest-client",
@@ -5276,6 +5276,7 @@ dependencies = [
  "libc",
  "libz-sys",
  "lz4-sys",
+ "zstd-sys",
 ]
 
 [[package]]
@@ -7461,15 +7462,15 @@ checksum = "8bccbff07d5ed689c4087d20d7307a52ab6141edeedf487c3876a55b86cf63df"
 
 [[package]]
 name = "prometheus"
-version = "0.13.1"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cface98dfa6d645ea4c789839f176e4b072265d085bfcc48eaa8d137f58d3c39"
+checksum = "b7f64969ffd5dd8f39bd57a68ac53c163a095ed9d0fb707146da1b27025a3504"
 dependencies = [
  "cfg-if",
  "fnv",
  "lazy_static 1.4.0",
  "memchr",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "thiserror",
 ]
 
@@ -8801,6 +8802,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos",
+ "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
  "aptos-debugger",
@@ -10038,9 +10040,9 @@ checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "ureq"
-version = "1.5.5"
+version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b8b063c2d59218ae09f22b53c42eaad0d53516457905f5235ca4bc9e99daa71"
+checksum = "294b85ef5dbc3670a72e82a89971608a1fcc4ed5c7c5a2895230d31a95f0569b"
 dependencies = [
  "base64 0.13.0",
  "chunked_transfer",
@@ -10603,4 +10605,14 @@ dependencies = [
  "quote 1.0.21",
  "syn 1.0.99",
  "synstructure",
+]
+
+[[package]]
+name = "zstd-sys"
+version = "2.0.1+zstd.1.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fd07cbbc53846d9145dbffdf6dd09a7a0aa52be46741825f5c97bdd4f73f12b"
+dependencies = [
+ "cc",
+ "libc",
 ]

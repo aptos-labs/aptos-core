@@ -99,7 +99,7 @@ export class AptosAccount {
   /**
    * This key enables account owners to rotate their private key(s)
    * associated with the account without changing the address that hosts their account.
-   * See here for more info: {@link https://aptos.dev/basics/basics-accounts#single-signer-authentication}
+   * See here for more info: {@link https://aptos.dev/concepts/accounts#single-signer-authentication}
    * @returns Authentication key for the associated account
    */
   @Memoize()

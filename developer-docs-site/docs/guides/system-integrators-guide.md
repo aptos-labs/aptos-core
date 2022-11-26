@@ -1,9 +1,9 @@
 ---
-title: "Integrate Aptos"
+title: "Use Aptos API"
 slug: "system-integrators-guide"
 ---
 
-# Integrate Aptos with Your Platform
+# Use the Aptos API with Your Platform
 
 If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. This system integrators guide will walk you through all you need to integrate the Aptos blockchain into your platform.
 
@@ -67,7 +67,7 @@ Most integrations into the Aptos blockchain benefit from a holistic and comprehe
 
 * Historical transactions specify the execution status, output, and tie to related events. Each transaction has a unique version number associated with it that dictates its global sequential ordering in the history of the blockchain ledger.
 * The state is the representation of all transaction outputs up to a specific version. In other words, a state version is the accumulation of all transactions inclusive of that transaction version.
-* As transactions execute, they may emit events. [Events](/concepts/basics-events) are hints about changes in on-chain data.
+* As transactions execute, they may emit events. [Events](/concepts/events) are hints about changes in on-chain data.
 
 The storage service on a node employs two forms of pruning that erase data from nodes: 
 

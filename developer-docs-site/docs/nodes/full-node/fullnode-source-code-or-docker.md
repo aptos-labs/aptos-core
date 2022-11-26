@@ -6,7 +6,7 @@ sidebar_position: 10
 
 # Public Fullnode Using Aptos Source or Docker
 
-You can run your own [public fullnode](/concepts/basics-fullnodes) to synchronize with the state of the Aptos blockchain and stay up-to-date. Public fullnodes replicate the entire state of the blockchain by querying other Aptos fullnodes (public fullnodes or validator fullnodes) or validators.
+You can run your own [public fullnode](/concepts/fullnodes) to synchronize with the state of the Aptos blockchain and stay up-to-date. Public fullnodes replicate the entire state of the blockchain by querying other Aptos fullnodes (public fullnodes or validator fullnodes) or validators.
 
 Alternatively, you can use the public fullnodes provided by Aptos Labs. However, such Aptos Labs-provided public fullnodes have rate limits, which can impede your development. By running your own public fullnode you can directly synchronize with the Aptos blockchain and avoid such rate limits.
 
@@ -221,12 +221,11 @@ The command will output the current synced version of your node. For example:
 71000
 ```
 
-Compare the synced version returned by this command (e.g., `71000`) with the `Current Version` (latest) shown on the
-[Aptos status page](https://status.devnet.aptos.dev/). If your node is catching up to the current version, it is synchronizing correctly.
+Compare the synced version returned by this command (e.g., `71000`) with the highest version shown on the
+[Aptos explorer page](https://explorer.aptoslabs.com/?network=mainnet). If your node is catching up to the highest version, it is synchronizing correctly.
 
 :::tip
-It is fine if the status page differs by a few versions, as the status
-page does not automatically refresh.
+It is fine if the explorer page differs by a few versions, as the explorer nodes may sync with some variance.
 :::
 
 ### (Optional) Verify outbound network connections

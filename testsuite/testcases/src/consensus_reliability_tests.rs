@@ -19,6 +19,9 @@ pub struct ChangingWorkingQuorumTest {
     pub max_down_nodes: usize,
     pub num_large_validators: usize,
     pub add_execution_delay: bool,
+    /// Check that every given number of seconds all nodes make progress, without any failures.
+    /// It is good to make epoch length and this duration not be multiples of one another,
+    /// to test different timings
     pub check_period_s: usize,
 }
 
