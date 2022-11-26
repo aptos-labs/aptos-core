@@ -32,35 +32,11 @@ use std::{env, fs, path::Path};
 use storage_interface::DbReaderWriter;
 
 pub static EXECUTOR_BENCHMARK_LATENCY: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "executor_benchmark_latency_ms",
-        "blah",
-        &[
-            "commit_id",
-            "commit_desc",
-            "arity",
-            "num_accounts",
-            "block_size",
-            "concurrency_level"
-        ]
-    )
-    .unwrap()
+    register_int_gauge_vec!("executor_benchmark_latency_ms", "blah", &["foo"]).unwrap()
 });
 
 pub static EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "executor_benchmark_committed_txn_count",
-        "blah",
-        &[
-            "commit_id",
-            "commit_desc",
-            "arity",
-            "num_accounts",
-            "block_size",
-            "concurrency_level"
-        ]
-    )
-    .unwrap()
+    register_int_counter_vec!("executor_benchmark_committed_txn_count", "blah", &["foo"]).unwrap()
 });
 
 pub static COMMIT_ID: Lazy<String> =

@@ -1,10 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    ARITY, BLOCK_SIZE, COMMIT_DESC, COMMIT_ID, CONCURRENCY_LEVEL,
-    EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT, EXECUTOR_BENCHMARK_LATENCY, NUM_ACCOUNTS,
-};
+use crate::{EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT, EXECUTOR_BENCHMARK_LATENCY};
 use aptos_crypto::hash::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::aggregate_signature::AggregateSignature;
@@ -117,24 +114,10 @@ fn report_block(
         .duration_since(execution_start_time)
         .as_millis();
     EXECUTOR_BENCHMARK_LATENCY
-        .with_label_values(&[
-            COMMIT_ID.as_str(),
-            COMMIT_DESC.as_str(),
-            ARITY.as_str(),
-            NUM_ACCOUNTS.as_str(),
-            BLOCK_SIZE.as_str(),
-            CONCURRENCY_LEVEL.as_str(),
-        ])
+        .with_label_values(&["bar"])
         .set(latency as i64);
     EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT
-        .with_label_values(&[
-            COMMIT_ID.as_str(),
-            COMMIT_DESC.as_str(),
-            ARITY.as_str(),
-            NUM_ACCOUNTS.as_str(),
-            BLOCK_SIZE.as_str(),
-            CONCURRENCY_LEVEL.as_str(),
-        ])
+        .with_label_values(&["bar"])
         .inc_by(block_size as u64);
     info!(
         "Version: {}. latency: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0}. Accumulative TPS: {:.0}",

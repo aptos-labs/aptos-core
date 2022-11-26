@@ -6,7 +6,6 @@ use aptos_config::config::{
 };
 use aptos_push_metrics::MetricsPusher;
 use aptos_vm::AptosVM;
-use executor_benchmark::COMMIT_ID;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -147,8 +146,6 @@ enum Command {
 
 fn main() {
     #[allow(deprecated)]
-    let commit_id = COMMIT_ID.as_str();
-    println!("commit_id={commit_id}");
     let _mp = MetricsPusher::start();
     let opt = Opt::from_args();
 
