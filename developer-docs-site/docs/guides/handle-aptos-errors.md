@@ -55,7 +55,7 @@ Help us update this list by sending pull requests containing the errors you enco
 |SIGNERS_CONTAIN_DUPLICATES|There are duplicates among signers, including the sender and all the secondary signers.|
 |SEQUENCE_NONCE_INVALID|The sequence nonce in the transaction is invalid (too new, too old, or already used).|
 |CHAIN_ACCOUNT_INFO_DOES_NOT_EXIST|There was an error when accessing chain-specific account information.|
-|MODULE_ADDRESS_DOES_NOT_MATCH_SENDER|he self address of a module the transaction is publishing is not the sender address.|
+|MODULE_ADDRESS_DOES_NOT_MATCH_SENDER|the module publisher is not the account that will eventually hold the module.|
 |ZERO_SIZED_STRUCT|Reported when a struct has zero fields.|
 |DUPLICATE_MODULE_NAME|The sender is trying to publish two modules with the same name in one transaction.|
 |BACKWARD_INCOMPATIBLE_MODULE_UPDATE|The sender is trying to publish a module that breaks the compatibility checks.|
