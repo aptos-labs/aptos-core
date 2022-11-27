@@ -92,6 +92,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - uses: pre-commit/action@v3.0.0
       - run: cargo install cargo-sort
       - run: scripts/rust_lint.sh --check
@@ -103,6 +105,8 @@ jobs:
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: cargo test --locked --doc --workspace --exclude aptos-node-checker
 
   rust-unit-test:
@@ -112,6 +116,8 @@ jobs:
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       - uses: taiki-e/install-action@v1.5.6
         with:
@@ -125,6 +131,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       - uses: taiki-e/install-action@v1.5.6
         with:
@@ -152,6 +160,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: cargo test --locked --features check-vm-features -p aptos-node
 
   python-lint-test:
