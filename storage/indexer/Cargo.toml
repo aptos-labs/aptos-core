@@ -33,8 +33,8 @@ schemadb = { path = "../schemadb" }
 scratchpad = { path = "../scratchpad" }
 storage-interface = { path = "../storage-interface" }
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "93c96eb0d1ed6ee6577ff73f07d44ef6e7869fbd", features = ["address32"] }
-move-resource-viewer = { git = "https://github.com/move-language/move", rev = "93c96eb0d1ed6ee6577ff73f07d44ef6e7869fbd" }
+move-core-types = { git = "https://github.com/aptos-labs/move-private", rev = "04ddcc59ec0eab8279814c4a5d61a7ff6a9c5bb5", features = ["address32"] }
+move-resource-viewer = { git = "https://github.com/aptos-labs/move-private", rev = "04ddcc59ec0eab8279814c4a5d61a7ff6a9c5bb5" }
 
 [dev-dependencies]
 proptest = "1.0.0"

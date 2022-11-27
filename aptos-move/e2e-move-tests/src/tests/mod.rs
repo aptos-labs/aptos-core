@@ -20,4 +20,5 @@ mod rotate_auth_key;
 mod scripts;
 mod stake;
 mod string_args;
+mod type_too_large;
 mod vector_numeric_address;
