@@ -1,14 +1,17 @@
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::format;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
+use std::time::UNIX_EPOCH;
 
-use anyhow::{anyhow, Context, ensure};
+use anyhow::{anyhow, ensure, Context};
 use async_trait::async_trait;
 use clap::Parser;
 use convert_case::{Case, Casing};
 use path_absolutize::Absolutize;
+use regex::Regex;
 use tera::Tera;
 use url::Url;
 use walkdir::WalkDir;
@@ -23,18 +26,18 @@ pub enum Template {
 }
 
 pub fn parse_template(val: &str) -> anyhow::Result<Template> {
-    if val == "empty" || val == "coin" || val == "dapp" {
-        return Ok(Template::Default(val.to_string()))
-    }
-    if !val.starts_with("http") {
-        // is not a url, fail with unknown template
-        return Err(anyhow!("choose one of 'empty', 'coin', 'dapp'."))
-    }
-    let parsed_url = Url::parse(val);
-    match parsed_url {
-        Ok(url) => Ok(Template::GitUrl(url)),
-        Err(_) => {
-            Err(anyhow!("Invalid git url {}", val))
+    let re = Regex::new("^[a-zA-Z_]+$").unwrap();
+    if re.is_match(val) {
+        if val == "empty" || val == "coin" || val == "dapp" {
+            Ok(Template::Default(val.to_string()))
+        } else {
+            Err(anyhow!("choose one of 'empty', 'coin', 'dapp'."))
+        }
+    } else {
+        let parsed_url = Url::parse(val);
+        match parsed_url {
+            Ok(url) => Ok(Template::GitUrl(url)),
+            Err(_) => Err(anyhow!("Invalid git url {}", val)),
         }
     }
 }
@@ -67,6 +70,9 @@ pub struct NewPackage {
     pub(crate) framework_package_args: FrameworkPackageArgs,
 }
 
+const GIT_APTOS_TEMPLATES_URL: &str = "https://github.com/mkurnikov/aptos-templates.git";
+const GIT_COMMIT: &str = "540b78598d74152fbc6cb6ac6c7b139c34114259";
+
 #[async_trait]
 impl CliCommand<()> for NewPackage {
     fn command_name(&self) -> &'static str {
@@ -80,11 +86,28 @@ impl CliCommand<()> for NewPackage {
                     self.render_empty_template()?;
                     return Ok(());
                 }
-                let templates_root_path = git_download_aptos_templates()?;
-                let template_path = templates_root_path.join(template_name);
-                self.render_tera_template(template_path)?;
-            },
-            Template::GitUrl(_) => unimplemented!()
+                let core_templates_dir =
+                    std::env::temp_dir().join(&format!("aptos_templates_{GIT_COMMIT}"));
+
+                git_download_template(&core_templates_dir, GIT_APTOS_TEMPLATES_URL)?;
+
+                let core_template_path = core_templates_dir.join(template_name);
+                self.render_tera_template(core_template_path)?;
+            }
+            Template::GitUrl(url) => {
+                let git_url = url.as_str();
+                let directory_name = url_to_file_name(git_url);
+                let time_millis = std::time::SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis();
+                let custom_template_dir =
+                    std::env::temp_dir().join(format!("{}_{}", directory_name, time_millis));
+
+                git_download_template(&custom_template_dir, git_url)?;
+
+                self.render_tera_template(custom_template_dir)?;
+            }
         }
         Ok(())
     }
@@ -94,7 +117,7 @@ impl NewPackage {
     fn package_name(&self) -> anyhow::Result<String> {
         let package_name = match &self.name {
             Some(name) => name.clone(),
-            None => self.package_dir.to_package_name()
+            None => self.package_dir.to_package_name(),
         };
         Ok(package_name)
     }
@@ -111,27 +134,23 @@ impl NewPackage {
         )?;
         fs::create_dir(package_dir.join("tests"))?;
         Ok(())
-
     }
 
     fn render_tera_template(&self, template_path: PathBuf) -> anyhow::Result<()> {
         let package_dir = self.package_dir.as_ref();
         let package_name = self.package_name()?;
 
-        let tera_template = Tera::new(&format!(
-            "{}/**/*",
-            template_path.to_string_lossy(),
-        ))
+        let tera_template = Tera::new(&format!("{}/**/*", template_path.to_string_lossy(),))
             .map_err(|_| CliError::UnexpectedError("tera error".to_string()))?;
         let tera_context = tera::Context::from_serialize(
             [
                 ("package_name".to_string(), package_name),
                 // ("package_lowercase_name".to_string(), package_lowercase_name),
             ]
-                .into_iter()
-                .collect::<HashMap<String, String>>(),
+            .into_iter()
+            .collect::<HashMap<String, String>>(),
         )
-            .map_err(|err| anyhow!("Tera context: {err}"))?;
+        .map_err(|err| anyhow!("Tera context: {err}"))?;
 
         for (from, to, subpath) in tera_walk_dir(&template_path, package_dir) {
             if to.exists() {
@@ -155,28 +174,24 @@ impl NewPackage {
     }
 }
 
-const GIT_TEMPLATE: &str = "https://github.com/mkurnikov/aptos-templates.git";
-const GIT_COMMIT: &str = "540b78598d74152fbc6cb6ac6c7b139c34114259";
-
-fn git_download_aptos_templates() -> anyhow::Result<PathBuf> {
+fn git_download_template(tmp_dir: &PathBuf, git_url: &str) -> anyhow::Result<()> {
     // TODO: download more reliably (i.e. directory exists)
-    let tmp_dir = std::env::temp_dir().join(&format!("aptos_templates_{GIT_COMMIT}"));
     if !tmp_dir.exists() {
-        println!("Downloading: {GIT_TEMPLATE}");
+        println!("Downloading: {git_url}");
         Command::new("git")
             .arg("clone")
-            .arg(GIT_TEMPLATE)
+            .arg(git_url)
+            .arg(tmp_dir)
             .output()
             .context("Failed to find merge base")?;
     }
-
-    Ok(tmp_dir)
+    Ok(())
 }
 
 fn tera_walk_dir<'a>(
     from_dir: &'a Path,
     to_dir: &'a Path,
-) -> impl Iterator<Item=(PathBuf, PathBuf, String)> + 'a {
+) -> impl Iterator<Item = (PathBuf, PathBuf, String)> + 'a {
     let from_str = from_dir.to_string_lossy().to_string();
 
     WalkDir::new(from_dir)
@@ -195,6 +210,12 @@ fn tera_walk_dir<'a>(
         })
 }
 
+fn url_to_file_name(url: &str) -> String {
+    regex::Regex::new(r"/|:|\.|@")
+        .unwrap()
+        .replace_all(url, "_")
+        .to_string()
+}
 
 #[derive(Clone)]
 pub struct PackageDir(PathBuf);
@@ -223,7 +244,7 @@ impl From<PackageDir> for PathBuf {
 impl FromStr for PackageDir {
     type Err = anyhow::Error;
 
-    fn from_str(path: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(path: &str) -> Result<Self, Self::Err> {
         let package_dir = PathBuf::from(path).absolutize()?.to_path_buf();
 
         if !package_dir.exists() {

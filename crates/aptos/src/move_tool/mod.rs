@@ -5,8 +5,8 @@ mod aptos_debug_natives;
 mod manifest;
 pub mod package_hooks;
 pub use package_hooks::*;
-pub mod template;
 pub mod stored_package;
+pub mod template;
 mod transactional_tests_runner;
 
 pub use stored_package::*;
