@@ -12,6 +12,7 @@ Reconfiguration, and may be updated by root.
 -  [Function `initialize`](#0x1_consensus_config_initialize)
 -  [Function `set`](#0x1_consensus_config_set)
 -  [Specification](#@Specification_1)
+    -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `set`](#@Specification_1_set)
 
 
@@ -128,6 +129,34 @@ This can be called by on-chain governance to update on-chain consensus configs.
 ## Specification
 
 
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_strict;
+</code></pre>
+
+
+
+<a name="@Specification_1_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="consensus_config.md#0x1_consensus_config_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+Ensure caller is admin.
+Aborts if StateStorageUsage already exists.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !(len(config) &gt; 0);
+</code></pre>
+
+
+
 <a name="@Specification_1_set"></a>
 
 ### Function `set`
@@ -137,9 +166,15 @@ This can be called by on-chain governance to update on-chain consensus configs.
 </code></pre>
 
 
+Ensure the caller is admin and <code><a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a></code> should be existed.
+When setting now time must be later than last_reconfiguration_time.
 
 
-<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !(len(config) &gt; 0);
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>requires</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
 </code></pre>
 
