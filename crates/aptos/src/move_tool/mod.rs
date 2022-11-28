@@ -5,6 +5,7 @@ mod aptos_debug_natives;
 mod manifest;
 pub mod package_hooks;
 pub use package_hooks::*;
+pub mod template;
 pub mod stored_package;
 mod transactional_tests_runner;
 
@@ -111,7 +112,7 @@ impl MoveTool {
     }
 }
 
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 pub struct FrameworkPackageArgs {
     /// Git revision or branch for the Aptos framework
     ///

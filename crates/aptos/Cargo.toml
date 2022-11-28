@@ -40,6 +40,7 @@ async-trait = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
 chrono = { workspace = true }
+convert_case = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }
 dirs = { workspace = true }
@@ -56,6 +57,7 @@ move-prover-boogie-backend = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true, features = [ "testing" ] }
+path-absolutize = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
@@ -64,12 +66,14 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 shadow-rs = { workspace = true }
 storage-interface = { workspace = true }
+tera = { workspace = true }
 tempfile = { workspace = true }
 termcolor = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 toml = { workspace = true }
+url = { workspace = true }
 vm-genesis = { workspace = true }
 walkdir = { workspace = true }
 

@@ -35,6 +35,7 @@ pub enum Tool {
     Governance(governance::GovernanceTool),
     Info(InfoTool),
     Init(common::init::InitTool),
+    New(move_tool::template::NewPackage),
     #[clap(subcommand)]
     Key(op::key::KeyTool),
     #[clap(subcommand)]
@@ -56,6 +57,8 @@ impl Tool {
             Info(tool) => tool.execute_serialized().await,
             // TODO: Replace entirely with config init
             Init(tool) => tool.execute_serialized_success().await,
+            // Create a project with a basic structure
+            New(tool) => tool.execute_serialized_success().await,
             Key(tool) => tool.execute().await,
             Move(tool) => tool.execute().await,
             Node(tool) => tool.execute().await,
