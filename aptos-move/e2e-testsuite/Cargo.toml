@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-crypto = { workspace = true }
-aptos-gas = { workspace = true }
+aptos-gas = { workspace = true, features = ["testing"] }
 aptos-keygen = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-parallel-executor = { workspace = true }
