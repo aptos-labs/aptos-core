@@ -207,3 +207,15 @@ variable "fullnode_storage_class" {
     error_message = "Supported storage classes are gp3, io1, io2"
   }
 }
+
+### Genesis configs
+
+variable "genesis_initcontainer_image" {
+  description = "Image used for the genesis initcontainer, which pulls the genesis data from S3"
+  default     = "public.ecr.aws/aws-cli/aws-cli:2.8.13@sha256:8f062519c92b3c4689a5cb0e2426c9976ed1559bafcf25439ad885484b2b8afe"
+}
+
+variable "genesis_s3_retention_days" {
+  description = "Number of days to retain genesis data in S3. If unset, no expiration is set"
+  default     = ""
+}
