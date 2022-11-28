@@ -22,4 +22,5 @@ mod scripts;
 mod simple_defi;
 mod stake;
 mod string_args;
+mod type_too_large;
 mod vector_numeric_address;
