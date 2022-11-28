@@ -730,6 +730,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-protos",
  "aptos-types",
  "aptos-vm",
  "async-trait",
@@ -741,8 +742,12 @@ dependencies = [
  "diesel_migrations",
  "field_count",
  "futures",
+ "futures-util",
+ "gcloud-sdk",
  "hex",
  "once_cell",
+ "prost 0.10.4",
+ "prost-types 0.10.1",
  "regex",
  "reqwest",
  "reqwest-middleware",
@@ -752,6 +757,7 @@ dependencies = [
  "sha2 0.9.9",
  "storage-interface",
  "tokio",
+ "tonic 0.7.2",
  "url",
 ]
 

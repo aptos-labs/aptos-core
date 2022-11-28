@@ -21,6 +21,7 @@ aptos-config = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-mempool = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-protos = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 async-trait = { workspace = true }
@@ -32,8 +33,12 @@ diesel = { workspace = true }
 diesel_migrations = { workspace = true }
 field_count = { workspace = true }
 futures = { workspace = true }
+futures-util = { workspace = true }
+gcloud-sdk = { workspace = true }
 hex = { workspace = true }
 once_cell = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 reqwest-middleware = { workspace = true }
@@ -43,6 +48,7 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 storage-interface = { workspace = true }
 tokio = { workspace = true }
+tonic = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
