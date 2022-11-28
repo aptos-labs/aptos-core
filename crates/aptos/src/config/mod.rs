@@ -3,7 +3,7 @@
 
 use crate::common::types::{
     CliCommand, CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode, ProfileSummary,
-    CONFIG_FOLDER,
+    PromptOptions, CONFIG_FOLDER,
 };
 use crate::common::utils::{
     create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file,
@@ -214,6 +214,15 @@ impl GlobalConfig {
         match self.config_type.unwrap_or_default() {
             ConfigType::Global => global_folder(),
             ConfigType::Workspace => find_workspace_config(current_dir()?, mode),
+        }
+    }
+
+    /// Get the prompt options from global config
+    pub fn get_default_prompt_response(&self) -> Option<PromptOptions> {
+        match self.default_prompt_response {
+            PromptResponseType::Prompt => None,
+            PromptResponseType::Yes => Some(PromptOptions::yes()),
+            PromptResponseType::No => Some(PromptOptions::no()),
         }
     }
 
