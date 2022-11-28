@@ -75,6 +75,7 @@ pub struct IndexerConfig {
     pub bigquery_project_id: Option<String>,
 
     /// Which BigQuery dataset name is used for data streaming. If null, disable data ingestion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bigquery_dataset_name: Option<String>,
 }
 
