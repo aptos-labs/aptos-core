@@ -1,4 +1,4 @@
-spec aptos_std::any {
+spec aptos_std::copyable_any {
 
     // -----------------------
     // Function specifications
