@@ -254,9 +254,12 @@ impl EpochManager {
                     vec![1; proposers.len()]
                 };
 
-                // First block (after genesis) is epoch=1, so that is the first epoch we consider. (Genesis is epoch=0)
+                // Genesis is epoch=0
+                // First block (after genesis) is epoch=1, and is the only block in that epoch.
+                // It has no votes, so we skip it unless we are in epoch 1, as otherwise it will
+                // skew leader elections for exclude_round number of rounds.
                 let first_epoch_to_consider = std::cmp::max(
-                    1,
+                    if epoch_state.epoch == 1 { 1 } else { 2 },
                     epoch_state
                         .epoch
                         .saturating_sub(use_history_from_previous_epoch_max_count as u64),
@@ -300,6 +303,7 @@ impl EpochManager {
                 ));
                 // LeaderReputation is not cheap, so we can cache the amount of rounds round_manager needs.
                 Box::new(CachedProposerElection::new(
+                    epoch_state.epoch,
                     proposer_election,
                     onchain_config.max_failed_authors_to_store()
                         + PROPSER_ELECTION_CACHING_WINDOW_ADDITION,

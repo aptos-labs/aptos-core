@@ -5,6 +5,7 @@ use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 
+#[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
 #[cfg(feature = "testing")]
 use {
@@ -68,7 +69,12 @@ pub fn assert_no_test_natives(err_msg: &str) {
                 || module_name.as_str() == "ed25519" && func_name.as_str() == "sign_internal"
                 || module_name.as_str() == "multi_ed25519"
                     && func_name.as_str() == "generate_keys_internal"
-                || module_name.as_str() == "multi_ed25519" && func_name.as_str() == "sign_internal")
+                || module_name.as_str() == "multi_ed25519" && func_name.as_str() == "sign_internal"
+                || module_name.as_str() == "bls12381"
+                    && func_name.as_str() == "generate_keys_internal"
+                || module_name.as_str() == "bls12381" && func_name.as_str() == "sign_internal"
+                || module_name.as_str() == "bls12381"
+                    && func_name.as_str() == "generate_proof_of_possession_internal")
         }),
         "{}",
         err_msg

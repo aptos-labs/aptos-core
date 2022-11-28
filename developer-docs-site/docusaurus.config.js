@@ -208,14 +208,27 @@ const config = {
                 docId: "nodes/aptos-api-spec",
               },
               {
-                label: "Issues and Workarounds",
+                href: "https://aptos-labs.github.io/ts-sdk-doc/",
+                label: "TypeScript SDK",
+              },
+              {
+                href: "https://pypi.org/project/aptos-sdk/",
+                label: "Python SDK",
+              },
+              {
+                label: "Rust SDK",
                 type: "doc",
-                docId: "issues-and-workarounds",
+                docId: "sdks/rust-sdk",
               },
               {
                 label: "Aptos Glossary",
                 type: "doc",
                 docId: "reference/glossary",
+              },
+              {
+                label: "Issues and Workarounds",
+                type: "doc",
+                docId: "issues-and-workarounds",
               },
             ],
           },
@@ -318,11 +331,38 @@ const config = {
               "/basics/basics-accounts",
               "/basics/basics-events",
               "/basics/basics-gas-txn-fee",
-              "/basics/basics-merkle-proof",
               "/basics/basics-fullnodes",
               "/basics/basics-validator-nodes",
               "/basics/basics-node-networks-sync",
             ],
+          },
+          {
+            to: "/concepts/txns-states",
+            from: ["/concepts/basics-txns-states"],
+          },
+          {
+            to: "/concepts/accounts",
+            from: ["/concepts/basics-accounts"],
+          },
+          {
+            to: "/concepts/events",
+            from: ["/concepts/basics-events"],
+          },
+          {
+            to: "/concepts/gas-txn-fee",
+            from: ["/concepts/basics-gas-txn-fee"],
+          },
+          {
+            to: "/concepts/fullnodes",
+            from: ["/concepts/basics-fullnodes"],
+          },
+          {
+            to: "/concepts/validator-nodes",
+            from: ["/concepts/basics-validator-nodes"],
+          },
+          {
+            to: "/concepts/node-networks-sync",
+            from: ["/concepts/basics-node-networks-sync"],
           },
           {
             to: "/nodes/local-testnet/run-a-local-testnet",
@@ -353,8 +393,8 @@ const config = {
             from: "/aptos-developer-resources",
           },
           {
-            to: "/concepts/basics-txns-states",
-            from: "/concepts/basics-merkle-proof",
+            to: "/concepts/txns-states",
+            from: "/concepts/merkle-proof",
           },
           {
             to: "/nodes/validator-node/operator/connect-to-aptos-network",

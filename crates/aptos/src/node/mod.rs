@@ -55,7 +55,7 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::pin::Pin;
 use std::sync::Arc;
 use std::{path::PathBuf, thread, time::Duration};
 use tokio::time::Instant;
@@ -1107,20 +1107,20 @@ impl CliCommand<()> for RunLocalTestnet {
         // Spawn the node in a separate thread
         let config_path = self.config_path.clone();
         let test_dir_copy = test_dir.clone();
-        let _node = thread::spawn(move || {
-            aptos_node::load_test_environment(
+        let node_thread_handle = thread::spawn(move || {
+            let result = aptos_node::load_test_environment(
                 config_path,
                 Some(test_dir_copy),
                 false,
                 false,
                 cached_packages::head_release_bundle(),
                 rng,
-            )
-            .map_err(|err| CliError::UnexpectedError(format!("Node failed to run {}", err)))
+            );
+            eprintln!("Node stopped unexpectedly {:#?}", result);
         });
 
         // Run faucet if selected
-        let _maybe_faucet = if self.with_faucet {
+        let maybe_faucet_future = if self.with_faucet {
             let max_wait = Duration::from_secs(MAX_WAIT_S);
             let wait_interval = Duration::from_millis(WAIT_INTERVAL_MS);
 
@@ -1170,30 +1170,48 @@ impl CliCommand<()> for RunLocalTestnet {
             }
 
             // Start the faucet
-            FaucetArgs {
-                address: "0.0.0.0".to_string(),
-                port: self.faucet_port,
-                server_url: rest_url,
-                mint_key_file_path: test_dir.join("mint.key"),
-                mint_key: None,
-                mint_account_address: None,
-                chain_id: ChainId::test(),
-                maximum_amount: None,
-                do_not_delegate: self.do_not_delegate,
-            }
-            .run()
-            .await;
-            Some(())
+            Some(
+                FaucetArgs {
+                    address: "0.0.0.0".to_string(),
+                    port: self.faucet_port,
+                    server_url: rest_url,
+                    mint_key_file_path: test_dir.join("mint.key"),
+                    mint_key: None,
+                    mint_account_address: None,
+                    chain_id: ChainId::test(),
+                    maximum_amount: None,
+                    do_not_delegate: self.do_not_delegate,
+                }
+                .run(),
+            )
         } else {
             None
         };
 
-        // Wait for an interrupt
-        let term = Arc::new(AtomicBool::new(false));
-        while !term.load(Ordering::Acquire) {
-            std::thread::park();
+        // Collect futures that should never end.
+        let mut futures: Vec<Pin<Box<dyn futures::Future<Output = ()> + Send>>> = Vec::new();
+
+        // This future just waits for the node thread.
+        let node_future = async move {
+            loop {
+                if node_thread_handle.is_finished() {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+        };
+
+        // Wait for all the futures. We should never get past this point unless
+        // something goes wrong or the user signals for the process to end.
+        futures.push(Box::pin(node_future));
+        if let Some(faucet_future) = maybe_faucet_future {
+            futures.push(Box::pin(faucet_future));
         }
-        Ok(())
+        futures::future::select_all(futures).await;
+
+        Err(CliError::UnexpectedError(
+            "One of the components stopped unexpectedly".to_string(),
+        ))
     }
 }
 

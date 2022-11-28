@@ -54,8 +54,8 @@ Currently, two different upgrade policies are supported:
     the new code. This ensures that the existing state of storage is 
     correctly interpreted by the new code. However, new struct declarations 
     can be added.
-  - For APIs, all public functions must have the same signature as 
-    before. New functions can be added.
+  - For APIs, all existing public functions must have the same signature as 
+    before. New functions, incl. public and entry functions, can be added.
 - `immutable`: the code is not upgradeable and guaranteed to stay the same 
   forever.
 

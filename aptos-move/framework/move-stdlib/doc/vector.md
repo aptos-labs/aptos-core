@@ -557,6 +557,18 @@ Check that <code>v1</code> is equal to the result of removing the element at ind
 </code></pre>
 
 
+Check if <code>v</code> contains <code>e</code>.
+
+
+<a name="0x1_vector_spec_contains"></a>
+
+
+<pre><code><b>fun</b> <a href="vector.md#0x1_vector_spec_contains">spec_contains</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: Element): bool {
+    <b>exists</b> x in v: x == e
+}
+</code></pre>
+
+
 
 <a name="@Specification_1_singleton"></a>
 

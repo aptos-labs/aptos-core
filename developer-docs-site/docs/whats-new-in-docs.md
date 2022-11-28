@@ -7,13 +7,25 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 21 November 2022
+
+- Added conceptual overviews for [blocks](concepts/blocks.md) and [resources](concepts/resources.md) in Aptos, explaining how transactions are batched and resources relate to objects, respectively.
+
+## 18 November 2022
+
+- Increased [Aptos Indexer](/guides/indexing) rate limits from 300 requests per IP per hour to 400 requests every five minutes.
+
+## 17 November 2022
+
+- Published instructions for [updating validator nodes](/nodes/validator-node/operator/update-validator-node) by configuring and failing over to validator fullnode.
+
 ## 16 November 2022
 
 Completely overhauled the navigation of Aptos.dev to better reflect our users and their feedback. Here are the highlights:
  * Introduced new *Start Aptos* and *Build Apps* sections to contain information related to setup and app development, respectively.
  * Shifted key concepts up in navigation, included the Aptos White Paper, moved nodes-related materials to the *Run Nodes* section, and gas-related pages to a new *Build Apps > [Write Move Smart Contracts](/guides/move-guides/aptos-move-guides)* section.
  * Placed instructions for the Aptos CLI and other tools under *Start Aptos > [Set Environment](/guides/getting-started)*.
- * Recategorized previous *Guides* across several new subsections, including *Build Apps > [Develop Locally](/nodes/local-testnet/local-testnet-index)*, *[Interact with Blockchain](/guides/aptos-guides)*, and *Run Nodes > [Configure Nodes](/nodes/identity-and-configuration).
+ * Recategorized previous *Guides* across several new subsections, including *Build Apps > [Develop Locally](/nodes/local-testnet/local-testnet-index)*, *[Interact with Blockchain](/guides/aptos-guides)*, and *Run Nodes > [Configure Nodes](/nodes/identity-and-configuration)*.
  * Integrated the [Aptos Node API specification](/nodes/aptos-api-spec#/), [Issues and Workarounds](/issues-and-workarounds) and [Aptos Glossary](/reference/glossary) into a new *Reference* section.
 
 ## 12 November 2022
@@ -94,11 +106,11 @@ Completely overhauled the navigation of Aptos.dev to better reflect our users an
 
 ## 25 September 2022
 
-- [Transactions and States](/docs/concepts/basics-txns-states.md) matches the [Aptos Blockchain whitepaper](/docs/aptos-white-paper/index.md) in structure and content.
+- [Transactions and States](/docs/concepts/txns-states.md) matches the [Aptos Blockchain whitepaper](/docs/aptos-white-paper/index.md) in structure and content.
 
 ## 23 September 2022
 
-- [Gas and Transaction Fees](/docs/concepts/basics-gas-txn-fee.md) contains sections on [prioritizing your transaction](/docs/concepts/basics-gas-txn-fee.md#prioritizing-your-transaction), [gas parameters set by governance](/docs/concepts/basics-gas-txn-fee.md#gas-parameters-set-by-governance), and [examples](/docs/concepts/basics-gas-txn-fee.md#examples) for understanding account balances, transaction fees, and transaction amounts.
+- [Gas and Transaction Fees](/docs/concepts/gas-txn-fee.md) contains sections on [prioritizing your transaction](/docs/concepts/gas-txn-fee.md#prioritizing-your-transaction), [gas parameters set by governance](/docs/concepts/gas-txn-fee.md#gas-parameters-set-by-governance), and [examples](/docs/concepts/gas-txn-fee.md#examples) for understanding account balances, transaction fees, and transaction amounts.
 
 ## 22 September 2022
 

@@ -7,6 +7,7 @@ use aptos::node::analyze::analyze_validators::{AnalyzeValidators, EpochStats};
 use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos::test::ValidatorPerformance;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
+use aptos_bitvec::BitVec;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::config::HostAndPort;
@@ -14,11 +15,15 @@ use aptos_keygen::KeyGen;
 use aptos_rest_client::{Client, State};
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use aptos_types::network_address::DnsName;
-use aptos_types::on_chain_config::ValidatorSet;
+use aptos_types::on_chain_config::{
+    ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
+    ProposerElectionType, ValidatorSet,
+};
 use aptos_types::PeerId;
-use forge::{reconfig, NodeExt, Swarm, SwarmExt};
+use forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -74,6 +79,276 @@ async fn test_show_validator_set() {
             .account_address(),
         &swarm.validators().next().unwrap().peer_id()
     );
+}
+
+/// One effect of updated leader election config, is that new node/node that was down before
+/// will be elected much sooner than before.
+/// This function checks for a node that is down and not being elected, how long it takes for it
+/// to start voting (after being up), and then how long it takes for it to be elected.
+async fn check_vote_to_elected(swarm: &mut LocalSwarm) -> (Option<u64>, Option<u64>) {
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    let (address_off, rest_client_off) = swarm
+        .validators()
+        .nth(1)
+        .map(|v| (v.peer_id(), v.rest_client()))
+        .unwrap();
+
+    let (_address_after_off, rest_client_after_off) = swarm
+        .validators()
+        .nth(2)
+        .map(|v| (v.peer_id(), v.rest_client()))
+        .unwrap();
+
+    rest_client_off
+        .set_failpoint("consensus::send::any".to_string(), "100%return".to_string())
+        .await
+        .unwrap();
+
+    // clear leader reputation history, so we stop electing down node altogether
+    for _ in 0..5 {
+        reconfig(
+            &rest_client,
+            &transaction_factory,
+            swarm.chain_info().root_account(),
+        )
+        .await;
+    }
+
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    rest_client_off
+        .set_failpoint("consensus::send::any".to_string(), "off".to_string())
+        .await
+        .unwrap();
+
+    let epoch = reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await
+    .epoch;
+
+    // Turn off a different node, to force votes from recently down node being required for forming consnensus
+    rest_client_after_off
+        .set_failpoint("consensus::send::any".to_string(), "100%return".to_string())
+        .await
+        .unwrap();
+
+    tokio::time::sleep(Duration::from_secs(60)).await;
+
+    rest_client_after_off
+        .set_failpoint("consensus::send::any".to_string(), "off".to_string())
+        .await
+        .unwrap();
+
+    let events = FetchMetadata::fetch_new_block_events(&rest_client, Some(epoch as i64), None)
+        .await
+        .unwrap();
+    assert_eq!(events.len(), 1);
+
+    let info = events.first().unwrap();
+    let off_index = info
+        .validators
+        .iter()
+        .find(|v| v.address == address_off)
+        .unwrap()
+        .validator_index;
+    let mut first_vote = None;
+    let mut first_elected = None;
+    for (_i, event) in info.blocks.iter().enumerate() {
+        let previous_block_votes_bitvec: BitVec =
+            event.event.previous_block_votes_bitvec().clone().into();
+        if first_vote.is_none() && previous_block_votes_bitvec.is_set(off_index as u16) {
+            first_vote = Some(event.event.round());
+        }
+
+        if first_elected.is_none() && event.event.proposer() == address_off {
+            first_elected = Some(event.event.round());
+        }
+    }
+    (first_vote, first_elected)
+}
+
+#[ignore]
+#[tokio::test]
+async fn test_onchain_config_change() {
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_init_config(Arc::new(|_, conf, _| {
+            // reduce timeout, as we will have dead node during rounds
+            conf.consensus.round_initial_timeout_ms = 400;
+            conf.consensus.quorum_store_poll_count = 4;
+            conf.api.failpoints_enabled = true;
+        }))
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            let OnChainConsensusConfig::V1(inner) = genesis_config.consensus_config.clone();
+
+            let leader_reputation_type =
+                if let ProposerElectionType::LeaderReputation(leader_reputation_type) =
+                    inner.proposer_election_type
+                {
+                    leader_reputation_type
+                } else {
+                    panic!()
+                };
+            let proposer_and_voter_config = match &leader_reputation_type {
+                LeaderReputationType::ProposerAndVoter(_) => panic!(),
+                LeaderReputationType::ProposerAndVoterV2(proposer_and_voter_config) => {
+                    proposer_and_voter_config
+                }
+            };
+            let new_consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 {
+                proposer_election_type: ProposerElectionType::LeaderReputation(
+                    LeaderReputationType::ProposerAndVoter(ProposerAndVoterConfig {
+                        proposer_window_num_validators_multiplier: 20,
+                        // reduce max epoch history to speed up the test.
+                        use_history_from_previous_epoch_max_count: 2,
+                        // make test not flaky, by making unlikely selections extremely unlikely:
+                        active_weight: 1000000,
+                        ..*proposer_and_voter_config
+                    }),
+                ),
+                ..inner
+            });
+            genesis_config.consensus_config = new_consensus_config;
+        }))
+        .with_aptos()
+        .build_with_cli(0)
+        .await;
+
+    let root_cli_index = cli.add_account_with_address_to_cli(
+        swarm.root_key(),
+        swarm.chain_info().root_account().address(),
+    );
+
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
+        &rest_client
+            .get_account_resource_bcs::<Vec<u8>>(
+                CORE_CODE_ADDRESS,
+                "0x1::consensus_config::ConsensusConfig",
+            )
+            .await
+            .unwrap()
+            .into_inner(),
+    )
+    .unwrap();
+
+    let OnChainConsensusConfig::V1(inner) = current_consensus_config;
+    let leader_reputation_type =
+        if let ProposerElectionType::LeaderReputation(leader_reputation_type) =
+            inner.proposer_election_type
+        {
+            leader_reputation_type
+        } else {
+            panic!()
+        };
+    let proposer_and_voter_config = match &leader_reputation_type {
+        LeaderReputationType::ProposerAndVoterV2(_) => panic!(),
+        LeaderReputationType::ProposerAndVoter(proposer_and_voter_config) => {
+            proposer_and_voter_config
+        }
+    };
+    let new_consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 {
+        proposer_election_type: ProposerElectionType::LeaderReputation(
+            LeaderReputationType::ProposerAndVoterV2(*proposer_and_voter_config),
+        ),
+        ..inner
+    });
+
+    let update_consensus_config_script = format!(
+        r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use aptos_framework::consensus_config;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let config_bytes = {};
+            consensus_config::set(&framework_signer, config_bytes);
+        }}
+    }}
+    "#,
+        generate_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
+    );
+
+    // confirm with old configs, validator will need to wait quite a bit from voting to being elected
+    let (first_vote_old, first_elected_old) = check_vote_to_elected(&mut swarm).await;
+    println!(
+        "With old config: {:?} to {:?}",
+        first_vote_old, first_elected_old
+    );
+
+    println!(
+        "Epoch before : {}",
+        rest_client
+            .get_ledger_information()
+            .await
+            .unwrap()
+            .into_inner()
+            .epoch
+    );
+    cli.run_script(root_cli_index, &update_consensus_config_script)
+        .await
+        .unwrap();
+    // faucet can make our root LocalAccount sequence number get out of sync.
+    swarm
+        .chain_info()
+        .resync_root_account_seq_num(&rest_client)
+        .await
+        .unwrap();
+    swarm
+        .wait_for_all_nodes_to_catchup_to_next(Duration::from_secs(30))
+        .await
+        .unwrap();
+    println!(
+        "Epoch after : {}",
+        rest_client
+            .get_ledger_information()
+            .await
+            .unwrap()
+            .into_inner()
+            .epoch
+    );
+
+    // confirm with new configs, validator doesn't wait much from voting to being elected
+    let (first_vote_new, first_elected_new) = check_vote_to_elected(&mut swarm).await;
+    println!(
+        "With new config: {:?} to {:?}",
+        first_vote_new, first_elected_new
+    );
+
+    cli.analyze_validator_performance(Some(0), None)
+        .await
+        .unwrap();
+
+    // Node that is down, should start voting very fast
+    assert!(first_vote_old.unwrap() < 20);
+    assert!(first_vote_new.unwrap() < 20);
+    // In old config, we expect there to be a lot of rounds before node gets elected as leader
+    assert!(first_elected_old.unwrap() > 80);
+    // In updated config, we expect it to be elected pretty fast.
+    // There is necessary 20 rounds delay due to exclude_round, and then only a few more rounds.
+    assert!(first_elected_new.unwrap() < 40);
+}
+
+fn generate_blob(data: &[u8]) -> String {
+    let mut buf = String::new();
+
+    write!(buf, "vector[").unwrap();
+    for (i, b) in data.iter().enumerate() {
+        if i % 20 == 0 {
+            if i > 0 {
+                writeln!(buf).unwrap();
+            }
+        } else {
+            write!(buf, " ").unwrap();
+        }
+        write!(buf, "{}u8,", b).unwrap();
+    }
+    write!(buf, "]").unwrap();
+    buf
 }
 
 #[tokio::test]

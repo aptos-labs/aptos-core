@@ -1093,6 +1093,7 @@ impl VMAdapter for AptosVM {
                 (vm_status, output, Some("waypoint_write_set".to_string()))
             }
             PreprocessedTransaction::UserTransaction(txn) => {
+                fail_point!("aptos_vm::execution::user_transaction");
                 let sender = txn.sender().to_string();
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
                 let (vm_status, output) =

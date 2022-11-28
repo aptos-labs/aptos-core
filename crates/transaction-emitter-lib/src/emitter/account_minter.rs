@@ -203,7 +203,7 @@ impl<'t> AccountMinter<'t> {
                 )
             });
 
-        // Each future creates 50 accounts, limit concurrency to 30.
+        // Each future creates 10 accounts, limit concurrency to 100.
         let stream = futures::stream::iter(account_futures).buffer_unordered(CREATION_PARALLELISM);
         // wait for all futures to complete
         let mut minted_accounts = stream
@@ -363,7 +363,7 @@ where
 
     // Wait for source account to exist, this can happen because the corresponding REST endpoint might
     // not be up to date with the latest ledger state and requires some time for syncing.
-    wait_for_single_account_sequence(&client, &source_account, Duration::from_secs(30)).await?;
+    wait_for_single_account_sequence(&client, &source_account, Duration::from_secs(60)).await?;
     while i < num_new_accounts {
         let batch_size = min(max_num_accounts_per_batch, num_new_accounts - i);
         let mut batch = if reuse_account {
@@ -460,11 +460,12 @@ pub async fn execute_and_wait_transactions(
     txns: Vec<SignedTransaction>,
     failure_counter: &AtomicUsize,
 ) -> Result<()> {
+    let start_seq_num = account.sequence_number();
     debug!(
         "[{:?}] Submitting transactions {} - {} for {}",
         client.path_prefix_string(),
-        account.sequence_number() - txns.len() as u64,
-        account.sequence_number(),
+        start_seq_num - txns.len() as u64,
+        start_seq_num,
         account.address()
     );
 
@@ -583,17 +584,39 @@ pub async fn execute_and_wait_transactions(
     let state = state.into_inner();
 
     for txn in state.txns.iter() {
-        RETRY_POLICY
-            .retry(move || {
-                client.wait_for_transaction_by_hash_bcs(
-                    txn.clone().committed_hash(),
-                    txn.expiration_timestamp_secs(),
-                    Some(Duration::from_secs(120)),
-                    None,
-                )
-            })
+        client
+            .wait_for_transaction_by_hash_bcs(
+                txn.clone().committed_hash(),
+                txn.expiration_timestamp_secs(),
+                Some(Duration::from_secs(120)),
+                None,
+            )
             .await
-            .map_err(|e| format_err!("Failed to wait for transactions: {:?}", e))?;
+            .map_err(|e| {
+                warn!(
+                    "Failed to wait for transactions: {:?}, txn: {:?}. [{:?}] We were submitting transactions for account {}: from {} - {}, now at {}",
+                    e,
+                    txn,
+                    client.path_prefix_string(),
+                    account.address(),
+                    start_seq_num - state.txns.len() as u64,
+                    start_seq_num,
+                    account.sequence_number()
+                );
+
+                // We shouldn't be able to reach this point.
+                // This failure is unrecoverable, we end the test at this point.
+                // It it sporadically happens in forge, and we need to debug why.
+                // By default, we end the test and stop the nodes, before the next
+                // counters poll happens after this.
+                // Wait for 30s here, to make sure Grafana counters for expired transactions, etc,
+                // get pulled from all the nodes, so we can investigate.
+                std::thread::sleep(Duration::from_secs(30));
+                format_err!(
+                    "Failed to wait for transactions: {:?}",
+                    e,
+                )
+            })?;
     }
 
     debug!(
@@ -605,4 +628,4 @@ pub async fn execute_and_wait_transactions(
     Ok(())
 }
 
-const CREATION_PARALLELISM: usize = 200;
+const CREATION_PARALLELISM: usize = 100;

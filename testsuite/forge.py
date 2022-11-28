@@ -320,7 +320,7 @@ def get_dashboard_link(
         raise Exception(f"Invalid refresh argument: {time_filter}")
 
     return (
-        f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}"
+        f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}&var-metrics_source=All"
         f"&var-chain_name={forge_chain_name}{grafana_time_filter}"
     )
 
@@ -379,6 +379,7 @@ def get_humio_forge_link(
     forge_namespace: str,
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
+    """Get a link to the forge test runner logs in humio for a given test run in a given namespace"""
     columns = [
         {
             "type": "field",
@@ -420,7 +421,8 @@ def get_humio_logs_link(
     forge_namespace: str,
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
-    query = f"$forgeLogs(validator_instance=*) | {forge_namespace}"
+    """Get a link to the node logs in humio for a given test run in a given namespace"""
+    query = f'$forgeLogs(validator_instance=*) | "k8s.namespace" = "{forge_namespace}"'
     columns = [
         {
             "type": "field",
