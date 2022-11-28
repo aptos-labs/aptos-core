@@ -74,8 +74,8 @@ pub struct IndexerConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bigquery_project_id: Option<String>,
 
-    /// Which BigQuery dataset prefix is used for data streaming. If null, disable data ingestion.
-    pub bigquery_dataset_prefix: Option<String>,
+    /// Which BigQuery dataset name is used for data streaming. If null, disable data ingestion.
+    pub bigquery_dataset_name: Option<String>,
 }
 
 pub fn env_or_default<T: std::str::FromStr>(

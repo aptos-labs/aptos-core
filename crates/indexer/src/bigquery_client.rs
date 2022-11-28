@@ -20,8 +20,6 @@ use prost_types::{DescriptorProto, FileDescriptorSet};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
-const BIGQUERY_DATASET_NAME: &str = "aptos_indexer_bigquery_data";
-
 /// Typed AppendRowsRequest, which facilitates the table name(data destination) resolution.
 pub enum TypedAppendRowsRequest {
     Transactions(AppendRowsRequest),
@@ -41,7 +39,7 @@ pub struct BigQueryClient {
 impl BigQueryClient {
     /// Creates BigQuery client based on service account credential file(json).
     /// GOOGLE_APPLICATION_CREDENTIALS saves the absolute path pointing to the file.
-    pub async fn new(project_id: String, dataset_prefix: String) -> Self {
+    pub async fn new(project_id: String, dataset_name: String) -> Self {
         let client = GoogleApi::from_function(
             BigQueryWriteClient::new,
             "https://bigquerystorage.googleapis.com",
@@ -49,10 +47,7 @@ impl BigQueryClient {
         )
         .await
         .expect("Create raw Bigquery Client successfully");
-        let data_set_path = format!(
-            "projects/{}/datasets/{}_{}/tables/",
-            project_id, dataset_prefix, BIGQUERY_DATASET_NAME,
-        );
+        let data_set_path = format!("projects/{}/datasets/{}/tables/", project_id, dataset_name,);
         Self {
             client,
             stream_map: Mutex::new(HashMap::new()),

@@ -24,23 +24,23 @@ pub struct DefaultTransactionProcessorBq {
     connection_pool: PgDbPool,
     bigquery_client: Arc<BigQueryClient>,
     bigquery_project_id: String,
-    bigquery_dataset_prefix: String,
+    bigquery_dataset_name: String,
 }
 
 impl DefaultTransactionProcessorBq {
     pub async fn new(
         connection_pool: PgDbPool,
         bigquery_project_id: String,
-        bigquery_dataset_prefix: String,
+        bigquery_dataset_name: String,
     ) -> Self {
         let bigquery_client = Arc::new(
-            BigQueryClient::new(bigquery_project_id.clone(), bigquery_dataset_prefix.clone()).await,
+            BigQueryClient::new(bigquery_project_id.clone(), bigquery_dataset_name.clone()).await,
         );
         Self {
             connection_pool,
             bigquery_client,
             bigquery_project_id,
-            bigquery_dataset_prefix,
+            bigquery_dataset_name,
         }
     }
 }
@@ -51,7 +51,7 @@ impl Debug for DefaultTransactionProcessorBq {
         write!(
             f,
             "DefaultTransactionProcessor {{ connections: {:?}  idle_connections: {:?} project id: {:?} dataset prefix: {:?} }}",
-            state.connections, state.idle_connections, self.bigquery_project_id, self.bigquery_dataset_prefix
+            state.connections, state.idle_connections, self.bigquery_project_id, self.bigquery_dataset_name
         )
     }
 }
