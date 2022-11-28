@@ -373,20 +373,14 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.3",
  "byteorder",
- "futures-util",
- "gcloud-sdk",
  "get_if_addrs",
- "itertools",
  "mirai-annotations",
  "poem-openapi",
- "prost 0.10.4",
- "prost-types 0.10.1",
  "rand 0.7.3",
  "serde 1.0.148",
  "serde_yaml 0.8.26",
  "short-hex-str",
  "thiserror",
- "tonic 0.7.2",
 ]
 
 [[package]]

@@ -23,20 +23,14 @@ aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
-futures-util = { workspace = true }
-gcloud-sdk = { workspace = true }
 get_if_addrs = { workspace = true }
-itertools = { workspace = true }
 mirai-annotations = { workspace = true }
 poem-openapi = { workspace = true }
 rand = { workspace = true }
-prost = { workspace = true }
-prost-types = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }
 short-hex-str = { workspace = true }
 thiserror = { workspace = true }
-tonic = { workspace = true }
 
 [dev-dependencies]
 aptos-crypto = { workspace = true }
