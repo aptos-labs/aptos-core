@@ -3,6 +3,7 @@
 
 use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
+    config::GlobalConfig,
     CliResult,
 };
 use aptos_build_info::build_information;
@@ -154,11 +155,23 @@ pub fn check_if_file_exists(file: &Path, prompt_options: PromptOptions) -> CliTy
 }
 
 pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> CliTypedResult<()> {
-    if prompt_options.assume_no || (!prompt_options.assume_yes && !prompt_yes(prompt)) {
-        Err(CliError::AbortedError)
-    } else {
-        Ok(())
+    if prompt_options.assume_no {
+        return Err(CliError::AbortedError);
     }
+
+    if !prompt_options.assume_yes {
+        match GlobalConfig::load()?.get_default_prompt_response() {
+            None => {
+                if !prompt_yes(prompt) {
+                    return Err(CliError::AbortedError);
+                }
+            }
+            Some(o) if o == PromptOptions::no() => return Err(CliError::AbortedError),
+            _ => (),
+        }
+    }
+
+    Ok(())
 }
 
 pub fn read_from_file(path: &Path) -> CliTypedResult<Vec<u8>> {
