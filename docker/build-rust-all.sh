@@ -23,7 +23,7 @@ cargo build --locked --profile=$PROFILE \
     -p forge-cli \
     -p transaction-emitter \
     "$@"
-
+export RUSTFLAGS="--cfg tokio_unstable -Clink-arg=-fuse-ld=lld -Ctarget-feature=+aes,+sse2,+sse4.1,,+sse4.1,+sse4a,+ssse3,+avx512vaes,+sse-unaligned-mem"
 # Build aptos-node separately
 cargo build --locked --profile=$PROFILE \
     -p aptos-node \
