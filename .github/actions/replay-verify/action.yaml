@@ -40,7 +40,7 @@ runs:
           echo [main process] spawning $NAME
           unbuffer target/release/replay-verify \
           --concurrent-downloads 4 \
-          --replay-concurrency-level 4 \
+          --replay-concurrency-level 1 \
           --metadata-cache-dir ./$NAME/metadata-cache \
           --target-db-dir ./$NAME/db \
           --start-version $START \
