@@ -8,10 +8,11 @@ mod log_build_information;
 use anyhow::{anyhow, Context};
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
+use aptos_config::config::StateSyncConfig;
 use aptos_config::{
     config::{
-        AptosDataClientConfig, BaseConfig, DataStreamingServiceConfig, NetworkConfig, NodeConfig,
-        PersistableConfig, StorageServiceConfig,
+        AptosDataClientConfig, BaseConfig, NetworkConfig, NodeConfig, PersistableConfig,
+        StorageServiceConfig,
     },
     network_id::NetworkId,
     utils::get_genesis_txn,
@@ -412,10 +413,8 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     )?;
 
     // Start the data streaming service
-    let (streaming_service_client, streaming_service_runtime) = setup_data_streaming_service(
-        node_config.state_sync.data_streaming_service,
-        aptos_data_client.clone(),
-    )?;
+    let (streaming_service_client, streaming_service_runtime) =
+        setup_data_streaming_service(node_config.state_sync.clone(), aptos_data_client.clone())?;
 
     // Create the chunk executor and persistent storage
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
@@ -446,14 +445,18 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
 }
 
 fn setup_data_streaming_service(
-    config: DataStreamingServiceConfig,
+    state_sync_config: StateSyncConfig,
     aptos_data_client: AptosNetDataClient,
 ) -> anyhow::Result<(StreamingServiceClient, Runtime)> {
     // Create the data streaming service
     let (streaming_service_client, streaming_service_listener) =
         new_streaming_service_client_listener_pair();
-    let data_streaming_service =
-        DataStreamingService::new(config, aptos_data_client, streaming_service_listener);
+    let data_streaming_service = DataStreamingService::new(
+        state_sync_config.aptos_data_client,
+        state_sync_config.data_streaming_service,
+        aptos_data_client,
+        streaming_service_listener,
+    );
 
     // Start the data streaming service
     let streaming_service_runtime = Builder::new_multi_thread()

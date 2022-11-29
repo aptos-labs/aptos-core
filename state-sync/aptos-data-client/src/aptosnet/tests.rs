@@ -208,8 +208,9 @@ async fn request_works_only_when_data_available() {
     tokio::spawn(poller.start_poller());
 
     // This request should fail because no peers are currently connected
+    let request_timeout = client.data_client_config.response_timeout_ms;
     let error = client
-        .get_transactions_with_proof(100, 50, 100, false)
+        .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
         .unwrap_err();
     assert_matches!(error, Error::DataIsUnavailable(_));
@@ -220,7 +221,7 @@ async fn request_works_only_when_data_available() {
     // Requesting some txns now will still fail since no peers are advertising
     // availability for the desired range.
     let error = client
-        .get_transactions_with_proof(100, 50, 100, false)
+        .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
         .unwrap_err();
     assert_matches!(error, Error::DataIsUnavailable(_));
@@ -268,7 +269,7 @@ async fn request_works_only_when_data_available() {
     // The client's request should succeed since a peer finally has advertised
     // data for this range.
     let response = client
-        .get_transactions_with_proof(100, 50, 100, false)
+        .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
         .unwrap();
     assert_eq!(response.payload, TransactionListWithProof::new_empty());
@@ -992,9 +993,10 @@ async fn bad_peer_is_eventually_banned_internal() {
     let mut seen_data_unavailable_err = false;
 
     // Sending a bunch of requests to the bad peer's upper range will fail.
+    let request_timeout = client.data_client_config.response_timeout_ms;
     for _ in 0..20 {
         let result = client
-            .get_transactions_with_proof(200, 200, 200, false)
+            .get_transactions_with_proof(200, 200, 200, false, request_timeout)
             .await;
 
         // While the score is still decreasing, we should see a bunch of
@@ -1024,7 +1026,7 @@ async fn bad_peer_is_eventually_banned_internal() {
 
     // We should still be able to send the good peer a request.
     let response = client
-        .get_transactions_with_proof(100, 50, 100, false)
+        .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
         .unwrap();
     assert_eq!(response.payload, TransactionListWithProof::new_empty());
@@ -1054,9 +1056,10 @@ async fn bad_peer_is_eventually_banned_callback() {
     let mut seen_data_unavailable_err = false;
 
     // Sending a bunch of requests to the bad peer (that we later decide are bad).
+    let request_timeout = client.data_client_config.response_timeout_ms;
     for _ in 0..20 {
         let result = client
-            .get_transactions_with_proof(200, 200, 200, false)
+            .get_transactions_with_proof(200, 200, 200, false, request_timeout)
             .await;
 
         // While the score is still decreasing, we should see a bunch of
@@ -1137,8 +1140,9 @@ async fn compression_mismatch_disabled() {
     });
 
     // The client should receive a compressed response and return an error
+    let request_timeout = client.data_client_config.response_timeout_ms;
     let response = client
-        .get_transactions_with_proof(100, 50, 100, false)
+        .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
         .unwrap_err();
     assert_matches!(response, Error::InvalidResponse(_));
@@ -1186,8 +1190,9 @@ async fn compression_mismatch_enabled() {
     });
 
     // The client should receive a compressed response and return an error
+    let request_timeout = client.data_client_config.response_timeout_ms;
     let response = client
-        .get_transactions_with_proof(100, 50, 100, false)
+        .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
         .unwrap_err();
     assert_matches!(response, Error::InvalidResponse(_));
@@ -1255,8 +1260,9 @@ async fn disable_compression() {
 
     // The client's request should succeed since a peer finally has advertised
     // data for this range.
+    let request_timeout = client.data_client_config.response_timeout_ms;
     let response = client
-        .get_transactions_with_proof(100, 50, 100, false)
+        .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
         .unwrap();
     assert_eq!(response.payload, TransactionListWithProof::new_empty());
@@ -1313,8 +1319,11 @@ async fn bad_peer_is_eventually_added_back() {
 
     // Keep decreasing this peer's score by considering its responses bad.
     // Eventually its score drops below IGNORE_PEER_THRESHOLD.
+    let request_timeout = client.data_client_config.response_timeout_ms;
     for _ in 0..20 {
-        let result = client.get_transactions_with_proof(200, 0, 200, false).await;
+        let result = client
+            .get_transactions_with_proof(200, 0, 200, false, request_timeout)
+            .await;
 
         if let Ok(response) = result {
             response

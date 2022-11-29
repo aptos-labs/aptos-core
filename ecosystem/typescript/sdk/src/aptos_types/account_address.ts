@@ -47,6 +47,13 @@ export class AccountAddress {
     return new AccountAddress(res);
   }
 
+  /**
+   * Return a hex string from account Address.
+   */
+  toHexString(): MaybeHexString {
+    return HexString.fromUint8Array(this.address).hex();
+  }
+
   serialize(serializer: Serializer): void {
     serializer.serializeFixedBytes(this.address);
   }
