@@ -76,6 +76,7 @@ pub trait AptosDataClient {
         &self,
         start_epoch: Epoch,
         expected_end_epoch: Epoch,
+        request_timeout_ms: u64,
     ) -> Result<Response<Vec<LedgerInfoWithSignatures>>>;
 
     /// Fetches a new transaction output list with proof. Versions start at
@@ -86,6 +87,7 @@ pub trait AptosDataClient {
         &self,
         known_version: Version,
         known_epoch: Epoch,
+        request_timeout_ms: u64,
     ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
 
     /// Fetches a new transaction list with proof. Versions start at
@@ -97,10 +99,15 @@ pub trait AptosDataClient {
         known_version: Version,
         known_epoch: Epoch,
         include_events: bool,
+        request_timeout_ms: u64,
     ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
 
     /// Fetches the number of states at the specified version.
-    async fn get_number_of_states(&self, version: Version) -> Result<Response<u64>>;
+    async fn get_number_of_states(
+        &self,
+        version: Version,
+        request_timeout_ms: u64,
+    ) -> Result<Response<u64>>;
 
     /// Fetches a single state value chunk with proof, containing the values
     /// from start to end index (inclusive) at the specified version. The proof
@@ -112,6 +119,7 @@ pub trait AptosDataClient {
         version: u64,
         start_index: u64,
         end_index: u64,
+        request_timeout_ms: u64,
     ) -> Result<Response<StateValueChunkWithProof>>;
 
     /// Fetches a transaction output list with proof, with transaction
@@ -124,6 +132,7 @@ pub trait AptosDataClient {
         proof_version: Version,
         start_version: Version,
         end_version: Version,
+        request_timeout_ms: u64,
     ) -> Result<Response<TransactionOutputListWithProof>>;
 
     /// Fetches a transaction list with proof, with transactions from
@@ -138,6 +147,7 @@ pub trait AptosDataClient {
         start_version: Version,
         end_version: Version,
         include_events: bool,
+        request_timeout_ms: u64,
     ) -> Result<Response<TransactionListWithProof>>;
 }
 

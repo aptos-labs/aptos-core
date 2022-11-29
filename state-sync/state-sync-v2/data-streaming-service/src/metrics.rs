@@ -75,6 +75,17 @@ pub static SENT_DATA_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for tracking data requests that were retried (including
+/// the new timeouts).
+pub static RETRIED_DATA_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_data_streaming_service_retried_data_requests",
+        "Counters related to retried data requests",
+        &["request_type", "request_timeout"]
+    )
+    .unwrap()
+});
+
 /// Counter for tracking received data responses
 pub static RECEIVED_DATA_RESPONSE: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -105,9 +116,20 @@ pub static DATA_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Increments the given counter with the provided label values.
+/// Increments the given counter with the single label value.
 pub fn increment_counter(counter: &Lazy<IntCounterVec>, label: &str) {
     counter.with_label_values(&[label]).inc();
+}
+
+/// Increments the given counter with two label values.
+pub fn increment_counter_multiple(
+    counter: &Lazy<IntCounterVec>,
+    first_label: &str,
+    second_label: &str,
+) {
+    counter
+        .with_label_values(&[first_label, second_label])
+        .inc();
 }
 
 /// Sets the number of active data streams

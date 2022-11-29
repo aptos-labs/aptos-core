@@ -1,6 +1,6 @@
 ---
 title: "Accounts"
-id: "basics-accounts"
+id: "accounts"
 ---
 
 # Accounts
@@ -28,7 +28,7 @@ constructing the authentication key. In the future, more authentication schemes 
 integrated with the Aptos account.
 
 There are two types of accounts in Aptos:
-  * *Address account* - This is a typical account corresponding to an address with a corresponding pair of public/private keys.
+  * *Standard account* - This is a typical account corresponding to an address with a corresponding pair of public/private keys.
   * *Resource account* - An autonomous account without a corresponding private key used by developers to store resources or publish modules on chain.
 
 :::tip Account address example
@@ -90,7 +90,10 @@ During the account creation process, a 32-byte authentication key comes to exist
 then returned as it is as the 32-byte account address. 
 
 However, the authentication key may subsequently change, for example when you generate a new public-private key pair,
-public keys to rotate the keys. But the account address will not change. Hence, **only initially** the 32-byte authentication key will be the same as the 32-byte account address. After an account is created, the account address will remain unchanged even though the private key, public key and authentication keys may change. There is nothing called that changes the address of the existing account. 
+public keys to rotate the keys. But the account address will not change. Hence, **only initially** the 32-byte authentication
+key will be the same as the 32-byte account address. After an account is created, the account address will remain unchanged
+even though the private key, public key and authentication keys may change. There is nothing called that changes the address
+of the existing account. 
 
 ## Signature schemes
 
@@ -158,7 +161,9 @@ The on-chain data maps an effective account address as defined by the current mn
 ## Access control with signer
 
 The sender of a transaction is represented by a signer. When a function in a Move module takes `signer` as an argument,
-then the Aptos Move VM translates the identity of the account that signed the transaction into a signer in a Move module entry point. See the below Move example code with `signer` in the `initialize` and `withdraw` functions. When a `signer` is not specified in a function, for example, the below `deposit` function, then no access controls exist for this function:
+then the Aptos Move VM translates the identity of the account that signed the transaction into a signer in a Move module entry point.
+See the below Move example code with `signer` in the `initialize` and `withdraw` functions. When a `signer` is not specified
+in a function, for example, the below `deposit` function, then no access controls exist for this function:
 
 ```rust
 module Test::Coin {

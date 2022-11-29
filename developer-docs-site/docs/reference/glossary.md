@@ -13,12 +13,12 @@ slug: "glossary"
 
 ### Account
 
-- An **account** in the Aptos blockchain is a container for an arbitrary number of [Move modules](#move-module) and [Move resources](#move-resources). This essentially means that the state of each [account](/concepts/basics-accounts) is comprised of both code and data.
+- An **account** in the Aptos blockchain is a container for an arbitrary number of [Move modules](#move-module) and [Move resources](#move-resources). This essentially means that the state of each [account](/concepts/accounts) is comprised of both code and data.
 - The account is identified by an [account address](#account-address).
 
 ### Account Address
 
-- The address of a Aptos account, see [basics on accounts](/concepts/basics-accounts#initial-account-setup).
+- The address of a Aptos account, see [basics on accounts](/concepts/accounts#initial-account-setup).
 
 ### AptosBFT
 

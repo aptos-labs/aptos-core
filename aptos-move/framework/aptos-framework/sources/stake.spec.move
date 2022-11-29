@@ -27,6 +27,111 @@ spec aptos_framework::stake {
     // Function specifications
     // -----------------------
 
+    // `Validator` is initialized once.
+    spec initialize(aptos_framework: &signer) {
+        let aptos_addr = signer::address_of(aptos_framework);
+        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
+        aborts_if exists<ValidatorSet>(aptos_addr);
+        aborts_if exists<ValidatorPerformance>(aptos_addr);
+    }
+
+    spec extract_owner_cap(owner: &signer): OwnerCapability {
+        let owner_address = signer::address_of(owner);
+        aborts_if !exists<OwnerCapability>(owner_address);
+    }
+
+    spec deposit_owner_cap(owner: &signer, owner_cap: OwnerCapability) {
+        let owner_address = signer::address_of(owner);
+        aborts_if exists<OwnerCapability>(owner_address);
+    }
+
+    spec unlock_with_cap(amount: u64, owner_cap: &OwnerCapability) {
+        let pool_address = owner_cap.pool_address;
+        let pre_stake_pool = global<StakePool>(pool_address);
+        let post stake_pool = global<StakePool>(pool_address);
+        modifies global<StakePool>(pool_address);
+        let min_amount = aptos_std::math64::min(amount,pre_stake_pool.active.value);
+
+        ensures stake_pool.pending_inactive.value == pre_stake_pool.pending_inactive.value + min_amount;
+    }
+
+    // Only active validator can update locked_until_secs.
+    spec increase_lockup_with_cap(owner_cap: &OwnerCapability) {
+        let config = global<staking_config::StakingConfig>(@aptos_framework);
+        let pool_address = owner_cap.pool_address;
+        let pre_stake_pool = global<StakePool>(pool_address);
+        let post stake_pool = global<StakePool>(pool_address);
+        let now_seconds = timestamp::spec_now_seconds();
+        let lockup = config.recurring_lockup_duration_secs;
+        modifies global<StakePool>(pool_address);
+
+        aborts_if !exists<StakePool>(pool_address);
+        aborts_if pre_stake_pool.locked_until_secs >= lockup + now_seconds;
+        aborts_if lockup + now_seconds > MAX_U64;
+        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        aborts_if !exists<staking_config::StakingConfig>(@aptos_framework);
+
+        ensures stake_pool.locked_until_secs == lockup + now_seconds;
+    }
+
+    spec update_network_and_fullnode_addresses(
+        operator: &signer,
+        pool_address: address,
+        new_network_addresses: vector<u8>,
+        new_fullnode_addresses: vector<u8>,
+    ) {
+        let pre_stake_pool = global<StakePool>(pool_address);
+        let post validator_info = global<ValidatorConfig>(pool_address);
+        modifies global<ValidatorConfig>(pool_address);
+
+        // Only the true operator address can update the network and full node addresses of the validator.
+        aborts_if !exists<StakePool>(pool_address);
+        aborts_if !exists<ValidatorConfig>(pool_address);
+        aborts_if signer::address_of(operator) != pre_stake_pool.operator_address;
+
+        ensures validator_info.network_addresses == new_network_addresses;
+        ensures validator_info.fullnode_addresses == new_fullnode_addresses;
+    }
+
+    spec set_operator_with_cap(owner_cap: &OwnerCapability, new_operator: address) {
+        let pool_address = owner_cap.pool_address;
+        let post stake_pool = global<StakePool>(pool_address);
+        modifies global<StakePool>(pool_address);
+        ensures stake_pool.operator_address == new_operator;
+    }
+
+    spec reactivate_stake_with_cap(owner_cap: &OwnerCapability, amount: u64) {
+        let pool_address = owner_cap.pool_address;
+        aborts_if !stake_pool_exists(pool_address);
+
+        let pre_stake_pool = global<StakePool>(pool_address);
+        let post stake_pool = global<StakePool>(pool_address);
+        modifies global<StakePool>(pool_address);
+        let min_amount = aptos_std::math64::min(amount,pre_stake_pool.pending_inactive.value);
+
+        ensures stake_pool.active.value == pre_stake_pool.active.value + min_amount;
+    }
+
+    spec rotate_consensus_key(
+        operator: &signer,
+        pool_address: address,
+        new_consensus_pubkey: vector<u8>,
+        proof_of_possession: vector<u8>,
+    ) {
+        let pre_stake_pool = global<StakePool>(pool_address);
+        let post validator_info = global<ValidatorConfig>(pool_address);
+        modifies global<ValidatorConfig>(pool_address);
+
+        ensures validator_info.consensus_pubkey == new_consensus_pubkey;
+    }
+
+    spec set_delegated_voter_with_cap(owner_cap: &OwnerCapability, new_voter: address) {
+        let pool_address = owner_cap.pool_address;
+        let post stake_pool = global<StakePool>(pool_address);
+        modifies global<StakePool>(pool_address);
+        ensures stake_pool.delegated_voter == new_voter;
+    }
+
     spec on_new_epoch {
         pragma disable_invariants_in_body;
         // The following resource requirement cannot be discharged by the global
@@ -150,6 +255,34 @@ spec aptos_framework::stake {
 
     spec initialize_stake_owner {
         include ResourceRequirement;
+    }
+
+    spec update_voting_power_increase(increase_amount: u64) {
+        let aptos = @aptos_framework;
+        let pre_validator_set = global<ValidatorSet>(aptos);
+        let post validator_set = global<ValidatorSet>(aptos);
+        let staking_config = global<staking_config::StakingConfig>(aptos);
+        let voting_power_increase_limit = staking_config.voting_power_increase_limit;
+
+        // Correctly modified total_joining_power and the value of total_voting_power is legal.
+        ensures validator_set.total_voting_power > 0 ==> validator_set.total_joining_power <= validator_set.total_voting_power * voting_power_increase_limit / 100;
+        ensures validator_set.total_joining_power == pre_validator_set.total_joining_power + increase_amount;
+    }
+
+    spec assert_stake_pool_exists(pool_address: address) {
+        aborts_if !stake_pool_exists(pool_address);
+    }
+
+    spec configure_allowed_validators(aptos_framework: &signer, accounts: vector<address>) {
+        let aptos_framework_address = signer::address_of(aptos_framework);
+        aborts_if !system_addresses::is_aptos_framework_address(aptos_framework_address);
+        let post allowed = global<AllowedValidators>(aptos_framework_address);
+        // Make sure that the accounts of AllowedValidators are always the passed parameter.
+        ensures allowed.accounts == accounts;
+    }
+
+    spec assert_owner_cap_exists(owner: address) {
+        aborts_if !exists<OwnerCapability>(owner);
     }
 
     // ---------------------------------

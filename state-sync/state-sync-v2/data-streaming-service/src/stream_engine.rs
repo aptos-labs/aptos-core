@@ -72,6 +72,19 @@ pub trait DataStreamEngine {
     /// Returns true iff the stream has sent all data to the stream listener.
     fn is_stream_complete(&self) -> bool;
 
+    /// Notifies the data stream engine that a timeout was encountered when
+    /// trying to send the subscription request.
+    ///
+    /// Note: Most engines shouldn't process these notifications, so a default
+    /// implementation that returns an error is provided. If a subscription request
+    /// does exist, there should only ever be a single request in-flight.
+    fn notify_subscription_timeout(
+        &mut self,
+        client_request: &DataClientRequest,
+    ) -> Result<(), Error> {
+        Err(Error::UnexpectedErrorEncountered(format!("Received a subscription request timeout but no subscription request was sent! Reported request: {:?}", client_request)))
+    }
+
     /// Transforms a given data client response (for the previously sent
     /// request) into a data notification to be sent along the data stream.
     /// Note: this call may return `None`, in which case, no notification needs
@@ -796,6 +809,48 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
 
     fn is_stream_complete(&self) -> bool {
         self.stream_is_complete
+    }
+
+    fn notify_subscription_timeout(
+        &mut self,
+        client_request: &DataClientRequest,
+    ) -> Result<(), Error> {
+        if !self.subscription_requested {
+            return Err(Error::UnexpectedErrorEncountered(format!(
+                "Received a subscription timeout but no request is in-flight! Request: {:?}",
+                client_request
+            )));
+        }
+
+        // Reset the subscription request and handle the timeout
+        self.subscription_requested = false;
+        if matches!(
+            self.request,
+            StreamRequest::ContinuouslyStreamTransactions(_)
+        ) && matches!(
+            client_request,
+            DataClientRequest::NewTransactionsWithProof(_)
+        ) {
+            info!(
+                (LogSchema::new(LogEntry::RequestTimeout)
+                    .message("Subscription request for new transactions timed out!"))
+            );
+        } else if matches!(
+            self.request,
+            StreamRequest::ContinuouslyStreamTransactionOutputs(_)
+        ) && matches!(
+            client_request,
+            DataClientRequest::NewTransactionOutputsWithProof(_)
+        ) {
+            info!(
+                (LogSchema::new(LogEntry::RequestTimeout)
+                    .message("Subscription request for new transaction outputs timed out!"))
+            );
+        } else {
+            return Err(Error::UnexpectedErrorEncountered(format!("Received a subscription request timeout but the request did not match the expected type for the stream! Request: {:?}, Stream: {:?}", client_request, self.request)));
+        }
+
+        Ok(())
     }
 
     fn transform_client_response_into_notification(

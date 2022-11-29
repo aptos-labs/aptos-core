@@ -106,56 +106,6 @@ Faucets are stateless services that can be run in parallel with the testnet. A F
 
 This will start a Faucet running locally without any restrictions to tokens that can be claimed and minted. This Faucet service will be as accessible as the testnet you started above.
 
-## Using Docker
-
-This section describes how to start your local testing using Docker.
-
-1. Install [Docker](https://docs.docker.com/get-docker/) including [Docker-Compose](https://docs.docker.com/compose/install/).
-2. Create a directory for your local test validator network, and `cd` into it.
-3. Download the YAML configuration files for:
-
-  - [Validator testnet docker compose](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/validator-testnet/docker-compose.yaml) and
-  - [Validator configuration](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/validator-testnet/validator_node_template.yaml).
-
-4. Start Docker Compose by running the command:
-
-    ```
-    docker-compose up
-    ```
-
-### Example
-
-An example command sequence for the above steps 2 through 4 is shown below:
-
-```bash
-mkdir aptos_local_validator && cd aptos_local_validator
-wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/validator-testnet/docker-compose.yaml
-wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/validator-testnet/validator_node_template.yaml
-docker-compose up
-```
-
-This will start both a validator node and Faucet service.
-
-- The Validator's REST endpoint will be available at `http://127.0.0.1:8080`, and
-- The Faucet is available at `http://127.0.0.1:8000`.
-
-### Troubleshooting
-
-As the software is in the early stages of development, there may be breaking changes. If the software fails to start, do the following:
-
-1. First, query Docker for both the containers and shared volumes with `docker container ls -a` and `docker volume ls`.
-2. Then, delete them using `docker container rm $id` and `docker volume rm $name`.
-3. Alternatively you can start with a clean slate by cleaning your entire local docker state by running the below command:
-
-```bash
-docker stop $(docker ps -a -q) && docker rm $(docker ps -a -q) && docker rmi $(docker images -q) && docker volume rm $(docker volume ls -q)
-```
-:::note
-
-If you intend to use your testnet over an extended period of time, you should pin the images to a specific ID. Image IDs can be obtained via `docker container ls` and added to the docker compose file.
-
-:::
-
 ## Interacting with the local test testnet
 
 After starting your local testnet, you will see the following:
