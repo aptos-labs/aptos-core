@@ -45,6 +45,8 @@ genesis:
     pullPolicy: IfNotPresent
   # -- Number of validators to include in genesis
   numValidators: 1
+  # -- If specified, the S3 bucket to store genesis data. Otherwise data will be stored in k8s secrets for each validator
+  s3Bucket:
   # -- If `enable_onchain_discovery` is false, use this kubernetes service name prefix. It should be the fullname for the aptos-node helm release
   username_prefix: aptos-node
   # -- If set, the base domain name of the fullnode and validator endpoints
@@ -75,6 +77,7 @@ serviceAccount:
   create: true
   # -- The name of the service account to use. If not set and create is true, a name is generated using the fullname template
   name:
+  annotations: {}
 
 # -- LEGACY: create PodSecurityPolicy, which exists at the cluster-level
 podSecurityPolicy: true

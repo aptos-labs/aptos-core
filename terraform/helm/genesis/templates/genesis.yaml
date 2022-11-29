@@ -130,6 +130,8 @@ spec:
           value: {{ .Values.genesis.validator.num_validators_with_larger_stake | quote }}
         - name: LARGER_STAKE_AMOUNT
           value: {{ .Values.genesis.validator.larger_stake_amount | quote }}
+        - name: S3_BUCKET
+          value: {{ .Values.genesis.s3Bucket | quote }}
         volumeMounts:
         - name: layout
           mountPath: /tmp/layout.yaml
@@ -140,7 +142,6 @@ spec:
         - name: tmp
           mountPath: /tmp
         securityContext:
-          readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
           capabilities:
             drop:
@@ -158,11 +159,6 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 6180
-        runAsGroup: 6180
-        fsGroup: 6180
       {{- end }}
       volumes:
       - name: layout

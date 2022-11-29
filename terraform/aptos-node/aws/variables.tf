@@ -79,9 +79,15 @@ variable "helm_chart" {
 }
 
 variable "helm_values" {
-  description = "Map of values to pass to Helm"
+  description = "DEPRECATED (use var.helm_values_list). Map of values to pass to Helm"
   type        = any
   default     = {}
+}
+
+variable "helm_values_list" {
+  description = "List of map of values to pass to Helm. To be merged in order after var.helm_values"
+  type        = any
+  default     = []
 }
 
 variable "helm_values_file" {
