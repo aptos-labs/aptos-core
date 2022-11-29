@@ -17,9 +17,9 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Function `burn_collected_fee`](#0x1_transaction_fee_burn_collected_fee)
 -  [Function `collect_fee`](#0x1_transaction_fee_collect_fee)
 -  [Function `store_aptos_coin_burn_cap`](#0x1_transaction_fee_store_aptos_coin_burn_cap)
--  [Specification](#@Specification_0)
-    -  [Function `burn_fee`](#@Specification_0_burn_fee)
-    -  [Function `store_aptos_coin_burn_cap`](#@Specification_0_store_aptos_coin_burn_cap)
+-  [Specification](#@Specification_1)
+    -  [Function `burn_fee`](#@Specification_1_burn_fee)
+    -  [Function `store_aptos_coin_burn_cap`](#@Specification_1_store_aptos_coin_burn_cap)
 
 
 <pre><code><b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
@@ -394,7 +394,7 @@ Only called during genesis.
 
 </details>
 
-<a name="@Specification_0"></a>
+<a name="@Specification_1"></a>
 
 ## Specification
 
@@ -406,7 +406,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_0_burn_fee"></a>
+<a name="@Specification_1_burn_fee"></a>
 
 ### Function `burn_fee`
 
@@ -424,7 +424,7 @@ Only called during genesis.
 
 
 
-<a name="@Specification_0_store_aptos_coin_burn_cap"></a>
+<a name="@Specification_1_store_aptos_coin_burn_cap"></a>
 
 ### Function `store_aptos_coin_burn_cap`
 

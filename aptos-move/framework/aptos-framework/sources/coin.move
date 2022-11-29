@@ -157,7 +157,7 @@ module aptos_framework::coin {
     }
 
     //
-    //  Aggregator coin functions
+    //  Aggregatable coin functions
     //
 
     /// Creates a new aggregatable coin with value overflowing on `limit`. Note that this function can
@@ -1026,5 +1026,45 @@ module aptos_framework::coin {
         let supply = option::borrow_mut(maybe_supply);
         assert!(optional_aggregator::is_parallelizable(supply), 0);
         assert!(optional_aggregator::read(supply) == 100, 0);
+    }
+
+    #[test_only]
+    fun destroy_aggregatable_coin_for_test<CoinType>(aggregatable_coin: AggregatableCoin<CoinType>) {
+        let AggregatableCoin { value } = aggregatable_coin;
+        aggregator::destroy(value);
+    }
+
+    #[test(framework = @aptos_framework)]
+    public entry fun test_collect_from_and_drain(
+        framework: signer,
+    ) acquires CoinInfo, CoinStore {
+        let framework_addr = signer::address_of(&framework);
+        account::create_account_for_test(framework_addr);
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&framework, 1, true);
+
+        let coins_minted = mint<FakeMoney>(100, &mint_cap);
+        deposit(framework_addr, coins_minted);
+        assert!(balance<FakeMoney>(framework_addr) == 100, 0);
+        assert!(*option::borrow(&supply<FakeMoney>()) == 100, 0);
+
+        let aggregatable_coin = initialize_aggregatable_coin<FakeMoney>(&framework);
+        collect_from_into_aggregatable_coin<FakeMoney>(framework_addr, 10, &mut aggregatable_coin);
+
+        // Check that aggregatable coin has the right amount.
+        let collected_coin = drain_aggregatable_coin(&mut aggregatable_coin);
+        assert!(is_aggregatable_coin_zero(&aggregatable_coin), 0);
+        assert!(value(&collected_coin) == 10, 0);
+
+        // Supply of coins should be unchanged, but the balance on the account should decrease.
+        assert!(balance<FakeMoney>(framework_addr) == 90, 0);
+        assert!(*option::borrow(&supply<FakeMoney>()) == 100, 0);
+
+        burn(collected_coin, &burn_cap);
+        destroy_aggregatable_coin_for_test(aggregatable_coin);
+        move_to(&framework, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
     }
 }
