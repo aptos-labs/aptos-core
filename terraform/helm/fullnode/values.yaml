@@ -24,6 +24,8 @@ aptos_chains:
     genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob
 
 fullnode:
+  # -- Additional InitContainers to initialize the fullnode pod
+  extraInitContainers: []
   # -- Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config:
     full_node_networks:

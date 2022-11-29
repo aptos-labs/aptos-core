@@ -57,6 +57,8 @@ haproxy:
 validator:
   # -- Internal: name of your validator for use in labels
   name:
+  # -- Additional InitContainers to initialize the validator pod
+  extraInitContainers: []
   image:
     # -- Image repo to use for validator images
     repo: aptoslabs/validator
@@ -92,6 +94,8 @@ validator:
   enableNetworkPolicy: true
 
 fullnode:
+  # -- Additional InitContainers to initialize the fullnode pod
+  extraInitContainers: []
   # -- Specify fullnode groups by `name` and number of `replicas`
   groups:
     - name: fullnode
@@ -171,6 +175,7 @@ serviceAccount:
   create: true
   # -- The name of the service account to use. If not set and create is true, a name is generated using the fullname template
   name:
+  annotations: {}
 
 # -- LEGACY: create PodSecurityPolicy, which exists at the cluster-level
 podSecurityPolicy: true
