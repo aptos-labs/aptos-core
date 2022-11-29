@@ -9,9 +9,26 @@ export const TOKEN_TRANSFER_OPT_IN =
 
 /*
 Follow these steps to get the ABI strings:
-1. Compile the Move packages with Aptos CLI. e.g. aptos move compile --package-dir ./aptos-move/framework/aptos-token
-2. Find the ABI files under the `build` directory and convert the ABI files to hex strings. On Mac and Linux, this can
-be done with `cat <ABI_FILE_PATH> | od -v -t x1 -A n | tr -d ' \n'`
+
+Go to the package directory of the relevant Move module, e.g. if you're trying
+to get the ABI for the `transfer` function of `aptos_account.move`, go to
+the directory `aptos-move/framework/aptos-framework`.
+
+Compile the Move packages with the Aptos CLI:
+```
+aptos move compile --included-artifacts all
+```
+This `--included-artifacts all` argument is necessary to generate ABIs.
+
+Find the ABI files under the `build` directory and convert the ABI files to hex strings.
+On Mac and Linux, this can be done with this command:
+```
+cat <ABI_FILE_PATH> | od -v -t x1 -A n | tr -d ' \n'
+```
+For example:
+```
+cat build/AptosFramework/abis/aptos_account/transfer.abi | od -v -t x1 -A n | tr -d ' \n'
+```
 */
 export const TOKEN_ABIS = [
   // aptos-token/build/AptosToken/abis/token/create_collection_script.abi
@@ -39,4 +56,6 @@ export const TOKEN_ABIS = [
 export const COIN_ABIS = [
   // aptos-framework/build/AptosFramework/abis/coin/transfer.abi
   "01087472616E73666572000000000000000000000000000000000000000000000000000000000000000104636F696E3C205472616E73666572732060616D6F756E7460206F6620636F696E732060436F696E54797065602066726F6D206066726F6D6020746F2060746F602E0109636F696E5F747970650202746F0406616D6F756E7402",
+  // aptos-framework/build/AptosFramework/abis/aptos_account/transfer.abi
+  "01087472616e7366657200000000000000000000000000000000000000000000000000000000000000010d6170746f735f6163636f756e7400000202746f0406616d6f756e7402",
 ];

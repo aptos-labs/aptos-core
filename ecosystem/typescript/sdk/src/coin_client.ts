@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount } from "./aptos_account";
+import { AptosAccount, getAddressFromAccountOrAddress } from "./aptos_account";
 import { AptosClient, OptionalTransactionArgs } from "./aptos_client";
-import { HexString } from "./hex_string";
+import { HexString, MaybeHexString } from "./hex_string";
 import { TransactionBuilderABI } from "./transaction_builder";
 import { COIN_ABIS } from "./abis";
 import { APTOS_COIN } from "./utils";
@@ -28,7 +28,14 @@ export class CoinClient {
 
   /**
    * Generate, sign, and submit a transaction to the Aptos blockchain API to
-   * transfer AptosCoin from one account to another.
+   * transfer coins from one account to another. By default it transfers
+   * 0x1::aptos_coin::AptosCoin, but you can specify a different coin type
+   * with the `coinType` argument.
+   *
+   * You may set `createReceiverIfMissing` to true if you want to create the
+   * receiver account if it does not exist on chain yet. If you do not set
+   * this to true, the transaction will fail if the receiver account does not
+   * exist on-chain.
    *
    * @param from Account sending the coins
    * @param to Account to receive the coins
@@ -40,36 +47,48 @@ export class CoinClient {
   // :!:>transfer
   async transfer(
     from: AptosAccount,
-    to: AptosAccount,
+    to: AptosAccount | MaybeHexString,
     amount: number | bigint,
     extraArgs?: OptionalTransactionArgs & {
       // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin
       coinType?: string;
+      // If set, create the `receiver` account if it doesn't exist on-chain.
+      // This is done by calling `0x1::aptos_account::transfer` instead, which
+      // will create the account on-chain first if it doesn't exist before
+      // transferring the coins to it.
+      createReceiverIfMissing?: boolean;
     },
   ): Promise<string> {
+    // If none is explicitly given, use 0x1::aptos_coin::AptosCoin as the coin type.
     const coinTypeToTransfer = extraArgs?.coinType ?? APTOS_COIN;
-    const payload = this.transactionBuilder.buildTransactionPayload(
-      "0x1::coin::transfer",
-      [coinTypeToTransfer],
-      [to.address(), amount],
-    );
+
+    // If we should create the receiver account if it doesn't exist on-chain,
+    // use the `0x1::aptos_account::transfer` function.
+    const func = extraArgs?.createReceiverIfMissing ? "0x1::aptos_account::transfer" : "0x1::coin::transfer";
+
+    // If we're using the `0x1::aptos_account::transfer` function, we don't
+    // need type args.
+    const typeArgs = extraArgs?.createReceiverIfMissing ? [] : [coinTypeToTransfer];
+
+    // Get the receiver address from the AptosAccount or MaybeHexString.
+    const toAddress = getAddressFromAccountOrAddress(to);
+
+    const payload = this.transactionBuilder.buildTransactionPayload(func, typeArgs, [toAddress, amount]);
+
     return this.aptosClient.generateSignSubmitTransaction(from, payload, extraArgs);
   } // <:!:transfer
 
   /**
-   * Generate, submit, and wait for a transaction to transfer AptosCoin from
-   * one account to another.
+   * Get the balance of the account. By default it checks the balance of
+   * 0x1::aptos_coin::AptosCoin, but you can specify a different coin type.
    *
-   * If the transaction is submitted successfully, it returns the response
-   * from the API indicating that the transaction was submitted.
-   *
-   * @param account Account that you want to check the balance of.
+   * @param account Account that you want to get the balance of.
    * @param extraArgs Extra args for checking the balance.
    * @returns Promise that resolves to the balance as a bigint.
    */
   // :!:>checkBalance
   async checkBalance(
-    account: AptosAccount,
+    account: AptosAccount | MaybeHexString,
     extraArgs?: {
       // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin
       coinType?: string;
@@ -77,7 +96,8 @@ export class CoinClient {
   ): Promise<bigint> {
     const coinType = extraArgs?.coinType ?? APTOS_COIN;
     const typeTag = `0x1::coin::CoinStore<${coinType}>`;
-    const resources = await this.aptosClient.getAccountResources(account.address());
+    const address = getAddressFromAccountOrAddress(account);
+    const resources = await this.aptosClient.getAccountResources(address);
     const accountResource = resources.find((r) => r.type === typeTag);
     return BigInt((accountResource!.data as any).coin.value);
   } // <:!:checkBalance
