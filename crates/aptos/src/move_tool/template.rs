@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::format;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, ExitStatus};
 use std::str::FromStr;
 use std::time::UNIX_EPOCH;
 
@@ -22,7 +22,7 @@ use crate::move_tool::FrameworkPackageArgs;
 #[derive(Clone)]
 pub enum Template {
     Default(String),
-    GitUrl(Url),
+    GitUrl(String),
 }
 
 pub fn parse_template(val: &str) -> anyhow::Result<Template> {
@@ -34,11 +34,7 @@ pub fn parse_template(val: &str) -> anyhow::Result<Template> {
             Err(anyhow!("choose one of 'empty', 'coin', 'dapp'."))
         }
     } else {
-        let parsed_url = Url::parse(val);
-        match parsed_url {
-            Ok(url) => Ok(Template::GitUrl(url)),
-            Err(_) => Err(anyhow!("Invalid git url {}", val)),
-        }
+        Ok(Template::GitUrl(val.to_string()))
     }
 }
 
@@ -70,9 +66,6 @@ pub struct NewPackage {
     pub(crate) framework_package_args: FrameworkPackageArgs,
 }
 
-const GIT_APTOS_TEMPLATES_URL: &str = "https://github.com/mkurnikov/aptos-templates.git";
-const GIT_COMMIT: &str = "5a7c26311c8c406ca00dfa08fc4cd4cbc5d66268";
-
 #[async_trait]
 impl CliCommand<()> for NewPackage {
     fn command_name(&self) -> &'static str {
@@ -89,7 +82,7 @@ impl CliCommand<()> for NewPackage {
                 let core_templates_dir =
                     std::env::temp_dir().join(&format!("aptos_templates_{GIT_COMMIT}"));
 
-                git_download_template(&core_templates_dir, GIT_APTOS_TEMPLATES_URL)?;
+                git_download_default_templates(&core_templates_dir)?;
 
                 let core_template_path = core_templates_dir.join(template_name);
                 self.render_tera_template(core_template_path)?;
@@ -104,7 +97,7 @@ impl CliCommand<()> for NewPackage {
                 let custom_template_dir =
                     std::env::temp_dir().join(format!("{}_{}", directory_name, time_millis));
 
-                git_download_template(&custom_template_dir, git_url)?;
+                git_download_custom_template(&custom_template_dir, git_url)?;
 
                 self.render_tera_template(custom_template_dir)?;
             }
@@ -141,7 +134,7 @@ impl NewPackage {
         let package_name = self.package_name()?;
 
         let tera_template = Tera::new(&format!("{}/**/*", template_path.to_string_lossy(),))
-            .map_err(|_| CliError::UnexpectedError("tera error".to_string()))?;
+            .map_err(|err| CliError::UnexpectedError(format!("tera error '{}'", err)))?;
         let tera_context = tera::Context::from_serialize(
             [
                 ("package_name".to_string(), package_name),
@@ -174,16 +167,53 @@ impl NewPackage {
     }
 }
 
-fn git_download_template(tmp_dir: &PathBuf, git_url: &str) -> anyhow::Result<()> {
+
+const GIT_APTOS_TEMPLATES_URL: &str = "https://github.com/mkurnikov/aptos-templates.git";
+const GIT_COMMIT: &str = "5a7c26311c8c406ca00dfa08fc4cd4cbc5d66268";
+
+fn git_download_default_templates(tmp_dir: &PathBuf) -> anyhow::Result<()> {
     // TODO: download more reliably (i.e. directory exists)
     if !tmp_dir.exists() {
-        println!("Downloading: {git_url}");
-        Command::new("git")
+        println!("Downloading: {GIT_APTOS_TEMPLATES_URL}");
+        let output = Command::new("git")
             .arg("clone")
-            .arg(git_url)
+            .arg(GIT_APTOS_TEMPLATES_URL)
             .arg(tmp_dir)
             .output()
             .context("Failed to find merge base")?;
+        if output.status.code() != Some(0) {
+            eprintln!("{}", String::from_utf8(output.stderr)?);
+            return Err(anyhow!("Clone failed"));
+        }
+        let tmp_dir_str = tmp_dir.to_string_lossy().to_string();
+        Command::new("git")
+            .args(["-C", &tmp_dir_str, "checkout", GIT_COMMIT])
+            .output()
+            .map_err(|_| {
+                anyhow::anyhow!(
+                        "Failed to checkout Git reference '{}'",
+                        GIT_COMMIT,
+                    )
+            })?;
+    }
+    Ok(())
+}
+
+fn git_download_custom_template(tmp_dir: &PathBuf, git_url: &str) -> anyhow::Result<()> {
+    // TODO: download more reliably (i.e. directory exists)
+    if !tmp_dir.exists() {
+        println!("Downloading: {git_url}");
+        let output = Command::new("git")
+            .arg("clone")
+            .arg(git_url)
+            .arg(tmp_dir)
+            .args(["--depth", "1"])
+            .output()
+            .context("Failed to find merge base")?;
+        if output.status.code() != Some(0) {
+            eprintln!("{}", String::from_utf8(output.stderr)?);
+            return Err(anyhow!("Clone failed"));
+        }
     }
     Ok(())
 }
@@ -194,11 +224,12 @@ fn tera_walk_dir<'a>(
 ) -> impl Iterator<Item = (PathBuf, PathBuf, String)> + 'a {
     let from_str = from_dir.to_string_lossy().to_string();
 
+    let dot_git_path = from_dir.join(".git");
     WalkDir::new(from_dir)
         .into_iter()
+        .filter_entry(move |entry| entry.path() == dot_git_path)
         .filter_map(|path| path.ok())
         .map(|path| path.into_path())
-        // .skip(1)
         .map(move |path| {
             let sub = path
                 .to_string_lossy()
