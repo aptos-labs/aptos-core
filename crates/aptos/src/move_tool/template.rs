@@ -71,7 +71,7 @@ pub struct NewPackage {
 }
 
 const GIT_APTOS_TEMPLATES_URL: &str = "https://github.com/mkurnikov/aptos-templates.git";
-const GIT_COMMIT: &str = "540b78598d74152fbc6cb6ac6c7b139c34114259";
+const GIT_COMMIT: &str = "5a7c26311c8c406ca00dfa08fc4cd4cbc5d66268";
 
 #[async_trait]
 impl CliCommand<()> for NewPackage {
@@ -211,7 +211,7 @@ fn tera_walk_dir<'a>(
 }
 
 fn url_to_file_name(url: &str) -> String {
-    regex::Regex::new(r"/|:|\.|@")
+    Regex::new(r"[/:.@]")
         .unwrap()
         .replace_all(url, "_")
         .to_string()
