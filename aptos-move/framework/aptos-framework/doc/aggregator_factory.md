@@ -3,7 +3,11 @@
 
 # Module `0x1::aggregator_factory`
 
-This module provides foundations to create aggregators.
+This module provides foundations to create aggregators. Currently only
+Aptos Framework (0x1) can create them, so this module helps to wrap
+the constructor of <code>Aggregator</code> struct so that only a system account
+can initialize one. In the future, this might change and aggregators
+can be enabled for the public.
 
 
 -  [Resource `AggregatorFactory`](#0x1_aggregator_factory_AggregatorFactory)
@@ -28,7 +32,9 @@ This module provides foundations to create aggregators.
 
 ## Resource `AggregatorFactory`
 
-Creates new aggregators.
+Creates new aggregators. Used to control the numbers of aggregators in the
+system and who can create them. At the moment, only Aptos Framework (0x1)
+account can.
 
 
 <pre><code><b>struct</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a> <b>has</b> key
@@ -59,7 +65,7 @@ Creates new aggregators.
 
 <a name="0x1_aggregator_factory_EAGGREGATOR_FACTORY_NOT_FOUND"></a>
 
-When aggregator factory is not published yet.
+Aggregator factory is not published yet.
 
 
 <pre><code><b>const</b> <a href="aggregator_factory.md#0x1_aggregator_factory_EAGGREGATOR_FACTORY_NOT_FOUND">EAGGREGATOR_FACTORY_NOT_FOUND</a>: u64 = 1;

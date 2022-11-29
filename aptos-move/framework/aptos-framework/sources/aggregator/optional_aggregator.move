@@ -9,10 +9,10 @@ module aptos_framework::optional_aggregator {
 
     friend aptos_framework::coin;
 
-    /// When the value of aggregator underflows (goes below zero). Raised by native code.
+    /// The value of aggregator underflows (goes below zero). Raised by native code.
     const EAGGREGATOR_OVERFLOW: u64 = 1;
 
-    /// When aggregator feature is not supported. Raised by native code.
+    /// Aggregator feature is not supported. Raised by native code.
     const EAGGREGATOR_UNDERFLOW: u64 = 2;
 
     /// Wrapper around integer with a custom overflow limit. Supports add, subtract and read just like `Aggregator`.
@@ -21,7 +21,7 @@ module aptos_framework::optional_aggregator {
         limit: u128,
     }
 
-    /// Creates a new integer
+    /// Creates a new integer which overflows on exceeding a `limit`.
     fun new_integer(limit: u128): Integer {
         Integer {
             value: 0,

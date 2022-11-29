@@ -1,4 +1,8 @@
-/// This module provides foundations to create aggregators.
+/// This module provides foundations to create aggregators. Currently only
+/// Aptos Framework (0x1) can create them, so this module helps to wrap
+/// the constructor of `Aggregator` struct so that only a system account
+/// can initialize one. In the future, this might change and aggregators
+/// can be enabled for the public.
 module aptos_framework::aggregator_factory {
     use std::error;
 
@@ -9,10 +13,12 @@ module aptos_framework::aggregator_factory {
     friend aptos_framework::genesis;
     friend aptos_framework::optional_aggregator;
 
-    /// When aggregator factory is not published yet.
+    /// Aggregator factory is not published yet.
     const EAGGREGATOR_FACTORY_NOT_FOUND: u64 = 1;
 
-    /// Creates new aggregators.
+    /// Creates new aggregators. Used to control the numbers of aggregators in the
+    /// system and who can create them. At the moment, only Aptos Framework (0x1)
+    /// account can.
     struct AggregatorFactory has key {
         phantom_table: Table<address, u128>,
     }

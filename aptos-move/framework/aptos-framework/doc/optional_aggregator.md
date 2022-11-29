@@ -114,7 +114,7 @@ Contains either an aggregator or a normal integer, both overflowing on limit.
 
 <a name="0x1_optional_aggregator_EAGGREGATOR_OVERFLOW"></a>
 
-When the value of aggregator underflows (goes below zero). Raised by native code.
+The value of aggregator underflows (goes below zero). Raised by native code.
 
 
 <pre><code><b>const</b> <a href="optional_aggregator.md#0x1_optional_aggregator_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>: u64 = 1;
@@ -124,7 +124,7 @@ When the value of aggregator underflows (goes below zero). Raised by native code
 
 <a name="0x1_optional_aggregator_EAGGREGATOR_UNDERFLOW"></a>
 
-When aggregator feature is not supported. Raised by native code.
+Aggregator feature is not supported. Raised by native code.
 
 
 <pre><code><b>const</b> <a href="optional_aggregator.md#0x1_optional_aggregator_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>: u64 = 2;
@@ -136,7 +136,7 @@ When aggregator feature is not supported. Raised by native code.
 
 ## Function `new_integer`
 
-Creates a new integer
+Creates a new integer which overflows on exceeding a <code>limit</code>.
 
 
 <pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_new_integer">new_integer</a>(limit: u128): <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>

@@ -3,7 +3,18 @@
 
 # Module `0x1::aggregator`
 
-This module provides an interface for aggregators.
+This module provides an interface for aggregators. Aggregators are similar to
+unsigned integers and support addition and subtraction (aborting on underflow
+or on overflowing a custom upper limit). The difference from integers is that
+aggregators allow to perform both additions and subtractions in parallel across
+multiple transactions, enabling parallel execution. For example, if the first
+transaction is doing <code><a href="aggregator.md#0x1_aggregator_add">add</a>(X, 1)</code> for aggregator resource <code>X</code>, and the second
+is doing <code><a href="aggregator.md#0x1_aggregator_sub">sub</a>(X,3)</code>, they can be executed in parallel avoiding a read-modify-write
+dependency.
+However, reading the aggregator value (i.e. calling <code><a href="aggregator.md#0x1_aggregator_read">read</a>(X)</code>) is an expensive
+operation and should be avoided as much as possible because it reduces the
+parallelism. Moreover, **aggregators can only be created by Aptos Framework (0x1)
+at the moment.**
 
 
 -  [Struct `Aggregator`](#0x1_aggregator_Aggregator)
@@ -28,7 +39,8 @@ This module provides an interface for aggregators.
 
 ## Struct `Aggregator`
 
-Represents an aggregatable integer.
+Represents an integer which supports parallel additions and subtractions
+across multiple transactions. See the module description for more details.
 
 
 <pre><code><b>struct</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a> <b>has</b> store
@@ -71,7 +83,7 @@ Represents an aggregatable integer.
 
 <a name="0x1_aggregator_EAGGREGATOR_OVERFLOW"></a>
 
-When the value of aggregator overflows. Raised by native code.
+The value of aggregator overflows. Raised by native code.
 
 
 <pre><code><b>const</b> <a href="aggregator.md#0x1_aggregator_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>: u64 = 1;
@@ -81,7 +93,7 @@ When the value of aggregator overflows. Raised by native code.
 
 <a name="0x1_aggregator_EAGGREGATOR_UNDERFLOW"></a>
 
-When the value of aggregator underflows (goes below zero). Raised by native code.
+The value of aggregator underflows (goes below zero). Raised by native code.
 
 
 <pre><code><b>const</b> <a href="aggregator.md#0x1_aggregator_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>: u64 = 2;
@@ -91,7 +103,7 @@ When the value of aggregator underflows (goes below zero). Raised by native code
 
 <a name="0x1_aggregator_ENOT_SUPPORTED"></a>
 
-When aggregator feature is not supported. Raised by native code.
+Aggregator feature is not supported. Raised by native code.
 
 
 <pre><code><b>const</b> <a href="aggregator.md#0x1_aggregator_ENOT_SUPPORTED">ENOT_SUPPORTED</a>: u64 = 3;
