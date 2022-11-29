@@ -1391,6 +1391,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-bitvec",
  "aptos-crypto",
+ "aptos-gas",
  "aptos-types",
  "aptos-vm",
  "criterion",
