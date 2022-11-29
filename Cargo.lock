@@ -338,6 +338,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-block-executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-aggregator",
+ "aptos-infallible",
+ "aptos-metrics-core",
+ "aptos-state-view",
+ "aptos-types",
+ "arc-swap",
+ "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
+ "claims",
+ "criterion",
+ "crossbeam",
+ "crossbeam-queue",
+ "dashmap",
+ "mvhashmap",
+ "num_cpus",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "rand 0.7.3",
+ "rayon",
+]
+
+[[package]]
 name = "aptos-build-info"
 version = "0.1.0"
 dependencies = [
@@ -1008,32 +1034,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-parallel-executor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-aggregator",
- "aptos-infallible",
- "aptos-metrics-core",
- "aptos-state-view",
- "aptos-types",
- "arc-swap",
- "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "claims",
- "criterion",
- "crossbeam",
- "crossbeam-queue",
- "dashmap",
- "mvhashmap",
- "num_cpus",
- "once_cell",
- "proptest",
- "proptest-derive",
- "rand 0.7.3",
- "rayon",
-]
-
-[[package]]
 name = "aptos-proptest-helpers"
 version = "0.1.0"
 dependencies = [
@@ -1502,13 +1502,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-block-executor",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-gas",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-module-verifier",
- "aptos-parallel-executor",
  "aptos-state-view",
  "aptos-types",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
@@ -3470,11 +3470,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos",
+ "aptos-block-executor",
  "aptos-crypto",
  "aptos-gas",
  "aptos-keygen",
  "aptos-logger",
- "aptos-parallel-executor",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
@@ -5156,11 +5156,11 @@ dependencies = [
 name = "language-e2e-testsuite"
 version = "0.1.0"
 dependencies = [
+ "aptos-block-executor",
  "aptos-crypto",
  "aptos-gas",
  "aptos-keygen",
  "aptos-logger",
- "aptos-parallel-executor",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",

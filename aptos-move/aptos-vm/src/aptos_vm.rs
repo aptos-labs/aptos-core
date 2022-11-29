@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    adapter_common,
     adapter_common::{
         discard_error_output, discard_error_vm_status, validate_signature_checked_transaction,
         validate_signed_transaction, PreprocessedTransaction, VMAdapter,
     },
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
+    block_executor::BlockAptosVM,
     counters::*,
-    data_cache::{AsMoveResolver, IntoMoveResolver, StateViewCache},
+    data_cache::{AsMoveResolver, IntoMoveResolver},
     delta_state_view::DeltaStateView,
     errors::expect_only_successful_execution,
     logging::AdapterLogSchema,
@@ -912,21 +912,6 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    /// Alternate form of 'execute_block' that keeps the vm_status before it goes into the
-    /// `TransactionOutput`
-    pub fn execute_block_and_keep_vm_status(
-        transactions: Vec<Transaction>,
-        state_view: &impl StateView,
-    ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
-        let mut state_view_cache = StateViewCache::new(state_view);
-        let count = transactions.len();
-        let vm = AptosVM::new(&state_view_cache);
-        let res = adapter_common::execute_block_impl(&vm, transactions, &mut state_view_cache)?;
-        // Record the histogram count for transactions per block.
-        BLOCK_TRANSACTION_COUNT.observe(count as f64);
-        Ok(res)
-    }
-
     pub fn simulate_signed_transaction(
         txn: &SignedTransaction,
         state_view: &impl StateView,
@@ -983,22 +968,21 @@ impl VMExecutor for AptosVM {
             ))
         });
 
-        let concurrency_level = Self::get_concurrency_level();
-        if concurrency_level > 1 {
-            let (result, err) = crate::parallel_executor::ParallelAptosVM::execute_block(
-                transactions,
-                state_view,
-                concurrency_level,
-            )?;
-            debug!("Parallel execution error {:?}", err);
-            Ok(result)
-        } else {
-            let output = Self::execute_block_and_keep_vm_status(transactions, state_view)?;
-            Ok(output
-                .into_iter()
-                .map(|(_vm_status, txn_output)| txn_output)
-                .collect())
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        info!(
+            log_context,
+            "Executing block, transaction count: {}",
+            transactions.len()
+        );
+
+        let count = transactions.len();
+        let ret =
+            BlockAptosVM::execute_block(transactions, state_view, Self::get_concurrency_level());
+        if ret.is_ok() {
+            // Record the histogram count for transactions per block.
+            BLOCK_TRANSACTION_COUNT.observe(count as f64);
         }
+        ret
     }
 }
 

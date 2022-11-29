@@ -15,9 +15,9 @@ use aptos_types::write_set::TransactionWrite;
 use mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use num_cpus;
 use once_cell::sync::Lazy;
-use std::{hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
+use std::{collections::btree_map::BTreeMap, hash::Hash, marker::PhantomData, sync::Arc};
 
-static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_cpus::get())
         .thread_name(|index| format!("par_exec_{}", index))
@@ -55,7 +55,7 @@ pub enum ReadResult<V> {
 
 impl<
         'a,
-        K: ModulePath + PartialOrd + Send + Clone + Hash + Eq,
+        K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq,
         V: TransactionWrite + Send + Sync,
     > MVHashMapView<'a, K, V>
 {
@@ -105,7 +105,7 @@ impl<
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     match self.scheduler.wait_for_dependency(self.txn_idx, dep_idx) {
                         Some(dep_condition) => {
-                            // Wait on a condition variable correpsonding to the encountered
+                            // Wait on a condition variable corresponding to the encountered
                             // read dependency. Once the dep_idx finishes re-execution, scheduler
                             // will mark the dependency as resolved, and then the txn_idx will be
                             // scheduled for re-execution, which will re-awaken cvar here.
@@ -147,14 +147,14 @@ impl<
     }
 }
 
-pub struct ParallelTransactionExecutor<T: Transaction, E: ExecutorTask> {
+pub struct BlockExecutor<T: Transaction, E: ExecutorTask> {
     // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     phantom: PhantomData<(T, E)>,
 }
 
-impl<T, E> ParallelTransactionExecutor<T, E>
+impl<T, E> BlockExecutor<T, E>
 where
     T: Transaction,
     E: ExecutorTask<T = T>,
@@ -163,8 +163,8 @@ where
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(concurrency_level: usize) -> Self {
         assert!(
-            concurrency_level > 1 && concurrency_level <= num_cpus::get(),
-            "Parallel execution concurrency level {} should be between 2 and number of CPUs",
+            concurrency_level > 0 && concurrency_level <= num_cpus::get(),
+            "Parallel execution concurrency level {} should be between 1 and number of CPUs",
             concurrency_level
         );
         Self {
@@ -198,7 +198,7 @@ where
         };
 
         // VM execution.
-        let execute_result = executor.execute_transaction(&state_view, txn);
+        let execute_result = executor.execute_transaction_mvhashmap_view(&state_view, txn);
         let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
@@ -359,7 +359,7 @@ where
     pub fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        signature_verified_block: Vec<T>,
+        signature_verified_block: &[T],
     ) -> Result<
         (
             Vec<E::Output>,
@@ -367,6 +367,8 @@ where
         ),
         E::Error,
     > {
+        assert!(self.concurrency_level > 1, "Must use sequential execution");
+
         let versioned_data_cache = MVHashMap::new();
 
         if signature_verified_block.is_empty() {
@@ -382,7 +384,7 @@ where
                 s.spawn(|_| {
                     self.work_task_with_scope(
                         &executor_initial_arguments,
-                        &signature_verified_block,
+                        signature_verified_block,
                         &last_input_output,
                         &versioned_data_cache,
                         &scheduler,
@@ -416,10 +418,9 @@ where
             ret
         };
 
-        spawn(move || {
+        RAYON_EXEC_POOL.spawn(move || {
             // Explicit async drops.
             drop(last_input_output);
-            drop(signature_verified_block);
             drop(scheduler);
         });
 
@@ -433,5 +434,49 @@ where
                 ))
             }
         }
+    }
+
+    pub fn execute_transactions_sequential(
+        &self,
+        executor_arguments: E::Argument,
+        signature_verified_block: &[T],
+    ) -> Result<Vec<E::Output>, E::Error> {
+        let num_txns = signature_verified_block.len();
+        let executor = E::init(executor_arguments);
+        let mut data_map = BTreeMap::new();
+
+        let mut ret = Vec::with_capacity(num_txns);
+        for (idx, txn) in signature_verified_block.iter().enumerate() {
+            // this call internally materializes deltas.
+            let res = executor.execute_transaction_btree_view(&data_map, txn, idx);
+
+            let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
+
+            match res {
+                ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                    assert_eq!(
+                        output.get_deltas().len(),
+                        0,
+                        "Sequential execution must materialize deltas"
+                    );
+                    // Apply the writes.
+                    for (ap, write_op) in output.get_writes().into_iter() {
+                        data_map.insert(ap, write_op);
+                    }
+                    ret.push(output);
+                }
+                ExecutionStatus::Abort(err) => {
+                    // Record the status indicating abort.
+                    return Err(Error::UserError(err));
+                }
+            }
+
+            if must_skip {
+                break;
+            }
+        }
+
+        ret.resize_with(num_txns, E::Output::skip_output);
+        Ok(ret)
     }
 }
