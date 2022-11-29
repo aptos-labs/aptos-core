@@ -16,6 +16,7 @@ module aptos_framework::coin {
 
     friend aptos_framework::aptos_coin;
     friend aptos_framework::genesis;
+    friend aptos_framework::transaction_fee;
 
     //
     // Errors.
@@ -57,8 +58,8 @@ module aptos_framework::coin {
     /// Symbol of the coin is too long
     const ECOIN_SYMBOL_TOO_LONG: u64 = 13;
 
-    /// The value of aggregator coin does not fit in u64.
-    const EAGGREGATOR_COIN_VALUE_TOO_LARGE: u64 = 14;
+    /// The value of aggregatable coin used for transaction fees redistribution does not fit in u64.
+    const EAGGREGATABLE_COIN_VALUE_TOO_LARGE: u64 = 14;
 
     //
     // Constants
@@ -75,9 +76,11 @@ module aptos_framework::coin {
         value: u64,
     }
 
-    /// Structure representing aggregatable coin.
+    /// Represents a coin with aggregator as its value. This allows to update
+    /// the coin in every transaction avoiding read-modify-write conflicts. Only
+    /// used for gas fees distribution by Aptos Framework (0x1).
     struct AggregatableCoin<phantom CoinType> has store {
-        /// Amount of aggregator coin this address has.
+        /// Amount of aggregatable coin this address has.
         value: Aggregator,
     }
 
@@ -159,7 +162,7 @@ module aptos_framework::coin {
 
     /// Creates a new aggregatable coin with value overflowing on `limit`. Note that this function can
     /// only be called by Aptos Framework (0x1) account for now becuase of `create_aggregator`.
-    public fun initialize_aggregator_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
+    public(friend) fun initialize_aggregatable_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
         let aggregator = aggregator_factory::create_aggregator(aptos_framework, MAX_U64);
         AggregatableCoin<CoinType> {
             value: aggregator,
@@ -167,15 +170,15 @@ module aptos_framework::coin {
     }
 
     /// Returns true if the value of aggregatable coin is zero.
-    public fun is_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
+    public(friend) fun is_aggregatable_coin_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
         let amount = aggregator::read(&coin.value);
         amount == 0
     }
 
     /// Drains the aggregatable coin, setting it to zero and returning a standard coin.
-    public fun drain<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
+    public(friend) fun drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
         let amount = aggregator::read(&coin.value);
-        assert!(amount <= MAX_U64, error::out_of_range(EAGGREGATOR_COIN_VALUE_TOO_LARGE));
+        assert!(amount <= MAX_U64, error::out_of_range(EAGGREGATABLE_COIN_VALUE_TOO_LARGE));
 
         aggregator::sub(&mut coin.value, amount);
         Coin<CoinType> {
@@ -183,15 +186,15 @@ module aptos_framework::coin {
         }
     }
 
-    /// Aggregates `coin` into aggregatable coin (`dst_coin`).
-    public fun aggregate<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
+    /// Merges `coin` into aggregatable coin (`dst_coin`).
+    public(friend) fun merge_aggregatable_coin<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
         let Coin { value } = coin;
         let amount = (value as u128);
         aggregator::add(&mut dst_coin.value, amount);
     }
 
-    /// Collects a specified amount form an account to aggregatable coin.
-    public fun collect_from<CoinType>(
+    /// Collects a specified amount of coin form an account into aggregatable coin.
+    public(friend) fun collect_from_into_aggregatable_coin<CoinType>(
         account_addr: address,
         amount: u64,
         dst_coin: &mut AggregatableCoin<CoinType>,
@@ -202,8 +205,8 @@ module aptos_framework::coin {
         };
 
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
-        let collected_coin = extract(&mut coin_store.coin, amount);
-        aggregate(dst_coin, collected_coin);
+        let coin = extract(&mut coin_store.coin, amount);
+        merge_aggregatable_coin(dst_coin, coin);
     }
 
     //

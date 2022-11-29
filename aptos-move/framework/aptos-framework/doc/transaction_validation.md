@@ -465,8 +465,11 @@ Called by the Adapter
     );
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
+        // If transaction fees are redistributed <b>to</b> validators, collect them here for
+        // later redistribution.
         <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">transaction_fee::collect_fee</a>(addr, transaction_fee_amount);
     } <b>else</b> {
+        // Otherwise, just burn the fee.
         <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(addr, transaction_fee_amount);
     };
 

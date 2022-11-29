@@ -197,8 +197,11 @@ module aptos_framework::transaction_validation {
         );
 
         if (features::collect_and_distribute_gas_fees()) {
+            // If transaction fees are redistributed to validators, collect them here for
+            // later redistribution.
             transaction_fee::collect_fee(addr, transaction_fee_amount);
         } else {
+            // Otherwise, just burn the fee.
             transaction_fee::burn_fee(addr, transaction_fee_amount);
         };
 

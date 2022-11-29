@@ -154,7 +154,7 @@ distribution. Should be called by on-chain governance.
     <a href="stake.md#0x1_stake_initialize_fees_table">stake::initialize_fees_table</a>(aptos_framework);
 
     // Initially, no fees are collected and the <a href="block.md#0x1_block">block</a> proposer is not set.
-    <b>let</b> zero = <a href="coin.md#0x1_coin_initialize_aggregator_coin">coin::initialize_aggregator_coin</a>(aptos_framework);
+    <b>let</b> zero = <a href="coin.md#0x1_coin_initialize_aggregatable_coin">coin::initialize_aggregatable_coin</a>(aptos_framework);
     <b>let</b> info = <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
         amount: zero,
         proposer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
@@ -249,12 +249,12 @@ called by the VM and should be called at the beginning of the block.
     <b>let</b> collected_fees = <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);
 
     // If there are no collected fees, do nothing.
-    <b>if</b> (<a href="coin.md#0x1_coin_is_zero">coin::is_zero</a>(&collected_fees.amount)) {
+    <b>if</b> (<a href="coin.md#0x1_coin_is_aggregatable_coin_zero">coin::is_aggregatable_coin_zero</a>(&collected_fees.amount)) {
         <b>return</b>
     };
 
     // Otherwise get the collected fee, and check <b>if</b> it can distributed later.
-    <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_drain">coin::drain</a>(&<b>mut</b> collected_fees.amount);
+    <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_drain_aggregatable_coin">coin::drain_aggregatable_coin</a>(&<b>mut</b> collected_fees.amount);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&collected_fees.proposer)) {
         <b>let</b> proposer_addr = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&collected_fees.proposer);
         <b>if</b> (<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(proposer_addr)) {
@@ -357,7 +357,7 @@ Collect transaction fees in epilogue.
     // or we cannot redistribute fees later for some reason (e.g. <a href="account.md#0x1_account">account</a> cannot receive AptoCoin)
     // we burn them all at once. This way we avoid having a check for every transaction epilogue.
     <b>let</b> collected_amount = &<b>mut</b> collected_fees.amount;
-    <a href="coin.md#0x1_coin_collect_from">coin::collect_from</a>&lt;AptosCoin&gt;(<a href="account.md#0x1_account">account</a>, fee, collected_amount);
+    <a href="coin.md#0x1_coin_collect_from_into_aggregatable_coin">coin::collect_from_into_aggregatable_coin</a>&lt;AptosCoin&gt;(<a href="account.md#0x1_account">account</a>, fee, collected_amount);
 }
 </code></pre>
 

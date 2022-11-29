@@ -45,7 +45,7 @@ module aptos_framework::transaction_fee {
         stake::initialize_fees_table(aptos_framework);
 
         // Initially, no fees are collected and the block proposer is not set.
-        let zero = coin::initialize_aggregator_coin(aptos_framework);
+        let zero = coin::initialize_aggregatable_coin(aptos_framework);
         let info = CollectedFeesPerBlock {
             amount: zero,
             proposer: option::none(),
@@ -80,12 +80,12 @@ module aptos_framework::transaction_fee {
         let collected_fees = borrow_global_mut<CollectedFeesPerBlock>(@aptos_framework);
 
         // If there are no collected fees, do nothing.
-        if (coin::is_zero(&collected_fees.amount)) {
+        if (coin::is_aggregatable_coin_zero(&collected_fees.amount)) {
             return
         };
 
         // Otherwise get the collected fee, and check if it can distributed later.
-        let coin = coin::drain(&mut collected_fees.amount);
+        let coin = coin::drain_aggregatable_coin(&mut collected_fees.amount);
         if (option::is_some(&collected_fees.proposer)) {
             let proposer_addr = *option::borrow(&collected_fees.proposer);
             if (coin::is_account_registered<AptosCoin>(proposer_addr)) {
@@ -128,7 +128,7 @@ module aptos_framework::transaction_fee {
         // or we cannot redistribute fees later for some reason (e.g. account cannot receive AptoCoin)
         // we burn them all at once. This way we avoid having a check for every transaction epilogue.
         let collected_amount = &mut collected_fees.amount;
-        coin::collect_from<AptosCoin>(account, fee, collected_amount);
+        coin::collect_from_into_aggregatable_coin<AptosCoin>(account, fee, collected_amount);
     }
 
     /// Only called during genesis.
@@ -150,7 +150,7 @@ module aptos_framework::transaction_fee {
 
         // Check that initial balance is 0 and there is no proposer set.
         let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
-        assert!(coin::is_zero(&collected_fees.amount), 0);
+        assert!(coin::is_aggregatable_coin_zero(&collected_fees.amount), 0);
         assert!(option::is_none(&collected_fees.proposer), 0);
         assert!(collected_fees.burn_percentage == 25, 0);
     }
@@ -225,7 +225,7 @@ module aptos_framework::transaction_fee {
 
         // Check that there was no fees distribution in the first block.
         let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
-        assert!(coin::is_zero(&collected_fees.amount), 0);
+        assert!(coin::is_aggregatable_coin_zero(&collected_fees.amount), 0);
         assert!(*option::borrow(&collected_fees.proposer) == alice_addr, 0);
         assert!(*option::borrow(&coin::supply<AptosCoin>()) == 20000, 0);
 
@@ -249,7 +249,7 @@ module aptos_framework::transaction_fee {
 
         // Also, aggregator coin is drained and total supply is slightly changed (10% of 1000 is burnt).
         let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
-        assert!(coin::is_zero(&collected_fees.amount), 0);
+        assert!(coin::is_aggregatable_coin_zero(&collected_fees.amount), 0);
         assert!(*option::borrow(&collected_fees.proposer) == bob_addr, 0);
         assert!(*option::borrow(&coin::supply<AptosCoin>()) == 19900, 0);
 
@@ -272,7 +272,7 @@ module aptos_framework::transaction_fee {
 
         // Again, aggregator coin is drained and total supply is changed by 10% of 9000.
         let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
-        assert!(coin::is_zero(&collected_fees.amount), 0);
+        assert!(coin::is_aggregatable_coin_zero(&collected_fees.amount), 0);
         assert!(*option::borrow(&collected_fees.proposer) == carol_addr, 0);
         assert!(*option::borrow(&coin::supply<AptosCoin>()) == 19000, 0);
 
@@ -291,7 +291,7 @@ module aptos_framework::transaction_fee {
         // Since carol has no account registered, fees should be burnt and total supply
         // should reflect that.
         let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
-        assert!(coin::is_zero(&collected_fees.amount), 0);
+        assert!(coin::is_aggregatable_coin_zero(&collected_fees.amount), 0);
         assert!(*option::borrow(&collected_fees.proposer) == alice_addr, 0);
         assert!(*option::borrow(&coin::supply<AptosCoin>()) == 17000, 0);
 

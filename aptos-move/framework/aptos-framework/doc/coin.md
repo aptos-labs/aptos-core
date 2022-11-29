@@ -19,11 +19,11 @@ This module provides the foundation for typesafe Coins.
 -  [Constants](#@Constants_0)
 -  [Function `initialize_supply_config`](#0x1_coin_initialize_supply_config)
 -  [Function `allow_supply_upgrades`](#0x1_coin_allow_supply_upgrades)
--  [Function `initialize_aggregator_coin`](#0x1_coin_initialize_aggregator_coin)
--  [Function `is_zero`](#0x1_coin_is_zero)
--  [Function `drain`](#0x1_coin_drain)
--  [Function `aggregate`](#0x1_coin_aggregate)
--  [Function `collect_from`](#0x1_coin_collect_from)
+-  [Function `initialize_aggregatable_coin`](#0x1_coin_initialize_aggregatable_coin)
+-  [Function `is_aggregatable_coin_zero`](#0x1_coin_is_aggregatable_coin_zero)
+-  [Function `drain_aggregatable_coin`](#0x1_coin_drain_aggregatable_coin)
+-  [Function `merge_aggregatable_coin`](#0x1_coin_merge_aggregatable_coin)
+-  [Function `collect_from_into_aggregatable_coin`](#0x1_coin_collect_from_into_aggregatable_coin)
 -  [Function `coin_address`](#0x1_coin_coin_address)
 -  [Function `balance`](#0x1_coin_balance)
 -  [Function `is_coin_initialized`](#0x1_coin_is_coin_initialized)
@@ -131,7 +131,9 @@ Main structure representing a coin/token in an account's custody.
 
 ## Struct `AggregatableCoin`
 
-Structure representing aggregatable coin.
+Represents a coin with aggregator as its value. This allows to update
+the coin in every transaction avoiding read-modify-write conflicts. Only
+used for gas fees distribution by Aptos Framework (0x1).
 
 
 <pre><code><b>struct</b> <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt; <b>has</b> store
@@ -148,7 +150,7 @@ Structure representing aggregatable coin.
 <code>value: <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a></code>
 </dt>
 <dd>
- Amount of aggregator coin this address has.
+ Amount of aggregatable coin this address has.
 </dd>
 </dl>
 
@@ -445,12 +447,12 @@ Maximum possible coin supply.
 
 
 
-<a name="0x1_coin_EAGGREGATOR_COIN_VALUE_TOO_LARGE"></a>
+<a name="0x1_coin_EAGGREGATABLE_COIN_VALUE_TOO_LARGE"></a>
 
-The value of aggregator coin does not fit in u64.
+The value of aggregatable coin used for transaction fees redistribution does not fit in u64.
 
 
-<pre><code><b>const</b> <a href="coin.md#0x1_coin_EAGGREGATOR_COIN_VALUE_TOO_LARGE">EAGGREGATOR_COIN_VALUE_TOO_LARGE</a>: u64 = 14;
+<pre><code><b>const</b> <a href="coin.md#0x1_coin_EAGGREGATABLE_COIN_VALUE_TOO_LARGE">EAGGREGATABLE_COIN_VALUE_TOO_LARGE</a>: u64 = 14;
 </code></pre>
 
 
@@ -646,15 +648,15 @@ This should be called by on-chain governance to update the config and allow
 
 </details>
 
-<a name="0x1_coin_initialize_aggregator_coin"></a>
+<a name="0x1_coin_initialize_aggregatable_coin"></a>
 
-## Function `initialize_aggregator_coin`
+## Function `initialize_aggregatable_coin`
 
 Creates a new aggregatable coin with value overflowing on <code>limit</code>. Note that this function can
 only be called by Aptos Framework (0x1) account for now becuase of <code>create_aggregator</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_initialize_aggregator_coin">initialize_aggregator_coin</a>&lt;CoinType&gt;(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_initialize_aggregatable_coin">initialize_aggregatable_coin</a>&lt;CoinType&gt;(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;
 </code></pre>
 
 
@@ -663,7 +665,7 @@ only be called by Aptos Framework (0x1) account for now becuase of <code>create_
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_initialize_aggregator_coin">initialize_aggregator_coin</a>&lt;CoinType&gt;(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_initialize_aggregatable_coin">initialize_aggregatable_coin</a>&lt;CoinType&gt;(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt; {
     <b>let</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> = <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator">aggregator_factory::create_aggregator</a>(aptos_framework, <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>);
     <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt; {
         value: <a href="aggregator.md#0x1_aggregator">aggregator</a>,
@@ -675,14 +677,14 @@ only be called by Aptos Framework (0x1) account for now becuase of <code>create_
 
 </details>
 
-<a name="0x1_coin_is_zero"></a>
+<a name="0x1_coin_is_aggregatable_coin_zero"></a>
 
-## Function `is_zero`
+## Function `is_aggregatable_coin_zero`
 
 Returns true if the value of aggregatable coin is zero.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_zero">is_zero</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_is_aggregatable_coin_zero">is_aggregatable_coin_zero</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;): bool
 </code></pre>
 
 
@@ -691,7 +693,7 @@ Returns true if the value of aggregatable coin is zero.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_zero">is_zero</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt;): bool {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_is_aggregatable_coin_zero">is_aggregatable_coin_zero</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt;): bool {
     <b>let</b> amount = <a href="aggregator.md#0x1_aggregator_read">aggregator::read</a>(&<a href="coin.md#0x1_coin">coin</a>.value);
     amount == 0
 }
@@ -701,14 +703,14 @@ Returns true if the value of aggregatable coin is zero.
 
 </details>
 
-<a name="0x1_coin_drain"></a>
+<a name="0x1_coin_drain_aggregatable_coin"></a>
 
-## Function `drain`
+## Function `drain_aggregatable_coin`
 
 Drains the aggregatable coin, setting it to zero and returning a standard coin.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_drain">drain</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_drain_aggregatable_coin">drain_aggregatable_coin</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
 </code></pre>
 
 
@@ -717,9 +719,9 @@ Drains the aggregatable coin, setting it to zero and returning a standard coin.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_drain">drain</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt;): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_drain_aggregatable_coin">drain_aggregatable_coin</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt;): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
     <b>let</b> amount = <a href="aggregator.md#0x1_aggregator_read">aggregator::read</a>(&<a href="coin.md#0x1_coin">coin</a>.value);
-    <b>assert</b>!(amount &lt;= <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="coin.md#0x1_coin_EAGGREGATOR_COIN_VALUE_TOO_LARGE">EAGGREGATOR_COIN_VALUE_TOO_LARGE</a>));
+    <b>assert</b>!(amount &lt;= <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="coin.md#0x1_coin_EAGGREGATABLE_COIN_VALUE_TOO_LARGE">EAGGREGATABLE_COIN_VALUE_TOO_LARGE</a>));
 
     <a href="aggregator.md#0x1_aggregator_sub">aggregator::sub</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>.value, amount);
     <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
@@ -732,14 +734,14 @@ Drains the aggregatable coin, setting it to zero and returning a standard coin.
 
 </details>
 
-<a name="0x1_coin_aggregate"></a>
+<a name="0x1_coin_merge_aggregatable_coin"></a>
 
-## Function `aggregate`
+## Function `merge_aggregatable_coin`
 
-Aggregates <code><a href="coin.md#0x1_coin">coin</a></code> into aggregatable coin (<code>dst_coin</code>).
+Merges <code><a href="coin.md#0x1_coin">coin</a></code> into aggregatable coin (<code>dst_coin</code>).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_aggregate">aggregate</a>&lt;CoinType&gt;(dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_merge_aggregatable_coin">merge_aggregatable_coin</a>&lt;CoinType&gt;(dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
 </code></pre>
 
 
@@ -748,7 +750,7 @@ Aggregates <code><a href="coin.md#0x1_coin">coin</a></code> into aggregatable co
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_aggregate">aggregate</a>&lt;CoinType&gt;(dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_merge_aggregatable_coin">merge_aggregatable_coin</a>&lt;CoinType&gt;(dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;) {
     <b>let</b> <a href="coin.md#0x1_coin_Coin">Coin</a> { value } = <a href="coin.md#0x1_coin">coin</a>;
     <b>let</b> amount = (value <b>as</b> u128);
     <a href="aggregator.md#0x1_aggregator_add">aggregator::add</a>(&<b>mut</b> dst_coin.value, amount);
@@ -759,14 +761,14 @@ Aggregates <code><a href="coin.md#0x1_coin">coin</a></code> into aggregatable co
 
 </details>
 
-<a name="0x1_coin_collect_from"></a>
+<a name="0x1_coin_collect_from_into_aggregatable_coin"></a>
 
-## Function `collect_from`
+## Function `collect_from_into_aggregatable_coin`
 
-Collects a specified amount form an account to aggregatable coin.
+Collects a specified amount of coin form an account into aggregatable coin.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_collect_from">collect_from</a>&lt;CoinType&gt;(account_addr: <b>address</b>, amount: u64, dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_collect_from_into_aggregatable_coin">collect_from_into_aggregatable_coin</a>&lt;CoinType&gt;(account_addr: <b>address</b>, amount: u64, dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;)
 </code></pre>
 
 
@@ -775,7 +777,7 @@ Collects a specified amount form an account to aggregatable coin.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_collect_from">collect_from</a>&lt;CoinType&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_collect_from_into_aggregatable_coin">collect_from_into_aggregatable_coin</a>&lt;CoinType&gt;(
     account_addr: <b>address</b>,
     amount: u64,
     dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt;,
@@ -786,8 +788,8 @@ Collects a specified amount form an account to aggregatable coin.
     };
 
     <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
-    <b>let</b> collected_coin = <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, amount);
-    <a href="coin.md#0x1_coin_aggregate">aggregate</a>(dst_coin, collected_coin);
+    <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, amount);
+    <a href="coin.md#0x1_coin_merge_aggregatable_coin">merge_aggregatable_coin</a>(dst_coin, <a href="coin.md#0x1_coin">coin</a>);
 }
 </code></pre>
 
