@@ -12,7 +12,7 @@ import { TransactionBuilder, TransactionBuilderABI, TxnBuilderTypes } from "./tr
 import { MAX_U64_BIG_INT } from "./bcs/consts";
 import { TOKEN_ABIS, TOKEN_TRANSFER_OPT_IN } from "./abis";
 import { AnyNumber, bcsToBytes, Bytes } from "./bcs";
-import { getPropertyValueRaw } from "./utils/property_map_serializer";
+import { getPropertyValueRaw, PropertyMap } from "./utils/property_map_serde";
 import {
   Script,
   TransactionArgumentAddress,
@@ -20,6 +20,7 @@ import {
   TransactionArgumentU8Vector,
   TransactionPayloadScript,
 } from "./aptos_types";
+import { Token, TokenData } from "./token_types";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
@@ -356,7 +357,7 @@ export class TokenClient {
   }
 
   /**
-   * User opt-in or out direct transfer through a boolean flag
+   * Directly transfer token to a receiver. The receiver should have opted in to direct transfer
    *
    * @param sender AptosAccount where the token will be transferred
    * @param creator  address of the token creator
@@ -570,7 +571,17 @@ export class TokenClient {
 
     // We know the response will be a struct containing TokenData, hence the
     // implicit cast.
-    return this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
+    const rawTokenData = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
+    return new TokenData(
+      rawTokenData.collection,
+      rawTokenData.description,
+      rawTokenData.name,
+      rawTokenData.maximum,
+      rawTokenData.supply,
+      rawTokenData.uri,
+      rawTokenData.default_properties,
+      rawTokenData.mutability_config,
+    );
   } // <:!:getTokenData
 
   /**
@@ -629,13 +640,14 @@ export class TokenClient {
     };
 
     try {
-      return await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
+      const rawToken = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
+      return new Token(rawToken.id, rawToken.amount, rawToken.token_properties);
     } catch (error: any) {
       if (error?.status === 404) {
         return {
           id: tokenId,
           amount: "0",
-          token_properties: {},
+          token_properties: new PropertyMap(),
         };
       }
       return error;

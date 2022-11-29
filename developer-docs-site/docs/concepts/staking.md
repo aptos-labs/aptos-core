@@ -8,7 +8,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Staking
 
 :::tip Consensus
-We strongly recommend that you read the consensus section of the [Life of a Transaction](/guides/basics-life-of-txn#consensus) before proceeding further. 
+We strongly recommend that you read the consensus section of the [Life of a Transaction](../guides/basics-life-of-txn#consensus) before proceeding further. 
 :::
 
 In a distributed system like blockchain, executing a transaction is distinct from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before the results are persisted in storage and the state of the ledger is updated. 
@@ -81,7 +81,7 @@ As an operator:
 An owner can designate a voter. This enables the voter to participate in governance. The voter  will use the voter key to sign the governance votes in the transactions.
 
 :::tip Governance
-This document describes staking. See [Governance](governance.md) for how to participate in the Aptos on-chain governance using the owner-voter model.
+This document describes staking. See [Governance](./governance.md) for how to participate in the Aptos on-chain governance using the owner-voter model.
 :::
 
 ## Validation on the Aptos blockchain
@@ -152,7 +152,7 @@ sources={{
 ## Validator flow
 
 :::tip Staking pool operations
-See [Staking pool operations](/nodes/validator-node/operator/staking-pool-operations.md) for the correct sequence of commands to run for the below flow.
+See [Staking pool operations](../nodes/validator-node/operator/staking-pool-operations.md) for the correct sequence of commands to run for the below flow.
 :::
 
 1. Owner initializes the stake pool with `aptos stake initialize-stake-owner`.
@@ -178,7 +178,7 @@ Participating as a validator node on the Aptos network works like this:
 6.  Operator must wait until the new epoch starts before their validator becomes active.
 
 :::tip Joining the validator set
-For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](/nodes/validator-node/operator/staking-pool-operations#joining-validator-set).
+For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](../nodes/validator-node/operator/staking-pool-operations.md#joining-validator-set).
 :::
 
 ### Minimum and maximum stake
@@ -276,10 +276,6 @@ See the Aptos Stake module in the Move language at [stake.move](https://github.c
 - At any time you can call the following sequence of functions to leave the validator set:
     - Call `Stake::unlock` to unlock your stake amount, and 
     - Either call `Stake::withdraw` to withdraw your staked amount at the next epoch, or call `Stake::leave_validator_set`.
-
-:::tip Leaving the validator set
-For step-by-step instructions on how to leave the validator set, see: [Leaving Validator Set](/nodes/ait/connect-to-testnet#leaving-validator-set).
-:::
 
 ## Rejoining the validator set
 

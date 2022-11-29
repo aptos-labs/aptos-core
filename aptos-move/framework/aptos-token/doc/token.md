@@ -138,13 +138,15 @@ Checkout our developer doc on our token standard https://aptos.dev/concepts/coin
 <code>amount: u64</code>
 </dt>
 <dd>
-
+ the amount of tokens. Only property_version = 0 can have a value bigger than 1.
 </dd>
 <dt>
 <code>token_properties: <a href="property_map.md#0x3_property_map_PropertyMap">property_map::PropertyMap</a></code>
 </dt>
 <dd>
-
+ The properties with this token.
+ when property_version = 0, the token_properties are the same as default_properties in TokenData, we don't store it.
+ when the property_map mutates, a new property_version is assigned to the token.
 </dd>
 </dl>
 
@@ -172,13 +174,13 @@ global unique identifier of a token
 <code>token_data_id: <a href="token.md#0x3_token_TokenDataId">token::TokenDataId</a></code>
 </dt>
 <dd>
-
+ the id to the common token data shared by token with different property_version
 </dd>
 <dt>
 <code>property_version: u64</code>
 </dt>
 <dd>
-
+ The version of the property map; when a fungible token is mutated, a new property version is created and assigned to the token to make it an NFT
 </dd>
 </dl>
 
@@ -206,19 +208,19 @@ globally unique identifier of tokendata
 <code>creator: <b>address</b></code>
 </dt>
 <dd>
-
+ The address of the creator, eg: 0xcafe
 </dd>
 <dt>
 <code>collection: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
-
+ The name of collection; this is unique under the same account, eg: "Aptos Animal Collection"
 </dd>
 <dt>
 <code>name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
-
+ The name of the token; this is the same as the name field of TokenData
 </dd>
 </dl>
 
@@ -246,55 +248,55 @@ The shared TokenData by tokens with different property_version
 <code>maximum: u64</code>
 </dt>
 <dd>
-
+ The maximal number of tokens that can be minted under this TokenData; if the maximum is 0, there is no limit
 </dd>
 <dt>
 <code>largest_property_version: u64</code>
 </dt>
 <dd>
-
+ The current largest property version of all tokens with this TokenData
 </dd>
 <dt>
 <code>supply: u64</code>
 </dt>
 <dd>
-
+ The number of tokens with this TokenData. Supply is only tracked for the limited token whose maximum is not 0
 </dd>
 <dt>
 <code>uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
-
+ The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain storage; the URL length should be less than 512 characters, eg: https://arweave.net/Fmmn4ul-7Mv6vzm7JwE69O-I-vd6Bz2QriJO1niwCh4
 </dd>
 <dt>
 <code>royalty: <a href="token.md#0x3_token_Royalty">token::Royalty</a></code>
 </dt>
 <dd>
-
+ The denominator and numerator for calculating the royalty fee; it also contains payee account address for depositing the Royalty
 </dd>
 <dt>
 <code>name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
-
+ The name of the token, which should be unique within the collection; the length of name should be smaller than 128, characters, eg: "Aptos Animal #1234"
 </dd>
 <dt>
 <code>description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
-
+ Describes this Token
 </dd>
 <dt>
 <code>default_properties: <a href="property_map.md#0x3_property_map_PropertyMap">property_map::PropertyMap</a></code>
 </dt>
 <dd>
-
+ The properties are stored in the TokenData that are shared by all tokens
 </dd>
 <dt>
 <code>mutability_config: <a href="token.md#0x3_token_TokenMutabilityConfig">token::TokenMutabilityConfig</a></code>
 </dt>
 <dd>
-
+ Control the TokenData field mutability
 </dd>
 </dl>
 
@@ -334,7 +336,8 @@ The royalty of a token
 <code>payee_address: <b>address</b></code>
 </dt>
 <dd>
-
+ if the token is jointly owned by multiple creators, the group of creators should create a shared account.
+ the payee_address will be the shared account address.
 </dd>
 </dl>
 
@@ -362,31 +365,31 @@ This config specifies which fields in the TokenData are mutable
 <code>maximum: bool</code>
 </dt>
 <dd>
-
+ control if the token maximum is mutable
 </dd>
 <dt>
 <code>uri: bool</code>
 </dt>
 <dd>
-
+ control if the token uri is mutable
 </dd>
 <dt>
 <code>royalty: bool</code>
 </dt>
 <dd>
-
+ control if the token royalty is mutable
 </dd>
 <dt>
 <code>description: bool</code>
 </dt>
 <dd>
-
+ control if the token description is mutable
 </dd>
 <dt>
 <code>properties: bool</code>
 </dt>
 <dd>
-
+ control if the property map is mutable
 </dd>
 </dl>
 
@@ -414,7 +417,7 @@ Represents token resources owned by token owner
 <code>tokens: <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="token.md#0x3_token_TokenId">token::TokenId</a>, <a href="token.md#0x3_token_Token">token::Token</a>&gt;</code>
 </dt>
 <dd>
-
+ the tokens owned by a token owner
 </dd>
 <dt>
 <code>direct_transfer: bool</code>
@@ -472,19 +475,19 @@ This config specifies which fields in the Collection are mutable
 <code>description: bool</code>
 </dt>
 <dd>
-
+ control if description is mutable
 </dd>
 <dt>
 <code>uri: bool</code>
 </dt>
 <dd>
-
+ control if uri is mutable
 </dd>
 <dt>
 <code>maximum: bool</code>
 </dt>
 <dd>
-
+ control if collection maxium is mutable
 </dd>
 </dl>
 
@@ -564,37 +567,38 @@ Represent the collection metadata
 <code>description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
-
+ A description for the token collection Eg: "Aptos Toad Overload"
 </dd>
 <dt>
 <code>name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
-
+ The collection name, which should be unique among all collections by the creator; the name should also be smaller than 128 characters, eg: "Animal Collection"
 </dd>
 <dt>
 <code>uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
-
+ The URI for the collection; its length should be smaller than 512 characters
 </dd>
 <dt>
 <code>supply: u64</code>
 </dt>
 <dd>
-
+ The number of different TokenData entries in this collection
 </dd>
 <dt>
 <code>maximum: u64</code>
 </dt>
 <dd>
-
+ If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum
+ If maximal is 0, Aptos doesn't track the supply of this collection, and there is no limit
 </dd>
 <dt>
 <code>mutability_config: <a href="token.md#0x3_token_CollectionMutabilityConfig">token::CollectionMutabilityConfig</a></code>
 </dt>
 <dd>
-
+ control which collectionData field is mutable
 </dd>
 </dl>
 

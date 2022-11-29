@@ -10,11 +10,8 @@ use aptos_logger::prelude::*;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
-    access_path::AccessPath,
-    on_chain_config::ConfigStorage,
-    state_store::state_key::StateKey,
-    vm_status::StatusCode,
-    write_set::{WriteOp, WriteSet},
+    access_path::AccessPath, on_chain_config::ConfigStorage, state_store::state_key::StateKey,
+    vm_status::StatusCode, write_set::WriteOp,
 };
 use fail::fail_point;
 use framework::natives::state_storage::StateStorageUsageResolver;
@@ -26,6 +23,7 @@ use move_core_types::{
 };
 use move_table_extension::{TableHandle, TableResolver};
 use std::{
+    borrow::Cow,
     collections::btree_map::BTreeMap,
     ops::{Deref, DerefMut},
 };
@@ -34,10 +32,6 @@ use std::{
 /// but can be used as a one shot cache for systems that need a simple `RemoteCache`
 /// implementation (e.g. tests or benchmarks).
 ///
-/// The cache is responsible to track all changes to the `StateView` that are the result
-/// of transaction execution. Those side effects are published at the end of a transaction
-/// execution via `StateViewCache::push_write_set`.
-///
 /// `StateViewCache` is responsible to give an up to date view over the data store,
 /// so that changes executed but not yet committed are visible to subsequent transactions.
 ///
@@ -45,33 +39,23 @@ use std::{
 /// track of incremental changes is vital to the consistency of the data store and the system.
 pub struct StateViewCache<'a, S> {
     data_view: &'a S,
-    data_map: BTreeMap<StateKey, Option<Vec<u8>>>,
+    data_map: Cow<'a, BTreeMap<StateKey, WriteOp>>,
 }
 
 impl<'a, S: StateView> StateViewCache<'a, S> {
+    pub fn from_map_ref(data_view: &'a S, data_map_ref: &'a BTreeMap<StateKey, WriteOp>) -> Self {
+        Self {
+            data_view,
+            data_map: Cow::Borrowed(data_map_ref),
+        }
+    }
+
     /// Create a `StateViewCache` give a `StateView`. Hold updates to the data store and
     /// forward data request to the `StateView` if not in the local cache.
     pub fn new(data_view: &'a S) -> Self {
         StateViewCache {
             data_view,
-            data_map: BTreeMap::new(),
-        }
-    }
-
-    // Publishes a `WriteSet` computed at the end of a transaction.
-    // The effect is to build a layer in front of the `StateView` which keeps
-    // track of the data as if the changes were applied immediately.
-    pub(crate) fn push_write_set(&mut self, write_set: &WriteSet) {
-        for (ap, write_op) in write_set.iter() {
-            match write_op {
-                WriteOp::Modification(blob) | WriteOp::Creation(blob) => {
-                    self.data_map.insert(ap.clone(), Some(blob.clone()));
-                }
-                WriteOp::Deletion => {
-                    self.data_map.remove(ap);
-                    self.data_map.insert(ap.clone(), None);
-                }
-            }
+            data_map: Cow::Owned(BTreeMap::new()),
         }
     }
 }
@@ -84,7 +68,10 @@ impl<'block, S: StateView> StateView for StateViewCache<'block, S> {
         )));
 
         match self.data_map.get(state_key) {
-            Some(opt_data) => Ok(opt_data.clone()),
+            Some(write_op) => Ok(match write_op {
+                WriteOp::Modification(blob) | WriteOp::Creation(blob) => Some(blob.clone()),
+                WriteOp::Deletion => None,
+            }),
             None => match self.data_view.get_state_value(state_key) {
                 Ok(remote_data) => Ok(remote_data),
                 // TODO: should we forward some error info?

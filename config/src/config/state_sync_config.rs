@@ -76,13 +76,13 @@ pub struct StateSyncDriverConfig {
 impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
-            bootstrapping_mode: BootstrappingMode::ExecuteTransactionsFromGenesis,
+            bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
             commit_notification_timeout_ms: 5000,
-            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactions,
+            continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
-            max_num_stream_timeouts: 6,
+            max_num_stream_timeouts: 12,
             max_pending_data_chunks: 100,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
@@ -170,9 +170,11 @@ impl Default for DataStreamingServiceConfig {
 pub struct AptosDataClientConfig {
     pub max_num_in_flight_priority_polls: u64, // Max num of in-flight polls for priority peers
     pub max_num_in_flight_regular_polls: u64,  // Max num of in-flight polls for regular peers
-    pub response_timeout_ms: u64, // Timeout (in milliseconds) when waiting for a response
-    pub summary_poll_interval_ms: u64, // Interval (in milliseconds) between data summary polls
-    pub use_compression: bool,    // Whether or not to request compression for incoming data
+    pub max_response_timeout_ms: u64, // Max timeout (in ms) when waiting for a response (after exponential increases)
+    pub response_timeout_ms: u64,     // First timeout (in ms) when waiting for a response
+    pub subscription_timeout_ms: u64, // Timeout (in ms) when waiting for a subscription response
+    pub summary_poll_interval_ms: u64, // Interval (in ms) between data summary polls
+    pub use_compression: bool,        // Whether or not to request compression for incoming data
 }
 
 impl Default for AptosDataClientConfig {
@@ -180,7 +182,9 @@ impl Default for AptosDataClientConfig {
         Self {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
-            response_timeout_ms: 20000, // 20 seconds
+            max_response_timeout_ms: 60000, // 60 seconds
+            response_timeout_ms: 10000,     // 10 seconds
+            subscription_timeout_ms: 5000,  // 5 seconds
             summary_poll_interval_ms: 200,
             use_compression: true,
         }
