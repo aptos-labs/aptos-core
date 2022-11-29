@@ -27,12 +27,11 @@ register and store new LiquidityCoin resources.
 
 Code snippets to help:
 ```
-fun init_module(source: &signer) {
+fun init_module(resource: &signer) {
 let dev_address = @DEV_ADDR;
-let signer_cap = retrieve_resource_account_cap(&source, dev_address);
-let lp_signer = create_signer_with_capability(&signer_cap);
+let signer_cap = retrieve_resource_account_cap(resource, dev_address);
 let lp = LiquidityPoolInfo { signer_cap: signer_cap, ... };
-move_to(&lp_signer, lp);
+move_to(resource, lp);
 }
 ```
 
