@@ -1,5 +1,5 @@
 output "helm_release_name" {
-  value = helm_release.validator[0].name
+  value = local.helm_release_name
 }
 
 output "aws_eks_cluster" {

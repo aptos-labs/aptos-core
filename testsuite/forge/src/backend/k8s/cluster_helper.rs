@@ -26,6 +26,7 @@ use kube::{
     Config, Error as KubeError,
 };
 use rand::Rng;
+use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::{
@@ -503,13 +504,21 @@ pub async fn install_testnet_resources(
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     let kube_client = create_k8s_client().await;
 
-    // get deployment-specific helm values and cache it
-    let tmp_dir = TempDir::new().expect("Could not create temp dir");
-    let aptos_node_values_file = dump_helm_values_to_file(APTOS_NODE_HELM_RELEASE_NAME, &tmp_dir)?;
-    let genesis_values_file = dump_helm_values_to_file(GENESIS_HELM_RELEASE_NAME, &tmp_dir)?;
-
     // generate a random era to wipe the network state
     let new_era = generate_new_era();
+
+    // get deployment-specific helm values and cache it
+    let tmp_dir = TempDir::new().expect("Could not create temp dir");
+
+    // get the default helm values for aptos-node and replace all reference of era with the new era
+    let aptos_node_values_file = dump_helm_values_to_file_with_era_replacement(
+        APTOS_NODE_HELM_RELEASE_NAME,
+        &new_era,
+        &tmp_dir,
+    )?;
+
+    // get the default helm values for genesis and use as is
+    let genesis_values_file = dump_helm_values_to_file(GENESIS_HELM_RELEASE_NAME, &tmp_dir)?;
 
     // get forge override helm values and cache it
     let aptos_node_forge_helm_values_yaml = construct_node_helm_values(
@@ -752,6 +761,32 @@ pub fn dump_string_to_file(
     Ok(file_path_str)
 }
 
+/// Replace all references of eras in a helm values string with the given era. Assumes the existing era is numeric
+fn replace_all_era_references_in_helm(helm_values: &str, new_era: &str) -> Result<String> {
+    // replace era when used in s3 genesis path
+    let re = Regex::new(r"e(?P<era>[0-9]+)-(?P<filename>waypoint.txt|genesis.blob)").unwrap();
+    let new_helm_values = re.replace_all(helm_values, &format!("e{}-${{filename}}", new_era));
+    // replace era when in helm value
+    let re = Regex::new(r"era: (?P<era>[0-9]+)").unwrap();
+    let new_helm_values = re.replace_all(&new_helm_values, &format!("era: {}", new_era));
+    Ok(new_helm_values.to_string())
+}
+
+/// Dumps the given helm release's values into a file at the temp directory, while replacing all references to the chain's era
+fn dump_helm_values_to_file_with_era_replacement(
+    helm_release_name: &str,
+    new_era: &str,
+    tmp_dir: &TempDir,
+) -> Result<String> {
+    let v: Value = get_helm_status(helm_release_name).unwrap();
+    let config = &v["config"];
+    let content = config.to_string();
+
+    let new_helm_values = replace_all_era_references_in_helm(&content, new_era)?;
+    dump_string_to_file("helm_values.yaml".to_string(), new_helm_values, tmp_dir)
+}
+
+/// Dumps the given helm release's values into a file at the temp directory
 fn dump_helm_values_to_file(helm_release_name: &str, tmp_dir: &TempDir) -> Result<String> {
     // get aptos-node values
     let v: Value = get_helm_status(helm_release_name).unwrap();
@@ -1230,5 +1265,16 @@ labels:
             "foo".to_string(),
             time_since_the_epoch
         ));
+    }
+
+    #[tokio::test]
+    async fn test_helm_value_era_replacement() {
+        let helm_values =
+            "test: abc\nera: 123\n cmd: \"echo e123 && curl genesis/aptos-node/e123-genesis.blob && curl genesis/aptos-node/e123-waypoint.txt\"";
+        let expected_helm_values =
+            "test: abc\nera: 456\n cmd: \"echo e123 && curl genesis/aptos-node/e456-genesis.blob && curl genesis/aptos-node/e456-waypoint.txt\"";
+        let new_era = "456";
+        let new_helm_values = replace_all_era_references_in_helm(helm_values, new_era);
+        assert_eq!(new_helm_values.unwrap(), expected_helm_values);
     }
 }

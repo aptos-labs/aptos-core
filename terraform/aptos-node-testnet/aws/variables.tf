@@ -232,3 +232,15 @@ variable "manage_via_tf" {
   description = "Whether to manage the aptos-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
   default     = true
 }
+
+### Genesis configs
+
+variable "genesis_initcontainer_image" {
+  description = "Image used for the genesis initcontainer, which pulls the genesis data from S3"
+  default     = "public.ecr.aws/aws-cli/aws-cli:2.8.13@sha256:8f062519c92b3c4689a5cb0e2426c9976ed1559bafcf25439ad885484b2b8afe"
+}
+
+variable "genesis_s3_retention_days" {
+  description = "Number of days to retain genesis data in S3. If unset, no expiration is set"
+  default     = ""
+}
