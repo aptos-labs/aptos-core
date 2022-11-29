@@ -43,6 +43,8 @@ impl MoveVmExt {
                     max_generic_instantiation_length: Some(32),
                     max_function_parameters: Some(128),
                     max_basic_blocks: Some(1024),
+                    max_value_stack_size: 1024,
+                    max_type_nodes: Some(256),
                 },
                 crate::AptosVM::get_runtime_config(),
             )?,
