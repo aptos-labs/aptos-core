@@ -1,0 +1,54 @@
+{
+  "name": "aptos-node-tools",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@emotion/react": "latest",
+    "@emotion/styled": "latest",
+    "@mui/icons-material": "^5.4.2",
+    "@mui/material": "latest",
+    "@mui/x-date-pickers": "^5.0.0-beta.3",
+    "@sentry/react": "^6.19.7",
+    "@sentry/tracing": "^6.19.7",
+    "@types/lodash": "^4.14.179",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "aptos": "^1.3.14",
+    "aptos-node-checker-client": "0.0.2",
+    "date-fns": "^2.29.1",
+    "js-sha3": "^0.8.0",
+    "lodash": "^4.17.21",
+    "moment": "^2.29.1",
+    "prettier": "^2.6.2",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-ga4": "^1.4.1",
+    "react-intersection-observer": "^9.4.0",
+    "react-number-format": "^4.9.1",
+    "react-query": "^3.38.0",
+    "react-router-dom": "^6.2.1",
+    "react-scripts": "latest",
+    "recharts": "^2.1.9",
+    "ts-results": "^3.3.0",
+    "typescript": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "fmt": "prettier --config .prettierrc.json 'src/**/*.{js,jsx,ts,tsx,json,css,scss,md}' -w"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
