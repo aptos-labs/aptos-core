@@ -66,7 +66,6 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 shadow-rs = { workspace = true }
 storage-interface = { workspace = true }
-tera = { workspace = true }
 tempfile = { workspace = true }
 termcolor = { workspace = true }
 thiserror = { workspace = true }
@@ -76,6 +75,8 @@ toml = { workspace = true }
 url = { workspace = true }
 vm-genesis = { workspace = true }
 walkdir = { workspace = true }
+
+handlebars = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }

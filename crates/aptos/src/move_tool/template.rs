@@ -1,8 +1,8 @@
-use std::collections::{BTreeMap, HashMap};
-use std::fmt::format;
+use std::collections::BTreeMap;
+
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
+use std::process::Command;
 use std::str::FromStr;
 use std::time::UNIX_EPOCH;
 
@@ -10,13 +10,14 @@ use anyhow::{anyhow, ensure, Context};
 use async_trait::async_trait;
 use clap::Parser;
 use convert_case::{Case, Casing};
+use handlebars::Handlebars;
 use path_absolutize::Absolutize;
 use regex::Regex;
-use tera::Tera;
-use url::Url;
+use serde_json::json;
+
 use walkdir::WalkDir;
 
-use crate::common::types::{CliCommand, CliError, CliTypedResult, PromptOptions};
+use crate::common::types::{CliCommand, CliTypedResult, PromptOptions};
 use crate::move_tool::FrameworkPackageArgs;
 
 #[derive(Clone)]
@@ -85,7 +86,7 @@ impl CliCommand<()> for NewPackage {
                 git_download_default_templates(&core_templates_dir)?;
 
                 let core_template_path = core_templates_dir.join(template_name);
-                self.render_tera_template(core_template_path)?;
+                self.render_template_dir(core_template_path)?;
             }
             Template::GitUrl(url) => {
                 let git_url = url.as_str();
@@ -99,7 +100,7 @@ impl CliCommand<()> for NewPackage {
 
                 git_download_custom_template(&custom_template_dir, git_url)?;
 
-                self.render_tera_template(custom_template_dir)?;
+                self.render_template_dir(custom_template_dir)?;
             }
         }
         Ok(())
@@ -129,44 +130,56 @@ impl NewPackage {
         Ok(())
     }
 
-    fn render_tera_template(&self, template_path: PathBuf) -> anyhow::Result<()> {
+    fn render_template_dir(&self, template_dir_path: PathBuf) -> anyhow::Result<()> {
         let package_dir = self.package_dir.as_ref();
         let package_name = self.package_name()?;
 
-        let tera_template = Tera::new(&format!("{}/**/*", template_path.to_string_lossy(),))
-            .map_err(|err| CliError::UnexpectedError(format!("tera error '{}'", err)))?;
-        let tera_context = tera::Context::from_serialize(
-            [
-                ("package_name".to_string(), package_name),
-                // ("package_lowercase_name".to_string(), package_lowercase_name),
-            ]
+        let dot_git_path = template_dir_path.join(".git");
+        let template_fs_items = WalkDir::new(&template_dir_path)
             .into_iter()
-            .collect::<HashMap<String, String>>(),
-        )
-        .map_err(|err| anyhow!("Tera context: {err}"))?;
+            .filter_entry(move |entry| entry.path() != dot_git_path)
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.into_path());
 
-        for (from, to, subpath) in tera_walk_dir(&template_path, package_dir) {
-            if to.exists() {
+        let renderer = Handlebars::new();
+        let template_context = json!({ "package_name": package_name });
+
+        let start_dir_pat = template_dir_path.to_str().unwrap();
+        for source_path in template_fs_items {
+            let subpath = source_path
+                .to_string_lossy()
+                .to_string()
+                .trim_start_matches(&start_dir_pat)
+                .trim_matches('/')
+                .to_string();
+
+            let dest_path = package_dir.join(subpath);
+            if dest_path.exists() {
                 continue;
             }
-            if to.file_name().unwrap() == ".gitkeep" {
+
+            if source_path.is_dir() {
+                fs::create_dir(dest_path)
+                    .map_err(|err| anyhow!("Create dir: {err}. {source_path:?}"))?;
                 continue;
             }
 
-            if from.is_dir() {
-                fs::create_dir(to).map_err(|err| anyhow!("Create dir: {err}. {from:?}"))?;
-                continue;
+            if let Some(ext) = source_path.extension() {
+                if ext == "move" || ext == "toml" {
+                    // interpolate
+                    let contents = fs::read_to_string(source_path)?;
+                    let rendered_contents =
+                        renderer.render_template(&contents, &template_context)?;
+                    fs::write(dest_path, rendered_contents)?;
+                    continue;
+                }
             }
-
-            let r = tera_template
-                .render(&subpath, &tera_context)
-                .map_err(|err| anyhow!("Tera render: {err}."))?;
-            fs::write(to, r).map_err(|err| anyhow!("{err}. {subpath}"))?;
+            // copy as-is
+            fs::copy(source_path, dest_path)?;
         }
         Ok(())
     }
 }
-
 
 const GIT_APTOS_TEMPLATES_URL: &str = "https://github.com/mkurnikov/aptos-templates.git";
 const GIT_COMMIT: &str = "5a7c26311c8c406ca00dfa08fc4cd4cbc5d66268";
@@ -189,12 +202,7 @@ fn git_download_default_templates(tmp_dir: &PathBuf) -> anyhow::Result<()> {
         Command::new("git")
             .args(["-C", &tmp_dir_str, "checkout", GIT_COMMIT])
             .output()
-            .map_err(|_| {
-                anyhow::anyhow!(
-                        "Failed to checkout Git reference '{}'",
-                        GIT_COMMIT,
-                    )
-            })?;
+            .map_err(|_| anyhow::anyhow!("Failed to checkout Git reference '{}'", GIT_COMMIT,))?;
     }
     Ok(())
 }
