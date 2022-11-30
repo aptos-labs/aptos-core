@@ -6,7 +6,7 @@ sidebar_position: 14
 
 # Bootstrap a New Fullnode
 
-Bootstrapping a new fullnode using [state-sync](../../guides/state-sync.md) might not be an optimal approach after the network has been running for a while; it can either take too much time, or it won't be able to fetch required data since most nodes have already pruned the ledger history. The most effective way for bootstrapping a new fullnode is to use data restore.
+Bootstrapping a new fullnode using [state-sync](../../guides/state-sync.md) might not be an optimal approach after the network has been running for a while; it can either take too much time, or it won't be able to fetch required data since most nodes have already pruned the ledger history. The most effective way for bootstrapping a new fullnode is to use data restore, which attempts to grab the latest snapshot.
 
 ## Restore data from a backup
 
