@@ -9,6 +9,7 @@ module aptos_framework::transaction_fee {
 
     friend aptos_framework::block;
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration;
     friend aptos_framework::transaction_validation;
 
     /// When gas fees are already being collected and the struct holding
@@ -74,7 +75,7 @@ module aptos_framework::transaction_fee {
 
     /// Calculates the fee which should be distributed to the block proposer at the
     /// end of an epoch, and records it in the system. This function can only be called
-    /// at the beginning of the block.
+    /// at the beginning of the block or during reconfiguration.
     public(friend) fun assign_or_burn_collected_fee() acquires AptosCoinCapabilities, CollectedFeesPerBlock {
         let collected_fees = borrow_global_mut<CollectedFeesPerBlock>(@aptos_framework);
 

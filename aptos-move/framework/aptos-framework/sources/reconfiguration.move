@@ -2,6 +2,7 @@
 /// to synchronize configuration changes for the validators.
 module aptos_framework::reconfiguration {
     use std::error;
+    use std::features;
     use std::signer;
 
     use aptos_framework::account;
@@ -11,6 +12,7 @@ module aptos_framework::reconfiguration {
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
     use aptos_framework::storage_gas;
+    use aptos_framework::transaction_fee;
 
     friend aptos_framework::aptos_governance;
     friend aptos_framework::block;
@@ -115,7 +117,18 @@ module aptos_framework::reconfiguration {
             return
         };
 
-        // Call stake to compute the new validator set and distribute rewards.
+        // Reconfiguration "forces the block" to end, as mentioned above. Therefore, we
+        // must assign the collected fees explicitly so that staking can distribute them.
+        // In particular, this is necessary when validators are removed, but still have to
+        // get their fees.
+        if (features::collect_and_distribute_gas_fees()) {
+            // All transactions after reconfiguration are Retry. Therefore, when the next
+            // block starts and tries to assign/burn collected fees it will be just 0 and
+            // nothing will be assigned.
+            transaction_fee::assign_or_burn_collected_fee();
+        };
+
+        // Call stake to compute the new validator set and distribute rewards and transaction fees.
         stake::on_new_epoch();
         storage_gas::on_reconfig();
 
