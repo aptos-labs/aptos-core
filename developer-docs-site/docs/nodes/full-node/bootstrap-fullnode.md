@@ -10,7 +10,7 @@ Bootstrapping a new fullnode using state-sync might not work well after the netw
 
 ## Restore data from a backup
 
-We're hosting the **AIT3 blockchain** (other network coming soon) backup data on AWS S3 and Google Cloud GCS. Following the guide below to build your Aptos DB, then you can point your fullnode binary to start with this restored data directory.
+Follow the guide below to build your Aptos database; then you can configure your fullnode binary to start with this restored data directory.
 
 ### Using source code or docker
 
