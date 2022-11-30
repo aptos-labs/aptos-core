@@ -1,0 +1,22 @@
+[package]
+name = "aptos-datastream-worker"
+description = "Aptos Datastream worker to collect on-chain data in real-time and send it out."
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-protos = { workspace = true }
+futures = { workspace = true }
+redis = { workspace = true }
+tokio = { workspace = true }
+deadpool-redis = { workspace = true }
+tonic = { workspace = true }
+once_cell = { workspace = true }

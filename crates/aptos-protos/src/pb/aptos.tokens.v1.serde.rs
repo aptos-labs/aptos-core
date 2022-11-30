@@ -84,15 +84,22 @@ impl<'de> serde::Deserialize<'de> for CollectionData {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
+            "creator_address",
             "creatorAddress",
+            "collection_name",
             "collectionName",
             "description",
+            "transaction_version",
             "transactionVersion",
+            "metadata_uri",
             "metadataUri",
             "supply",
             "maximum",
+            "maximum_mutable",
             "maximumMutable",
+            "uri_mutable",
             "uriMutable",
+            "description_mutable",
             "descriptionMutable",
         ];
 
@@ -132,16 +139,26 @@ impl<'de> serde::Deserialize<'de> for CollectionData {
                         E: serde::de::Error,
                     {
                         match value {
-                            "creatorAddress" => Ok(GeneratedField::CreatorAddress),
-                            "collectionName" => Ok(GeneratedField::CollectionName),
+                            "creatorAddress" | "creator_address" => {
+                                Ok(GeneratedField::CreatorAddress)
+                            }
+                            "collectionName" | "collection_name" => {
+                                Ok(GeneratedField::CollectionName)
+                            }
                             "description" => Ok(GeneratedField::Description),
-                            "transactionVersion" => Ok(GeneratedField::TransactionVersion),
-                            "metadataUri" => Ok(GeneratedField::MetadataUri),
+                            "transactionVersion" | "transaction_version" => {
+                                Ok(GeneratedField::TransactionVersion)
+                            }
+                            "metadataUri" | "metadata_uri" => Ok(GeneratedField::MetadataUri),
                             "supply" => Ok(GeneratedField::Supply),
                             "maximum" => Ok(GeneratedField::Maximum),
-                            "maximumMutable" => Ok(GeneratedField::MaximumMutable),
-                            "uriMutable" => Ok(GeneratedField::UriMutable),
-                            "descriptionMutable" => Ok(GeneratedField::DescriptionMutable),
+                            "maximumMutable" | "maximum_mutable" => {
+                                Ok(GeneratedField::MaximumMutable)
+                            }
+                            "uriMutable" | "uri_mutable" => Ok(GeneratedField::UriMutable),
+                            "descriptionMutable" | "description_mutable" => {
+                                Ok(GeneratedField::DescriptionMutable)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -329,12 +346,18 @@ impl<'de> serde::Deserialize<'de> for Token {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
+            "token_id",
             "tokenId",
+            "transaction_version",
             "transactionVersion",
+            "token_properties",
             "tokenProperties",
             "amount",
+            "owner_address",
             "ownerAddress",
+            "table_handle",
             "tableHandle",
+            "table_type",
             "tableType",
         ];
 
@@ -371,13 +394,17 @@ impl<'de> serde::Deserialize<'de> for Token {
                         E: serde::de::Error,
                     {
                         match value {
-                            "tokenId" => Ok(GeneratedField::TokenId),
-                            "transactionVersion" => Ok(GeneratedField::TransactionVersion),
-                            "tokenProperties" => Ok(GeneratedField::TokenProperties),
+                            "tokenId" | "token_id" => Ok(GeneratedField::TokenId),
+                            "transactionVersion" | "transaction_version" => {
+                                Ok(GeneratedField::TransactionVersion)
+                            }
+                            "tokenProperties" | "token_properties" => {
+                                Ok(GeneratedField::TokenProperties)
+                            }
                             "amount" => Ok(GeneratedField::Amount),
-                            "ownerAddress" => Ok(GeneratedField::OwnerAddress),
-                            "tableHandle" => Ok(GeneratedField::TableHandle),
-                            "tableType" => Ok(GeneratedField::TableType),
+                            "ownerAddress" | "owner_address" => Ok(GeneratedField::OwnerAddress),
+                            "tableHandle" | "table_handle" => Ok(GeneratedField::TableHandle),
+                            "tableType" | "table_type" => Ok(GeneratedField::TableType),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -410,7 +437,7 @@ impl<'de> serde::Deserialize<'de> for Token {
                             if token_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("tokenId"));
                             }
-                            token_id__ = Some(map.next_value()?);
+                            token_id__ = map.next_value()?;
                         }
                         GeneratedField::TransactionVersion => {
                             if transaction_version__.is_some() {
@@ -442,7 +469,7 @@ impl<'de> serde::Deserialize<'de> for Token {
                             if owner_address__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("ownerAddress"));
                             }
-                            owner_address__ = Some(map.next_value()?);
+                            owner_address__ = map.next_value()?;
                         }
                         GeneratedField::TableHandle => {
                             if table_handle__.is_some() {
@@ -454,7 +481,7 @@ impl<'de> serde::Deserialize<'de> for Token {
                             if table_type__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("tableType"));
                             }
-                            table_type__ = Some(map.next_value()?);
+                            table_type__ = map.next_value()?;
                         }
                     }
                 }
@@ -593,20 +620,33 @@ impl<'de> serde::Deserialize<'de> for TokenData {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
+            "token_data_id",
             "tokenDataId",
+            "transaction_version",
             "transactionVersion",
             "maximum",
             "supply",
+            "largest_property_version",
             "largestPropertyVersion",
+            "metadata_uri",
             "metadataUri",
+            "payee_address",
             "payeeAddress",
+            "royalty_points_numerator",
             "royaltyPointsNumerator",
+            "royalty_points_denominator",
             "royaltyPointsDenominator",
+            "maximum_mutable",
             "maximumMutable",
+            "uri_mutable",
             "uriMutable",
+            "description_mutable",
             "descriptionMutable",
+            "properties_mutable",
             "propertiesMutable",
+            "royalty_mutable",
             "royaltyMutable",
+            "default_properties",
             "defaultProperties",
         ];
 
@@ -651,23 +691,39 @@ impl<'de> serde::Deserialize<'de> for TokenData {
                         E: serde::de::Error,
                     {
                         match value {
-                            "tokenDataId" => Ok(GeneratedField::TokenDataId),
-                            "transactionVersion" => Ok(GeneratedField::TransactionVersion),
+                            "tokenDataId" | "token_data_id" => Ok(GeneratedField::TokenDataId),
+                            "transactionVersion" | "transaction_version" => {
+                                Ok(GeneratedField::TransactionVersion)
+                            }
                             "maximum" => Ok(GeneratedField::Maximum),
                             "supply" => Ok(GeneratedField::Supply),
-                            "largestPropertyVersion" => Ok(GeneratedField::LargestPropertyVersion),
-                            "metadataUri" => Ok(GeneratedField::MetadataUri),
-                            "payeeAddress" => Ok(GeneratedField::PayeeAddress),
-                            "royaltyPointsNumerator" => Ok(GeneratedField::RoyaltyPointsNumerator),
-                            "royaltyPointsDenominator" => {
+                            "largestPropertyVersion" | "largest_property_version" => {
+                                Ok(GeneratedField::LargestPropertyVersion)
+                            }
+                            "metadataUri" | "metadata_uri" => Ok(GeneratedField::MetadataUri),
+                            "payeeAddress" | "payee_address" => Ok(GeneratedField::PayeeAddress),
+                            "royaltyPointsNumerator" | "royalty_points_numerator" => {
+                                Ok(GeneratedField::RoyaltyPointsNumerator)
+                            }
+                            "royaltyPointsDenominator" | "royalty_points_denominator" => {
                                 Ok(GeneratedField::RoyaltyPointsDenominator)
                             }
-                            "maximumMutable" => Ok(GeneratedField::MaximumMutable),
-                            "uriMutable" => Ok(GeneratedField::UriMutable),
-                            "descriptionMutable" => Ok(GeneratedField::DescriptionMutable),
-                            "propertiesMutable" => Ok(GeneratedField::PropertiesMutable),
-                            "royaltyMutable" => Ok(GeneratedField::RoyaltyMutable),
-                            "defaultProperties" => Ok(GeneratedField::DefaultProperties),
+                            "maximumMutable" | "maximum_mutable" => {
+                                Ok(GeneratedField::MaximumMutable)
+                            }
+                            "uriMutable" | "uri_mutable" => Ok(GeneratedField::UriMutable),
+                            "descriptionMutable" | "description_mutable" => {
+                                Ok(GeneratedField::DescriptionMutable)
+                            }
+                            "propertiesMutable" | "properties_mutable" => {
+                                Ok(GeneratedField::PropertiesMutable)
+                            }
+                            "royaltyMutable" | "royalty_mutable" => {
+                                Ok(GeneratedField::RoyaltyMutable)
+                            }
+                            "defaultProperties" | "default_properties" => {
+                                Ok(GeneratedField::DefaultProperties)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -708,7 +764,7 @@ impl<'de> serde::Deserialize<'de> for TokenData {
                             if token_data_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("tokenDataId"));
                             }
-                            token_data_id__ = Some(map.next_value()?);
+                            token_data_id__ = map.next_value()?;
                         }
                         GeneratedField::TransactionVersion => {
                             if transaction_version__.is_some() {
@@ -882,7 +938,13 @@ impl<'de> serde::Deserialize<'de> for TokenDataId {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["creatorAddress", "collectionName", "name"];
+        const FIELDS: &[&str] = &[
+            "creator_address",
+            "creatorAddress",
+            "collection_name",
+            "collectionName",
+            "name",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -913,8 +975,12 @@ impl<'de> serde::Deserialize<'de> for TokenDataId {
                         E: serde::de::Error,
                     {
                         match value {
-                            "creatorAddress" => Ok(GeneratedField::CreatorAddress),
-                            "collectionName" => Ok(GeneratedField::CollectionName),
+                            "creatorAddress" | "creator_address" => {
+                                Ok(GeneratedField::CreatorAddress)
+                            }
+                            "collectionName" | "collection_name" => {
+                                Ok(GeneratedField::CollectionName)
+                            }
                             "name" => Ok(GeneratedField::Name),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -1003,7 +1069,12 @@ impl<'de> serde::Deserialize<'de> for TokenId {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["tokenDataId", "propertyVersion"];
+        const FIELDS: &[&str] = &[
+            "token_data_id",
+            "tokenDataId",
+            "property_version",
+            "propertyVersion",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -1033,8 +1104,10 @@ impl<'de> serde::Deserialize<'de> for TokenId {
                         E: serde::de::Error,
                     {
                         match value {
-                            "tokenDataId" => Ok(GeneratedField::TokenDataId),
-                            "propertyVersion" => Ok(GeneratedField::PropertyVersion),
+                            "tokenDataId" | "token_data_id" => Ok(GeneratedField::TokenDataId),
+                            "propertyVersion" | "property_version" => {
+                                Ok(GeneratedField::PropertyVersion)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1062,7 +1135,7 @@ impl<'de> serde::Deserialize<'de> for TokenId {
                             if token_data_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("tokenDataId"));
                             }
-                            token_data_id__ = Some(map.next_value()?);
+                            token_data_id__ = map.next_value()?;
                         }
                         GeneratedField::PropertyVersion => {
                             if property_version__.is_some() {
@@ -1136,10 +1209,14 @@ impl<'de> serde::Deserialize<'de> for Tokens {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
+            "block_height",
             "blockHeight",
+            "chain_id",
             "chainId",
             "tokens",
+            "token_datas",
             "tokenDatas",
+            "collection_datas",
             "collectionDatas",
         ];
 
@@ -1174,11 +1251,13 @@ impl<'de> serde::Deserialize<'de> for Tokens {
                         E: serde::de::Error,
                     {
                         match value {
-                            "blockHeight" => Ok(GeneratedField::BlockHeight),
-                            "chainId" => Ok(GeneratedField::ChainId),
+                            "blockHeight" | "block_height" => Ok(GeneratedField::BlockHeight),
+                            "chainId" | "chain_id" => Ok(GeneratedField::ChainId),
                             "tokens" => Ok(GeneratedField::Tokens),
-                            "tokenDatas" => Ok(GeneratedField::TokenDatas),
-                            "collectionDatas" => Ok(GeneratedField::CollectionDatas),
+                            "tokenDatas" | "token_datas" => Ok(GeneratedField::TokenDatas),
+                            "collectionDatas" | "collection_datas" => {
+                                Ok(GeneratedField::CollectionDatas)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
