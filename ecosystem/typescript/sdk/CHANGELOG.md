@@ -7,6 +7,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 ## Unreleased
 
 N/A
+
 ## 1.4.0 (2022-11-30)
 
 - Add missing fields to TokenData class
