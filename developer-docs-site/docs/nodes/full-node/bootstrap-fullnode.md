@@ -113,4 +113,4 @@ If you use our fullnode helm chart to deploy your node, we have a restore job bu
     }
     ```
 
-    See [Run a Public Fullnode on GCP](nodes/full-node/run-a-fullnode-on-gcp.md) for additional details.
+    Follow the GCP instructions above for the remaining steps.
