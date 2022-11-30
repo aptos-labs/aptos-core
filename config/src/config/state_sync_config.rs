@@ -170,6 +170,7 @@ impl Default for DataStreamingServiceConfig {
 pub struct AptosDataClientConfig {
     pub max_num_in_flight_priority_polls: u64, // Max num of in-flight polls for priority peers
     pub max_num_in_flight_regular_polls: u64,  // Max num of in-flight polls for regular peers
+    pub max_num_output_reductions: u64, // The max num of output reductions before transactions are returned
     pub max_response_timeout_ms: u64, // Max timeout (in ms) when waiting for a response (after exponential increases)
     pub response_timeout_ms: u64,     // First timeout (in ms) when waiting for a response
     pub subscription_timeout_ms: u64, // Timeout (in ms) when waiting for a subscription response
@@ -182,6 +183,7 @@ impl Default for AptosDataClientConfig {
         Self {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
+            max_num_output_reductions: 2,
             max_response_timeout_ms: 60000, // 60 seconds
             response_timeout_ms: 10000,     // 10 seconds
             subscription_timeout_ms: 5000,  // 5 seconds
