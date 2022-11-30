@@ -154,7 +154,7 @@ distribution. Should be called by on-chain governance.
     <b>assert</b>!(burn_percentage &lt;= 100, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>));
 
     // Make sure stakng <b>module</b> is aware of transaction fees collection.
-    <a href="stake.md#0x1_stake_initialize_fees_table">stake::initialize_fees_table</a>(aptos_framework);
+    <a href="stake.md#0x1_stake_initialize_validator_fees">stake::initialize_validator_fees</a>(aptos_framework);
 
     // Initially, no fees are collected and the <a href="block.md#0x1_block">block</a> proposer is not set.
     <b>let</b> zero = <a href="coin.md#0x1_coin_initialize_aggregatable_coin">coin::initialize_aggregatable_coin</a>(aptos_framework);
@@ -176,10 +176,10 @@ distribution. Should be called by on-chain governance.
 ## Function `register_proposer_for_fee_collection`
 
 Registers the proposer of the block for gas fees collection. This function
-can only be called by the VM.
+can only be called at the beginning of the block.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">register_proposer_for_fee_collection</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, proposer_addr: <b>address</b>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">register_proposer_for_fee_collection</a>(proposer_addr: <b>address</b>)
 </code></pre>
 
 
@@ -188,8 +188,7 @@ can only be called by the VM.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">register_proposer_for_fee_collection</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, proposer_addr: <b>address</b>) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm);
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">register_proposer_for_fee_collection</a>(proposer_addr: <b>address</b>) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
     <b>let</b> collected_fees = <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);
     <b>let</b> _ = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_swap_or_fill">option::swap_or_fill</a>(&<b>mut</b> collected_fees.proposer, proposer_addr);
 }
@@ -234,11 +233,11 @@ Burns a specified fraction of the coin.
 ## Function `assign_or_burn_collected_fee`
 
 Calculates the fee which should be distributed to the block proposer at the
-end of an epoch, and records it in the system. This function can only be
-called by the VM and should be called at the beginning of the block.
+end of an epoch, and records it in the system. This function can only be called
+at the beginning of the block or during reconfiguration.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_assign_or_burn_collected_fee">assign_or_burn_collected_fee</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_assign_or_burn_collected_fee">assign_or_burn_collected_fee</a>()
 </code></pre>
 
 
@@ -247,8 +246,7 @@ called by the VM and should be called at the beginning of the block.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_assign_or_burn_collected_fee">assign_or_burn_collected_fee</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm);
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_assign_or_burn_collected_fee">assign_or_burn_collected_fee</a>() <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
     <b>let</b> collected_fees = <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);
 
     // If there are no collected fees, do nothing.

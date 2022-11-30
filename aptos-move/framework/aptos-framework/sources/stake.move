@@ -259,15 +259,15 @@ module aptos_framework::stake {
         pool_address: address,
     }
 
-    /// Stores transaction fees assigned to validators. All fees are distributed at the
-    /// end of the epoch.
+    /// Stores transaction fees assigned to validators. All fees are distributed to validators
+    /// at the end of the epoch.
     struct ValidatorFees has key {
         fees_table: Table<address, Coin<AptosCoin>>,
     }
 
-    /// Initializes the resource storing information about collected gas fees per validator.
-    /// Should be called by on-chain governance.
-    public(friend) fun initialize_fees_table(aptos_framework: &signer) {
+    /// Initializes the resource storing information about collected transaction fees per validator.
+    /// Used by `transaction_fee.move` to initialize fee collection and distribution.
+    public(friend) fun initialize_validator_fees(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             !exists<ValidatorFees>(@aptos_framework),
@@ -276,14 +276,14 @@ module aptos_framework::stake {
         move_to(aptos_framework, ValidatorFees { fees_table: table::new() });
     }
 
-    /// Stores the coin collected from transaction fees to the specified address.
-    public(friend) fun add_transaction_fee(addr: address, coin: Coin<AptosCoin>) acquires ValidatorFees {
+    /// Stores the transaction fee collected to the specified validator address.
+    public(friend) fun add_transaction_fee(validator_addr: address, fee: Coin<AptosCoin>) acquires ValidatorFees {
         let fees_table = &mut borrow_global_mut<ValidatorFees>(@aptos_framework).fees_table;
-        if (!table::contains(fees_table, addr)) {
-            table::add(fees_table, addr, coin);
+        if (!table::contains(fees_table, validator_addr)) {
+            table::add(fees_table, validator_addr, fee);
         } else {
-            let stored_coin = table::borrow_mut(fees_table, addr);
-            coin::merge(stored_coin, coin);
+            let collected_fee = table::borrow_mut(fees_table, validator_addr);
+            coin::merge(collected_fee, fee);
         }
     }
 
@@ -1154,6 +1154,8 @@ module aptos_framework::stake {
         };
     }
 
+    /// If the pool address has some transaction fees assigned to it, removes the appropriate entry
+    /// from `ValidatorFees` and puts coin into pool's active stake.
     fun distribute_transaction_fees(
         validator_fees: &mut ValidatorFees,
         pool_address: address,
@@ -2651,5 +2653,65 @@ module aptos_framework::stake {
         let fees_table = &borrow_global<ValidatorFees>(@aptos_framework).fees_table;
         let coin = table::borrow(fees_table, validator_addr);
         coin::value(coin)
+    }
+
+    #[test_only]
+    public fun assert_no_fees_for_validator(validator_addr: address) acquires ValidatorFees {
+        let fees_table = &borrow_global<ValidatorFees>(@aptos_framework).fees_table;
+        assert!(!table::contains(fees_table, validator_addr), 0);
+    }
+
+    #[test(aptos_framework = @0x1, validator_1 = @0x123, validator_2 = @0x234, validator_3 = @0x345)]
+    fun test_distribute_validator_fees(
+        aptos_framework: &signer,
+        validator_1: &signer,
+        validator_2: &signer,
+        validator_3: &signer,
+    ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
+        // Make sure that fees collection and distribution is enabled.
+        features::change_feature_flags(aptos_framework, vector[5], vector[]);
+        assert!(features::collect_and_distribute_gas_fees(), 0);
+
+        // Initialize staking and validator fees table.
+        initialize_for_test(aptos_framework);
+        initialize_validator_fees(aptos_framework);
+
+        let validator_1_address = signer::address_of(validator_1);
+        let validator_2_address = signer::address_of(validator_2);
+        let validator_3_address = signer::address_of(validator_3);
+
+        // Validators join the set and epoch ends.
+        let (_sk_1, pk_1, pop_1) = generate_identity();
+        let (_sk_2, pk_2, pop_2) = generate_identity();
+        let (_sk_3, pk_3, pop_3) = generate_identity();
+        initialize_test_validator(&pk_1, &pop_1, validator_1, 100, true, false);
+        initialize_test_validator(&pk_2, &pop_2, validator_2, 100, true, false);
+        initialize_test_validator(&pk_3, &pop_3, validator_3, 100, true, true);
+
+        // Next, simulate fees collection during three blocks, where proposers are
+        // validators 1, 2, and 1 again.
+        add_transaction_fee(validator_1_address, mint_coins(100));
+        add_transaction_fee(validator_2_address, mint_coins(500));
+        add_transaction_fee(validator_1_address, mint_coins(200));
+
+        // Fess have to be assigned to the right validators, but not
+        // distributed yet.
+        assert!(get_validator_fee(validator_1_address) == 300, 0);
+        assert!(get_validator_fee(validator_2_address) == 500, 0);
+        assert_no_fees_for_validator(validator_3_address);
+        assert_validator_state(validator_1_address, 100, 0, 0, 0, 2);
+        assert_validator_state(validator_2_address, 100, 0, 0, 0, 1);
+        assert_validator_state(validator_3_address, 100, 0, 0, 0, 0);
+
+        end_epoch();
+
+        // Epoch ended. Validators must have recieved their rewards and, most importantly,
+        // their fees.
+        assert_no_fees_for_validator(validator_1_address);
+        assert_no_fees_for_validator(validator_2_address);
+        assert_no_fees_for_validator(validator_3_address);
+        assert_validator_state(validator_1_address, 404, 0, 0, 0, 2);
+        assert_validator_state(validator_2_address, 606, 0, 0, 0, 1);
+        assert_validator_state(validator_3_address, 101, 0, 0, 0, 0);
     }
 }

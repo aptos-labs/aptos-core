@@ -7,6 +7,7 @@ module aptos_framework::transaction_fee {
     use std::error;
     use std::option::{Self, Option};
 
+    friend aptos_framework::block;
     friend aptos_framework::genesis;
     friend aptos_framework::transaction_validation;
 
@@ -42,7 +43,7 @@ module aptos_framework::transaction_fee {
         assert!(burn_percentage <= 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));
 
         // Make sure stakng module is aware of transaction fees collection.
-        stake::initialize_fees_table(aptos_framework);
+        stake::initialize_validator_fees(aptos_framework);
 
         // Initially, no fees are collected and the block proposer is not set.
         let zero = coin::initialize_aggregatable_coin(aptos_framework);
@@ -55,9 +56,8 @@ module aptos_framework::transaction_fee {
     }
 
     /// Registers the proposer of the block for gas fees collection. This function
-    /// can only be called by the VM.
-    public fun register_proposer_for_fee_collection(vm: &signer, proposer_addr: address) acquires CollectedFeesPerBlock {
-        system_addresses::assert_vm(vm);
+    /// can only be called at the beginning of the block.
+    public(friend) fun register_proposer_for_fee_collection(proposer_addr: address) acquires CollectedFeesPerBlock {
         let collected_fees = borrow_global_mut<CollectedFeesPerBlock>(@aptos_framework);
         let _ = option::swap_or_fill(&mut collected_fees.proposer, proposer_addr);
     }
@@ -73,10 +73,9 @@ module aptos_framework::transaction_fee {
     }
 
     /// Calculates the fee which should be distributed to the block proposer at the
-    /// end of an epoch, and records it in the system. This function can only be
-    /// called by the VM and should be called at the beginning of the block.
-    public fun assign_or_burn_collected_fee(vm: &signer) acquires AptosCoinCapabilities, CollectedFeesPerBlock {
-        system_addresses::assert_vm(vm);
+    /// end of an epoch, and records it in the system. This function can only be called
+    /// at the beginning of the block.
+    public(friend) fun assign_or_burn_collected_fee() acquires AptosCoinCapabilities, CollectedFeesPerBlock {
         let collected_fees = borrow_global_mut<CollectedFeesPerBlock>(@aptos_framework);
 
         // If there are no collected fees, do nothing.
@@ -192,10 +191,9 @@ module aptos_framework::transaction_fee {
         coin::destroy_mint_cap(mint_cap);
     }
 
-    #[test(aptos_framework = @aptos_framework, vm = @vm_reserved, alice = @0xa11ce, bob = @0xb0b, carol = @0xca101)]
+    #[test(aptos_framework = @aptos_framework, alice = @0xa11ce, bob = @0xb0b, carol = @0xca101)]
     fun test_fees_distribution(
         aptos_framework: signer,
-        vm: signer,
         alice: signer,
         bob: signer,
         carol: signer,
@@ -220,8 +218,8 @@ module aptos_framework::transaction_fee {
         assert!(*option::borrow(&coin::supply<AptosCoin>()) == 20000, 0);
 
         // Block 1 starts.
-        assign_or_burn_collected_fee(&vm);
-        register_proposer_for_fee_collection(&vm, alice_addr);
+        assign_or_burn_collected_fee();
+        register_proposer_for_fee_collection(alice_addr);
 
         // Check that there was no fees distribution in the first block.
         let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
@@ -239,8 +237,8 @@ module aptos_framework::transaction_fee {
         assert!(coin::balance<AptosCoin>(bob_addr) == 9000, 0);
 
         // Block 2 starts.
-        assign_or_burn_collected_fee(&vm);
-        register_proposer_for_fee_collection(&vm, bob_addr);
+        assign_or_burn_collected_fee();
+        register_proposer_for_fee_collection(bob_addr);
 
         // Collected fees from Bob must have been assigned to Alice.
         assert!(stake::get_validator_fee(alice_addr) == 900, 0);
@@ -261,8 +259,8 @@ module aptos_framework::transaction_fee {
         assert!(coin::balance<AptosCoin>(bob_addr) == 0, 0);
 
         // Block 3 starts.
-        assign_or_burn_collected_fee(&vm);
-        register_proposer_for_fee_collection(&vm, carol_addr);
+        assign_or_burn_collected_fee();
+        register_proposer_for_fee_collection(carol_addr);
 
         // Collected fees should have been assigned to Bob because he was the peoposer.
         assert!(stake::get_validator_fee(alice_addr) == 900, 0);
@@ -281,8 +279,8 @@ module aptos_framework::transaction_fee {
         collect_fee(alice_addr, 1000);
 
         // Block 4 starts.
-        assign_or_burn_collected_fee(&vm);
-        register_proposer_for_fee_collection(&vm, alice_addr);
+        assign_or_burn_collected_fee();
+        register_proposer_for_fee_collection(alice_addr);
 
         // Check that 2000 was collected from Alice.
         assert!(coin::balance<AptosCoin>(alice_addr) == 8000, 0);

@@ -397,10 +397,10 @@ The runtime always runs this before executing the transactions in a block.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
         // Assign the fees collected from the previous <a href="block.md#0x1_block">block</a> <b>to</b> the previous <a href="block.md#0x1_block">block</a> proposer.
         // If for <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> reason the fees cannot be assigned, this function burns the collected coins.
-        <a href="transaction_fee.md#0x1_transaction_fee_assign_or_burn_collected_fee">transaction_fee::assign_or_burn_collected_fee</a>(&vm);
+        <a href="transaction_fee.md#0x1_transaction_fee_assign_or_burn_collected_fee">transaction_fee::assign_or_burn_collected_fee</a>();
         // Set the proposer of this <a href="block.md#0x1_block">block</a> <b>as</b> the receiver of the fees, so that the fees for this
         // <a href="block.md#0x1_block">block</a> are assigned <b>to</b> the right <a href="account.md#0x1_account">account</a>.
-        <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">transaction_fee::register_proposer_for_fee_collection</a>(&vm, proposer);
+        <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">transaction_fee::register_proposer_for_fee_collection</a>(proposer);
     };
 
     // Performance scores have <b>to</b> be updated before the epoch transition <b>as</b> the transaction that triggers the
