@@ -14,16 +14,11 @@ import { TypeTagParser } from "../transaction_builder";
 
 test("test property_map_serializer", () => {
   function isSame(array1: Bytes, array2: Bytes): boolean {
-    return (
-      array1.length == array2.length &&
-      array1.every((element, index) => {
-        return element === array2[index];
-      })
-    );
+    return array1.length === array2.length && array1.every((element, index) => element === array2[index]);
   }
-  let values = ["false", "10", "18446744073709551615", "340282366920938463463374607431768211455", "hello", "0x1"];
-  let types = ["bool", "u8", "u64", "u128", "0x1::string::String", "address"];
-  let newValues = getPropertyValueRaw(values, types);
+  const values = ["false", "10", "18446744073709551615", "340282366920938463463374607431768211455", "hello", "0x1"];
+  const types = ["bool", "u8", "u64", "u128", "0x1::string::String", "address"];
+  const newValues = getPropertyValueRaw(values, types);
   expect(isSame(newValues[0], bcsSerializeBool(false))).toBe(true);
   expect(isSame(newValues[1], bcsSerializeU8(10))).toBe(true);
   expect(isSame(newValues[2], bcsSerializeUint64(18446744073709551615n))).toBe(true);
@@ -34,9 +29,9 @@ test("test property_map_serializer", () => {
 
 test("test propertymap deserializer", () => {
   function toHexString(data: Bytes): string {
-    return new Buffer(data).toString("hex");
+    return HexString.fromUint8Array(data).hex();
   }
-  let values = [
+  const values = [
     "false",
     "10",
     "18446744073709551615",
@@ -44,9 +39,9 @@ test("test propertymap deserializer", () => {
     "hello",
     "0x0000000000000000000000000000000000000000000000000000000000000001",
   ];
-  let types = ["bool", "u8", "u64", "u128", "0x1::string::String", "address"];
-  let newValues = getPropertyValueRaw(values, types);
-  for (let i = 0; i < values.length; i++) {
+  const types = ["bool", "u8", "u64", "u128", "0x1::string::String", "address"];
+  const newValues = getPropertyValueRaw(values, types);
+  for (let i = 0; i < values.length; i += 1) {
     expect(deserializeValueBasedOnTypeTag(new TypeTagParser(types[i]).parseTypeTag(), toHexString(newValues[i]))).toBe(
       values[i],
     );
