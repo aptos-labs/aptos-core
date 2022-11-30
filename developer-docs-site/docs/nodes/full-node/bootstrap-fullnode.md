@@ -39,9 +39,11 @@ Follow the guide below to build your Aptos database; then you can configure your
 
 If you use our fullnode helm chart to deploy your node, we have a restore job built in there.
 
-- GCP fullnode
+#### GCP fullnode
 
-  1. Modify the `main.tf` to add `restore` config in `fullnode_helm_values`; this will configure where the node should be restoring data from:
+For Google Cloud Platform (GCP) fullnodes:
+
+1. Modify the `main.tf` to add `restore` config in `fullnode_helm_values`; this will configure where the node should be restoring data from:
 
     ```
     module "fullnode" {
@@ -69,18 +71,18 @@ If you use our fullnode helm chart to deploy your node, we have a restore job bu
     }
     ```
 
-    2. Apply Terraform changes:
+1. Apply Terraform changes:
 
         ```
         terraform apply
         ```
 
-    3. Take down the fullnode pod and make sure the fullnode pod has stopped running since we have to unmount the storage and mount it to the restore job. Once the pod stops, the storage PVC is automatically detached.
+1. Take down the fullnode pod and make sure the fullnode pod has stopped running since we have to unmount the storage and mount it to the restore job. Once the pod stops, the storage PVC is automatically detached.
     
         ```
         kubectl scale sts $WORKSPACE0-aptos-fullnode -n aptos --replicas=0
         ```
-    4. Get the job manifest file from the original never-run job; modify it for restart. (The `create-restore-job.py` script is hosted in the `aptos-core` repo.):
+1. Get the job manifest file from the original never-run job; modify it for restart. (The `create-restore-job.py` script is hosted in the `aptos-core` repo.):
         ```
         kubectl get job -n aptos \
           -l app.kubernetes.io/name=restore \
@@ -89,17 +91,19 @@ If you use our fullnode helm chart to deploy your node, we have a restore job bu
           | kubectl apply -n aptos -f -
         ```
 
-    5. Check the job is running; it might take a few hours for the data to finish restoring:
+1. Check the job is running; it might take a few hours for the data to finish restoring:
         ```
         kubectl get pods
         ```
     
-    6. Once the job finishes, scale back the fullnode pod:
+1. Once the job finishes, scale back the fullnode pod:
         ```
         kubectl scale sts $WORKSPACE0-aptos-fullnode -n aptos --replicas=1
         ```
 
-- For AWS or other clouds, modify the restore config in Terraform:
+#### AWS fullnode
+
+For AWS or other clouds, modify the restore config in Terraform:
 
     ```
     restore = {
