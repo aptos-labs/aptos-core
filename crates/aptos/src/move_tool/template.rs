@@ -226,29 +226,6 @@ fn git_download_custom_template(tmp_dir: &PathBuf, git_url: &str) -> anyhow::Res
     Ok(())
 }
 
-fn tera_walk_dir<'a>(
-    from_dir: &'a Path,
-    to_dir: &'a Path,
-) -> impl Iterator<Item = (PathBuf, PathBuf, String)> + 'a {
-    let from_str = from_dir.to_string_lossy().to_string();
-
-    let dot_git_path = from_dir.join(".git");
-    WalkDir::new(from_dir)
-        .into_iter()
-        .filter_entry(move |entry| entry.path() == dot_git_path)
-        .filter_map(|path| path.ok())
-        .map(|path| path.into_path())
-        .map(move |path| {
-            let sub = path
-                .to_string_lossy()
-                .to_string()
-                .trim_start_matches(&from_str)
-                .trim_matches('/')
-                .to_string();
-            (path, to_dir.join(&sub), sub)
-        })
-}
-
 fn url_to_file_name(url: &str) -> String {
     Regex::new(r"[/:.@]")
         .unwrap()
