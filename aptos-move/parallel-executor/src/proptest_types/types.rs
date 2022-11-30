@@ -22,7 +22,7 @@ use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, samp
 use proptest_derive::Arbitrary;
 use std::collections::hash_map::DefaultHasher;
 use std::{
-    collections::{btree_map::BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeSet, HashMap},
     convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -40,8 +40,8 @@ const STORAGE_DELTA_VAL: u128 = 100;
 // Generation of transactions
 ///////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Copy, Hash, Debug, PartialEq, PartialOrd, Ord, Eq)]
-pub struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
+#[derive(Clone, Copy, Hash, Debug, PartialEq, PartialOrd, Eq)]
+pub struct KeyType<K: Hash + Clone + Debug + PartialOrd + Eq>(
     /// Wrapping the types used for testing to add ModulePath trait implementation (below).
     pub K,
     /// The bool field determines for testing purposes, whether the key will be interpreted
@@ -51,7 +51,7 @@ pub struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
     pub bool,
 );
 
-impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> {
+impl<K: Hash + Clone + Debug + Eq + PartialOrd> ModulePath for KeyType<K> {
     fn module_path(&self) -> Option<AccessPath> {
         // Since K is generic, use its hash to assign addresses.
         let mut hasher = DefaultHasher::new();
@@ -320,7 +320,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
 impl<K, V> TransactionType for Transaction<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Key = K;
@@ -341,7 +341,7 @@ impl<K, V> Task<K, V> {
 
 impl<K, V> ExecutorTask for Task<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type T = Transaction<K, V>;
@@ -353,17 +353,7 @@ where
         Self::new()
     }
 
-    fn execute_transaction_btree_view(
-        &self,
-        _view: &BTreeMap<K, V>,
-        _txn: &Self::T,
-        _txn_idx: usize,
-    ) -> ExecutionStatus<Self::Output, Self::Error> {
-        // Separate PR to proptest sequential execution flow.
-        unreachable!();
-    }
-
-    fn execute_transaction_mvhashmap_view(
+    fn execute_transaction(
         &self,
         view: &MVHashMapView<K, V>,
         txn: &Self::T,
@@ -404,7 +394,7 @@ pub struct Output<K, V>(Vec<(K, V)>, Vec<(K, DeltaOp)>, Vec<ReadResult<V>>);
 
 impl<K, V> TransactionOutput for Output<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type T = Transaction<K, V>;

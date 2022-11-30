@@ -76,8 +76,10 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransactionOutput {
             "version",
             "id",
             "round",
+            "previous_block_votes_bitvec",
             "previousBlockVotesBitvec",
             "proposer",
+            "failed_proposer_indices",
             "failedProposerIndices",
             "timestamp",
             "epoch",
@@ -120,11 +122,13 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransactionOutput {
                             "version" => Ok(GeneratedField::Version),
                             "id" => Ok(GeneratedField::Id),
                             "round" => Ok(GeneratedField::Round),
-                            "previousBlockVotesBitvec" => {
+                            "previousBlockVotesBitvec" | "previous_block_votes_bitvec" => {
                                 Ok(GeneratedField::PreviousBlockVotesBitvec)
                             }
                             "proposer" => Ok(GeneratedField::Proposer),
-                            "failedProposerIndices" => Ok(GeneratedField::FailedProposerIndices),
+                            "failedProposerIndices" | "failed_proposer_indices" => {
+                                Ok(GeneratedField::FailedProposerIndices)
+                            }
                             "timestamp" => Ok(GeneratedField::Timestamp),
                             "epoch" => Ok(GeneratedField::Epoch),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -217,7 +221,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransactionOutput {
                             if timestamp__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("timestamp"));
                             }
-                            timestamp__ = Some(map.next_value()?);
+                            timestamp__ = map.next_value()?;
                         }
                         GeneratedField::Epoch => {
                             if epoch__.is_some() {
@@ -286,7 +290,7 @@ impl<'de> serde::Deserialize<'de> for BlockOutput {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["height", "transactions", "chainId"];
+        const FIELDS: &[&str] = &["height", "transactions", "chain_id", "chainId"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -319,7 +323,7 @@ impl<'de> serde::Deserialize<'de> for BlockOutput {
                         match value {
                             "height" => Ok(GeneratedField::Height),
                             "transactions" => Ok(GeneratedField::Transactions),
-                            "chainId" => Ok(GeneratedField::ChainId),
+                            "chainId" | "chain_id" => Ok(GeneratedField::ChainId),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -418,7 +422,12 @@ impl<'de> serde::Deserialize<'de> for EventKeyOutput {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["creationNumber", "accountAddress"];
+        const FIELDS: &[&str] = &[
+            "creation_number",
+            "creationNumber",
+            "account_address",
+            "accountAddress",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -448,8 +457,12 @@ impl<'de> serde::Deserialize<'de> for EventKeyOutput {
                         E: serde::de::Error,
                     {
                         match value {
-                            "creationNumber" => Ok(GeneratedField::CreationNumber),
-                            "accountAddress" => Ok(GeneratedField::AccountAddress),
+                            "creationNumber" | "creation_number" => {
+                                Ok(GeneratedField::CreationNumber)
+                            }
+                            "accountAddress" | "account_address" => {
+                                Ok(GeneratedField::AccountAddress)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -564,8 +577,10 @@ impl<'de> serde::Deserialize<'de> for EventOutput {
         const FIELDS: &[&str] = &[
             "version",
             "key",
+            "sequence_number",
             "sequenceNumber",
             "type",
+            "type_str",
             "typeStr",
             "data",
         ];
@@ -604,9 +619,11 @@ impl<'de> serde::Deserialize<'de> for EventOutput {
                         match value {
                             "version" => Ok(GeneratedField::Version),
                             "key" => Ok(GeneratedField::Key),
-                            "sequenceNumber" => Ok(GeneratedField::SequenceNumber),
+                            "sequenceNumber" | "sequence_number" => {
+                                Ok(GeneratedField::SequenceNumber)
+                            }
                             "type" => Ok(GeneratedField::Type),
-                            "typeStr" => Ok(GeneratedField::TypeStr),
+                            "typeStr" | "type_str" => Ok(GeneratedField::TypeStr),
                             "data" => Ok(GeneratedField::Data),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -648,7 +665,7 @@ impl<'de> serde::Deserialize<'de> for EventOutput {
                             if key__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("key"));
                             }
-                            key__ = Some(map.next_value()?);
+                            key__ = map.next_value()?;
                         }
                         GeneratedField::SequenceNumber => {
                             if sequence_number__.is_some() {
@@ -872,9 +889,12 @@ impl<'de> serde::Deserialize<'de> for MoveModuleOutput {
             "address",
             "bytecode",
             "friends",
+            "exposed_functions",
             "exposedFunctions",
             "structs",
+            "is_deleted",
             "isDeleted",
+            "wsc_index",
             "wscIndex",
         ];
 
@@ -916,10 +936,12 @@ impl<'de> serde::Deserialize<'de> for MoveModuleOutput {
                             "address" => Ok(GeneratedField::Address),
                             "bytecode" => Ok(GeneratedField::Bytecode),
                             "friends" => Ok(GeneratedField::Friends),
-                            "exposedFunctions" => Ok(GeneratedField::ExposedFunctions),
+                            "exposedFunctions" | "exposed_functions" => {
+                                Ok(GeneratedField::ExposedFunctions)
+                            }
                             "structs" => Ok(GeneratedField::Structs),
-                            "isDeleted" => Ok(GeneratedField::IsDeleted),
-                            "wscIndex" => Ok(GeneratedField::WscIndex),
+                            "isDeleted" | "is_deleted" => Ok(GeneratedField::IsDeleted),
+                            "wscIndex" | "wsc_index" => Ok(GeneratedField::WscIndex),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1095,11 +1117,15 @@ impl<'de> serde::Deserialize<'de> for MoveResourceOutput {
         const FIELDS: &[&str] = &[
             "address",
             "module",
+            "type_str",
             "typeStr",
             "name",
+            "generic_type_params",
             "genericTypeParams",
             "data",
+            "is_deleted",
             "isDeleted",
+            "wsc_index",
             "wscIndex",
         ];
 
@@ -1139,12 +1165,14 @@ impl<'de> serde::Deserialize<'de> for MoveResourceOutput {
                         match value {
                             "address" => Ok(GeneratedField::Address),
                             "module" => Ok(GeneratedField::Module),
-                            "typeStr" => Ok(GeneratedField::TypeStr),
+                            "typeStr" | "type_str" => Ok(GeneratedField::TypeStr),
                             "name" => Ok(GeneratedField::Name),
-                            "genericTypeParams" => Ok(GeneratedField::GenericTypeParams),
+                            "genericTypeParams" | "generic_type_params" => {
+                                Ok(GeneratedField::GenericTypeParams)
+                            }
                             "data" => Ok(GeneratedField::Data),
-                            "isDeleted" => Ok(GeneratedField::IsDeleted),
-                            "wscIndex" => Ok(GeneratedField::WscIndex),
+                            "isDeleted" | "is_deleted" => Ok(GeneratedField::IsDeleted),
+                            "wscIndex" | "wsc_index" => Ok(GeneratedField::WscIndex),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1334,13 +1362,19 @@ impl<'de> serde::Deserialize<'de> for SignatureOutput {
         const FIELDS: &[&str] = &[
             "version",
             "signer",
+            "is_sender_primary",
             "isSenderPrimary",
+            "signature_type",
             "signatureType",
+            "public_key",
             "publicKey",
             "signature",
             "threshold",
+            "public_key_indices",
             "publicKeyIndices",
+            "multi_agent_index",
             "multiAgentIndex",
+            "multi_sig_index",
             "multiSigIndex",
         ];
 
@@ -1382,14 +1416,22 @@ impl<'de> serde::Deserialize<'de> for SignatureOutput {
                         match value {
                             "version" => Ok(GeneratedField::Version),
                             "signer" => Ok(GeneratedField::Signer),
-                            "isSenderPrimary" => Ok(GeneratedField::IsSenderPrimary),
-                            "signatureType" => Ok(GeneratedField::SignatureType),
-                            "publicKey" => Ok(GeneratedField::PublicKey),
+                            "isSenderPrimary" | "is_sender_primary" => {
+                                Ok(GeneratedField::IsSenderPrimary)
+                            }
+                            "signatureType" | "signature_type" => Ok(GeneratedField::SignatureType),
+                            "publicKey" | "public_key" => Ok(GeneratedField::PublicKey),
                             "signature" => Ok(GeneratedField::Signature),
                             "threshold" => Ok(GeneratedField::Threshold),
-                            "publicKeyIndices" => Ok(GeneratedField::PublicKeyIndices),
-                            "multiAgentIndex" => Ok(GeneratedField::MultiAgentIndex),
-                            "multiSigIndex" => Ok(GeneratedField::MultiSigIndex),
+                            "publicKeyIndices" | "public_key_indices" => {
+                                Ok(GeneratedField::PublicKeyIndices)
+                            }
+                            "multiAgentIndex" | "multi_agent_index" => {
+                                Ok(GeneratedField::MultiAgentIndex)
+                            }
+                            "multiSigIndex" | "multi_sig_index" => {
+                                Ok(GeneratedField::MultiSigIndex)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1598,11 +1640,17 @@ impl<'de> serde::Deserialize<'de> for TableItemOutput {
         const FIELDS: &[&str] = &[
             "handle",
             "key",
+            "decoded_key",
             "decodedKey",
+            "key_type",
             "keyType",
+            "decoded_value",
             "decodedValue",
+            "value_type",
             "valueType",
+            "is_deleted",
             "isDeleted",
+            "wsc_index",
             "wscIndex",
         ];
 
@@ -1642,12 +1690,12 @@ impl<'de> serde::Deserialize<'de> for TableItemOutput {
                         match value {
                             "handle" => Ok(GeneratedField::Handle),
                             "key" => Ok(GeneratedField::Key),
-                            "decodedKey" => Ok(GeneratedField::DecodedKey),
-                            "keyType" => Ok(GeneratedField::KeyType),
-                            "decodedValue" => Ok(GeneratedField::DecodedValue),
-                            "valueType" => Ok(GeneratedField::ValueType),
-                            "isDeleted" => Ok(GeneratedField::IsDeleted),
-                            "wscIndex" => Ok(GeneratedField::WscIndex),
+                            "decodedKey" | "decoded_key" => Ok(GeneratedField::DecodedKey),
+                            "keyType" | "key_type" => Ok(GeneratedField::KeyType),
+                            "decodedValue" | "decoded_value" => Ok(GeneratedField::DecodedValue),
+                            "valueType" | "value_type" => Ok(GeneratedField::ValueType),
+                            "isDeleted" | "is_deleted" => Ok(GeneratedField::IsDeleted),
+                            "wscIndex" | "wsc_index" => Ok(GeneratedField::WscIndex),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1866,14 +1914,21 @@ impl<'de> serde::Deserialize<'de> for TransactionInfoOutput {
             "hash",
             "type",
             "version",
+            "state_change_hash",
             "stateChangeHash",
+            "event_root_hash",
             "eventRootHash",
+            "state_checkpoint_hash",
             "stateCheckpointHash",
+            "gas_used",
             "gasUsed",
             "success",
             "epoch",
+            "block_height",
             "blockHeight",
+            "vm_status",
             "vmStatus",
+            "accumulator_root_hash",
             "accumulatorRootHash",
             "timestamp",
         ];
@@ -1920,15 +1975,23 @@ impl<'de> serde::Deserialize<'de> for TransactionInfoOutput {
                             "hash" => Ok(GeneratedField::Hash),
                             "type" => Ok(GeneratedField::Type),
                             "version" => Ok(GeneratedField::Version),
-                            "stateChangeHash" => Ok(GeneratedField::StateChangeHash),
-                            "eventRootHash" => Ok(GeneratedField::EventRootHash),
-                            "stateCheckpointHash" => Ok(GeneratedField::StateCheckpointHash),
-                            "gasUsed" => Ok(GeneratedField::GasUsed),
+                            "stateChangeHash" | "state_change_hash" => {
+                                Ok(GeneratedField::StateChangeHash)
+                            }
+                            "eventRootHash" | "event_root_hash" => {
+                                Ok(GeneratedField::EventRootHash)
+                            }
+                            "stateCheckpointHash" | "state_checkpoint_hash" => {
+                                Ok(GeneratedField::StateCheckpointHash)
+                            }
+                            "gasUsed" | "gas_used" => Ok(GeneratedField::GasUsed),
                             "success" => Ok(GeneratedField::Success),
                             "epoch" => Ok(GeneratedField::Epoch),
-                            "blockHeight" => Ok(GeneratedField::BlockHeight),
-                            "vmStatus" => Ok(GeneratedField::VmStatus),
-                            "accumulatorRootHash" => Ok(GeneratedField::AccumulatorRootHash),
+                            "blockHeight" | "block_height" => Ok(GeneratedField::BlockHeight),
+                            "vmStatus" | "vm_status" => Ok(GeneratedField::VmStatus),
+                            "accumulatorRootHash" | "accumulator_root_hash" => {
+                                Ok(GeneratedField::AccumulatorRootHash)
+                            }
                             "timestamp" => Ok(GeneratedField::Timestamp),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -2015,10 +2078,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfoOutput {
                                     "stateCheckpointHash",
                                 ));
                             }
-                            state_checkpoint_hash__ = Some(
-                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
-                                    .0,
-                            );
+                            state_checkpoint_hash__ =
+                                map.next_value::<::std::option::Option<::pbjson::private::BytesDeserialize<_>>>()?.map(|x| x.0)
+                            ;
                         }
                         GeneratedField::GasUsed => {
                             if gas_used__.is_some() {
@@ -2074,7 +2136,7 @@ impl<'de> serde::Deserialize<'de> for TransactionInfoOutput {
                             if timestamp__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("timestamp"));
                             }
-                            timestamp__ = Some(map.next_value()?);
+                            timestamp__ = map.next_value()?;
                         }
                     }
                 }
@@ -2156,9 +2218,12 @@ impl<'de> serde::Deserialize<'de> for TransactionOutput {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
+            "transaction_info_output",
             "transactionInfoOutput",
             "events",
+            "write_set_changes",
             "writeSetChanges",
+            "block_metadata",
             "blockMetadata",
             "user",
             "genesis",
@@ -2196,10 +2261,14 @@ impl<'de> serde::Deserialize<'de> for TransactionOutput {
                         E: serde::de::Error,
                     {
                         match value {
-                            "transactionInfoOutput" => Ok(GeneratedField::TransactionInfoOutput),
+                            "transactionInfoOutput" | "transaction_info_output" => {
+                                Ok(GeneratedField::TransactionInfoOutput)
+                            }
                             "events" => Ok(GeneratedField::Events),
-                            "writeSetChanges" => Ok(GeneratedField::WriteSetChanges),
-                            "blockMetadata" => Ok(GeneratedField::BlockMetadata),
+                            "writeSetChanges" | "write_set_changes" => {
+                                Ok(GeneratedField::WriteSetChanges)
+                            }
+                            "blockMetadata" | "block_metadata" => Ok(GeneratedField::BlockMetadata),
                             "user" => Ok(GeneratedField::User),
                             "genesis" => Ok(GeneratedField::Genesis),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -2233,7 +2302,7 @@ impl<'de> serde::Deserialize<'de> for TransactionOutput {
                                     "transactionInfoOutput",
                                 ));
                             }
-                            transaction_info_output__ = Some(map.next_value()?);
+                            transaction_info_output__ = map.next_value()?;
                         }
                         GeneratedField::Events => {
                             if events__.is_some() {
@@ -2251,22 +2320,25 @@ impl<'de> serde::Deserialize<'de> for TransactionOutput {
                             if txn_data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("blockMetadata"));
                             }
-                            txn_data__ = Some(transaction_output::TxnData::BlockMetadata(
-                                map.next_value()?,
-                            ));
+                            txn_data__ = map
+                                .next_value::<::std::option::Option<_>>()?
+                                .map(transaction_output::TxnData::BlockMetadata);
                         }
                         GeneratedField::User => {
                             if txn_data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("user"));
                             }
-                            txn_data__ = Some(transaction_output::TxnData::User(map.next_value()?));
+                            txn_data__ = map
+                                .next_value::<::std::option::Option<_>>()?
+                                .map(transaction_output::TxnData::User);
                         }
                         GeneratedField::Genesis => {
                             if txn_data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("genesis"));
                             }
-                            txn_data__ =
-                                Some(transaction_output::TxnData::Genesis(map.next_value()?));
+                            txn_data__ = map
+                                .next_value::<::std::option::Option<_>>()?
+                                .map(transaction_output::TxnData::Genesis);
                         }
                     }
                 }
@@ -2381,15 +2453,21 @@ impl<'de> serde::Deserialize<'de> for UserTransactionOutput {
     {
         const FIELDS: &[&str] = &[
             "version",
+            "parent_signature_type",
             "parentSignatureType",
             "sender",
+            "sequence_number",
             "sequenceNumber",
+            "max_gas_amount",
             "maxGasAmount",
+            "expiration_timestamp_secs",
             "expirationTimestampSecs",
+            "gas_unit_price",
             "gasUnitPrice",
             "timestamp",
             "signatures",
             "payload",
+            "entry_function_id_str",
             "entryFunctionIdStr",
         ];
 
@@ -2431,18 +2509,24 @@ impl<'de> serde::Deserialize<'de> for UserTransactionOutput {
                     {
                         match value {
                             "version" => Ok(GeneratedField::Version),
-                            "parentSignatureType" => Ok(GeneratedField::ParentSignatureType),
+                            "parentSignatureType" | "parent_signature_type" => {
+                                Ok(GeneratedField::ParentSignatureType)
+                            }
                             "sender" => Ok(GeneratedField::Sender),
-                            "sequenceNumber" => Ok(GeneratedField::SequenceNumber),
-                            "maxGasAmount" => Ok(GeneratedField::MaxGasAmount),
-                            "expirationTimestampSecs" => {
+                            "sequenceNumber" | "sequence_number" => {
+                                Ok(GeneratedField::SequenceNumber)
+                            }
+                            "maxGasAmount" | "max_gas_amount" => Ok(GeneratedField::MaxGasAmount),
+                            "expirationTimestampSecs" | "expiration_timestamp_secs" => {
                                 Ok(GeneratedField::ExpirationTimestampSecs)
                             }
-                            "gasUnitPrice" => Ok(GeneratedField::GasUnitPrice),
+                            "gasUnitPrice" | "gas_unit_price" => Ok(GeneratedField::GasUnitPrice),
                             "timestamp" => Ok(GeneratedField::Timestamp),
                             "signatures" => Ok(GeneratedField::Signatures),
                             "payload" => Ok(GeneratedField::Payload),
-                            "entryFunctionIdStr" => Ok(GeneratedField::EntryFunctionIdStr),
+                            "entryFunctionIdStr" | "entry_function_id_str" => {
+                                Ok(GeneratedField::EntryFunctionIdStr)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2525,7 +2609,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionOutput {
                                     "expirationTimestampSecs",
                                 ));
                             }
-                            expiration_timestamp_secs__ = Some(map.next_value()?);
+                            expiration_timestamp_secs__ = map.next_value()?;
                         }
                         GeneratedField::GasUnitPrice => {
                             if gas_unit_price__.is_some() {
@@ -2540,7 +2624,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionOutput {
                             if timestamp__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("timestamp"));
                             }
-                            timestamp__ = Some(map.next_value()?);
+                            timestamp__ = map.next_value()?;
                         }
                         GeneratedField::Signatures => {
                             if signatures__.is_some() {
@@ -2644,8 +2728,11 @@ impl<'de> serde::Deserialize<'de> for WriteSetChangeOutput {
             "version",
             "hash",
             "type",
+            "move_module",
             "moveModule",
+            "move_resource",
             "moveResource",
+            "table_item",
             "tableItem",
         ];
 
@@ -2684,9 +2771,9 @@ impl<'de> serde::Deserialize<'de> for WriteSetChangeOutput {
                             "version" => Ok(GeneratedField::Version),
                             "hash" => Ok(GeneratedField::Hash),
                             "type" => Ok(GeneratedField::Type),
-                            "moveModule" => Ok(GeneratedField::MoveModule),
-                            "moveResource" => Ok(GeneratedField::MoveResource),
-                            "tableItem" => Ok(GeneratedField::TableItem),
+                            "moveModule" | "move_module" => Ok(GeneratedField::MoveModule),
+                            "moveResource" | "move_resource" => Ok(GeneratedField::MoveResource),
+                            "tableItem" | "table_item" => Ok(GeneratedField::TableItem),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2740,25 +2827,25 @@ impl<'de> serde::Deserialize<'de> for WriteSetChangeOutput {
                             if change__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("moveModule"));
                             }
-                            change__ = Some(write_set_change_output::Change::MoveModule(
-                                map.next_value()?,
-                            ));
+                            change__ = map
+                                .next_value::<::std::option::Option<_>>()?
+                                .map(write_set_change_output::Change::MoveModule);
                         }
                         GeneratedField::MoveResource => {
                             if change__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("moveResource"));
                             }
-                            change__ = Some(write_set_change_output::Change::MoveResource(
-                                map.next_value()?,
-                            ));
+                            change__ = map
+                                .next_value::<::std::option::Option<_>>()?
+                                .map(write_set_change_output::Change::MoveResource);
                         }
                         GeneratedField::TableItem => {
                             if change__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("tableItem"));
                             }
-                            change__ = Some(write_set_change_output::Change::TableItem(
-                                map.next_value()?,
-                            ));
+                            change__ = map
+                                .next_value::<::std::option::Option<_>>()?
+                                .map(write_set_change_output::Change::TableItem);
                         }
                     }
                 }

@@ -172,9 +172,8 @@ pub fn expect_only_successful_execution(
         VMStatus::Executed => VMStatus::Executed,
 
         status => {
-            // Only trigger a warning here as some errors could be a result of the speculative parallel execution.
-            // We will report the errors after we obtained the final transaction output in update_counters_for_processed_chunk
-            warn!(
+            log_context.alert();
+            error!(
                 *log_context,
                 "[aptos_vm] Unexpected error from known Move function, '{}'. Error: {:?}",
                 function_name,

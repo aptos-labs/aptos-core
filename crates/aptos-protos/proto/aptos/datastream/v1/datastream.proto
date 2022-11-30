@@ -1,0 +1,29 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.datastream.v1;
+
+message TransactionsData {
+    message TransactionData {
+        string encoded_proto_data = 1;
+        uint64 version = 2;
+    }
+    repeated TransactionData transactions  = 1;
+}
+
+message RawDatastreamRequest {
+  uint64 starting_version = 1;
+  uint64 fetcher_count = 2;
+  uint64 processor_task_count = 3;
+}
+
+message RawDatastreamResponse {
+  uint64 size = 1;
+  TransactionsData data = 2;
+}
+
+service NodeDataService {
+    rpc RawDatastream(RawDatastreamRequest) returns (stream RawDatastreamResponse);
+}

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    executor::BlockExecutor,
+    executor::ParallelTransactionExecutor,
     proptest_types::types::{
         ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams, ValueType,
     },
@@ -27,10 +27,8 @@ pub struct Bencher<K, V> {
     phantom_value: PhantomData<V>,
 }
 
-pub(crate) struct BencherState<
-    K: Hash + Clone + Debug + Eq + PartialOrd + Ord,
-    V: Clone + Eq + Arbitrary,
-> where
+pub(crate) struct BencherState<K: Hash + Clone + Debug + Eq + PartialOrd, V: Clone + Eq + Arbitrary>
+where
     Vec<u8>: From<V>,
 {
     transactions: Vec<Transaction<KeyType<K>, ValueType<V>>>,
@@ -110,11 +108,11 @@ where
     }
 
     pub(crate) fn run(self) {
-        let output = BlockExecutor::<
+        let output = ParallelTransactionExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &self.transactions)
+        .execute_transactions_parallel((), self.transactions.clone())
         .map(|(res, _)| res);
 
         self.expected_output.assert_output(&output, None);

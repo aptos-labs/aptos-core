@@ -11,5 +11,6 @@ edition = "2021"
 
 [dependencies]
 pbjson = "0.4.0"
-prost = "0.10.4"
+prost = { workspace = true }
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
+tonic = { workspace = true }

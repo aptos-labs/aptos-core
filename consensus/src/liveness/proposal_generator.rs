@@ -43,7 +43,6 @@ impl ChainHealthBackoffConfig {
         Self { backoffs }
     }
 
-    #[allow(dead_code)]
     pub fn new_no_backoff() -> Self {
         Self {
             backoffs: BTreeMap::new(),

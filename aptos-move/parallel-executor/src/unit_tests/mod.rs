@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    executor::BlockExecutor,
+    executor::ParallelTransactionExecutor,
     proptest_types::types::{ExpectedOutput, KeyType, Task, Transaction, ValueType},
     scheduler::{Scheduler, SchedulerTask, TaskGuard},
     task::ModulePath,
@@ -18,11 +18,11 @@ use std::{
 
 fn run_and_assert<K, V>(transactions: Vec<Transaction<K, V>>)
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + Eq + TransactionWrite + 'static,
 {
-    let output = BlockExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions)
+    let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
+        .execute_transactions_parallel((), transactions.clone())
         .map(|(res, _)| res);
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None);
