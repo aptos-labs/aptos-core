@@ -94,7 +94,7 @@ Contrast the following two functions of implementing a coin transfer using depos
 
 ```rust
 public fun transfer<T>(sender: &signer, recipient: address, amount: u64) {
-    let coin = withdraw(&signer, amount);
+    let coin = withdraw(&sender, amount);
     deposit(recipient, coin);
 }
 ```
