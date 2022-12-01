@@ -1,14 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use tonic::{transport::Server, Request, Response, Status, Streaming};
+use tonic::{Request, Response, Status};
 
-use aptos_protos::datastream::v1::node_data_service_server::{
-    NodeDataService, NodeDataServiceServer,
-};
+use aptos_protos::datastream::v1::node_data_service_server::NodeDataService;
 use aptos_protos::datastream::v1::{RawDatastreamRequest, RawDatastreamResponse};
 use futures::Stream;
-use std::{error::Error, io::ErrorKind, net::ToSocketAddrs, pin::Pin, time::Duration};
+use std::{pin::Pin, time::Duration};
 use tokio::sync::mpsc;
 use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 

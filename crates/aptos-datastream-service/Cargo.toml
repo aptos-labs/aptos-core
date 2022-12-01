@@ -1,0 +1,21 @@
+[package]
+name = "aptos-datastream-service"
+description = "Aptos Datastream service to serve real-time on-chain data."
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+tokio = { workspace = true }
+tonic = { workspace = true }
+prost =  { workspace = true }
+futures = { workspace = true }
+aptos-protos = { workspace = true }
+tokio-stream = { workspace = true }
