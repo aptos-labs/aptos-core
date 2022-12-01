@@ -687,6 +687,7 @@ Check for overflow.
 
 <pre><code><b>aborts_if</b> value &gt; (integer.limit - integer.value);
 <b>aborts_if</b> integer.value + value &gt; MAX_U128;
+<b>ensures</b> integer.value == <b>old</b>(integer.value) + value;
 </code></pre>
 
 
@@ -703,6 +704,7 @@ Check for overflow.
 
 
 <pre><code><b>aborts_if</b> value &gt; integer.value;
+<b>ensures</b> integer.value == <b>old</b>(integer.value) - value;
 </code></pre>
 
 

@@ -30,9 +30,4 @@ spec aptos_framework::version {
         aborts_if exists<Version>(@aptos_framework);
         aborts_if exists<SetVersionCapability>(@aptos_framework);
     }
-
-    /// Only for test
-    spec initialize_for_test(core_resources: &signer) {
-        pragma verify = false;
-    }
 }
