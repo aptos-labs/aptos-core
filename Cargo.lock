@@ -488,6 +488,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-datastream-service"
+version = "0.1.0"
+dependencies = [
+ "aptos-protos",
+ "futures",
+ "prost",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+]
+
+[[package]]
 name = "aptos-datastream-worker"
 version = "0.1.0"
 dependencies = [

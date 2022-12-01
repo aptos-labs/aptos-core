@@ -61,6 +61,7 @@ members = [
     "crates/aptos-telemetry",
     "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
+    "crates/aptos-datastream-service",
     "crates/aptos-datastream-worker",
     "crates/aptos-time-service",
     "crates/aptos-warp-webserver",
@@ -229,6 +230,7 @@ aptos-types = { path = "types" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
+aptos-datastream-service = { path = "crates/aptos-datastream-service" }
 aptos-datastream-worker = { path = "crates/aptos-datastream-worker" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
