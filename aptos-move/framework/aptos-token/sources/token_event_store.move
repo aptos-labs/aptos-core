@@ -118,7 +118,7 @@ module aptos_token::token_event_store {
         royalty_mutate_events: EventHandle<RoyaltyMutateEvent>,
         maximum_mutate_events: EventHandle<MaxiumMutateEvent>,
         /// This is for adding new events in future
-        extention: Option<Any>,
+        extension: Option<Any>,
     }
 
     fun initialize_token_event_store(acct: &signer){
@@ -133,7 +133,7 @@ module aptos_token::token_event_store {
                 description_mutate_events: account::new_event_handle<DescriptionMutateEvent>(acct),
                 royalty_mutate_events: account::new_event_handle<RoyaltyMutateEvent>(acct),
                 maximum_mutate_events: account::new_event_handle<MaxiumMutateEvent>(acct),
-                extention: option::none<Any>(),
+                extension: option::none<Any>(),
             });
         };
     }
