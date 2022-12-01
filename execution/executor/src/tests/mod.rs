@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{iter::once, sync::Arc};
+use std::{collections::BTreeSet, iter::once, sync::Arc};
 
 use proptest::prelude::*;
 
@@ -661,7 +661,7 @@ proptest! {
             // replay txns in one batch across epoch boundary,
             // and the replayer should deal with `Retry`s automatically
             let replayer = chunk_executor_tests::TestExecutor::new();
-            replayer.executor.replay(block.txns, txn_infos).unwrap();
+            replayer.executor.replay(block.txns, txn_infos, vec![], vec![], Arc::new(BTreeSet::new())).unwrap();
             replayer.executor.commit().unwrap();
             let replayed_db = replayer.db.reader.clone();
             prop_assert_eq!(
