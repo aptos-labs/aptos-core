@@ -44,7 +44,9 @@ use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
 use move_cli::base::test::UnitTestResult;
 use move_command_line_common::env::MOVE_HOME;
+use serde::Serialize;
 use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
@@ -698,7 +700,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
 #[derive(Parser)]
 pub struct DownloadPackage {
     /// Address of the account containing the package
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
     /// Name of the package
@@ -754,7 +756,7 @@ impl CliCommand<&'static str> for DownloadPackage {
 #[derive(Parser)]
 pub struct VerifyPackage {
     /// Address of the account containing the package
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
     /// Artifacts to be generated when building this package.
@@ -815,7 +817,7 @@ impl CliCommand<&'static str> for VerifyPackage {
 #[derive(Parser)]
 pub struct ListPackage {
     /// Address of the account for which to list packages.
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
     /// Type of items to query
@@ -1033,7 +1035,7 @@ impl CliCommand<TransactionSummary> for RunScript {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum FunctionArgType {
     Address,
     Bool,
@@ -1044,6 +1046,24 @@ pub(crate) enum FunctionArgType {
     U64,
     U128,
     Raw,
+    Vector(Box<FunctionArgType>),
+}
+
+impl Display for FunctionArgType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FunctionArgType::Address => write!(f, "address"),
+            FunctionArgType::Bool => write!(f, "bool"),
+            FunctionArgType::Hex => write!(f, "hex"),
+            FunctionArgType::HexArray => write!(f, "hex_array"),
+            FunctionArgType::String => write!(f, "string"),
+            FunctionArgType::U8 => write!(f, "u8"),
+            FunctionArgType::U64 => write!(f, "u64"),
+            FunctionArgType::U128 => write!(f, "u128"),
+            FunctionArgType::Raw => write!(f, "raw"),
+            FunctionArgType::Vector(inner) => write!(f, "vector<{}>", inner),
+        }
+    }
 }
 
 impl FunctionArgType {
@@ -1066,7 +1086,7 @@ impl FunctionArgType {
                     encoded.push(hex::decode(sub_arg).map_err(|err| {
                         CliError::UnableToParse(
                             "hex_array",
-                            format!("Failed to parse hex array: {:?}", err.to_string()),
+                            format!("Failed to parse hex array: {}", err),
                         )
                     })?);
                 }
@@ -1089,9 +1109,55 @@ impl FunctionArgType {
                     .map_err(|err| CliError::UnableToParse("raw", err.to_string()))?;
                 Ok(raw)
             }
+            FunctionArgType::Vector(inner) => {
+                let parsed = match inner.deref() {
+                    FunctionArgType::Address => parse_vector_arg(arg, |arg| {
+                        load_account_arg(arg).map_err(|err| {
+                            CliError::UnableToParse("vector<address>", err.to_string())
+                        })
+                    }),
+                    FunctionArgType::Bool => parse_vector_arg(arg, |arg| {
+                        bool::from_str(arg)
+                            .map_err(|err| CliError::UnableToParse("vector<bool>", err.to_string()))
+                    }),
+                    FunctionArgType::Hex => parse_vector_arg(arg, |arg| {
+                        hex::decode(arg)
+                            .map_err(|err| CliError::UnableToParse("vector<hex>", err.to_string()))
+                    }),
+                    FunctionArgType::U8 => parse_vector_arg(arg, |arg| {
+                        u8::from_str(arg)
+                            .map_err(|err| CliError::UnableToParse("vector<u8>", err.to_string()))
+                    }),
+                    FunctionArgType::U64 => parse_vector_arg(arg, |arg| {
+                        u64::from_str(arg)
+                            .map_err(|err| CliError::UnableToParse("vector<u64>", err.to_string()))
+                    }),
+                    FunctionArgType::U128 => parse_vector_arg(arg, |arg| {
+                        u64::from_str(arg)
+                            .map_err(|err| CliError::UnableToParse("vector<128>", err.to_string()))
+                    }),
+                    vector_type => {
+                        panic!("Unsupported vector type vector<{}>", vector_type)
+                    }
+                }?;
+                Ok(parsed)
+            }
         }
         .map_err(|err| CliError::BCS("arg", err))
     }
+}
+
+fn parse_vector_arg<T: Serialize, F: Fn(&str) -> CliTypedResult<T>>(
+    args: &str,
+    parse: F,
+) -> CliTypedResult<Vec<u8>> {
+    let mut parsed_args = vec![];
+    let args = args.split(',');
+    for arg in args {
+        parsed_args.push(parse(arg)?);
+    }
+
+    bcs::to_bytes(&parsed_args).map_err(|err| CliError::BCS("arg", err))
 }
 
 impl FromStr for FunctionArgType {
@@ -1107,7 +1173,35 @@ impl FromStr for FunctionArgType {
             "u128" => Ok(FunctionArgType::U128),
             "hex_array" => Ok(FunctionArgType::HexArray),
             "raw" => Ok(FunctionArgType::Raw),
-            str => Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','hex_array','string','u8','u64','u128','raw']", str))),
+            str => {
+                // If it's a vector, go one level inside
+                if str.starts_with("vector<") && str.ends_with('>') {
+                    let arg = FunctionArgType::from_str(&str[7..str.len() - 1])?;
+
+                    // String gets confusing on parsing by commas
+                    if arg == FunctionArgType::String {
+                        return Err(CliError::CommandArgumentError(
+                            "vector<string> is not supported".to_string(),
+                        ));
+                    } else if arg == FunctionArgType::Raw {
+                        return Err(CliError::CommandArgumentError(
+                            "vector<raw> is not supported".to_string(),
+                        ));
+                    } else if matches!(arg, FunctionArgType::Vector(_)) {
+                        return Err(CliError::CommandArgumentError(
+                            "nested vector<vector<_>> is not supported".to_string(),
+                        ));
+                    } else if arg == FunctionArgType::HexArray {
+                        return Err(CliError::CommandArgumentError(
+                            "nested vector<hex_array> is not supported".to_string(),
+                        ));
+                    }
+
+                    Ok(FunctionArgType::Vector(Box::new(arg)))
+                } else {
+                    Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','hex_array','string','u8','u64','u128','raw', 'vector<inner_type>']", str)))
+                }
+            }
         }
     }
 }
@@ -1197,6 +1291,10 @@ impl TryInto<TransactionArgument> for ArgWithType {
             FunctionArgType::Raw => Ok(TransactionArgument::U8Vector(txn_arg_parser(
                 &self.arg, "raw",
             )?)),
+            arg_type => Err(CliError::CommandArgumentError(format!(
+                "Input type {} not supported",
+                arg_type
+            ))),
         }
     }
 }

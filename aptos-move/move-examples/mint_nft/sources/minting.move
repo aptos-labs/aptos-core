@@ -120,17 +120,16 @@ module mint_nft::minting {
 
         // change source_addr to the actual account that created the resource account
         let resource_signer_cap = resource_account::retrieve_resource_account_cap(resource_account, @source_addr);
-        let resource_signer = account::create_signer_with_capability(&resource_signer_cap);
 
         // create the nft collection
         let maximum_supply = 0;
         let mutate_setting = vector<bool>[ false, false, false ];
-        let resource_account_address = signer::address_of(&resource_signer);
-        token::create_collection(&resource_signer, collection_name, description, collection_uri, maximum_supply, mutate_setting);
+        let resource_account_address = signer::address_of(resource_account);
+        token::create_collection(resource_account, collection_name, description, collection_uri, maximum_supply, mutate_setting);
 
         // create a token data id to specify which token will be minted
         let token_data_id = token::create_tokendata(
-            &resource_signer,
+            resource_account,
             collection_name,
             token_name,
             string::utf8(b""),
@@ -156,7 +155,7 @@ module mint_nft::minting {
             token_data_id,
             expiration_timestamp,
             minting_enabled: true,
-            token_minting_events: account::new_event_handle<TokenMintingEvent>(&resource_signer),
+            token_minting_events: account::new_event_handle<TokenMintingEvent>(resource_account),
         });
     }
 
