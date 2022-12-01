@@ -31,7 +31,9 @@ spec aptos_framework::version {
         aborts_if exists<SetVersionCapability>(@aptos_framework);
     }
 
+    /// This module turns on `aborts_if_is_strict`, so need to add spec for test function `initialize_for_test`.
     spec initialize_for_test {
+        // Don't verify test functions.
         pragma verify = false;
     }
 }
