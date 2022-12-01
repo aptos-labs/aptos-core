@@ -145,6 +145,10 @@ module aptos_token::token {
     /// Token Properties count doesn't match
     const ETOKEN_PROPERTIES_COUNT_NOT_MATCH: u64 = 37;
 
+
+    /// Withdraw capability doesn't have sufficient amount
+    const EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT: u64 = 38;
+
     //
     // Core data structures for holding tokens
     //
@@ -961,6 +965,40 @@ module aptos_token::token {
             withdraw_proof.token_id,
             withdraw_proof.amount,
         )
+    }
+
+    /// Withdraw the token with a capability.
+    public fun partial_withdraw_with_capability(
+        withdraw_proof: WithdrawCapability,
+        withdraw_amount: u64,
+    ): (Token, Option<WithdrawCapability>) acquires TokenStore {
+        // verify the delegation hasn't expired yet
+        assert!(timestamp::now_seconds() <= *&withdraw_proof.expiration_sec, error::invalid_argument(EWITHDRAW_PROOF_EXPIRES));
+
+        assert!(withdraw_amount <= withdraw_proof.amount, error::invalid_argument(EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT));
+
+        let res: Option<WithdrawCapability> = if (withdraw_amount == withdraw_proof.amount) {
+            option::none<WithdrawCapability>()
+        } else {
+            option::some(
+                WithdrawCapability {
+                    token_owner: withdraw_proof.token_owner,
+                    token_id: withdraw_proof.token_id,
+                    amount: withdraw_proof.amount - withdraw_amount,
+                    expiration_sec: withdraw_proof.expiration_sec,
+                }
+            )
+        };
+
+        (
+            withdraw_with_event_internal(
+                withdraw_proof.token_owner,
+                withdraw_proof.token_id,
+                withdraw_amount,
+            ),
+            res
+        )
+
     }
 
     public fun withdraw_token(
@@ -2446,6 +2484,40 @@ module aptos_token::token {
     #[expected_failure(abort_code = 65570)]
     public fun test_enter_illegal_royalty(){
         create_royalty(101, 100, @0xcafe);
+    }
+
+    #[test(framework = @0x1, creator = @0xcafe)]
+    fun test_partial_withdraw_with_proof(creator: &signer, framework: &signer): Token acquires TokenStore, Collections {
+        timestamp::set_time_has_started_for_testing(framework);
+        account::create_account_for_test(signer::address_of(creator));
+        let token_id = create_collection_and_token(
+            creator,
+            4,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+
+        timestamp::update_global_time_for_test(1000000);
+
+        // provide the proof to the account
+        let cap = create_withdraw_capability(
+            creator, // ask user to provide address to avoid ambiguity from rotated keys
+            token_id,
+            3,
+            2000000,
+        );
+
+        let (token, capability) = partial_withdraw_with_capability(cap, 1);
+        assert!(option::borrow<WithdrawCapability>(&capability).amount == 2, 1);
+        let (token_1, cap) = partial_withdraw_with_capability(option::extract(&mut capability), 2);
+        assert!(option::is_none(&cap), 1);
+        merge(&mut token, token_1);
+        token
     }
 
     //

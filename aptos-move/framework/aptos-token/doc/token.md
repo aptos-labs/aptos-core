@@ -55,6 +55,7 @@ Checkout our developer doc on our token standard https://aptos.dev/concepts/coin
 -  [Function `transfer`](#0x3_token_transfer)
 -  [Function `create_withdraw_capability`](#0x3_token_create_withdraw_capability)
 -  [Function `withdraw_with_capability`](#0x3_token_withdraw_with_capability)
+-  [Function `partial_withdraw_with_capability`](#0x3_token_partial_withdraw_with_capability)
 -  [Function `withdraw_token`](#0x3_token_withdraw_token)
 -  [Function `create_collection`](#0x3_token_create_collection)
 -  [Function `check_collection_exists`](#0x3_token_check_collection_exists)
@@ -1131,6 +1132,16 @@ The field is not mutable
 
 
 <pre><code><b>const</b> <a href="token.md#0x3_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>: u64 = 13;
+</code></pre>
+
+
+
+<a name="0x3_token_EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT"></a>
+
+Withdraw capability doesn't have sufficient amount
+
+
+<pre><code><b>const</b> <a href="token.md#0x3_token_EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT">EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT</a>: u64 = 37;
 </code></pre>
 
 
@@ -2652,6 +2663,60 @@ Withdraw the token with a capability
         withdraw_proof.token_id,
         withdraw_proof.amount,
     )
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_partial_withdraw_with_capability"></a>
+
+## Function `partial_withdraw_with_capability`
+
+Withdraw the token with a capability.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_partial_withdraw_with_capability">partial_withdraw_with_capability</a>(withdraw_proof: <a href="token.md#0x3_token_WithdrawCapability">token::WithdrawCapability</a>, withdraw_amount: u64): (<a href="token.md#0x3_token_Token">token::Token</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="token.md#0x3_token_WithdrawCapability">token::WithdrawCapability</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_partial_withdraw_with_capability">partial_withdraw_with_capability</a>(
+    withdraw_proof: <a href="token.md#0x3_token_WithdrawCapability">WithdrawCapability</a>,
+    withdraw_amount: u64,
+): (<a href="token.md#0x3_token_Token">Token</a>, Option&lt;<a href="token.md#0x3_token_WithdrawCapability">WithdrawCapability</a>&gt;) <b>acquires</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a> {
+    // verify the delegation hasn't expired yet
+    <b>assert</b>!(<a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt;= *&withdraw_proof.expiration_sec, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EWITHDRAW_PROOF_EXPIRES">EWITHDRAW_PROOF_EXPIRES</a>));
+
+    <b>assert</b>!(withdraw_amount &lt;= withdraw_proof.amount, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT">EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT</a>));
+
+    <b>let</b> res: Option&lt;<a href="token.md#0x3_token_WithdrawCapability">WithdrawCapability</a>&gt; = <b>if</b> (withdraw_amount == withdraw_proof.amount) {
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;<a href="token.md#0x3_token_WithdrawCapability">WithdrawCapability</a>&gt;()
+    } <b>else</b> {
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
+            <a href="token.md#0x3_token_WithdrawCapability">WithdrawCapability</a> {
+                token_owner: withdraw_proof.token_owner,
+                token_id: withdraw_proof.token_id,
+                amount: withdraw_proof.amount - withdraw_amount,
+                expiration_sec: withdraw_proof.expiration_sec,
+            }
+        )
+    };
+
+    (
+        <a href="token.md#0x3_token_withdraw_with_event_internal">withdraw_with_event_internal</a>(
+            withdraw_proof.token_owner,
+            withdraw_proof.token_id,
+            withdraw_amount,
+        ),
+        res
+    )
+
 }
 </code></pre>
 
