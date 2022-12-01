@@ -139,7 +139,7 @@ module aptos_framework::block {
         if (features::collect_and_distribute_gas_fees()) {
             // Assign the fees collected from the previous block to the previous block proposer.
             // If for any reason the fees cannot be assigned, this function burns the collected coins.
-            transaction_fee::assign_or_burn_collected_fee();
+            transaction_fee::process_collected_fees();
             // Set the proposer of this block as the receiver of the fees, so that the fees for this
             // block are assigned to the right account.
             transaction_fee::register_proposer_for_fee_collection(proposer);

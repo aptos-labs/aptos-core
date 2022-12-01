@@ -365,7 +365,7 @@ Signal validators to start using new configuration. Must be called from friend c
         // All transactions after <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> are Retry. Therefore, when the next
         // <a href="block.md#0x1_block">block</a> starts and tries <b>to</b> assign/burn collected fees it will be just 0 and
         // nothing will be assigned.
-        <a href="transaction_fee.md#0x1_transaction_fee_assign_or_burn_collected_fee">transaction_fee::assign_or_burn_collected_fee</a>();
+        <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">transaction_fee::process_collected_fees</a>();
     };
 
     // Call <a href="stake.md#0x1_stake">stake</a> <b>to</b> compute the new validator set and distribute rewards and transaction fees.

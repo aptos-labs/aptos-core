@@ -279,11 +279,11 @@ module aptos_framework::stake {
     /// Stores the transaction fee collected to the specified validator address.
     public(friend) fun add_transaction_fee(validator_addr: address, fee: Coin<AptosCoin>) acquires ValidatorFees {
         let fees_table = &mut borrow_global_mut<ValidatorFees>(@aptos_framework).fees_table;
-        if (!table::contains(fees_table, validator_addr)) {
-            table::add(fees_table, validator_addr, fee);
-        } else {
+        if (table::contains(fees_table, validator_addr)) {
             let collected_fee = table::borrow_mut(fees_table, validator_addr);
             coin::merge(collected_fee, fee);
+        } else {
+            table::add(fees_table, validator_addr, fee);
         }
     }
 

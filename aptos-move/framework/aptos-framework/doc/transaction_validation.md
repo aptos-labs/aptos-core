@@ -477,6 +477,8 @@ Called by the Adapter
         <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">transaction_fee::collect_fee</a>(addr, transaction_fee_amount);
     } <b>else</b> {
         // Otherwise, just burn the fee.
+        // TODO: this branch should be removed completely when transaction fee collection
+        // is tested and is fully proven <b>to</b> work well.
         <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(addr, transaction_fee_amount);
     };
 

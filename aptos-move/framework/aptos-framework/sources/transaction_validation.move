@@ -202,6 +202,8 @@ module aptos_framework::transaction_validation {
             transaction_fee::collect_fee(addr, transaction_fee_amount);
         } else {
             // Otherwise, just burn the fee.
+            // TODO: this branch should be removed completely when transaction fee collection
+            // is tested and is fully proven to work well.
             transaction_fee::burn_fee(addr, transaction_fee_amount);
         };
 

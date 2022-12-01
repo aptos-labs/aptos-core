@@ -10,11 +10,11 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Resource `CollectedFeesPerBlock`](#0x1_transaction_fee_CollectedFeesPerBlock)
 -  [Constants](#@Constants_0)
 -  [Function `initialize_fee_collection_and_distribution`](#0x1_transaction_fee_initialize_fee_collection_and_distribution)
+-  [Function `is_fees_collection_enabled`](#0x1_transaction_fee_is_fees_collection_enabled)
 -  [Function `register_proposer_for_fee_collection`](#0x1_transaction_fee_register_proposer_for_fee_collection)
 -  [Function `burn_coin_fraction`](#0x1_transaction_fee_burn_coin_fraction)
--  [Function `assign_or_burn_collected_fee`](#0x1_transaction_fee_assign_or_burn_collected_fee)
+-  [Function `process_collected_fees`](#0x1_transaction_fee_process_collected_fees)
 -  [Function `burn_fee`](#0x1_transaction_fee_burn_fee)
--  [Function `burn_collected_fee`](#0x1_transaction_fee_burn_collected_fee)
 -  [Function `collect_fee`](#0x1_transaction_fee_collect_fee)
 -  [Function `store_aptos_coin_burn_cap`](#0x1_transaction_fee_store_aptos_coin_burn_cap)
 -  [Specification](#@Specification_1)
@@ -145,7 +145,6 @@ distribution. Should be called by on-chain governance.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_percentage: u8) {
-    // Sanity checks.
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>assert</b>!(
         !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework),
@@ -157,13 +156,36 @@ distribution. Should be called by on-chain governance.
     <a href="stake.md#0x1_stake_initialize_validator_fees">stake::initialize_validator_fees</a>(aptos_framework);
 
     // Initially, no fees are collected and the <a href="block.md#0x1_block">block</a> proposer is not set.
-    <b>let</b> zero = <a href="coin.md#0x1_coin_initialize_aggregatable_coin">coin::initialize_aggregatable_coin</a>(aptos_framework);
-    <b>let</b> info = <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
-        amount: zero,
+    <b>let</b> collected_fees = <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
+        amount: <a href="coin.md#0x1_coin_initialize_aggregatable_coin">coin::initialize_aggregatable_coin</a>(aptos_framework),
         proposer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
         burn_percentage,
     };
-    <b>move_to</b>(aptos_framework, info);
+    <b>move_to</b>(aptos_framework, collected_fees);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_transaction_fee_is_fees_collection_enabled"></a>
+
+## Function `is_fees_collection_enabled`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>(): bool {
+    <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework)
 }
 </code></pre>
 
@@ -189,8 +211,10 @@ can only be called at the beginning of the block.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">register_proposer_for_fee_collection</a>(proposer_addr: <b>address</b>) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
-    <b>let</b> collected_fees = <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);
-    <b>let</b> _ = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_swap_or_fill">option::swap_or_fill</a>(&<b>mut</b> collected_fees.proposer, proposer_addr);
+    <b>if</b> (<a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>()) {
+        <b>let</b> collected_fees = <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);
+        <b>let</b> _ = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_swap_or_fill">option::swap_or_fill</a>(&<b>mut</b> collected_fees.proposer, proposer_addr);
+    }
 }
 </code></pre>
 
@@ -219,8 +243,13 @@ Burns a specified fraction of the coin.
 
     <b>let</b> collected_amount = <a href="coin.md#0x1_coin_value">coin::value</a>(<a href="coin.md#0x1_coin">coin</a>);
     <b>let</b> amount_to_burn = (burn_percentage <b>as</b> u64) * collected_amount / 100;
-    <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract">coin::extract</a>(<a href="coin.md#0x1_coin">coin</a>, amount_to_burn);
-    <a href="transaction_fee.md#0x1_transaction_fee_burn_collected_fee">burn_collected_fee</a>(coin_to_burn);
+    <b>if</b> (amount_to_burn &gt; 0) {
+        <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract">coin::extract</a>(<a href="coin.md#0x1_coin">coin</a>, amount_to_burn);
+        <a href="coin.md#0x1_coin_burn">coin::burn</a>(
+            coin_to_burn,
+            &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,
+        );
+    }
 }
 </code></pre>
 
@@ -228,16 +257,16 @@ Burns a specified fraction of the coin.
 
 </details>
 
-<a name="0x1_transaction_fee_assign_or_burn_collected_fee"></a>
+<a name="0x1_transaction_fee_process_collected_fees"></a>
 
-## Function `assign_or_burn_collected_fee`
+## Function `process_collected_fees`
 
 Calculates the fee which should be distributed to the block proposer at the
 end of an epoch, and records it in the system. This function can only be called
 at the beginning of the block or during reconfiguration.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_assign_or_burn_collected_fee">assign_or_burn_collected_fee</a>()
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">process_collected_fees</a>()
 </code></pre>
 
 
@@ -246,7 +275,10 @@ at the beginning of the block or during reconfiguration.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_assign_or_burn_collected_fee">assign_or_burn_collected_fee</a>() <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">process_collected_fees</a>() <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
+    <b>if</b> (!<a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>()) {
+        <b>return</b>
+    };
     <b>let</b> collected_fees = <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);
 
     // If there are no collected fees, do nothing.
@@ -257,16 +289,15 @@ at the beginning of the block or during reconfiguration.
     // Otherwise get the collected fee, and check <b>if</b> it can distributed later.
     <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_drain_aggregatable_coin">coin::drain_aggregatable_coin</a>(&<b>mut</b> collected_fees.amount);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&collected_fees.proposer)) {
-        <b>let</b> proposer_addr = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&collected_fees.proposer);
-        <b>if</b> (<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(proposer_addr)) {
-            <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, collected_fees.burn_percentage);
-            <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(proposer_addr, <a href="coin.md#0x1_coin">coin</a>);
-            <b>return</b>
-        };
+        <b>let</b> proposer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> collected_fees.proposer);
+        <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, collected_fees.burn_percentage);
+        <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(proposer_addr, <a href="coin.md#0x1_coin">coin</a>);
+        <b>return</b>
     };
 
-    // If checks did not pass, simply burn the collected coins and <b>return</b> none.
-    <a href="transaction_fee.md#0x1_transaction_fee_burn_collected_fee">burn_collected_fee</a>(<a href="coin.md#0x1_coin">coin</a>)
+    // If checks did not pass, simply burn all collected coins and <b>return</b> none.
+    <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, 100);
+    <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(<a href="coin.md#0x1_coin">coin</a>)
 }
 </code></pre>
 
@@ -296,38 +327,6 @@ Burn transaction fees in epilogue.
         fee,
         &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,
     );
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_transaction_fee_burn_collected_fee"></a>
-
-## Function `burn_collected_fee`
-
-Burn a collected transaction fee.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_collected_fee">burn_collected_fee</a>(<a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_collected_fee">burn_collected_fee</a>(<a href="coin.md#0x1_coin">coin</a>: Coin&lt;AptosCoin&gt;) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
-    <b>if</b> (<a href="coin.md#0x1_coin_value">coin::value</a>(&<a href="coin.md#0x1_coin">coin</a>) == 0) {
-        <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(<a href="coin.md#0x1_coin">coin</a>)
-    } <b>else</b> {
-        <a href="coin.md#0x1_coin_burn">coin::burn</a>(
-            <a href="coin.md#0x1_coin">coin</a>,
-            &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,
-        )
-    };
 }
 </code></pre>
 

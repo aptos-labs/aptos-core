@@ -125,7 +125,7 @@ module aptos_framework::reconfiguration {
             // All transactions after reconfiguration are Retry. Therefore, when the next
             // block starts and tries to assign/burn collected fees it will be just 0 and
             // nothing will be assigned.
-            transaction_fee::assign_or_burn_collected_fee();
+            transaction_fee::process_collected_fees();
         };
 
         // Call stake to compute the new validator set and distribute rewards and transaction fees.
