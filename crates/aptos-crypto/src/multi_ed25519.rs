@@ -510,7 +510,7 @@ impl Signature for MultiEd25519Signature {
         // NOTE: Public keys need not be validated because we use ed25519_dalek's verify_strict,
         // which checks for small order public keys.
         match bitmap_last_set_bit(self.bitmap) {
-            Some(last_bit) if last_bit as usize <= public_key.public_keys.len() => (),
+            Some(last_bit) if (last_bit as usize) < public_key.public_keys.len() => (),
             _ => {
                 return Err(anyhow!(
                     "{}",
@@ -637,4 +637,28 @@ fn bitmap_tests() {
     bitmap_set_bit(&mut bitmap, 30);
     assert!(bitmap_get_bit(bitmap, 30));
     assert_eq!(bitmap_last_set_bit(bitmap), Some(30));
+}
+
+#[test]
+fn test_key_boundaries() {
+    let pr = Ed25519PrivateKey::generate_for_testing();
+    let multi_pr = MultiEd25519PrivateKey::new(vec![pr], 1).unwrap();
+    let pb = multi_pr.public_key();
+
+    let msg = &[];
+    let sig = multi_pr.sign_arbitrary_message(msg);
+
+    let pb_bytes = pb.to_bytes();
+    let mut sig_bytes = sig.to_bytes();
+    let sig_len = sig_bytes.len();
+    assert_eq!(sig_len, 68);
+    assert_eq!(sig_bytes[sig_len - 4], 0b10000000);
+    assert_eq!(sig_bytes[sig_len - 3], 0);
+    assert_eq!(sig_bytes[sig_len - 2], 0);
+    assert_eq!(sig_bytes[sig_len - 1], 0);
+    sig_bytes[sig_len - 4] = 0b01000000;
+
+    let bad_sig = MultiEd25519Signature::try_from(sig_bytes.as_slice()).unwrap();
+    let pub_key = MultiEd25519PublicKey::try_from(pb_bytes.as_slice()).unwrap();
+    bad_sig.verify_arbitrary_msg(msg, &pub_key).unwrap_err();
 }

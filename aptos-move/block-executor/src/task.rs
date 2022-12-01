@@ -6,7 +6,7 @@ use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::{
     access_path::AccessPath, state_store::state_key::StateKey, write_set::TransactionWrite,
 };
-use std::{fmt::Debug, hash::Hash};
+use std::{collections::btree_map::BTreeMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -39,7 +39,7 @@ impl ModulePath for StateKey {
 /// Trait that defines a transaction that could be parallel executed by the scheduler. Each
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
-    type Key: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath;
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath;
     type Value: Send + Sync + TransactionWrite;
 }
 
@@ -68,8 +68,16 @@ pub trait ExecutorTask: Sync {
     /// Create an instance of the transaction executor.
     fn init(args: Self::Argument) -> Self;
 
+    /// Execute one single transaction given the view of the current state as a BTreeMap,
+    fn execute_transaction_btree_view(
+        &self,
+        view: &BTreeMap<<Self::T as Transaction>::Key, <Self::T as Transaction>::Value>,
+        txn: &Self::T,
+        txn_idx: usize,
+    ) -> ExecutionStatus<Self::Output, Self::Error>;
+
     /// Execute one single transaction given the view of the current state.
-    fn execute_transaction(
+    fn execute_transaction_mvhashmap_view(
         &self,
         view: &MVHashMapView<<Self::T as Transaction>::Key, <Self::T as Transaction>::Value>,
         txn: &Self::T,

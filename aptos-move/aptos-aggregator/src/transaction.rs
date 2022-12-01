@@ -184,6 +184,7 @@ impl TransactionOutputExt {
         &self.output
     }
 
+    // TODO: rename to unpack() and consider other into()'s in the crate.
     pub fn into(self) -> (DeltaChangeSet, TransactionOutput) {
         (self.delta_change_set, self.output)
     }

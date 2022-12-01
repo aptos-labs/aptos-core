@@ -138,6 +138,7 @@ async fn test_critical_timeout() {
     // Create a driver configuration with a genesis waypoint and a stream timeout of 1 second
     let mut driver_configuration = create_full_node_driver_configuration();
     driver_configuration.config.max_stream_wait_time_ms = 1000;
+    driver_configuration.config.max_num_stream_timeouts = 6;
 
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();

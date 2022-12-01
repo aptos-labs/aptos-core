@@ -3,7 +3,7 @@
 
 use crate::{
     errors::Error,
-    executor::ParallelTransactionExecutor,
+    executor::BlockExecutor,
     proptest_types::types::{
         ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams, ValueType,
     },
@@ -46,11 +46,11 @@ fn run_transactions<K, V>(
     }
 
     for _ in 0..num_repeat {
-        let output = ParallelTransactionExecutor::<
+        let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone())
+        .execute_transactions_parallel((), &transactions)
         .map(|(res, _)| res);
 
         if module_access.0 && module_access.1 {
@@ -166,11 +166,11 @@ fn deltas_writes_mixed() {
         .collect();
 
     for _ in 0..20 {
-        let output = ParallelTransactionExecutor::<
+        let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone())
+        .execute_transactions_parallel((), &transactions)
         .map(|(res, _)| res);
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None);
@@ -202,11 +202,11 @@ fn deltas_resolver() {
         .collect();
 
     for _ in 0..20 {
-        let output = ParallelTransactionExecutor::<
+        let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone());
+        .execute_transactions_parallel((), &transactions);
 
         let (output, delta_resolver) = output.unwrap();
         // Should not be possible to overflow or underflow, as each delta is at
@@ -347,11 +347,11 @@ fn publishing_fixed_params() {
     };
 
     // Confirm still no intersection
-    let output = ParallelTransactionExecutor::<
+    let output = BlockExecutor::<
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
     >::new(num_cpus::get())
-    .execute_transactions_parallel((), transactions.clone());
+    .execute_transactions_parallel((), &transactions);
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -382,11 +382,11 @@ fn publishing_fixed_params() {
     };
 
     for _ in 0..200 {
-        let output = ParallelTransactionExecutor::<
+        let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone())
+        .execute_transactions_parallel((), &transactions)
         .map(|(res, _)| res);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);

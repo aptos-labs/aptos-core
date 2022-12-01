@@ -221,12 +221,11 @@ The command will output the current synced version of your node. For example:
 71000
 ```
 
-Compare the synced version returned by this command (e.g., `71000`) with the `Current Version` (latest) shown on the
-[Aptos status page](https://status.devnet.aptos.dev/). If your node is catching up to the current version, it is synchronizing correctly.
+Compare the synced version returned by this command (e.g., `71000`) with the highest version shown on the
+[Aptos explorer page](https://explorer.aptoslabs.com/?network=mainnet). If your node is catching up to the highest version, it is synchronizing correctly.
 
 :::tip
-It is fine if the status page differs by a few versions, as the status
-page does not automatically refresh.
+It is fine if the explorer page differs by a few versions, as the explorer nodes may sync with some variance.
 :::
 
 ### (Optional) Verify outbound network connections
