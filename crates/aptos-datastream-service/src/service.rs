@@ -4,7 +4,7 @@
 use tonic::{Request, Response, Status};
 
 use aptos_protos::datastream::v1::node_data_service_server::NodeDataService;
-use aptos_protos::datastream::v1::{RawDatastreamRequest, RawDatastreamResponse};
+use aptos_protos::datastream::v1::{RawDatastreamRequest, RawDatastreamResponse, TransactionsData};
 use futures::Stream;
 use std::{pin::Pin, time::Duration};
 use tokio::sync::mpsc;
@@ -28,6 +28,9 @@ impl NodeDataService for DatastreamServer {
 
         // creating infinite stream with requested message
         let repeat = std::iter::repeat(RawDatastreamResponse {
+            data: Some(TransactionsData {
+                ..TransactionsData::default()
+            }),
             ..RawDatastreamResponse::default()
         });
         let mut stream = Box::pin(tokio_stream::iter(repeat).throttle(Duration::from_millis(200)));
