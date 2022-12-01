@@ -39,24 +39,6 @@ pub static EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT: Lazy<IntCounterVec> =
     register_int_counter_vec!("executor_benchmark_committed_txn_count", "blah", &["foo"]).unwrap()
 });
 
-pub static COMMIT_ID: Lazy<String> =
-    Lazy::new(|| env::var("JMTEXP_COMMIT_ID").unwrap_or(String::from("unknown")));
-
-pub static COMMIT_DESC: Lazy<String> =
-    Lazy::new(|| env::var("JMTEXP_COMMIT_DESC").unwrap_or(String::from("unknown")));
-
-pub static ARITY: Lazy<String> =
-    Lazy::new(|| env::var("JMTEXP_ARITY").unwrap_or(String::from("unknown")));
-
-pub static NUM_ACCOUNTS: Lazy<String> =
-    Lazy::new(|| env::var("JMTEXP_ACCOUNT_COUNT").unwrap_or(String::from("unknown")));
-
-pub static BLOCK_SIZE: Lazy<String> =
-    Lazy::new(|| env::var("JMTEXP_BLOCK_SIZE").unwrap_or(String::from("unknown")));
-
-pub static CONCURRENCY_LEVEL: Lazy<String> =
-    Lazy::new(|| env::var("JMTEXP_CONCURRENCY_LEVEL").unwrap_or(String::from("unknown")));
-
 pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<AptosVM>) {
     let db = DbReaderWriter::new(
         AptosDB::open(
