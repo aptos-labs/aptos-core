@@ -23,7 +23,7 @@ data:
       recurring_lockup_duration_secs: {{ .Values.chain.recurring_lockup_duration_secs | int }}
       voting_power_increase_limit: {{ .Values.chain.voting_power_increase_limit | int }}
     rewards:
-      rewards_apy_percentage: {{ .Values.chain.rewards_apy_percentage | int }}
+      initial_yearly_rewards_rate: {{ .Values.chain.initial_yearly_rewards_rate | float }}
     governance:
       min_voting_threshold: {{ .Values.chain.min_voting_threshold | int }}
       required_proposer_stake: {{ .Values.chain.required_proposer_stake | int }}

@@ -29,6 +29,8 @@ module aptos_framework::genesis {
 
     const EDUPLICATE_ACCOUNT: u64 = 1;
     const EACCOUNT_DOES_NOT_EXIST: u64 = 2;
+    /// Deprecated function
+    const EDEPRECATED_FUNCTION: u64 = 3;
 
     struct AccountMap has drop {
         account_address: address,
@@ -60,7 +62,7 @@ module aptos_framework::genesis {
         join_during_genesis: bool,
     }
 
-    /// Genesis step 1: Initialize aptos framework account and core modules on chain.
+    /// Deprecated function.
     fun initialize(
         gas_schedule: vector<u8>,
         chain_id: u8,
@@ -71,9 +73,30 @@ module aptos_framework::genesis {
         maximum_stake: u64,
         recurring_lockup_duration_secs: u64,
         allow_validator_set_change: bool,
-        rewards_rate: u64,
-        rewards_rate_denominator: u64,
+        _rewards_rate: u64,
+        _rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
+    ) {
+        assert!(false, EDEPRECATED_FUNCTION);
+    }
+
+    /// Genesis step 1: Initialize aptos framework account and core modules on chain.
+    fun initialize_v2(
+        gas_schedule: vector<u8>,
+        chain_id: u8,
+        initial_version: u64,
+        consensus_config: vector<u8>,
+        allow_validator_set_change: bool,
+        epoch_interval_microsecs: u64,
+        minimum_stake: u64,
+        maximum_stake: u64,
+        recurring_lockup_duration_secs: u64,
+        voting_power_increase_limit: u64,
+        initial_yearly_rewards_rate: u64,
+        min_yearly_rewards_rate: u64,
+        rewards_rate_denominator: u64,
+        yearly_rewards_rate_decrease_numerator: u64,
+        yearly_rewards_rate_decrease_denominator: u64,
     ) {
         // Initialize the aptos framework account. This is the account where system resources and modules will be
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
@@ -104,16 +127,23 @@ module aptos_framework::genesis {
         consensus_config::initialize(&aptos_framework_account, consensus_config);
         version::initialize(&aptos_framework_account, initial_version);
         stake::initialize(&aptos_framework_account);
-        staking_config::initialize(
+        staking_config::initialize_staking(
             &aptos_framework_account,
             minimum_stake,
             maximum_stake,
             recurring_lockup_duration_secs,
             allow_validator_set_change,
-            rewards_rate,
-            rewards_rate_denominator,
             voting_power_increase_limit,
         );
+        staking_config::initialize_rewards(
+            &aptos_framework_account,
+            initial_yearly_rewards_rate,
+            min_yearly_rewards_rate,
+            rewards_rate_denominator,
+            yearly_rewards_rate_decrease_numerator,
+            yearly_rewards_rate_decrease_denominator,
+        );
+
         storage_gas::initialize(&aptos_framework_account);
         gas_schedule::initialize(&aptos_framework_account, gas_schedule);
 
@@ -297,7 +327,7 @@ module aptos_framework::genesis {
         // validators.
         aptos_coin::destroy_mint_cap(aptos_framework);
 
-        stake::on_new_epoch();
+        stake::on_new_epoch(0, 0);
     }
 
     /// Sets up the initial validator set for the network.

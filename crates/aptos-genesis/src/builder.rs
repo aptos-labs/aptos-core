@@ -601,9 +601,7 @@ impl Builder {
                 recurring_lockup_duration_secs: ONE_DAY,
                 voting_power_increase_limit: 50,
             },
-            rewards: GenesisRewardsConfiguration {
-                rewards_apy_percentage: 7,
-            },
+            rewards: GenesisRewardsConfiguration::default(),
             governance: GenesisGovernanceConfiguration {
                 min_voting_threshold: 0,
                 required_proposer_stake: 0,

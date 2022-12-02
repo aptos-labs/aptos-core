@@ -563,7 +563,7 @@ module aptos_framework::aptos_governance {
         account::create_account_for_test(signer::address_of(no_voter));
 
         // Initialize the governance.
-        staking_config::initialize_for_test(aptos_framework, 0, 1000, 2000, true, 0, 1, 100);
+        staking_config::initialize_for_test(aptos_framework, 0, 1000, 2000, true, 0, 1, 1, 100);
         initialize(aptos_framework, 10, 100, 1000);
         store_signer_cap(
             aptos_framework,

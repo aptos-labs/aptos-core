@@ -16,9 +16,20 @@ module aptos_framework::staking_config {
     const EINVALID_VOTING_POWER_INCREASE_LIMIT: u64 = 4;
     /// Specified rewards rate is invalid, which must be within [0, MAX_REWARDS_RATE].
     const EINVALID_REWARDS_RATE: u64 = 5;
+    /// Deprecated function
+    const EDEPRECATED_FUNCTION: u64 = 6;
+    /// Configured time period is not valid
+    const EINVALID_TIME_PERIOD: u64 = 7;
+    /// Time went backwards (between rate reconfig and current time)
+    const ETIME_WENT_BACKWARDS: u64 = 8;
 
     /// Limit the maximum value of `rewards_rate` in order to avoid any arithmetic overflow.
-    const MAX_REWARDS_RATE: u64 = 1000000;
+    const MAX_EPOCH_REWARDS_RATE: u64 = 100000;
+
+    const MAX_REWARDS_RATE: u64 = 100000000;
+
+    // 365.24*24*3600*1000*1000
+    const ONE_YEAR_IN_MICROS: u64 = 31556926000000;
 
     /// Validator set configurations that will be stored with the @aptos_framework account.
     struct StakingConfig has copy, drop, key {
@@ -35,8 +46,8 @@ module aptos_framework::staking_config {
         allow_validator_set_change: bool,
         // The maximum rewards given out every epoch. This will be divided by the rewards rate denominator.
         // For example, 0.001% (0.00001) can be represented as 10 / 1000000.
-        rewards_rate: u64,
-        rewards_rate_denominator: u64,
+        _rewards_rate: u64,
+        _rewards_rate_denominator: u64,
         // Only this % of current total voting power is allowed to join the validator set in each epoch.
         // This is necessary to prevent a massive amount of new stake from joining that can potentially take down the
         // network if corresponding validators are not ready to participate in consensus in time.
@@ -44,15 +55,27 @@ module aptos_framework::staking_config {
         voting_power_increase_limit: u64,
     }
 
+    struct StakingRewardsConfig has copy, drop, key {
+        yearly_rewards_rate: u64,
+        min_yearly_rewards_rate: u64,
+
+        rewards_rate_denominator: u64,
+
+        last_rate_decrease_time: u64,
+
+        yearly_rewards_rate_decrease_numerator: u64,
+        yearly_rewards_rate_decrease_denominator: u64,
+
+        year_in_micros: u64,
+    }
+
     /// Only called during genesis.
-    public(friend) fun initialize(
+    public(friend) fun initialize_staking(
         aptos_framework: &signer,
         minimum_stake: u64,
         maximum_stake: u64,
         recurring_lockup_duration_secs: u64,
         allow_validator_set_change: bool,
-        rewards_rate: u64,
-        rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
     ) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -61,31 +84,55 @@ module aptos_framework::staking_config {
         validate_required_stake(minimum_stake, maximum_stake);
 
         assert!(recurring_lockup_duration_secs > 0, error::invalid_argument(EZERO_LOCKUP_DURATION));
-        assert!(
-            rewards_rate_denominator > 0,
-            error::invalid_argument(EZERO_REWARDS_RATE_DENOMINATOR),
-        );
+
         assert!(
             voting_power_increase_limit > 0 && voting_power_increase_limit <= 50,
             error::invalid_argument(EINVALID_VOTING_POWER_INCREASE_LIMIT),
         );
-
-        // `rewards_rate` which is the numerator is limited to be `<= MAX_REWARDS_RATE` in order to avoid the arithmetic
-        // overflow in the rewards calculation. `rewards_rate_denominator` can be adjusted to get the desired rewards
-        // rate (i.e., rewards_rate / rewards_rate_denominator).
-        assert!(rewards_rate <= MAX_REWARDS_RATE, error::invalid_argument(EINVALID_REWARDS_RATE));
-
-        // We assert that (rewards_rate / rewards_rate_denominator <= 1).
-        assert!(rewards_rate <= rewards_rate_denominator, error::invalid_argument(EINVALID_REWARDS_RATE));
 
         move_to(aptos_framework, StakingConfig {
             minimum_stake,
             maximum_stake,
             recurring_lockup_duration_secs,
             allow_validator_set_change,
-            rewards_rate,
-            rewards_rate_denominator,
+            _rewards_rate: 0,
+            _rewards_rate_denominator: 1,
             voting_power_increase_limit,
+        });
+    }
+
+    public(friend) fun initialize_rewards(
+        aptos_framework: &signer,
+        initial_yearly_rewards_rate: u64,
+        min_yearly_rewards_rate: u64,
+        rewards_rate_denominator: u64,
+        yearly_rewards_rate_decrease_numerator: u64,
+        yearly_rewards_rate_decrease_denominator: u64,
+    ) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
+        assert!(
+            rewards_rate_denominator > 0,
+            error::invalid_argument(EZERO_REWARDS_RATE_DENOMINATOR),
+        );
+        // `yearly_rewards_rate` which is the numerator is limited to be `<= MAX_REWARDS_RATE` in order to avoid the arithmetic
+        // overflow in the rewards calculation. `rewards_rate_denominator` can be adjusted to get the desired rewards
+        // rate (i.e., yearly_rewards_rate / rewards_rate_denominator).
+        assert!(initial_yearly_rewards_rate <= MAX_REWARDS_RATE, error::invalid_argument(EINVALID_REWARDS_RATE));
+        assert!(min_yearly_rewards_rate <= initial_yearly_rewards_rate, error::invalid_argument(EINVALID_REWARDS_RATE));
+
+        // We assert that (initial_yearly_rewards_rate / rewards_rate_denominator <= 1).
+        assert!(initial_yearly_rewards_rate <= rewards_rate_denominator, error::invalid_argument(EINVALID_REWARDS_RATE));
+        assert!(yearly_rewards_rate_decrease_numerator <= yearly_rewards_rate_decrease_denominator, error::invalid_argument(EINVALID_REWARDS_RATE));
+
+        move_to(aptos_framework, StakingRewardsConfig {
+            yearly_rewards_rate: initial_yearly_rewards_rate,
+            min_yearly_rewards_rate,
+            rewards_rate_denominator,
+            last_rate_decrease_time: 0,
+            yearly_rewards_rate_decrease_numerator,
+            yearly_rewards_rate_decrease_denominator,
+            year_in_micros: ONE_YEAR_IN_MICROS,
         });
     }
 
@@ -110,8 +157,39 @@ module aptos_framework::staking_config {
     }
 
     /// Return the reward rate.
-    public fun get_reward_rate(config: &StakingConfig): (u64, u64) {
-        (config.rewards_rate, config.rewards_rate_denominator)
+    public fun get_reward_rate(_config: &StakingConfig): (u64, u64) {
+        assert!(false, EDEPRECATED_FUNCTION);
+        (0, 1)
+    }
+
+    public fun get_epoch_reward_rate(epoch_duration: u64): (u64, u64) acquires StakingRewardsConfig {
+        let staking_rewards_config = borrow_global<StakingRewardsConfig>(@aptos_framework);
+        assert!(staking_rewards_config.year_in_micros > 0, EINVALID_TIME_PERIOD);
+        if (epoch_duration > 0) {
+            (staking_rewards_config.yearly_rewards_rate * epoch_duration / staking_rewards_config.year_in_micros, staking_rewards_config.rewards_rate_denominator)
+        } else {
+            (0, 1)
+        }
+    }
+
+    public fun check_and_autodecrease_rewards_rate(current_time: u64) acquires StakingRewardsConfig {
+        let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(@aptos_framework);
+
+        // initiliaze on first pass
+        if (staking_rewards_config.last_rate_decrease_time == 0) {
+            staking_rewards_config.last_rate_decrease_time = current_time;
+        };
+
+        assert!(current_time >= staking_rewards_config.last_rate_decrease_time, ETIME_WENT_BACKWARDS);
+        if (current_time - staking_rewards_config.last_rate_decrease_time >= staking_rewards_config.year_in_micros) {
+            let new_rate = staking_rewards_config.yearly_rewards_rate * staking_rewards_config.yearly_rewards_rate_decrease_numerator / staking_rewards_config.yearly_rewards_rate_decrease_denominator;
+            if (new_rate > staking_rewards_config.min_yearly_rewards_rate) {
+                staking_rewards_config.yearly_rewards_rate = new_rate;
+            } else {
+                staking_rewards_config.yearly_rewards_rate = staking_rewards_config.min_yearly_rewards_rate;
+            };
+            staking_rewards_config.last_rate_decrease_time = staking_rewards_config.last_rate_decrease_time + staking_rewards_config.year_in_micros;
+        };
     }
 
     /// Return the joining limit %.
@@ -147,29 +225,46 @@ module aptos_framework::staking_config {
         staking_config.recurring_lockup_duration_secs = new_recurring_lockup_duration_secs;
     }
 
+    public fun update_rewards_rate(
+        _aptos_framework: &signer,
+        _new_rewards_rate: u64,
+        _new_rewards_rate_denominator: u64,
+    ) {
+        assert!(false, EDEPRECATED_FUNCTION);
+    }
+
     /// Update the rewards rate.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
-    public fun update_rewards_rate(
+    public fun update_rewards_config(
         aptos_framework: &signer,
-        new_rewards_rate: u64,
-        new_rewards_rate_denominator: u64,
-    ) acquires StakingConfig {
+        yearly_rewards_rate: u64,
+        min_yearly_rewards_rate: u64,
+        rewards_rate_denominator: u64,
+        yearly_rewards_rate_decrease_numerator: u64,
+        yearly_rewards_rate_decrease_denominator: u64,
+    ) acquires StakingRewardsConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
+
         assert!(
-            new_rewards_rate_denominator > 0,
+            rewards_rate_denominator > 0,
             error::invalid_argument(EZERO_REWARDS_RATE_DENOMINATOR),
         );
-        // `rewards_rate` which is the numerator is limited to be `<= MAX_REWARDS_RATE` in order to avoid the arithmetic
+        // `yearly_rewards_rate` which is the numerator is limited to be `<= MAX_REWARDS_RATE` in order to avoid the arithmetic
         // overflow in the rewards calculation. `rewards_rate_denominator` can be adjusted to get the desired rewards
-        // rate (i.e., rewards_rate / rewards_rate_denominator).
-        assert!(new_rewards_rate <= MAX_REWARDS_RATE, error::invalid_argument(EINVALID_REWARDS_RATE));
+        // rate (i.e., yearly_rewards_rate / rewards_rate_denominator).
+        assert!(yearly_rewards_rate <= MAX_REWARDS_RATE, error::invalid_argument(EINVALID_REWARDS_RATE));
+        assert!(min_yearly_rewards_rate <= MAX_REWARDS_RATE, error::invalid_argument(EINVALID_REWARDS_RATE));
 
-        // We assert that (rewards_rate / rewards_rate_denominator <= 1).
-        assert!(new_rewards_rate <= new_rewards_rate_denominator, error::invalid_argument(EINVALID_REWARDS_RATE));
+        // We assert that (yearly_rewards_rate / rewards_rate_denominator <= 1).
+        assert!(yearly_rewards_rate <= rewards_rate_denominator, error::invalid_argument(EINVALID_REWARDS_RATE));
+        assert!(yearly_rewards_rate_decrease_numerator <= yearly_rewards_rate_decrease_denominator, error::invalid_argument(EINVALID_REWARDS_RATE));
 
-        let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
-        staking_config.rewards_rate = new_rewards_rate;
-        staking_config.rewards_rate_denominator = new_rewards_rate_denominator;
+        let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(@aptos_framework);
+        staking_rewards_config.yearly_rewards_rate = yearly_rewards_rate;
+        staking_rewards_config.min_yearly_rewards_rate = min_yearly_rewards_rate;
+        staking_rewards_config.rewards_rate_denominator = rewards_rate_denominator;
+        staking_rewards_config.yearly_rewards_rate_decrease_numerator = yearly_rewards_rate_decrease_numerator;
+        staking_rewards_config.yearly_rewards_rate_decrease_denominator = yearly_rewards_rate_decrease_denominator;
     }
 
     /// Update the joining limit %.
@@ -194,20 +289,31 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_change_staking_configs(aptos_framework: signer) acquires StakingConfig {
-        initialize(&aptos_framework, 0, 1, 1, false, 1, 1, 1);
+        initialize_staking(&aptos_framework, 0, 1, 1, false, 1);
 
         update_required_stake(&aptos_framework, 100, 1000);
         update_recurring_lockup_duration_secs(&aptos_framework, 10000);
-        update_rewards_rate(&aptos_framework, 10, 100);
         update_voting_power_increase_limit(&aptos_framework, 10);
 
         let config = borrow_global<StakingConfig>(@aptos_framework);
         assert!(config.minimum_stake == 100, 0);
         assert!(config.maximum_stake == 1000, 1);
         assert!(config.recurring_lockup_duration_secs == 10000, 3);
-        assert!(config.rewards_rate == 10, 4);
-        assert!(config.rewards_rate_denominator == 100, 4);
         assert!(config.voting_power_increase_limit == 10, 5);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    public entry fun test_change_staking_rewards_configs(aptos_framework: signer) acquires StakingRewardsConfig {
+        initialize_rewards(&aptos_framework, 2, 1, 10, 9, 10);
+
+        update_rewards_config(&aptos_framework, 75, 30, 1000, 98, 100);
+
+        let config = borrow_global<StakingRewardsConfig>(@aptos_framework);
+        assert!(config.yearly_rewards_rate == 75, 4);
+        assert!(config.min_yearly_rewards_rate == 30, 4);
+        assert!(config.rewards_rate_denominator == 1000, 4);
+        assert!(config.yearly_rewards_rate_decrease_numerator == 98, 4);
+        assert!(config.yearly_rewards_rate_decrease_denominator == 100, 4);
     }
 
     #[test(account = @0x123)]
@@ -224,8 +330,8 @@ module aptos_framework::staking_config {
 
     #[test(account = @0x123)]
     #[expected_failure(abort_code = 0x50003)]
-    public entry fun test_update_rewards_unauthorized_should_fail(account: signer) acquires StakingConfig {
-        update_rewards_rate(&account, 1, 10);
+    public entry fun test_update_rewards_unauthorized_should_fail(account: signer) acquires StakingRewardsConfig {
+        update_rewards_config(&account, 75, 30, 1000, 98, 100);
     }
 
     #[test(account = @0x123)]
@@ -254,8 +360,8 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10002)]
-    public entry fun test_update_rewards_invalid_denominator_should_fail(aptos_framework: signer) acquires StakingConfig {
-        update_rewards_rate(&aptos_framework, 1, 0);
+    public entry fun test_update_rewards_invalid_denominator_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
+        update_rewards_config(&aptos_framework, 75, 30, 0, 98, 100);
     }
 
     #[test(aptos_framework = @aptos_framework)]
@@ -284,6 +390,7 @@ module aptos_framework::staking_config {
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        year_in_micros: u64,
         voting_power_increase_limit: u64,
     ) {
         if (!exists<StakingConfig>(@aptos_framework)) {
@@ -292,10 +399,25 @@ module aptos_framework::staking_config {
                 maximum_stake,
                 recurring_lockup_duration_secs,
                 allow_validator_set_change,
-                rewards_rate,
-                rewards_rate_denominator,
+                _rewards_rate: 0,
+                _rewards_rate_denominator: 0,
                 voting_power_increase_limit,
             });
         };
+        if (!exists<StakingRewardsConfig>(@aptos_framework)) {
+            move_to(aptos_framework, StakingRewardsConfig {
+                yearly_rewards_rate: rewards_rate,
+                min_yearly_rewards_rate: rewards_rate,
+
+                rewards_rate_denominator,
+
+                last_rate_decrease_time: 0,
+
+                yearly_rewards_rate_decrease_numerator: 1,
+                yearly_rewards_rate_decrease_denominator: 1,
+
+                year_in_micros,
+            });
+        }
     }
 }

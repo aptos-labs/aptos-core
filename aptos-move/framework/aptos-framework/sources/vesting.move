@@ -1245,7 +1245,8 @@ module aptos_framework::vesting {
         commission = with_rewards(commission) + commission_on_staker_rewards;
         distribute(contract_address);
         // Rounding error leads to a dust amount of 1 transferred to the staker.
-        assert!(coin::balance<AptosCoin>(shareholder_address) == staker_rewards + 1, 0);
+        let shareholder_balance = coin::balance<AptosCoin>(shareholder_address);
+        assert!(shareholder_balance == staker_rewards + 1, shareholder_balance);
         assert!(coin::balance<AptosCoin>(operator_address) == commission - 1, 1);
     }
 

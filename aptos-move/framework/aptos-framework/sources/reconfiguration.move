@@ -36,6 +36,11 @@ module aptos_framework::reconfiguration {
         events: event::EventHandle<NewEpochEvent>,
     }
 
+    struct EpochConfiguration has key {
+        /// Time period between epochs.
+        epoch_interval: u64,
+    }
+
     /// Reconfiguration will be disabled if this resource is published under the
     /// aptos_framework system address
     struct DisableReconfiguration has key {}
@@ -115,11 +120,17 @@ module aptos_framework::reconfiguration {
             return
         };
 
+        assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
+        let epoch_duration = if (config_ref.last_reconfiguration_time == 0) {
+            0
+        } else {
+            current_time - config_ref.last_reconfiguration_time
+        };
+
         // Call stake to compute the new validator set and distribute rewards.
-        stake::on_new_epoch();
+        stake::on_new_epoch(current_time, epoch_duration);
         storage_gas::on_reconfig();
 
-        assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
         config_ref.last_reconfiguration_time = current_time;
         spec {
             assume config_ref.epoch + 1 <= MAX_U64;

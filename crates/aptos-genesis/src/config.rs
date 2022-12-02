@@ -88,9 +88,7 @@ impl Default for Layout {
                 recurring_lockup_duration_secs: 86_400,
                 voting_power_increase_limit: 20,
             },
-            rewards: GenesisRewardsConfiguration {
-                rewards_apy_percentage: 7,
-            },
+            rewards: GenesisRewardsConfiguration::default(),
             governance: GenesisGovernanceConfiguration {
                 min_voting_threshold: 100_000_000_000_000,
                 required_proposer_stake: 100_000_000_000_000,

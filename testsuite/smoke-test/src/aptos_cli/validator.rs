@@ -436,7 +436,7 @@ async fn test_nodes_rewards() {
             genesis_config.epoch_duration_secs = 4;
             genesis_config.staking.recurring_lockup_duration_secs = 4;
             genesis_config.governance.voting_duration_secs = 3;
-            genesis_config.rewards.rewards_apy_percentage = 10;
+            genesis_config.rewards.initial_yearly_rewards_rate = 0.1;
         }))
         .build_with_cli(0)
         .await;

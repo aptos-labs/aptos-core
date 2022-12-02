@@ -11,6 +11,7 @@
 -  [Struct `ValidatorConfigurationWithCommission`](#0x1_genesis_ValidatorConfigurationWithCommission)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_genesis_initialize)
+-  [Function `initialize_v2`](#0x1_genesis_initialize_v2)
 -  [Function `initialize_aptos_coin`](#0x1_genesis_initialize_aptos_coin)
 -  [Function `initialize_core_resources_and_aptos_coin`](#0x1_genesis_initialize_core_resources_and_aptos_coin)
 -  [Function `create_accounts`](#0x1_genesis_create_accounts)
@@ -280,7 +281,7 @@
 Genesis step 1: Initialize aptos framework account and core modules on chain.
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize">initialize</a>(<a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, initial_version: u64, <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, epoch_interval_microsecs: u64, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, allow_validator_set_change: bool, rewards_rate: u64, rewards_rate_denominator: u64, voting_power_increase_limit: u64)
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize">initialize</a>(<a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, initial_version: u64, <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, epoch_interval_microsecs: u64, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, allow_validator_set_change: bool, _rewards_rate: u64, _rewards_rate_denominator: u64, voting_power_increase_limit: u64)
 </code></pre>
 
 
@@ -299,9 +300,49 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     maximum_stake: u64,
     recurring_lockup_duration_secs: u64,
     allow_validator_set_change: bool,
-    rewards_rate: u64,
-    rewards_rate_denominator: u64,
+    _rewards_rate: u64,
+    _rewards_rate_denominator: u64,
     voting_power_increase_limit: u64,
+) {
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_genesis_initialize_v2"></a>
+
+## Function `initialize_v2`
+
+Genesis step 1: Initialize aptos framework account and core modules on chain.
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_v2">initialize_v2</a>(<a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, initial_version: u64, <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, allow_validator_set_change: bool, epoch_interval_microsecs: u64, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, voting_power_increase_limit: u64, initial_yearly_rewards_rate: u64, min_yearly_rewards_rate: u64, rewards_rate_denominator: u64, yearly_rewards_rate_decrease_numerator: u64, yearly_rewards_rate_decrease_denominator: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_v2">initialize_v2</a>(
+    <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
+    initial_version: u64,
+    <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    allow_validator_set_change: bool,
+    epoch_interval_microsecs: u64,
+    minimum_stake: u64,
+    maximum_stake: u64,
+    recurring_lockup_duration_secs: u64,
+    voting_power_increase_limit: u64,
+    initial_yearly_rewards_rate: u64,
+    min_yearly_rewards_rate: u64,
+    rewards_rate_denominator: u64,
+    yearly_rewards_rate_decrease_numerator: u64,
+    yearly_rewards_rate_decrease_denominator: u64,
 ) {
     // Initialize the aptos framework <a href="account.md#0x1_account">account</a>. This is the <a href="account.md#0x1_account">account</a> <b>where</b> system resources and modules will be
     // deployed <b>to</b>. This will be entirely managed by on-chain governance and no entities have the key or privileges
@@ -332,16 +373,23 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="consensus_config.md#0x1_consensus_config_initialize">consensus_config::initialize</a>(&aptos_framework_account, <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>);
     <a href="version.md#0x1_version_initialize">version::initialize</a>(&aptos_framework_account, initial_version);
     <a href="stake.md#0x1_stake_initialize">stake::initialize</a>(&aptos_framework_account);
-    <a href="staking_config.md#0x1_staking_config_initialize">staking_config::initialize</a>(
+    <a href="staking_config.md#0x1_staking_config_initialize_staking">staking_config::initialize_staking</a>(
         &aptos_framework_account,
         minimum_stake,
         maximum_stake,
         recurring_lockup_duration_secs,
         allow_validator_set_change,
-        rewards_rate,
-        rewards_rate_denominator,
         voting_power_increase_limit,
     );
+    <a href="staking_config.md#0x1_staking_config_initialize_rewards">staking_config::initialize_rewards</a>(
+        &aptos_framework_account,
+        initial_yearly_rewards_rate,
+        min_yearly_rewards_rate,
+        rewards_rate_denominator,
+        yearly_rewards_rate_decrease_numerator,
+        yearly_rewards_rate_decrease_denominator,
+    );
+
     <a href="storage_gas.md#0x1_storage_gas_initialize">storage_gas::initialize</a>(&aptos_framework_account);
     <a href="gas_schedule.md#0x1_gas_schedule_initialize">gas_schedule::initialize</a>(&aptos_framework_account, <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>);
 
@@ -645,7 +693,7 @@ If it exists, it just returns the signer.
     // validators.
     <a href="aptos_coin.md#0x1_aptos_coin_destroy_mint_cap">aptos_coin::destroy_mint_cap</a>(aptos_framework);
 
-    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
+    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>(0, 0);
 }
 </code></pre>
 

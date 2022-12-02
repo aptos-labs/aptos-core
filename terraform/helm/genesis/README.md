@@ -25,7 +25,7 @@ Aptos blockchain automated genesis ceremony for testnets
 | chain.name | string | `"testnet"` | Internal: name of the testnet to connect to |
 | chain.recurring_lockup_duration_secs | int | `86400` | Recurring lockup duration in seconds. Defaults to 1 day |
 | chain.required_proposer_stake | int | `100000000000` | Required stake to be a proposer. 1M APTOS coins with 8 decimals |
-| chain.rewards_apy_percentage | int | `10` | Rewards APY percentage |
+| chain.initial_yearly_rewards_rate | float | `0.07` | Rewards APY percentage |
 | chain.root_key | string | `"0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956"` | If specified, the root key for the testnet |
 | chain.voting_duration_secs | int | `43200` | Voting duration in seconds. Defaults to 12 hours |
 | genesis.domain | string | `nil` | If set, the base domain name of the fullnode and validator endpoints |

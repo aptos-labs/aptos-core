@@ -989,7 +989,12 @@ module aptos_framework::stake {
     /// pending inactive validators so they no longer can vote.
     /// 4. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
     /// power.
-    public(friend) fun on_new_epoch() acquires StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+    public(friend) fun on_new_epoch(current_time: u64, epoch_duration: u64) acquires StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        // Update staking config if needed
+        staking_config::check_and_autodecrease_rewards_rate(current_time);
+
+        let (rewards_rate, rewards_rate_denominator) = staking_config::get_epoch_reward_rate(epoch_duration);
+
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
         let config = staking_config::get();
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
@@ -999,7 +1004,7 @@ module aptos_framework::stake {
         let len = vector::length(&validator_set.active_validators);
         while (i < len) {
             let validator = vector::borrow(&validator_set.active_validators, i);
-            update_stake_pool(validator_perf, validator.addr, &config);
+            update_stake_pool(validator_perf, validator.addr, rewards_rate, rewards_rate_denominator);
             i = i + 1;
         };
 
@@ -1009,7 +1014,7 @@ module aptos_framework::stake {
         let len = vector::length(&validator_set.pending_inactive);
         while (i < len) {
             let validator = vector::borrow(&validator_set.pending_inactive, i);
-            update_stake_pool(validator_perf, validator.addr, &config);
+            update_stake_pool(validator_perf, validator.addr, rewards_rate, rewards_rate_denominator);
             i = i + 1;
         };
 
@@ -1104,7 +1109,8 @@ module aptos_framework::stake {
     fun update_stake_pool(
         validator_perf: &ValidatorPerformance,
         pool_address: address,
-        staking_config: &StakingConfig,
+        rewards_rate: u64,
+        rewards_rate_denominator: u64,
     ) acquires StakePool, AptosCoinCapabilities, ValidatorConfig {
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
@@ -1117,7 +1123,6 @@ module aptos_framework::stake {
         };
         let num_total_proposals = cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals;
 
-        let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(staking_config);
         let rewards_active = distribute_rewards(
             &mut stake_pool.active,
             num_successful_proposals,
@@ -1362,6 +1367,7 @@ module aptos_framework::stake {
             allow_validator_set_change,
             rewards_rate_numerator,
             rewards_rate_denominator,
+            EPOCH_DURATION * 1000000,
             voting_power_increase_limit,
         );
 
@@ -2508,7 +2514,7 @@ module aptos_framework::stake {
         // Set the number of blocks to 1, to give out rewards to non-failing validators.
         set_validator_perf_at_least_one_block();
         timestamp::fast_forward_seconds(EPOCH_DURATION);
-        on_new_epoch();
+        on_new_epoch(timestamp::now_microseconds(), EPOCH_DURATION * 1000000);
     }
 
     #[test_only]
@@ -2573,7 +2579,7 @@ module aptos_framework::stake {
 
     #[test_only]
     public fun with_rewards(amount: u64): u64 {
-        let (numerator, denominator) = staking_config::get_reward_rate(&staking_config::get());
+        let (numerator, denominator) = staking_config::get_epoch_reward_rate(EPOCH_DURATION * 1000000);
         amount + amount * numerator / denominator
     }
 }

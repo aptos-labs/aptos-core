@@ -49,7 +49,6 @@ const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
 
-const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
 const APTOS_COINS_BASE_WITH_DECIMALS: u64 = u64::pow(10, 8);
 
@@ -67,7 +66,22 @@ pub struct GenesisStakingConfiguration {
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct GenesisRewardsConfiguration {
-    pub rewards_apy_percentage: u64,
+    /// Fraction of stake given out as rewards a year (0-1).
+    pub initial_yearly_rewards_rate: f64,
+    pub min_yearly_rewards_rate: f64,
+
+    pub yearly_rewards_rate_decrease: f64,
+}
+
+/// This is used when on-chain config is not initialized.
+impl Default for GenesisRewardsConfiguration {
+    fn default() -> Self {
+        Self {
+            initial_yearly_rewards_rate: 0.07,
+            min_yearly_rewards_rate: 0.035,
+            yearly_rewards_rate_decrease: 0.985,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -330,9 +344,15 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
         "voting_power_increase_limit must be > 0 and <= 50"
     );
     assert!(
-        genesis_config.rewards.rewards_apy_percentage > 0
-            && genesis_config.rewards.rewards_apy_percentage < 100,
-        "Rewards APY must be > 0% and < 100%"
+        genesis_config.rewards.initial_yearly_rewards_rate > 0.0
+            && genesis_config.rewards.initial_yearly_rewards_rate < 1.0,
+        "Rewards yearly rate must be > 0% and < 100%"
+    );
+    assert!(
+        genesis_config.rewards.min_yearly_rewards_rate > 0.0
+            && genesis_config.rewards.min_yearly_rewards_rate
+                < genesis_config.rewards.initial_yearly_rewards_rate,
+        "Rewards yearly rate must be > 0% and < initial_yearly_rate"
     );
     assert!(
         genesis_config.governance.voting_duration_secs > 0,
@@ -374,6 +394,17 @@ fn exec_function(
         });
 }
 
+fn round_and_check_precision(value: f64, denominator: u64) -> u64 {
+    let result = (value * denominator as f64).round() as u64;
+    assert!(
+        ((result as f64) - (value * denominator as f64)).abs() < 0.1,
+        "Couldn't round {} with denominator {} precisely enough",
+        value,
+        denominator
+    );
+    result
+}
+
 fn initialize(
     session: &mut SessionExt<impl MoveResolver>,
     chain_id: ChainId,
@@ -391,11 +422,20 @@ fn initialize(
     // denominator).
     let rewards_rate_denominator = 1_000_000_000;
 
-    let num_epochs_in_a_year = NUM_SECONDS_PER_YEAR / genesis_config.epoch_duration_secs;
-    // Multiplication before division to minimize rounding errors due to integer division.
-    let rewards_rate_numerator =
-        (genesis_config.rewards.rewards_apy_percentage * rewards_rate_denominator / 100)
-            / num_epochs_in_a_year;
+    let initial_yearly_rewards_rate_numerator = round_and_check_precision(
+        genesis_config.rewards.initial_yearly_rewards_rate,
+        rewards_rate_denominator,
+    );
+    let min_yearly_rewards_rate_numerator = round_and_check_precision(
+        genesis_config.rewards.min_yearly_rewards_rate,
+        rewards_rate_denominator,
+    );
+
+    let yearly_rewards_rate_decrease_denominator: u64 = 1_000;
+    let yearly_rewards_rate_decrease_numerator = round_and_check_precision(
+        genesis_config.rewards.yearly_rewards_rate_decrease,
+        yearly_rewards_rate_decrease_denominator,
+    );
 
     // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
     // has crossed into a new epoch. So epoch_interval also needs to be in micro seconds.
@@ -403,21 +443,24 @@ fn initialize(
     exec_function(
         session,
         GENESIS_MODULE_NAME,
-        "initialize",
+        "initialize_v2",
         vec![],
         serialize_values(&vec![
             MoveValue::vector_u8(gas_schedule_blob),
             MoveValue::U8(chain_id.id()),
             MoveValue::U64(APTOS_MAX_KNOWN_VERSION.major),
             MoveValue::vector_u8(consensus_config_bytes),
+            MoveValue::Bool(genesis_config.allow_new_validators),
             MoveValue::U64(epoch_interval_usecs),
             MoveValue::U64(genesis_config.staking.min_stake),
             MoveValue::U64(genesis_config.staking.max_stake),
             MoveValue::U64(genesis_config.staking.recurring_lockup_duration_secs),
-            MoveValue::Bool(genesis_config.allow_new_validators),
-            MoveValue::U64(rewards_rate_numerator),
-            MoveValue::U64(rewards_rate_denominator),
             MoveValue::U64(genesis_config.staking.voting_power_increase_limit),
+            MoveValue::U64(initial_yearly_rewards_rate_numerator),
+            MoveValue::U64(min_yearly_rewards_rate_numerator),
+            MoveValue::U64(rewards_rate_denominator),
+            MoveValue::U64(yearly_rewards_rate_decrease_numerator),
+            MoveValue::U64(yearly_rewards_rate_decrease_denominator),
         ]),
     );
 }
@@ -802,9 +845,7 @@ pub fn generate_test_genesis(
                 recurring_lockup_duration_secs: 7200,
                 voting_power_increase_limit: 50,
             },
-            rewards: GenesisRewardsConfiguration {
-                rewards_apy_percentage: 7,
-            },
+            rewards: GenesisRewardsConfiguration::default(),
             governance: GenesisGovernanceConfiguration {
                 min_voting_threshold: 0,
                 required_proposer_stake: 0,
@@ -854,9 +895,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
             recurring_lockup_duration_secs: 30 * 24 * 3600,         // 1 month
             voting_power_increase_limit: 30,
         },
-        rewards: GenesisRewardsConfiguration {
-            rewards_apy_percentage: 7,
-        },
+        rewards: GenesisRewardsConfiguration::default(),
         governance: GenesisGovernanceConfiguration {
             // 400M APT
             min_voting_threshold: (400_000_000 * APTOS_COINS_BASE_WITH_DECIMALS as u128),

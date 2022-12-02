@@ -9,6 +9,7 @@ to synchronize configuration changes for the validators.
 
 -  [Struct `NewEpochEvent`](#0x1_reconfiguration_NewEpochEvent)
 -  [Resource `Configuration`](#0x1_reconfiguration_Configuration)
+-  [Resource `EpochConfiguration`](#0x1_reconfiguration_EpochConfiguration)
 -  [Resource `DisableReconfiguration`](#0x1_reconfiguration_DisableReconfiguration)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_reconfiguration_initialize)
@@ -106,6 +107,33 @@ Holds information about state of reconfiguration
 </dt>
 <dd>
  Event handle for reconfiguration events
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_reconfiguration_EpochConfiguration"></a>
+
+## Resource `EpochConfiguration`
+
+
+
+<pre><code><b>struct</b> <a href="reconfiguration.md#0x1_reconfiguration_EpochConfiguration">EpochConfiguration</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>epoch_interval: u64</code>
+</dt>
+<dd>
+ Time period between epochs.
 </dd>
 </dl>
 
@@ -355,11 +383,17 @@ Signal validators to start using new configuration. Must be called from friend c
         <b>return</b>
     };
 
+    <b>assert</b>!(current_time &gt; config_ref.last_reconfiguration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_EINVALID_BLOCK_TIME">EINVALID_BLOCK_TIME</a>));
+    <b>let</b> epoch_duration = <b>if</b> (config_ref.last_reconfiguration_time == 0) {
+        0
+    } <b>else</b> {
+        current_time - config_ref.last_reconfiguration_time
+    };
+
     // Call <a href="stake.md#0x1_stake">stake</a> <b>to</b> compute the new validator set and distribute rewards.
-    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
+    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>(current_time, epoch_duration);
     <a href="storage_gas.md#0x1_storage_gas_on_reconfig">storage_gas::on_reconfig</a>();
 
-    <b>assert</b>!(current_time &gt; config_ref.last_reconfiguration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_EINVALID_BLOCK_TIME">EINVALID_BLOCK_TIME</a>));
     config_ref.last_reconfiguration_time = current_time;
     <b>spec</b> {
         <b>assume</b> config_ref.epoch + 1 &lt;= MAX_U64;

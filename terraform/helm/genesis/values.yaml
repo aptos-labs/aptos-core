@@ -27,8 +27,8 @@ chain:
   voting_duration_secs: 43200
   # -- Limit on how much voting power can join every epoch. Defaults to 20%.
   voting_power_increase_limit: 20
-  # -- Rewards APY percentage
-  rewards_apy_percentage: 10
+  # -- Yearly rewards rate
+  initial_yearly_rewards_rate: 0.07
   # -- Minimum price per gas unit
   min_price_per_gas_unit: 1
 
