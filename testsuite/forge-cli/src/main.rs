@@ -842,14 +842,14 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
         //     helm_values["validator"]["config"]["execution"]
         //         ["processed_transactions_detailed_counters"] = true.into();
         // }))
-        // .with_emit_job(
-        //     EmitJobRequest::default()
-        //         .mode(EmitJobMode::ConstTps { tps: 8000 })
-        //         .transaction_mix(vec![
-        //             (TransactionType::P2P, 80),
-        //             // (TransactionType::AccountGeneration, 20),
-        //         ]),
-        // )
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 8000 })
+                .transaction_mix(vec![
+                    (TransactionType::P2P, 80),
+                    // (TransactionType::AccountGeneration, 20),
+                ]),
+        )
         .with_success_criteria(SuccessCriteria::new(
             if duration.as_secs() > 1200 {
                 5000
