@@ -7,8 +7,9 @@ use crate::{
         ModuleBundlePayload, StateCheckpointTransaction, UserTransactionRequestInner, WriteModule,
         WriteResource, WriteTableItem,
     },
+    view::ViewRequest,
     Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event, HexEncodedBytes,
-    MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveValue,
+    MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType, MoveValue,
     PendingTransaction, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
     TransactionInfo, TransactionOnChainData, TransactionPayload, UserTransactionRequest,
     VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
@@ -682,6 +683,52 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
 
     pub fn try_into_move_value(&self, typ: &TypeTag, bytes: &[u8]) -> Result<MoveValue> {
         self.inner.view_value(typ, bytes)?.try_into()
+    }
+
+    pub fn function_return_types(&self, function: &EntryFunction) -> Result<Vec<MoveType>> {
+        let module = function.module().clone();
+        let code = self.inner.get_module(&module)? as Rc<dyn Bytecode>;
+        let func = code
+            .find_function(function.function())
+            .ok_or_else(|| format_err!("could not find entry function by {:?}", function))?;
+
+        Ok(func.return_)
+    }
+
+    pub fn convert_view_function(&self, view_request: ViewRequest) -> Result<EntryFunction> {
+        let ViewRequest {
+            function,
+            type_arguments,
+            arguments,
+        } = view_request;
+
+        let module = function.module.clone();
+        let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
+        let func = code
+            .find_function(function.name.0.as_ident_str())
+            .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
+        ensure!(
+            func.generic_type_params.len() == type_arguments.len(),
+            "expected {} type arguments for entry function {}, but got {}",
+            func.generic_type_params.len(),
+            function,
+            type_arguments.len()
+        );
+        let args = self
+            .try_into_vm_values(func, arguments)?
+            .iter()
+            .map(bcs::to_bytes)
+            .collect::<Result<_, bcs::Error>>()?;
+
+        Ok(EntryFunction::new(
+            module.into(),
+            function.name.into(),
+            type_arguments
+                .into_iter()
+                .map(|v| v.try_into())
+                .collect::<Result<_>>()?,
+            args,
+        ))
     }
 }
 

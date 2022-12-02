@@ -201,6 +201,14 @@ impl TestContext {
         self.fake_time_usecs = fake_time_usecs;
     }
 
+    pub fn check_golden_output_no_prune(&mut self, msg: Value) {
+        if self.golden_output.is_none() {
+            self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(':', "_")));
+        }
+
+        self.golden_output.as_ref().unwrap().log(&msg.to_string());
+    }
+
     pub fn check_golden_output(&mut self, msg: Value) {
         if self.golden_output.is_none() {
             self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(':', "_")));
