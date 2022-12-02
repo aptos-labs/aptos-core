@@ -19,3 +19,4 @@ prost =  { workspace = true }
 futures = { workspace = true }
 aptos-protos = { workspace = true }
 tokio-stream = { workspace = true }
+aptos-datastream-worker = { workspace = true }

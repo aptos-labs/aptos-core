@@ -491,6 +491,7 @@ dependencies = [
 name = "aptos-datastream-service"
 version = "0.1.0"
 dependencies = [
+ "aptos-datastream-worker",
  "aptos-protos",
  "futures",
  "prost",
