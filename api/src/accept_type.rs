@@ -15,25 +15,22 @@ pub enum AcceptType {
     Bcs,
 }
 
+/// Check that the accept type is one of the allowed variants. If there is no
+/// overriding explicit accept type, default to JSON.
+fn parse_accept(accept: &Accept) -> Result<AcceptType> {
+    if matches!(accept.0, BCS) {
+        Ok(AcceptType::Bcs)
+    } else {
+        Ok(AcceptType::Json)
+    }
+}
+
 /// This impl allows us to get the data straight from the arguments to the
 /// endpoint handler.
 #[async_trait::async_trait]
 impl<'a> FromRequest<'a> for AcceptType {
     async fn from_request(request: &'a Request, _body: &mut RequestBody) -> Result<Self> {
-        let accept = Accept::from_request_without_body(request).await?;
+        let accept = Accept::from_request_without_body(request)?;
         parse_accept(&accept)
     }
-}
-
-/// Check that the accept type is one of the allowed variants. If there is no
-/// overriding explicit accept type, default to JSON.
-fn parse_accept(accept: &Accept) -> Result<AcceptType> {
-    for mime in &accept.0 {
-        if matches!(mime.as_ref(), BCS) {
-            return Ok(AcceptType::Bcs);
-        }
-    }
-
-    // Default to returning content as JSON.
-    Ok(AcceptType::Json)
 }
