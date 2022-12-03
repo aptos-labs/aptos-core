@@ -148,8 +148,18 @@ import './App.css';
 function App() {
   // Retrieve aptos.account on initial render and store it.
   const [address, setAddress] = React.useState<string | null>(null);
+  
+  /**
+   * init function
+   */
+  const init = async() => {
+    // connect
+    const { address, publicKey } = await window.aptos.connect();
+    setAddress(address);
+  }
+  
   React.useEffect(() => {
-    window.aptos.account().then((data : {address: string}) => setAddress(data.address));
+     init();
   }, []);
 
   return (
