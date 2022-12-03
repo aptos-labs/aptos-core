@@ -70,7 +70,7 @@ Help us update this list by sending pull requests containing the errors you enco
 |RESOURCE_DOES_NOT_EXIST|We tried to access a resource that does not exist under the account.|
 |RESOURCE_ALREADY_EXISTS|We tried to create a resource under an account where that resource already exists.|
 |UNKNOWN_STATUS|A reserved status to represent an unknown vm status. This is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in.|
-|LINKER_ERROR|The function that your are trying to execute (possibly through aptos-cli) is not valid, either with incorrect account address, module name or function name.|
+|LINKER_ERROR|There are many causes of LINKER_ERROR, one possibly is the function you try to run does not exist on chain, either due to incorrect (account address, module name, function name), or simply you have the source for locally but have not published that module on chain.|
 |
 
 ## Move Standard Library (stdlib)
