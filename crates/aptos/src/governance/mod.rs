@@ -587,15 +587,22 @@ fn compile_in_temp_dir(
     })?;
 
     // Compile the script
-    compile_script(package_dir)
+    compile_script(
+        framework_package_args.skip_fetch_latest_git_deps,
+        package_dir,
+    )
 }
 
-fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
+fn compile_script(
+    skip_fetch_latest_git_deps: bool,
+    package_dir: &Path,
+) -> CliTypedResult<(Vec<u8>, HashValue)> {
     let build_options = BuildOptions {
         with_srcs: false,
         with_abis: false,
         with_source_maps: false,
         with_error_map: false,
+        skip_fetch_latest_git_deps,
         ..BuildOptions::default()
     };
 
@@ -756,7 +763,10 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             testnet,
         } = self;
         let package_path = move_options.get_package_path()?;
-        let options = included_artifacts.build_options(move_options.named_addresses());
+        let options = included_artifacts.build_options(
+            move_options.skip_fetch_latest_git_deps,
+            move_options.named_addresses(),
+        );
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
         if testnet {

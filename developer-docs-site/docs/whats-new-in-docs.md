@@ -7,11 +7,15 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
-## 21 November 2002
+## 29 November 2022
+
+- Increased rate limits of https://indexer.mainnet.aptoslabs.com and https://fullnode.mainnet.aptoslabs.com to 1000 requests/5-minute interval by IP.
+
+## 21 November 2022
 
 - Added conceptual overviews for [blocks](concepts/blocks.md) and [resources](concepts/resources.md) in Aptos, explaining how transactions are batched and resources relate to objects, respectively.
 
-## 18 November 2002
+## 18 November 2022
 
 - Increased [Aptos Indexer](/guides/indexing) rate limits from 300 requests per IP per hour to 400 requests every five minutes.
 

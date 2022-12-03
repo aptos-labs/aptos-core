@@ -1,6 +1,6 @@
 [package]
-name = "aptos-parallel-executor"
-description = "Aptos parallel transaction executor library"
+name = "aptos-block-executor"
+description = "Aptos block transaction executor library, parallel execution via Block-STM"
 version = "0.1.0"
 
 # Workspace inherited keys

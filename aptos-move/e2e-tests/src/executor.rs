@@ -43,9 +43,9 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
+    block_executor::BlockAptosVM,
     data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
-    parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
 use framework::ReleaseBundle;
@@ -354,21 +354,6 @@ impl FakeExecutor {
         )
     }
 
-    /// Alternate form of 'execute_block' that keeps the vm_status before it goes into the
-    /// `TransactionOutput`
-    pub fn execute_block_and_keep_vm_status(
-        &self,
-        txn_block: Vec<SignedTransaction>,
-    ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
-        AptosVM::execute_block_and_keep_vm_status(
-            txn_block
-                .into_iter()
-                .map(Transaction::UserTransaction)
-                .collect(),
-            &self.data_store,
-        )
-    }
-
     /// Executes the transaction as a singleton block and applies the resulting write set to the
     /// data store. Panics if execution fails
     pub fn execute_and_apply(&mut self, transaction: SignedTransaction) -> TransactionOutput {
@@ -395,13 +380,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let (result, _) = ParallelAptosVM::execute_block(
-            txn_block,
-            &self.data_store,
-            usize::min(4, num_cpus::get()),
-        )?;
-
-        Ok(result)
+        BlockAptosVM::execute_block(txn_block, &self.data_store, usize::min(4, num_cpus::get()))
     }
 
     pub fn execute_transaction_block(

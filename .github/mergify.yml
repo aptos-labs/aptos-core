@@ -32,7 +32,9 @@ pull_request_rules:
         title: |
           {% if not check_succeed %}
           {% if check_pending|length > 0 %}
-          Some checks are still pending...
+          Ignore the red X, it just means some checks are still pending, please wait...
+          {% elif check_skipped|length > 0 %}
+          Some checks were skipped (try rebasing, toggling automerge, or applying the corresponding labels)...
           {% else %}
           Tests failed
           {% endif %}
