@@ -154,10 +154,8 @@ function App() {
    */
   const init = async() => {
     // connect
-    await window.aptos.connect();
-    const data = await window.aptos.account(); 
-    // set address
-    setAddress(data.address);
+    const { address, publicKey } = await window.aptos.connect();
+    setAddress(address);
   }
   
   React.useEffect(() => {
