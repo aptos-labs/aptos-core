@@ -386,7 +386,7 @@ prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.2"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
-prost = "0.10.4"
+prost = "0.11.3"
 prost-types = "0.10.1"
 quanta = "0.10.1"
 quote = "1.0.18"
@@ -438,7 +438,7 @@ tokio-stream = "0.1.8"
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.5.9"
-tonic = { version = "0.7.2", features = ["tls-roots", "transport", "prost", "compression", "codegen"] }
+tonic = { version = "0.8.3", features = ["tls-roots", "transport", "prost", "gzip", "codegen"] }
 ureq = { version = "1.5.4", features = ["json", "native-tls"], default_features = false }
 url = { version = "2.2.2", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
