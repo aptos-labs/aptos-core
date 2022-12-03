@@ -149,4 +149,4 @@ We are excited that you are here, and we look forward to getting to know you. We
 * [Forum](https://forum.aptoslabs.com/)
 * [Medium](https://medium.com/aptoslabs)
 * [Telegram](https://t.me/aptos_official)
-* [Twitter](https://twitter.com/AptosLabs)
+* [Twitter](https://twitter.com/Aptos_Network)
