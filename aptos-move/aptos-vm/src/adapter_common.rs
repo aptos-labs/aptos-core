@@ -1,13 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters::*, data_cache::StateViewCache};
+use crate::{counters::*, data_cache::StateViewCache, move_vm_ext::verifier_config};
 use anyhow::Result;
 use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_state_view::StateView;
 use aptos_types::{
-    transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
+    transaction::{
+        SignatureCheckedTransaction, SignedTransaction, TransactionPayload, VMValidatorResult,
+    },
     vm_status::{StatusCode, VMStatus},
+};
+use crossbeam::thread::scope;
+use move_binary_format::{file_format::CompiledScript, CompiledModule};
+use std::{
+    sync::mpsc::{channel, RecvTimeoutError},
+    time::Duration,
 };
 
 use crate::{
@@ -112,6 +120,28 @@ pub fn validate_signed_transaction<A: VMAdapter>(
     result
 }
 
+pub(crate) fn validate_transaction_payload(payload: &TransactionPayload) -> Result<(), VMStatus> {
+    match payload {
+        TransactionPayload::EntryFunction(_) => Ok(()),
+        TransactionPayload::ModuleBundle(bundle) => {
+            let config = verifier_config();
+            for code in bundle.iter() {
+                let module = CompiledModule::deserialize(code.code())
+                    .map_err(|_| VMStatus::Error(StatusCode::CODE_DESERIALIZATION_ERROR))?;
+                move_bytecode_verifier::verify_module_with_config(&config, &module)
+                    .map_err(|err| err.into_vm_status())?;
+            }
+            Ok(())
+        }
+        TransactionPayload::Script(s) => {
+            let script = CompiledScript::deserialize(s.code())
+                .map_err(|_| VMStatus::Error(StatusCode::CODE_DESERIALIZATION_ERROR))?;
+            move_bytecode_verifier::verify_script_with_config(&verifier_config(), &script)
+                .map_err(|err| err.into_vm_status())
+        }
+    }
+}
+
 pub(crate) fn validate_signature_checked_transaction<S: MoveResolverExt, A: VMAdapter>(
     adapter: &A,
     session: &mut SessionExt<S>,
@@ -122,7 +152,28 @@ pub(crate) fn validate_signature_checked_transaction<S: MoveResolverExt, A: VMAd
 ) -> Result<(), VMStatus> {
     adapter.check_transaction_format(transaction)?;
 
+    let (sender, recv) = channel();
+    let _ = scope(|s| {
+        s.spawn(move |_| {
+            let result = validate_transaction_payload(&transaction.payload());
+            match sender.send(result) {
+                Ok(()) => {} // everything good
+                Err(_) => {} // we have been released, don't panic
+            }
+        })
+        .join()
+    });
+
     let prologue_status = adapter.run_prologue(session, storage, transaction, log_context);
+
+    match recv.recv_timeout(Duration::from_secs(2)) {
+        Ok(result) => result?,
+        Err(RecvTimeoutError::Timeout) => {
+            return Err(VMStatus::Error(StatusCode::UNKNOWN_VERIFICATION_ERROR))
+        }
+        Err(RecvTimeoutError::Disconnected) => unreachable!(),
+    };
+
     match prologue_status {
         Err(err) if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => {
             Err(err)

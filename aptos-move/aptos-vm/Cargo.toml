@@ -24,6 +24,7 @@ aptos-metrics-core = { workspace = true }
 aptos-module-verifier = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
+crossbeam = { workspace = true }
 bcs = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
