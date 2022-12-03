@@ -200,7 +200,7 @@ module aptos_token::property_map {
         assert!(key_len == typ_len, error::invalid_state(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
 
         let i = 0;
-        while (i < vector::length(&keys)) {
+        while (i < key_len) {
             let key = vector::borrow(&keys, i);
             let prop_val = PropertyValue {
                 value: *vector::borrow(&values, i),
