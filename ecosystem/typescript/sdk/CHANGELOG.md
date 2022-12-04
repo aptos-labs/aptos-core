@@ -6,10 +6,17 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
-- add missing fields to TokenData class
-- add PropertyMap and PropertyValue type to match on-chain data
-- support token property map deseralizer to read the property map in the original data format.
+- Export classes from property_map_serde
+- User can specify token string property type using "string", "String" or "0x1::string::String" to serde the string token property on-chain
 
+## 1.4.0 (2022-11-30)
+
+- Add missing fields to TokenData class
+- Add PropertyMap and PropertyValue type to match on-chain data
+- Support token property map deseralizer to read the property map in the original data format.
+- Allow `checkBalance` in `CoinClient` to take in a `MaybeHexString` as well as `AptosAccount`, since users might want to check the balance of accounts they don't own (which is generally how you use `AptosAccount`).
+- Similar to `checkBalance`, allow `transfer` in `CoinClient` to take in a `MaybeHexString` for the `receiver` argument.
+- Add a new `createReceiverIfMissing` argument to `transfer` in `CoinClient`. If set, the `0x1::aptos_account::transfer` function will be called instead of `0x1::coin::transfer`, which will create the account on chain if it doesn't exist instead of failing.
 
 ## 1.3.17 (2022-11-08)
 

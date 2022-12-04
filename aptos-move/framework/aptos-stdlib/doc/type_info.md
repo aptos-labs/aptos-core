@@ -14,13 +14,16 @@
 -  [Function `type_of`](#0x1_type_info_type_of)
 -  [Function `type_name`](#0x1_type_info_type_name)
 -  [Function `chain_id_internal`](#0x1_type_info_chain_id_internal)
+-  [Function `size_of_val`](#0x1_type_info_size_of_val)
 -  [Function `verify_type_of`](#0x1_type_info_verify_type_of)
 -  [Function `verify_type_of_generic`](#0x1_type_info_verify_type_of_generic)
 -  [Specification](#@Specification_1)
     -  [Function `chain_id_internal`](#@Specification_1_chain_id_internal)
+    -  [Function `verify_type_of_generic`](#@Specification_1_verify_type_of_generic)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
@@ -249,6 +252,38 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 
 </details>
 
+<a name="0x1_type_info_size_of_val"></a>
+
+## Function `size_of_val`
+
+Return the BCS size, in bytes, of value at <code>val_ref</code>.
+
+See the [BCS spec](https://github.com/diem/bcs)
+
+See <code>test_size_of_val()</code> for an analysis of common types and
+nesting patterns, as well as <code>test_size_of_val_vectors()</code> for an
+analysis of vector size dynamism.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_size_of_val">size_of_val</a>&lt;T&gt;(val_ref: &T): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_size_of_val">size_of_val</a>&lt;T&gt;(val_ref: &T): u64 {
+    // Return <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a> length of vectorized BCS representation.
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&<a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(val_ref))
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_type_info_verify_type_of"></a>
 
 ## Function `verify_type_of`
@@ -330,6 +365,42 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>();
+</code></pre>
+
+
+
+<a name="@Specification_1_verify_type_of_generic"></a>
+
+### Function `verify_type_of_generic`
+
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;()
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<a href="type_info.md#0x1_type_info_spec_is_struct">spec_is_struct</a>&lt;T&gt;();
+</code></pre>
+
+
+
+
+<a name="0x1_type_info_spec_is_struct"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_spec_is_struct">spec_is_struct</a>&lt;T&gt;(): bool;
+</code></pre>
+
+
+
+
+<a name="0x1_type_info_spec_chain_id_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>(): u8;
 </code></pre>
 
 

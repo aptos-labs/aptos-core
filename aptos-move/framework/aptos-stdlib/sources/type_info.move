@@ -134,6 +134,9 @@ module aptos_std::type_info {
             assert struct_name == type_of<T>().struct_name;
         };
     }
+    spec verify_type_of_generic {
+        aborts_if !spec_is_struct<T>();
+    }
 
     #[test_only]
     struct CustomType has drop {}

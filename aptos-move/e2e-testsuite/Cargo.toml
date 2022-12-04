@@ -13,11 +13,11 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-block-executor = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
 aptos-keygen = { workspace = true }
 aptos-logger = { workspace = true }
-aptos-parallel-executor = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }

@@ -12062,7 +12062,8 @@
             "$ref": "#/components/schemas/U64"
           },
           "git_hash": {
-            "type": "string"
+            "type": "string",
+            "description": "Git hash of the build of the API endpoint.  Can be used to determine the exact\nsoftware version used by the API endpoint."
           }
         }
       },

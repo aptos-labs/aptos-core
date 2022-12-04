@@ -15,13 +15,11 @@ use crate::{
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
 };
-use aptos_logger::prelude::*;
 use aptos_types::{
     block_metadata::BlockMetadata,
     transaction::{Transaction, TransactionOutput, TransactionStatus, WriteSetPayload},
     write_set::WriteSet,
 };
-use rayon::prelude::*;
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.
@@ -131,76 +129,6 @@ pub(crate) fn validate_signature_checked_transaction<S: MoveResolverExt, A: VMAd
         }
         _ => Ok(()),
     }
-}
-
-pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
-    adapter: &A,
-    transactions: Vec<Transaction>,
-    data_cache: &mut StateViewCache<S>,
-) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
-    let mut result = vec![];
-    let mut should_restart = false;
-
-    info!(
-        AdapterLogSchema::new(data_cache.id(), 0),
-        "Executing block, transaction count: {}",
-        transactions.len()
-    );
-
-    let signature_verified_block: Vec<PreprocessedTransaction>;
-    {
-        // Verify the signatures of all the transactions in parallel.
-        // This is time consuming so don't wait and do the checking
-        // sequentially while executing the transactions.
-        signature_verified_block = transactions
-            .into_par_iter()
-            .map(preprocess_transaction::<A>)
-            .collect();
-    }
-
-    for (idx, txn) in signature_verified_block.into_iter().enumerate() {
-        let log_context = AdapterLogSchema::new(data_cache.id(), idx);
-        if should_restart {
-            let txn_output =
-                TransactionOutput::new(WriteSet::default(), vec![], 0, TransactionStatus::Retry);
-            result.push((VMStatus::Error(StatusCode::UNKNOWN_STATUS), txn_output));
-            debug!(log_context, "Retry after reconfiguration");
-            continue;
-        };
-        let (vm_status, output_ext, sender) = adapter.execute_single_transaction(
-            &txn,
-            &data_cache.as_move_resolver(),
-            &log_context,
-        )?;
-
-        // Apply deltas.
-        let output = output_ext.into_transaction_output(&data_cache);
-
-        if !output.status().is_discarded() {
-            data_cache.push_write_set(output.write_set());
-        } else {
-            match sender {
-                Some(s) => trace!(
-                    log_context,
-                    "Transaction discarded, sender: {}, error: {:?}",
-                    s,
-                    vm_status,
-                ),
-                None => trace!(log_context, "Transaction malformed, error: {:?}", vm_status,),
-            }
-        }
-
-        if A::should_restart_execution(&output) {
-            info!(
-                AdapterLogSchema::new(data_cache.id(), 0),
-                "Reconfiguration occurred: restart required",
-            );
-            should_restart = true;
-        }
-
-        result.push((vm_status, output))
-    }
-    Ok(result)
 }
 
 /// Transactions after signature checking:
