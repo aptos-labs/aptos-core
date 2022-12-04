@@ -16,4 +16,4 @@ Each Aptos block contains both user transactions and special system transactions
 
 ## Epoch
 
-In Aptos, epochs represent a longer period of time in order to safely synchronize major changes such as validator set additions/removals. An epoch is a fixed duration of time, currently defined as two hours on mainnet. The number of blocks in an epoch depends on how many blocks can execute within this period fof time. It is only at the start of a new epoch that major changes such as a validator joining the validator set don't immediately take effect among the validators.
+In Aptos, epochs represent a longer period of time in order to safely synchronize major changes such as validator set additions/removals. An epoch is a fixed duration of time, currently defined as two hours on mainnet. The number of blocks in an epoch depends on how many blocks can execute within this period of time. It is only at the start of a new epoch that major changes such as a validator joining the validator set don't immediately take effect among the validators.
