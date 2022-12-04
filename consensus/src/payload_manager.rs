@@ -89,11 +89,9 @@ impl PayloadManager {
                 .into_iter()
                 .flat_map(|payload| match payload {
                     Payload::DirectMempool(_) => {
-                        warn!("InQuorumStore should be used");
-                        Vec::new()
+                        unreachable!("InQuorumStore should be used");
                     }
                     Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
-                    Payload::Empty => Vec::new(),
                 })
                 .map(|proof| *proof.digest())
                 .collect();
@@ -127,7 +125,6 @@ impl PayloadManager {
                             .replace(DataStatus::Requested(receivers));
                     }
                 }
-                Payload::Empty => {}
                 Payload::DirectMempool(_) => {
                     unreachable!()
                 }
@@ -207,10 +204,9 @@ impl PayloadManager {
                         }
                     }
                 }
-                _ => {
+                Payload::DirectMempool(_) => {
                     // the Empty case is checked in the beginning
-                    warn!("should use QuorumStore");
-                    Ok(Vec::new())
+                    unreachable!("should use QuorumStore");
                 }
             }
         } else {

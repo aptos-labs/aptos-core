@@ -101,7 +101,7 @@ pub struct ProposalGenerator {
     // proposed block.
     block_store: Arc<dyn BlockReader + Send + Sync>,
     // ProofOfStore manager is delivering the ProofOfStores.
-    payload_manager: Arc<dyn PayloadClient>,
+    payload_client: Arc<dyn PayloadClient>,
     // Transaction manager is delivering the transactions.
     // Time service to generate block timestamps
     time_service: Arc<dyn TimeService>,
@@ -116,6 +116,7 @@ pub struct ProposalGenerator {
 
     // Last round that a proposal was generated
     last_round_generated: Round,
+    quorum_store_enabled: bool,
 }
 
 impl ProposalGenerator {
@@ -128,17 +129,19 @@ impl ProposalGenerator {
         max_block_bytes: u64,
         max_failed_authors_to_store: usize,
         chain_health_backoff_config: ChainHealthBackoffConfig,
+        quorum_store_enabled: bool,
     ) -> Self {
         Self {
             author,
             block_store,
-            payload_manager,
+            payload_client: payload_manager,
             time_service,
             max_block_txns,
             max_block_bytes,
             max_failed_authors_to_store,
             chain_health_backoff_config,
             last_round_generated: 0,
+            quorum_store_enabled,
         }
     }
 
@@ -194,7 +197,7 @@ impl ProposalGenerator {
         let (payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
             // after reconfiguration until it's committed
-            (Payload::Empty, hqc.certified_block().timestamp_usecs())
+            (Payload::empty(self.quorum_store_enabled), hqc.certified_block().timestamp_usecs())
         } else {
             // One needs to hold the blocks with the references to the payloads while get_block is
             // being executed: pending blocks vector keeps all the pending ancestors of the extended branch.
@@ -246,7 +249,7 @@ impl ProposalGenerator {
             };
 
             let payload = self
-                .payload_manager
+                .payload_client
                 .pull_payload(
                     round,
                     max_block_txns,

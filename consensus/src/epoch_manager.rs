@@ -572,6 +572,7 @@ impl EpochManager {
         recovery_data: RecoveryData,
         epoch_state: EpochState,
         onchain_config: OnChainConsensusConfig,
+        quorum_store_enabled: bool,
     ) {
         let epoch = epoch_state.epoch;
         counters::EPOCH.set(epoch_state.epoch as i64);
@@ -638,7 +639,7 @@ impl EpochManager {
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
         self.spawn_direct_mempool_quorum_store(consensus_to_quorum_store_rx);
 
-        let payload_manager = QuorumStoreClient::new(
+        let payload_client = QuorumStoreClient::new(
             consensus_to_quorum_store_tx,
             self.config.quorum_store_poll_count,
             self.config.quorum_store_pull_timeout_ms,
@@ -650,12 +651,13 @@ impl EpochManager {
         let proposal_generator = ProposalGenerator::new(
             self.author,
             block_store.clone(),
-            Arc::new(payload_manager),
+            Arc::new(payload_client),
             self.time_service.clone(),
             self.config.max_sending_block_txns,
             self.config.max_sending_block_bytes,
             onchain_config.max_failed_authors_to_store(),
             chain_health_backoff_config,
+            quorum_store_enabled,
         );
 
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
@@ -719,6 +721,7 @@ impl EpochManager {
                     initial_data,
                     epoch_state,
                     onchain_config.unwrap_or_default(),
+                    false //TODO: read from on-chain config.
                 )
                 .await
             }

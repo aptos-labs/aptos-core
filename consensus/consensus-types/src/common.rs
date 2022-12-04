@@ -30,7 +30,7 @@ pub struct TransactionSummary {
 
 impl fmt::Display for TransactionSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number,)
+        write!(f, "{}:{}", self.sender, self.sequence_number, )
     }
 }
 
@@ -62,17 +62,29 @@ impl PartialEq for ProofWithData {
 
 impl Eq for ProofWithData {}
 
+impl ProofWithData {
+    pub fn new(proofs: Vec<ProofOfStore>) -> Self {
+        Self {
+            proofs,
+            status: Arc::new(Mutex::new(None)),
+        }
+    }
+}
+
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(ProofWithData),
-    Empty,
 }
 
 impl Payload {
-    pub fn empty() -> Self {
-        Payload::Empty
+    pub fn empty(quorum_store_enabled: bool) -> Self {
+        if quorum_store_enabled {
+            Payload::InQuorumStore(ProofWithData::new(Vec::new()))
+        } else {
+            Payload::DirectMempool(Vec::new())
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -83,7 +95,6 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.info().num_txns as usize)
                 .sum(),
-            Payload::Empty => 0,
         }
     }
 
@@ -91,7 +102,6 @@ impl Payload {
         match self {
             Payload::DirectMempool(txns) => txns.is_empty(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs.is_empty(),
-            Payload::Empty => true,
         }
     }
 
@@ -112,13 +122,11 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.info().num_bytes as usize)
                 .sum(),
-            Payload::Empty => 0,
         }
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         match self {
-            Payload::Empty => Ok(()),
             Payload::DirectMempool(_) => Ok(()),
             Payload::InQuorumStore(proof_with_status) => {
                 for proof in proof_with_status.proofs.iter() {
@@ -139,7 +147,6 @@ impl fmt::Display for Payload {
             Payload::InQuorumStore(proof_with_status) => {
                 write!(f, "InMemory proofs: {}", proof_with_status.proofs.len())
             }
-            Payload::Empty => write!(f, "Empty payload"),
         }
     }
 }
@@ -149,7 +156,7 @@ impl fmt::Display for Payload {
 pub enum PayloadFilter {
     DirectMempool(Vec<TransactionSummary>),
     InQuorumStore(HashSet<HashValue>),
-    Empty,
+    Empty, // TODO: consider removing it
 }
 
 impl From<&Vec<&Payload>> for PayloadFilter {
