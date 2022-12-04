@@ -20,7 +20,7 @@ pub const JELLYFISH_MERKLE_ARITY: usize = unwrap_ctx!(parse_usize(env!("JMTEXP_A
 pub const NIBBLE_SIZE_IN_BITS: usize = JELLYFISH_MERKLE_ARITY.trailing_zeros() as usize;
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct Nibble(usize);
+pub struct Nibble(u8);
 
 impl Nibble {
     pub(crate) fn get_bit(&self, i: usize) -> bool {
@@ -32,13 +32,13 @@ impl Nibble {
 
 impl From<Nibble> for usize {
     fn from(n: Nibble) -> Self {
-        n.0
+        n.0 as usize
     }
 }
 
 impl From<usize> for Nibble {
     fn from(v: usize) -> Self {
-        Nibble(v)
+        Nibble(v as u8)
     }
 }
 
@@ -49,7 +49,7 @@ impl From<u8> for Nibble {
             "Nibble out of range: {}",
             nibble
         );
-        Self(nibble as usize)
+        Self(nibble)
     }
 }
 
@@ -58,7 +58,7 @@ impl From<&[bool]> for Nibble {
         assert_eq!(bits.len(), NIBBLE_SIZE_IN_BITS);
         let mut val = 0;
         for &bit in bits {
-            val = (val << 1) + bit as usize
+            val = (val << 1) + bit as u8
         }
         Nibble(val)
     }
