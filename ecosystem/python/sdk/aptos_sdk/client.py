@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import httpx
 
@@ -51,7 +51,6 @@ class RestClient:
         resource = self.account_resource(
             account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
         )
-        assert resource is not None, "No account balance"
         return resource["data"]["coin"]["value"]
 
     def account_sequence_number(self, account_address: AccountAddress) -> int:
@@ -60,7 +59,7 @@ class RestClient:
 
     def account_resource(
         self, account_address: AccountAddress, resource_type: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         response = self.client.get(
             f"{self.base_url}/accounts/{account_address}/resource/{resource_type}"
         )
@@ -454,7 +453,6 @@ class RestClient:
         property_version: int,
     ) -> Any:
         resource = self.account_resource(owner, "0x3::token::TokenStore")
-        assert resource is not None, "Invalid TokenStore"
         token_store_handle = resource["data"]["tokens"]["handle"]
 
         token_id = {
@@ -502,7 +500,6 @@ class RestClient:
         property_version: int,
     ) -> Any:
         resource = self.account_resource(creator, "0x3::token::Collections")
-        assert resource is not None, "Invalid Collections"
         token_data_handle = resource["data"]["token_data"]["handle"]
 
         token_data_id = {
@@ -520,7 +517,6 @@ class RestClient:
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
         resource = self.account_resource(creator, "0x3::token::Collections")
-        assert resource is not None, "Invalid Collections"
         token_data = resource["data"]["collection_data"]["handle"]
 
         return self.get_table_item(
