@@ -28,6 +28,7 @@ Generating the protos requires `protoc`, as well as a few plugins:
 cargo install protoc-gen-prost
 cargo install protoc-gen-prost-serde
 cargo install protoc-gen-prost-crate
+cargo install protoc-gen-tonic
 ```
 
 Now we can generate the protos:
