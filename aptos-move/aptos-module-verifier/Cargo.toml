@@ -10,5 +10,5 @@ publish = false
 edition = "2021"
 
 [dependencies]
-move-core-types = { git = "https://github.com/aptos-labs/move-private", rev = "04ddcc59ec0eab8279814c4a5d61a7ff6a9c5bb5", features = ["address32"] }
-move-binary-format = { git = "https://github.com/aptos-labs/move-private", rev = "04ddcc59ec0eab8279814c4a5d61a7ff6a9c5bb5" }
+move-core-types = { git = "https://github.com/aptos-labs/move-private", rev = "79ade41b0dc503e0e45a55a18b0fa6f8df60ead2", features = ["address32"] }
+move-binary-format = { git = "https://github.com/aptos-labs/move-private", rev = "79ade41b0dc503e0e45a55a18b0fa6f8df60ead2" }
