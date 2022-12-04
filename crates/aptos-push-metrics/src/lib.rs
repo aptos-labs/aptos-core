@@ -45,7 +45,6 @@ impl MetricsPusher {
                 );
             } else {
                 let status = response.status_line();
-                info!("Metric push result: {status}");
             }
         }
     }

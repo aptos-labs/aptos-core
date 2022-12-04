@@ -377,7 +377,7 @@ impl fmt::Debug for HashValue {
 /// Will print shortened (4 bytes) hash
 impl fmt::Display for HashValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for byte in self.hash.iter() {
+        for byte in self.hash.iter().take(4) {
             write!(f, "{:02x}", byte)?;
         }
         Ok(())
