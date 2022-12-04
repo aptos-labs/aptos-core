@@ -150,6 +150,7 @@ class RestClient:
 
     def transaction_pending(self, txn_hash: str) -> bool:
         response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
+        # TODO(@davidiw): consider raising a different error here, since this is an ambiguous state
         if response.status_code == 404:
             return True
         if response.status_code >= 400:
@@ -213,7 +214,7 @@ class RestClient:
 
         return SignedTransaction(raw_transaction.inner(), authenticator)
 
-    def create_single_signer_bcs_transaction(
+    def create_bcs_transaction(
         self, sender: Account, payload: TransactionPayload
     ) -> SignedTransaction:
         raw_transaction = RawTransaction(
@@ -267,7 +268,7 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_transaction(
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -301,7 +302,7 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -345,7 +346,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -375,7 +376,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -403,7 +404,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -547,7 +548,7 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_transaction(
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
