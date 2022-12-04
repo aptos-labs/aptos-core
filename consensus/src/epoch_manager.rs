@@ -7,7 +7,6 @@ use crate::{
         BlockStore,
     },
     counters,
-    payload_manager::PayloadManager,
     error::{error_kind, DbError},
     experimental::{
         buffer_manager::{OrderedBlocks, ResetRequest},
@@ -32,6 +31,7 @@ use crate::{
     network::{IncomingBlockRetrievalRequest, NetworkReceivers, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkSender},
     payload_client::QuorumStoreClient,
+    payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore,
     recovery_manager::RecoveryManager,
@@ -109,7 +109,6 @@ pub struct EpochManager {
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener,
-    payload_manager: Arc<PayloadManager>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
@@ -134,7 +133,6 @@ impl EpochManager {
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         reconfig_events: ReconfigNotificationListener,
-        payload_manager: Arc<PayloadManager>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -153,7 +151,6 @@ impl EpochManager {
             storage,
             safety_rules_manager,
             reconfig_events,
-            payload_manager,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
@@ -615,7 +612,10 @@ impl EpochManager {
             ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
-        self.commit_state_computer.new_epoch(&epoch_state);
+        let payload_manager = Arc::from(PayloadManager::DirectMempool); // TODO: check if QuorumStore is enabled.
+
+        self.commit_state_computer
+            .new_epoch(&epoch_state, payload_manager.clone());
         let state_computer = if onchain_config.decoupled_execution() {
             Arc::new(self.spawn_decoupled_execution(
                 safety_rules_container.clone(),
@@ -633,7 +633,7 @@ impl EpochManager {
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             onchain_config.back_pressure_limit(),
-            self.payload_manager.clone(),
+            payload_manager,
         ));
 
         // Start QuorumStore
@@ -723,7 +723,7 @@ impl EpochManager {
                     initial_data,
                     epoch_state,
                     onchain_config.unwrap_or_default(),
-                    self.quorum_store_enabled
+                    self.quorum_store_enabled,
                 )
                 .await
             }

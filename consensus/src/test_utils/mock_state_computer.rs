@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    payload_manager::PayloadManager,
     error::StateSyncError,
     experimental::buffer_manager::OrderedBlocks,
+    payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
 };

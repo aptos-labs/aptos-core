@@ -3,12 +3,12 @@
 
 use crate::{
     counters,
-    payload_manager::PayloadManager,
     epoch_manager::EpochManager,
     experimental::buffer_manager::OrderedBlocks,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
     network_tests::{NetworkPlayground, TwinId},
+    payload_manager::PayloadManager,
     test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,
 };

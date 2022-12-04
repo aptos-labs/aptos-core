@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::{QuorumStoreError, StateSyncError};
+use crate::payload_manager::PayloadManager;
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
@@ -64,5 +65,5 @@ pub trait StateComputer: Send + Sync {
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
 
     // Reconfigure to execute transactions for a new epoch.
-    fn new_epoch(&self, epoch_state: &EpochState);
+    fn new_epoch(&self, epoch_state: &EpochState, payload_manager: Arc<PayloadManager>);
 }

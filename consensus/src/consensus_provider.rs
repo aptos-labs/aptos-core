@@ -3,7 +3,6 @@
 
 use crate::{
     counters,
-    payload_manager::PayloadManager,
     epoch_manager::EpochManager,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
@@ -54,13 +53,11 @@ pub fn start_consensus(
         consensus_to_mempool_sender.clone(),
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
-    let payload_manager: Arc<PayloadManager> = Arc::new(PayloadManager::new());
 
     let state_computer = Arc::new(ExecutionProxy::new(
         Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),
         txn_notifier,
         state_sync_notifier,
-        payload_manager.clone(),
         runtime.handle(),
     ));
 
@@ -80,7 +77,6 @@ pub fn start_consensus(
         state_computer,
         storage,
         reconfig_events,
-        payload_manager,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);

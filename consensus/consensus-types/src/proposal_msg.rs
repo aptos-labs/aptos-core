@@ -81,7 +81,10 @@ impl ProposalMsg {
 
     pub fn verify(&self, validator: &ValidatorVerifier, quorum_store_enabled: bool) -> Result<()> {
         if self.proposal().payload().is_some() {
-            self.proposal().payload().unwrap().verify(validator, quorum_store_enabled)?;
+            self.proposal()
+                .payload()
+                .unwrap()
+                .verify(validator, quorum_store_enabled)?;
         }
         self.proposal
             .validate_signature(validator)

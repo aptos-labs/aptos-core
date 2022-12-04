@@ -3,7 +3,6 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
-    payload_manager::PayloadManager,
     experimental::buffer_manager::OrderedBlocks,
     liveness::{
         proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
@@ -15,6 +14,7 @@ use crate::{
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
     network_tests::{NetworkPlayground, TwinId},
+    payload_manager::PayloadManager,
     persistent_liveness_storage::RecoveryData,
     round_manager::RoundManager,
     test_utils::{

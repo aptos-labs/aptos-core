@@ -3,7 +3,6 @@
 
 use crate::{
     block_storage::BlockStore,
-    payload_manager::PayloadManager,
     liveness::{
         proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
         rotating_proposer_election::RotatingProposer,
@@ -12,6 +11,7 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     network::NetworkSender,
     network_interface::ConsensusNetworkSender,
+    payload_manager::PayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     round_manager::RoundManager,
     test_utils::{EmptyStateComputer, MockPayloadManager, MockStorage},

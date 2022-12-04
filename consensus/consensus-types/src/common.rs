@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::proof_of_store::ProofOfStore;
+use anyhow::Context;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::validator_verifier::{ValidatorVerifier, VerifyError};
@@ -13,7 +14,6 @@ use std::collections::HashSet;
 use std::fmt;
 use std::fmt::Write;
 use std::sync::Arc;
-use anyhow::{anyhow, Context};
 use tokio::sync::oneshot;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
@@ -31,7 +31,7 @@ pub struct TransactionSummary {
 
 impl fmt::Display for TransactionSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number, )
+        write!(f, "{}:{}", self.sender, self.sequence_number,)
     }
 }
 
@@ -45,7 +45,12 @@ pub struct RejectedTransactionSummary {
 #[derive(Debug)]
 pub enum DataStatus {
     Cached(Vec<SignedTransaction>),
-    Requested(Vec<(HashValue, oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>)>),
+    Requested(
+        Vec<(
+            HashValue,
+            oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>,
+        )>,
+    ),
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -126,7 +131,11 @@ impl Payload {
         }
     }
 
-    pub fn verify(&self, validator: &ValidatorVerifier, quorum_store_enabled: bool) -> anyhow::Result<()> {
+    pub fn verify(
+        &self,
+        validator: &ValidatorVerifier,
+        quorum_store_enabled: bool,
+    ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {

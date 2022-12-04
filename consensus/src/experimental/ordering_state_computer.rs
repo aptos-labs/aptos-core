@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::payload_manager::PayloadManager;
 use crate::{
     error::StateSyncError,
     experimental::{
@@ -117,5 +118,5 @@ impl StateComputer for OrderingStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState) {}
+    fn new_epoch(&self, _: &EpochState, _payload_manager: Arc<PayloadManager>) {}
 }
