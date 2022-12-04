@@ -70,7 +70,7 @@ Help us update this list by sending pull requests containing the errors you enco
 |RESOURCE_DOES_NOT_EXIST|We tried to access a resource that does not exist under the account.|
 |RESOURCE_ALREADY_EXISTS|We tried to create a resource under an account where that resource already exists.|
 |UNKNOWN_STATUS|A reserved status to represent an unknown vm status. This is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in.|
-|
+|LINKER_ERROR|This may be due to the function has not been published on chain or by trying to call an invalid function as the result of either an incorrect account address, module name, or function name. This might not happen locally if the sources are available locally but have yet to be published on-chain.|
 |
 
 ## Move Standard Library (stdlib)
