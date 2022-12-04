@@ -20,16 +20,27 @@ from .type_tag import StructTag, TypeTag
 U64_MAX = 18446744073709551615
 
 
+class ClientConfig:
+    """Common configuration for clients, particularly for submitting transactions"""
+
+    expiration_ttl: int = 600
+    gas_unit_price: int = 100
+    max_gas_amount: int = 100_000
+    transaction_wait_in_seconds: int = 20
+
+
 class RestClient:
     """A wrapper around the Aptos-core Rest API"""
 
     chain_id: int
     client: httpx.Client
+    client_config: ClientConfig
     base_url: str
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, client_config: ClientConfig = ClientConfig()):
         self.base_url = base_url
         self.client = httpx.Client()
+        self.client_config = client_config
         self.chain_id = int(self.info()["chain_id"])
 
     def close(self):
@@ -146,9 +157,11 @@ class RestClient:
         txn_request = {
             "sender": f"{sender.address()}",
             "sequence_number": str(self.account_sequence_number(sender.address())),
-            "max_gas_amount": "10000",
-            "gas_unit_price": "100",
-            "expiration_timestamp_secs": str(int(time.time()) + 600),
+            "max_gas_amount": str(self.client_config.max_gas_amount),
+            "gas_unit_price": str(self.client_config.gas_unit_price),
+            "expiration_timestamp_secs": str(
+                int(time.time()) + self.client_config.expiration_ttl
+            ),
             "payload": payload,
         }
 
@@ -184,11 +197,14 @@ class RestClient:
         return response.json()["type"] == "pending_transaction"
 
     def wait_for_transaction(self, txn_hash: str) -> None:
-        """Waits up to 20 seconds for a transaction to move past pending state."""
+        """
+        Waits up to the duration specified in client_config for a transaction to move past pending
+        state.
+        """
 
         count = 0
         while self.transaction_pending(txn_hash):
-            assert count < 20, f"transaction {txn_hash} timed out"
+            assert count < self.client_config.transaction_wait_in_seconds, f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
         response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
@@ -211,9 +227,9 @@ class RestClient:
                 sender.address(),
                 self.account_sequence_number(sender.address()),
                 payload,
-                100_000,
-                100,
-                int(time.time()) + 600,
+                self.client_config.max_gas_amount,
+                self.client_config.gas_unit_price,
+                int(time.time()) + self.client_config.expiration_ttl,
                 self.chain_id,
             ),
             [x.address() for x in secondary_accounts],
@@ -247,9 +263,9 @@ class RestClient:
             sender.address(),
             self.account_sequence_number(sender.address()),
             payload,
-            100_000,
-            100,
-            int(time.time()) + 600,
+            self.client_config.max_gas_amount,
+            self.client_config.gas_unit_price,
+            int(time.time()) + self.client_config.expiration_ttl,
             self.chain_id,
         )
 
