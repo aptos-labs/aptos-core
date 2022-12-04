@@ -413,7 +413,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &dyn StateView<K>,
+        view: &impl StateView<K>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,

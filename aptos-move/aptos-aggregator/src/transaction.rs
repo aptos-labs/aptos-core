@@ -194,7 +194,7 @@ impl TransactionOutputExt {
     /// TODO: ideally, we may want to expose this function to VM instead. Since
     /// we do not care about rerunning the epilogue - it sufficies to have it
     /// here for now.
-    pub fn into_transaction_output<S: StateView<StateKey> + ?Sized>(
+    pub fn into_transaction_output<S: StateView<StateKey>>(
         self,
         state_view: &S,
     ) -> TransactionOutput {

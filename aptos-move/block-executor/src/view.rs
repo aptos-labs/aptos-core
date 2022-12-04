@@ -143,20 +143,20 @@ impl<
 }
 
 enum ViewMapKind<'a, T: Transaction> {
-    MultiVersion(&'a MVHashMapView<'a, <T as Transaction>::Key, <T as Transaction>::Value>),
-    BTree(&'a BTreeMap<<T as Transaction>::Key, <T as Transaction>::Value>),
+    MultiVersion(&'a MVHashMapView<'a, T::Key, T::Value>),
+    BTree(&'a BTreeMap<T::Key, T::Value>),
 }
 
-pub struct LatestView<'a, T: Transaction, S: StateView<<T as Transaction>::Key> + ?Sized> {
+pub struct LatestView<'a, T: Transaction, S: StateView<T::Key>> {
     base_view: &'a S,
     versioned_view: ViewMapKind<'a, T>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: StateView<<T as Transaction>::Key> + ?Sized> LatestView<'a, T, S> {
+impl<'a, T: Transaction, S: StateView<T::Key>> LatestView<'a, T, S> {
     pub fn new_mv_view(
         base_view: &'a S,
-        map: &'a MVHashMapView<'a, <T as Transaction>::Key, <T as Transaction>::Value>,
+        map: &'a MVHashMapView<'a, T::Key, T::Value>,
         txn_idx: TxnIndex,
     ) -> LatestView<T, S> {
         LatestView {
@@ -168,7 +168,7 @@ impl<'a, T: Transaction, S: StateView<<T as Transaction>::Key> + ?Sized> LatestV
 
     pub fn new_btree_view(
         base_view: &'a S,
-        map: &'a BTreeMap<<T as Transaction>::Key, <T as Transaction>::Value>,
+        map: &'a BTreeMap<T::Key, T::Value>,
         txn_idx: TxnIndex,
     ) -> LatestView<T, S> {
         LatestView {
@@ -179,13 +179,8 @@ impl<'a, T: Transaction, S: StateView<<T as Transaction>::Key> + ?Sized> LatestV
     }
 }
 
-impl<'a, T: Transaction, S: StateView<<T as Transaction>::Key> + ?Sized>
-    StateView<<T as Transaction>::Key> for LatestView<'a, T, S>
-{
-    fn get_state_value(
-        &self,
-        state_key: &<T as Transaction>::Key,
-    ) -> anyhow::Result<Option<Vec<u8>>> {
+impl<'a, T: Transaction, S: StateView<T::Key>> StateView<T::Key> for LatestView<'a, T, S> {
+    fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<Vec<u8>>> {
         match self.versioned_view {
             ViewMapKind::MultiVersion(map) => match map.read(state_key, self.txn_idx) {
                 ReadResult::Value(v) => Ok(v.extract_raw_bytes()),

@@ -24,17 +24,18 @@ pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-pub struct BlockExecutor<T: Transaction, E: ExecutorTask> {
+pub struct BlockExecutor<T, E, S> {
     // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
-    phantom: PhantomData<(T, E)>,
+    phantom: PhantomData<(T, E, S)>,
 }
 
-impl<T, E> BlockExecutor<T, E>
+impl<T, E, S> BlockExecutor<T, E, S>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
+    S: StateView<T::Key>,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -55,26 +56,19 @@ where
         version: Version,
         guard: TaskGuard<'a>,
         signature_verified_block: &[T],
-        last_input_output: &TxnLastInputOutput<
-            <T as Transaction>::Key,
-            <E as ExecutorTask>::Output,
-            <E as ExecutorTask>::Error,
-        >,
-        versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
         scheduler: &'a Scheduler,
         executor: &E,
-        base_view: &dyn StateView<<T as Transaction>::Key>,
+        base_view: &S,
     ) -> SchedulerTask<'a> {
         let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute];
 
         // TODO: no need to even have MVHashMapView as public.
         let state_view = MVHashMapView::new(versioned_data_cache, scheduler);
-        let versioned_view = LatestView::<T, dyn StateView<<T as Transaction>::Key>>::new_mv_view(
-            base_view,
-            &state_view,
-            idx_to_execute,
-        );
+        let versioned_view =
+            LatestView::<T, S>::new_mv_view(base_view, &state_view, idx_to_execute);
 
         // VM execution.
         let execute_result =
@@ -136,12 +130,8 @@ where
         &self,
         version_to_validate: Version,
         guard: TaskGuard<'a>,
-        last_input_output: &TxnLastInputOutput<
-            <T as Transaction>::Key,
-            <E as ExecutorTask>::Output,
-            <E as ExecutorTask>::Error,
-        >,
-        versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
         scheduler: &'a Scheduler,
     ) -> SchedulerTask<'a> {
         use MVHashMapError::*;
@@ -189,14 +179,10 @@ where
         &self,
         executor_arguments: &E::Argument,
         block: &[T],
-        last_input_output: &TxnLastInputOutput<
-            <T as Transaction>::Key,
-            <E as ExecutorTask>::Output,
-            <E as ExecutorTask>::Error,
-        >,
-        versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
         scheduler: &Scheduler,
-        base_view: &dyn StateView<<T as Transaction>::Key>,
+        base_view: &S,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let executor = E::init(*executor_arguments);
@@ -242,14 +228,8 @@ where
         &self,
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
-        base_view: &dyn StateView<<T as Transaction>::Key>,
-    ) -> Result<
-        (
-            Vec<E::Output>,
-            OutputDeltaResolver<<T as Transaction>::Key, <T as Transaction>::Value>,
-        ),
-        E::Error,
-    > {
+        base_view: &S,
+    ) -> Result<(Vec<E::Output>, OutputDeltaResolver<T::Key, T::Value>), E::Error> {
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_data_cache = MVHashMap::new();
@@ -324,7 +304,7 @@ where
         &self,
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
-        base_view: &dyn StateView<<T as Transaction>::Key>,
+        base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
@@ -332,10 +312,7 @@ where
 
         let mut ret = Vec::with_capacity(num_txns);
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let versioned_view =
-                LatestView::<T, dyn StateView<<T as Transaction>::Key>>::new_btree_view(
-                    base_view, &data_map, idx,
-                );
+            let versioned_view = LatestView::<T, S>::new_btree_view(base_view, &data_map, idx);
 
             let res = executor.execute_transaction(&versioned_view, txn, idx, true);
 

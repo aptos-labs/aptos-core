@@ -7,13 +7,17 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},
 };
-use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
+use aptos_state_view::{
+    account_with_state_view::{AccountWithStateView, AsAccountWithStateView},
+    StateView,
+};
 use aptos_types::{
     account_config::aptos_test_root_address,
     account_view::AccountView,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     event::EventKey,
+    state_store::state_key::StateKey,
     test_helpers::transaction_test_helpers::block,
     transaction::{
         Transaction, Transaction::UserTransaction, TransactionListWithProof, TransactionWithProof,
@@ -516,7 +520,9 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
     (db, dbrw, executor, waypoint)
 }
 
-pub fn get_account_balance(account_state_view: &AccountWithStateView) -> u64 {
+pub fn get_account_balance<S: StateView<StateKey>>(
+    account_state_view: &AccountWithStateView<S>,
+) -> u64 {
     account_state_view
         .get_coin_store_resource()
         .unwrap()

@@ -57,7 +57,7 @@ impl<'a, S: 'a + StateView<StateKey>> ExecutorTask for AptosExecutorTask<'a, S> 
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        view: &dyn StateView<StateKey>,
+        view: &impl StateView<StateKey>,
         txn: &PreprocessedTransaction,
         txn_idx: usize,
         materialize_deltas: bool,

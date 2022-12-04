@@ -71,7 +71,7 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &dyn StateView<<Self::Txn as Transaction>::Key>,
+        view: &impl StateView<<Self::Txn as Transaction>::Key>,
         txn: &Self::Txn,
         txn_idx: usize,
         materialize_deltas: bool,

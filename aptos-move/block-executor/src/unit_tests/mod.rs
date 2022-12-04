@@ -26,9 +26,10 @@ where
         phantom: PhantomData,
     };
 
-    let output = BlockExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view)
-        .map(|(res, _)| res);
+    let output =
+        BlockExecutor::<Transaction<K, V>, Task<K, V>, DeltaDataView<K, V>>::new(num_cpus::get())
+            .execute_transactions_parallel((), &transactions, &data_view)
+            .map(|(res, _)| res);
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None);
 

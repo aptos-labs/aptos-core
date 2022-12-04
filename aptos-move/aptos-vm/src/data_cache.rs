@@ -6,10 +6,11 @@ use crate::create_access_path;
 #[allow(unused_imports)]
 use anyhow::format_err;
 use anyhow::Error;
-use aptos_state_view::{StateView, StateViewId};
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_state_view::StateView;
 use aptos_types::{
-    access_path::AccessPath, on_chain_config::ConfigStorage, state_store::state_key::StateKey,
+    access_path::AccessPath,
+    on_chain_config::ConfigStorage,
+    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
     vm_status::StatusCode,
 };
 use framework::natives::state_storage::StateStorageUsageResolver;
@@ -23,9 +24,9 @@ use move_table_extension::{TableHandle, TableResolver};
 use std::ops::{Deref, DerefMut};
 
 // Adapter to convert a `StateView` into a `RemoteCache`.
-pub struct StorageAdapter<'a, S: ?Sized>(&'a S);
+pub struct StorageAdapter<'a, S>(&'a S);
 
-impl<'a, S: StateView<StateKey> + ?Sized> StorageAdapter<'a, S> {
+impl<'a, S: StateView<StateKey>> StorageAdapter<'a, S> {
     pub fn new(state_store: &'a S) -> Self {
         Self(state_store)
     }
@@ -37,7 +38,7 @@ impl<'a, S: StateView<StateKey> + ?Sized> StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView<StateKey> + ?Sized> ModuleResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView<StateKey>> ModuleResolver for StorageAdapter<'a, S> {
     type Error = VMError;
 
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
@@ -47,7 +48,7 @@ impl<'a, S: StateView<StateKey> + ?Sized> ModuleResolver for StorageAdapter<'a, 
     }
 }
 
-impl<'a, S: StateView<StateKey> + ?Sized> ResourceResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView<StateKey>> ResourceResolver for StorageAdapter<'a, S> {
     type Error = VMError;
 
     fn get_resource(
@@ -60,7 +61,7 @@ impl<'a, S: StateView<StateKey> + ?Sized> ResourceResolver for StorageAdapter<'a
     }
 }
 
-impl<'a, S: StateView<StateKey> + ?Sized> TableResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView<StateKey>> TableResolver for StorageAdapter<'a, S> {
     fn resolve_table_entry(
         &self,
         handle: &TableHandle,
@@ -70,51 +71,31 @@ impl<'a, S: StateView<StateKey> + ?Sized> TableResolver for StorageAdapter<'a, S
     }
 }
 
-impl<'a, S: StateView<StateKey> + ?Sized> ConfigStorage for StorageAdapter<'a, S> {
+impl<'a, S: StateView<StateKey>> ConfigStorage for StorageAdapter<'a, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         self.get(&access_path).ok()?
     }
 }
 
-impl<'a, S: StateView<StateKey> + ?Sized> StateStorageUsageResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView<StateKey>> StateStorageUsageResolver for StorageAdapter<'a, S> {
     fn get_state_storage_usage(&self) -> Result<StateStorageUsage, Error> {
         self.get_usage()
     }
 }
 
-// Unlike Deref to S, this removes the Sized restriction.
-impl<'a, S: StateView<StateKey> + ?Sized> StateView<StateKey> for StorageAdapter<'a, S> {
-    fn id(&self) -> StateViewId {
-        self.0.id()
-    }
+impl<'a, S> Deref for StorageAdapter<'a, S> {
+    type Target = S;
 
-    // Get some data either through the cache or the `StateView` on a cache miss.
-    fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
-        self.0.get_state_value(state_key)
-    }
-
-    fn is_genesis(&self) -> bool {
-        self.0.is_genesis()
-    }
-
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        self.0.get_usage()
+    fn deref(&self) -> &Self::Target {
+        self.0
     }
 }
 
-// impl<'a, S: ?Sized> Deref for StorageAdapter<'a, S> {
-//     type Target = S;
-
-//     fn deref(&self) -> &Self::Target {
-//         self.0
-//     }
-// }
-
-pub trait AsMoveResolver<S: ?Sized> {
+pub trait AsMoveResolver<S> {
     fn as_move_resolver(&self) -> StorageAdapter<S>;
 }
 
-impl<S: StateView<StateKey> + ?Sized> AsMoveResolver<S> for S {
+impl<S: StateView<StateKey>> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
         StorageAdapter::new(self)
     }

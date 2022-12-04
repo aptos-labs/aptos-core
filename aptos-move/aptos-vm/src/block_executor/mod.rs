@@ -144,8 +144,9 @@ impl BlockAptosVM {
                     .collect()
             });
 
-        let executor =
-            BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>>::new(concurrency_level);
+        let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
+            concurrency_level,
+        );
 
         let mut ret = if concurrency_level > 1 {
             executor

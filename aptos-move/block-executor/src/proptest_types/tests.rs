@@ -54,6 +54,7 @@ fn run_transactions<K, V>(
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
+            EmptyDataView<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
         .execute_transactions_parallel((), &transactions, &data_view)
         .map(|(res, _)| res);
@@ -178,6 +179,7 @@ fn deltas_writes_mixed() {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
         .execute_transactions_parallel((), &transactions, &data_view)
         .map(|(res, _)| res);
@@ -218,6 +220,7 @@ fn deltas_resolver() {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
         .execute_transactions_parallel((), &transactions, &data_view);
 
@@ -364,6 +367,7 @@ fn publishing_fixed_params() {
     let output = BlockExecutor::<
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+        DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
     >::new(num_cpus::get())
     .execute_transactions_parallel((), &transactions, &data_view);
     assert_ok!(output);
@@ -399,6 +403,7 @@ fn publishing_fixed_params() {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
         .execute_transactions_parallel((), &transactions, &data_view)
         .map(|(res, _)| res);

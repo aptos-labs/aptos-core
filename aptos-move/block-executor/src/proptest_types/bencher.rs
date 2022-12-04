@@ -116,6 +116,7 @@ where
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
+            EmptyDataView<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
         .execute_transactions_parallel((), &self.transactions, &data_view)
         .map(|(res, _)| res);

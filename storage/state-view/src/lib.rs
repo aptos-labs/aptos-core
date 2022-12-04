@@ -8,9 +8,10 @@
 use crate::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
-    account_address::AccountAddress, state_store::state_key::StateKey, transaction::Version,
+    account_address::AccountAddress,
+    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
+    transaction::Version,
 };
 use std::ops::Deref;
 
@@ -71,11 +72,11 @@ where
     }
 }
 
-impl<'a, S: 'a + StateView<StateKey>> AsAccountWithStateView<'a> for S {
+impl<'a, S: 'a + StateView<StateKey>> AsAccountWithStateView<'a, S> for S {
     fn as_account_with_state_view(
         &'a self,
         account_address: &'a AccountAddress,
-    ) -> AccountWithStateView {
+    ) -> AccountWithStateView<'a, S> {
         AccountWithStateView::new(account_address, self)
     }
 }
