@@ -5,8 +5,6 @@ slug: "gas-txn-fee"
 
 # Gas and Transaction Fees
 
-## Concept
-
 To conduct any transaction with the Aptos blockchain on the mainnet, you are required to pay a processing fee. This fee is derived from transactions with a client application, stake owner, node operator, or voter. The processing fee you are required to pay is based on the computing and storage resources you use on the blockchain to:
 
 1. Process your transactions on the blockchain.
@@ -17,32 +15,26 @@ To conduct any transaction with the Aptos blockchain on the mainnet, you are req
 Conceptually, this fee can be thought of as quite similar to how we pay for our home electric or water utilities.
 :::
  
-### Prioritizing your transaction
+## Unit of gas
 
-You can even bump up your transaction to a higher priority level on the blockchain by paying a larger processing fee. In your transaction, you can commit to paying a gas price that is higher than the market gas price. This is one way you can move your transaction higher in the priority list and have it processed more quickly. 
-
-### Unit of gas
-
-You can make a simple and inexpensive transaction or a complicated transaction that requires the blockchain to perform much computation and distributed storage. In either case, you will be required to spend a processing fee sufficient to complete the transaction. This is where the notion of **gas** becomes clear. Here is how it works:
-
-In the Aptos blockchain a **unit of gas** represents a basic unit of resource consumption. A single unit of gas is a combined representation of:
+Transactions can range from simple and inexpensive to complicated based upon the amount of computation and fetches from and writes to storage. In the Aptos blockchain, a **unit of gas** represents a basic unit of resource consumption for both
 
 - Computation resource, and
 - Storage resource.
 
-When your transaction is executed on the blockchain, instead of separately presenting you an account of each unit of the specific resource consumed, the blockchain simply presents an account of the number of units of gas being consumed by the transaction. 
-
 See [How Base Gas Works](./base-gas.md) for a detailed description of gas fee types and available optimizations.
 
-### Gas price
+## Gas price and prioritizing transactions
 
 In the Aptos network, the Aptos governance sets the minimum gas unit price. However, the market determines the actual minimum gas unit price. See [Ethereum Gas Tracker](https://etherscan.io/gastracker), for example, which shows the market price movements of Ethereum gas price.
+
+By specifying a higher gas unit price than the current market price, you can **increase** the priority level for your transaction on the blockchain by paying. While in most cases, this is unnecessary, if the network is under load, this can ensure that your transaction can be processed more quickly.
 
 :::tip Unit of gas
 👉 A **unit of gas** is a dimensionless number, expressed as an integer. The total gas units consumed by your transaction depends on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](/concepts/txns-states) for how a transaction submitted to the Aptos blockchain looks like.
 :::
 
-## Gas and transaction fee on the Aptos blockchain
+## Specifying gas fees within a transaction
 
 When a transaction is submitted to the Aptos blockchain, the transaction must contain the following mandatory gas fields:
 
@@ -90,11 +82,9 @@ If, let's say, you transfer all the money out of your account so that you have n
 
 In a transaction, for example, transaction A, you are transferring 1000 coins from one account to another account. In a second transaction B, with the same gas field values of transaction A, you now transfer 100,000 coins from one account to another one account. Assuming that both the transactions A and B are sent roughly at the same time, then the gas costs for transactions A and B would be near-identical.
 
-## Estimating the gas units
+## Estimating the gas units via simulation
 
-The gas used for a transaction can be estimated by simulating the transaction. When simulating the transaction, the simulation results represent the **exact** amount that is needed at the **exact** state of the blockchain at the time of simulation. These gas units used may change based on the state of the chain.  For this reason, any amount coming out of the simulation is only an estimate, and when setting the max gas amount, it should be increased above by an amount you’re comfortable with.
-
-## Simulating the transaction to estimate the gas
+The gas used for a transaction can be estimated by simulating the transaction. When simulating the transaction, the simulation results represent the **exact** amount that is needed at the **exact** state of the blockchain at the time of simulation. These gas units used may change based on the state of the chain.  For this reason, any amount coming out of the simulation is only an estimate, and when setting the max gas amount, it should include an appropriate amount of headroom based upon your comfort-level and historical behaviors. Setting the max gas amount too low will result in the transaction aborting and the account being charged for whatever gas was consumed.
 
 Transactions can be simulated with the [`SimulateTransaction`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction) API. This API will run the exact transaction that you plan to run.  
 
@@ -119,3 +109,7 @@ The simulation steps for finding the correct amount of gas for a transaction are
     1. `gas_unit_price` from the returned simulated transaction.
     2. `max_gas_amount` as the minimum of the `gas_used` * `a safety factor` or the `max_gas_amount` from the transaction.
 6. If you feel the need to prioritize or deprioritize your transaction, adjust the `gas_unit_price` of the transaction. Increase the value for higher priority, and decrease the value for lower priority.
+
+::: tip
+Prioritization is based upon buckets of `gas_unit_price`. The buckets are defined [here](https://github.com/aptos-labs/aptos-core/blob/30b385bf38d3dc8c4e8ee0ff045bc5d0d2f67a85/config/src/config/mempool_config.rs#L8). The current buckets are `[0, 150, 300, 500, 1000, 3000, 5000, 10000, 100000, 1000000]`. Therefore a `gas_unit_price` of 150 and 299 would be priortized nearly the same.
+:::
