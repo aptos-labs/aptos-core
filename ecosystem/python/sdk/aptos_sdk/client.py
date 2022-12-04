@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 
 import httpx
 
+from . import ed25519
 from .account import Account
 from .account_address import AccountAddress
 from .authenticator import (Authenticator, Ed25519Authenticator,
@@ -97,6 +98,31 @@ class RestClient:
     #
     # Transactions
     #
+
+    def simulate_transaction(
+        self,
+        transaction: RawTransaction,
+        sender: Account,
+    ) -> Dict[str, Any]:
+        # Note that simulated transactions are not signed and have all 0 signatures!
+        authenticator = Authenticator(
+            Ed25519Authenticator(
+                sender.public_key(),
+                ed25519.Signature(b"\x00" * 64),
+            )
+        )
+        signed_transaction = SignedTransaction(transaction, authenticator)
+
+        headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
+        response = self.client.post(
+            f"{self.base_url}/transactions/simulate",
+            headers=headers,
+            content=signed_transaction.bytes(),
+        )
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+
+        return response.json()
 
     def submit_bcs_transaction(self, signed_transaction: SignedTransaction) -> str:
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
@@ -216,8 +242,8 @@ class RestClient:
 
     def create_bcs_transaction(
         self, sender: Account, payload: TransactionPayload
-    ) -> SignedTransaction:
-        raw_transaction = RawTransaction(
+    ) -> RawTransaction:
+        return RawTransaction(
             sender.address(),
             self.account_sequence_number(sender.address()),
             payload,
@@ -227,6 +253,10 @@ class RestClient:
             self.chain_id,
         )
 
+    def create_bcs_signed_transaction(
+        self, sender: Account, payload: TransactionPayload
+    ) -> SignedTransaction:
+        raw_transaction = self.create_bcs_transaction(sender, payload)
         signature = sender.sign(raw_transaction.keyed())
         authenticator = Authenticator(
             Ed25519Authenticator(sender.public_key(), signature)
@@ -268,7 +298,7 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -302,7 +332,7 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -346,7 +376,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -376,7 +406,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -404,7 +434,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -548,7 +578,7 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
