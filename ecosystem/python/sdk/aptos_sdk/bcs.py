@@ -72,7 +72,7 @@ class Deserializer:
         return self.to_bytes().decode()
 
     def struct(self, struct: typing.Any) -> typing.Any:
-        return struct.deserialize
+        return struct.deserialize(self)
 
     def u8(self) -> int:
         return self._read_int(1)

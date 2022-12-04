@@ -62,7 +62,7 @@ class Authenticator:
         elif variant == Authenticator.MULTI_AGENT:
             authenticator = MultiAgentAuthenticator.deserialize(deserializer)
         else:
-            raise Exception("Invalid type")
+            raise Exception(f"Invalid type: {variant}")
 
         return Authenticator(authenticator)
 

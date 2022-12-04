@@ -355,7 +355,7 @@ class EntryFunction:
 
     @staticmethod
     def deserialize(deserializer: Deserializer) -> EntryFunction:
-        module = ModuleId.deserialize
+        module = ModuleId.deserialize(deserializer)
         function = deserializer.str()
         ty_args = deserializer.sequence(TypeTag.deserialize)
         args = deserializer.sequence(Deserializer.to_bytes)
@@ -671,9 +671,9 @@ class Test(unittest.TestCase):
 
     def verify_transactions(
         self,
-        raw_transaction_input: bytes,
+        raw_transaction_input: str,
         raw_transaction_generated: RawTransaction,
-        signed_transaction_input: bytes,
+        signed_transaction_input: str,
         signed_transaction_generated: SignedTransaction,
     ):
         # Produce serialized generated transactions
@@ -688,14 +688,14 @@ class Test(unittest.TestCase):
         # Verify the RawTransaction
         self.assertEqual(raw_transaction_input, raw_transaction_generated_bytes)
         raw_transaction = RawTransaction.deserialize(
-            Deserializer(bytes.fromhex(str(raw_transaction_input)))
+            Deserializer(bytes.fromhex(raw_transaction_input))
         )
         self.assertEqual(raw_transaction_generated, raw_transaction)
 
         # Verify the SignedTransaction
         self.assertEqual(signed_transaction_input, signed_transaction_generated_bytes)
         signed_transaction = SignedTransaction.deserialize(
-            Deserializer(bytes.fromhex(str(signed_transaction_input)))
+            Deserializer(bytes.fromhex(signed_transaction_input))
         )
 
         self.assertEqual(signed_transaction.transaction, raw_transaction)
