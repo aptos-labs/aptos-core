@@ -77,7 +77,6 @@ members = [
     "crates/transaction-emitter-lib",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
-    "ecosystem/sf-indexer/firehose-stream",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
@@ -183,7 +182,6 @@ aptos-crypto-derive = { path = "crates/aptos-crypto-derive" }
 aptos-data-client = { path = "state-sync/aptos-data-client" }
 aptosdb-indexer = { path = "storage/indexer" }
 aptos-debugger = { path = "aptos-move/aptos-debugger" }
-aptos-fh-stream = { path = "ecosystem/sf-indexer/firehose-stream" }
 aptos-faucet = { path = "crates/aptos-faucet" }
 aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
 aptos-gas = { path = "aptos-move/aptos-gas" }
