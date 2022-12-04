@@ -12,7 +12,7 @@ The Aptos on-chain governance is a process by which the Aptos community members 
 - Changes to the blockchain parameters, for example, the epoch duration, and the minimum required and maximum allowed validator stake.
 - Changes to the core blockchain code. 
 - Upgrades to the Aptos Framework modules for fixing bugs or for adding or enhancing the Aptos blockchain functionality.
-- Deploying new framework modules (at the address 0x1).
+- Deploying new framework modules (at the address `0x1` - `0xa`).
 
 ## How a proposal becomes ready to be resolved
 
@@ -26,12 +26,10 @@ sources={{
   }}
 />
 
-- The  Aptos community can suggest an Aptos Improvement Proposal (AIP) in community forums,  channels and discuss them off-chain.
-- When an off-chain AIP acquires sufficient importance, then an on-chain proposal can be created for the AIP via the `AptosGovernance` module. 
-- Voters can then vote on this proposal on-chain via the `AptosGovernance` module. When the voting period is over, the proposal can be resolved.
-- The proposal contains an early expiration threshold that is set to 50% of the total supply of Aptos Coins. This allows for emergency bug fixes **without waiting for the full voting period**, assuming that the votes of the 50% of the total supply are cast quickly. 
-  - If the number of YES votes exceed this threshold, the proposal is ready to be resolved.
-  - If the number of NO votes exceed this threshold, the proposal is considered failed. 
+- The  Aptos community can suggest an Aptos Improvement Proposal (AIP) in [GitHub](https://github.com/aptos-foundation/aip).
+- When appropriate, an on-chain proposal can be created for the AIP via the `AptosGovernance` module. 
+- Voters can then vote on this proposal on-chain via the `AptosGovernance` module. If there is sufficient support for a proposal, then it can be resolved.
+- Governance requires a minimal number of votes to be cast by an expiration threshold. However, if sufficient votes, more than 50% of th total supply, are accumulated prior to that threshold, the proposal can be executed **without waiting for the full voting period**.
 
 ## Who can propose
 
@@ -42,13 +40,8 @@ sources={{
 ## Who can vote
 
 - To vote, you must stake, though you are not required to run a validator node. Your voting power is derived from the backing stake pool. 
-  
-  :::tip
-  
-  Each stake pool can only be used to vote on each proposal exactly once.
-  :::
-
 - Voting power is calculated based on the current epoch's active stake of the proposer or voter's backing stake pool. In addition, the stake pool's lockup must be at least as long as the proposal's duration.
 
-
-
+:::tip
+Each stake pool can only be used to vote on each proposal exactly once.
+:::
