@@ -4,7 +4,7 @@
 use crate::proof_of_store::ProofOfStore;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
-use aptos_types::validator_verifier::ValidatorVerifier;
+use aptos_types::validator_verifier::{ValidatorVerifier, VerifyError};
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use executor_types::Error;
 use rayon::prelude::*;
@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::fmt::Write;
 use std::sync::Arc;
+use anyhow::{anyhow, Context};
 use tokio::sync::oneshot;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
@@ -125,15 +126,16 @@ impl Payload {
         }
     }
 
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        match self {
-            Payload::DirectMempool(_) => Ok(()),
-            Payload::InQuorumStore(proof_with_status) => {
+    pub fn verify(&self, validator: &ValidatorVerifier, quorum_store_enabled: bool) -> anyhow::Result<()> {
+        match (quorum_store_enabled, self) {
+            (false, Payload::DirectMempool(_)) => Ok(()),
+            (true, Payload::InQuorumStore(proof_with_status)) => {
                 for proof in proof_with_status.proofs.iter() {
                     proof.verify(validator)?;
                 }
                 Ok(())
             }
+            (_, _) => Err(VerifyError::WrongPayload).context("Failed to verify Payload"),
         }
     }
 }

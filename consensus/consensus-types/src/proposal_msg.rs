@@ -79,7 +79,10 @@ impl ProposalMsg {
         Ok(())
     }
 
-    pub fn verify(&self, validator: &ValidatorVerifier) -> Result<()> {
+    pub fn verify(&self, validator: &ValidatorVerifier, quorum_store_enabled: bool) -> Result<()> {
+        if self.proposal().payload().is_some() {
+            self.proposal().payload().unwrap().verify(validator, quorum_store_enabled)?;
+        }
         self.proposal
             .validate_signature(validator)
             .map_err(|e| format_err!("{:?}", e))?;

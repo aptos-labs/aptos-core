@@ -103,6 +103,7 @@ pub struct EpochManager {
     self_sender: channel::Sender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkSender,
     timeout_sender: channel::Sender<Round>,
+    quorum_store_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
@@ -146,6 +147,7 @@ impl EpochManager {
             self_sender,
             network_sender,
             timeout_sender,
+            quorum_store_enabled: false, // TODO: read form on chain config
             quorum_store_to_mempool_sender,
             commit_state_computer,
             storage,
@@ -721,7 +723,7 @@ impl EpochManager {
                     initial_data,
                     epoch_state,
                     onchain_config.unwrap_or_default(),
-                    false //TODO: read from on-chain config.
+                    self.quorum_store_enabled
                 )
                 .await
             }
@@ -755,7 +757,7 @@ impl EpochManager {
                 "verify_message",
                 unverified_event
                     .clone()
-                    .verify(&self.epoch_state().verifier)
+                    .verify(&self.epoch_state().verifier, self.quorum_store_enabled)
             )
             .context("[EpochManager] Verify event")
             .map_err(|err| {
