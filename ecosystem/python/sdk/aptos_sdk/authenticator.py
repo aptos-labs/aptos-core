@@ -56,7 +56,7 @@ class Authenticator:
         variant = deserializer.uleb128()
 
         if variant == Authenticator.ED25519:
-            authenticator = Ed25519Authenticator.deserialize(deserializer)
+            authenticator: typing.Any = Ed25519Authenticator.deserialize(deserializer)
         elif variant == Authenticator.MULTI_ED25519:
             authenticator = MultiEd25519Authenticator.deserialize(deserializer)
         elif variant == Authenticator.MULTI_AGENT:
@@ -104,12 +104,12 @@ class Ed25519Authenticator:
 
 class MultiAgentAuthenticator:
     sender: Authenticator
-    secondary_signers: List[(AccountAddress, Authenticator)]
+    secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]]
 
     def __init__(
         self,
         sender: Authenticator,
-        secondary_signers: List[(AccountAddress, Authenticator)],
+        secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]],
     ):
         self.sender = sender
         self.secondary_signers = secondary_signers
