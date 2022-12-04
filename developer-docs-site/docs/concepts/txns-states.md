@@ -39,7 +39,7 @@ A transaction that is successfully submitted but ultimately discarded may have n
 The submitter can try to increase the gas cost by a trivial amount to help make progress and adjust for whatever may have been causing the discarding of the transaction further downstream.
 
 :::tip Read more
-See [Life of a Transaction](../guides/basics-life-of-txn) for a comprehensive description of the Aptos transaction lifecycle.
+See [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn) for a comprehensive description of the Aptos transaction lifecycle.
 :::
 
 ### Contents of a Transaction

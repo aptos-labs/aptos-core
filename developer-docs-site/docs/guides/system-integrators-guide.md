@@ -123,7 +123,7 @@ The submitter can try to increase the gas cost by a trivial amount to help make 
 On the Aptos devnet, the time between submission and confirmation is within seconds.
 
 :::tip Read more
-See [Life of a Transaction](/guides/basics-life-of-txn) for a comprehensive description of the Aptos transaction lifecycle.
+See [Aptos Blockchain Deep Dive](/guides/basics-life-of-txn) for a comprehensive description of the Aptos transaction lifecycle.
 :::
 
 ### Constructing a transaction
