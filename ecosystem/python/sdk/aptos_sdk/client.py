@@ -48,9 +48,11 @@ class RestClient:
 
     def account_balance(self, account_address: AccountAddress) -> int:
         """Returns the test coin balance associated with the account"""
-        return self.account_resource(
+        resource = self.account_resource(
             account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
-        )["data"]["coin"]["value"]
+        )
+        assert resource is not None, "No account balance"
+        return resource["data"]["coin"]["value"]
 
     def account_sequence_number(self, account_address: AccountAddress) -> int:
         account_res = self.account(account_address)
@@ -250,7 +252,7 @@ class RestClient:
         }
         return self.submit_transaction(sender, payload)
 
-    #:!:>bcs_transfer
+    # :!:>bcs_transfer
     def bcs_transfer(
         self, sender: Account, recipient: AccountAddress, amount: int
     ) -> str:
@@ -277,7 +279,7 @@ class RestClient:
     # Token transaction wrappers
     #
 
-    #:!:>create_collection
+    # :!:>create_collection
     def create_collection(
         self, account: Account, name: str, description: str, uri: str
     ) -> str:  # <:!:create_collection
@@ -305,7 +307,7 @@ class RestClient:
         )
         return self.submit_bcs_transaction(signed_transaction)
 
-    #:!:>create_token
+    # :!:>create_token
     def create_token(
         self,
         account: Account,
@@ -451,9 +453,9 @@ class RestClient:
         token_name: str,
         property_version: int,
     ) -> Any:
-        token_store_handle = self.account_resource(owner, "0x3::token::TokenStore")[
-            "data"
-        ]["tokens"]["handle"]
+        resource = self.account_resource(owner, "0x3::token::TokenStore")
+        assert resource is not None, "Invalid TokenStore"
+        token_store_handle = resource["data"]["tokens"]["handle"]
 
         token_id = {
             "token_data_id": {
@@ -491,7 +493,7 @@ class RestClient:
             owner, creator, collection_name, token_name, property_version
         )["amount"]
 
-    #:!:>read_token_data_table
+    # :!:>read_token_data_table
     def get_token_data(
         self,
         creator: AccountAddress,
@@ -499,9 +501,9 @@ class RestClient:
         token_name: str,
         property_version: int,
     ) -> Any:
-        token_data_handle = self.account_resource(creator, "0x3::token::Collections")[
-            "data"
-        ]["token_data"]["handle"]
+        resource = self.account_resource(creator, "0x3::token::Collections")
+        assert resource is not None, "Invalid Collections"
+        token_data_handle = resource["data"]["token_data"]["handle"]
 
         token_data_id = {
             "creator": creator.hex(),
@@ -517,9 +519,9 @@ class RestClient:
         )  # <:!:read_token_data_table
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
-        token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
-            "collection_data"
-        ]["handle"]
+        resource = self.account_resource(creator, "0x3::token::Collections")
+        assert resource is not None, "Invalid Collections"
+        token_data = resource["data"]["collection_data"]["handle"]
 
         return self.get_table_item(
             token_data,

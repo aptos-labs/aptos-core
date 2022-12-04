@@ -187,7 +187,7 @@ class TransactionPayload:
         variant = deserializer.uleb128()
 
         if variant == TransactionPayload.SCRIPT:
-            payload = Script.deserialize(deserializer)
+            payload: typing.Any = Script.deserialize(deserializer)
         elif variant == TransactionPayload.MODULE_BUNDLE:
             payload = ModuleBundle.deserialize(deserializer)
         elif variant == TransactionPayload.SCRIPT_FUNCTION:
@@ -224,6 +224,7 @@ class Script:
         self.ty_args = ty_args
         self.args = args
 
+    @staticmethod
     def deserialize(deserializer: Deserializer) -> Script:
         code = deserializer.to_bytes()
         ty_args = deserializer.sequence(TypeTag.deserialize)
@@ -270,7 +271,7 @@ class ScriptArgument:
     def deserialize(deserializer: Deserializer) -> ScriptArgument:
         variant = deserializer.u8()
         if variant == ScriptArgument.U8:
-            value = deserializer.u8()
+            value: typing.Any = deserializer.u8()
         elif variant == ScriptArgument.U64:
             value = deserializer.u64()
         elif variant == ScriptArgument.U128:

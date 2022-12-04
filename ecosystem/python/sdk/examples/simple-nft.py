@@ -9,11 +9,11 @@ from aptos_sdk.client import FaucetClient, RestClient
 from .common import FAUCET_URL, NODE_URL
 
 if __name__ == "__main__":
-    #:!:>section_1
+    # :!:>section_1
     rest_client = RestClient(NODE_URL)
     faucet_client = FaucetClient(FAUCET_URL, rest_client)  # <:!:section_1
 
-    #:!:>section_2
+    # :!:>section_2
     alice = Account.generate()
     bob = Account.generate()  # <:!:section_2
 
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
 
-    #:!:>section_3
+    # :!:>section_3
     faucet_client.fund_account(alice.address(), 100_000_000)
     faucet_client.fund_account(bob.address(), 100_000_000)  # <:!:section_3
 
@@ -35,13 +35,13 @@ if __name__ == "__main__":
 
     print("\n=== Creating Collection and Token ===")
 
-    #:!:>section_4
+    # :!:>section_4
     txn_hash = rest_client.create_collection(
         alice, collection_name, "Alice's simple collection", "https://aptos.dev"
     )  # <:!:section_4
     rest_client.wait_for_transaction(txn_hash)
 
-    #:!:>section_5
+    # :!:>section_5
     txn_hash = rest_client.create_token(
         alice,
         collection_name,
@@ -53,17 +53,17 @@ if __name__ == "__main__":
     )  # <:!:section_5
     rest_client.wait_for_transaction(txn_hash)
 
-    #:!:>section_6
+    # :!:>section_6
     collection_data = rest_client.get_collection(alice.address(), collection_name)
     print(
         f"Alice's collection: {json.dumps(collection_data, indent=4, sort_keys=True)}"
     )  # <:!:section_6
-    #:!:>section_7
+    # :!:>section_7
     balance = rest_client.get_token_balance(
         alice.address(), alice.address(), collection_name, token_name, property_version
     )
     print(f"Alice's token balance: {balance}")  # <:!:section_7
-    #:!:>section_8
+    # :!:>section_8
     token_data = rest_client.get_token_data(
         alice.address(), collection_name, token_name, property_version
     )
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     )  # <:!:section_8
 
     print("\n=== Transferring the token to Bob ===")
-    #:!:>section_9
+    # :!:>section_9
     txn_hash = rest_client.offer_token(
         alice,
         bob.address(),
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     )  # <:!:section_9
     rest_client.wait_for_transaction(txn_hash)
 
-    #:!:>section_10
+    # :!:>section_10
     txn_hash = rest_client.claim_token(
         bob,
         alice.address(),
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     print(f"Bob's token balance: {balance}")
 
     print("\n=== Transferring the token back to Alice using MultiAgent ===")
-    #:!:>section_11
+    # :!:>section_11
     txn_hash = rest_client.direct_transfer_token(
         bob, alice, alice.address(), collection_name, token_name, 0, 1
     )  # <:!:section_11
