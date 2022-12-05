@@ -19,6 +19,7 @@
 -  [Function `verify_type_of_generic`](#0x1_type_info_verify_type_of_generic)
 -  [Specification](#@Specification_1)
     -  [Function `chain_id_internal`](#@Specification_1_chain_id_internal)
+    -  [Function `verify_type_of_generic`](#@Specification_1_verify_type_of_generic)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -364,6 +365,42 @@ analysis of vector size dynamism.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>();
+</code></pre>
+
+
+
+<a name="@Specification_1_verify_type_of_generic"></a>
+
+### Function `verify_type_of_generic`
+
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;()
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<a href="type_info.md#0x1_type_info_spec_is_struct">spec_is_struct</a>&lt;T&gt;();
+</code></pre>
+
+
+
+
+<a name="0x1_type_info_spec_is_struct"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_spec_is_struct">spec_is_struct</a>&lt;T&gt;(): bool;
+</code></pre>
+
+
+
+
+<a name="0x1_type_info_spec_chain_id_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>(): u8;
 </code></pre>
 
 

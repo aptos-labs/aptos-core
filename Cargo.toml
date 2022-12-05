@@ -61,7 +61,6 @@ members = [
     "crates/aptos-telemetry",
     "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
-    "crates/aptos-datastream-worker",
     "crates/aptos-time-service",
     "crates/aptos-warp-webserver",
     "crates/bounded-executor",
@@ -78,7 +77,6 @@ members = [
     "crates/transaction-emitter-lib",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
-    "ecosystem/sf-indexer/firehose-stream",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
@@ -184,7 +182,6 @@ aptos-crypto-derive = { path = "crates/aptos-crypto-derive" }
 aptos-data-client = { path = "state-sync/aptos-data-client" }
 aptosdb-indexer = { path = "storage/indexer" }
 aptos-debugger = { path = "aptos-move/aptos-debugger" }
-aptos-fh-stream = { path = "ecosystem/sf-indexer/firehose-stream" }
 aptos-faucet = { path = "crates/aptos-faucet" }
 aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
 aptos-gas = { path = "aptos-move/aptos-gas" }
@@ -229,7 +226,6 @@ aptos-types = { path = "types" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
-aptos-datastream-worker = { path = "crates/aptos-datastream-worker" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
 aptosdb = { path = "storage/aptosdb" }
@@ -318,13 +314,13 @@ curve25519-dalek = "3"
 dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
-deadpool-redis = "0.11.0"
 diesel = { version = "2.0.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
 diesel_migrations = { version = "2.0.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
 dirs = "4.0.0"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
+ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
 enum_dispatch = "0.3.8"
 env_logger = "0.9.0"
@@ -396,7 +392,6 @@ quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
 rayon = "1.5.2"
-redis = "0.22.1"
 regex = "1.5.5"
 reqwest = { version = "0.11.11", features = ["blocking", "cookies", "json", "stream"] }
 reqwest-middleware = "0.1.6"
@@ -432,6 +427,7 @@ tempfile = "3.3.0"
 termcolor = "1.1.2"
 textwrap = "0.15.0"
 thiserror = "1.0.31"
+tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.34"
 tracing-subscriber = "0.3.11"
@@ -442,7 +438,7 @@ tokio-stream = "0.1.8"
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.5.9"
-tonic = { version = "0.8.0", features = ["tls-roots", "transport", "prost", "gzip", "codegen"] }
+tonic = { version = "0.8.3", features = ["tls-roots", "transport", "prost", "gzip", "codegen"] }
 ureq = { version = "1.5.4", features = ["json", "native-tls"], default_features = false }
 url = { version = "2.2.2", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }

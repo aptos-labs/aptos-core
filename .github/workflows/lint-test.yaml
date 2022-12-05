@@ -54,6 +54,15 @@ jobs:
       - run: cd ./ecosystem/typescript/sdk && pnpm lint
       - run: cd ./ecosystem/typescript/sdk && pnpm fmt:check
 
+  ecosystem-python-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: snok/install-poetry@v1
+        with:
+          version: 1.2.2
+      - run: cd ./ecosystem/python/sdk && poetry install && make fmt && git status --porcelain
+
   docs-lint:
     runs-on: ubuntu-latest
     steps:

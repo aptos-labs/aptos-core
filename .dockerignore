@@ -20,8 +20,6 @@
 !crates/aptos/src/move_tool/*.bpl
 !api/doc/
 !crates/indexer/migrations/**/*.sql
-!ecosystem/sf-indexer/aptos-sf-indexer/migrations/**/*.sql
-!ecosystem/sf-indexer/aptos-substreams/*.spkg
 !terraform/helm/aptos-node/
 !terraform/helm/genesis/
 !testsuite/forge/src/backend/k8s/

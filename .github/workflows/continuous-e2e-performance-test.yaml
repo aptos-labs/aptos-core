@@ -11,7 +11,7 @@ on:
 
 jobs:
   ### Please remember to use different namespace for different tests
-  # Performance test in an optimal setting
+  # Performance test in an optimal setting with the performance profile
   run-forge-performance:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
@@ -21,4 +21,6 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 7200
       # Land blocking is performance test
       FORGE_TEST_SUITE: land_blocking
+      # Enable performance profile
+      FORGE_ENABLE_PERFORMANCE: true
       POST_TO_SLACK: true

@@ -3,16 +3,16 @@
 
 // @generated
 /// Generated client implementations.
-pub mod node_data_service_client {
+pub mod indexer_stream_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::http::Uri;
     use tonic::codegen::*;
     ///
     #[derive(Debug, Clone)]
-    pub struct NodeDataServiceClient<T> {
+    pub struct IndexerStreamClient<T> {
         inner: tonic::client::Grpc<T>,
     }
-    impl NodeDataServiceClient<tonic::transport::Channel> {
+    impl IndexerStreamClient<tonic::transport::Channel> {
         /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
@@ -23,7 +23,7 @@ pub mod node_data_service_client {
             Ok(Self::new(conn))
         }
     }
-    impl<T> NodeDataServiceClient<T>
+    impl<T> IndexerStreamClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
@@ -41,7 +41,7 @@ pub mod node_data_service_client {
         pub fn with_interceptor<F>(
             inner: T,
             interceptor: F,
-        ) -> NodeDataServiceClient<InterceptedService<T, F>>
+        ) -> IndexerStreamClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
@@ -54,7 +54,7 @@ pub mod node_data_service_client {
             <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
                 Into<StdError> + Send + Sync,
         {
-            NodeDataServiceClient::new(InterceptedService::new(inner, interceptor))
+            IndexerStreamClient::new(InterceptedService::new(inner, interceptor))
         }
         /// Compress requests with the given encoding.
         ///
@@ -87,7 +87,7 @@ pub mod node_data_service_client {
             })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.datastream.v1.NodeDataService/RawDatastream",
+                "/aptos.datastream.v1.IndexerStream/RawDatastream",
             );
             self.inner
                 .server_streaming(request.into_request(), path, codec)
@@ -96,12 +96,12 @@ pub mod node_data_service_client {
     }
 }
 /// Generated server implementations.
-pub mod node_data_service_server {
+pub mod indexer_stream_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    ///Generated trait containing gRPC methods that should be implemented for use with NodeDataServiceServer.
+    ///Generated trait containing gRPC methods that should be implemented for use with IndexerStreamServer.
     #[async_trait]
-    pub trait NodeDataService: Send + Sync + 'static {
+    pub trait IndexerStream: Send + Sync + 'static {
         ///Server streaming response type for the RawDatastream method.
         type RawDatastreamStream: futures_core::Stream<Item = Result<super::RawDatastreamResponse, tonic::Status>>
             + Send
@@ -114,13 +114,13 @@ pub mod node_data_service_server {
     }
     ///
     #[derive(Debug)]
-    pub struct NodeDataServiceServer<T: NodeDataService> {
+    pub struct IndexerStreamServer<T: IndexerStream> {
         inner: _Inner<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
     }
     struct _Inner<T>(Arc<T>);
-    impl<T: NodeDataService> NodeDataServiceServer<T> {
+    impl<T: IndexerStream> IndexerStreamServer<T> {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
@@ -151,9 +151,9 @@ pub mod node_data_service_server {
             self
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for NodeDataServiceServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for IndexerStreamServer<T>
     where
-        T: NodeDataService,
+        T: IndexerStream,
         B: Body + Send + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
@@ -166,10 +166,10 @@ pub mod node_data_service_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/aptos.datastream.v1.NodeDataService/RawDatastream" => {
+                "/aptos.datastream.v1.IndexerStream/RawDatastream" => {
                     #[allow(non_camel_case_types)]
-                    struct RawDatastreamSvc<T: NodeDataService>(pub Arc<T>);
-                    impl<T: NodeDataService>
+                    struct RawDatastreamSvc<T: IndexerStream>(pub Arc<T>);
+                    impl<T: IndexerStream>
                         tonic::server::ServerStreamingService<super::RawDatastreamRequest>
                         for RawDatastreamSvc<T>
                     {
@@ -213,7 +213,7 @@ pub mod node_data_service_server {
             }
         }
     }
-    impl<T: NodeDataService> Clone for NodeDataServiceServer<T> {
+    impl<T: IndexerStream> Clone for IndexerStreamServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -223,7 +223,7 @@ pub mod node_data_service_server {
             }
         }
     }
-    impl<T: NodeDataService> Clone for _Inner<T> {
+    impl<T: IndexerStream> Clone for _Inner<T> {
         fn clone(&self) -> Self {
             Self(self.0.clone())
         }
@@ -233,7 +233,7 @@ pub mod node_data_service_server {
             write!(f, "{:?}", self.0)
         }
     }
-    impl<T: NodeDataService> tonic::server::NamedService for NodeDataServiceServer<T> {
-        const NAME: &'static str = "aptos.datastream.v1.NodeDataService";
+    impl<T: IndexerStream> tonic::server::NamedService for IndexerStreamServer<T> {
+        const NAME: &'static str = "aptos.datastream.v1.IndexerStream";
     }
 }
