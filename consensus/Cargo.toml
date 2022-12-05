@@ -50,6 +50,7 @@ rand = { workspace = true }
 safety-rules = { workspace = true }
 schemadb = { workspace = true }
 serde = { workspace = true }
+serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 short-hex-str = { workspace = true }
 storage-interface = { workspace = true }

@@ -759,9 +759,11 @@ impl EpochManager {
             // same epoch -> run well-formedness + signature check
             let verified_event = monitor!(
                 "verify_message",
-                unverified_event
-                    .clone()
-                    .verify(&self.epoch_state().verifier, self.quorum_store_enabled)
+                unverified_event.clone().verify(
+                    peer_id,
+                    &self.epoch_state().verifier,
+                    self.quorum_store_enabled
+                )
             )
             .context("[EpochManager] Verify event")
             .map_err(|err| {
@@ -790,7 +792,11 @@ impl EpochManager {
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
-            | ConsensusMsg::CommitDecisionMsg(_) => {
+            | ConsensusMsg::CommitDecisionMsg(_)
+            | ConsensusMsg::FragmentMsg(_)
+            | ConsensusMsg::BatchMsg(_)
+            | ConsensusMsg::SignedDigestMsg(_)
+            | ConsensusMsg::ProofOfStoreMsg(_) => {
                 let event: UnverifiedEvent = msg.into();
                 if event.epoch() == self.epoch() {
                     return Ok(Some(event));

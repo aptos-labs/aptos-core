@@ -38,6 +38,21 @@ AggregateSignatureWithRounds:
         TYPENAME: AggregateSignature
     - rounds:
         SEQ: U64
+Batch:
+  STRUCT:
+    - source:
+        TYPENAME: AccountAddress
+    - maybe_payload:
+        OPTION:
+          SEQ:
+            TYPENAME: SignedTransaction
+    - batch_info:
+        TYPENAME: BatchInfo
+BatchInfo:
+  STRUCT:
+    - epoch: U64
+    - digest:
+        TYPENAME: HashValue
 BitVec:
   STRUCT:
     - inner: BYTES
@@ -190,6 +205,22 @@ ConsensusMsg:
       CommitDecisionMsg:
         NEWTYPE:
           TYPENAME: CommitDecision
+    9:
+      FragmentMsg:
+        NEWTYPE:
+          TYPENAME: Fragment
+    10:
+      BatchMsg:
+        NEWTYPE:
+          TYPENAME: Batch
+    11:
+      SignedDigestMsg:
+        NEWTYPE:
+          TYPENAME: SignedDigest
+    12:
+      ProofOfStoreMsg:
+        NEWTYPE:
+          TYPENAME: ProofOfStore
 ContractEvent:
   ENUM:
     0:
@@ -239,6 +270,23 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
+Fragment:
+  STRUCT:
+    - source:
+        TYPENAME: AccountAddress
+    - fragment_info:
+        TYPENAME: FragmentInfo
+FragmentInfo:
+  STRUCT:
+    - epoch: U64
+    - batch_id: U64
+    - fragment_id: U64
+    - payload:
+        SEQ:
+          TYPENAME: SerializedTransaction
+    - maybe_expiration:
+        OPTION:
+          TYPENAME: LogicalTime
 HashValue:
   STRUCT:
     - hash:
@@ -294,21 +342,27 @@ Payload:
         NEWTYPE:
           SEQ:
             TYPENAME: SignedTransaction
+<<<<<<< HEAD
     1:
       InQuorumStore:
         NEWTYPE:
           TYPENAME: ProofWithData
+=======
+>>>>>>> f336cfc341 (Quorum Store related changes to consensus networking.)
 ProofOfStore:
   STRUCT:
     - info:
         TYPENAME: SignedDigestInfo
     - multi_signature:
         TYPENAME: AggregateSignature
+<<<<<<< HEAD
 ProofWithData:
   STRUCT:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
+=======
+>>>>>>> f336cfc341 (Quorum Store related changes to consensus networking.)
 ProposalMsg:
   STRUCT:
     - proposal:
@@ -344,8 +398,23 @@ Script:
     - args:
         SEQ:
           TYPENAME: TransactionArgument
+SerializedTransaction:
+  STRUCT:
+    - bytes: BYTES
 Signature:
   NEWTYPESTRUCT: BYTES
+<<<<<<< HEAD
+=======
+SignedDigest:
+  STRUCT:
+    - epoch: U64
+    - peer_id:
+        TYPENAME: AccountAddress
+    - info:
+        TYPENAME: SignedDigestInfo
+    - signature:
+        TYPENAME: Signature
+>>>>>>> f336cfc341 (Quorum Store related changes to consensus networking.)
 SignedDigestInfo:
   STRUCT:
     - digest:

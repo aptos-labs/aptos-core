@@ -547,6 +547,7 @@ dependencies = [
  "safety-rules",
  "schemadb",
  "serde 1.0.149",
+ "serde_bytes",
  "serde_json",
  "short-hex-str",
  "storage-interface",
