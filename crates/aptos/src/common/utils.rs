@@ -157,21 +157,21 @@ pub fn check_if_file_exists(file: &Path, prompt_options: PromptOptions) -> CliTy
 pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> CliTypedResult<()> {
     if prompt_options.assume_no {
         return Err(CliError::AbortedError);
+    } else if prompt_options.assume_yes {
+        return Ok(());
     }
 
-    if !prompt_options.assume_yes {
-        match GlobalConfig::load()?.get_default_prompt_response() {
-            Some(o) if o == PromptOptions::no() => return Err(CliError::AbortedError),
-            None => {
-                if !prompt_yes(prompt) {
-                    return Err(CliError::AbortedError);
-                }
-            }
-            _ => (),
-        }
-    }
+    let is_yes = if let Some(response) = GlobalConfig::load()?.get_default_prompt_response() {
+        response
+    } else {
+        prompt_yes(prompt)
+    };
 
-    Ok(())
+    if is_yes {
+        return Ok(());
+    } else {
+        return Err(CliError::AbortedError);
+    }
 }
 
 pub fn read_from_file(path: &Path) -> CliTypedResult<Vec<u8>> {
