@@ -161,12 +161,12 @@ pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> 
 
     if !prompt_options.assume_yes {
         match GlobalConfig::load()?.get_default_prompt_response() {
+            Some(o) if o == PromptOptions::no() => return Err(CliError::AbortedError),
             None => {
                 if !prompt_yes(prompt) {
                     return Err(CliError::AbortedError);
                 }
             }
-            Some(o) if o == PromptOptions::no() => return Err(CliError::AbortedError),
             _ => (),
         }
     }
