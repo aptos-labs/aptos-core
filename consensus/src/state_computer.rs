@@ -130,7 +130,7 @@ impl StateComputer for ExecutionProxy {
             })
             .await
         )
-        .expect("spawn_blocking failed")?;
+            .expect("spawn_blocking failed")?;
         observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
 
         // notify mempool about failed transaction
@@ -197,7 +197,7 @@ impl StateComputer for ExecutionProxy {
             })
             .await
         )
-        .expect("spawn_blocking failed");
+            .expect("spawn_blocking failed");
 
         let blocks = blocks.to_vec();
         let wrapped_callback = move || {
@@ -233,15 +233,17 @@ impl StateComputer for ExecutionProxy {
 
         // This is to update QuorumStore with the latest known commit in the system,
         // so it can set batches expiration accordingly.
-        self.payload_manager
+        //Might be none if called from in recovery path.
+        if let Some(payload_manager) = self.payload_manager
             .load()
-            .as_ref()
-            .unwrap()
-            .notify_commit(
+            .as_ref() {
+            payload_manager.notify_commit(
                 LogicalTime::new(target.ledger_info().epoch(), target.ledger_info().round()),
                 Vec::new(),
             )
-            .await;
+                .await;
+        }
+
 
         fail_point!("consensus::sync_to", |_| {
             Err(anyhow::anyhow!("Injected error in sync_to").into())

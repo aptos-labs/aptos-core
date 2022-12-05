@@ -95,7 +95,7 @@ impl SMRNode {
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
         };
-        let commit_notifier = Arc::from(PayloadManager::DirectMempool);
+        let _commit_notifier = Arc::from(PayloadManager::DirectMempool);
         let mut configs = HashMap::new();
         configs.insert(
             ValidatorSet::CONFIG_ID,
