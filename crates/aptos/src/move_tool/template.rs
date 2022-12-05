@@ -1,18 +1,19 @@
 use std::collections::BTreeMap;
 
 use std::fs;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
-use std::time::UNIX_EPOCH;
+
 
 use anyhow::{anyhow, ensure, Context};
 use async_trait::async_trait;
-use clap::Parser;
+use clap::{Parser};
 use convert_case::{Case, Casing};
 use handlebars::Handlebars;
 use path_absolutize::Absolutize;
-use regex::Regex;
+
 use serde_json::json;
 
 use walkdir::WalkDir;
@@ -20,24 +21,8 @@ use walkdir::WalkDir;
 use crate::common::types::{CliCommand, CliTypedResult, PromptOptions};
 use crate::move_tool::FrameworkPackageArgs;
 
-#[derive(Clone)]
-pub enum Template {
-    Default(String),
-    GitUrl(String),
-}
-
-pub fn parse_template(val: &str) -> anyhow::Result<Template> {
-    let re = Regex::new("^[a-zA-Z_]+$").unwrap();
-    if re.is_match(val) {
-        if val == "empty" || val == "coin" || val == "dapp" {
-            Ok(Template::Default(val.to_string()))
-        } else {
-            Err(anyhow!("choose one of 'empty', 'coin', 'dapp'."))
-        }
-    } else {
-        Ok(Template::GitUrl(val.to_string()))
-    }
-}
+const GIT_APTOS_TEMPLATES_URL: &str = "https://github.com/mkurnikov/aptos-core.git";
+const GIT_COMMIT: &str = "5a7c26311c8c406ca00dfa08fc4cd4cbc5d66268";
 
 #[derive(Parser)]
 #[clap(verbatim_doc_comment)]
@@ -57,11 +42,9 @@ pub struct NewPackage {
     #[clap(long, display_order = 1)]
     pub(crate) name: Option<String>,
 
-    /// Package template.
-    /// Can be one of the default ones: 'empty', 'coin' or 'dapp',
-    /// or the url of the git repository to be used as template.
-    #[clap(short, long, default_value = "empty", value_parser = parse_template, display_order = 2)]
-    pub(crate) template: Template,
+    /// Name of the core package template.
+    #[clap(short, long, default_value = "empty", value_parser = ["empty", "coin", "dapp"])]
+    pub(crate) template: String,
 
     #[clap(flatten)]
     pub(crate) framework_package_args: FrameworkPackageArgs,
@@ -74,35 +57,24 @@ impl CliCommand<()> for NewPackage {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        match &self.template {
-            Template::Default(template_name) => {
-                if template_name == "empty" {
-                    self.render_empty_template()?;
-                    return Ok(());
-                }
-                let core_templates_dir =
-                    std::env::temp_dir().join(&format!("aptos_templates_{GIT_COMMIT}"));
-
-                git_download_default_templates(&core_templates_dir)?;
-
-                let core_template_path = core_templates_dir.join(template_name);
-                self.render_template_dir(core_template_path)?;
-            }
-            Template::GitUrl(url) => {
-                let git_url = url.as_str();
-                let directory_name = url_to_file_name(git_url);
-                let time_millis = std::time::SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis();
-                let custom_template_dir =
-                    std::env::temp_dir().join(format!("{}_{}", directory_name, time_millis));
-
-                git_download_custom_template(&custom_template_dir, git_url)?;
-
-                self.render_template_dir(custom_template_dir)?;
-            }
+        if &self.template == "empty" {
+            self.render_empty_template()?;
+            return Ok(());
         }
+
+        let core_templates_dir =
+            std::env::temp_dir().join(&format!("aptos_templates_{GIT_COMMIT}"));
+
+        git_download_default_templates(&core_templates_dir)?;
+
+        let template_dir_path = core_templates_dir
+            .join("crates")
+            .join("aptos")
+            .join("src")
+            .join("move_tool")
+            .join("package_templates")
+            .join(&self.template);
+        self.render_template_dir(template_dir_path)?;
         Ok(())
     }
 }
@@ -181,9 +153,6 @@ impl NewPackage {
     }
 }
 
-const GIT_APTOS_TEMPLATES_URL: &str = "https://github.com/mkurnikov/aptos-templates.git";
-const GIT_COMMIT: &str = "5a7c26311c8c406ca00dfa08fc4cd4cbc5d66268";
-
 fn git_download_default_templates(tmp_dir: &PathBuf) -> anyhow::Result<()> {
     // TODO: download more reliably (i.e. directory exists)
     if !tmp_dir.exists() {
@@ -205,32 +174,6 @@ fn git_download_default_templates(tmp_dir: &PathBuf) -> anyhow::Result<()> {
             .map_err(|_| anyhow::anyhow!("Failed to checkout Git reference '{}'", GIT_COMMIT,))?;
     }
     Ok(())
-}
-
-fn git_download_custom_template(tmp_dir: &PathBuf, git_url: &str) -> anyhow::Result<()> {
-    // TODO: download more reliably (i.e. directory exists)
-    if !tmp_dir.exists() {
-        println!("Downloading: {git_url}");
-        let output = Command::new("git")
-            .arg("clone")
-            .arg(git_url)
-            .arg(tmp_dir)
-            .args(["--depth", "1"])
-            .output()
-            .context("Failed to find merge base")?;
-        if output.status.code() != Some(0) {
-            eprintln!("{}", String::from_utf8(output.stderr)?);
-            return Err(anyhow!("Clone failed"));
-        }
-    }
-    Ok(())
-}
-
-fn url_to_file_name(url: &str) -> String {
-    Regex::new(r"[/:.@]")
-        .unwrap()
-        .replace_all(url, "_")
-        .to_string()
 }
 
 #[derive(Clone)]

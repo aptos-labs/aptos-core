@@ -74,6 +74,7 @@ use {
 #[derive(Subcommand)]
 pub enum MoveTool {
     Compile(CompilePackage),
+    NewPackage(template::NewPackage),
     Init(InitPackage),
     Publish(PublishPackage),
     Download(DownloadPackage),
@@ -94,6 +95,7 @@ impl MoveTool {
         match self {
             MoveTool::Compile(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
+            MoveTool::NewPackage(tool) => tool.execute_serialized_success().await,
             MoveTool::Publish(tool) => tool.execute_serialized().await,
             MoveTool::Download(tool) => tool.execute_serialized().await,
             MoveTool::List(tool) => tool.execute_serialized().await,
