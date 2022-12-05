@@ -34,8 +34,15 @@ fn add_execution_phase_test_cases(
 ) {
     let genesis_qc = certificate_for_genesis();
     let (signers, _validators) = random_validator_verifier(1, None, false);
-    let block =
-        Block::new_proposal(Payload::empty(false), 1, 1, genesis_qc, &signers[0], Vec::new()).unwrap();
+    let block = Block::new_proposal(
+        Payload::empty(false),
+        1,
+        1,
+        genesis_qc,
+        &signers[0],
+        Vec::new(),
+    )
+    .unwrap();
 
     // happy path
     phase_tester.add_test_case(

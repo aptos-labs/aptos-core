@@ -643,7 +643,7 @@ impl EpochManager {
 
         let payload_client = QuorumStoreClient::new(
             consensus_to_quorum_store_tx,
-            self.config.quorum_store_poll_count,
+            self.config.quorum_store_poll_count, // TODO: consider moving it to a quorum store config in later PRs.
             self.config.quorum_store_pull_timeout_ms,
         );
 

@@ -714,8 +714,15 @@ fn no_vote_on_old_proposal() {
     )
     .unwrap();
     let new_block_id = new_block.id();
-    let old_block =
-        Block::new_proposal(Payload::empty(false), 1, 2, genesis_qc, &node.signer, Vec::new()).unwrap();
+    let old_block = Block::new_proposal(
+        Payload::empty(false),
+        1,
+        2,
+        genesis_qc,
+        &node.signer,
+        Vec::new(),
+    )
+    .unwrap();
     timed_block_on(&runtime, async {
         // clear the message queue
         node.next_proposal().await;

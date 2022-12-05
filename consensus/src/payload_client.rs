@@ -17,7 +17,7 @@ use futures::{
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
 
-const NO_TXN_DELAY: u64 = 30;
+const NO_TXN_DELAY: u64 = 30; // TODO: consider moving to a config
 
 /// Client that pulls blocks from Quorum Store
 #[derive(Clone)]

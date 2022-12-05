@@ -77,7 +77,7 @@ fn build_empty_store(
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
-        Arc::new(PayloadManager::new()),
+        Arc::from(PayloadManager::DirectMempool),
     ))
 }
 
@@ -154,6 +154,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         1024,
         10,
         ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
 
     //
