@@ -120,6 +120,7 @@ module aptos_std::multi_ed25519 {
 
     /// Parses the input bytes as a *validated* MultiEd25519 public key.
     public fun new_validated_public_key_from_bytes(bytes: vector<u8>): Option<ValidatedPublicKey> {
+        // Note that `public_key_validate_internal` will check that `vector::length(&bytes) / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES <= MAX_NUMBER_OF_PUBLIC_KEYS`.
         if (vector::length(&bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES &&
             public_key_validate_internal(bytes)) {
             option::some(ValidatedPublicKey {

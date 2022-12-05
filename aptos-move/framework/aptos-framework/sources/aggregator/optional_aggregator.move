@@ -9,19 +9,19 @@ module aptos_framework::optional_aggregator {
 
     friend aptos_framework::coin;
 
-    // These error codes are produced by `Aggregator` and used by `Integer` for
-    // consistency.
+    /// The value of aggregator underflows (goes below zero). Raised by native code.
     const EAGGREGATOR_OVERFLOW: u64 = 1;
+
+    /// Aggregator feature is not supported. Raised by native code.
     const EAGGREGATOR_UNDERFLOW: u64 = 2;
 
-    /// Wrapper around integer to have a custom overflow limit. Note that
-    /// Move has no traits (and trait bounds), so integer value must be u128.
-    /// `Integer` provides API to add/subtract and read, just like `Aggregator`.
+    /// Wrapper around integer with a custom overflow limit. Supports add, subtract and read just like `Aggregator`.
     struct Integer has store {
         value: u128,
         limit: u128,
     }
 
+    /// Creates a new integer which overflows on exceeding a `limit`.
     fun new_integer(limit: u128): Integer {
         Integer {
             value: 0,
@@ -29,6 +29,7 @@ module aptos_framework::optional_aggregator {
         }
     }
 
+    /// Adds `value` to integer. Aborts on overflowing the limit.
     fun add_integer(integer: &mut Integer, value: u128) {
         assert!(
             value <= (integer.limit - integer.value),
@@ -37,25 +38,28 @@ module aptos_framework::optional_aggregator {
         integer.value = integer.value + value;
     }
 
+    /// Subtracts `value` from integer. Aborts on going below zero.
     fun sub_integer(integer: &mut Integer, value: u128) {
         assert!(value <= integer.value, error::out_of_range(EAGGREGATOR_UNDERFLOW));
         integer.value = integer.value - value;
     }
 
+    /// Returns an overflow limit of integer.
     fun limit(integer: &Integer): u128 {
         integer.limit
     }
 
+    /// Returns a value stored in this integer.
     fun read_integer(integer: &Integer): u128 {
         integer.value
     }
 
+    /// Destroys an integer.
     fun destroy_integer(integer: Integer) {
         let Integer { value: _, limit: _ } = integer;
     }
 
-    /// Struct that contains either an aggregator or a normal integer, both
-    /// overflowing on limit.
+    /// Contains either an aggregator or a normal integer, both overflowing on limit.
     struct OptionalAggregator has store {
         // Parallelizable.
         aggregator: Option<Aggregator>,
@@ -63,7 +67,7 @@ module aptos_framework::optional_aggregator {
         integer: Option<Integer>,
     }
 
-    /// Creates a new optional aggregator instance.
+    /// Creates a new optional aggregator.
     public(friend) fun new(limit: u128, parallelizable: bool): OptionalAggregator {
         if (parallelizable) {
             OptionalAggregator {
@@ -148,7 +152,7 @@ module aptos_framework::optional_aggregator {
         limit
     }
 
-    /// Adds to optional aggregator, aborting on exceeding the `limit`.
+    /// Adds `value` to optional aggregator, aborting on exceeding the `limit`.
     public fun add(optional_aggregator: &mut OptionalAggregator, value: u128) {
         if (option::is_some(&optional_aggregator.aggregator)) {
             let aggregator = option::borrow_mut(&mut optional_aggregator.aggregator);
@@ -159,7 +163,7 @@ module aptos_framework::optional_aggregator {
         }
     }
 
-    /// Subtracts from optional aggregator, aborting on going below zero.
+    /// Subtracts `value` from optional aggregator, aborting on going below zero.
     public fun sub(optional_aggregator: &mut OptionalAggregator, value: u128) {
         if (option::is_some(&optional_aggregator.aggregator)) {
             let aggregator = option::borrow_mut(&mut optional_aggregator.aggregator);
@@ -181,7 +185,7 @@ module aptos_framework::optional_aggregator {
         }
     }
 
-    /// Returns true is optional aggregator uses parallelizable implementation.
+    /// Returns true if optional aggregator uses parallelizable implementation.
     public fun is_parallelizable(optional_aggregator: &OptionalAggregator): bool {
         option::is_some(&optional_aggregator.aggregator)
     }

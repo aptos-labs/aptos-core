@@ -18,7 +18,6 @@ use aptos_config::{
     utils::get_genesis_txn,
 };
 use aptos_data_client::aptosnet::AptosNetDataClient;
-use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -170,7 +169,6 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
-    _fh_stream: Option<Runtime>,
     _index_runtime: Option<Runtime>,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
@@ -811,15 +809,6 @@ pub fn setup_environment(
     } else {
         None
     };
-    let sf_runtime = match bootstrap_fh_stream(
-        &node_config,
-        chain_id,
-        aptos_db.clone(),
-        mp_client_sender.clone(),
-    ) {
-        None => None,
-        Some(res) => Some(res?),
-    };
 
     let index_runtime = bootstrap_indexer(&node_config, chain_id, aptos_db, mp_client_sender)?;
 
@@ -885,7 +874,6 @@ pub fn setup_environment(
         _mempool: mempool,
         _network_runtimes: network_runtimes,
         _index_runtime: index_runtime,
-        _fh_stream: sf_runtime,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })

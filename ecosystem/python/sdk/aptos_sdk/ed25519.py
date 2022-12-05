@@ -76,7 +76,7 @@ class PublicKey:
     def verify(self, data: bytes, signature: Signature) -> bool:
         try:
             self.key.verify(data, signature.data())
-        except:
+        except Exception:
             return False
         return True
 
