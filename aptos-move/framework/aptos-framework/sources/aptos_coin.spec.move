@@ -17,18 +17,22 @@ spec aptos_framework::aptos_coin {
         aborts_if !exists<MintCapStore>(@aptos_framework);
     }
 
+    // Test function,not needed verify.
     spec configure_accounts_for_test {
         pragma verify = false;
     }
 
+    // Only callable in tests and testnets.not needed verify.
     spec mint {
         pragma verify = false;
     }
 
+    // Only callable in tests and testnets.not needed verify.
     spec delegate_mint_capability {
         pragma verify = false;
     }
 
+    // Only callable in tests and testnets.not needed verify.
     spec claim_mint_capability(account: &signer) {
         pragma verify = false;
     }

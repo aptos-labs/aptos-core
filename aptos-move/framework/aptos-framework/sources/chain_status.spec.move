@@ -1,6 +1,6 @@
 spec aptos_framework::chain_status {
     spec module {
-        pragma verify = false;
+        pragma verify = true;
         pragma aborts_if_is_strict;
     }
 
@@ -9,14 +9,14 @@ spec aptos_framework::chain_status {
     }
 
     spec schema RequiresIsOperating {
-        requires is_operating();
+        requires !is_operating();
     }
 
     spec assert_operating {
-        aborts_if !exists<GenesisEndMarker>(@aptos_framework);
+        aborts_if !is_operating();
     }
 
     spec assert_genesis {
-        aborts_if exists<GenesisEndMarker>(@aptos_framework);
+        aborts_if !is_genesis();
     }
 }

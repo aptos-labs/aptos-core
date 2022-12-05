@@ -215,7 +215,7 @@ Helper function to assert genesis state.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
 
@@ -242,7 +242,7 @@ Helper function to assert genesis state.
 
 
 <pre><code><b>schema</b> <a href="chain_status.md#0x1_chain_status_RequiresIsOperating">RequiresIsOperating</a> {
-    <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>();
+    <b>requires</b> !<a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>();
 }
 </code></pre>
 
@@ -259,7 +259,7 @@ Helper function to assert genesis state.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a>&gt;(@aptos_framework);
+<pre><code><b>aborts_if</b> !<a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>();
 </code></pre>
 
 
@@ -275,7 +275,7 @@ Helper function to assert genesis state.
 
 
 
-<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a>&gt;(@aptos_framework);
+<pre><code><b>aborts_if</b> !<a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>();
 </code></pre>
 
 
