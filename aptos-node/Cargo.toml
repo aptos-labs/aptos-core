@@ -19,7 +19,6 @@ aptos-build-info = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-data-client = { workspace = true }
-aptos-fh-stream = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-indexer = { workspace = true, optional = true }
 aptos-infallible = { workspace = true }

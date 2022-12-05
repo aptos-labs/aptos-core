@@ -56,9 +56,7 @@ aggregator (parallelizable) or via normal integers.
 
 ## Struct `Integer`
 
-Wrapper around integer to have a custom overflow limit. Note that
-Move has no traits (and trait bounds), so integer value must be u128.
-<code><a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a></code> provides API to add/subtract and read, just like <code>Aggregator</code>.
+Wrapper around integer with a custom overflow limit. Supports add, subtract and read just like <code>Aggregator</code>.
 
 
 <pre><code><b>struct</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a> <b>has</b> store
@@ -92,8 +90,7 @@ Move has no traits (and trait bounds), so integer value must be u128.
 
 ## Struct `OptionalAggregator`
 
-Struct that contains either an aggregator or a normal integer, both
-overflowing on limit.
+Contains either an aggregator or a normal integer, both overflowing on limit.
 
 
 <pre><code><b>struct</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a> <b>has</b> store
@@ -130,6 +127,7 @@ overflowing on limit.
 
 <a name="0x1_optional_aggregator_EAGGREGATOR_OVERFLOW"></a>
 
+The value of aggregator underflows (goes below zero). Raised by native code.
 
 
 <pre><code><b>const</b> <a href="optional_aggregator.md#0x1_optional_aggregator_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>: u64 = 1;
@@ -139,6 +137,7 @@ overflowing on limit.
 
 <a name="0x1_optional_aggregator_EAGGREGATOR_UNDERFLOW"></a>
 
+Aggregator feature is not supported. Raised by native code.
 
 
 <pre><code><b>const</b> <a href="optional_aggregator.md#0x1_optional_aggregator_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>: u64 = 2;
@@ -150,6 +149,7 @@ overflowing on limit.
 
 ## Function `new_integer`
 
+Creates a new integer which overflows on exceeding a <code>limit</code>.
 
 
 <pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_new_integer">new_integer</a>(limit: u128): <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>
@@ -177,6 +177,7 @@ overflowing on limit.
 
 ## Function `add_integer`
 
+Adds <code>value</code> to integer. Aborts on overflowing the limit.
 
 
 <pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_add_integer">add_integer</a>(integer: &<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>, value: u128)
@@ -205,6 +206,7 @@ overflowing on limit.
 
 ## Function `sub_integer`
 
+Subtracts <code>value</code> from integer. Aborts on going below zero.
 
 
 <pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_sub_integer">sub_integer</a>(integer: &<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>, value: u128)
@@ -230,6 +232,7 @@ overflowing on limit.
 
 ## Function `limit`
 
+Returns an overflow limit of integer.
 
 
 <pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_limit">limit</a>(integer: &<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>): u128
@@ -254,6 +257,7 @@ overflowing on limit.
 
 ## Function `read_integer`
 
+Returns a value stored in this integer.
 
 
 <pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_read_integer">read_integer</a>(integer: &<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>): u128
@@ -278,6 +282,7 @@ overflowing on limit.
 
 ## Function `destroy_integer`
 
+Destroys an integer.
 
 
 <pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_integer">destroy_integer</a>(integer: <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>)
@@ -302,7 +307,7 @@ overflowing on limit.
 
 ## Function `new`
 
-Creates a new optional aggregator instance.
+Creates a new optional aggregator.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_new">new</a>(limit: u128, parallelizable: bool): <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>
@@ -547,7 +552,7 @@ Destroys non-parallelizable optional aggregator and returns its limit.
 
 ## Function `add`
 
-Adds to optional aggregator, aborting on exceeding the <code>limit</code>.
+Adds <code>value</code> to optional aggregator, aborting on exceeding the <code>limit</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_add">add</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>, value: u128)
@@ -578,7 +583,7 @@ Adds to optional aggregator, aborting on exceeding the <code>limit</code>.
 
 ## Function `sub`
 
-Subtracts from optional aggregator, aborting on going below zero.
+Subtracts <code>value</code> from optional aggregator, aborting on going below zero.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_sub">sub</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>, value: u128)
@@ -640,7 +645,7 @@ Returns the value stored in optional aggregator.
 
 ## Function `is_parallelizable`
 
-Returns true is optional aggregator uses parallelizable implementation.
+Returns true if optional aggregator uses parallelizable implementation.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &<a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): bool
