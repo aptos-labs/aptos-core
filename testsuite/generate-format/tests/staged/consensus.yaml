@@ -297,16 +297,14 @@ Payload:
     1:
       InQuorumStore:
         NEWTYPE:
-          TYPENAME: ProofWithStatus
-    2:
-      Empty: UNIT
+          TYPENAME: ProofWithData
 ProofOfStore:
   STRUCT:
     - info:
         TYPENAME: SignedDigestInfo
     - multi_signature:
         TYPENAME: AggregateSignature
-ProofWithStatus:
+ProofWithData:
   STRUCT:
     - proofs:
         SEQ:

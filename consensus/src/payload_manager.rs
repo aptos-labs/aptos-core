@@ -45,7 +45,7 @@ impl PayloadManager {
                 logical_time
             );
             if logical_time <= pos.expiration() {
-                receivers.push((pos.digest().clone(), batch_reader.get_batch(pos).await));
+                receivers.push((*pos.digest(), batch_reader.get_batch(pos).await));
             } else {
                 debug!("QS: skipped expired pos");
             }
