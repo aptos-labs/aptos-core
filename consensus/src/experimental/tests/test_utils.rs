@@ -69,7 +69,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
     assert!(num_blocks > 0);
 
     let p1 = if let Some(parent) = some_parent {
-        make_proposal_with_parent(Payload::empty(), init_round, &parent, None, signer)
+        make_proposal_with_parent(Payload::empty(false), init_round, &parent, None, signer)
     } else {
         make_proposal_with_qc(init_round, init_qc.unwrap(), signer)
     };
@@ -80,7 +80,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
         println!("Generating {}", i);
         let parent = proposals.last().unwrap();
         let proposal =
-            make_proposal_with_parent(Payload::empty(), init_round + i, parent, None, signer);
+            make_proposal_with_parent(Payload::empty(false), init_round + i, parent, None, signer);
         proposals.push(proposal);
     }
 

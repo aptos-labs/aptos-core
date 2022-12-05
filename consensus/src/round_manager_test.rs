@@ -217,7 +217,7 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
-            Arc::new(PayloadManager::new()),
+            Arc::from(PayloadManager::DirectMempool),
         ));
 
         let proposer_election = Self::create_proposer_election(proposers.clone());
@@ -230,6 +230,7 @@ impl NodeSetup {
             1000,
             10,
             ChainHealthBackoffConfig::new_no_backoff(),
+            false,
         );
 
         let round_state = Self::create_round_state(time_service);
@@ -611,7 +612,7 @@ fn vote_on_successful_proposal() {
         node.next_proposal().await;
 
         let proposal = Block::new_proposal(
-            Payload::empty(),
+            Payload::empty(false),
             1,
             1,
             genesis_qc.clone(),
@@ -652,7 +653,7 @@ fn delay_proposal_processing_in_sync_only() {
             .block_store
             .set_back_pressure_for_test(true);
         let proposal = Block::new_proposal(
-            Payload::empty(),
+            Payload::empty(false),
             1,
             1,
             genesis_qc.clone(),
@@ -704,7 +705,7 @@ fn no_vote_on_old_proposal() {
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
     let new_block = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -714,7 +715,7 @@ fn no_vote_on_old_proposal() {
     .unwrap();
     let new_block_id = new_block.id();
     let old_block =
-        Block::new_proposal(Payload::empty(), 1, 2, genesis_qc, &node.signer, Vec::new()).unwrap();
+        Block::new_proposal(Payload::empty(false), 1, 2, genesis_qc, &node.signer, Vec::new()).unwrap();
     timed_block_on(&runtime, async {
         // clear the message queue
         node.next_proposal().await;
@@ -747,7 +748,7 @@ fn no_vote_on_mismatch_round() {
         .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -756,7 +757,7 @@ fn no_vote_on_mismatch_round() {
     )
     .unwrap();
     let block_skip_round = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         2,
         2,
         genesis_qc.clone(),
@@ -851,7 +852,7 @@ fn no_vote_on_invalid_proposer() {
     let mut node = nodes.pop().unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -860,7 +861,7 @@ fn no_vote_on_invalid_proposer() {
     )
     .unwrap();
     let block_incorrect_proposer = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -902,7 +903,7 @@ fn new_round_on_timeout_certificate() {
         .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -911,7 +912,7 @@ fn new_round_on_timeout_certificate() {
     )
     .unwrap();
     let block_skip_round = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         2,
         2,
         genesis_qc.clone(),
@@ -974,7 +975,7 @@ fn reject_invalid_failed_authors() {
 
     let create_proposal = |round: Round, failed_authors: Vec<(Round, Author)>| {
         let block = Block::new_proposal(
-            Payload::empty(),
+            Payload::empty(false),
             round,
             2,
             genesis_qc.clone(),
@@ -1049,7 +1050,7 @@ fn response_on_block_retrieval() {
 
     let genesis_qc = certificate_for_genesis();
     let block = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -1161,7 +1162,7 @@ fn recover_on_restart() {
             genesis_qc.clone(),
             i,
             i,
-            Payload::empty(),
+            Payload::empty(false),
             (std::cmp::max(1, i.saturating_sub(10))..i)
                 .map(|i| (i, inserter.signer().author()))
                 .collect(),

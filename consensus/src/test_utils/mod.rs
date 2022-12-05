@@ -74,7 +74,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
-        Arc::new(PayloadManager::new()),
+        Arc::from(PayloadManager::DirectMempool),
     ))
 }
 
@@ -136,7 +136,7 @@ impl TreeInserter {
                 parent_qc,
                 parent.timestamp_usecs() + 1,
                 round,
-                Payload::empty(),
+                Payload::empty(false),
                 vec![],
             ))
             .await

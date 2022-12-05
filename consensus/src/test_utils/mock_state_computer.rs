@@ -40,7 +40,7 @@ impl MockStateComputer {
             executor_channel,
             consensus_db,
             block_cache: Mutex::new(HashMap::new()),
-            payload_manager: Arc::new(PayloadManager::new()),
+            payload_manager: Arc::from(PayloadManager::DirectMempool),
         }
     }
 
@@ -84,7 +84,7 @@ impl StateComputer for MockStateComputer {
     ) -> Result<StateComputeResult, Error> {
         self.block_cache.lock().insert(
             block.id(),
-            block.payload().unwrap_or(&Payload::empty()).clone(),
+            block.payload().unwrap_or(&Payload::empty(false)).clone(),
         );
         let result = StateComputeResult::new_dummy();
         Ok(result)
@@ -131,7 +131,7 @@ impl StateComputer for MockStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState) {}
+    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>) {}
 }
 
 pub struct EmptyStateComputer;
@@ -159,7 +159,7 @@ impl StateComputer for EmptyStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState) {}
+    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>) {}
 }
 
 /// Random Compute Result State Computer
@@ -210,5 +210,5 @@ impl StateComputer for RandomComputeResultStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState) {}
+    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>) {}
 }

@@ -95,7 +95,7 @@ impl SMRNode {
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
         };
-        let commit_notifier = Arc::new(PayloadManager::new());
+        let commit_notifier = Arc::from(PayloadManager::DirectMempool);
         let mut configs = HashMap::new();
         configs.insert(
             ValidatorSet::CONFIG_ID,
@@ -145,7 +145,6 @@ impl SMRNode {
             state_computer.clone(),
             storage.clone(),
             reconfig_listener,
-            commit_notifier,
         );
         let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
 
