@@ -130,4 +130,6 @@ async fn test_account_key_rotation() {
     cli.transfer_coins(0, 1, 5, None)
         .await
         .expect("New key should be able to transfer");
+
+    panic!("INJECT to test artifact upload")
 }
