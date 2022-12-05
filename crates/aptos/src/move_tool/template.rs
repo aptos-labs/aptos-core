@@ -22,7 +22,7 @@ use crate::common::types::{CliCommand, CliTypedResult, PromptOptions};
 use crate::move_tool::FrameworkPackageArgs;
 
 const GIT_APTOS_TEMPLATES_URL: &str = "https://github.com/mkurnikov/aptos-core.git";
-const GIT_COMMIT: &str = "5a7c26311c8c406ca00dfa08fc4cd4cbc5d66268";
+const GIT_COMMIT: &str = "333324900835e083e220f5619bfa44cdc3f774b3";
 
 #[derive(Parser)]
 #[clap(verbatim_doc_comment)]
@@ -154,7 +154,6 @@ impl NewPackage {
 }
 
 fn git_download_default_templates(tmp_dir: &PathBuf) -> anyhow::Result<()> {
-    // TODO: download more reliably (i.e. directory exists)
     if !tmp_dir.exists() {
         println!("Downloading: {GIT_APTOS_TEMPLATES_URL}");
         let output = Command::new("git")
@@ -168,10 +167,14 @@ fn git_download_default_templates(tmp_dir: &PathBuf) -> anyhow::Result<()> {
             return Err(anyhow!("Clone failed"));
         }
         let tmp_dir_str = tmp_dir.to_string_lossy().to_string();
-        Command::new("git")
+        let output = Command::new("git")
             .args(["-C", &tmp_dir_str, "checkout", GIT_COMMIT])
             .output()
             .map_err(|_| anyhow::anyhow!("Failed to checkout Git reference '{}'", GIT_COMMIT,))?;
+        if output.status.code() != Some(0) {
+            eprintln!("{}", String::from_utf8(output.stderr)?);
+            return Err(anyhow!("Checkout failed"));
+        }
     }
     Ok(())
 }
