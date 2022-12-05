@@ -307,7 +307,27 @@ RUN apt-get update && apt-get install -y \
 		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
+RUN apt-get update && apt-get install -y \
+        dwarves \
+        binutils-dev \
+        libdwarf-dev \
+        libperl-dev \
+        libcap-dev \
+        libnuma-dev \
+        libunwind-dev \
+        libzstd-dev \
+        libdw-dev \
+        libssl-dev \
+        systemtap-sdt-dev \
+        python3-dev \
+        libiberty-dev \
+        libslang2-dev \
+        python3-setuptools
+
+RUN git clone https://github.com/amazonlinux/linux.git --depth 1
+
 RUN git clone https://github.com/aptos-labs/bcc.git --depth 1
+
 RUN mkdir bcc/build
 WORKDIR  bcc/build
 RUN cmake ..
