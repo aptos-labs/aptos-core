@@ -220,7 +220,7 @@ impl GlobalConfig {
     /// Get the prompt options from global config
     pub fn get_default_prompt_response(&self) -> Option<bool> {
         match self.default_prompt_response {
-            PromptResponseType::Prompt => None, // prompt
+            PromptResponseType::Prompt => None,    // prompt
             PromptResponseType::Yes => Some(true), // assume_yes
             PromptResponseType::No => Some(false), // assume_no
         }
