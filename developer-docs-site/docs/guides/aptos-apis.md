@@ -3,63 +3,13 @@ title: "Use Aptos API"
 slug: "aptos-api"
 ---
 
-# Use the Aptos API with Your Platform
+# Use the Aptos REST Read API
 
-If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. This system integrators guide will walk you through all you need to integrate the Aptos blockchain into your platform.
+If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. This guide will walk you through all you need to integrate the Aptos blockchain into your platform.
 
-## Overview
-
-This document will guide you through the following tasks to integrate with Aptos:
-1. Prepare an environment for testing.
-1. Create an account on the blockchain.
-1. Exchange account identifiers with another entity on the blockchain, for example, to perform swaps.
-1. Create a transaction.
-1. Obtain a gas estimate and validate the transaction for correctness.
-1. Submit the transaction to the blockchain.
-1. Wait for the outcome of the transaction.
-1. Query historical transactions and interactions for a given account with a specific account, i.e., withdraws and deposits.
-
-## Networks
-
-There are three well-supported networks for integrating with the Aptos blockchain:
-
-1. Local testnet -- our standalone tool for local development against a known version of the codebase with no external network.
-1. Devnet -- a shared resource for the community, data resets weekly, weekly update from aptos-core main branch.
-1. Testnet -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
-
-See [Aptos Blockchain Deployments](../nodes/aptos-deployments.md) for full details on each environment.
-
-### Local testnet
-
-There are two options to run a local testnet:
-* Directly [run a local testnet](../nodes/local-testnet/run-a-local-testnet.md) using either the [Aptos-core source code](/nodes/local-testnet/run-a-local-testnet/#using-the-aptos-core-source-code) or a [Docker image](/nodes/local-testnet/run-a-local-testnet/#using-docker). These paths are useful for testing changes to the Aptos-core codebase or framework, or for building services on top of the Aptos blockchain, respectively.
-* [Install the Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli) and 2) start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet). This path is useful for developing on the Aptos blockchain, debugging Move contracts, and testing node operations.
-
-Either of these methods will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.0.1:8000` for option 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.
-
-### Aptos Devnet
-
-* Faucet service: https://faucet.devnet.aptoslabs.com
-* REST API service: https://fullnode.devnet.aptoslabs.com/v1
-
-### Access Testnet
-
-* Faucet service: https://faucet.testnet.aptoslabs.com
-* REST API service: https://fullnode.testnet.aptoslabs.com/v1
-
-### SDKs
-
-Aptos currently provides three SDKs:
-1. [Typescript](/sdks/ts-sdk/index)
-2. [Python](/sdks/python-sdk)
-3. [Rust](/sdks/rust-sdk)
-
-
-### Other tools
-
-* [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
-* [REST API spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
-* [Local testnet development flow](/guides/local-testnet-dev-flow)
+:::tip
+Before starting in this guide, it might be beneficial to read the [System Integrators Guide](/guides/system-integrators-guide).
+:::
 
 ## Viewing current and historical state
 
