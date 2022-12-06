@@ -20,7 +20,11 @@ use std::{
     path::Path,
     str::FromStr,
 };
-use vm_genesis::{AccountBalance, EmployeePool, Validator, ValidatorWithCommissionRate};
+use vm_genesis::{
+    AccountBalance, EmployeePool, GenesisEmployeeVestingConfiguration,
+    GenesisGovernanceConfiguration, GenesisRewardsConfiguration, GenesisStakingConfiguration,
+    Validator, ValidatorWithCommissionRate,
+};
 
 /// Template for setting up Github for Genesis
 ///
@@ -45,28 +49,13 @@ pub struct Layout {
     /// Ignored for mainnet
     #[serde(default)]
     pub is_test: bool,
-    /// Minimum stake to be in the validator set
-    pub min_stake: u64,
-    /// Minimum number of votes to consider a proposal valid.
-    pub min_voting_threshold: u128,
-    /// Maximum stake to be in the validator set
-    pub max_stake: u64,
-    /// Minimum number of seconds to lockup staked coins
-    pub recurring_lockup_duration_secs: u64,
-    /// Required amount of stake to create proposals.
-    pub required_proposer_stake: u64,
-    /// Percentage of stake given out as rewards a year (0-100%).
-    pub rewards_apy_percentage: u64,
-    /// Voting duration for a proposal in seconds.
-    pub voting_duration_secs: u64,
-    /// % of current epoch's total voting power that can be added in this epoch.
-    pub voting_power_increase_limit: u64,
+
+    pub staking: GenesisStakingConfiguration,
+    pub rewards: GenesisRewardsConfiguration,
+    pub governance: GenesisGovernanceConfiguration,
+    pub employee_vesting: GenesisEmployeeVestingConfiguration,
     /// Total supply of coins
     pub total_supply: Option<u64>,
-    /// Timestamp (in seconds) when employee vesting starts.
-    pub employee_vesting_start: Option<u64>,
-    /// Duration of each vesting period (in seconds).
-    pub employee_vesting_period_duration: Option<u64>,
 }
 
 impl Layout {
@@ -93,17 +82,25 @@ impl Default for Layout {
             allow_new_validators: false,
             epoch_duration_secs: 7_200,
             is_test: true,
-            min_stake: 100_000_000_000_000,
-            min_voting_threshold: 100_000_000_000_000,
-            max_stake: 100_000_000_000_000_000,
-            recurring_lockup_duration_secs: 86_400,
-            required_proposer_stake: 100_000_000_000_000,
-            rewards_apy_percentage: 10,
-            voting_duration_secs: 43_200,
-            voting_power_increase_limit: 20,
+            staking: GenesisStakingConfiguration {
+                min_stake: 100_000_000_000_000,
+                max_stake: 100_000_000_000_000_000,
+                recurring_lockup_duration_secs: 86_400,
+                voting_power_increase_limit: 20,
+            },
+            rewards: GenesisRewardsConfiguration {
+                rewards_apy_percentage: 7,
+            },
+            governance: GenesisGovernanceConfiguration {
+                min_voting_threshold: 100_000_000_000_000,
+                required_proposer_stake: 100_000_000_000_000,
+                voting_duration_secs: 43_200,
+            },
+            employee_vesting: GenesisEmployeeVestingConfiguration {
+                employee_vesting_start: 1663456089,
+                employee_vesting_period_duration: 5 * 60, // 5 minutes
+            },
             total_supply: None,
-            employee_vesting_start: Some(1663456089),
-            employee_vesting_period_duration: Some(5 * 60), // 5 minutes
         }
     }
 }

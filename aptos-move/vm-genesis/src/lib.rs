@@ -53,21 +53,50 @@ const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
 const APTOS_COINS_BASE_WITH_DECIMALS: u64 = u64::pow(10, 8);
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub struct GenesisStakingConfiguration {
+    /// Maximum stake to be in the validator set
+    pub max_stake: u64,
+    /// Minimum stake to be in the validator set
+    pub min_stake: u64,
+    /// Minimum number of seconds to lockup staked coins
+    pub recurring_lockup_duration_secs: u64,
+    /// Percent of current epoch's total voting power that can be added in this epoch.
+    pub voting_power_increase_limit: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub struct GenesisRewardsConfiguration {
+    pub rewards_apy_percentage: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub struct GenesisGovernanceConfiguration {
+    /// Required amount of stake to create proposals.
+    pub required_proposer_stake: u64,
+    /// Minimum number of votes to consider a proposal valid.
+    pub min_voting_threshold: u128,
+    /// Voting duration for a proposal in seconds.
+    pub voting_duration_secs: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub struct GenesisEmployeeVestingConfiguration {
+    /// Timestamp (in seconds) when employee vesting starts.
+    pub employee_vesting_start: u64,
+    /// Duration of each vesting period (in seconds).
+    pub employee_vesting_period_duration: u64,
+}
+
 pub struct GenesisConfiguration {
     pub allow_new_validators: bool,
     pub epoch_duration_secs: u64,
     // If true, genesis will create a special core resources account that can mint coins.
     pub is_test: bool,
-    pub max_stake: u64,
-    pub min_stake: u64,
-    pub min_voting_threshold: u128,
-    pub recurring_lockup_duration_secs: u64,
-    pub required_proposer_stake: u64,
-    pub rewards_apy_percentage: u64,
-    pub voting_duration_secs: u64,
-    pub voting_power_increase_limit: u64,
-    pub employee_vesting_start: u64,
-    pub employee_vesting_period_duration: u64,
+    pub staking: GenesisStakingConfiguration,
+    pub rewards: GenesisRewardsConfiguration,
+    pub governance: GenesisGovernanceConfiguration,
+    pub employee_vesting: GenesisEmployeeVestingConfiguration,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -125,9 +154,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     );
     initialize_features(&mut session);
     initialize_aptos_coin(&mut session);
-    initialize_on_chain_governance(&mut session, genesis_config);
+    initialize_on_chain_governance(&mut session, &genesis_config.governance);
     create_accounts(&mut session, accounts);
-    create_employee_validators(&mut session, employees, genesis_config);
+    create_employee_validators(&mut session, employees, &genesis_config.employee_vesting);
     create_and_initialize_validators_with_commission(&mut session, validators);
     set_genesis_end(&mut session);
 
@@ -232,7 +261,7 @@ pub fn encode_genesis_change_set(
     } else {
         initialize_aptos_coin(&mut session);
     }
-    initialize_on_chain_governance(&mut session, genesis_config);
+    initialize_on_chain_governance(&mut session, &genesis_config.governance);
     create_and_initialize_validators(&mut session, validators);
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
@@ -280,37 +309,39 @@ pub fn encode_genesis_change_set(
 
 fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
     assert!(
-        genesis_config.min_stake <= genesis_config.max_stake,
-        "Min stake must be smaller than or equal to max stake"
-    );
-    assert!(
         genesis_config.epoch_duration_secs > 0,
         "Epoch duration must be > 0"
     );
     assert!(
-        genesis_config.recurring_lockup_duration_secs > 0,
+        genesis_config.staking.min_stake <= genesis_config.staking.max_stake,
+        "Min stake must be smaller than or equal to max stake"
+    );
+    assert!(
+        genesis_config.staking.recurring_lockup_duration_secs > 0,
         "Recurring lockup duration must be > 0"
     );
     assert!(
-        genesis_config.recurring_lockup_duration_secs >= genesis_config.epoch_duration_secs,
+        genesis_config.staking.recurring_lockup_duration_secs >= genesis_config.epoch_duration_secs,
         "Recurring lockup duration must be at least as long as epoch duration"
     );
     assert!(
-        genesis_config.rewards_apy_percentage > 0 && genesis_config.rewards_apy_percentage < 100,
+        genesis_config.staking.voting_power_increase_limit > 0
+            && genesis_config.staking.voting_power_increase_limit <= 50,
+        "voting_power_increase_limit must be > 0 and <= 50"
+    );
+    assert!(
+        genesis_config.rewards.rewards_apy_percentage > 0
+            && genesis_config.rewards.rewards_apy_percentage < 100,
         "Rewards APY must be > 0% and < 100%"
     );
     assert!(
-        genesis_config.voting_duration_secs > 0,
+        genesis_config.governance.voting_duration_secs > 0,
         "On-chain voting duration must be > 0"
     );
     assert!(
-        genesis_config.voting_duration_secs < genesis_config.recurring_lockup_duration_secs,
+        genesis_config.governance.voting_duration_secs
+            < genesis_config.staking.recurring_lockup_duration_secs,
         "Voting duration must be strictly smaller than recurring lockup"
-    );
-    assert!(
-        genesis_config.voting_power_increase_limit > 0
-            && genesis_config.voting_power_increase_limit <= 50,
-        "voting_power_increase_limit must be > 0 and <= 50"
     );
 }
 
@@ -359,11 +390,12 @@ fn initialize(
     // Calculate the per-epoch rewards rate, represented as 2 separate ints (numerator and
     // denominator).
     let rewards_rate_denominator = 1_000_000_000;
+
     let num_epochs_in_a_year = NUM_SECONDS_PER_YEAR / genesis_config.epoch_duration_secs;
     // Multiplication before division to minimize rounding errors due to integer division.
-    let rewards_rate_numerator = (genesis_config.rewards_apy_percentage * rewards_rate_denominator
-        / 100)
-        / num_epochs_in_a_year;
+    let rewards_rate_numerator =
+        (genesis_config.rewards.rewards_apy_percentage * rewards_rate_denominator / 100)
+            / num_epochs_in_a_year;
 
     // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
     // has crossed into a new epoch. So epoch_interval also needs to be in micro seconds.
@@ -379,13 +411,13 @@ fn initialize(
             MoveValue::U64(APTOS_MAX_KNOWN_VERSION.major),
             MoveValue::vector_u8(consensus_config_bytes),
             MoveValue::U64(epoch_interval_usecs),
-            MoveValue::U64(genesis_config.min_stake),
-            MoveValue::U64(genesis_config.max_stake),
-            MoveValue::U64(genesis_config.recurring_lockup_duration_secs),
+            MoveValue::U64(genesis_config.staking.min_stake),
+            MoveValue::U64(genesis_config.staking.max_stake),
+            MoveValue::U64(genesis_config.staking.recurring_lockup_duration_secs),
             MoveValue::Bool(genesis_config.allow_new_validators),
             MoveValue::U64(rewards_rate_numerator),
             MoveValue::U64(rewards_rate_denominator),
-            MoveValue::U64(genesis_config.voting_power_increase_limit),
+            MoveValue::U64(genesis_config.staking.voting_power_increase_limit),
         ]),
     );
 }
@@ -446,7 +478,7 @@ fn initialize_core_resources_and_aptos_coin(
 /// Create and initialize Association and Core Code accounts.
 fn initialize_on_chain_governance(
     session: &mut SessionExt<impl MoveResolver>,
-    genesis_config: &GenesisConfiguration,
+    genesis_governance_config: &GenesisGovernanceConfiguration,
 ) {
     exec_function(
         session,
@@ -455,9 +487,9 @@ fn initialize_on_chain_governance(
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            MoveValue::U128(genesis_config.min_voting_threshold),
-            MoveValue::U64(genesis_config.required_proposer_stake),
-            MoveValue::U64(genesis_config.voting_duration_secs),
+            MoveValue::U128(genesis_governance_config.min_voting_threshold),
+            MoveValue::U64(genesis_governance_config.required_proposer_stake),
+            MoveValue::U64(genesis_governance_config.voting_duration_secs),
         ]),
     );
 }
@@ -478,12 +510,12 @@ fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[Acco
 fn create_employee_validators(
     session: &mut SessionExt<impl MoveResolver>,
     employees: &[EmployeePool],
-    genesis_config: &GenesisConfiguration,
+    genesis_employee_vesting_config: &GenesisEmployeeVestingConfiguration,
 ) {
     let employees_bytes = bcs::to_bytes(employees).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&vec![
-        MoveValue::U64(genesis_config.employee_vesting_start),
-        MoveValue::U64(genesis_config.employee_vesting_period_duration),
+        MoveValue::U64(genesis_employee_vesting_config.employee_vesting_start),
+        MoveValue::U64(genesis_employee_vesting_config.employee_vesting_period_duration),
     ]);
     serialized_values.push(employees_bytes);
 
@@ -763,17 +795,25 @@ pub fn generate_test_genesis(
             allow_new_validators: true,
             epoch_duration_secs: 3600,
             is_test: true,
-            min_stake: 0,
-            min_voting_threshold: 0,
-            // 1M APTOS coins (with 8 decimals).
-            max_stake: 100_000_000_000_000,
-            recurring_lockup_duration_secs: 7200,
-            required_proposer_stake: 0,
-            rewards_apy_percentage: 10,
-            voting_duration_secs: 3600,
-            voting_power_increase_limit: 50,
-            employee_vesting_start: 1663456089,
-            employee_vesting_period_duration: 5 * 60, // 5 minutes
+            staking: GenesisStakingConfiguration {
+                min_stake: 0,
+                // 1M APTOS coins (with 8 decimals).
+                max_stake: 100_000_000_000_000,
+                recurring_lockup_duration_secs: 7200,
+                voting_power_increase_limit: 50,
+            },
+            rewards: GenesisRewardsConfiguration {
+                rewards_apy_percentage: 7,
+            },
+            governance: GenesisGovernanceConfiguration {
+                min_voting_threshold: 0,
+                required_proposer_stake: 0,
+                voting_duration_secs: 3600,
+            },
+            employee_vesting: GenesisEmployeeVestingConfiguration {
+                employee_vesting_start: 1663456089,
+                employee_vesting_period_duration: 5 * 60, // 5 minutes
+            },
         },
         &OnChainConsensusConfig::default(),
         &default_gas_schedule(),
@@ -803,22 +843,30 @@ pub fn generate_mainnet_genesis(
 }
 
 fn mainnet_genesis_config() -> GenesisConfiguration {
-    // TODO: Update once mainnet numbers are decided. These numbers are just placeholders.
     GenesisConfiguration {
         allow_new_validators: true,
         epoch_duration_secs: 2 * 3600, // 2 hours
         is_test: false,
-        min_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
-        // 400M APT
-        min_voting_threshold: (400_000_000 * APTOS_COINS_BASE_WITH_DECIMALS as u128),
-        max_stake: 50_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 50M APT.
-        recurring_lockup_duration_secs: 30 * 24 * 3600,         // 1 month
-        required_proposer_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
-        rewards_apy_percentage: 10,
-        voting_duration_secs: 7 * 24 * 3600, // 7 days
-        voting_power_increase_limit: 30,
-        employee_vesting_start: 1663456089,
-        employee_vesting_period_duration: 5 * 60, // 5 minutes
+        staking: GenesisStakingConfiguration {
+            min_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
+            // 1M APTOS coins (with 8 decimals).
+            max_stake: 50_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 50M APT.
+            recurring_lockup_duration_secs: 30 * 24 * 3600,         // 1 month
+            voting_power_increase_limit: 30,
+        },
+        rewards: GenesisRewardsConfiguration {
+            rewards_apy_percentage: 7,
+        },
+        governance: GenesisGovernanceConfiguration {
+            // 400M APT
+            min_voting_threshold: (400_000_000 * APTOS_COINS_BASE_WITH_DECIMALS as u128),
+            required_proposer_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
+            voting_duration_secs: 7 * 24 * 3600,                                 // 7 days
+        },
+        employee_vesting: GenesisEmployeeVestingConfiguration {
+            employee_vesting_start: 1663456089,
+            employee_vesting_period_duration: 5 * 60, // 5 minutes
+        },
     }
 }
 

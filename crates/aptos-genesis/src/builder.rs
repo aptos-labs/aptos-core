@@ -41,7 +41,10 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use vm_genesis::default_gas_schedule;
+use vm_genesis::{
+    default_gas_schedule, GenesisEmployeeVestingConfiguration, GenesisGovernanceConfiguration,
+    GenesisRewardsConfiguration, GenesisStakingConfiguration,
+};
 
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
 const VFN_IDENTITY: &str = "vfn-identity.yaml";
@@ -397,16 +400,12 @@ pub struct GenesisConfiguration {
     pub allow_new_validators: bool,
     pub epoch_duration_secs: u64,
     pub is_test: bool,
-    pub min_stake: u64,
-    pub max_stake: u64,
-    pub min_voting_threshold: u128,
-    pub recurring_lockup_duration_secs: u64,
-    pub required_proposer_stake: u64,
-    pub rewards_apy_percentage: u64,
-    pub voting_duration_secs: u64,
-    pub voting_power_increase_limit: u64,
-    pub employee_vesting_start: Option<u64>,
-    pub employee_vesting_period_duration: Option<u64>,
+
+    pub staking: GenesisStakingConfiguration,
+    pub rewards: GenesisRewardsConfiguration,
+    pub governance: GenesisGovernanceConfiguration,
+    pub employee_vesting: GenesisEmployeeVestingConfiguration,
+
     pub consensus_config: OnChainConsensusConfig,
     pub gas_schedule: GasScheduleV2,
 }
@@ -596,16 +595,24 @@ impl Builder {
             allow_new_validators: false,
             epoch_duration_secs: ONE_DAY,
             is_test: true,
-            min_stake: 0,
-            min_voting_threshold: 0,
-            max_stake: u64::MAX,
-            recurring_lockup_duration_secs: ONE_DAY,
-            required_proposer_stake: 0,
-            rewards_apy_percentage: 10,
-            voting_duration_secs: ONE_DAY / 24,
-            voting_power_increase_limit: 50,
-            employee_vesting_start: None,
-            employee_vesting_period_duration: None,
+            staking: GenesisStakingConfiguration {
+                min_stake: 0,
+                max_stake: u64::MAX,
+                recurring_lockup_duration_secs: ONE_DAY,
+                voting_power_increase_limit: 50,
+            },
+            rewards: GenesisRewardsConfiguration {
+                rewards_apy_percentage: 7,
+            },
+            governance: GenesisGovernanceConfiguration {
+                min_voting_threshold: 0,
+                required_proposer_stake: 0,
+                voting_duration_secs: ONE_DAY / 24,
+            },
+            employee_vesting: GenesisEmployeeVestingConfiguration {
+                employee_vesting_start: 1663456089,
+                employee_vesting_period_duration: 5 * 60, // 5 minutes
+            },
             consensus_config: OnChainConsensusConfig::default(),
             gas_schedule: default_gas_schedule(),
         };

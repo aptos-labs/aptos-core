@@ -12,7 +12,11 @@ use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use framework::ReleaseBundle;
 use storage_interface::DbReaderWriter;
-use vm_genesis::{AccountBalance, EmployeePool, ValidatorWithCommissionRate};
+use vm_genesis::{
+    AccountBalance, EmployeePool, GenesisEmployeeVestingConfiguration,
+    GenesisGovernanceConfiguration, GenesisRewardsConfiguration, GenesisStakingConfiguration,
+    ValidatorWithCommissionRate,
+};
 
 /// Holder object for all pieces needed to generate a genesis transaction
 #[derive(Clone)]
@@ -26,22 +30,10 @@ pub struct MainnetGenesisInfo {
 
     /// Duration of an epoch
     pub epoch_duration_secs: u64,
-    /// Minimum stake to be in the validator set
-    pub min_stake: u64,
-    /// Minimum number of votes to consider a proposal valid.
-    pub min_voting_threshold: u128,
-    /// Maximum stake to be in the validator set
-    pub max_stake: u64,
-    /// Minimum number of seconds to lockup staked coins
-    pub recurring_lockup_duration_secs: u64,
-    /// Required amount of stake to create proposals.
-    pub required_proposer_stake: u64,
-    /// Percentage of stake given out as rewards a year (0-100%).
-    pub rewards_apy_percentage: u64,
-    /// Voting duration for a proposal in seconds.
-    pub voting_duration_secs: u64,
-    /// Percent of current epoch's total voting power that can be added in this epoch.
-    pub voting_power_increase_limit: u64,
+    pub staking: GenesisStakingConfiguration,
+    pub rewards: GenesisRewardsConfiguration,
+    pub governance: GenesisGovernanceConfiguration,
+    pub employee_vesting: GenesisEmployeeVestingConfiguration,
 
     // MAINNET SPECIFIC FIELDS.
     /// Initial accounts and balances.
@@ -50,10 +42,6 @@ pub struct MainnetGenesisInfo {
     employee_vesting_accounts: Vec<EmployeePool>,
     /// Set of configurations for validators who will be joining the genesis validator set.
     validators: Vec<ValidatorWithCommissionRate>,
-    /// Timestamp (in seconds) when employee vesting starts.
-    employee_vesting_start: u64,
-    /// Duration of each vesting period (in seconds).
-    employee_vesting_period_duration: u64,
 }
 
 impl MainnetGenesisInfo {
@@ -65,13 +53,6 @@ impl MainnetGenesisInfo {
         framework: ReleaseBundle,
         genesis_config: &GenesisConfiguration,
     ) -> anyhow::Result<MainnetGenesisInfo> {
-        let employee_vesting_start = genesis_config
-            .employee_vesting_start
-            .expect("Employee vesting start time (in secs) needs to be provided");
-        let employee_vesting_period_duration = genesis_config
-            .employee_vesting_period_duration
-            .expect("Employee vesting period duration (in secs) needs to be provided");
-
         Ok(MainnetGenesisInfo {
             chain_id,
             accounts,
@@ -83,16 +64,10 @@ impl MainnetGenesisInfo {
             framework,
             genesis: None,
             epoch_duration_secs: genesis_config.epoch_duration_secs,
-            min_stake: genesis_config.min_stake,
-            min_voting_threshold: genesis_config.min_voting_threshold,
-            max_stake: genesis_config.max_stake,
-            recurring_lockup_duration_secs: genesis_config.recurring_lockup_duration_secs,
-            required_proposer_stake: genesis_config.required_proposer_stake,
-            rewards_apy_percentage: genesis_config.rewards_apy_percentage,
-            voting_duration_secs: genesis_config.voting_duration_secs,
-            voting_power_increase_limit: genesis_config.voting_power_increase_limit,
-            employee_vesting_start,
-            employee_vesting_period_duration,
+            staking: genesis_config.staking,
+            rewards: genesis_config.rewards,
+            governance: genesis_config.governance,
+            employee_vesting: genesis_config.employee_vesting,
         })
     }
 
@@ -116,16 +91,10 @@ impl MainnetGenesisInfo {
                 allow_new_validators: true,
                 is_test: false,
                 epoch_duration_secs: self.epoch_duration_secs,
-                min_stake: self.min_stake,
-                min_voting_threshold: self.min_voting_threshold,
-                max_stake: self.max_stake,
-                recurring_lockup_duration_secs: self.recurring_lockup_duration_secs,
-                required_proposer_stake: self.required_proposer_stake,
-                rewards_apy_percentage: self.rewards_apy_percentage,
-                voting_duration_secs: self.voting_duration_secs,
-                voting_power_increase_limit: self.voting_power_increase_limit,
-                employee_vesting_start: self.employee_vesting_start,
-                employee_vesting_period_duration: self.employee_vesting_period_duration,
+                staking: self.staking,
+                rewards: self.rewards,
+                governance: self.governance,
+                employee_vesting: self.employee_vesting,
             },
         )
     }
