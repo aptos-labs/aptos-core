@@ -726,6 +726,58 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-api-test-context",
+ "aptos-api-types",
+ "aptos-bitvec",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis",
+ "aptos-global-constants",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics-core",
+ "aptos-proptest-helpers",
+ "aptos-protos",
+ "aptos-sdk",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptosdb",
+ "base64 0.13.0",
+ "bytes 1.2.1",
+ "chrono",
+ "executor",
+ "executor-types",
+ "fail 0.5.0",
+ "framework",
+ "futures",
+ "goldenfile",
+ "hex",
+ "hyper",
+ "mempool-notifications",
+ "move-binary-format",
+ "move-core-types",
+ "move-package",
+ "once_cell",
+ "prost",
+ "rand 0.7.3",
+ "regex",
+ "serde 1.0.144",
+ "serde_json",
+ "storage-interface",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "vm-validator",
+]
+
+[[package]]
 name = "aptos-infallible"
 version = "0.1.0"
 
@@ -989,6 +1041,16 @@ dependencies = [
  "crossbeam",
  "proptest",
  "proptest-derive",
+]
+
+[[package]]
+name = "aptos-protos"
+version = "0.1.0"
+dependencies = [
+ "pbjson",
+ "prost",
+ "serde 1.0.144",
+ "tonic",
 ]
 
 [[package]]
@@ -6934,6 +6996,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9423e2b32f7a043629287a536f21951e8c6a82482d0acb1eeebfc90bc2225b22"
 
 [[package]]
+name = "pbjson"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "599fe9aefc2ca0df4a96179b3075faee2cacb89d4cf947a00b9a89152dfffc9d"
+dependencies = [
+ "base64 0.13.0",
+ "serde 1.0.144",
+]
+
+[[package]]
 name = "pbkdf2"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9592,6 +9664,7 @@ dependencies = [
  "axum 0.6.1",
  "base64 0.13.0",
  "bytes 1.2.1",
+ "flate2",
  "futures-core",
  "futures-util",
  "h2",
@@ -9603,7 +9676,10 @@ dependencies = [
  "pin-project",
  "prost",
  "prost-derive",
+ "rustls-native-certs",
+ "rustls-pemfile 1.0.1",
  "tokio",
+ "tokio-rustls 0.23.4",
  "tokio-stream",
  "tokio-util 0.7.3",
  "tower",

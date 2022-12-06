@@ -68,6 +68,7 @@ members = [
     "crates/crash-handler",
     "crates/fallible",
     "crates/indexer",
+    "crates/indexer-grpc",
     "crates/inspection-service",
     "crates/node-resource-metrics",
     "crates/num-variants",
@@ -220,7 +221,9 @@ aptos-state-view = { path = "storage/state-view" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }
-aptos-time-service = { path = "crates/aptos-time-service", features = ["async"] }
+aptos-time-service = { path = "crates/aptos-time-service", features = [
+    "async",
+] }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
@@ -314,7 +317,13 @@ curve25519-dalek = "3"
 dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
-diesel = { version = "2.0.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
+diesel = { version = "2.0.0", features = [
+    "chrono",
+    "postgres",
+    "r2d2",
+    "numeric",
+    "serde_json",
+] }
 diesel_migrations = { version = "2.0.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
@@ -349,10 +358,15 @@ indicatif = "0.15.0"
 indoc = "1.0.6"
 ipnet = "2.5.0"
 itertools = "0.10.3"
-jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
+jemallocator = { version = "0.3.2", features = [
+    "profiling",
+    "unprefixed_malloc_on_supported_platforms",
+] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
-k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_15"] }
+k8s-openapi = { version = "0.11.0", default-features = false, features = [
+    "v1_15",
+] }
 kube = { version = "0.51.0", features = ["jsonpatch"] }
 libfuzzer-sys = "=0.3.2"
 libsecp256k1 = "0.7.0"
@@ -393,7 +407,12 @@ rand = "0.7.3"
 rand_core = "0.5.1"
 rayon = "1.5.2"
 regex = "1.5.5"
-reqwest = { version = "0.11.11", features = ["blocking", "cookies", "json", "stream"] }
+reqwest = { version = "0.11.11", features = [
+    "blocking",
+    "cookies",
+    "json",
+    "stream",
+] }
 reqwest-middleware = "0.1.6"
 reqwest-retry = "0.1.5"
 ring = { version = "0.16.20", features = ["std"] }
@@ -438,8 +457,17 @@ tokio-stream = "0.1.8"
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.5.9"
-tonic = { version = "0.8.3", features = ["tls-roots", "transport", "prost", "gzip", "codegen"] }
-ureq = { version = "1.5.4", features = ["json", "native-tls"], default_features = false }
+tonic = { version = "0.8.3", features = [
+    "tls-roots",
+    "transport",
+    "prost",
+    "gzip",
+    "codegen",
+] }
+ureq = { version = "1.5.4", features = [
+    "json",
+    "native-tls",
+], default_features = false }
 url = { version = "2.2.2", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 walkdir = "2.3.2"
@@ -456,8 +484,10 @@ move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = 
 move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
 move-cli = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
 move-command-line-common = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
-move-compiler ={ git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6", features = ["address32"] }
+move-compiler = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6", features = [
+    "address32",
+] }
 move-docgen = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
 move-ir-compiler = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
 move-model = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
@@ -472,9 +502,15 @@ move-stdlib = { git = "https://github.com/move-language/move", rev = "c8663453b1
 move-symbol-pool = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
 move-table-extension = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
 move-transactional-test-runner = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
-move-unit-test = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6", features = ["table-extension"] }
-move-vm-runtime = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6", features = ["lazy_natives"] }
-move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6", features = ["table-extension"] }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6", features = [
+    "table-extension",
+] }
+move-vm-runtime = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6", features = [
+    "lazy_natives",
+] }
+move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6", features = [
+    "table-extension",
+] }
 move-vm-types = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
 read-write-set = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }
 read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "c8663453b1c1ceed0928e0afeb8a15f7c94e47a6" }

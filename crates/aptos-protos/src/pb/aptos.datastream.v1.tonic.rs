@@ -1,12 +1,9 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 // @generated
 /// Generated client implementations.
 pub mod indexer_stream_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::http::Uri;
     use tonic::codegen::*;
+    use tonic::codegen::http::Uri;
     ///
     #[derive(Debug, Clone)]
     pub struct IndexerStreamClient<T> {
@@ -51,8 +48,9 @@ pub mod indexer_stream_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             IndexerStreamClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -79,19 +77,20 @@ pub mod indexer_stream_client {
             tonic::Response<tonic::codec::Streaming<super::RawDatastreamResponse>>,
             tonic::Status,
         > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/aptos.datastream.v1.IndexerStream/RawDatastream",
             );
-            self.inner
-                .server_streaming(request.into_request(), path, codec)
-                .await
+            self.inner.server_streaming(request.into_request(), path, codec).await
         }
     }
 }
@@ -103,7 +102,9 @@ pub mod indexer_stream_server {
     #[async_trait]
     pub trait IndexerStream: Send + Sync + 'static {
         ///Server streaming response type for the RawDatastream method.
-        type RawDatastreamStream: futures_core::Stream<Item = Result<super::RawDatastreamResponse, tonic::Status>>
+        type RawDatastreamStream: futures_core::Stream<
+                Item = Result<super::RawDatastreamResponse, tonic::Status>,
+            >
             + Send
             + 'static;
         ///
@@ -132,7 +133,10 @@ pub mod indexer_stream_server {
                 send_compression_encodings: Default::default(),
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -160,7 +164,10 @@ pub mod indexer_stream_server {
         type Response = http::Response<tonic::body::BoxBody>;
         type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
@@ -169,20 +176,24 @@ pub mod indexer_stream_server {
                 "/aptos.datastream.v1.IndexerStream/RawDatastream" => {
                     #[allow(non_camel_case_types)]
                     struct RawDatastreamSvc<T: IndexerStream>(pub Arc<T>);
-                    impl<T: IndexerStream>
-                        tonic::server::ServerStreamingService<super::RawDatastreamRequest>
-                        for RawDatastreamSvc<T>
-                    {
+                    impl<
+                        T: IndexerStream,
+                    > tonic::server::ServerStreamingService<super::RawDatastreamRequest>
+                    for RawDatastreamSvc<T> {
                         type Response = super::RawDatastreamResponse;
                         type ResponseStream = T::RawDatastreamStream;
-                        type Future =
-                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::RawDatastreamRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).raw_datastream(request).await };
+                            let fut = async move {
+                                (*inner).raw_datastream(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -193,23 +204,28 @@ pub mod indexer_stream_server {
                         let inner = inner.0;
                         let method = RawDatastreamSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
