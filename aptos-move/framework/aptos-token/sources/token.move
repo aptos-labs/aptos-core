@@ -11,7 +11,8 @@ module aptos_token::token {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
     use aptos_std::table::{Self, Table};
-    use aptos_token::property_map::{Self, PropertyMap};
+    use aptos_token::property_map::{Self, PropertyMap, PropertyValue};
+    use aptos_token::token_event_store;
 
     //
     // Constants
@@ -140,6 +141,13 @@ module aptos_token::token {
 
     /// Collection or tokendata maximum must be larger than supply
     const EINVALID_MAXIMUM: u64 = 36;
+
+    /// Token Properties count doesn't match
+    const ETOKEN_PROPERTIES_COUNT_NOT_MATCH: u64 = 37;
+
+
+    /// Withdraw capability doesn't have sufficient amount
+    const EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT: u64 = 38;
 
     //
     // Core data structures for holding tokens
@@ -468,6 +476,7 @@ module aptos_token::token {
         initialize_token_store(account);
         let opt_in_flag = &mut borrow_global_mut<TokenStore>(addr).direct_transfer;
         *opt_in_flag = opt_in;
+        token_event_store::emit_token_opt_in_event(account, opt_in);
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
@@ -641,6 +650,7 @@ module aptos_token::token {
         assert_collection_exists(creator_address, collection_name);
         let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
         assert!(collection_data.mutability_config.description, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_collection_description_mutate_event(creator, collection_name, collection_data.description, description);
         collection_data.description = description;
     }
 
@@ -650,6 +660,7 @@ module aptos_token::token {
         assert_collection_exists(creator_address, collection_name);
         let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
         assert!(collection_data.mutability_config.uri, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_collection_uri_mutate_event(creator, collection_name, collection_data.uri , uri);
         collection_data.uri = uri;
     }
 
@@ -661,6 +672,7 @@ module aptos_token::token {
         assert!(collection_data.maximum != 0 && maximum != 0, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(maximum >= collection_data.supply, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(collection_data.mutability_config.maximum, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_collection_maximum_mutate_event(creator, collection_name, collection_data.maximum, maximum);
         collection_data.maximum = maximum;
     }
 
@@ -673,6 +685,7 @@ module aptos_token::token {
         assert!(token_data.maximum != 0 && maximum != 0, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(maximum >= token_data.supply, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(token_data.mutability_config.maximum, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_token_maximum_mutate_event(creator, token_data_id.collection, token_data_id.name, token_data.maximum, maximum);
         token_data.maximum = maximum;
     }
 
@@ -687,6 +700,7 @@ module aptos_token::token {
         let all_token_data = &mut borrow_global_mut<Collections>(token_data_id.creator).token_data;
         let token_data = table::borrow_mut(all_token_data, token_data_id);
         assert!(token_data.mutability_config.uri, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_token_uri_mutate_event(creator, token_data_id.collection, token_data_id.name, token_data.uri ,uri);
         token_data.uri = uri;
     }
 
@@ -696,6 +710,18 @@ module aptos_token::token {
         let all_token_data = &mut borrow_global_mut<Collections>(token_data_id.creator).token_data;
         let token_data = table::borrow_mut(all_token_data, token_data_id);
         assert!(token_data.mutability_config.royalty, error::permission_denied(EFIELD_NOT_MUTABLE));
+
+        token_event_store::emit_token_royalty_mutate_event(
+            creator,
+            token_data_id.collection,
+            token_data_id.name,
+            token_data.royalty.royalty_points_numerator,
+            token_data.royalty.royalty_points_denominator,
+            token_data.royalty.payee_address,
+            royalty.royalty_points_numerator,
+            royalty.royalty_points_denominator,
+            royalty.payee_address
+        );
         token_data.royalty = royalty;
     }
 
@@ -705,6 +731,7 @@ module aptos_token::token {
         let all_token_data = &mut borrow_global_mut<Collections>(token_data_id.creator).token_data;
         let token_data = table::borrow_mut(all_token_data, token_data_id);
         assert!(token_data.mutability_config.description, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_token_descrition_mutate_event(creator, token_data_id.collection, token_data_id.name, token_data.description, description);
         token_data.description = description;
     }
 
@@ -717,11 +744,36 @@ module aptos_token::token {
         types: vector<String>,
     ) acquires Collections {
         assert_tokendata_exists(creator, token_data_id);
+        let key_len = vector::length(&keys);
+        let val_len = vector::length(&values);
+        let typ_len = vector::length(&types);
+        assert!(key_len == val_len, error::invalid_state(ETOKEN_PROPERTIES_COUNT_NOT_MATCH));
+        assert!(key_len == typ_len, error::invalid_state(ETOKEN_PROPERTIES_COUNT_NOT_MATCH));
 
         let all_token_data = &mut borrow_global_mut<Collections>(token_data_id.creator).token_data;
         let token_data = table::borrow_mut(all_token_data, token_data_id);
         assert!(token_data.mutability_config.properties, error::permission_denied(EFIELD_NOT_MUTABLE));
-        property_map::update_property_map(&mut token_data.default_properties, keys, values, types);
+        let i: u64 = 0;
+        let old_values: vector<Option<PropertyValue>> = vector::empty();
+        let new_values: vector<PropertyValue> = vector::empty();
+        while (i < vector::length(&keys)){
+            let key = vector::borrow(&keys, i);
+            let old_pv = if (property_map::contains_key(&token_data.default_properties, key)) {
+                option::some(*property_map::borrow(&token_data.default_properties, key))
+            } else {
+                option::none<PropertyValue>()
+            };
+            vector::push_back(&mut old_values, old_pv);
+            let new_pv = property_map::create_property_value_raw(*vector::borrow(&values, i), *vector::borrow(&types, i));
+            vector::push_back(&mut new_values, new_pv);
+            if (option::is_some(&old_pv)) {
+                property_map::update_property_value(&mut token_data.default_properties, key, new_pv);
+            } else {
+                property_map::add(&mut token_data.default_properties, *key, new_pv);
+            };
+            i = i + 1;
+        };
+        token_event_store::emit_default_property_mutate_event(creator, token_data_id.collection, token_data_id.name, keys, old_values, new_values);
     }
 
     public fun mutate_one_token(
@@ -913,6 +965,40 @@ module aptos_token::token {
             withdraw_proof.token_id,
             withdraw_proof.amount,
         )
+    }
+
+    /// Withdraw the token with a capability.
+    public fun partial_withdraw_with_capability(
+        withdraw_proof: WithdrawCapability,
+        withdraw_amount: u64,
+    ): (Token, Option<WithdrawCapability>) acquires TokenStore {
+        // verify the delegation hasn't expired yet
+        assert!(timestamp::now_seconds() <= *&withdraw_proof.expiration_sec, error::invalid_argument(EWITHDRAW_PROOF_EXPIRES));
+
+        assert!(withdraw_amount <= withdraw_proof.amount, error::invalid_argument(EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT));
+
+        let res: Option<WithdrawCapability> = if (withdraw_amount == withdraw_proof.amount) {
+            option::none<WithdrawCapability>()
+        } else {
+            option::some(
+                WithdrawCapability {
+                    token_owner: withdraw_proof.token_owner,
+                    token_id: withdraw_proof.token_id,
+                    amount: withdraw_proof.amount - withdraw_amount,
+                    expiration_sec: withdraw_proof.expiration_sec,
+                }
+            )
+        };
+
+        (
+            withdraw_with_event_internal(
+                withdraw_proof.token_owner,
+                withdraw_proof.token_id,
+                withdraw_amount,
+            ),
+            res
+        )
+
     }
 
     public fun withdraw_token(
@@ -2398,6 +2484,40 @@ module aptos_token::token {
     #[expected_failure(abort_code = 65570)]
     public fun test_enter_illegal_royalty(){
         create_royalty(101, 100, @0xcafe);
+    }
+
+    #[test(framework = @0x1, creator = @0xcafe)]
+    fun test_partial_withdraw_with_proof(creator: &signer, framework: &signer): Token acquires TokenStore, Collections {
+        timestamp::set_time_has_started_for_testing(framework);
+        account::create_account_for_test(signer::address_of(creator));
+        let token_id = create_collection_and_token(
+            creator,
+            4,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+
+        timestamp::update_global_time_for_test(1000000);
+
+        // provide the proof to the account
+        let cap = create_withdraw_capability(
+            creator, // ask user to provide address to avoid ambiguity from rotated keys
+            token_id,
+            3,
+            2000000,
+        );
+
+        let (token, capability) = partial_withdraw_with_capability(cap, 1);
+        assert!(option::borrow<WithdrawCapability>(&capability).amount == 2, 1);
+        let (token_1, cap) = partial_withdraw_with_capability(option::extract(&mut capability), 2);
+        assert!(option::is_none(&cap), 1);
+        merge(&mut token, token_1);
+        token
     }
 
     //

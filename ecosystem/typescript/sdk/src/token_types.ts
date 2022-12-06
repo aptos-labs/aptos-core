@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { deserializePropertyMap, PropertyMap } from "./utils/property_map_serde";
+import { deserializePropertyMap, PropertyMap, PropertyValue } from "./utils/property_map_serde";
 
+export { PropertyMap, PropertyValue };
 export class TokenData {
   /** Unique name within this creator's account for this Token's collection */
   collection: string;

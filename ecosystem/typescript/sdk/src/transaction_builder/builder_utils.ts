@@ -24,6 +24,13 @@ import {
 } from "../aptos_types";
 import { Serializer } from "../bcs";
 
+export const stringStructTag = new StructTag(
+  AccountAddress.fromHex("0x1"),
+  new Identifier("string"),
+  new Identifier("String"),
+  [],
+);
+
 function assertType(val: any, types: string[] | string, message?: string) {
   if (!types?.includes(typeof val)) {
     throw new Error(

@@ -1,6 +1,6 @@
 import { Bytes, Deserializer, Serializer } from "../bcs";
 import { TypeTagParser } from "../transaction_builder";
-import { serializeArg } from "../transaction_builder/builder_utils";
+import { serializeArg, stringStructTag } from "../transaction_builder/builder_utils";
 import {
   TypeTag,
   TypeTagAddress,
@@ -35,6 +35,16 @@ export class PropertyMap {
   }
 }
 
+export function getPropertyType(typ: string): TypeTag {
+  let typeTag: TypeTag;
+  if (typ === "string" || typ === "String") {
+    typeTag = new TypeTagStruct(stringStructTag);
+  } else {
+    typeTag = new TypeTagParser(typ).parseTypeTag();
+  }
+  return typeTag;
+}
+
 export function getPropertyValueRaw(values: Array<string>, types: Array<string>): Array<Bytes> {
   if (values.length !== types.length) {
     throw new Error("Length of property values and types not match");
@@ -43,7 +53,7 @@ export function getPropertyValueRaw(values: Array<string>, types: Array<string>)
   const results = new Array<Bytes>();
   types.forEach((typ, index) => {
     try {
-      const typeTag = new TypeTagParser(typ).parseTypeTag();
+      const typeTag = getPropertyType(typ);
       const serializer = new Serializer();
       serializeArg(values[index], typeTag, serializer);
       results.push(serializer.getBytes());
@@ -62,7 +72,7 @@ export function deserializePropertyMap(rawPropertyMap: any): PropertyMap {
     const { key } = prop;
     const val: string = prop.value.value;
     const typ: string = prop.value.type;
-    const typeTag = new TypeTagParser(typ).parseTypeTag();
+    const typeTag = getPropertyType(typ);
     const newValue = deserializeValueBasedOnTypeTag(typeTag, val);
     const pv = new PropertyValue(typ, newValue);
     pm.setProperty(key, pv);

@@ -69,6 +69,7 @@ const sidebars = {
         "cli-tools/install-move-prover",
       ],
     },
+    "guides/system-integrators-guide",
     {
       type: "html",
       value: "Build Apps",
@@ -87,7 +88,7 @@ const sidebars = {
       label: "Read Blockchain Data",
       collapsible: true,
       collapsed: true,
-      items: ["guides/system-integrators-guide", "guides/indexing"],
+      items: ["guides/aptos-apis", "guides/indexing"],
     },
     {
       type: "category",
@@ -237,7 +238,6 @@ const sidebars = {
       items: [
         "concepts/fullnodes",
         "nodes/full-node/fullnode-source-code-or-docker",
-        "nodes/full-node/bootstrap-fullnode",
         "nodes/full-node/update-fullnode-with-new-releases",
         "nodes/full-node/network-identity-fullnode",
         "nodes/full-node/fullnode-network-connections",

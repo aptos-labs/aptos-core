@@ -13,8 +13,12 @@ use crate::{
     },
 };
 
+use anyhow::Result;
 use aptos_types::event::EventKey;
 pub use aptos_types::*;
+use bip39::{Language, Mnemonic, Seed};
+use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
+use std::str::FromStr;
 
 /// LocalAccount represents an account on the Aptos blockchain. Internally it
 /// holds the private / public key pair and the address of the account. You can
@@ -40,6 +44,29 @@ impl LocalAccount {
             key: key.into(),
             sequence_number,
         }
+    }
+
+    /// Recover an account from derive path (e.g. m/44'/637'/0'/0'/0') and mnemonic phrase,
+    pub fn from_derive_path(
+        derive_path: &str,
+        mnemonic_phrase: &str,
+        sequence_number: u64,
+    ) -> Result<Self> {
+        let derive_path = DerivationPath::from_str(derive_path)?;
+        let mnemonic = Mnemonic::from_phrase(mnemonic_phrase, Language::English)?;
+        // TODO: Make `password` as an optional argument.
+        let seed = Seed::new(&mnemonic, "");
+        let key = ExtendedSecretKey::from_seed(seed.as_bytes())?
+            .derive(&derive_path)?
+            .secret_key;
+        let key = AccountKey::from(Ed25519PrivateKey::try_from(key.as_bytes().as_ref())?);
+        let address = key.authentication_key().derived_address();
+
+        Ok(Self {
+            address,
+            key,
+            sequence_number,
+        })
     }
 
     /// Generate a new account locally. Note: This function does not actually
@@ -181,5 +208,30 @@ impl AccountKey {
 impl From<Ed25519PrivateKey> for AccountKey {
     fn from(private_key: Ed25519PrivateKey) -> Self {
         Self::from_private_key(private_key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_recover_account_from_derive_path() {
+        // Same constants in test cases of TypeScript
+        // https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/aptos_account.test.ts
+        let derive_path = "m/44'/637'/0'/0'/0'";
+        let mnemonic_phrase =
+            "shoot island position soft burden budget tooth cruel issue economy destroy above";
+        let expected_address = "0x7968dab936c1bad187c60ce4082f307d030d780e91e694ae03aef16aba73f30";
+
+        // Validate if the expected address.
+        let account = LocalAccount::from_derive_path(derive_path, mnemonic_phrase, 0).unwrap();
+        assert_eq!(account.address().to_hex_literal(), expected_address);
+
+        // Return an error for empty derive path.
+        assert!(LocalAccount::from_derive_path("", mnemonic_phrase, 0).is_err());
+
+        // Return an error for empty mnemonic phrase.
+        assert!(LocalAccount::from_derive_path(derive_path, "", 0).is_err());
     }
 }

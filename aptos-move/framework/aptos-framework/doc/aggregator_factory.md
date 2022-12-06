@@ -3,34 +3,11 @@
 
 # Module `0x1::aggregator_factory`
 
-This module provides foundations to create aggregators in the system.
-
-Design rationale (V1)
-=====================
-First, we encourage the reader to see rationale of <code>Aggregator</code> in
-<code><a href="aggregator.md#0x1_aggregator">aggregator</a>.<b>move</b></code>.
-
-Recall that the value of any aggregator can be identified in storage by
-(handle, key) pair. How this pair can be generated? Short answer: with
-<code><a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a></code>!
-
-<code><a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a></code> is a struct that can be stored as a resource on some
-account and which contains a <code>phantom_table</code> field. When the factory is
-initialized, we initialize this table. Importantly, table initialization
-only generates a uniue table <code>handle</code> - something we can reuse.
-
-When the user wants to create a new aggregator, he/she calls a constructor
-provided by the factory (<code><a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator">create_aggregator</a>(..)</code>). This constructor generates
-a unique key, which with the handle is used to initialize <code>Aggregator</code> struct.
-
-Use cases
-=========
-We limit the usage of <code><a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a></code> by only storing it on the core
-account.
-
-When something whants to use an aggregator, the factory is queried and an
-aggregator instance is created. Once aggregator is no longer in use, it
-should be destroyed by the user.
+This module provides foundations to create aggregators. Currently only
+Aptos Framework (0x1) can create them, so this module helps to wrap
+the constructor of <code>Aggregator</code> struct so that only a system account
+can initialize one. In the future, this might change and aggregators
+can be enabled for the public.
 
 
 -  [Resource `AggregatorFactory`](#0x1_aggregator_factory_AggregatorFactory)
@@ -55,7 +32,9 @@ should be destroyed by the user.
 
 ## Resource `AggregatorFactory`
 
-Struct that creates aggregators.
+Creates new aggregators. Used to control the numbers of aggregators in the
+system and who can create them. At the moment, only Aptos Framework (0x1)
+account can.
 
 
 <pre><code><b>struct</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a> <b>has</b> key
@@ -86,7 +65,7 @@ Struct that creates aggregators.
 
 <a name="0x1_aggregator_factory_EAGGREGATOR_FACTORY_NOT_FOUND"></a>
 
-When aggregator factory is not published yet.
+Aggregator factory is not published yet.
 
 
 <pre><code><b>const</b> <a href="aggregator_factory.md#0x1_aggregator_factory_EAGGREGATOR_FACTORY_NOT_FOUND">EAGGREGATOR_FACTORY_NOT_FOUND</a>: u64 = 1;
@@ -98,8 +77,7 @@ When aggregator factory is not published yet.
 
 ## Function `initialize_aggregator_factory`
 
-Can only be called during genesis.
-Creates a new factory for aggregators.
+Creates a new factory for aggregators. Can only be called during genesis.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_initialize_aggregator_factory">initialize_aggregator_factory</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
@@ -187,6 +165,7 @@ to allow any signer to call.
 
 ## Function `new_aggregator`
 
+Returns a new aggregator.
 
 
 <pre><code><b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_new_aggregator">new_aggregator</a>(<a href="aggregator_factory.md#0x1_aggregator_factory">aggregator_factory</a>: &<b>mut</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>, limit: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>
