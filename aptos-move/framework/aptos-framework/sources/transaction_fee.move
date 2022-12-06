@@ -12,12 +12,12 @@ module aptos_framework::transaction_fee {
     friend aptos_framework::reconfiguration;
     friend aptos_framework::transaction_validation;
 
-    /// When gas fees are already being collected and the struct holding
+    /// Gas fees are already being collected and the struct holding
     /// information about collected amounts is already published.
     const EALREADY_COLLECTING_FEES: u64 = 1;
 
-    /// When the burn percentage is out of range [0, 100].
-    const EINVALID_BURN_PERCENTAGE: u64 = 2;
+    /// The burn percentage is out of range [0, 100].
+    const EINVALID_BURN_PERCENTAGE: u64 = 3;
 
     /// Stores burn capability to burn the gas fees.
     struct AptosCoinCapabilities has key {
@@ -56,6 +56,18 @@ module aptos_framework::transaction_fee {
 
     fun is_fees_collection_enabled(): bool {
         exists<CollectedFeesPerBlock>(@aptos_framework)
+    }
+
+    /// Sets the burn percentage for collected fees to a new value. Should be called by on-chain governance.
+    public fun upgrade_burn_percentage(aptos_framework: &signer, new_burn_percentage: u8) acquires CollectedFeesPerBlock {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(new_burn_percentage <= 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));
+
+        if (is_fees_collection_enabled()) {
+            // Upgrade has no effect unless fees are being collected.
+            let burn_percentage = &mut borrow_global_mut<CollectedFeesPerBlock>(@aptos_framework).burn_percentage;
+            *burn_percentage = new_burn_percentage
+        }
     }
 
     /// Registers the proposer of the block for gas fees collection. This function

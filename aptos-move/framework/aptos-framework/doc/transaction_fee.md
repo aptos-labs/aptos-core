@@ -11,6 +11,7 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Constants](#@Constants_0)
 -  [Function `initialize_fee_collection_and_distribution`](#0x1_transaction_fee_initialize_fee_collection_and_distribution)
 -  [Function `is_fees_collection_enabled`](#0x1_transaction_fee_is_fees_collection_enabled)
+-  [Function `upgrade_burn_percentage`](#0x1_transaction_fee_upgrade_burn_percentage)
 -  [Function `register_proposer_for_fee_collection`](#0x1_transaction_fee_register_proposer_for_fee_collection)
 -  [Function `burn_coin_fraction`](#0x1_transaction_fee_burn_coin_fraction)
 -  [Function `process_collected_fees`](#0x1_transaction_fee_process_collected_fees)
@@ -108,7 +109,7 @@ collected when executing the block.
 
 <a name="0x1_transaction_fee_EALREADY_COLLECTING_FEES"></a>
 
-When gas fees are already being collected and the struct holding
+Gas fees are already being collected and the struct holding
 information about collected amounts is already published.
 
 
@@ -119,10 +120,10 @@ information about collected amounts is already published.
 
 <a name="0x1_transaction_fee_EINVALID_BURN_PERCENTAGE"></a>
 
-When the burn percentage is out of range [0, 100].
+The burn percentage is out of range [0, 100].
 
 
-<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>: u64 = 2;
+<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>: u64 = 3;
 </code></pre>
 
 
@@ -186,6 +187,38 @@ distribution. Should be called by on-chain governance.
 
 <pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>(): bool {
     <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_transaction_fee_upgrade_burn_percentage"></a>
+
+## Function `upgrade_burn_percentage`
+
+Sets the burn percentage for collected fees to a new value. Should be called by on-chain governance.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_burn_percentage: u8)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_burn_percentage: u8) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>assert</b>!(new_burn_percentage &lt;= 100, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>));
+
+    <b>if</b> (<a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>()) {
+        // Upgrade <b>has</b> no effect unless fees are being collected.
+        <b>let</b> burn_percentage = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).burn_percentage;
+        *burn_percentage = new_burn_percentage
+    }
 }
 </code></pre>
 
