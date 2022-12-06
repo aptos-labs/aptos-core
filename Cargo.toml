@@ -191,6 +191,7 @@ aptos-github-client = { path = "secure/storage/github" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
+aptos-indexer-grpc = { path = "crates/indexer-grpc" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
 aptos-keygen = { path = "crates/aptos-keygen" }

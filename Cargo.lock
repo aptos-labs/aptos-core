@@ -936,6 +936,7 @@ dependencies = [
  "aptos-data-client",
  "aptos-genesis",
  "aptos-indexer",
+ "aptos-indexer-grpc",
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",

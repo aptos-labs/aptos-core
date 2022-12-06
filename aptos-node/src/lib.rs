@@ -18,6 +18,7 @@ use aptos_config::{
     utils::get_genesis_txn,
 };
 use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_indexer_grpc::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -169,6 +170,7 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
+    _indexer_grpc: Option<Runtime>,
     _index_runtime: Option<Runtime>,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
@@ -810,6 +812,16 @@ pub fn setup_environment(
         None
     };
 
+    let indexer_grpc = match bootstrap_indexer_grpc(
+        &node_config,
+        chain_id,
+        aptos_db.clone(),
+        mp_client_sender.clone(),
+    ) {
+        None => None,
+        Some(res) => Some(res?),
+    };
+
     let index_runtime = bootstrap_indexer(&node_config, chain_id, aptos_db, mp_client_sender)?;
 
     let mut consensus_runtime = None;
@@ -874,6 +886,7 @@ pub fn setup_environment(
         _mempool: mempool,
         _network_runtimes: network_runtimes,
         _index_runtime: index_runtime,
+        _indexer_grpc: indexer_grpc,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })

@@ -21,6 +21,7 @@ aptos-crypto = { workspace = true }
 aptos-data-client = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-indexer = { workspace = true, optional = true }
+aptos-indexer-grpc = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-mempool = { workspace = true }
@@ -65,7 +66,15 @@ jemallocator = { workspace = true }
 
 [features]
 default = []
-assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-cloneable"]
-failpoints = ["fail/failpoints", "consensus/failpoints", "executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
+assert-private-keys-not-cloneable = [
+  "aptos-crypto/assert-private-keys-not-cloneable",
+]
+failpoints = [
+  "fail/failpoints",
+  "consensus/failpoints",
+  "executor/failpoints",
+  "aptos-mempool/failpoints",
+  "aptos-api/failpoints",
+]
 indexer = ["aptos-indexer"]
 check-vm-features = []
