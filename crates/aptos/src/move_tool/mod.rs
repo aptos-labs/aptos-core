@@ -606,7 +606,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include less artifacts via `--included_artifacts`. \
+                you may want to include less artifacts via `--included-artifacts`. \
                 You can also override this check with `--override-size-check",
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
@@ -699,7 +699,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include less artifacts via `--included_artifacts`. \
+                you may want to include less artifacts via `--included-artifacts`. \
                 You can also override this check with `--override-size-check",
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));

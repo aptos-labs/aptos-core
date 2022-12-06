@@ -14,14 +14,25 @@ message TransactionOutput {
   uint64 version = 2;
 }
 
+
+/*
+StreamStatus serves as the signal to inform the downstream about current
+streaming status. It
+  1. sends the INIT signal for the first time when connection starts.
+    Only start_version is present.
+  2. sends the BATCH_END signal for each batch ends. Both starting version(inclusive) and
+    end version(exclusive) for the batch are present, i.e., [start_version, end_version).
+*/
 message StreamStatus {
   enum StatusType {
-    BATCH_START = 0;
+    INIT = 0;
     BATCH_END = 1;
   }
   StatusType type = 1;
+  // Starting version of current stream/batch, inclusive.
   uint64 start_version = 2;
-  uint64 end_version = 3;
+  // Ending version of current batch, exclusive.
+  optional uint64 end_version = 3;
 }
 
 message RawDatastreamRequest {

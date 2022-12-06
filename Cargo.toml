@@ -41,6 +41,7 @@ members = [
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
+    "crates/aptos-datastream-worker",
     "crates/aptos-faucet",
     "crates/aptos-faucet-cli",
     "crates/aptos-genesis",
@@ -180,6 +181,7 @@ aptos-config = { path = "config" }
 aptos-crypto = { path = "crates/aptos-crypto" }
 aptos-crypto-derive = { path = "crates/aptos-crypto-derive" }
 aptos-data-client = { path = "state-sync/aptos-data-client" }
+aptos-datastream-worker = { path = "crates/aptos-datastream-worker" }
 aptosdb-indexer = { path = "storage/indexer" }
 aptos-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-faucet = { path = "crates/aptos-faucet" }
@@ -320,6 +322,7 @@ digest = "0.9.0"
 dir-diff = "0.3.2"
 dirs = "4.0.0"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
+deadpool-redis = "0.11.0"
 ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
 enum_dispatch = "0.3.8"
@@ -392,6 +395,7 @@ quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
 rayon = "1.5.2"
+redis = "0.22.1"
 regex = "1.5.5"
 reqwest = { version = "0.11.11", features = ["blocking", "cookies", "json", "stream"] }
 reqwest-middleware = "0.1.6"
