@@ -23,7 +23,7 @@ macro_rules! define_gas_parameters_for_natives {
         $(, allow_unmapped = $allow_unmapped: expr)?
     ) => {
         impl crate::gas_meter::FromOnChainGasSchedule for $param_ty {
-            fn from_on_chain_gas_schedule(gas_schedule: &std::collections::BTreeMap<String, u64>) -> Option<Self> {
+            fn from_on_chain_gas_schedule(gas_schedule: &std::collections::BTreeMap<String, u64>, feature_version: u64) -> Option<Self> {
                 let mut params = <$param_ty>::zeros();
 
                 $(
@@ -35,7 +35,7 @@ macro_rules! define_gas_parameters_for_natives {
         }
 
         impl crate::gas_meter::ToOnChainGasSchedule for $param_ty {
-            fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)> {
+            fn to_on_chain_gas_schedule(&self, feature_version: u64) -> Vec<(String, u64)> {
                 [$(($key, u64::from(self $(.$field)+))),*]
                     .into_iter().map(|(key, val)| (format!("{}.{}", $package_name, key), val)).collect()
             }
@@ -92,7 +92,7 @@ pub(crate) use expand_get_impl_for_native_gas_params;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gas_meter::FromOnChainGasSchedule;
+    use crate::gas_meter::{FromOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION};
     use move_core_types::gas_algebra::InternalGas;
 
     #[derive(Debug, Clone)]
@@ -121,12 +121,16 @@ mod tests {
         assert!(matches!(
             GasParameters::from_on_chain_gas_schedule(
                 &[("test.foo".to_string(), 0)].into_iter().collect(),
+                LATEST_GAS_FEATURE_VERSION
             ),
             Some(_)
         ));
 
         assert!(matches!(
-            GasParameters::from_on_chain_gas_schedule(&[].into_iter().collect()),
+            GasParameters::from_on_chain_gas_schedule(
+                &[].into_iter().collect(),
+                LATEST_GAS_FEATURE_VERSION
+            ),
             None
         ));
     }

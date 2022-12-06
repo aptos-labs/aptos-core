@@ -69,7 +69,7 @@ crate::params::define_gas_parameters!(
         // call
         [call_base: InternalGas, "call.base", 1000 * MUL],
         [call_per_arg: InternalGasPerArg, "call.per_arg", 100 * MUL],
-        [call_per_local: InternalGasPerArg, optional "call.per_local", 100 * MUL],
+        [call_per_local: InternalGasPerArg, { 1.. => "call.per_local" }, 100 * MUL],
         [call_generic_base: InternalGas, "call_generic.base", 1000 * MUL],
         [
             call_generic_per_ty_arg: InternalGasPerArg,
@@ -81,7 +81,7 @@ crate::params::define_gas_parameters!(
             "call_generic.per_arg",
             100 * MUL
         ],
-        [call_generic_per_local: InternalGasPerArg, optional "call_generic.per_local", 100 * MUL],
+        [call_generic_per_local: InternalGasPerArg, { 1.. => "call_generic.per_local" }, 100 * MUL],
         // struct
         [pack_base: InternalGas, "pack.base", 220 * MUL],
         [pack_per_field: InternalGasPerArg, "pack.per_field", 40 * MUL],

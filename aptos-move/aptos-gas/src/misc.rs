@@ -579,16 +579,22 @@ pub struct MiscGasParameters {
 }
 
 impl FromOnChainGasSchedule for MiscGasParameters {
-    fn from_on_chain_gas_schedule(gas_schedule: &BTreeMap<String, u64>) -> Option<Self> {
+    fn from_on_chain_gas_schedule(
+        gas_schedule: &BTreeMap<String, u64>,
+        feature_version: u64,
+    ) -> Option<Self> {
         Some(Self {
-            abs_val: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
+            abs_val: FromOnChainGasSchedule::from_on_chain_gas_schedule(
+                gas_schedule,
+                feature_version,
+            )?,
         })
     }
 }
 
 impl ToOnChainGasSchedule for MiscGasParameters {
-    fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)> {
-        self.abs_val.to_on_chain_gas_schedule()
+    fn to_on_chain_gas_schedule(&self, feature_version: u64) -> Vec<(String, u64)> {
+        self.abs_val.to_on_chain_gas_schedule(feature_version)
     }
 }
 
