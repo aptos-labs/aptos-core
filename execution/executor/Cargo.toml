@@ -33,7 +33,7 @@ executor-types = { path = "../executor-types" }
 scratchpad = { path = "../../storage/scratchpad" }
 storage-interface = { path = "../../storage/storage-interface" }
 
-move-core-types = { git = "https://github.com/aptos-labs/move-private", rev = "79ade41b0dc503e0e45a55a18b0fa6f8df60ead2", features = ["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "7d9d1ebccc7bef425ab40f141d0683cfe564cd47", features = ["address32"] }
 
 [dev-dependencies]
 proptest = "1.0.0"

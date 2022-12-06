@@ -43,7 +43,7 @@ aptos-vm = { path = "../aptos-move/aptos-vm" }
 
 storage-interface = { path = "../storage/storage-interface" }
 
-move-core-types = { git = "https://github.com/aptos-labs/move-private", rev = "79ade41b0dc503e0e45a55a18b0fa6f8df60ead2", features = ["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "7d9d1ebccc7bef425ab40f141d0683cfe564cd47", features = ["address32"] }
 
 [dev-dependencies]
 aptos-api-test-context = { path = "./test-context", package = "aptos-api-test-context" }
@@ -57,7 +57,7 @@ regex = "1.5.5"
 reqwest = { version = "0.11.10", features = ["blocking", "json"], default_features = false }
 warp = { version = "0.3.2", features = ["default"] }
 
-move-package = { git = "https://github.com/aptos-labs/move-private", rev = "79ade41b0dc503e0e45a55a18b0fa6f8df60ead2" }
+move-package = { git = "https://github.com/move-language/move", rev = "7d9d1ebccc7bef425ab40f141d0683cfe564cd47" }
 
 [features]
 failpoints = ["fail/failpoints"]
