@@ -168,9 +168,9 @@ pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> 
     };
 
     if is_yes {
-        return Ok(());
+        Ok(())
     } else {
-        return Err(CliError::AbortedError);
+        Err(CliError::AbortedError)
     }
 }
 
