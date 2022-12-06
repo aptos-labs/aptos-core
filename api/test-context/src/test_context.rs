@@ -99,7 +99,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
     )
     .unwrap()
     .with_init_genesis_config(Some(Arc::new(|genesis_config| {
-        genesis_config.recurring_lockup_duration_secs = 86400;
+        genesis_config.staking.recurring_lockup_duration_secs = 86400;
     })))
     .with_randomize_first_validator_ports(false);
 

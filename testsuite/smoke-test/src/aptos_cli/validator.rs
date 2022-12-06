@@ -370,8 +370,8 @@ async fn test_large_total_stake() {
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = 4;
-            genesis_config.recurring_lockup_duration_secs = 4;
-            genesis_config.voting_duration_secs = 3;
+            genesis_config.staking.recurring_lockup_duration_secs = 4;
+            genesis_config.governance.voting_duration_secs = 3;
         }))
         .build_with_cli(0)
         .await;
@@ -441,9 +441,9 @@ async fn test_nodes_rewards() {
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = 4;
-            genesis_config.recurring_lockup_duration_secs = 4;
-            genesis_config.voting_duration_secs = 3;
-            genesis_config.rewards_apy_percentage = 10;
+            genesis_config.staking.recurring_lockup_duration_secs = 4;
+            genesis_config.governance.voting_duration_secs = 3;
+            genesis_config.rewards.rewards_apy_percentage = 10;
         }))
         .build_with_cli(0)
         .await;
@@ -867,8 +867,8 @@ async fn test_join_and_leave_validator() {
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = 5;
-            genesis_config.recurring_lockup_duration_secs = 10;
-            genesis_config.voting_duration_secs = 5;
+            genesis_config.staking.recurring_lockup_duration_secs = 10;
+            genesis_config.governance.voting_duration_secs = 5;
         }))
         .build_with_cli(0)
         .await;
@@ -1030,9 +1030,9 @@ async fn test_owner_create_and_delegate_flow() {
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = 5;
-            genesis_config.recurring_lockup_duration_secs = 10;
-            genesis_config.voting_duration_secs = 5;
-            genesis_config.min_stake = 500000
+            genesis_config.staking.recurring_lockup_duration_secs = 10;
+            genesis_config.governance.voting_duration_secs = 5;
+            genesis_config.staking.min_stake = 500000
         }))
         .build_with_cli(0)
         .await;

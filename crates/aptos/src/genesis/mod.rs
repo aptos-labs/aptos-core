@@ -244,16 +244,10 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             allow_new_validators: true,
             epoch_duration_secs: layout.epoch_duration_secs,
             is_test: false,
-            min_stake: layout.min_stake,
-            min_voting_threshold: layout.min_voting_threshold,
-            max_stake: layout.max_stake,
-            recurring_lockup_duration_secs: layout.recurring_lockup_duration_secs,
-            required_proposer_stake: layout.required_proposer_stake,
-            rewards_apy_percentage: layout.rewards_apy_percentage,
-            voting_duration_secs: layout.voting_duration_secs,
-            voting_power_increase_limit: layout.voting_power_increase_limit,
-            employee_vesting_start: layout.employee_vesting_start,
-            employee_vesting_period_duration: layout.employee_vesting_period_duration,
+            staking: layout.staking,
+            rewards: layout.rewards,
+            governance: layout.governance,
+            employee_vesting: layout.employee_vesting,
             consensus_config: OnChainConsensusConfig::default(),
             gas_schedule: default_gas_schedule(),
         },
@@ -283,16 +277,10 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             allow_new_validators: layout.allow_new_validators,
             epoch_duration_secs: layout.epoch_duration_secs,
             is_test: layout.is_test,
-            min_stake: layout.min_stake,
-            min_voting_threshold: layout.min_voting_threshold,
-            max_stake: layout.max_stake,
-            recurring_lockup_duration_secs: layout.recurring_lockup_duration_secs,
-            required_proposer_stake: layout.required_proposer_stake,
-            rewards_apy_percentage: layout.rewards_apy_percentage,
-            voting_duration_secs: layout.voting_duration_secs,
-            voting_power_increase_limit: layout.voting_power_increase_limit,
-            employee_vesting_start: layout.employee_vesting_start,
-            employee_vesting_period_duration: layout.employee_vesting_period_duration,
+            staking: layout.staking,
+            rewards: layout.rewards,
+            governance: layout.governance,
+            employee_vesting: layout.employee_vesting,
             consensus_config: OnChainConsensusConfig::default(),
             gas_schedule: default_gas_schedule(),
         },
@@ -686,16 +674,16 @@ fn validate_validators(
                 validator.owner_account_address, name, owner_balance, validator.stake_amount
             )));
         }
-        if validator.stake_amount < layout.min_stake {
+        if validator.stake_amount < layout.staking.min_stake {
             errors.push(CliError::UnexpectedError(format!(
                 "Validator {} has stake {} under the min stake {}",
-                name, validator.stake_amount, layout.min_stake
+                name, validator.stake_amount, layout.staking.min_stake
             )));
         }
-        if validator.stake_amount > layout.max_stake {
+        if validator.stake_amount > layout.staking.max_stake {
             errors.push(CliError::UnexpectedError(format!(
                 "Validator {} has stake {} over the max stake {}",
-                name, validator.stake_amount, layout.max_stake
+                name, validator.stake_amount, layout.staking.max_stake
             )));
         }
 

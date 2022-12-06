@@ -170,8 +170,8 @@ async fn test_upgrade_flow_multi_step() {
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
-            genesis_config.voting_duration_secs = 30;
-            genesis_config.voting_power_increase_limit = 50;
+            genesis_config.governance.voting_duration_secs = 30;
+            genesis_config.staking.voting_power_increase_limit = 50;
             genesis_config.epoch_duration_secs = 4;
         }))
         .build_with_cli(2)
@@ -297,8 +297,8 @@ async fn test_release_validate_tool_multi_step() {
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
-            genesis_config.voting_duration_secs = 30;
-            genesis_config.voting_power_increase_limit = 50;
+            genesis_config.governance.voting_duration_secs = 30;
+            genesis_config.staking.voting_power_increase_limit = 50;
             genesis_config.epoch_duration_secs = 4;
         }))
         .build_with_cli(2)
