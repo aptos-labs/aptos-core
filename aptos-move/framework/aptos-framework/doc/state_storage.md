@@ -362,7 +362,6 @@ aborts if StateStorageUsage already exists.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
