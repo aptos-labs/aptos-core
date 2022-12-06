@@ -13,17 +13,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "accumulator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-types",
- "proptest",
- "rand 0.7.3",
-]
-
-[[package]]
 name = "addr2line"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -195,6 +184,17 @@ dependencies = [
  "toml",
  "vm-genesis",
  "walkdir",
+]
+
+[[package]]
+name = "aptos-accumulator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-types",
+ "proptest",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -586,8 +586,8 @@ dependencies = [
 name = "aptos-fuzzer"
 version = "0.1.0"
 dependencies = [
- "accumulator",
  "anyhow",
+ "aptos-accumulator",
  "aptos-crypto",
  "aptos-jellyfish-merkle",
  "aptos-mempool",
@@ -1524,8 +1524,8 @@ dependencies = [
 name = "aptosdb"
 version = "0.1.0"
 dependencies = [
- "accumulator",
  "anyhow",
+ "aptos-accumulator",
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",
