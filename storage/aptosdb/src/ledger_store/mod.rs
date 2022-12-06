@@ -13,8 +13,8 @@ use crate::{
         transaction_info::TransactionInfoSchema,
     },
 };
-use accumulator::{HashReader, MerkleAccumulator};
 use anyhow::{ensure, format_err, Result};
+use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
     hash::{CryptoHash, TransactionAccumulatorHasher},
     HashValue,

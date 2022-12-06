@@ -13,8 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-accumulator = { workspace = true, features = ["fuzzing"] }
 anyhow = { workspace = true }
+aptos-accumulator = { workspace = true, features = ["fuzzing"] }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-jellyfish-merkle = { workspace = true, features = ["fuzzing"] }
 aptos-mempool = { workspace = true }
