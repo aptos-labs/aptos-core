@@ -663,10 +663,18 @@ fn spawn_state_snapshot_receiver<
                                     last_committed_state_index
                                 ))
                             );
+
+                            let operation_label =
+                                metrics::StorageSynchronizerOperations::SyncedStates.get_label();
                             metrics::set_gauge(
                                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                                metrics::StorageSynchronizerOperations::SyncedStates.get_label(),
+                                operation_label,
                                 last_committed_state_index as u64,
+                            );
+                            metrics::observe_value(
+                                &metrics::STORAGE_SYNCHRONIZER_CHUNK_SIZES,
+                                operation_label,
+                                num_state_values as u64,
                             );
 
                             if !all_states_synced {
