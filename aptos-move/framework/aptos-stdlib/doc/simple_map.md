@@ -22,7 +22,6 @@ This module provides a solution for sorted maps, that is it has the properties t
 -  [Function `destroy_empty`](#0x1_simple_map_destroy_empty)
 -  [Function `add`](#0x1_simple_map_add)
 -  [Function `remove`](#0x1_simple_map_remove)
--  [Function `find_element`](#0x1_simple_map_find_element)
 -  [Function `find`](#0x1_simple_map_find)
 -  [Specification](#@Specification_1)
     -  [Struct `SimpleMap`](#@Specification_1_SimpleMap)
@@ -106,16 +105,6 @@ This module provides a solution for sorted maps, that is it has the properties t
 <a name="@Constants_0"></a>
 
 ## Constants
-
-
-<a name="0x1_simple_map_EDEPRECATED_FUNCTION"></a>
-
-Deprecated method
-
-
-<pre><code><b>const</b> <a href="simple_map.md#0x1_simple_map_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>: u64 = 3;
-</code></pre>
-
 
 
 <a name="0x1_simple_map_EKEY_ALREADY_EXISTS"></a>
@@ -207,7 +196,7 @@ Map key is not found
     map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
     key: &Key,
 ): &Value {
-    <b>let</b> maybe_idx = <a href="simple_map.md#0x1_simple_map_find_element">find_element</a>(map, key);
+    <b>let</b> maybe_idx = <a href="simple_map.md#0x1_simple_map_find">find</a>(map, key);
     <b>assert</b>!(<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&maybe_idx), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="simple_map.md#0x1_simple_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
     <b>let</b> idx = <a href="../../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> maybe_idx);
     &<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&map.data, idx).value
@@ -237,7 +226,7 @@ Map key is not found
     map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
     key: &Key,
 ): &<b>mut</b> Value {
-    <b>let</b> maybe_idx = <a href="simple_map.md#0x1_simple_map_find_element">find_element</a>(map, key);
+    <b>let</b> maybe_idx = <a href="simple_map.md#0x1_simple_map_find">find</a>(map, key);
     <b>assert</b>!(<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&maybe_idx), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="simple_map.md#0x1_simple_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
     <b>let</b> idx = <a href="../../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> maybe_idx);
     &<b>mut</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> map.data, idx).value
@@ -267,7 +256,7 @@ Map key is not found
     map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
     key: &Key,
 ): bool {
-    <b>let</b> maybe_idx = <a href="simple_map.md#0x1_simple_map_find_element">find_element</a>(map, key);
+    <b>let</b> maybe_idx = <a href="simple_map.md#0x1_simple_map_find">find</a>(map, key);
     <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&maybe_idx)
 }
 </code></pre>
@@ -321,10 +310,9 @@ Map key is not found
     key: Key,
     value: Value,
 ) {
-    <b>let</b> maybe_idx = <a href="simple_map.md#0x1_simple_map_find_element">find_element</a>(map, &key);
+    <b>let</b> maybe_idx = <a href="simple_map.md#0x1_simple_map_find">find</a>(map, &key);
     <b>assert</b>!(<a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&maybe_idx), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="simple_map.md#0x1_simple_map_EKEY_ALREADY_EXISTS">EKEY_ALREADY_EXISTS</a>));
 
-    // Append <b>to</b> the end and then swap elements until the list is ordered again
     <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> map.data, <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value });
 }
 </code></pre>
@@ -352,7 +340,7 @@ Map key is not found
     map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
     key: &Key,
 ): (Key, Value) {
-    <b>let</b> maybe_idx = <a href="simple_map.md#0x1_simple_map_find_element">find_element</a>(map, key);
+    <b>let</b> maybe_idx = <a href="simple_map.md#0x1_simple_map_find">find</a>(map, key);
     <b>assert</b>!(<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&maybe_idx), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="simple_map.md#0x1_simple_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
 
     <b>let</b> placement = <a href="../../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> maybe_idx);
@@ -372,13 +360,13 @@ Map key is not found
 
 </details>
 
-<a name="0x1_simple_map_find_element"></a>
+<a name="0x1_simple_map_find"></a>
 
-## Function `find_element`
+## Function `find`
 
 
 
-<pre><code><b>fun</b> <a href="simple_map.md#0x1_simple_map_find_element">find_element</a>&lt;Key: store, Value: store&gt;(map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, key: &Key): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>fun</b> <a href="simple_map.md#0x1_simple_map_find">find</a>&lt;Key: store, Value: store&gt;(map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, key: &Key): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -387,7 +375,7 @@ Map key is not found
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="simple_map.md#0x1_simple_map_find_element">find_element</a>&lt;Key: store, Value: store&gt;(
+<pre><code><b>fun</b> <a href="simple_map.md#0x1_simple_map_find">find</a>&lt;Key: store, Value: store&gt;(
     map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
     key: &Key,
 ): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;{
@@ -398,36 +386,9 @@ Map key is not found
         <b>if</b> (&element.key == key){
             <b>return</b> <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(i)
         };
-      i = i + 1;
+        i = i + 1;
     };
     <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u64&gt;()
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_simple_map_find"></a>
-
-## Function `find`
-
-
-
-<pre><code><b>fun</b> <a href="simple_map.md#0x1_simple_map_find">find</a>&lt;Key: store, Value: store&gt;(_map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, _key: &Key): (<a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="simple_map.md#0x1_simple_map_find">find</a>&lt;Key: store, Value: store&gt;(
-    _map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
-    _key: &Key,
-): (<a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;) {
-    <b>abort</b> <a href="../../move-stdlib/doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="simple_map.md#0x1_simple_map_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>)
 }
 </code></pre>
 
@@ -612,7 +573,7 @@ Map key is not found
 ### Function `find`
 
 
-<pre><code><b>fun</b> <a href="simple_map.md#0x1_simple_map_find">find</a>&lt;Key: store, Value: store&gt;(_map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, _key: &Key): (<a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>fun</b> <a href="simple_map.md#0x1_simple_map_find">find</a>&lt;Key: store, Value: store&gt;(map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, key: &Key): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
