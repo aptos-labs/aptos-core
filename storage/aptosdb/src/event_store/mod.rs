@@ -14,8 +14,8 @@ use crate::{
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
     },
 };
-use accumulator::{HashReader, MerkleAccumulator};
 use anyhow::{bail, ensure, format_err, Result};
+use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,

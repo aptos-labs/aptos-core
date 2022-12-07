@@ -13,12 +13,12 @@ echo "FEATURES: $FEATURES"
 # Build all the rust binaries
 cargo build --locked --profile=$PROFILE \
     -p aptos \
+    -p aptos-backup-cli \
     -p aptos-faucet \
+    -p aptos-fn-check-client \
     -p aptos-node-checker \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
-    -p aptos-fn-check-client \
-    -p backup-cli \
     -p db-bootstrapper \
     -p forge-cli \
     -p transaction-emitter \
