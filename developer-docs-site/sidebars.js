@@ -81,7 +81,7 @@ const sidebars = {
       link: { type: "doc", id: "concepts/coin-and-token/index" },
       collapsible: true,
       collapsed: true,
-      items: ["concepts/coin-and-token/aptos-coin", "concepts/coin-and-token/aptos-token"],
+      items: ["concepts/coin-and-token/aptos-coin", "concepts/coin-and-token/aptos-token", "guides/wallet-standard"],
     },
     {
       type: "category",
@@ -99,7 +99,6 @@ const sidebars = {
       items: [
         "guides/sign-a-transaction",
         "guides/resource-accounts",
-        "guides/wallet-standard",
         "guides/handle-aptos-errors",
       ],
     },
