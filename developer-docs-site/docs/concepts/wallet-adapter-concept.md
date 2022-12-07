@@ -37,7 +37,7 @@ If a wallet supports functions that are not part of the basic plugin interface, 
 
 This is a light [React package](https://github.com/aptos-labs/aptos-wallet-adapter/tree/main/packages/wallet-adapter-react) for dapps to import and use. The package contains a `Provider` and a `Context` to implement and use within your app.
 
-Follow the guide on how to use the provider package on your dapp!
+Follow the [guide](../guides/wallet-adapter-for-dapp.md) on how to use the provider package on your dapp!
 
 ### Adapter Template Plugin
 
@@ -45,7 +45,7 @@ Wallets looking to integrate with the adapter should implement their own wallet 
 
 The [Wallet Adapter Plugin Template repo](https://github.com/aptos-labs/wallet-adapter-plugin-template) holds a pre-made class, a test file, and some config files to help you build and publish the plugin as a npm package.
 
-Follow the guide on how to use the template to implement and publish your wallet plugin!
+Follow the [guide](../guides/wallet-adapter-for-wallets.md) on how to use the template to implement and publish your wallet plugin!
 
 ### Why we use this structure?
 
