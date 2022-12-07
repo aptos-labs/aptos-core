@@ -21,7 +21,6 @@ members = [
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
-    "aptos-move/framework/artifacts-test",
     "aptos-move/framework/cached-packages",
     "aptos-move/gas-algebra-ext",
     "aptos-move/move-examples",
