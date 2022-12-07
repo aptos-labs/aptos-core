@@ -1,5 +1,5 @@
 [package]
-name = "backup-cli"
+name = "aptos-backup-cli"
 description = "Backup CLI"
 version = "0.1.0"
 
