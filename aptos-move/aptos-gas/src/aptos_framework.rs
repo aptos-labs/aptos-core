@@ -72,8 +72,8 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.hash.sip_hash.base, "hash.sip_hash.base", 1000 * MUL],
     [.hash.sip_hash.per_byte, "hash.sip_hash.per_byte", 20 * MUL],
 
-    [.hash.keccak256.base, optional "hash.keccak256.base", 4000 * MUL],
-    [.hash.keccak256.per_byte, optional "hash.keccak256.per_byte", 45 * MUL],
+    [.hash.keccak256.base, { 1.. => "hash.keccak256.base" }, 4000 * MUL],
+    [.hash.keccak256.per_byte, { 1.. => "hash.keccak256.per_byte" }, 45 * MUL],
 
     [.type_info.type_of.base, "type_info.type_of.base", 300 * MUL],
     // TODO(Gas): the on-chain name is wrong...
@@ -81,17 +81,17 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.type_info.type_name.base, "type_info.type_name.base", 300 * MUL],
     // TODO(Gas): the on-chain name is wrong...
     [.type_info.type_name.per_byte_in_str, "type_info.type_name.per_abstract_memory_unit", 5 * MUL],
-    [.type_info.chain_id.base, optional "type_info.chain_id.base", 150 * MUL],
+    [.type_info.chain_id.base, { 4.. => "type_info.chain_id.base" }, 150 * MUL],
 
     // Reusing SHA2-512's cost from Ristretto
-    [.hash.sha2_512.base, optional "hash.sha2_512.base", 3_240],
-    [.hash.sha2_512.per_byte, optional "hash.sha2_512.per_byte", 60],
+    [.hash.sha2_512.base, { 4.. => "hash.sha2_512.base" }, 3_240],
+    [.hash.sha2_512.per_byte, { 4.. => "hash.sha2_512.per_byte" }, 60],
     // Back-of-the-envelop approximation from SHA3-256's (4000 base, 45 per-byte) costs
-    [.hash.sha3_512.base, optional "hash.sha3_512.base", 4_500],
-    [.hash.sha3_512.per_byte, optional "hash.sha3_512.per_byte", 50],
+    [.hash.sha3_512.base, { 4.. => "hash.sha3_512.base" }, 4_500],
+    [.hash.sha3_512.per_byte, { 4.. => "hash.sha3_512.per_byte" }, 50],
     // Using SHA2-256's cost
-    [.hash.ripemd160.base, optional "hash.ripemd160.base", 3000],
-    [.hash.ripemd160.per_byte, optional "hash.ripemd160.per_byte", 50],
+    [.hash.ripemd160.base, { 4.. => "hash.ripemd160.base" }, 3000],
+    [.hash.ripemd160.per_byte, { 4.. => "hash.ripemd160.per_byte" }, 50],
 
     [.util.from_bytes.base, "util.from_bytes.base", 300 * MUL],
     [.util.from_bytes.per_byte, "util.from_bytes.per_byte", 5 * MUL],
