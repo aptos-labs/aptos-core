@@ -33,6 +33,8 @@ executor-test-helpers = { workspace = true }
 executor-types = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 pin-project = { workspace = true }
