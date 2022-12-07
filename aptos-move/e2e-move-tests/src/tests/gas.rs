@@ -202,7 +202,7 @@ fn test_gas() {
         keys.push(format!("attr_{}", i).as_bytes().to_vec());
         vals.push(format!("{}", i).as_bytes().to_vec());
         typs.push("u64".as_bytes().to_vec());
-    };
+    }
     print_gas_cost(
         "MutateTokenAdd10NewProperties",
         harness.evaluate_gas(
@@ -237,6 +237,7 @@ fn test_gas() {
             ),
         ),
     );
+
     let publisher = &harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     print_gas_cost(
         "PublishSmall",

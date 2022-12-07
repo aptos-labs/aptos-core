@@ -117,7 +117,6 @@ module aptos_token::property_map {
 
     public fun add(map: &mut PropertyMap, key: String, value: PropertyValue) {
         assert!(string::length(&key) <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
-        assert!(!simple_map::contains_key(&map.map, &key), error::already_exists(EKEY_AREADY_EXIST_IN_PROPERTY_MAP));
         assert!(simple_map::length<String, PropertyValue>(&map.map) < MAX_PROPERTY_MAP_SIZE, error::invalid_state(EPROPERTY_NUMBER_EXCEED_LIMIT));
         simple_map::add(&mut map.map, key, value);
     }
@@ -220,8 +219,6 @@ module aptos_token::property_map {
         key: &String,
         value: PropertyValue
     ) {
-        let found = contains_key(map, key);
-        assert!(found, error::not_found(EPROPERTY_NOT_EXIST));
         let property_val = simple_map::borrow_mut(&mut map.map, key);
         *property_val = value;
     }
