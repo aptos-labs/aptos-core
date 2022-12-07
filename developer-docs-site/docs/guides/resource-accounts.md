@@ -14,7 +14,9 @@ Typically, a resource account is used for two main purposes:
 
 ## Restrictions
 
-In Aptos, a resource account is created based upon the SHA3-256 hash of the source's address and additional seed data. A resource account can be created only once. An entity may call `create_account` in an attempt to claim an account ahead of the creation of a resource account. But if a resource account is found, Aptos will transition ownership of the account over to the resource account. This is done by validating that the account has yet to execute any transactions and that the `Account::signer_capbility_offer::for` is none. The probability of a collision where someone has legitimately produced a private key that maps to a resource account address is improbably low.
+In Aptos, a resource account is created based upon the SHA3-256 hash of the source's address and additional seed data. A resource account can be created only once; for a given source address and seed, there can be only one resource account. That is because the calculation of the resource account address is fully determined by the former.
+
+An entity may call `create_account` in an attempt to claim an account ahead of the creation of a resource account. But if a resource account is found, Aptos will transition ownership of the account over to the resource account. This is done by validating that the account has yet to execute any transactions and that the `Account::signer_capbility_offer::for` is none. The probability of a collision where someone has legitimately produced a private key that maps to a resource account address is improbably low.
 
 ## Setup
 
