@@ -2028,6 +2028,8 @@ dependencies = [
  "executor-types",
  "futures",
  "itertools",
+ "move-binary-format",
+ "move-bytecode-verifier",
  "num_cpus",
  "once_cell",
  "pin-project",

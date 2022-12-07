@@ -30,6 +30,9 @@ impl MoveVmExt {
         treat_friend_as_private: bool,
         chain_id: u8,
     ) -> VMResult<Self> {
+        let mut config = verifier_config();
+        config.treat_friend_as_private = treat_friend_as_private;
+
         Ok(Self {
             inner: MoveVM::new_with_configs(
                 aptos_natives(
@@ -37,17 +40,7 @@ impl MoveVmExt {
                     abs_val_size_gas_params,
                     gas_feature_version,
                 ),
-                VerifierConfig {
-                    max_loop_depth: Some(5),
-                    treat_friend_as_private,
-                    max_generic_instantiation_length: Some(32),
-                    max_function_parameters: Some(128),
-                    max_basic_blocks: Some(1024),
-                    max_value_stack_size: 1024,
-                    max_type_nodes: Some(256),
-                    max_push_size: Some(10000),
-                    max_dependency_depth: 100,
-                },
+                config,
                 crate::AptosVM::get_runtime_config(),
             )?,
             chain_id,
@@ -96,5 +89,19 @@ impl Deref for MoveVmExt {
 
     fn deref(&self) -> &Self::Target {
         &self.inner
+    }
+}
+
+pub fn verifier_config() -> VerifierConfig {
+    VerifierConfig {
+        max_loop_depth: Some(5),
+        treat_friend_as_private: false,
+        max_generic_instantiation_length: Some(32),
+        max_function_parameters: Some(128),
+        max_basic_blocks: Some(1024),
+        max_value_stack_size: 1024,
+        max_type_nodes: Some(256),
+        max_dependency_depth: 256,
+        max_push_size: Some(10000),
     }
 }

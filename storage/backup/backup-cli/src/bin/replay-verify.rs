@@ -46,6 +46,8 @@ struct Opt {
         in the backup). [Defaults to the latest version available] "
     )]
     end_version: Option<Version>,
+    #[clap(long)]
+    validate_modules: bool,
 }
 
 #[tokio::main]
@@ -79,6 +81,7 @@ async fn main_impl() -> Result<()> {
         restore_handler,
         opt.start_version.unwrap_or(0),
         opt.end_version.unwrap_or(Version::MAX),
+        opt.validate_modules,
     )?
     .run()
     .await

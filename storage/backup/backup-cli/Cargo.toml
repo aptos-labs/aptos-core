@@ -50,6 +50,9 @@ executor-types = { path = "../../../execution/executor-types" }
 scratchpad = { path = "../../scratchpad" }
 storage-interface = { path = "../../storage-interface" }
 
+move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
+
 [dev-dependencies]
 proptest = "1.0.0"
 warp = "0.3.2"
