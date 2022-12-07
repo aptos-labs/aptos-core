@@ -107,7 +107,7 @@ pub enum EntryFunctionCall {
         proposal_id: u64,
     },
 
-    /// Create a proposal with the backing `stake_pool`.
+    /// Create a single-step proposal with the backing `stake_pool`.
     /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
     /// only the exact script with matching hash can be successfully executed.
     AptosGovernanceCreateProposal {
@@ -115,6 +115,17 @@ pub enum EntryFunctionCall {
         execution_hash: Vec<u8>,
         metadata_location: Vec<u8>,
         metadata_hash: Vec<u8>,
+    },
+
+    /// Create a single-step or multi-step proposal with the backing `stake_pool`.
+    /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
+    /// only the exact script with matching hash can be successfully executed.
+    AptosGovernanceCreateProposalV2 {
+        stake_pool: AccountAddress,
+        execution_hash: Vec<u8>,
+        metadata_location: Vec<u8>,
+        metadata_hash: Vec<u8>,
+        is_multi_step_proposal: bool,
     },
 
     /// Vote on proposal with `proposal_id` and voting power from `stake_pool`.
@@ -514,6 +525,19 @@ impl EntryFunctionCall {
                 execution_hash,
                 metadata_location,
                 metadata_hash,
+            ),
+            AptosGovernanceCreateProposalV2 {
+                stake_pool,
+                execution_hash,
+                metadata_location,
+                metadata_hash,
+                is_multi_step_proposal,
+            } => aptos_governance_create_proposal_v2(
+                stake_pool,
+                execution_hash,
+                metadata_location,
+                metadata_hash,
+                is_multi_step_proposal,
             ),
             AptosGovernanceVote {
                 stake_pool,
@@ -934,7 +958,7 @@ pub fn aptos_governance_add_approved_script_hash_script(proposal_id: u64) -> Tra
     ))
 }
 
-/// Create a proposal with the backing `stake_pool`.
+/// Create a single-step proposal with the backing `stake_pool`.
 /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
 /// only the exact script with matching hash can be successfully executed.
 pub fn aptos_governance_create_proposal(
@@ -958,6 +982,36 @@ pub fn aptos_governance_create_proposal(
             bcs::to_bytes(&execution_hash).unwrap(),
             bcs::to_bytes(&metadata_location).unwrap(),
             bcs::to_bytes(&metadata_hash).unwrap(),
+        ],
+    ))
+}
+
+/// Create a single-step or multi-step proposal with the backing `stake_pool`.
+/// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
+/// only the exact script with matching hash can be successfully executed.
+pub fn aptos_governance_create_proposal_v2(
+    stake_pool: AccountAddress,
+    execution_hash: Vec<u8>,
+    metadata_location: Vec<u8>,
+    metadata_hash: Vec<u8>,
+    is_multi_step_proposal: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_governance").to_owned(),
+        ),
+        ident_str!("create_proposal_v2").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&stake_pool).unwrap(),
+            bcs::to_bytes(&execution_hash).unwrap(),
+            bcs::to_bytes(&metadata_location).unwrap(),
+            bcs::to_bytes(&metadata_hash).unwrap(),
+            bcs::to_bytes(&is_multi_step_proposal).unwrap(),
         ],
     ))
 }
@@ -2220,6 +2274,22 @@ mod decoder {
         }
     }
 
+    pub fn aptos_governance_create_proposal_v2(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosGovernanceCreateProposalV2 {
+                stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
+                execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
+                metadata_location: bcs::from_bytes(script.args().get(2)?).ok()?,
+                metadata_hash: bcs::from_bytes(script.args().get(3)?).ok()?,
+                is_multi_step_proposal: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_governance_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosGovernanceVote {
@@ -2932,6 +3002,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_governance_create_proposal".to_string(),
             Box::new(decoder::aptos_governance_create_proposal),
+        );
+        map.insert(
+            "aptos_governance_create_proposal_v2".to_string(),
+            Box::new(decoder::aptos_governance_create_proposal_v2),
         );
         map.insert(
             "aptos_governance_vote".to_string(),

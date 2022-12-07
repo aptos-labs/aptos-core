@@ -20,6 +20,12 @@ use crate::{
     },
     genesis::git::from_yaml,
 };
+use aptos_backup_cli::coordinators::restore::{RestoreCoordinator, RestoreCoordinatorOpt};
+use aptos_backup_cli::metadata::cache::MetadataCacheOpt;
+use aptos_backup_cli::storage::command_adapter::{config::CommandAdapterConfig, CommandAdapter};
+use aptos_backup_cli::utils::{
+    ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt,
+};
 use aptos_config::config::NodeConfig;
 use aptos_crypto::bls12381::PublicKey;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
@@ -38,12 +44,6 @@ use aptos_types::validator_performances::ValidatorPerformances;
 use aptos_types::vesting::VestingAdminStore;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
-use backup_cli::coordinators::restore::{RestoreCoordinator, RestoreCoordinatorOpt};
-use backup_cli::metadata::cache::MetadataCacheOpt;
-use backup_cli::storage::command_adapter::{config::CommandAdapterConfig, CommandAdapter};
-use backup_cli::utils::{
-    ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt,
-};
 use bcs::Result;
 use cached_packages::aptos_stdlib;
 use chrono::{DateTime, NaiveDateTime, Utc};

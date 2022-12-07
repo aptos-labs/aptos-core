@@ -125,6 +125,7 @@ name = "aptos"
 version = "1.0.1"
 dependencies = [
  "anyhow",
+ "aptos-backup-cli",
  "aptos-bitvec",
  "aptos-build-info",
  "aptos-config",
@@ -146,7 +147,6 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "async-trait",
- "backup-cli",
  "base64 0.13.0",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
  "cached-packages",
@@ -323,6 +323,50 @@ dependencies = [
  "serde 1.0.144",
  "serde_json",
  "storage-interface",
+]
+
+[[package]]
+name = "aptos-backup-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-jellyfish-merkle",
+ "aptos-logger",
+ "aptos-proptest-helpers",
+ "aptos-push-metrics",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptosdb",
+ "async-trait",
+ "backup-service",
+ "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
+ "bytes 1.2.1",
+ "clap 3.2.17",
+ "executor",
+ "executor-test-helpers",
+ "executor-types",
+ "futures",
+ "itertools",
+ "num_cpus",
+ "once_cell",
+ "pin-project",
+ "proptest",
+ "rand 0.7.3",
+ "regex",
+ "reqwest",
+ "scratchpad",
+ "serde 1.0.144",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "storage-interface",
+ "tokio",
+ "tokio-stream",
+ "tokio-util 0.7.3",
+ "warp",
 ]
 
 [[package]]
@@ -1991,50 +2035,6 @@ dependencies = [
  "miniz_oxide",
  "object",
  "rustc-demangle",
-]
-
-[[package]]
-name = "backup-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-infallible",
- "aptos-jellyfish-merkle",
- "aptos-logger",
- "aptos-proptest-helpers",
- "aptos-push-metrics",
- "aptos-temppath",
- "aptos-types",
- "aptos-vm",
- "aptosdb",
- "async-trait",
- "backup-service",
- "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "bytes 1.2.1",
- "clap 3.2.17",
- "executor",
- "executor-test-helpers",
- "executor-types",
- "futures",
- "itertools",
- "num_cpus",
- "once_cell",
- "pin-project",
- "proptest",
- "rand 0.7.3",
- "regex",
- "reqwest",
- "scratchpad",
- "serde 1.0.144",
- "serde_json",
- "serde_yaml 0.8.26",
- "storage-interface",
- "tokio",
- "tokio-stream",
- "tokio-util 0.7.3",
- "warp",
 ]
 
 [[package]]
@@ -8794,6 +8794,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos",
+ "aptos-backup-cli",
  "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
@@ -8818,7 +8819,6 @@ dependencies = [
  "aptos-vm",
  "aptos-writeset-generator",
  "async-trait",
- "backup-cli",
  "base64 0.13.0",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
  "cached-packages",

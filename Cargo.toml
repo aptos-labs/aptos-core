@@ -172,6 +172,7 @@ aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
 aptos-api = { path = "api" }
 aptos-api-test-context = { path = "api/test-context" }
 aptos-api-types = { path = "api/types" }
+aptos-backup-cli = { path = "storage/backup/backup-cli" }
 aptos-block-executor = { path = "aptos-move/block-executor" }
 aptos-bitvec = { path = "crates/aptos-bitvec" }
 aptos-build-info = { path = "crates/aptos-build-info" }
@@ -229,7 +230,6 @@ aptos-vm = { path = "aptos-move/aptos-vm" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
 aptosdb = { path = "storage/aptosdb" }
-backup-cli = { path = "storage/backup/backup-cli" }
 backup-service = { path = "storage/backup/backup-service" }
 bounded-executor = { path = "crates/bounded-executor" }
 cached-packages = { path = "aptos-move/framework/cached-packages" }

@@ -172,7 +172,7 @@ https://github.com/aptos-labs/aptos-core/tree/main/storage/backup/backup-cli/src
 
 
 ```bash
-$ cargo run -p backup-cli --bin db-backup coordinator run
+$ cargo run -p aptos-backup-cli --bin db-backup coordinator run
     Finished dev [unoptimized + debuginfo] target(s) in 0.52s
      Running `target/debug/db-backup coordinator run`
 db-backup-coordinator-run
@@ -235,7 +235,7 @@ SUBCOMMANDS:
 
 Example command:
 ```
-$ cargo run -p backup-cli --bin db-backup -- \
+$ cargo run -p aptos-backup-cli --bin db-backup -- \
     coordinator run \
     --metadata-cache-dir ./mc \
     --state-snapshot-interval-epochs 1 \
@@ -303,7 +303,7 @@ RUST_LOG=info ./aptos \
 ```
 
 This is basically the same functionality with
-the "auto" mode of `cargo run -p backup-cli --bin db-restore`, but with more
+the "auto" mode of `cargo run -p aptos-backup-cli --bin db-restore`, but with more
 limited options. The `db-restore` tool mentioned has the ability to manually
 hack a local DB and is highly experimental. It's not recommended is be used if
 you are not 100% aware of what you are doing.
