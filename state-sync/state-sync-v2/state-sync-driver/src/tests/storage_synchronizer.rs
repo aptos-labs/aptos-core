@@ -23,6 +23,7 @@ use crate::{
 };
 use anyhow::format_err;
 use aptos_config::config::StateSyncDriverConfig;
+use aptos_data_streaming_service::data_notification::NotificationId;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -30,7 +31,6 @@ use aptos_types::{
     transaction::{TransactionOutputListWithProof, Version},
 };
 use claims::assert_matches;
-use data_streaming_service::data_notification::NotificationId;
 use event_notifications::EventSubscriptionService;
 use executor_types::ChunkCommitNotification;
 use futures::StreamExt;

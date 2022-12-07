@@ -10,6 +10,7 @@ use crate::common::utils::prompt_yes_with_override;
 use crate::common::utils::read_from_file;
 use crate::move_tool::{FrameworkPackageArgs, IncludedArtifacts};
 use crate::{CliCommand, CliResult};
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::HashValue;
 use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::{Address, HexEncodedBytes, U128, U64};
@@ -24,7 +25,6 @@ use aptos_types::{
     transaction::{Script, TransactionPayload},
 };
 use async_trait::async_trait;
-use cached_packages::aptos_stdlib;
 use clap::Parser;
 use framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use move_core_types::transaction_argument::TransactionArgument;

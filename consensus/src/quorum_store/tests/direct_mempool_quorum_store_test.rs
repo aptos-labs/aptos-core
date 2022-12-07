@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
-use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-use consensus_types::{
+use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
     request_response::{ConsensusRequest, ConsensusResponse},
 };
+use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use futures::{
     channel::{mpsc, oneshot},
     StreamExt,

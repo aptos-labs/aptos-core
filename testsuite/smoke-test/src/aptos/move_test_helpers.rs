@@ -17,7 +17,7 @@ pub async fn publish_package(
     let package = BuiltPackage::build(move_dir, BuildOptions::default())?;
     let blobs = package.extract_code();
     let metadata = package.extract_metadata()?;
-    let payload = cached_packages::aptos_stdlib::code_publish_package_txn(
+    let payload = aptos_cached_packages::aptos_stdlib::code_publish_package_txn(
         bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
         blobs,
     );

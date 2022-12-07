@@ -49,7 +49,7 @@ impl SwarmBuilder {
     }
 
     pub fn with_aptos(mut self) -> Self {
-        self.genesis_framework = Some(cached_packages::head_release_bundle().clone());
+        self.genesis_framework = Some(aptos_cached_packages::head_release_bundle().clone());
         self
     }
 

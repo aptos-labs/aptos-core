@@ -3,11 +3,11 @@
 
 use crate::{error::QuorumStoreError, monitor, state_replication::PayloadManager};
 use anyhow::Result;
-use aptos_logger::prelude::*;
-use consensus_types::{
+use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
     request_response::{ConsensusRequest, ConsensusResponse},
 };
+use aptos_logger::prelude::*;
 use fail::fail_point;
 use futures::{
     channel::{mpsc, oneshot},

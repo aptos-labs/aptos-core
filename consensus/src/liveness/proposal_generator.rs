@@ -7,15 +7,15 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::ChainHealthBackoffValues;
-use aptos_logger::{error, sample, sample::SampleRate, warn};
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block,
     block_data::BlockData,
     common::{Author, Round},
     quorum_cert::QuorumCert,
 };
+use aptos_logger::{error, sample, sample::SampleRate, warn};
 
-use consensus_types::common::{Payload, PayloadFilter};
+use aptos_consensus_types::common::{Payload, PayloadFilter};
 use futures::future::BoxFuture;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 

@@ -1,5 +1,5 @@
 [package]
-name = "consensus"
+name = "aptos-consensus"
 description = "Aptos consensus"
 version = "0.1.0"
 
@@ -16,6 +16,8 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-config = { workspace = true }
+aptos-consensus-notifications = { workspace = true }
+aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
@@ -30,8 +32,6 @@ bcs = { workspace = true }
 byteorder = { workspace = true }
 bytes = { workspace = true }
 channel = { workspace = true }
-consensus-notifications = { workspace = true }
-consensus-types = { workspace = true }
 event-notifications = { workspace = true }
 executor = { workspace = true }
 executor-types = { workspace = true }
@@ -57,10 +57,10 @@ tokio = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true, features = ["fuzzing"] }
+aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
 aptos-keygen = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
 claims = { workspace = true }
-consensus-types = { workspace = true, features = ["fuzzing"] }
 executor-test-helpers = { workspace = true }
 move-core-types = { workspace = true }
 network = { workspace = true, features = ["fuzzing"] }
@@ -71,5 +71,5 @@ vm-validator = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["consensus-types/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-mempool/fuzzing", "aptos-types/fuzzing", "safety-rules/testing"]
+fuzzing = ["aptos-consensus-types/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-mempool/fuzzing", "aptos-types/fuzzing", "safety-rules/testing"]
 failpoints = ["fail/failpoints"]

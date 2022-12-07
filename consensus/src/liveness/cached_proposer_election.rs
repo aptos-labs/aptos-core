@@ -3,9 +3,9 @@
 
 use std::collections::BTreeMap;
 
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::info;
-use consensus_types::common::{Author, Round};
 
 use crate::counters::PROPOSER_ELECTION_DURATION;
 

@@ -10,7 +10,9 @@ use crate::{
     },
 };
 use aptos_config::config::{NodeConfig, RoleType};
+use aptos_consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
 use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use aptos_infallible::RwLock;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -22,8 +24,6 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use claims::{assert_err, assert_none};
-use consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
-use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use event_notifications::{
     EventNotificationListener, EventSubscriptionService, ReconfigNotificationListener,
 };
@@ -251,7 +251,7 @@ async fn create_driver_for_tests(
 
     // Create consensus and mempool notifiers and listeners
     let (consensus_notifier, consensus_listener) =
-        consensus_notifications::new_consensus_notifier_listener_pair(5000);
+        aptos_consensus_notifications::new_consensus_notifier_listener_pair(5000);
     let (mempool_notifier, mempool_listener) =
         mempool_notifications::new_mempool_notifier_listener_pair();
 

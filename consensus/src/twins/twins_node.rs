@@ -17,6 +17,7 @@ use aptos_config::{
     generator::{self, ValidatorSwarm},
     network_id::NetworkId,
 };
+use aptos_consensus_types::common::{Author, Round};
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -30,7 +31,6 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::common::{Author, Round};
 use event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use futures::channel::mpsc;
 use futures::StreamExt;

@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-backup-cli = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-build-info = { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-faucet = { workspace = true }
@@ -38,7 +39,6 @@ aptos-vm = { workspace = true, features = ["testing"] }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
-cached-packages = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }

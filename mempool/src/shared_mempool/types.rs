@@ -11,12 +11,12 @@ use aptos_config::{
     config::{MempoolConfig, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
+use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
     mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
 };
-use consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use futures::{
     channel::{mpsc, mpsc::UnboundedSender, oneshot},
     future::Future,

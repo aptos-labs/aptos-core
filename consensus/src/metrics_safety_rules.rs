@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{monitor, persistent_liveness_storage::PersistentLivenessStorage};
+use aptos_consensus_types::{
+    block_data::BlockData,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    vote::Vote,
+    vote_proposal::VoteProposal,
+};
 use aptos_crypto::bls12381;
 use aptos_logger::prelude::info;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-};
-use consensus_types::{
-    block_data::BlockData,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
-    vote::Vote,
-    vote_proposal::VoteProposal,
 };
 use safety_rules::{ConsensusState, Error, TSafetyRules};
 use std::sync::Arc;
@@ -135,18 +135,18 @@ impl TSafetyRules for MetricsSafetyRules {
 #[cfg(test)]
 mod tests {
     use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::EmptyStorage};
+    use aptos_consensus_types::{
+        block_data::BlockData,
+        timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+        vote::Vote,
+        vote_proposal::VoteProposal,
+    };
     use aptos_crypto::bls12381;
     use aptos_types::{
         epoch_change::EpochChangeProof,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     };
     use claims::{assert_matches, assert_ok};
-    use consensus_types::{
-        block_data::BlockData,
-        timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
-        vote::Vote,
-        vote_proposal::VoteProposal,
-    };
     use safety_rules::{ConsensusState, Error, TSafetyRules};
 
     pub struct MockSafetyRules {

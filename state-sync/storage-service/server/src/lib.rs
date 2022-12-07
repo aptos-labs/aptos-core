@@ -10,6 +10,7 @@ use crate::{
     network::{ResponseSender, StorageServiceNetworkEvents},
 };
 use ::network::ProtocolId;
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::StorageServiceConfig;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
@@ -21,7 +22,6 @@ use aptos_types::{
     state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
-use bounded_executor::BoundedExecutor;
 use futures::stream::StreamExt;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};

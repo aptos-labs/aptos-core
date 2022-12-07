@@ -128,6 +128,7 @@ dependencies = [
  "aptos-backup-cli",
  "aptos-bitvec",
  "aptos-build-info",
+ "aptos-cached-packages",
  "aptos-config",
  "aptos-crypto",
  "aptos-faucet",
@@ -149,7 +150,6 @@ dependencies = [
  "async-trait",
  "base64 0.13.0",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "chrono",
  "clap 3.2.17",
  "clap_complete",
@@ -269,6 +269,7 @@ dependencies = [
  "anyhow",
  "aptos-api",
  "aptos-api-types",
+ "aptos-cached-packages",
  "aptos-config",
  "aptos-crypto",
  "aptos-genesis",
@@ -279,7 +280,6 @@ dependencies = [
  "aptos-vm",
  "aptosdb",
  "bytes 1.2.1",
- "cached-packages",
  "executor",
  "executor-types",
  "goldenfile",
@@ -330,6 +330,7 @@ name = "aptos-backup-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-backup-service",
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",
@@ -342,7 +343,6 @@ dependencies = [
  "aptos-vm",
  "aptosdb",
  "async-trait",
- "backup-service",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
  "bytes 1.2.1",
  "clap 3.2.17",
@@ -366,6 +366,29 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.3",
+ "warp",
+]
+
+[[package]]
+name = "aptos-backup-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-temppath",
+ "aptos-types",
+ "aptosdb",
+ "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
+ "bytes 1.2.1",
+ "hyper",
+ "once_cell",
+ "reqwest",
+ "serde 1.0.144",
+ "storage-interface",
+ "tokio",
  "warp",
 ]
 
@@ -408,10 +431,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-bounded-executor"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-build-info"
 version = "0.1.0"
 dependencies = [
  "shadow-rs",
+]
+
+[[package]]
+name = "aptos-cached-packages"
+version = "0.1.0"
+dependencies = [
+ "aptos-types",
+ "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
+ "framework",
+ "include_dir 0.7.2",
+ "move-core-types",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
 ]
 
 [[package]]
@@ -451,6 +496,107 @@ dependencies = [
  "serde_yaml 0.8.26",
  "short-hex-str",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-consensus"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-bitvec",
+ "aptos-config",
+ "aptos-consensus-notifications",
+ "aptos-consensus-types",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-keygen",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics-core",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "async-trait",
+ "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
+ "byteorder",
+ "bytes 1.2.1",
+ "channel",
+ "claims",
+ "event-notifications",
+ "executor",
+ "executor-test-helpers",
+ "executor-types",
+ "fail 0.5.0",
+ "fallible",
+ "futures",
+ "futures-channel",
+ "itertools",
+ "mirai-annotations",
+ "move-core-types",
+ "network",
+ "num-derive",
+ "num-traits 0.2.15",
+ "once_cell",
+ "proptest",
+ "rand 0.7.3",
+ "safety-rules",
+ "schemadb",
+ "serde 1.0.144",
+ "serde_json",
+ "short-hex-str",
+ "storage-interface",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "vm-validator",
+]
+
+[[package]]
+name = "aptos-consensus-notifications"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-types",
+ "async-trait",
+ "claims",
+ "futures",
+ "move-core-types",
+ "serde 1.0.144",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-consensus-types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-bitvec",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-infallible",
+ "aptos-types",
+ "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
+ "executor-types",
+ "futures",
+ "itertools",
+ "mirai-annotations",
+ "proptest",
+ "rayon",
+ "serde 1.0.144",
+ "serde_json",
+ "short-hex-str",
+]
+
+[[package]]
+name = "aptos-crash-handler"
+version = "0.1.0"
+dependencies = [
+ "aptos-logger",
+ "backtrace",
+ "serde 1.0.144",
+ "toml",
 ]
 
 [[package]]
@@ -529,6 +675,34 @@ dependencies = [
  "storage-service-types",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "aptos-data-streaming-service"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-data-client",
+ "aptos-id-generator",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-types",
+ "async-trait",
+ "channel",
+ "claims",
+ "enum_dispatch",
+ "futures",
+ "network",
+ "once_cell",
+ "rand 0.7.3",
+ "serde 1.0.144",
+ "short-hex-str",
+ "storage-service-types",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -632,6 +806,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-accumulator",
+ "aptos-consensus",
+ "aptos-consensus-types",
  "aptos-crypto",
  "aptos-jellyfish-merkle",
  "aptos-mempool",
@@ -641,8 +817,6 @@ dependencies = [
  "aptosdb",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
  "byteorder",
- "consensus",
- "consensus-types",
  "datatest-stable",
  "executor",
  "executor-types",
@@ -691,6 +865,7 @@ name = "aptos-genesis"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-cached-packages",
  "aptos-config",
  "aptos-crypto",
  "aptos-keygen",
@@ -701,7 +876,6 @@ dependencies = [
  "aptos-vm",
  "aptosdb",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "executor",
  "framework",
  "rand 0.7.3",
@@ -847,8 +1021,10 @@ name = "aptos-mempool"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-bounded-executor",
  "aptos-compression",
  "aptos-config",
+ "aptos-consensus-types",
  "aptos-crypto",
  "aptos-id-generator",
  "aptos-infallible",
@@ -858,9 +1034,7 @@ dependencies = [
  "aptos-types",
  "async-trait",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "bounded-executor",
  "channel",
- "consensus-types",
  "enum_dispatch",
  "event-notifications",
  "fail 0.5.0",
@@ -922,10 +1096,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-api",
+ "aptos-backup-service",
  "aptos-build-info",
+ "aptos-cached-packages",
  "aptos-config",
+ "aptos-consensus",
+ "aptos-consensus-notifications",
+ "aptos-crash-handler",
  "aptos-crypto",
  "aptos-data-client",
+ "aptos-data-streaming-service",
  "aptos-genesis",
  "aptos-indexer",
  "aptos-infallible",
@@ -939,14 +1119,8 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptosdb",
- "backup-service",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "clap 3.2.17",
- "consensus",
- "consensus-notifications",
- "crash-handler",
- "data-streaming-service",
  "event-notifications",
  "executor",
  "executor-types",
@@ -1132,6 +1306,7 @@ name = "aptos-rosetta"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "aptos-cached-packages",
  "aptos-config",
  "aptos-crypto",
  "aptos-global-constants",
@@ -1142,7 +1317,6 @@ dependencies = [
  "aptos-types",
  "aptos-warp-webserver",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "clap 3.2.17",
  "futures",
  "hex",
@@ -1180,12 +1354,12 @@ name = "aptos-sdk"
 version = "0.0.3"
 dependencies = [
  "anyhow",
+ "aptos-cached-packages",
  "aptos-crypto",
  "aptos-global-constants",
  "aptos-rest-client",
  "aptos-types",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "ed25519-dalek-bip32",
  "move-core-types",
  "once_cell",
@@ -1202,9 +1376,9 @@ name = "aptos-sdk-builder"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-cached-packages",
  "aptos-types",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "framework",
  "heck 0.3.3",
  "move-core-types",
@@ -1275,6 +1449,7 @@ dependencies = [
  "anyhow",
  "aptos-api",
  "aptos-config",
+ "aptos-consensus",
  "aptos-crypto",
  "aptos-infallible",
  "aptos-logger",
@@ -1283,7 +1458,6 @@ dependencies = [
  "aptos-telemetry-service",
  "aptos-types",
  "aptosdb",
- "consensus",
  "flate2",
  "futures",
  "httpmock",
@@ -1393,13 +1567,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
+ "aptos-cached-packages",
  "aptos-crypto",
  "aptos-gas",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "clap 3.2.17",
  "datatest-stable",
  "framework",
@@ -1545,6 +1719,7 @@ name = "aptos-writeset-generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-cached-packages",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-gas",
@@ -1552,7 +1727,6 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "framework",
  "handlebars",
  "move-command-line-common",
@@ -2038,29 +2212,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "backup-service"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-logger",
- "aptos-metrics-core",
- "aptos-temppath",
- "aptos-types",
- "aptosdb",
- "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "bytes 1.2.1",
- "hyper",
- "once_cell",
- "reqwest",
- "serde 1.0.144",
- "storage-interface",
- "tokio",
- "warp",
-]
-
-[[package]]
 name = "base64"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2257,14 +2408,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bounded-executor"
-version = "0.1.0"
-dependencies = [
- "futures",
- "tokio",
-]
-
-[[package]]
 name = "bstr"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2344,20 +2487,6 @@ name = "cache-padded"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1db59621ec70f09c5e9b597b220c7a2b43611f4710dc03ceb8748637775692c"
-
-[[package]]
-name = "cached-packages"
-version = "0.1.0"
-dependencies = [
- "aptos-types",
- "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "framework",
- "include_dir 0.7.2",
- "move-core-types",
- "once_cell",
- "proptest",
- "proptest-derive",
-]
 
 [[package]]
 name = "cassowary"
@@ -2617,97 +2746,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "consensus"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-bitvec",
- "aptos-config",
- "aptos-crypto",
- "aptos-infallible",
- "aptos-keygen",
- "aptos-logger",
- "aptos-mempool",
- "aptos-metrics-core",
- "aptos-secure-storage",
- "aptos-temppath",
- "aptos-types",
- "aptos-vm",
- "async-trait",
- "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "byteorder",
- "bytes 1.2.1",
- "channel",
- "claims",
- "consensus-notifications",
- "consensus-types",
- "event-notifications",
- "executor",
- "executor-test-helpers",
- "executor-types",
- "fail 0.5.0",
- "fallible",
- "futures",
- "futures-channel",
- "itertools",
- "mirai-annotations",
- "move-core-types",
- "network",
- "num-derive",
- "num-traits 0.2.15",
- "once_cell",
- "proptest",
- "rand 0.7.3",
- "safety-rules",
- "schemadb",
- "serde 1.0.144",
- "serde_json",
- "short-hex-str",
- "storage-interface",
- "tempfile",
- "thiserror",
- "tokio",
- "vm-validator",
-]
-
-[[package]]
-name = "consensus-notifications"
-version = "0.1.0"
-dependencies = [
- "aptos-crypto",
- "aptos-types",
- "async-trait",
- "claims",
- "futures",
- "move-core-types",
- "serde 1.0.144",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "consensus-types"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-bitvec",
- "aptos-crypto",
- "aptos-crypto-derive",
- "aptos-infallible",
- "aptos-types",
- "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "executor-types",
- "futures",
- "itertools",
- "mirai-annotations",
- "proptest",
- "rayon",
- "serde 1.0.144",
- "serde_json",
- "short-hex-str",
-]
-
-[[package]]
 name = "console"
 version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2846,16 +2884,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc948ebb96241bb40ab73effeb80d9f93afaad49359d159a5e61be51619fe813"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "crash-handler"
-version = "0.1.0"
-dependencies = [
- "aptos-logger",
- "backtrace",
- "serde 1.0.144",
- "toml",
 ]
 
 [[package]]
@@ -3214,34 +3242,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "data-streaming-service"
-version = "0.1.0"
-dependencies = [
- "aptos-config",
- "aptos-crypto",
- "aptos-data-client",
- "aptos-id-generator",
- "aptos-infallible",
- "aptos-logger",
- "aptos-metrics-core",
- "aptos-types",
- "async-trait",
- "channel",
- "claims",
- "enum_dispatch",
- "futures",
- "network",
- "once_cell",
- "rand 0.7.3",
- "serde 1.0.144",
- "short-hex-str",
- "storage-service-types",
- "thiserror",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
 name = "datatest-stable"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3467,6 +3467,7 @@ dependencies = [
  "anyhow",
  "aptos",
  "aptos-block-executor",
+ "aptos-cached-packages",
  "aptos-crypto",
  "aptos-gas",
  "aptos-keygen",
@@ -3476,7 +3477,6 @@ dependencies = [
  "aptos-vm",
  "aptos-writeset-generator",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "framework",
  "hex",
  "itertools",
@@ -3687,7 +3687,9 @@ name = "executor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-cached-packages",
  "aptos-config",
+ "aptos-consensus-types",
  "aptos-crypto",
  "aptos-gas",
  "aptos-genesis",
@@ -3701,8 +3703,6 @@ dependencies = [
  "aptos-vm",
  "aptosdb",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
- "consensus-types",
  "executor-test-helpers",
  "executor-types",
  "fail 0.5.0",
@@ -3758,7 +3758,9 @@ name = "executor-test-helpers"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-cached-packages",
  "aptos-config",
+ "aptos-consensus-types",
  "aptos-crypto",
  "aptos-genesis",
  "aptos-sdk",
@@ -3767,8 +3769,6 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptosdb",
- "cached-packages",
- "consensus-types",
  "executor",
  "executor-types",
  "rand 0.7.3",
@@ -3916,6 +3916,7 @@ dependencies = [
  "again",
  "anyhow",
  "aptos",
+ "aptos-cached-packages",
  "aptos-config",
  "aptos-genesis",
  "aptos-global-constants",
@@ -3927,7 +3928,6 @@ dependencies = [
  "aptos-secure-storage",
  "aptosdb",
  "async-trait",
- "cached-packages",
  "chrono",
  "either",
  "framework",
@@ -3965,13 +3965,13 @@ name = "forge-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos-cached-packages",
  "aptos-config",
  "aptos-global-constants",
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
  "async-trait",
- "cached-packages",
  "forge",
  "framework",
  "jemallocator",
@@ -4004,6 +4004,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-cached-packages",
  "aptos-crypto",
  "aptos-gas",
  "aptos-module-verifier",
@@ -4014,7 +4015,6 @@ dependencies = [
  "base64 0.13.0",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
  "better_any",
- "cached-packages",
  "claims",
  "clap 3.2.17",
  "codespan-reporting",
@@ -4220,12 +4220,12 @@ version = "0.1.0"
 dependencies = [
  "aptos-api-types",
  "aptos-config",
+ "aptos-consensus",
+ "aptos-consensus-types",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-types",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "consensus",
- "consensus-types",
  "move-core-types",
  "network",
  "rand 0.7.3",
@@ -5136,6 +5136,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-cached-packages",
  "aptos-crypto",
  "aptos-gas",
  "aptos-keygen",
@@ -5144,7 +5145,6 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "framework",
  "goldenfile",
  "hex",
@@ -5167,6 +5167,7 @@ name = "language-e2e-testsuite"
 version = "0.1.0"
 dependencies = [
  "aptos-block-executor",
+ "aptos-cached-packages",
  "aptos-crypto",
  "aptos-gas",
  "aptos-keygen",
@@ -5176,7 +5177,6 @@ dependencies = [
  "aptos-vm",
  "aptos-writeset-generator",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "framework",
  "itertools",
  "language-e2e-tests",
@@ -6965,12 +6965,12 @@ dependencies = [
 name = "peer-monitoring-service-server"
 version = "0.1.0"
 dependencies = [
+ "aptos-bounded-executor",
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "bounded-executor",
  "bytes 1.2.1",
  "channel",
  "futures",
@@ -8215,6 +8215,7 @@ name = "safety-rules"
 version = "0.1.0"
 dependencies = [
  "aptos-config",
+ "aptos-consensus-types",
  "aptos-crypto",
  "aptos-global-constants",
  "aptos-infallible",
@@ -8226,7 +8227,6 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vault-client",
- "consensus-types",
  "criterion",
  "once_cell",
  "proptest",
@@ -8796,7 +8796,9 @@ dependencies = [
  "aptos",
  "aptos-backup-cli",
  "aptos-bitvec",
+ "aptos-cached-packages",
  "aptos-config",
+ "aptos-consensus",
  "aptos-crypto",
  "aptos-debugger",
  "aptos-faucet",
@@ -8821,8 +8823,6 @@ dependencies = [
  "async-trait",
  "base64 0.13.0",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
- "consensus",
  "diesel",
  "forge",
  "framework",
@@ -8874,8 +8874,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-config",
+ "aptos-consensus-notifications",
  "aptos-crypto",
  "aptos-data-client",
+ "aptos-data-streaming-service",
  "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
@@ -8889,8 +8891,6 @@ dependencies = [
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
  "channel",
  "claims",
- "consensus-notifications",
- "data-streaming-service",
  "event-notifications",
  "executor",
  "executor-test-helpers",
@@ -8969,6 +8969,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-bounded-executor",
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",
@@ -8977,7 +8978,6 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "bounded-executor",
  "bytes 1.2.1",
  "channel",
  "claims",
@@ -10160,6 +10160,7 @@ name = "vm-genesis"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-cached-packages",
  "aptos-crypto",
  "aptos-gas",
  "aptos-proptest-helpers",
@@ -10167,7 +10168,6 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
- "cached-packages",
  "framework",
  "move-core-types",
  "move-vm-types",
@@ -10183,6 +10183,7 @@ name = "vm-validator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-cached-packages",
  "aptos-crypto",
  "aptos-gas",
  "aptos-state-view",
@@ -10190,7 +10191,6 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptosdb",
- "cached-packages",
  "executor-test-helpers",
  "fail 0.5.0",
  "move-core-types",

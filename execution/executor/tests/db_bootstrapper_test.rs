@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use aptos_gas::LATEST_GAS_FEATURE_VERSION;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -28,7 +29,6 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use cached_packages::aptos_stdlib;
 use executor::{
     block_executor::BlockExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},

@@ -1,5 +1,5 @@
 [package]
-name = "data-streaming-service"
+name = "aptos-data-streaming-service"
 description = "The data streaming service that sends data notifications to clients"
 version = "0.1.0"
 

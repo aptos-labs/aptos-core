@@ -285,7 +285,9 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     let deps = vec![PackagePaths {
         name: None,
-        paths: cached_packages::head_release_bundle().files().unwrap(),
+        paths: aptos_cached_packages::head_release_bundle()
+            .files()
+            .unwrap(),
         named_address_map: framework::named_addresses().clone(),
     }];
     let program_res = move_compiler::construct_pre_compiled_lib(
@@ -505,7 +507,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_test_root_address(),
             parameters.sequence_number,
-            cached_packages::aptos_stdlib::aptos_account_create_account(account_addr),
+            aptos_cached_packages::aptos_stdlib::aptos_account_create_account(account_addr),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,
@@ -521,7 +523,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_test_root_address(),
             parameters.sequence_number + 1,
-            cached_packages::aptos_stdlib::aptos_coin_mint(account_addr, amount),
+            aptos_cached_packages::aptos_stdlib::aptos_coin_mint(account_addr, amount),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,

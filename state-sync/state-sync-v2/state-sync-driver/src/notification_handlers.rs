@@ -5,6 +5,11 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
 };
+use aptos_consensus_notifications::{
+    ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
+    ConsensusSyncNotification,
+};
+use aptos_data_streaming_service::data_notification::NotificationId;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -12,11 +17,6 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{Transaction, Version},
 };
-use consensus_notifications::{
-    ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
-    ConsensusSyncNotification,
-};
-use data_streaming_service::data_notification::NotificationId;
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use futures::{channel::mpsc, stream::FusedStream, Stream};
 use mempool_notifications::MempoolNotificationSender;
@@ -283,7 +283,7 @@ impl ConsensusNotificationHandler {
     ) -> Result<(), Error> {
         // Wrap the result in an error that consensus can process
         let message = result.map_err(|error| {
-            consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
+            aptos_consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
         });
 
         info!(
@@ -313,7 +313,7 @@ impl ConsensusNotificationHandler {
     ) -> Result<(), Error> {
         // Wrap the result in an error that consensus can process
         let message = result.map_err(|error| {
-            consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
+            aptos_consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
         });
 
         debug!(

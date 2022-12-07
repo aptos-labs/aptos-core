@@ -1,5 +1,5 @@
 [package]
-name = "crash-handler"
+name = "aptos-crash-handler"
 description = "Aptos crash handler"
 version = "0.1.0"
 

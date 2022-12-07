@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_cached_packages::aptos_stdlib;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use cached_packages::aptos_stdlib;
 use forge::{reconfig, LocalSwarm, NodeExt, Swarm};
 use rand::random;
 

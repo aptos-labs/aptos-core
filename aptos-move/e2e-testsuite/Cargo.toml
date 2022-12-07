@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-block-executor = { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
 aptos-keygen = { workspace = true }
@@ -23,7 +24,6 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
-cached-packages ={ workspace = true }
 framework = { workspace = true }
 itertools = { workspace = true }
 language-e2e-tests = { workspace = true }
@@ -36,4 +36,4 @@ serde = { workspace = true }
 vm-genesis = { workspace = true }
 
 [features]
-default = ["cached-packages/fuzzing"]
+default = ["aptos-cached-packages/fuzzing"]

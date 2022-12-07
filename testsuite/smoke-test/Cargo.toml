@@ -16,7 +16,9 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos = { workspace = true, features = ["fuzzing"] }
 aptos-bitvec = { path = "../../crates/aptos-bitvec" }
+aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
+aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-debugger = { workspace = true }
 aptos-faucet = { workspace = true }
@@ -33,8 +35,6 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
-cached-packages = { workspace = true }
-consensus = { workspace = true }
 diesel = { workspace = true }
 forge = { workspace = true }
 framework = { workspace = true }
