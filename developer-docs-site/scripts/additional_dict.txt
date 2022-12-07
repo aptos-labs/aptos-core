@@ -396,3 +396,14 @@ yamls
 TransactionBuilder
 ABIs
 TransactionBuilderABI
+dapps
+Dapps
+npm
+feedbacks
+Modularity
+monorepo
+unscoped
+jsx
+AptosWalletAdapterProvider
+autoConnect
+useWallet
