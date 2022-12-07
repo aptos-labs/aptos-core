@@ -1,5 +1,5 @@
 ---
-title: "Wallet Adapter For Wallets"
+title: "For Wallets"
 id: "wallet-adapter-for-wallets"
 ---
 

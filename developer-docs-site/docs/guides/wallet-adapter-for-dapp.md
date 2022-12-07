@@ -1,5 +1,5 @@
 ---
-title: "Wallet Adapter For Dapps"
+title: "For Dapps"
 id: "wallet-adapter-for-dapp"
 ---
 
