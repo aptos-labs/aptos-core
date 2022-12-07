@@ -4,7 +4,7 @@
 use aptos_infallible::Mutex;
 use crossbeam::utils::CachePadded;
 use std::{
-    cmp::min,
+    // cmp::min,
     hint,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -16,7 +16,7 @@ use std::{
 pub type TxnIndex = usize;
 pub type Incarnation = usize;
 pub type Version = (TxnIndex, Incarnation);
-type DependencyCondvar = Arc<(Mutex<bool>, Condvar)>;
+type DependencyCondvar = Arc<(Mutex<(bool, bool)>, Condvar)>;
 
 // A struct to track the number of active tasks in the scheduler using RAII.
 pub struct TaskGuard<'a> {
@@ -124,9 +124,11 @@ pub struct Scheduler {
     /// The number of times execution_idx and validation_idx are decreased.
     decrease_cnt: AtomicUsize,
 
+    commit_idx: AtomicUsize,
+
     /// Number of tasks used to track when transactions can be committed, incremented / decremented
     /// as new validation or execution tasks are created and completed.
-    num_active_tasks: AtomicUsize,
+    pub num_active_tasks: AtomicUsize,
     /// Shared marker that is set when a thread detects that all txns can be committed.
     done_marker: AtomicBool,
 
@@ -135,6 +137,10 @@ pub struct Scheduler {
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
     /// An index i maps to the most up-to-date status of transaction i.
     txn_status: Vec<CachePadded<Mutex<TransactionStatus>>>,
+
+    max_gas: u64,
+    num_commit: AtomicUsize,
+    is_first: AtomicBool,
 }
 
 /// Public Interfaces for the Scheduler
@@ -145,6 +151,7 @@ impl Scheduler {
             execution_idx: AtomicUsize::new(0),
             validation_idx: AtomicUsize::new(0),
             decrease_cnt: AtomicUsize::new(0),
+            commit_idx: AtomicUsize::new(0),
             num_active_tasks: AtomicUsize::new(0),
             done_marker: AtomicBool::new(false),
             txn_dependency: (0..num_txns)
@@ -153,12 +160,85 @@ impl Scheduler {
             txn_status: (0..num_txns)
                 .map(|_| CachePadded::new(Mutex::new(TransactionStatus::ReadyToExecute(0, None))))
                 .collect(),
+            max_gas: 100000, //u64::MAX,
+            num_commit: AtomicUsize::new(0),
+            is_first: AtomicBool::new(true),
         }
     }
 
     /// Return the number of transactions to be executed from the block.
     pub fn num_txn_to_execute(&self) -> usize {
         self.num_txns
+    }
+
+    pub fn max_gas(&self) -> u64 {
+        self.max_gas
+    }
+
+    pub fn num_txn_to_commit(&self) -> usize {
+        self.num_commit.load(Ordering::SeqCst)
+    }
+
+    pub fn get_commit_idx(&self) -> usize {
+        self.commit_idx.load(Ordering::SeqCst)
+    }
+
+    pub fn increase_commit_idx(&self, target_idx: usize) {
+        self.commit_idx.fetch_max(target_idx, Ordering::SeqCst);
+    }
+
+    pub fn is_first(&self) -> bool {
+        self.is_first.fetch_and(false, Ordering::SeqCst)
+    }
+
+    pub fn resolve_condvar(&self, txn_idx: TxnIndex) {
+        let status = self.txn_status[txn_idx].lock();
+
+        if let TransactionStatus::Suspended(_, condvar) = &*status {
+            // println!(
+            //     "thread {} resolve Suspended txn {}",
+            //     rayon::current_thread_index().unwrap(),
+            //     txn_idx
+            // );
+            let (lock, cvar) = &**condvar;
+            // Mark parallel execution halted.
+            (*lock.lock()).0 = true;
+            (*lock.lock()).1 = true;
+            // Wake up the process waiting for dependency.
+            cvar.notify_one();
+        } else if let TransactionStatus::ReadyToExecute(_, Some(condvar)) = &*status {
+            // println!(
+            //     "thread {} resolve ReadyToExecute txn {}",
+            //     rayon::current_thread_index().unwrap(),
+            //     txn_idx
+            // );
+            let (lock, cvar) = &**condvar;
+            // Mark parallel execution halted.
+            (*lock.lock()).0 = true;
+            (*lock.lock()).1 = true;
+            // Wake up the process waiting for dependency.
+            cvar.notify_one();
+        }
+    }
+
+    pub fn produce_validation_task(&self, idx_to_validate: usize) -> Option<(Version, TaskGuard)> {
+        if idx_to_validate >= self.num_txns {
+            if !self.done() {
+                // Avoid pointlessly spinning, and give priority to other threads that may
+                // be working to finish the remaining tasks.
+                hint::spin_loop();
+            }
+            return None;
+        }
+
+        // Must create guard before incremeting validation_idx.
+        let guard = TaskGuard::new(&self.num_active_tasks);
+        // let idx_to_validate = self.validation_idx.fetch_add(1, Ordering::SeqCst);
+
+        // If incarnation was last executed, and thus ready for validation,
+        // return version and guard for validation task, otherwise None.
+        self.is_executed(idx_to_validate)
+            .map(|incarnation| ((idx_to_validate, incarnation), guard))
     }
 
     /// Try to abort version = (txn_idx, incarnation), called upon validation failure.
@@ -181,6 +261,7 @@ impl Scheduler {
     /// Return the next task for the thread.
     pub fn next_task(&self) -> SchedulerTask {
         loop {
+            // println!("id {}", rayon::current_thread_index().unwrap());
             if self.done() {
                 // No more tasks.
                 return SchedulerTask::Done;
@@ -216,7 +297,7 @@ impl Scheduler {
         // usually has just observed the read dependency.
 
         // Create a condition variable associated with the dependency.
-        let dep_condvar = Arc::new((Mutex::new(false), Condvar::new()));
+        let dep_condvar = Arc::new((Mutex::new((false, false)), Condvar::new()));
 
         let mut stored_deps = self.txn_dependency[dep_txn_idx].lock();
 
@@ -332,7 +413,7 @@ impl Scheduler {
     }
 }
 
-/// Public functions of the Scheduler
+/// Private functions of the Scheduler
 impl Scheduler {
     /// Decreases the validation index, increases the decrease counter if it actually decreased.
     fn decrease_validation_idx(&self, target_idx: TxnIndex) {
@@ -377,6 +458,7 @@ impl Scheduler {
         }
 
         let status = self.txn_status[txn_idx].lock();
+        // println!("status {:?}", status);
         if let TransactionStatus::Executed(incarnation) = *status {
             Some(incarnation)
         } else {
@@ -394,7 +476,7 @@ impl Scheduler {
         let idx_to_validate = self.validation_idx.load(Ordering::SeqCst);
 
         if idx_to_validate >= self.num_txns {
-            if !self.check_done() {
+            if !self.done() {
                 // Avoid pointlessly spinning, and give priority to other threads that may
                 // be working to finish the remaining tasks.
                 hint::spin_loop();
@@ -424,7 +506,7 @@ impl Scheduler {
         let idx_to_execute = self.execution_idx.load(Ordering::SeqCst);
 
         if idx_to_execute >= self.num_txns {
-            if !self.check_done() {
+            if !self.done() {
                 // Avoid pointlessly spinning, and give priority to other threads that may
                 // be working to finish the remaining tasks.
                 hint::spin_loop();
@@ -463,9 +545,13 @@ impl Scheduler {
     fn resume(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx].lock();
         if let TransactionStatus::Suspended(incarnation, dep_condvar) = &*status {
-            *status = TransactionStatus::ReadyToExecute(*incarnation, Some(dep_condvar.clone()));
+            if !self.done() {
+                *status =
+                    TransactionStatus::ReadyToExecute(*incarnation, Some(dep_condvar.clone()));
+            }
         } else {
-            unreachable!();
+            // println!("thread {} resume txn {} but not suspended, status {:?}", rayon::current_thread_index().unwrap(), txn_idx, status);
+            // unreachable!();
         }
     }
 
@@ -502,28 +588,42 @@ impl Scheduler {
     /// so it must first perform the next instruction in 'decrease_validation_idx' or
     /// 'decrease_execution_idx' functions, which is to increment the decrease_cnt++.
     /// Final check will then detect a change in decrease_cnt and not allow a false positive.
-    fn check_done(&self) -> bool {
-        let observed_cnt = self.decrease_cnt.load(Ordering::SeqCst);
+    // fn check_done(&self) -> bool {
+    //     let observed_cnt = self.decrease_cnt.load(Ordering::SeqCst);
 
-        let val_idx = self.validation_idx.load(Ordering::SeqCst);
-        let exec_idx = self.execution_idx.load(Ordering::SeqCst);
-        let num_tasks = self.num_active_tasks.load(Ordering::SeqCst);
-        if min(exec_idx, val_idx) < self.num_txns || num_tasks > 0 {
-            // There is work remaining.
-            return false;
-        }
+    //     let val_idx = self.validation_idx.load(Ordering::SeqCst);
+    //     let exec_idx = self.execution_idx.load(Ordering::SeqCst);
+    //     let cmt_idx = self.commit_idx.load(Ordering::SeqCst);
+    //     let num_tasks = self.num_active_tasks.load(Ordering::SeqCst);
+    //     if min(exec_idx, val_idx) < self.num_txns || num_tasks > 0 {
+    //         // There is work remaining.
+    //         return false;
+    //     }
 
-        // Re-read and make sure decrease_cnt hasn't changed.
-        if observed_cnt == self.decrease_cnt.load(Ordering::SeqCst) {
-            self.done_marker.store(true, Ordering::Release);
-            true
-        } else {
-            false
-        }
+    //     // Re-read and make sure decrease_cnt hasn't changed.
+    //     if observed_cnt == self.decrease_cnt.load(Ordering::SeqCst) && cmt_idx == self.num_txns {
+    //         // self.done_marker.store(true, Ordering::Release);
+    //         true
+    //     } else {
+    //         false
+    //     }
+    // }
+
+    pub fn set_done(&self, num_commit: usize) {
+        self.num_commit.store(num_commit, Ordering::SeqCst);
+        self.done_marker.store(true, Ordering::SeqCst);
     }
 
     /// Checks whether the done marker is set. The marker can only be set by 'check_done'.
-    fn done(&self) -> bool {
-        self.done_marker.load(Ordering::Acquire)
+    pub fn done(&self) -> bool {
+        self.done_marker.load(Ordering::SeqCst)
+    }
+
+    pub fn all_finish(&self) -> bool {
+        let num_tasks = self.num_active_tasks.load(Ordering::SeqCst);
+        if num_tasks > 0 {
+            return false;
+        }
+        true
     }
 }

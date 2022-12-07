@@ -81,6 +81,10 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             TransactionStatus::Retry,
         )))
     }
+
+    fn gas_used(&self) -> u64 {
+        self.0.txn_output().gas_used()
+    }
 }
 
 pub struct BlockAptosVM();

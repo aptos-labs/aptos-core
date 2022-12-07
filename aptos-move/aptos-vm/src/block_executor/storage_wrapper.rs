@@ -56,6 +56,10 @@ impl<'a, S: StateView> StateView for VersionedView<'a, S> {
                     .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
                 Ok(Some(serialize(&result)))
             }
+            // TODO: generate parallel execution error for StatusCode
+            ReadResult::PEerror(_) => Err(anyhow::Error::new(VMStatus::Error(
+                StatusCode::STORAGE_ERROR,
+            ))),
             ReadResult::None => self.base_view.get_state_value(state_key),
         }
     }

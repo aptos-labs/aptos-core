@@ -214,6 +214,12 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
         self.inputs[txn_idx].load_full()
     }
 
+    pub fn write_set(&self, txn_idx: TxnIndex) -> Arc<ExecutionStatus<T, Error<E>>> {
+        self.outputs[txn_idx]
+            .load_full()
+            .expect("PE Reading Gas: Output must be recorded after execution")
+    }
+
     // Extracts a set of paths written or updated during execution from transaction
     // output: (modified by writes, modified by deltas).
     pub fn modified_keys(&self, txn_idx: TxnIndex) -> KeySet<T> {

@@ -15,7 +15,15 @@ use aptos_types::write_set::TransactionWrite;
 use mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use num_cpus;
 use once_cell::sync::Lazy;
-use std::{collections::btree_map::BTreeMap, hash::Hash, marker::PhantomData, sync::Arc};
+use std::{
+    collections::btree_map::BTreeMap,
+    hash::Hash,
+    marker::PhantomData,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -37,6 +45,7 @@ pub struct MVHashMapView<'a, K, V> {
     txn_idx: TxnIndex,
     scheduler: &'a Scheduler,
     captured_reads: Mutex<Vec<ReadDescriptor<K>>>,
+    poisoned: AtomicBool,
 }
 
 /// A struct which describes the result of the read from the proxy. The client
@@ -49,6 +58,8 @@ pub enum ReadResult<V> {
     U128(u128),
     // Read failed while resolving a delta.
     Unresolved(DeltaOp),
+    // Parallel execution error
+    PEerror(usize),
     // Read did not return anything.
     None,
 }
@@ -70,6 +81,9 @@ impl<
         use MVHashMapError::*;
         use MVHashMapOutput::*;
 
+        if self.poisoned.load(Ordering::SeqCst) {
+            return ReadResult::PEerror(0);
+        }
         loop {
             match self.versioned_map.read(key, self.txn_idx) {
                 Ok(Version(version, v)) => {
@@ -121,8 +135,21 @@ impl<
                             // eventually finish and lead to unblocking txn_idx, contradiction.
                             let (lock, cvar) = &*dep_condition;
                             let mut dep_resolved = lock.lock();
-                            while !*dep_resolved {
+                            while !(*dep_resolved).0 {
+                                if self.scheduler.done() {
+                                    return ReadResult::PEerror(0);
+                                }
+                                // println!("thread {} waiting suspended txn {} dep {}", rayon::current_thread_index().unwrap(), self.txn_idx, dep_idx);
+
                                 dep_resolved = cvar.wait(dep_resolved).unwrap();
+                                // out of gas
+                                // println!("thread {} resume suspended txn {} dep {}", rayon::current_thread_index().unwrap(), self.txn_idx, dep_idx);
+                                if (*dep_resolved).1 {
+                                    // println!("thread {} abort suspended txn {} dep {}", rayon::current_thread_index().unwrap(), self.txn_idx, dep_idx);
+                                    // return error
+                                    self.poisoned.store(true, Ordering::SeqCst);
+                                    return ReadResult::PEerror(0);
+                                }
                             }
                         }
                         None => continue,
@@ -144,6 +171,10 @@ impl<
     /// Return txn_idx associated with the MVHashMapView
     pub fn txn_idx(&self) -> TxnIndex {
         self.txn_idx
+    }
+
+    pub fn is_poisoned(&self) -> bool {
+        self.poisoned.load(Ordering::SeqCst)
     }
 }
 
@@ -195,10 +226,16 @@ where
             txn_idx: idx_to_execute,
             scheduler,
             captured_reads: Mutex::new(Vec::new()),
+            poisoned: AtomicBool::new(false),
         };
 
         // VM execution.
         let execute_result = executor.execute_transaction_mvhashmap_view(&state_view, txn);
+        if state_view.is_poisoned() {
+            assert!(scheduler.done());
+            return SchedulerTask::NoTask;
+        }
+
         let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
@@ -305,6 +342,46 @@ where
         }
     }
 
+    fn validate_for_commit<'a>(
+        &self,
+        version_to_validate: Version,
+        guard: TaskGuard<'a>,
+        last_input_output: &TxnLastInputOutput<
+            <T as Transaction>::Key,
+            <E as ExecutorTask>::Output,
+            <E as ExecutorTask>::Error,
+        >,
+        versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
+        scheduler: &'a Scheduler,
+    ) -> bool {
+        use MVHashMapError::*;
+        use MVHashMapOutput::*;
+
+        let (idx_to_validate, incarnation) = version_to_validate;
+        let read_set = last_input_output
+            .read_set(idx_to_validate)
+            .expect("Prior read-set must be recorded");
+
+        let valid = read_set.iter().all(|r| {
+            match versioned_data_cache.read(r.path(), idx_to_validate) {
+                Ok(Version(version, _)) => r.validate_version(version),
+                Ok(Resolved(value)) => r.validate_resolved(value),
+                Err(Dependency(_)) => false, // Dependency implies a validation failure.
+                Err(Unresolved(delta)) => r.validate_unresolved(delta),
+                Err(NotFound) => r.validate_storage(),
+                // We successfully validate when read (again) results in a delta application
+                // failure. If the failure is speculative, a later validation will fail due to
+                // a read without this error. However, if the failure is real, passing
+                // validation here allows to avoid infinitely looping and instead panic when
+                // materializing deltas as writes in the final output preparation state. Panic
+                // is also preferrable as it allows testing for this scenario.
+                Err(DeltaApplicationFailure) => r.validate_delta_application_failure(),
+            }
+        });
+
+        return valid;
+    }
+
     fn work_task_with_scope(
         &self,
         executor_arguments: &E::Argument,
@@ -321,39 +398,107 @@ where
         let executor = E::init(*executor_arguments);
 
         let mut scheduler_task = SchedulerTask::NoTask;
-        loop {
-            scheduler_task = match scheduler_task {
-                SchedulerTask::ValidationTask(version_to_validate, guard) => self.validate(
-                    version_to_validate,
-                    guard,
-                    last_input_output,
-                    versioned_data_cache,
-                    scheduler,
-                ),
-                SchedulerTask::ExecutionTask(version_to_execute, None, guard) => self.execute(
-                    version_to_execute,
-                    guard,
-                    block,
-                    last_input_output,
-                    versioned_data_cache,
-                    scheduler,
-                    &executor,
-                ),
-                SchedulerTask::ExecutionTask(_, Some(condvar), _guard) => {
-                    let (lock, cvar) = &*condvar;
-                    // Mark dependency resolved.
-                    *lock.lock() = true;
-                    // Wake up the process waiting for dependency.
-                    cvar.notify_one();
 
-                    SchedulerTask::NoTask
+        let mut local_cmt_idx = 0;
+        let mut current_gas = 0;
+        let is_first = scheduler.is_first();
+
+        if is_first {
+            while !scheduler.done() {
+                let num_txns = scheduler.num_txn_to_execute();
+
+                while local_cmt_idx < num_txns {
+                    // validate txn sequentially
+                    if let Some((version, guard)) = scheduler.produce_validation_task(local_cmt_idx)
+                    {
+                        if self.validate_for_commit(
+                            version,
+                            guard,
+                            last_input_output,
+                            versioned_data_cache,
+                            scheduler,
+                        ) {
+                            // println!("validated txn {:?}", version);
+                            // add gas
+                            let txn_gas = match last_input_output.write_set(local_cmt_idx).as_ref()
+                            {
+                                ExecutionStatus::Success(t) => t.gas_used(),
+                                ExecutionStatus::SkipRest(t) => t.gas_used(),
+                                ExecutionStatus::Abort(_) => 0,
+                            };
+                            current_gas += txn_gas;
+                            if current_gas > scheduler.max_gas() {
+                                println!(
+                                    "thread {} set done local_cmt_idx {}",
+                                    rayon::current_thread_index().unwrap(),
+                                    local_cmt_idx
+                                );
+                                scheduler.set_done(local_cmt_idx);
+                                break;
+                            }
+                            local_cmt_idx += 1;
+                        } else {
+                            // println!("validation txn {:?} fails", version);
+                        }
+                    } else {
+                        // println!("cannot produce validation task {:?}", local_cmt_idx);
+                    }
                 }
-                SchedulerTask::NoTask => scheduler.next_task(),
-                SchedulerTask::Done => {
+                if local_cmt_idx == num_txns {
+                    println!(
+                        "thread {} set done local_cmt_idx {}",
+                        rayon::current_thread_index().unwrap(),
+                        local_cmt_idx
+                    );
+                    scheduler.set_done(local_cmt_idx);
                     break;
                 }
             }
+            // help other threads
+            for txn_idx in 0..scheduler.num_txn_to_execute() {
+                scheduler.resolve_condvar(txn_idx);
+            }
+        } else {
+            loop {
+                // println!("loop id {}", rayon::current_thread_index().unwrap());
+                scheduler_task = match scheduler_task {
+                    SchedulerTask::ValidationTask(version_to_validate, guard) => self.validate(
+                        version_to_validate,
+                        guard,
+                        last_input_output,
+                        versioned_data_cache,
+                        scheduler,
+                    ),
+                    SchedulerTask::ExecutionTask(version_to_execute, None, guard) => self.execute(
+                        version_to_execute,
+                        guard,
+                        block,
+                        last_input_output,
+                        versioned_data_cache,
+                        scheduler,
+                        &executor,
+                    ),
+                    SchedulerTask::ExecutionTask(_, Some(condvar), _guard) => {
+                        let (lock, cvar) = &*condvar;
+                        // Mark dependency resolved.
+                        (*lock.lock()).0 = true;
+                        // Wake up the process waiting for dependency.
+                        cvar.notify_one();
+
+                        SchedulerTask::NoTask
+                    }
+                    SchedulerTask::NoTask => scheduler.next_task(),
+                    SchedulerTask::Done => {
+                        break;
+                    }
+                }
+            }
         }
+        // println!(
+        //     "thread finish {} is_first {}",
+        //     rayon::current_thread_index().unwrap(),
+        //     is_first
+        // );
     }
 
     pub fn execute_transactions_parallel(
@@ -368,6 +513,10 @@ where
         E::Error,
     > {
         assert!(self.concurrency_level > 1, "Must use sequential execution");
+
+        println!("");
+        println!("");
+        println!("PE starts level {}", self.concurrency_level);
 
         let versioned_data_cache = MVHashMap::new();
 
@@ -393,8 +542,12 @@ where
             }
         });
 
+        println!("all threads finish");
+
         // TODO: for large block sizes and many cores, extract outputs in parallel.
-        let num_txns = scheduler.num_txn_to_execute();
+        // let num_txns = scheduler.num_txn_to_execute();
+        let num_txns = scheduler.num_txn_to_commit();
+
         let mut final_results = Vec::with_capacity(num_txns);
 
         let maybe_err = if last_input_output.module_publishing_may_race() {
