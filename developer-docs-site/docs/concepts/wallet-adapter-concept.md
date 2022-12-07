@@ -3,6 +3,9 @@ title: "Wallet Adapter Concept"
 id: "wallet-adapter-concept"
 ---
 
+import ThemedImage from '@theme/ThemedImage';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
 # Wallet Adapter Concept
 
 Aptos provides a [monorepo](https://github.com/aptos-labs/aptos-wallet-adapter) “Aptos Wallet Adapter” for wallet and dapps creators for easy development and smooth process in building projects on the Aptos network.
