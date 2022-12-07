@@ -23,6 +23,19 @@ use crate::{
     util::time_service::{ClockTimeService, TimeService},
 };
 use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
+use aptos_consensus_types::{
+    block::{
+        block_test_utils::{certificate_for_genesis, gen_test_certificate},
+        Block,
+    },
+    block_retrieval::{BlockRetrievalRequest, BlockRetrievalStatus},
+    common::{Author, Payload, Round},
+    experimental::commit_decision::CommitDecision,
+    proposal_msg::ProposalMsg,
+    sync_info::SyncInfo,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
+    vote_msg::VoteMsg,
+};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::info;
@@ -37,19 +50,6 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::{
-    block::{
-        block_test_utils::{certificate_for_genesis, gen_test_certificate},
-        Block,
-    },
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalStatus},
-    common::{Author, Payload, Round},
-    experimental::commit_decision::CommitDecision,
-    proposal_msg::ProposalMsg,
-    sync_info::SyncInfo,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
-    vote_msg::VoteMsg,
-};
 use futures::{
     channel::{mpsc, oneshot},
     executor::block_on,

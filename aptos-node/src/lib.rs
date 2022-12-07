@@ -7,6 +7,7 @@ mod log_build_information;
 
 use anyhow::{anyhow, Context};
 use aptos_api::bootstrap as bootstrap_api;
+use aptos_backup_service::start_backup_service;
 use aptos_build_info::build_information;
 use aptos_config::{
     config::{
@@ -17,7 +18,13 @@ use aptos_config::{
     network_id::NetworkId,
     utils::get_genesis_txn,
 };
+use aptos_consensus::consensus_provider::start_consensus;
+use aptos_consensus_notifications::ConsensusNotificationListener;
 use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_data_streaming_service::{
+    streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
+    streaming_service::DataStreamingService,
+};
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -29,14 +36,7 @@ use aptos_types::{
 
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use backup_service::start_backup_service;
 use clap::Parser;
-use consensus::consensus_provider::start_consensus;
-use consensus_notifications::ConsensusNotificationListener;
-use data_streaming_service::{
-    streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
-    streaming_service::DataStreamingService,
-};
 use event_notifications::EventSubscriptionService;
 use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
 use framework::ReleaseBundle;
@@ -127,7 +127,7 @@ impl AptosNodeArgs {
             let genesis_framework = if let Some(path) = self.genesis_framework {
                 ReleaseBundle::read(path).unwrap()
             } else {
-                cached_packages::head_release_bundle().clone()
+                aptos_cached_packages::head_release_bundle().clone()
             };
             load_test_environment(
                 self.config,
@@ -182,7 +182,7 @@ pub fn start(
     log_file: Option<PathBuf>,
     create_global_rayon_pool: bool,
 ) -> anyhow::Result<()> {
-    crash_handler::setup_panic_handler();
+    aptos_crash_handler::setup_panic_handler();
 
     if create_global_rayon_pool {
         rayon::ThreadPoolBuilder::new()
@@ -597,7 +597,7 @@ fn create_checkpoint_and_change_working_dir(
     .create_checkpoint(&checkpoint_dir)
     .expect("AptosDB checkpoint creation failed.");
 
-    consensus::create_checkpoint(&source_dir, &checkpoint_dir)
+    aptos_consensus::create_checkpoint(&source_dir, &checkpoint_dir)
         .expect("ConsensusDB checkpoint creation failed.");
     let state_sync_db =
         state_sync_driver::metadata_storage::PersistentMetadataStorage::new(&source_dir);
@@ -801,10 +801,10 @@ pub fn setup_environment(
                 panic!("There can be at most one validator network!");
             }
 
-            consensus_network_handles = Some(
-                network_builder
-                    .add_p2p_service(&consensus::network_interface::network_endpoint_config()),
-            );
+            consensus_network_handles =
+                Some(network_builder.add_p2p_service(
+                    &aptos_consensus::network_interface::network_endpoint_config(),
+                ));
         }
 
         let network_context = network_builder.network_context();
@@ -821,7 +821,7 @@ pub fn setup_environment(
     let (mempool_notifier, mempool_listener) =
         mempool_notifications::new_mempool_notifier_listener_pair();
     let (consensus_notifier, consensus_listener) =
-        consensus_notifications::new_consensus_notifier_listener_pair(
+        aptos_consensus_notifications::new_consensus_notifier_listener_pair(
             node_config
                 .state_sync
                 .state_sync_driver

@@ -5,14 +5,14 @@ use crate::{
     error::QuorumStoreError, payload_manager::QuorumStoreClient, state_replication::PayloadManager,
 };
 use anyhow::Result;
-use aptos_types::{
-    transaction::{ExecutionStatus, TransactionStatus},
-    vm_status::StatusCode,
-};
-use consensus_types::{
+use aptos_consensus_types::{
     block::block_test_utils::random_payload,
     common::{Payload, PayloadFilter},
     request_response::ConsensusRequest,
+};
+use aptos_types::{
+    transaction::{ExecutionStatus, TransactionStatus},
+    vm_status::StatusCode,
 };
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;

@@ -3,6 +3,7 @@
 
 use crate::{assert_success, MoveHarness};
 use aptos::common::types::RotationProofChallenge;
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey};
 use aptos_crypto::{Signature, SigningKey, Uniform, ValidCryptoMaterial};
 use aptos_types::{
@@ -10,7 +11,6 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey,
     state_store::table::TableHandle, transaction::authenticator::AuthenticationKey,
 };
-use cached_packages::aptos_stdlib;
 use language_e2e_tests::account::Account;
 use move_core_types::parser::parse_struct_tag;
 

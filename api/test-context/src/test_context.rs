@@ -91,7 +91,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let builder = aptos_genesis::builder::Builder::new(
         tmp_dir.path(),
-        cached_packages::head_release_bundle().clone(),
+        aptos_cached_packages::head_release_bundle().clone(),
     )
     .unwrap()
     .with_init_genesis_config(Some(Arc::new(|genesis_config| {

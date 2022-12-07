@@ -14,9 +14,9 @@ use crate::{
     error::DbError,
 };
 use anyhow::Result;
+use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use consensus_types::{block::Block, quorum_cert::QuorumCert};
 use schema::{BLOCK_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME};
 use schemadb::{Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
 use std::{collections::HashMap, iter::Iterator, path::Path, time::Instant};

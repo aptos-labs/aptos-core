@@ -1,5 +1,5 @@
 [package]
-name = "cached-packages"
+name = "aptos-cached-packages"
 description = "Builds framework packages for caching in builds and tests"
 version = "0.1.0"
 

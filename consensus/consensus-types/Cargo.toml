@@ -1,5 +1,5 @@
 [package]
-name = "consensus-types"
+name = "aptos-consensus-types"
 description = "Aptos consensus types"
 version = "0.1.0"
 

@@ -16,14 +16,14 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 
+use aptos_consensus_types::{
+    block::Block, common::Round, executed_block::ExecutedBlock, quorum_cert::QuorumCert,
+    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
+};
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionStatus};
-use consensus_types::{
-    block::Block, common::Round, executed_block::ExecutedBlock, quorum_cert::QuorumCert,
-    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
-};
 use executor_types::{Error, StateComputeResult};
 use futures::executor::block_on;
 use std::{sync::Arc, time::Duration};

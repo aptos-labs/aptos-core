@@ -234,7 +234,7 @@ fn code_publishing_using_resource_account() {
 
     let result = h.run_transaction_payload(
         &acc,
-        cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
+        aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
             vec![],
             bcs_metadata,
             code,

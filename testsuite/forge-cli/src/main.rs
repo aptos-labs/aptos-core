@@ -399,7 +399,7 @@ fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'s
 fn run_forever() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_admin_tests(vec![&GetMetadata])
-        .with_genesis_module_bundle(cached_packages::head_release_bundle().clone())
+        .with_genesis_module_bundle(aptos_cached_packages::head_release_bundle().clone())
         .with_aptos_tests(vec![&RunForever])
 }
 
@@ -408,7 +408,7 @@ fn local_test_suite() -> ForgeConfig<'static> {
         .with_aptos_tests(vec![&FundAccount, &TransferCoins])
         .with_admin_tests(vec![&GetMetadata])
         .with_network_tests(vec![&RestartValidator, &EmitTransaction])
-        .with_genesis_module_bundle(cached_packages::head_release_bundle().clone())
+        .with_genesis_module_bundle(aptos_cached_packages::head_release_bundle().clone())
 }
 
 fn k8s_test_suite() -> ForgeConfig<'static> {

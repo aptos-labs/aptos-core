@@ -21,7 +21,9 @@ pub const SCRIPTS_DIR_PATH: &str = "templates";
 pub fn compile_script(source_file_str: String) -> Vec<u8> {
     let (_files, mut compiled_program) = Compiler::from_files(
         vec![source_file_str],
-        cached_packages::head_release_bundle().files().unwrap(),
+        aptos_cached_packages::head_release_bundle()
+            .files()
+            .unwrap(),
         framework::named_addresses().clone(),
     )
     .set_flags(Flags::empty().set_sources_shadow_deps(false))

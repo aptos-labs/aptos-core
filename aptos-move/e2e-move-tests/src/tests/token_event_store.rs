@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::MoveHarness;
-use cached_packages::aptos_stdlib::aptos_token_stdlib;
+use aptos_cached_packages::aptos_stdlib::aptos_token_stdlib;
 
 #[test]
 fn test_token_creation_with_token_events_store() {

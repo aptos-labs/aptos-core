@@ -51,10 +51,10 @@ tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 
 [dev-dependencies]
+aptos-backup-service = { workspace = true }
 aptos-config = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptosdb = { workspace = true }
-backup-service = { workspace = true }
 executor-test-helpers = { workspace = true }
 proptest = { workspace = true }
 storage-interface = { workspace = true }

@@ -6,7 +6,7 @@ use crate::liveness::{
 };
 use aptos_types::account_address::AccountAddress;
 
-use consensus_types::common::{Author, Round};
+use aptos_consensus_types::common::{Author, Round};
 use std::collections::HashMap;
 
 #[test]
