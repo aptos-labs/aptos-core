@@ -13,8 +13,6 @@ module aptos_std::simple_map {
     const EKEY_ALREADY_EXISTS: u64 = 1;
     /// Map key is not found
     const EKEY_NOT_FOUND: u64 = 2;
-    /// Deprecated method
-    const EDEPRECATED_FUNCTION: u64 = 3;
 
     struct SimpleMap<Key, Value> has copy, drop, store {
         data: vector<Element<Key, Value>>,
@@ -39,7 +37,7 @@ module aptos_std::simple_map {
         map: &SimpleMap<Key, Value>,
         key: &Key,
     ): &Value {
-        let maybe_idx = find_element(map, key);
+        let maybe_idx = find(map, key);
         assert!(option::is_some(&maybe_idx), error::invalid_argument(EKEY_NOT_FOUND));
         let idx = option::extract(&mut maybe_idx);
         &vector::borrow(&map.data, idx).value
@@ -49,7 +47,7 @@ module aptos_std::simple_map {
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
     ): &mut Value {
-        let maybe_idx = find_element(map, key);
+        let maybe_idx = find(map, key);
         assert!(option::is_some(&maybe_idx), error::invalid_argument(EKEY_NOT_FOUND));
         let idx = option::extract(&mut maybe_idx);
         &mut vector::borrow_mut(&mut map.data, idx).value
@@ -59,7 +57,7 @@ module aptos_std::simple_map {
         map: &SimpleMap<Key, Value>,
         key: &Key,
     ): bool {
-        let maybe_idx = find_element(map, key);
+        let maybe_idx = find(map, key);
         option::is_some(&maybe_idx)
     }
 
@@ -73,10 +71,9 @@ module aptos_std::simple_map {
         key: Key,
         value: Value,
     ) {
-        let maybe_idx = find_element(map, &key);
+        let maybe_idx = find(map, &key);
         assert!(option::is_none(&maybe_idx), error::invalid_argument(EKEY_ALREADY_EXISTS));
 
-        // Append to the end and then swap elements until the list is ordered again
         vector::push_back(&mut map.data, Element { key, value });
     }
 
@@ -84,7 +81,7 @@ module aptos_std::simple_map {
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
     ): (Key, Value) {
-        let maybe_idx = find_element(map, key);
+        let maybe_idx = find(map, key);
         assert!(option::is_some(&maybe_idx), error::invalid_argument(EKEY_NOT_FOUND));
 
         let placement = option::extract(&mut maybe_idx);
@@ -99,7 +96,7 @@ module aptos_std::simple_map {
         (key, value)
     }
 
-    fun find_element<Key: store, Value: store>(
+    fun find<Key: store, Value: store>(
         map: &SimpleMap<Key, Value>,
         key: &Key,
     ): option::Option<u64>{
@@ -110,16 +107,9 @@ module aptos_std::simple_map {
             if (&element.key == key){
                 return option::some(i)
             };
-          i = i + 1;
+            i = i + 1;
         };
         option::none<u64>()
-    }
-
-    fun find<Key: store, Value: store>(
-        _map: &SimpleMap<Key, Value>,
-        _key: &Key,
-    ): (option::Option<u64>, option::Option<u64>) {
-        abort error::unavailable(EDEPRECATED_FUNCTION)
     }
 
     #[test]
@@ -151,36 +141,6 @@ module aptos_std::simple_map {
         remove(&mut map, &3);
         assert!(length(&map) == 0, 14);
         assert!(!contains_key(&map, &3), 15);
-
-        destroy_empty(map);
-    }
-
-    #[test]
-    public fun test_several() {
-        let map = create<u64, u64>();
-        add(&mut map, 6, 6);
-        add(&mut map, 1, 1);
-        add(&mut map, 5, 5);
-        add(&mut map, 2, 2);
-        add(&mut map, 3, 3);
-        add(&mut map, 0, 0);
-        add(&mut map, 7, 7);
-        add(&mut map, 4, 4);
-
-        let idx = 0;
-        while (idx < vector::length(&map.data)) {
-            assert!(idx == vector::borrow(&map.data, idx).key, idx);
-            idx = idx + 1;
-        };
-
-        remove(&mut map, &0);
-        remove(&mut map, &1);
-        remove(&mut map, &2);
-        remove(&mut map, &3);
-        remove(&mut map, &4);
-        remove(&mut map, &5);
-        remove(&mut map, &6);
-        remove(&mut map, &7);
 
         destroy_empty(map);
     }
