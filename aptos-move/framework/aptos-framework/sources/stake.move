@@ -1014,44 +1014,20 @@ module aptos_framework::stake {
 
     /// Triggers at epoch boundary. This function shouldn't abort.
     ///
-    /// 1. Distribute transaction fees to stake pools of active and pending inactive validators.
-    /// 2. Distribute rewards to stake pools of active and pending inactive validators (requested to leave but not yet
-    /// removed).
-    /// 3. Officially move pending active stake to active and move pending inactive stake to inactive.
+    /// 1. Distribute transaction fees and rewards to stake pools of active and pending inactive validators (requested
+    /// to leave but not yet removed).
+    /// 2. Officially move pending active stake to active and move pending inactive stake to inactive.
     /// The staking pool's voting power in this new epoch will be updated to the total active stake.
-    /// 4. Add pending active validators to the active set if they satisfy requirements so they can vote and remove
+    /// 3. Add pending active validators to the active set if they satisfy requirements so they can vote and remove
     /// pending inactive validators so they no longer can vote.
-    /// 5. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
+    /// 4. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
     /// power.
     public(friend) fun on_new_epoch() acquires StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
         let config = staking_config::get();
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
 
-        if (features::collect_and_distribute_gas_fees()) {
-            let validator_fees = borrow_global_mut<ValidatorFees>(@aptos_framework);
-
-            // Distribute transaction fees for each currently active validator.
-            let i = 0;
-            let len = vector::length(&validator_set.active_validators);
-            while (i < len) {
-                let validator = vector::borrow(&validator_set.active_validators, i);
-                distribute_transaction_fees(validator_fees, validator.addr);
-                i = i + 1;
-            };
-
-            // Distribute transaction fees for each currently pending_inactive validator (requested to
-            // leave but not removed yet).
-            let i = 0;
-            let len = vector::length(&validator_set.pending_inactive);
-            while (i < len) {
-                let validator = vector::borrow(&validator_set.pending_inactive, i);
-                distribute_transaction_fees(validator_fees, validator.addr);
-                i = i + 1;
-            };
-        };
-
-        // Process pending stake and distribute rewards for each currently active validator.
+        // Process pending stake and distribute transaction fees and rewards for each currently active validator.
         let i = 0;
         let len = vector::length(&validator_set.active_validators);
         while (i < len) {
@@ -1060,8 +1036,8 @@ module aptos_framework::stake {
             i = i + 1;
         };
 
-        // Process pending stake and distribute rewards for each currently pending_inactive validator (requested to
-        // leave but not removed yet).
+        // Process pending stake and distribute transaction fees and rewards for each currently pending_inactive validator
+        // (requested to leave but not removed yet).
         let i = 0;
         let len = vector::length(&validator_set.pending_inactive);
         while (i < len) {
@@ -1154,30 +1130,27 @@ module aptos_framework::stake {
         };
     }
 
-    /// If the pool address has some transaction fees assigned to it, removes the appropriate entry
-    /// from `ValidatorFees` and puts coin into pool's active stake.
-    fun distribute_transaction_fees(
-        validator_fees: &mut ValidatorFees,
-        pool_address: address,
-    ) acquires StakePool {
-        let fees_table = &mut validator_fees.fees_table;
-        let stake_pool = borrow_global_mut<StakePool>(pool_address);
-        if (table::contains(fees_table, pool_address)) {
-            let coin = table::remove(fees_table, pool_address);
-            coin::merge(&mut stake_pool.active, coin);
-        }
-    }
-
     /// Update individual validator's stake pool
-    /// 1. distribute rewards to active/pending_inactive delegations
-    /// 2. process pending_active, pending_inactive correspondingly
+    /// 1. distribute transaction fees to active/pending_inactive delegations
+    /// 2. distribute rewards to active/pending_inactive delegations
+    /// 3. process pending_active, pending_inactive correspondingly
     /// This function shouldn't abort.
     fun update_stake_pool(
         validator_perf: &ValidatorPerformance,
         pool_address: address,
         staking_config: &StakingConfig,
-    ) acquires StakePool, AptosCoinCapabilities, ValidatorConfig {
+    ) acquires StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorFees {
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
+
+        // First, distribute transaction fees.
+        if (features::collect_and_distribute_gas_fees()) {
+            let fees_table = &mut borrow_global_mut<ValidatorFees>(@aptos_framework).fees_table;
+            if (table::contains(fees_table, pool_address)) {
+                let coin = table::remove(fees_table, pool_address);
+                coin::merge(&mut stake_pool.active, coin);
+            };
+        };
+
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
         let cur_validator_perf = vector::borrow(&validator_perf.validators, validator_config.validator_index);
         let num_successful_proposals = cur_validator_perf.successful_proposals;
