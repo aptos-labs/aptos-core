@@ -12,8 +12,9 @@ use aptos_types::{
     transaction::Version,
     write_set::WriteSet,
 };
+use dashmap::DashMap;
 use once_cell::sync::Lazy;
-use parking_lot::RwLock;
+use rayon::prelude::*;
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
 use std::{
     collections::{HashMap, HashSet},
@@ -81,7 +82,7 @@ pub struct CachedStateView {
     /// completely and migrate to fine grained storage. A value of None in this cache reflects that
     /// the corresponding key has been deleted. This is a temporary hack until we support deletion
     /// in JMT node.
-    state_cache: RwLock<HashMap<StateKey, Option<StateValue>>>,
+    state_cache: DashMap<StateKey, Option<StateValue>>,
     proof_fetcher: Arc<dyn ProofFetcher>,
 }
 
@@ -106,7 +107,7 @@ impl CachedStateView {
             id,
             snapshot,
             speculative_state,
-            state_cache: RwLock::new(HashMap::new()),
+            state_cache: DashMap::new(),
             proof_fetcher,
         })
     }
@@ -131,10 +132,12 @@ impl CachedStateView {
         Ok(())
     }
 
-    pub fn into_state_cache(self) -> StateCache {
+    pub fn into_state_cache(mut self) -> StateCache {
         StateCache {
             frozen_base: self.speculative_state,
-            state_cache: self.state_cache.into_inner(),
+            state_cache: std::mem::take(&mut self.state_cache)
+                .into_par_iter()
+                .collect::<HashMap<_, _>>(),
             proofs: self.proof_fetcher.get_proof_cache(),
         }
     }
@@ -192,14 +195,16 @@ impl StateView for CachedStateView {
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         // First check if the cache has the state value.
-        if let Some(contents) = self.state_cache.read().get(state_key) {
+        if let Some(contents) = self.state_cache.get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
             return Ok(contents.as_ref().map(|v| v.bytes().to_vec()));
         }
         let state_value_option = self.get_state_value_internal(state_key)?;
         // Update the cache if still empty
-        let mut cache = self.state_cache.write();
-        let new_value = cache.entry(state_key.clone()).or_insert(state_value_option);
+        let new_value = self
+            .state_cache
+            .entry(state_key.clone())
+            .or_insert(state_value_option);
         Ok(new_value.as_ref().map(|v| v.bytes().to_vec()))
     }
 
@@ -214,14 +219,14 @@ impl StateView for CachedStateView {
 
 pub struct CachedDbStateView {
     db_state_view: DbStateView,
-    state_cache: RwLock<HashMap<StateKey, Option<Vec<u8>>>>,
+    state_cache: DashMap<StateKey, Option<Vec<u8>>>,
 }
 
 impl From<DbStateView> for CachedDbStateView {
     fn from(db_state_view: DbStateView) -> Self {
         Self {
             db_state_view,
-            state_cache: RwLock::new(HashMap::new()),
+            state_cache: DashMap::new(),
         }
     }
 }
@@ -233,14 +238,14 @@ impl StateView for CachedDbStateView {
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         // First check if the cache has the state value.
-        if let Some(contents) = self.state_cache.read().get(state_key) {
+        if let Some(contents) = self.state_cache.get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
             return Ok(contents.clone());
         }
         let state_value_option = self.db_state_view.get_state_value(state_key)?;
         // Update the cache if still empty
-        let mut cache = self.state_cache.write();
-        let new_value = cache
+        let new_value = self
+            .state_cache
             .entry(state_key.clone())
             .or_insert_with(|| state_value_option);
         Ok(new_value.clone())

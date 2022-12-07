@@ -311,7 +311,7 @@ crossbeam = "0.8.1"
 crossbeam-channel = "0.5.4"
 crossbeam-queue = "0.3.5"
 curve25519-dalek = "3"
-dashmap = "5.2.0"
+dashmap = { version = "5.2.0", features = ["rayon"] }
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 diesel = { version = "2.0.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
