@@ -411,10 +411,18 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                 num_transactions
                             ))
                         );
+
+                        let operation_label =
+                            metrics::StorageSynchronizerOperations::ExecutedTransactions
+                                .get_label();
                         metrics::increment_gauge(
                             &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                            metrics::StorageSynchronizerOperations::ExecutedTransactions
-                                .get_label(),
+                            operation_label,
+                            num_transactions as u64,
+                        );
+                        metrics::observe_value(
+                            &metrics::STORAGE_SYNCHRONIZER_CHUNK_SIZES,
+                            operation_label,
                             num_transactions as u64,
                         );
                     }
@@ -451,10 +459,18 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                 num_outputs
                             ))
                         );
+
+                        let operation_label =
+                            metrics::StorageSynchronizerOperations::AppliedTransactionOutputs
+                                .get_label();
                         metrics::increment_gauge(
                             &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                            metrics::StorageSynchronizerOperations::AppliedTransactionOutputs
-                                .get_label(),
+                            operation_label,
+                            num_outputs as u64,
+                        );
+                        metrics::observe_value(
+                            &metrics::STORAGE_SYNCHRONIZER_CHUNK_SIZES,
+                            operation_label,
                             num_outputs as u64,
                         );
                     }
