@@ -86,7 +86,8 @@ module aptos_std::comparator {
 
     #[test]
     #[expected_failure]
-    public fun test_u128() {
+    public fun test_integer() {
+        // 1(0x1) will be larger than 256(0x100) after BCS serialization. 
         let value0: u128 = 1;
         let value1: u128 = 256;
 
@@ -95,6 +96,26 @@ module aptos_std::comparator {
 
         assert!(is_smaller_than(&compare(&value0, &value1)), 2);
         assert!(is_greater_than(&compare(&value1, &value0)), 3);
+    }
+
+    #[test]
+    public fun test_u128() {
+        let value0: u128 = 5;
+        let value1: u128 = 152;
+        let value2: u128 = 511; // 0x1ff
+
+        assert!(is_equal(&compare(&value0, &value0)), 0);
+        assert!(is_equal(&compare(&value1, &value1)), 1);
+        assert!(is_equal(&compare(&value2, &value2)), 2);
+
+        assert!(is_smaller_than(&compare(&value0, &value1)), 2);
+        assert!(is_greater_than(&compare(&value1, &value0)), 3);
+
+        assert!(is_smaller_than(&compare(&value0, &value2)), 3);
+        assert!(is_greater_than(&compare(&value2, &value0)), 4);
+
+        assert!(is_smaller_than(&compare(&value1, &value2)), 5);
+        assert!(is_greater_than(&compare(&value2, &value1)), 6);
     }
 
     #[test_only]
