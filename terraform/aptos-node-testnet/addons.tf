@@ -226,12 +226,26 @@ resource "helm_release" "external-dns" {
   ]
 }
 
+locals {
+  # these values are the most likely to be changed by the user and may be managed by terraform to trigger re-deployment
+  testnet_addons_helm_values_managed = {
+    "imageTag"    = var.image_tag
+    "genesis.era" = var.era
+  }
+}
+
 resource "helm_release" "testnet-addons" {
   count       = var.enable_forge ? 0 : 1
   name        = "testnet-addons"
   chart       = local.testnet_addons_helm_chart_path
   max_history = 5
   wait        = false
+
+  lifecycle {
+    ignore_changes = [
+      values,
+    ]
+  }
 
   values = [
     jsonencode({
@@ -259,6 +273,14 @@ resource "helm_release" "testnet-addons" {
     }),
     jsonencode(var.testnet_addons_helm_values)
   ]
+
+  dynamic "set" {
+    for_each = var.manage_via_tf ? local.testnet_addons_helm_values_managed : {}
+    content {
+      name  = set.key
+      value = set.value
+    }
+  }
 
   # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
