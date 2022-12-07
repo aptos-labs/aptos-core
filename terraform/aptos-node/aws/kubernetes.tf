@@ -172,7 +172,7 @@ locals {
 
   # these values are the most likely to be changed by the user and may be managed by terraform to trigger re-deployment
   helm_values_managed = {
-    "imageTag" = var.image_tag
+    "imageTag"  = var.image_tag
     "chain.era" = var.era
   }
 }
