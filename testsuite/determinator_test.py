@@ -1,7 +1,19 @@
 import unittest
+import tempfile
+import os
 
 from click.testing import CliRunner
 from determinator import main, ChangedFilesPredicate, ChangedFilesContext
+
+
+# If this test is run from Github Actions, $GITHUB_OUTPUT will be set
+# Otherwise, create a tempfile for it, which exists for the duration of the test
+if "GITHUB_OUTPUT" not in os.environ:
+    temp_github_output = tempfile.NamedTemporaryFile(
+        prefix="determinator_github_output_"
+    )
+    os.environ["GITHUB_OUTPUT"] = temp_github_output.name
+print("GITHUB_OUTPUT set to", os.environ["GITHUB_OUTPUT"])
 
 
 class ChangedFilesPredicateTestCase(unittest.TestCase):
@@ -33,7 +45,7 @@ class DeterminatorTestCase(unittest.TestCase):
         )
         self.assertEqual(
             result.output,
-            "FAILED because Matched files: []\n" "::set-output name=BANANA::false\n",
+            "FAILED because Matched files: []\n" "BANANA=false\n",
         )
         self.assertEqual(result.exit_code, 0)
 
@@ -55,6 +67,6 @@ class DeterminatorTestCase(unittest.TestCase):
             result.output,
             "PASSED because Matched files: "
             "['testsuite/fixtures/helm/banana.ts']\n"
-            "::set-output name=BANANA::true\n",
+            "BANANA=true\n",
         )
         self.assertEqual(result.exit_code, 0)
