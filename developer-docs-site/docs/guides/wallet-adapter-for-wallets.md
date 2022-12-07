@@ -33,7 +33,7 @@ Creating and publishing scoped public packages [https://docs.npmjs.com/creating
 Creating and publishing unscoped public packages [https://docs.npmjs.com/creating-and-publishing-unscoped-public-packages](https://docs.npmjs.com/creating-and-publishing-unscoped-public-packages)
 
 :::tip
-If your wallet provides function that is not included, you should open a PR against aptos-wallet-adapter in the core package so it would support this functionality. You can take a look at the signTransaction on the wallet core package
+If your wallet provides function that is not included, you should open a PR against aptos-wallet-adapter in the core package so it would support this functionality. You can take a look at the `signTransaction` on the [wallet core package](https://github.com/aptos-labs/aptos-wallet-adapter/blob/main/packages/wallet-adapter-core/src/WalletCore.ts)
 :::
 
 ### Add your name to the wallets list
