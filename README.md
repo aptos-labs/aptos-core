@@ -11,7 +11,7 @@
 
 Aptos-core strives towards being the safest and most scalable layer one blockchain solution. Today, this powers the Aptos Devnet, tomorrow Mainnet in order to create universal and fair access to decentralized assets for billions of people.
 
-## Getting Started
+## Getting Started!
 
 * [Aptos Labs](https://aptoslabs.com/)
 * [Aptos Developer Network](https://aptos.dev)
