@@ -20,6 +20,12 @@ spec aptos_std::multi_ed25519 {
         ensures !cond ==> result == option::spec_none<ValidatedPublicKey>();
     }
 
+    spec new_validated_public_key_from_bytes_v2(bytes: vector<u8>): Option<ValidatedPublicKey> {
+        let cond = spec_public_key_validate_v2_internal(bytes);
+        ensures cond ==> result == option::spec_some(ValidatedPublicKey{bytes});
+        ensures !cond ==> result == option::spec_none<ValidatedPublicKey>();
+    }
+
     spec new_signature_from_bytes(bytes: vector<u8>): Signature {
         aborts_if len(bytes) % INDIVIDUAL_SIGNATURE_NUM_BYTES != BITMAP_NUM_OF_BYTES;
         ensures result == Signature { bytes };
@@ -31,6 +37,7 @@ spec aptos_std::multi_ed25519 {
     // ----------------
 
     spec fun spec_public_key_validate_internal(bytes: vector<u8>): bool;
+    spec fun spec_public_key_validate_v2_internal(bytes: vector<u8>): bool;
 
     spec fun spec_signature_verify_strict_internal(
         multisignature: vector<u8>,
@@ -42,6 +49,11 @@ spec aptos_std::multi_ed25519 {
         pragma opaque;
         aborts_if len(bytes) / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES > MAX_NUMBER_OF_PUBLIC_KEYS;
         ensures result == spec_public_key_validate_internal(bytes);
+    }
+
+    spec public_key_validate_v2_internal(bytes: vector<u8>): bool {
+        pragma opaque;
+        ensures result == spec_public_key_validate_v2_internal(bytes);
     }
 
     spec signature_verify_strict_internal(
