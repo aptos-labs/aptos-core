@@ -197,16 +197,27 @@ impl StateView for CachedStateView {
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         // First check if the cache has the state value.
+        let read_timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         if let Some(contents) = self.state_cache.get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
             return Ok(contents.as_ref().map(|v| v.bytes().to_vec()));
         }
+        drop(read_timer);
+        let read_internal_timer = TIMER
+            .with_label_values(&["get_state_value_internal"])
+            .start_timer();
         let state_value_option = self.get_state_value_internal(state_key)?;
+        drop(read_internal_timer);
         // Update the cache if still empty
+        let write_timer = TIMER
+            .with_label_values(&["get_state_value_internal"])
+            .start_timer();
+
         let new_value = self
             .state_cache
             .entry(state_key.clone())
             .or_insert(state_value_option);
+        drop(write_timer);
         Ok(new_value.as_ref().map(|v| v.bytes().to_vec()))
     }
 
