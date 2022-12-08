@@ -1,0 +1,12 @@
+[package]
+name = "test_package"
+version = "0.0.0"
+upgrade_policy = "compatible"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+AptosToken = { local = "../../framework/aptos-token" }
+DataStructure = { local = "../data_structures" }
+
+[addresses]
+source_addr = "0xcafe"
