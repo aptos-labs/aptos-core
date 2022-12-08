@@ -11,28 +11,25 @@ This page shows the key updates to the developer documentation on this site.
 
 - Released a new version to Mainnet:
 
-Framework upgrade through governance voting:
+  Framework upgrade through governance voting:
+  - Testnet upgrade - Nov 30th
+  - Mainnet upgrade - Dec 12th - 19th (7 days voting period)
 
-- Testnet upgrade - Nov 30th
-- Mainnet upgrade - Dec 12th - 19th (7 days voting period)
-
-New features and enhancements:
-
-- Move
+  New features and enhancements:
+  - Move
     - [New chain_id native function + corresponding new gas schedule entry](https://github.com/aptos-labs/aptos-core/pull/5288).
-- Blockchain
+  - Blockchain
     - Added automatic chain-health based back pressure to improve reliability. Automatic slow-down (through max block size reduction) is triggered in some scenarios.
 
-Resolved issues:
-
-- Move
+  Resolved issues:
+  - Move
     - Explicit error codes in resource account.
     - Improved Leader Election (gated behind feature flag).
 
-See these resources for more details on the release:
-  - [Aptos Releases](https://github.com/aptos-labs/aptos-core/releases) list for all releases.
-  - [`testnet`](https://github.com/aptos-labs/aptos-core/commits/testnet) branch commits for the changes landing in mainnet today.
-  - [#mainnet-release](https://discord.com/channels/945856774056083548/1042502400507916349) Discord channel for more detailed descriptions of the above changes.
+  See these resources for more details on the release:
+    - [Aptos Releases](https://github.com/aptos-labs/aptos-core/releases) list for all releases.
+    - [`testnet`](https://github.com/aptos-labs/aptos-core/commits/testnet) branch commits for the changes landing in mainnet today.
+    - [#mainnet-release](https://discord.com/channels/945856774056083548/1042502400507916349) Discord channel for more detailed descriptions of the above changes.
 
 ## 05 December 2022
 
