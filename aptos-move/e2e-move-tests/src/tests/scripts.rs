@@ -24,15 +24,15 @@ fn test_two_to_two_transfer() {
     let amount_carol = 50;
     let amount_david = amount_alice + amount_bob - amount_carol;
 
-    let build_options = framework::BuildOptions {
+    let build_options = aptos_framework::BuildOptions {
         with_srcs: false,
         with_abis: false,
         with_source_maps: false,
         with_error_map: false,
-        ..framework::BuildOptions::default()
+        ..aptos_framework::BuildOptions::default()
     };
 
-    let package = framework::BuiltPackage::build(
+    let package = aptos_framework::BuiltPackage::build(
         common::test_dir_path("../../../move-examples/scripts/two_by_two_transfer"),
         build_options,
     )

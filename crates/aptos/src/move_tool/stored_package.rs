@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
+use aptos_framework::natives::code::{
+    ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy,
+};
+use aptos_framework::unzip_metadata_str;
 use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
-use framework::natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
-use framework::unzip_metadata_str;
 use move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
 use std::fs;

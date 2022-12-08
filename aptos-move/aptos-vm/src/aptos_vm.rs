@@ -25,6 +25,7 @@ use aptos_aggregator::{
     transaction::{ChangeSetExt, TransactionOutputExt},
 };
 use aptos_crypto::HashValue;
+use aptos_framework::natives::code::PublishRequest;
 use aptos_gas::AptosGasMeter;
 use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
@@ -43,7 +44,6 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use fail::fail_point;
-use framework::natives::code::PublishRequest;
 use move_binary_format::{
     access::ModuleAccess,
     errors::{verification_error, Location, PartialVMError, VMError, VMResult},

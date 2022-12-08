@@ -21,6 +21,7 @@ use crate::{
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
+use aptos_framework::ReleaseBundle;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
@@ -48,7 +49,6 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionId},
     AptosVM, VMExecutor, VMValidator,
 };
-use framework::ReleaseBundle;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -211,7 +211,9 @@ impl FakeExecutor {
     /// initialization done.
     pub fn stdlib_only_genesis() -> Self {
         let mut genesis = Self::no_genesis();
-        for (bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules() {
+        for (bytes, module) in
+            aptos_cached_packages::head_release_bundle().code_and_compiled_modules()
+        {
             let id = module.self_id();
             genesis.add_module(&id, bytes.to_vec());
         }

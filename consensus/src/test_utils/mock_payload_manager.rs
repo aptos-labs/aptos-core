@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::QuorumStoreError, payload_manager::QuorumStoreClient, state_replication::PayloadManager,
+    error::QuorumStoreError, payload_client::QuorumStoreClient, state_replication::PayloadClient,
 };
 use anyhow::Result;
+use aptos_consensus_types::{
+    block::block_test_utils::random_payload,
+    common::{Payload, PayloadFilter, Round},
+    request_response::PayloadRequest,
+};
 use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
     vm_status::StatusCode,
-};
-use consensus_types::{
-    block::block_test_utils::random_payload,
-    common::{Payload, PayloadFilter},
-    request_response::ConsensusRequest,
 };
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
@@ -23,7 +23,7 @@ pub struct MockPayloadManager {
 }
 
 impl MockPayloadManager {
-    pub fn new(consensus_to_quorum_store_sender: Option<mpsc::Sender<ConsensusRequest>>) -> Self {
+    pub fn new(consensus_to_quorum_store_sender: Option<mpsc::Sender<PayloadRequest>>) -> Self {
         let quorum_store_client =
             consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1));
         Self {
@@ -47,10 +47,11 @@ fn _mock_transaction_status(count: usize) -> Vec<TransactionStatus> {
 }
 
 #[async_trait::async_trait]
-impl PayloadManager for MockPayloadManager {
+impl PayloadClient for MockPayloadManager {
     /// The returned future is fulfilled with the vector of SignedTransactions
     async fn pull_payload(
         &self,
+        _round: Round,
         _max_size: u64,
         _max_bytes: u64,
         _exclude: PayloadFilter,

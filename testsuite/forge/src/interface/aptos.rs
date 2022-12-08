@@ -3,6 +3,7 @@
 
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
+use aptos_cached_packages::aptos_stdlib;
 use aptos_logger::info;
 use aptos_rest_client::{Client as RestClient, PendingTransaction, State, Transaction};
 use aptos_sdk::{
@@ -19,7 +20,6 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
-use cached_packages::aptos_stdlib;
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use reqwest::Url;
 

@@ -3,7 +3,7 @@
 
 use crate::common::types::load_account_arg;
 use crate::move_tool::CachedPackageRegistry;
-use framework::UPGRADE_POLICY_CUSTOM_FIELD;
+use aptos_framework::UPGRADE_POLICY_CUSTOM_FIELD;
 use futures::executor::block_on;
 use move_package::compilation::package_layout::CompiledPackageLayout;
 use move_package::package_hooks::PackageHooks;

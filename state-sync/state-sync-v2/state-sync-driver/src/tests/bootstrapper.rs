@@ -20,15 +20,15 @@ use crate::{
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
+use aptos_data_streaming_service::{
+    data_notification::{DataNotification, DataPayload},
+    streaming_client::{NotificationAndFeedback, NotificationFeedback},
+};
 use aptos_types::{
     transaction::{TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
 };
 use claims::{assert_matches, assert_none, assert_ok};
-use data_streaming_service::{
-    data_notification::{DataNotification, DataPayload},
-    streaming_client::{NotificationAndFeedback, NotificationFeedback},
-};
 use futures::{channel::oneshot, FutureExt, SinkExt};
 use mockall::{predicate::eq, Sequence};
 use std::sync::Arc;

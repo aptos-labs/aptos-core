@@ -16,6 +16,9 @@ use crate::{
     },
 };
 use anyhow::Result;
+use aptos_executor_types::{
+    ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, TransactionReplayer,
+};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
@@ -26,9 +29,6 @@ use aptos_types::{
     },
 };
 use aptos_vm::VMExecutor;
-use executor_types::{
-    ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, TransactionReplayer,
-};
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
 use storage_interface::{

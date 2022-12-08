@@ -53,7 +53,7 @@ fn mint_nft_e2e() {
     let resource_address = create_resource_address(*acc.address(), &[]);
 
     // give a named address to the `mint_nft` module publisher
-    let mut build_options = framework::BuildOptions::default();
+    let mut build_options = aptos_framework::BuildOptions::default();
     build_options
         .named_addresses
         .insert("mint_nft".to_string(), resource_address);
@@ -62,7 +62,7 @@ fn mint_nft_e2e() {
         .insert("source_addr".to_string(), *acc.address());
 
     // build the package from our example code
-    let package = framework::BuiltPackage::build(
+    let package = aptos_framework::BuiltPackage::build(
         common::test_dir_path("../../../move-examples/mint_nft/4-Getting-Production-Ready"),
         build_options,
     )
@@ -76,7 +76,7 @@ fn mint_nft_e2e() {
     // create the resource account and publish the module under the resource account's address
     let result = h.run_transaction_payload(
         &acc,
-        cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
+        aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
             vec![],
             bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
             code,

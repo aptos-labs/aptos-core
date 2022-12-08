@@ -12,10 +12,10 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use aptos_backup_cli::metadata::view::BackupStorageState;
+use aptos_forge::{reconfig, NodeExt, Swarm, SwarmExt};
 use aptos_logger::info;
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
-use forge::{reconfig, NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
     path::Path,

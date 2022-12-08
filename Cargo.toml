@@ -21,7 +21,6 @@ members = [
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
-    "aptos-move/framework/artifacts-test",
     "aptos-move/framework/cached-packages",
     "aptos-move/gas-algebra-ext",
     "aptos-move/move-examples",
@@ -172,7 +171,6 @@ aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
 aptos-api = { path = "api" }
 aptos-api-test-context = { path = "api/test-context" }
 aptos-api-types = { path = "api/types" }
-aptos-backup-cli = { path = "storage/backup/backup-cli" }
 aptos-block-executor = { path = "aptos-move/block-executor" }
 aptos-bitvec = { path = "crates/aptos-bitvec" }
 aptos-build-info = { path = "crates/aptos-build-info" }
@@ -230,24 +228,24 @@ aptos-vm = { path = "aptos-move/aptos-vm" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
 aptosdb = { path = "storage/aptosdb" }
-backup-service = { path = "storage/backup/backup-service" }
-bounded-executor = { path = "crates/bounded-executor" }
-cached-packages = { path = "aptos-move/framework/cached-packages" }
+aptos-backup-cli = { path = "storage/backup/backup-cli" }
+aptos-backup-service = { path = "storage/backup/backup-service" }
+aptos-bounded-executor = { path = "crates/bounded-executor" }
+aptos-cached-packages = { path = "aptos-move/framework/cached-packages" }
 channel = { path = "crates/channel" }
-consensus = { path = "consensus" }
-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
-consensus-types = { path = "consensus/consensus-types" }
-crash-handler = { path = "crates/crash-handler" }
-data-streaming-service = { path = "state-sync/state-sync-v2/data-streaming-service" }
-event-notifications = { path = "state-sync/inter-component/event-notifications" }
-executor = { path = "execution/executor" }
-executor-test-helpers = { path = "execution/executor-test-helpers" }
-executor-types = { path = "execution/executor-types" }
-fallible = { path = "crates/fallible" }
-forge = { path = "testsuite/forge" }
-framework = { path = "aptos-move/framework" }
-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
-handlebars = "4.2.2"
+aptos-consensus = { path = "consensus" }
+aptos-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
+aptos-consensus-types = { path = "consensus/consensus-types" }
+aptos-crash-handler = { path = "crates/crash-handler" }
+aptos-data-streaming-service = { path = "state-sync/state-sync-v2/data-streaming-service" }
+aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
+aptos-executor = { path = "execution/executor" }
+aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
+aptos-executor-types = { path = "execution/executor-types" }
+aptos-fallible = { path = "crates/fallible" }
+aptos-forge = { path = "testsuite/forge" }
+aptos-framework = { path = "aptos-move/framework" }
+aptos-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
 inspection-service = { path = "crates/inspection-service" }
 language-e2e-tests = { path = "aptos-move/e2e-tests" }
 mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
@@ -336,6 +334,7 @@ futures-util = "0.3.21"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
 goldenfile = "1.1.0"
+handlebars = "4.2.2"
 heck = "0.3.2"
 hex = "0.4.3"
 hkdf = "0.10.0"

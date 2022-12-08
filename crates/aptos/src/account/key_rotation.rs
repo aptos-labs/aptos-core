@@ -11,6 +11,7 @@ use crate::common::{
     },
     utils::{prompt_yes_with_override, read_line},
 };
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey, SigningKey,
@@ -23,7 +24,6 @@ use aptos_types::{
     transaction::authenticator::AuthenticationKey,
 };
 use async_trait::async_trait;
-use cached_packages::aptos_stdlib;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};

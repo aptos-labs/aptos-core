@@ -12,6 +12,11 @@ use crate::{
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
+use aptos_data_streaming_service::{
+    data_notification::{DataNotification, DataPayload, NotificationId},
+    data_stream::DataStreamListener,
+    streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
+};
 use aptos_logger::{prelude::*, sample::SampleRate};
 use aptos_types::{
     epoch_change::Verifier,
@@ -20,11 +25,6 @@ use aptos_types::{
     state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
-};
-use data_streaming_service::{
-    data_notification::{DataNotification, DataPayload, NotificationId},
-    data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
 };
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};

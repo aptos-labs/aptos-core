@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
+use aptos_consensus_types::block::block_test_utils::certificate_for_genesis;
 use aptos_temppath::TempPath;
-use consensus_types::block::block_test_utils::certificate_for_genesis;
 
 #[test]
 fn test_put_get() {

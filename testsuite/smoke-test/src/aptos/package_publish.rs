@@ -3,7 +3,7 @@
 
 use crate::aptos::move_test_helpers;
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
-use forge::Swarm;
+use aptos_forge::Swarm;
 
 #[tokio::test]
 async fn test_package_publish() {
