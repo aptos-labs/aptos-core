@@ -268,13 +268,8 @@ const sidebars = {
       value: "Reference",
       className: "sidebar-title",
     },
-    {
-      type: "category",
-      label: "Aptos API",
-      collapsible: true,
-      collapsed: true,
-      items: ["nodes/aptos-api-spec", "reference/index"],
-    },
+    "reference/index",
+    "nodes/aptos-api-spec",
     {
       type: "category",
       label: "Aptos SDKs",

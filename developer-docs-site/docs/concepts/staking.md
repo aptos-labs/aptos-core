@@ -8,18 +8,18 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Staking
 
 :::tip Consensus
-We strongly recommend that you read the consensus section of [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn#consensus) before proceeding further. 
+We strongly recommend that you read the consensus section of [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn.md#consensus) before proceeding further. 
 :::
 
 In a distributed system like blockchain, executing a transaction is distinct from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before these results are persisted in storage and the state of the ledger is updated. 
 
-Anyone can participate in the Aptos consensus process, if they stake sufficient utility coin, i.e., place their utility coin into escrow. To encourage validators to participate in the consensus process, each validator's vote weight is proportional to the amount of validator's stake. In exchange, the validator is rewarded proportionally to the amount staked. Hence, the performance of the Blockchain is aligned with the validator's interest, i.e., rewards.  
+Anyone can participate in the Aptos consensus process, if they stake sufficient utility coin, i.e., place their utility coin into escrow. To encourage validators to participate in the consensus process, each validator's vote weight is proportional to the amount of validator's stake. In exchange, the validator is rewarded proportionally to the amount staked. Hence, the performance of the blockchain is aligned with the validator's interest, i.e., rewards.  
 
 :::note 
-Currently slashing is not implemented.
+Currently, slashing is not implemented.
 :::
 
-The current on-chain data can be found [here](https://mainnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::staking_config::StakingConfig). With the configuration set defined in [staking_config.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/configs/staking_config.move).
+The current on-chain data can be found in [`staking_config::StakingConfig`](https://mainnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::staking_config::StakingConfig). The configuration set is defined in [`staking_config.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/configs/staking_config.move).
 
 The rest of this document presents how staking works on the Aptos blockchain. See [Supporting documentation](#supporting-documentation) at the bottom for related resources.
 
@@ -90,7 +90,7 @@ Throughout the duration of an epoch, the following flow of events occurs several
 
 - A validator leader is selected by a deterministic formula based on the validator reputation determined by validator's performance (including whether the validator has voted in the past or not) and stake. **This leader selection is not done by voting.**
 - The selected leader sends a proposal containing the collected quorum votes of the previous proposal and the leader's proposed order of transactions for the new block. 
-- All the validators from the validator set will vote on the leader's proposal for the new block. Once consensus is reached the block can be finalized. Hence the actual list of votes to achieve consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validators, not to the voter validators.**
+- All the validators from the validator set will vote on the leader's proposal for the new block. Once consensus is reached, the block can be finalized. Hence, the actual list of votes to achieve consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validators, not to the voter validators.**
 - The above flow repeats with the selection of another validator leader and repeating the steps for the next new block. Rewards are given at the end of the epoch. 
 
 ## Validator state and stake state
@@ -121,12 +121,12 @@ sources={{
 />
 
 There are two edge cases to call out:
-1. A validator can be moved from active state directly to the inactive state during an epoch change if their stake drops below the required minimum. This happens during an epoch change.
+1. If a validator's stake drops below the required minimum, that validator can be moved from active state directly to the inactive state during an epoch change. This happens only during an epoch change.
 2. Aptos governance can also directly remove validators from the active set. **Note that governance proposals will always trigger an epoch change.**
 
 ### Stake state
 
-The state of stake has more granularity than that of the validator, additional stake can be added and a portion of stake removed from an active validator.
+The state of stake has more granularity than that of the validator; additional stake can be added and a portion of stake removed from an active validator.
 
 <ThemedImage
 alt="Signed Transaction Flow"
@@ -136,12 +136,12 @@ sources={{
   }}
 />
 
-### Validator Ruleset
+### Validator ruleset
 
 The below ruleset is applicable during the changes of state:
 
-- Voting power can only change (increase or decrease) on epoch boundary.
-- A validator’s consensus key and the validator and validator fullnode network addresses can only change on epoch boundary.
+- Voting power can change (increase or decrease) only on epoch boundary.
+- A validator’s consensus key and the validator and validator fullnode network addresses can change only on epoch boundary.
 - Pending inactive stake cannot be moved into inactive (and thus withdrawable) until before lockup expires.
 - No validators in the active validator set can have their stake below the minimum required stake.
 

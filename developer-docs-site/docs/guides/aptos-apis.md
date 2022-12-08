@@ -5,10 +5,10 @@ slug: "aptos-api"
 
 # Use the Aptos REST Read API
 
-If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. This guide will walk you through all you need to integrate the Aptos blockchain into your platform.
+If you provide blockchain services to your customers and wish to employ the Aptos API, then this guide is for you. This guide will walk you through all you need to integrate the Aptos blockchain into your platform with the Aptos API.
 
 :::tip
-Before starting in this guide, it might be beneficial to read the [System Integrators Guide](/guides/system-integrators-guide).
+Also see the [System Integrators Guide](./system-integrators-guide.md) for a thorough walkthrough of Aptos integration.
 :::
 
 ## Viewing current and historical state
@@ -17,7 +17,7 @@ Most integrations into the Aptos blockchain benefit from a holistic and comprehe
 
 * Historical transactions specify the execution status, output, and tie to related events. Each transaction has a unique version number associated with it that dictates its global sequential ordering in the history of the blockchain ledger.
 * The state is the representation of all transaction outputs up to a specific version. In other words, a state version is the accumulation of all transactions inclusive of that transaction version.
-* As transactions execute, they may emit events. [Events](/concepts/events) are hints about changes in on-chain data.
+* As transactions execute, they may emit events. [Events](../concepts/events.md) are hints about changes in on-chain data.
 
 The storage service on a node employs two forms of pruning that erase data from nodes: 
 
@@ -26,7 +26,7 @@ The storage service on a node employs two forms of pruning that erase data from 
 
 While either of these may be disabled, storing the state versions is not particularly sustainable. 
 
-Events and transactions pruning can be disabled via setting the [`enable_ledger_pruner`](https://github.com/aptos-labs/aptos-core/blob/cf0bc2e4031a843cdc0c04e70b3f7cd92666afcf/config/src/config/storage_config.rs#L141) to `false`. This is default behavior in Mainnet. In the near future, Aptos will provide indexers that mitigate the need to directly query from a node.
+Events and transactions pruning can be disabled via setting the [`enable_ledger_pruner`](https://github.com/aptos-labs/aptos-core/blob/cf0bc2e4031a843cdc0c04e70b3f7cd92666afcf/config/src/config/storage_config.rs#L141) to `false` in `storage_config.rs`. This is default behavior in Mainnet. In the near future, Aptos will provide indexers that mitigate the need to directly query from a node.
 
 The REST API offers querying transactions and events in these ways:
 
@@ -36,7 +36,7 @@ The REST API offers querying transactions and events in these ways:
 
 ## Exchanging and tracking coins
 
-Aptos has a standard [Coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that represent the type parameter or generic for `Coin<T>`. 
+Aptos has a standard *Coin type* define in [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that symbolize the type parameter or use generic for `Coin<T>`. 
 
 Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::aptos_coin::AptosCoin>` or `CoinStore<AptosCoin>`, for short. Within this resource is the Aptos coin: `Coin<AptosCoin>`.
 
@@ -197,7 +197,7 @@ The `key` field will be going away in favor of `guid`
 
 ### Querying events
 
-Aptos provides clear and canonical events for all withdraw and deposit of coins. This can be used in coordination with the associated transactions to present to a user the change of their account balance over time, when that happened, and what caused it. With some amount of additional parsing, metadata such as the transaction type and the other parties involved can also be shared.
+Aptos provides clear and canonical events for all withdraw and deposit of coins. This can be used in coordination with the associated transactions to present to a user the change of their account balance over time, when that happened, and what caused it. With some amount of additional parsing, you can share metadata such as the transaction type and the other parties involved.
 
 Query events by handle URL: `https://{rest_api_server}/accounts/{address}/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`
 
@@ -329,7 +329,7 @@ To retrieve the withdrawal information:
 4. Note the `amount` field will be the number of `CoinType` removed from the account in the `guid`. In this example, it is `1000`.
 
 To retrieve the deposit information, it's the same as withdrawal except:
-1. The `guid` used is under `deposit_events`
+1. The `guid` used is under: `deposit_events`
 2. The `amount` will be a positive increase on the account's balance.
 3. The event's name will be: `0x1::coin::DepositEvent`
 
@@ -353,6 +353,6 @@ By monitoring the events, you will find all balance changes in the `0x1::coin::C
 
 :::
 
-To create some sample data to explore, conduct ["Your first transaction"](../tutorials/your-first-transaction).
+To create some sample data to explore, conduct ["Your first transaction"](../tutorials/your-first-transaction.md).
 
-To learn more about coin creation, make ["Your First Coin"](../tutorials/your-first-coin).
+To learn more about coin creation, make ["Your First Coin"](../tutorials/your-first-coin.md).
