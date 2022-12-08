@@ -1,5 +1,5 @@
 [package]
-name = "backup-cli"
+name = "aptos-backup-cli"
 description = "Backup CLI"
 version = "0.1.0"
 
@@ -33,6 +33,8 @@ executor-test-helpers = { workspace = true }
 executor-types = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 pin-project = { workspace = true }
@@ -49,10 +51,10 @@ tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 
 [dev-dependencies]
+aptos-backup-service = { workspace = true }
 aptos-config = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptosdb = { workspace = true }
-backup-service = { workspace = true }
 executor-test-helpers = { workspace = true }
 proptest = { workspace = true }
 storage-interface = { workspace = true }

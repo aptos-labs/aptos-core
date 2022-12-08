@@ -3,11 +3,11 @@
 
 use std::collections::HashMap;
 
-use aptos_types::validator_signer::ValidatorSigner;
-use consensus_types::{
+use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::{Author, Payload, Round},
 };
+use aptos_types::validator_signer::ValidatorSigner;
 
 use crate::liveness::unequivocal_proposer_election::UnequivocalProposerElection;
 

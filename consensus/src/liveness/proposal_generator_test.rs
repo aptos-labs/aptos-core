@@ -11,11 +11,11 @@ use crate::{
     test_utils::{build_empty_tree, MockPayloadManager, TreeInserter},
     util::mock_time_service::SimulatedTimeService,
 };
-use aptos_types::validator_signer::ValidatorSigner;
-use consensus_types::{
+use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
 };
+use aptos_types::validator_signer::ValidatorSigner;
 use futures::{future::BoxFuture, FutureExt};
 use std::sync::Arc;
 

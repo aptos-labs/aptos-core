@@ -13,6 +13,7 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
@@ -21,7 +22,6 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
 };
-use consensus_types::common::{Author, Round};
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,

@@ -1,31 +1,8 @@
-/// This module provides foundations to create aggregators in the system.
-///
-/// Design rationale (V1)
-/// =====================
-/// First, we encourage the reader to see rationale of `Aggregator` in
-/// `aggregator.move`.
-///
-/// Recall that the value of any aggregator can be identified in storage by
-/// (handle, key) pair. How this pair can be generated? Short answer: with
-/// `AggregatorFactory`!
-///
-/// `AggregatorFactory` is a struct that can be stored as a resource on some
-/// account and which contains a `phantom_table` field. When the factory is
-/// initialized, we initialize this table. Importantly, table initialization
-/// only generates a uniue table `handle` - something we can reuse.
-///
-/// When the user wants to create a new aggregator, he/she calls a constructor
-/// provided by the factory (`create_aggregator(..)`). This constructor generates
-/// a unique key, which with the handle is used to initialize `Aggregator` struct.
-///
-/// Use cases
-/// =========
-/// We limit the usage of `AggregatorFactory` by only storing it on the core
-/// account.
-///
-/// When something whants to use an aggregator, the factory is queried and an
-/// aggregator instance is created. Once aggregator is no longer in use, it
-/// should be destroyed by the user.
+/// This module provides foundations to create aggregators. Currently only
+/// Aptos Framework (0x1) can create them, so this module helps to wrap
+/// the constructor of `Aggregator` struct so that only a system account
+/// can initialize one. In the future, this might change and aggregators
+/// can be enabled for the public.
 module aptos_framework::aggregator_factory {
     use std::error;
 
@@ -36,16 +13,17 @@ module aptos_framework::aggregator_factory {
     friend aptos_framework::genesis;
     friend aptos_framework::optional_aggregator;
 
-    /// When aggregator factory is not published yet.
+    /// Aggregator factory is not published yet.
     const EAGGREGATOR_FACTORY_NOT_FOUND: u64 = 1;
 
-    /// Struct that creates aggregators.
+    /// Creates new aggregators. Used to control the numbers of aggregators in the
+    /// system and who can create them. At the moment, only Aptos Framework (0x1)
+    /// account can.
     struct AggregatorFactory has key {
         phantom_table: Table<address, u128>,
     }
 
-    /// Can only be called during genesis.
-    /// Creates a new factory for aggregators.
+    /// Creates a new factory for aggregators. Can only be called during genesis.
     public(friend) fun initialize_aggregator_factory(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         let aggregator_factory = AggregatorFactory {
@@ -73,6 +51,7 @@ module aptos_framework::aggregator_factory {
         create_aggregator_internal(limit)
     }
 
+    /// Returns a new aggregator.
     native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator;
 
     #[test_only]

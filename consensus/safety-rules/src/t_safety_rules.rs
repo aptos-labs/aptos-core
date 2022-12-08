@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{ConsensusState, Error};
-use aptos_crypto::bls12381;
-use aptos_types::{
-    epoch_change::EpochChangeProof,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-};
-use consensus_types::{
+use aptos_consensus_types::{
     block_data::BlockData,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::VoteProposal,
+};
+use aptos_crypto::bls12381;
+use aptos_types::{
+    epoch_change::EpochChangeProof,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 
 /// Interface for SafetyRules

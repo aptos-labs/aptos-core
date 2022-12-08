@@ -104,14 +104,20 @@ fn test_shared_account() {
 
 #[test]
 fn test_mint_nft() {
-    let named_address = BTreeMap::from([(
-        String::from("mint_nft"),
-        create_resource_address(
-            AccountAddress::from_hex_literal("0xcafe").unwrap(),
-            vec![].as_slice(),
+    let named_address = BTreeMap::from([
+        (
+            String::from("mint_nft"),
+            create_resource_address(
+                AccountAddress::from_hex_literal("0xcafe").unwrap(),
+                vec![].as_slice(),
+            ),
         ),
-    )]);
-    run_tests_for_pkg("mint_nft", named_address);
+        (
+            String::from("source_addr"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
+    run_tests_for_pkg("mint_nft/4-Getting-Production-Ready", named_address);
 }
 
 #[test]

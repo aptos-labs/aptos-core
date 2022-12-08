@@ -6,8 +6,8 @@ use crate::{
     initialize_staking, join_validator_set, leave_validator_set, rotate_consensus_key,
     setup_staking, unlock_stake, withdraw_stake, MoveHarness,
 };
+use aptos_cached_packages::aptos_stdlib;
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
-use cached_packages::aptos_stdlib;
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 
 #[test]

@@ -14,7 +14,9 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-bounded-executor = { workspace = true }
 aptos-config = { workspace = true }
+aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
@@ -23,9 +25,7 @@ aptos-proptest-helpers = { workspace = true, optional = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
-bounded-executor = { workspace = true }
 channel = { workspace = true }
-consensus-types = { workspace = true }
 event-notifications = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }

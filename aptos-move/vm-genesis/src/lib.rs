@@ -641,7 +641,7 @@ pub fn generate_genesis_change_set_for_testing_with_count(
     count: u64,
 ) -> ChangeSet {
     let framework = match genesis_options {
-        GenesisOptions::Head => cached_packages::head_release_bundle(),
+        GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
         GenesisOptions::Testnet => framework::testnet_release_bundle(),
         GenesisOptions::Mainnet => {
             // We don't yet have mainnet, so returning testnet here
@@ -655,7 +655,7 @@ pub fn generate_genesis_change_set_for_testing_with_count(
 /// Generate a genesis `ChangeSet` for mainnet
 pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
     let framework = match genesis_options {
-        GenesisOptions::Head => cached_packages::head_release_bundle(),
+        GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
         GenesisOptions::Testnet => framework::testnet_release_bundle(),
         // We don't yet have mainnet, so returning testnet here
         GenesisOptions::Mainnet => framework::testnet_release_bundle(),
@@ -672,7 +672,7 @@ pub fn test_genesis_transaction() -> Transaction {
 pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    generate_test_genesis(cached_packages::head_release_bundle(), count)
+    generate_test_genesis(aptos_cached_packages::head_release_bundle(), count)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -850,7 +850,8 @@ pub struct ValidatorWithCommissionRate {
 pub fn test_genesis_module_publishing() {
     // create a state view for move_vm
     let mut state_view = GenesisStateView::new();
-    for (module_bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules()
+    for (module_bytes, module) in
+        aptos_cached_packages::head_release_bundle().code_and_compiled_modules()
     {
         state_view.add_module(&module.self_id(), module_bytes);
     }
@@ -866,7 +867,7 @@ pub fn test_genesis_module_publishing() {
     .unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
-    publish_framework(&mut session, cached_packages::head_release_bundle());
+    publish_framework(&mut session, aptos_cached_packages::head_release_bundle());
 }
 
 #[test]
@@ -1059,7 +1060,7 @@ pub fn test_mainnet_end_to_end() {
         &accounts,
         &employees,
         &validators,
-        cached_packages::head_release_bundle(),
+        aptos_cached_packages::head_release_bundle(),
         ChainId::mainnet(),
         &mainnet_genesis_config(),
     );

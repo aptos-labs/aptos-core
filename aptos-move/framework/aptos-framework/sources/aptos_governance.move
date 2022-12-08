@@ -16,6 +16,7 @@ module aptos_framework::aptos_governance {
     use std::option;
     use std::signer;
     use std::string::{Self, String, utf8};
+    use std::vector;
 
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::table::{Self, Table};
@@ -206,7 +207,7 @@ module aptos_framework::aptos_governance {
         borrow_global<GovernanceConfig>(@aptos_framework).required_proposer_stake
     }
 
-    /// Create a proposal with the backing `stake_pool`.
+    /// Create a single-step proposal with the backing `stake_pool`.
     /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
     /// only the exact script with matching hash can be successfully executed.
     public entry fun create_proposal(
@@ -215,6 +216,20 @@ module aptos_framework::aptos_governance {
         execution_hash: vector<u8>,
         metadata_location: vector<u8>,
         metadata_hash: vector<u8>,
+    ) acquires GovernanceConfig, GovernanceEvents {
+        create_proposal_v2(proposer, stake_pool, execution_hash, metadata_location, metadata_hash, false);
+    }
+
+    /// Create a single-step or multi-step proposal with the backing `stake_pool`.
+    /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
+    /// only the exact script with matching hash can be successfully executed.
+    public entry fun create_proposal_v2(
+        proposer: &signer,
+        stake_pool: address,
+        execution_hash: vector<u8>,
+        metadata_location: vector<u8>,
+        metadata_hash: vector<u8>,
+        is_multi_step_proposal: bool,
     ) acquires GovernanceConfig, GovernanceEvents {
         let proposer_address = signer::address_of(proposer);
         assert!(stake::get_delegated_voter(stake_pool) == proposer_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
@@ -250,7 +265,7 @@ module aptos_framework::aptos_governance {
             early_resolution_vote_threshold = option::some(total_supply / 2 + 1);
         };
 
-        let proposal_id = voting::create_proposal(
+        let proposal_id = voting::create_proposal_v2(
             proposer_address,
             @aptos_framework,
             governance_proposal::create_proposal(),
@@ -259,6 +274,7 @@ module aptos_framework::aptos_governance {
             proposal_expiration,
             early_resolution_vote_threshold,
             proposal_metadata,
+            is_multi_step_proposal,
         );
 
         let events = borrow_global_mut<GovernanceEvents>(@aptos_framework);
@@ -341,24 +357,44 @@ module aptos_framework::aptos_governance {
     /// are too large (e.g. module upgrades).
     public fun add_approved_script_hash(proposal_id: u64) acquires ApprovedExecutionHashes {
         let approved_hashes = borrow_global_mut<ApprovedExecutionHashes>(@aptos_framework);
-        // Prevent adding the same script hash to the list multiple times.
-        if (simple_map::contains_key(&approved_hashes.hashes, &proposal_id)) {
-            return
-        };
 
         // Ensure the proposal can be resolved.
         let proposal_state = voting::get_proposal_state<GovernanceProposal>(@aptos_framework, proposal_id);
         assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, error::invalid_argument(EPROPOSAL_NOT_RESOLVABLE_YET));
 
         let execution_hash = voting::get_execution_hash<GovernanceProposal>(@aptos_framework, proposal_id);
-        simple_map::add(&mut approved_hashes.hashes, proposal_id, execution_hash);
+
+        // If this is a multi-step proposal, the proposal id will already exist in the ApprovedExecutionHashes map.
+        // We will update execution hash in ApprovedExecutionHashes to be the next_execution_hash.
+        if (simple_map::contains_key(&approved_hashes.hashes, &proposal_id)) {
+            let current_execution_hash = simple_map::borrow_mut(&mut approved_hashes.hashes, &proposal_id);
+            *current_execution_hash = execution_hash;
+        } else {
+            simple_map::add(&mut approved_hashes.hashes, proposal_id, execution_hash);
+        }
     }
 
-    /// Resolve a successful proposal. This would fail if the proposal is not successful (not enough votes or more no
+    /// Resolve a successful single-step proposal. This would fail if the proposal is not successful (not enough votes or more no
     /// than yes).
     public fun resolve(proposal_id: u64, signer_address: address): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
         voting::resolve<GovernanceProposal>(@aptos_framework, proposal_id);
         remove_approved_hash(proposal_id);
+        get_signer(signer_address)
+    }
+
+    /// Resolve a successful multi-step proposal. This would fail if the proposal is not successful.
+    public fun resolve_multi_step_proposal(proposal_id: u64, signer_address: address, next_execution_hash: vector<u8>): signer acquires GovernanceResponsbility, ApprovedExecutionHashes {
+        voting::resolve_proposal_v2<GovernanceProposal>(@aptos_framework, proposal_id, next_execution_hash);
+        // If the current step is the last step of this multi-step proposal,
+        // we will remove the execution hash from the ApprovedExecutionHashes map.
+        if (vector::length(&next_execution_hash) == 0) {
+            remove_approved_hash(proposal_id);
+        } else {
+            // If the current step is not the last step of this proposal,
+            // we replace the current execution hash with the next execution hash
+            // in the ApprovedExecutionHashes map.
+            add_approved_script_hash(proposal_id)
+        };
         get_signer(signer_address)
     }
 
@@ -422,26 +458,62 @@ module aptos_framework::aptos_governance {
     }
 
     #[test_only]
-    use std::vector;
+    public entry fun create_proposal_for_test(proposer: signer, multi_step:bool) acquires GovernanceConfig, GovernanceEvents {
+        let execution_hash = vector::empty<u8>();
+        vector::push_back(&mut execution_hash, 1);
 
-    #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
-    public entry fun test_voting(
+        if (multi_step) {
+            create_proposal_v2(
+                &proposer,
+                signer::address_of(&proposer),
+                execution_hash,
+                b"",
+                b"",
+                true,
+            );
+        } else {
+            create_proposal(
+                &proposer,
+                signer::address_of(&proposer),
+                execution_hash,
+                b"",
+                b"",
+            );
+        };
+    }
+
+    #[test_only]
+    public entry fun resolve_proposal_for_test(proposal_id: u64, signer_address: address, multi_step: bool, finish_multi_step_execution: bool): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
+        if (multi_step) {
+            let execution_hash = vector::empty<u8>();
+            vector::push_back(&mut execution_hash, 1);
+
+            if (finish_multi_step_execution) {
+                resolve_multi_step_proposal(proposal_id, signer_address, vector::empty<u8>())
+            } else {
+                resolve_multi_step_proposal(proposal_id, signer_address, execution_hash)
+            }
+        } else {
+            resolve(proposal_id, signer_address)
+        }
+    }
+
+    #[test_only]
+    public entry fun test_voting_generic(
         aptos_framework: signer,
         proposer: signer,
         yes_voter: signer,
         no_voter: signer,
+        multi_step: bool,
+        use_generic_resolve_function: bool,
     ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
         setup_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
 
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
-        create_proposal(
-            &proposer,
-            signer::address_of(&proposer),
-            execution_hash,
-            b"",
-            b"",
-        );
+
+        create_proposal_for_test(proposer, multi_step);
+
         vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
         vote(&no_voter, signer::address_of(&no_voter), 0, false);
 
@@ -457,11 +529,91 @@ module aptos_framework::aptos_governance {
         assert!(*simple_map::borrow(&approved_hashes, &0) == execution_hash, 0);
 
         // Resolve the proposal.
-        let account = resolve(0, @aptos_framework);
+        let account = resolve_proposal_for_test(0, @aptos_framework, use_generic_resolve_function, true);
         assert!(signer::address_of(&account) == @aptos_framework, 1);
         assert!(voting::is_resolved<GovernanceProposal>(@aptos_framework, 0), 2);
         let approved_hashes = borrow_global<ApprovedExecutionHashes>(@aptos_framework).hashes;
         assert!(!simple_map::contains_key(&approved_hashes, &0), 3);
+    }
+
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
+    public entry fun test_voting(
+        aptos_framework: signer,
+        proposer: signer,
+        yes_voter: signer,
+        no_voter: signer,
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
+        test_voting_generic(aptos_framework, proposer, yes_voter, no_voter, false, false);
+    }
+
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
+    public entry fun test_voting_multi_step(
+        aptos_framework: signer,
+        proposer: signer,
+        yes_voter: signer,
+        no_voter: signer,
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
+        test_voting_generic(aptos_framework, proposer, yes_voter, no_voter, true, true);
+    }
+
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
+    #[expected_failure(abort_code=0x5000a)]
+    public entry fun test_voting_multi_step_cannot_use_single_step_resolve(
+        aptos_framework: signer,
+        proposer: signer,
+        yes_voter: signer,
+        no_voter: signer,
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
+        test_voting_generic(aptos_framework, proposer, yes_voter, no_voter, true, false);
+    }
+
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
+    public entry fun test_voting_single_step_can_use_generic_resolve_function(
+        aptos_framework: signer,
+        proposer: signer,
+        yes_voter: signer,
+        no_voter: signer,
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
+        test_voting_generic(aptos_framework, proposer, yes_voter, no_voter, false, true);
+    }
+
+    #[test_only]
+    public entry fun test_can_remove_approved_hash_if_executed_directly_via_voting_generic(
+        aptos_framework: signer,
+        proposer: signer,
+        yes_voter: signer,
+        no_voter: signer,
+        multi_step: bool,
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
+        setup_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
+
+        create_proposal_for_test(proposer, multi_step);
+        vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
+        vote(&no_voter, signer::address_of(&no_voter), 0, false);
+
+        // Add approved script hash.
+        timestamp::update_global_time_for_test(100001000000);
+        add_approved_script_hash(0);
+
+        // Resolve the proposal.
+        if (multi_step) {
+            let execution_hash = vector::empty<u8>();
+            let next_execution_hash = vector::empty<u8>();
+            vector::push_back(&mut execution_hash, 1);
+            voting::resolve_proposal_v2<GovernanceProposal>(@aptos_framework, 0, next_execution_hash);
+            assert!(voting::is_resolved<GovernanceProposal>(@aptos_framework, 0), 0);
+            if (vector::length(&next_execution_hash) == 0) {
+                remove_approved_hash(0);
+            } else {
+                add_approved_script_hash(0)
+            };
+        } else {
+            voting::resolve<GovernanceProposal>(@aptos_framework, 0);
+            assert!(voting::is_resolved<GovernanceProposal>(@aptos_framework, 0), 0);
+            remove_approved_hash(0);
+        };
+        let approved_hashes = borrow_global<ApprovedExecutionHashes>(@aptos_framework).hashes;
+        assert!(!simple_map::contains_key(&approved_hashes, &0), 1);
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
@@ -471,30 +623,17 @@ module aptos_framework::aptos_governance {
         yes_voter: signer,
         no_voter: signer,
     ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
-        setup_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
+        test_can_remove_approved_hash_if_executed_directly_via_voting_generic(aptos_framework, proposer, yes_voter, no_voter, false);
+    }
 
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
-        create_proposal(
-            &proposer,
-            signer::address_of(&proposer),
-            execution_hash,
-            b"",
-            b"",
-        );
-        vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
-        vote(&no_voter, signer::address_of(&no_voter), 0, false);
-
-        // Add approved script hash.
-        timestamp::update_global_time_for_test(100001000000);
-        add_approved_script_hash(0);
-
-        // Resolve the proposal.
-        voting::resolve<GovernanceProposal>(@aptos_framework, 0);
-        assert!(voting::is_resolved<GovernanceProposal>(@aptos_framework, 0), 0);
-        remove_approved_hash(0);
-        let approved_hashes = borrow_global<ApprovedExecutionHashes>(@aptos_framework).hashes;
-        assert!(!simple_map::contains_key(&approved_hashes, &0), 1);
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
+    public entry fun test_can_remove_approved_hash_if_executed_directly_via_voting_multi_step(
+        aptos_framework: signer,
+        proposer: signer,
+        yes_voter: signer,
+        no_voter: signer,
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
+        test_can_remove_approved_hash_if_executed_directly_via_voting_generic(aptos_framework, proposer, yes_voter, no_voter, true);
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]

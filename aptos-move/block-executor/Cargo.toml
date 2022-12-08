@@ -1,0 +1,48 @@
+[package]
+name = "aptos-block-executor"
+description = "Aptos block transaction executor library, parallel execution via Block-STM"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-aggregator = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-state-view = { workspace = true }
+aptos-types = { workspace = true }
+arc-swap = { workspace = true }
+bcs = { workspace = true }
+criterion = { workspace = true, optional = true }
+crossbeam = { workspace = true }
+crossbeam-queue = { workspace = true }
+dashmap = { workspace = true }
+mvhashmap = { workspace = true }
+num_cpus = { workspace = true }
+once_cell = { workspace = true }
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+rayon = { workspace = true }
+
+[dev-dependencies]
+claims = { workspace = true }
+criterion = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+rand = { workspace = true }
+
+[features]
+fuzzing = ["criterion", "proptest", "proptest-derive"]
+
+[[bench]]
+name = "scheduler_benches"
+harness = false
+required-features = ["fuzzing"]

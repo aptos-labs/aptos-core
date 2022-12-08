@@ -282,7 +282,7 @@ impl Node for LocalNode {
         let node_config = self.config();
         let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
         let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
-        let secure_storage_path = node_config.base.data_dir.join("secure_storage.json");
+        let secure_storage_path = node_config.working_dir().join("secure_storage.json");
         let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
 
         debug!(

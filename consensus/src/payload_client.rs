@@ -4,8 +4,8 @@
 use crate::{error::QuorumStoreError, monitor, state_replication::PayloadClient};
 use anyhow::Result;
 use aptos_logger::prelude::*;
-use consensus_types::common::Round;
-use consensus_types::{
+use aptos_consensus_types::common::Round;
+use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
     request_response::{ConsensusResponse, PayloadRequest},
 };

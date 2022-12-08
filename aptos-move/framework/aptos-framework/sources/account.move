@@ -129,6 +129,10 @@ module aptos_framework::account {
 
     native fun create_signer(addr: address): signer;
 
+    #[test_only]
+    /// Create signer for testing, independently of an Aptos-style `Account`.
+    public fun create_signer_for_test(addr: address): signer { create_signer(addr) }
+
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -509,6 +513,13 @@ module aptos_framework::account {
 
     public fun get_signer_capability_address(capability: &SignerCapability): address {
         capability.account
+    }
+
+    #[test]
+    /// Assert correct signer creation.
+    fun test_create_signer_for_test() {
+        assert!(signer::address_of(&create_signer_for_test(@aptos_framework)) == @0x1, 0);
+        assert!(signer::address_of(&create_signer_for_test(@0x123)) == @0x123, 0);
     }
 
     #[test(user = @0x1)]

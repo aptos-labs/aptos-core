@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::FuzzTargetImpl;
+use aptos_consensus::round_manager_fuzzing::{fuzz_proposal, generate_corpus_proposal};
 use aptos_proptest_helpers::ValueGenerator;
-use consensus::round_manager_fuzzing::{fuzz_proposal, generate_corpus_proposal};
 
 #[derive(Clone, Debug, Default)]
 pub struct ConsensusProposal;

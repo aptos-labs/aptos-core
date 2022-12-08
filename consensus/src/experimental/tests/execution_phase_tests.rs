@@ -10,14 +10,14 @@ use crate::{
     },
     test_utils::{consensus_runtime, RandomComputeResultStateComputer},
 };
-use aptos_crypto::HashValue;
-use aptos_types::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
-use consensus_types::{
+use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Payload,
     executed_block::ExecutedBlock,
     quorum_cert::QuorumCert,
 };
+use aptos_crypto::HashValue;
+use aptos_types::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
 use executor_types::{Error, StateComputeResult};
 use std::sync::Arc;
 

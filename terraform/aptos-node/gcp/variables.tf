@@ -142,3 +142,8 @@ variable "node_exporter_helm_values" {
   type        = any
   default     = {}
 }
+
+variable "manage_via_tf" {
+  description = "Whether to manage the aptos-node k8s workload via Terraform"
+  default     = true
+}

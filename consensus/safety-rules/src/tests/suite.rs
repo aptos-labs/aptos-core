@@ -2,6 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{test_utils, test_utils::make_timeout_cert, Error, TSafetyRules};
+use aptos_consensus_types::{
+    block::block_test_utils::random_payload,
+    common::{Payload, Round},
+    quorum_cert::QuorumCert,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    vote_proposal::VoteProposal,
+};
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
 use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
@@ -10,13 +17,6 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
-};
-use consensus_types::{
-    block::block_test_utils::random_payload,
-    common::{Payload, Round},
-    quorum_cert::QuorumCert,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
-    vote_proposal::VoteProposal,
 };
 
 type Proof = test_utils::Proof;

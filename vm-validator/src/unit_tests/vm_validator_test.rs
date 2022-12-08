@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::vm_validator::{get_account_sequence_number, TransactionValidation, VMValidator};
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
 use aptos_types::{
@@ -13,7 +14,6 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use cached_packages::aptos_stdlib;
 use move_core_types::account_address::AccountAddress;
 use rand::SeedableRng;
 use storage_interface::state_view::LatestDbStateCheckpointView;

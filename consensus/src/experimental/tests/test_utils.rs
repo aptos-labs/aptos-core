@@ -2,6 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::MockStorage};
+use aptos_consensus_types::{
+    block::block_test_utils::certificate_for_genesis,
+    common::{Payload, Round},
+    executed_block::ExecutedBlock,
+    quorum_cert::QuorumCert,
+    vote_proposal::VoteProposal,
+};
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
@@ -10,13 +17,6 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     validator_verifier::random_validator_verifier,
     waypoint::Waypoint,
-};
-use consensus_types::{
-    block::block_test_utils::certificate_for_genesis,
-    common::{Payload, Round},
-    executed_block::ExecutedBlock,
-    quorum_cert::QuorumCert,
-    vote_proposal::VoteProposal,
 };
 use executor_types::StateComputeResult;
 use safety_rules::{

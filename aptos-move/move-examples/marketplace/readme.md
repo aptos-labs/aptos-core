@@ -1,15 +1,15 @@
-[RFC] Aptos NFT Marketplace Standard Proposal
+Aptos NFT Marketplace Example
 ------------
 
-NOTE: THIS IS A PROPOSAL AND HAVEN'T BEEN FULLY AUDITED. THESE CONTRACTS ARE FOR COLLECTING FEEDBACKS FROM OUR BUILDERS. ONCE WE ARE CONFIDENT THAT IT IS BENEFICIAL TO TOKEN ECOSYSTEM, WE WILL THEN ADD IT TO 0x3::aptos-token PACKAGE
+NOTE: THIS IS AN EXAMPLE AND HAS NOT BEEN FULLY AUDITED. THESE CONTRACTS ARE FOR COLLECTING FEEDBACK FROM OUR BUILDERS. ONCE WE ARE CONFIDENT THAT IT IS BENEFICIAL TO THE TOKEN ECOSYSTEM, WE WILL ADD IT TO the 0x3::aptos-token PACKAGE.
 
 Introduction
 ------------
 
-The package contains 2 parts:
+The package contains two parts:
 
--   marketplace utility functions: these contracts specify the basic function and data structures for building fixed price marketplace and the auction house. The two contracts are: (1) marketplace_bid_utils and (2) marketplace_listing_utils
--   example marketplace contracts: these contracts show two examples of building a marketplace leveraging the marketplace utility functions
+-   marketplace utility functions: these contracts specify the basic function and data structures for building a fixed-price marketplace and the auction house. The two contracts are: (1) marketplace_bid_utils and (2) marketplace_listing_utils
+-   example marketplace contracts: these contracts show two examples of building a marketplace leveraging the marketplace utility functions.
 
 Design principles
 -----------------

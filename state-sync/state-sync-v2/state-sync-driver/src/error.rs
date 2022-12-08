@@ -75,8 +75,8 @@ impl From<Canceled> for Error {
     }
 }
 
-impl From<data_streaming_service::error::Error> for Error {
-    fn from(error: data_streaming_service::error::Error) -> Self {
+impl From<aptos_data_streaming_service::error::Error> for Error {
+    fn from(error: aptos_data_streaming_service::error::Error) -> Self {
         Error::UnexpectedError(error.to_string())
     }
 }

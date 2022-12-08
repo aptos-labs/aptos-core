@@ -20,15 +20,15 @@ use crate::{
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
+use aptos_data_streaming_service::{
+    data_notification::{DataNotification, DataPayload},
+    streaming_client::{NotificationAndFeedback, NotificationFeedback},
+};
 use aptos_types::{
     transaction::{TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
 };
 use claims::{assert_matches, assert_none, assert_ok};
-use data_streaming_service::{
-    data_notification::{DataNotification, DataPayload},
-    streaming_client::{NotificationAndFeedback, NotificationFeedback},
-};
 use futures::{channel::oneshot, FutureExt, SinkExt};
 use mockall::{predicate::eq, Sequence};
 use std::sync::Arc;
@@ -138,6 +138,7 @@ async fn test_critical_timeout() {
     // Create a driver configuration with a genesis waypoint and a stream timeout of 1 second
     let mut driver_configuration = create_full_node_driver_configuration();
     driver_configuration.config.max_stream_wait_time_ms = 1000;
+    driver_configuration.config.max_num_stream_timeouts = 6;
 
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();

@@ -14,7 +14,9 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
+aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-sdk = { workspace = true }
@@ -23,8 +25,6 @@ aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptosdb = { workspace = true, features = ["fuzzing"] }
-cached-packages = { workspace = true }
-consensus-types = { workspace = true }
 executor = { workspace = true }
 executor-types = { workspace = true }
 rand = { workspace = true }

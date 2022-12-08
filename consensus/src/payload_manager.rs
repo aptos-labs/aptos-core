@@ -6,10 +6,9 @@ use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, warn};
 use aptos_types::transaction::SignedTransaction;
-use consensus_types::common::DataStatus;
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block,
-    common::Payload,
+    common::{Payload,DataStatus},
     proof_of_store::{LogicalTime, ProofOfStore},
     request_response::PayloadRequest,
 };

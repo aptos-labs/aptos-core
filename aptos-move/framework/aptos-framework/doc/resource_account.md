@@ -27,12 +27,11 @@ register and store new LiquidityCoin resources.
 
 Code snippets to help:
 ```
-fun init_module(source: &signer) {
+fun init_module(resource: &signer) {
 let dev_address = @DEV_ADDR;
-let signer_cap = retrieve_resource_account_cap(&source, dev_address);
-let lp_signer = create_signer_with_capability(&signer_cap);
+let signer_cap = retrieve_resource_account_cap(resource, dev_address);
 let lp = LiquidityPoolInfo { signer_cap: signer_cap, ... };
-move_to(&lp_signer, lp);
+move_to(resource, lp);
 }
 ```
 
@@ -356,8 +355,7 @@ the SignerCapability.
         <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_destroy_empty">simple_map::destroy_empty</a>(store);
     };
 
-    <b>let</b> resource = <a href="account.md#0x1_account_create_signer_with_capability">account::create_signer_with_capability</a>(&resource_signer_cap);
-    <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(&resource, <a href="resource_account.md#0x1_resource_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>);
+    <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(resource, <a href="resource_account.md#0x1_resource_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>);
     resource_signer_cap
 }
 </code></pre>

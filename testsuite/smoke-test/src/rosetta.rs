@@ -6,6 +6,7 @@ use anyhow::anyhow;
 use aptos::common::types::GasOptions;
 use aptos::test::INVALID_ACCOUNT;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
+use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::PersistableConfig;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
@@ -33,7 +34,6 @@ use aptos_types::account_config::CORE_CODE_ADDRESS;
 use aptos_types::on_chain_config::GasScheduleV2;
 use aptos_types::transaction::SignedTransaction;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
-use cached_packages::aptos_stdlib;
 use forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryFrom;
@@ -689,6 +689,7 @@ async fn test_block() {
     // Do some transfers
     let account_id_0 = cli.account_id(0);
     let account_id_1 = cli.account_id(1);
+    let account_id_2 = cli.account_id(2);
     let account_id_3 = cli.account_id(3);
 
     // TODO(greg): revisit after fixing gas estimation
@@ -909,6 +910,41 @@ async fn test_block() {
     )
     .await
     .unwrap_err();
+
+    // Test native stake pool and reset lockup support
+    cli.fund_account(2, Some(1000000000000000)).await.unwrap();
+    create_stake_pool_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_2,
+        Some(account_id_2),
+        Some(account_id_2),
+        Some(100000000000000),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully create stake pool");
+
+    // TODO: Verify lockup time changes
+
+    // Reset lockup
+    reset_lockup_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_2,
+        Some(account_id_2),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully reset lockup");
 
     // Successfully, and fail setting a voter
     set_voter_and_wait(
@@ -1461,8 +1497,114 @@ async fn parse_operations(
                     }
                 };
             }
+            OperationType::ResetLockup => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful reset lockup operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed reset lockup operation"
+                    );
+                }
+
+                // Check that reset lockup was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator)
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            }
             OperationType::InitializeStakePool => {
-                // This is not supported in block reads
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful initialize stake pool operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed initialize stake pool operation"
+                    );
+                }
+
+                // Check that reset lockup was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().get(0).unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .new_operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator);
+
+                        let actual_voter_address: AccountAddress =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        let voter = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .new_voter
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_voter_address, voter);
+
+                        let actual_stake_amount: u64 =
+                            bcs::from_bytes(payload.args().get(2).unwrap()).unwrap();
+                        let stake = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .staked_balance
+                            .as_ref()
+                            .unwrap()
+                            .0;
+                        assert_eq!(actual_stake_amount, stake);
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
             }
         }
     }
@@ -1865,6 +2007,70 @@ async fn set_voter_and_wait(
             sender_key,
             operator,
             new_voter,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn create_stake_pool_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    operator: Option<AccountAddress>,
+    voter: Option<AccountAddress>,
+    stake_amount: Option<u64>,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .create_stake_pool(
+            network_identifier,
+            sender_key,
+            operator,
+            voter,
+            stake_amount,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn reset_lockup_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    operator: Option<AccountAddress>,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .reset_lockup(
+            network_identifier,
+            sender_key,
+            operator,
             expiry_time.as_secs(),
             sequence_number,
             max_gas,

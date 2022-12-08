@@ -7,17 +7,24 @@ mod log_build_information;
 
 use anyhow::{anyhow, Context};
 use aptos_api::bootstrap as bootstrap_api;
+use aptos_backup_service::start_backup_service;
 use aptos_build_info::build_information;
 use aptos_config::{
     config::{
-        AptosDataClientConfig, BaseConfig, DataStreamingServiceConfig, NetworkConfig, NodeConfig,
-        PersistableConfig, StorageServiceConfig,
+        AptosDataClientConfig, BaseConfig, NetworkConfig, NodeConfig, PersistableConfig,
+        RocksdbConfigs, StateSyncConfig, StorageServiceConfig, BUFFERED_STATE_TARGET_ITEMS,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     },
     network_id::NetworkId,
     utils::get_genesis_txn,
 };
+use aptos_consensus::consensus_provider::start_consensus;
+use aptos_consensus_notifications::ConsensusNotificationListener;
 use aptos_data_client::aptosnet::AptosNetDataClient;
-use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
+use aptos_data_streaming_service::{
+    streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
+    streaming_service::DataStreamingService,
+};
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -26,16 +33,10 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
+
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use backup_service::start_backup_service;
 use clap::Parser;
-use consensus::consensus_provider::start_consensus;
-use consensus_notifications::ConsensusNotificationListener;
-use data_streaming_service::{
-    streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
-    streaming_service::DataStreamingService,
-};
 use event_notifications::EventSubscriptionService;
 use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
 use framework::ReleaseBundle;
@@ -53,8 +54,9 @@ use state_sync_driver::{
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
+    fs,
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
@@ -125,7 +127,7 @@ impl AptosNodeArgs {
             let genesis_framework = if let Some(path) = self.genesis_framework {
                 ReleaseBundle::read(path).unwrap()
             } else {
-                cached_packages::head_release_bundle().clone()
+                aptos_cached_packages::head_release_bundle().clone()
             };
             load_test_environment(
                 self.config,
@@ -169,7 +171,6 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
-    _fh_stream: Option<Runtime>,
     _index_runtime: Option<Runtime>,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
@@ -181,7 +182,7 @@ pub fn start(
     log_file: Option<PathBuf>,
     create_global_rayon_pool: bool,
 ) -> anyhow::Result<()> {
-    crash_handler::setup_panic_handler();
+    aptos_crash_handler::setup_panic_handler();
 
     if create_global_rayon_pool {
         rayon::ThreadPoolBuilder::new()
@@ -412,10 +413,8 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     )?;
 
     // Start the data streaming service
-    let (streaming_service_client, streaming_service_runtime) = setup_data_streaming_service(
-        node_config.state_sync.data_streaming_service,
-        aptos_data_client.clone(),
-    )?;
+    let (streaming_service_client, streaming_service_runtime) =
+        setup_data_streaming_service(node_config.state_sync.clone(), aptos_data_client.clone())?;
 
     // Create the chunk executor and persistent storage
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
@@ -446,14 +445,18 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
 }
 
 fn setup_data_streaming_service(
-    config: DataStreamingServiceConfig,
+    state_sync_config: StateSyncConfig,
     aptos_data_client: AptosNetDataClient,
 ) -> anyhow::Result<(StreamingServiceClient, Runtime)> {
     // Create the data streaming service
     let (streaming_service_client, streaming_service_listener) =
         new_streaming_service_client_listener_pair();
-    let data_streaming_service =
-        DataStreamingService::new(config, aptos_data_client, streaming_service_listener);
+    let data_streaming_service = DataStreamingService::new(
+        state_sync_config.aptos_data_client,
+        state_sync_config.data_streaming_service,
+        aptos_data_client,
+        streaming_service_listener,
+    );
 
     // Start the data streaming service
     let streaming_service_runtime = Builder::new_multi_thread()
@@ -568,8 +571,43 @@ fn bootstrap_indexer(
     Ok(None)
 }
 
+fn create_checkpoint_and_change_working_dir(
+    node_config: &mut NodeConfig,
+    working_dir: impl AsRef<Path>,
+) {
+    let source_dir = node_config.storage.dir();
+    node_config.set_data_dir(working_dir.as_ref().to_path_buf());
+    let checkpoint_dir = node_config.storage.dir();
+
+    assert!(source_dir != checkpoint_dir);
+
+    // Create rocksdb checkpoint.
+    fs::create_dir_all(&checkpoint_dir).unwrap();
+
+    AptosDB::open(
+        &source_dir,
+        false,                       /* readonly */
+        NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
+        RocksdbConfigs::default(),
+        false,
+        BUFFERED_STATE_TARGET_ITEMS,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    )
+    .expect("AptosDB open failure.")
+    .create_checkpoint(&checkpoint_dir)
+    .expect("AptosDB checkpoint creation failed.");
+
+    aptos_consensus::create_checkpoint(&source_dir, &checkpoint_dir)
+        .expect("ConsensusDB checkpoint creation failed.");
+    let state_sync_db =
+        state_sync_driver::metadata_storage::PersistentMetadataStorage::new(&source_dir);
+    state_sync_db
+        .create_checkpoint(&checkpoint_dir)
+        .expect("StateSyncDB checkpoint creation failed.");
+}
+
 pub fn setup_environment(
-    node_config: NodeConfig,
+    mut node_config: NodeConfig,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
@@ -578,6 +616,13 @@ pub fn setup_environment(
     thread::spawn(move || {
         inspection_service::inspection_service::start_inspection_service(node_config_clone)
     });
+
+    // If working_dir is provided, we will make RocksDb checkpoint for consensus_db,
+    // state_sync_db, ledger_db and state_merkle_db to the checkpoint_path, and running the node
+    // on the new path, so that the existing data won't change. For now this is a testonly feature.
+    if let Some(working_dir) = node_config.base.working_dir.clone() {
+        create_checkpoint_and_change_working_dir(&mut node_config, working_dir);
+    }
 
     // Open the database
     let mut instant = Instant::now();
@@ -756,10 +801,10 @@ pub fn setup_environment(
                 panic!("There can be at most one validator network!");
             }
 
-            consensus_network_handles = Some(
-                network_builder
-                    .add_p2p_service(&consensus::network_interface::network_endpoint_config()),
-            );
+            consensus_network_handles =
+                Some(network_builder.add_p2p_service(
+                    &aptos_consensus::network_interface::network_endpoint_config(),
+                ));
         }
 
         let network_context = network_builder.network_context();
@@ -776,7 +821,7 @@ pub fn setup_environment(
     let (mempool_notifier, mempool_listener) =
         mempool_notifications::new_mempool_notifier_listener_pair();
     let (consensus_notifier, consensus_listener) =
-        consensus_notifications::new_consensus_notifier_listener_pair(
+        aptos_consensus_notifications::new_consensus_notifier_listener_pair(
             node_config
                 .state_sync
                 .state_sync_driver
@@ -807,15 +852,6 @@ pub fn setup_environment(
         )?)
     } else {
         None
-    };
-    let sf_runtime = match bootstrap_fh_stream(
-        &node_config,
-        chain_id,
-        aptos_db.clone(),
-        mp_client_sender.clone(),
-    ) {
-        None => None,
-        Some(res) => Some(res?),
     };
 
     let index_runtime = bootstrap_indexer(&node_config, chain_id, aptos_db, mp_client_sender)?;
@@ -882,7 +918,6 @@ pub fn setup_environment(
         _mempool: mempool,
         _network_runtimes: network_runtimes,
         _index_runtime: index_runtime,
-        _fh_stream: sf_runtime,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })

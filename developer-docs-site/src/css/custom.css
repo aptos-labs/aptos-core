@@ -98,7 +98,15 @@ img.deep-dive-image {
 }
 
 audio,canvas,embed,iframe,img,object,svg,video {
-    display:inline;
+  display:inline;
+}
+
+ul {
+  list-style: disc;
+}
+
+ol {
+  list-style-type: decimal;
 }
 
 footer.footer {

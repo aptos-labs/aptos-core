@@ -4,14 +4,13 @@
 use crate::error::{QuorumStoreError, StateSyncError};
 use crate::payload_manager::PayloadManager;
 use anyhow::Result;
-use aptos_crypto::HashValue;
-use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
-use consensus_types::common::Round;
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block,
-    common::{Payload, PayloadFilter},
+    common::{Payload, PayloadFilter, Round},
     executed_block::ExecutedBlock,
 };
+use aptos_crypto::HashValue;
+use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use executor_types::{Error as ExecutionError, StateComputeResult};
 use futures::future::BoxFuture;
 use std::sync::Arc;

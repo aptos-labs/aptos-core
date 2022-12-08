@@ -15,13 +15,13 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
+aptos-block-executor = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-module-verifier = { workspace = true }
-aptos-parallel-executor = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }

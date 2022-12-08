@@ -177,3 +177,8 @@ export class AptosAccount {
     };
   }
 }
+
+// Returns an account address as a HexString given either an AptosAccount or a MaybeHexString.
+export function getAddressFromAccountOrAddress(accountOrAddress: AptosAccount | MaybeHexString): HexString {
+  return accountOrAddress instanceof AptosAccount ? accountOrAddress.address() : HexString.ensure(accountOrAddress);
+}

@@ -15,11 +15,16 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-api = { workspace = true }
+aptos-backup-service = { workspace = true }
 aptos-build-info = { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
+aptos-consensus = { workspace = true }
+aptos-consensus-notifications = { workspace = true }
+aptos-crash-handler = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-data-client = { workspace = true }
-aptos-fh-stream = { workspace = true }
+aptos-data-streaming-service = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-indexer = { workspace = true, optional = true }
 aptos-infallible = { workspace = true }
@@ -33,14 +38,8 @@ aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptosdb = { workspace = true }
-backup-service = { workspace = true }
 bcs = { workspace = true }
-cached-packages = { workspace = true }
 clap = { workspace = true }
-consensus = { workspace = true }
-consensus-notifications = { workspace = true }
-crash-handler = { workspace = true }
-data-streaming-service = { workspace = true }
 event-notifications = { workspace = true }
 executor = { workspace = true }
 executor-types = { workspace = true }
@@ -67,6 +66,6 @@ jemallocator = { workspace = true }
 [features]
 default = []
 assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-cloneable"]
-failpoints = ["fail/failpoints", "consensus/failpoints", "executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
+failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
 indexer = ["aptos-indexer"]
 check-vm-features = []

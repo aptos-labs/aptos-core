@@ -21,6 +21,8 @@ BCS
 BFT
 BIP
 Bitwise
+BlockMetadata
+BlockMetadataTransaction
 BlockQuote
 CANCELLED
 CDN
@@ -100,6 +102,7 @@ Homebrew
 HotStuff
 IDE
 IDEs
+IMCODING
 IOPS
 Incentivized
 Integrators
@@ -132,6 +135,7 @@ NoAvailablePeers
 ORM
 Octa
 Octas
+Ohlone
 OpenAPI
 OptionalAggregator
 PFN
@@ -139,6 +143,7 @@ PID
 PNG
 Parallelization
 Petra
+Pontem
 Postgres
 PropertyMap
 Prover
@@ -163,6 +168,7 @@ SignMessagePayload
 SignerCap
 Skylake
 Solana
+StateCheckpointTransaction
 TCP
 TPS
 TXT
@@ -180,6 +186,7 @@ Traw
 TypeScript
 UB
 UI
+UIs
 URI
 Upgradeable
 Uptime
@@ -291,6 +298,7 @@ multisig
 namespace
 natively
 nft
+nestable
 nonce
 nonces
 nonfungible
@@ -330,6 +338,7 @@ schema
 schemas
 sdk
 sdks
+sharded
 sharding
 signAndSubmitTransaction
 signMessage
@@ -383,3 +392,6 @@ withdrawable
 xlarge
 yaml
 yamls
+TransactionBuilder
+ABIs
+TransactionBuilderABI

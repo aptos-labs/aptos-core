@@ -566,7 +566,7 @@ impl FromStr for EncodingType {
 }
 
 /// An insertable option for use with prompts.
-#[derive(Clone, Copy, Debug, Default, Parser)]
+#[derive(Clone, Copy, Debug, Default, Parser, PartialEq, Eq)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
     #[clap(long, group = "prompt_options")]
@@ -912,6 +912,14 @@ pub struct MovePackageDir {
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
+
+    /// Skip pulling the latest git dependencies
+    ///
+    /// If you don't have a network connection, the compiler may fail due
+    /// to no ability to pull git dependencies.  This will allow overriding
+    /// this for local development.
+    #[clap(long)]
+    pub(crate) skip_fetch_latest_git_deps: bool,
 }
 
 impl MovePackageDir {
@@ -920,6 +928,7 @@ impl MovePackageDir {
             package_dir: Some(package_dir),
             output_dir: None,
             named_addresses: Default::default(),
+            skip_fetch_latest_git_deps: true,
         }
     }
 

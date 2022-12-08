@@ -130,7 +130,7 @@ export class TypeTagStruct extends TypeTag {
     if (
       this.value.module_name.value === "string" &&
       this.value.name.value === "String" &&
-      this.value.address === AccountAddress.fromHex("0x1")
+      this.value.address.toHexString() === AccountAddress.fromHex("0x1").toHexString()
     ) {
       return true;
     }

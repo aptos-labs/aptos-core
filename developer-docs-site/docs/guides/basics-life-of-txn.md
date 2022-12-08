@@ -1,18 +1,16 @@
 ---
-title: "Life of a Transaction"
+title: "Aptos Blockchain Deep Dive"
 slug: "basics-life-of-txn"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Life of a Transaction
+# Aptos Blockchain Deep Dive
 
 For a deeper understanding of the lifecycle of an Aptos transaction (from an operational perspective), we will follow a transaction on its journey, from being submitted to an Aptos fullnode, to being committed to the Aptos blockchain. We will then focus on the logical components of Aptos nodes and take a look how the transaction interacts with these components.
 
-## Assumptions
-
-For the purpose of this doc, we will assume that:
+## Life of a Transaction
 
 * Alice and Bob are two users who each have an [account](/reference/glossary#account) on the Aptos blockchain.
 * Alice's account has 110 Aptos Coins.
@@ -22,27 +20,7 @@ For the purpose of this doc, we will assume that:
 * An Aptos client submits Alice's transaction to a REST service on an Aptos Fullnode. The fullnode forwards this transaction to a validator fullnode which in turn forwards it to validator V<sub>1</sub>.
 * Validator V<sub>1</sub> is a proposer/leader for the current round.
 
-## Client submits a transaction
-
-An Aptos **client constructs a raw transaction** (let's call it Traw<sub>5</sub>) to transfer 10 Aptos Coins from Alice’s account to Bob’s account. The Aptos client signs the transaction with Alice's private key. The signed transaction T<sub>5</sub> includes the following:
-
-* The raw transaction.
-* Alice's public key.
-* Alice's signature.
-
-The raw transaction includes the following fields:
-
-| Fields | Description |
-| ------ | ----------- |
-| [Account address](/reference/glossary#account-address) | Alice's account address |
-| Move module | A module (or program) that indicates the actions to be performed on Alice's behalf. In this case, it contains:  <br />- A Move bytecode peer-to-peer [transaction script](/reference/glossary#transaction-script) <br />- A list of inputs to the script (for this example the list would contain Bob's account address and the payment amount in Aptos Coins). |
-| [Maximum gas amount](/reference/glossary#maximum-gas-amount) | The maximum gas amount Alice is willing to pay for this transaction. Gas is a way to pay for computation and storage. A gas unit is an abstract measurement of computation. |
-| [Gas price](/reference/glossary#gas-price) | The amount (in Aptos Coins) Alice is willing to pay per unit of gas, to execute the transaction. |
-| [Expiration time](/reference/glossary#expiration-time) | Expiration time of the transaction. |
-| [Sequence number](/reference/glossary#sequence-number)  | The sequence number (5, in this example) for an account indicates the number of transactions that have been submitted and committed on-chain from that account. In this case, 5 transactions have been submitted from Alice’s account, including Traw<sub>5</sub>. Note: a transaction with sequence number 5 can only be committed on-chain if the account sequence number is 5. |
-| [Chain ID](https://github.com/aptos-labs/aptos-core/blob/main/types/src/chain_id.rs) | An identifier that distinguishes the Aptos network deployments (to prevent cross-network attacks). |
-
-## Lifecycle of the transaction
+### The Journey
 
 In this section, we will describe the lifecycle of transaction T<sub>5</sub>, from when the client submits it to when it is committed to the Aptos blockchain.
 
@@ -72,7 +50,27 @@ The lifecycle of a transaction has five stages:
 
 We've described what happens in each stage below, along with links to the corresponding Aptos node component interactions.
 
-## Accepting the transaction
+### Client submits a transaction
+
+An Aptos **client constructs a raw transaction** (let's call it Traw<sub>5</sub>) to transfer 10 Aptos Coins from Alice’s account to Bob’s account. The Aptos client signs the transaction with Alice's private key. The signed transaction T<sub>5</sub> includes the following:
+
+* The raw transaction.
+* Alice's public key.
+* Alice's signature.
+
+The raw transaction includes the following fields:
+
+| Fields | Description |
+| ------ | ----------- |
+| [Account address](/reference/glossary#account-address) | Alice's account address |
+| Move module | A module (or program) that indicates the actions to be performed on Alice's behalf. In this case, it contains:  <br />- A Move bytecode peer-to-peer [transaction script](/reference/glossary#transaction-script) <br />- A list of inputs to the script (for this example the list would contain Bob's account address and the payment amount in Aptos Coins). |
+| [Maximum gas amount](/reference/glossary#maximum-gas-amount) | The maximum gas amount Alice is willing to pay for this transaction. Gas is a way to pay for computation and storage. A gas unit is an abstract measurement of computation. |
+| [Gas price](/reference/glossary#gas-price) | The amount (in Aptos Coins) Alice is willing to pay per unit of gas, to execute the transaction. |
+| [Expiration time](/reference/glossary#expiration-time) | Expiration time of the transaction. |
+| [Sequence number](/reference/glossary#sequence-number)  | The sequence number (5, in this example) for an account indicates the number of transactions that have been submitted and committed on-chain from that account. In this case, 5 transactions have been submitted from Alice’s account, including Traw<sub>5</sub>. Note: a transaction with sequence number 5 can only be committed on-chain if the account sequence number is 5. |
+| [Chain ID](https://github.com/aptos-labs/aptos-core/blob/main/types/src/chain_id.rs) | An identifier that distinguishes the Aptos network deployments (to prevent cross-network attacks). |
+
+### Accepting the transaction
 
 | Description                                                  | Aptos Node Component Interactions                           |
 | ------------------------------------------------------------ | ---------------------------------------------------------- |
@@ -81,21 +79,21 @@ We've described what happens in each stage below, along with links to the corres
 | 3. **Mempool → Virtual Machine (VM)**: Mempool will use the virtual machine (VM) component to perform transaction validation, such as signature verification, account balance verification and replay resistance using the sequence number. | [4. Mempool](#4-mempool--vm), [3. Virtual Machine](#3-mempool--virtual-machine) |
 
 
-## Sharing the transaction with other validator nodes
+### Sharing the transaction with other validator nodes
 
 | Description                                                  | Aptos Node Component Interactions |
 | ------------------------------------------------------------ | -------------------------------- |
 | 4. **Mempool**: The mempool will hold T<sub>5</sub> in an in-memory buffer. Mempool may already contain multiple transactions sent from Alice's address. | [Mempool](#mempool)                  |
 | 5. **Mempool → Other Validators**: Using the shared-mempool protocol, V<sub>1</sub> will share the transactions (including T<sub>5</sub>) in its mempool with other validator nodes and place transactions received from them into its own (V<sub>1</sub>) mempool. | [2. Mempool](#2-mempool--other-validator-nodes)               |
 
-## Proposing the block
+### Proposing the block
 
 | Description                                                  | Aptos Node Component Interactions         |
 | ------------------------------------------------------------ | ---------------------------------------- |
 | 6. **Consensus → Mempool**: &mdash; As validator V<sub>1</sub> is a proposer/leader for this transaction, it will pull a block of transactions from its mempool and replicate this block as a proposal to other validator nodes via its consensus component. | [1. Consensus](#1-consensus--mempool), [3. Mempool](#3-consensus--mempool) |
 | 7. **Consensus → Other Validators**: The consensus component of V<sub>1</sub> is responsible for coordinating agreement among all validators on the order of transactions in the proposed block. | [2. Consensus](#2-consensus--other-validators)                     |
 
-## Executing the block and reaching consensus
+### Executing the block and reaching consensus
 
 | Description                                                  | Aptos Node Component Interactions                 |
 | ------------------------------------------------------------ | ------------------------------------------------ |
@@ -104,7 +102,7 @@ We've described what happens in each stage below, along with links to the corres
 | 10. **Consensus → Execution**: After executing the transactions in the block, the execution component appends the transactions in the block (including T<sub>5</sub>) to the [Merkle accumulator](/reference/glossary#merkle-accumulator) (of the ledger history). This is an in-memory/temporary version of the Merkle accumulator. The necessary part of the proposed/speculative result of executing these transactions is returned to the consensus component to agree on. The arrow from "consensus" to "execution" indicates that the request to execute transactions was made by the consensus component. | [3. Consensus](#3-consensus--execution-consensus--other-validators), [1. Execution](#1-consensus--execution)       |
 | 11. **Consensus → Other Validators**: V<sub>1</sub> (the consensus leader) attempts to reach consensus on the proposed block's execution result with the other validator nodes participating in consensus. | [3. Consensus](#3-consensus--execution-consensus--other-validators)                             |
 
-## Committing the block
+### Committing the block
 
 | Description                                                  | Aptos Node Component Interactions                             |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
@@ -114,7 +112,7 @@ Alice's account will now have 100 Aptos Coins, and its sequence number will be 6
 
 ## Aptos node component interactions
 
-In the [previous section](#lifecycle-of-the-transaction), we described the typical lifecycle of a transaction (from transaction submission to transaction commit). Now let's look at the inter-component interactions of Aptos nodes as the blockchain processes transactions and responds to queries. This information will be most useful to those who:
+In the [previous section](#life-of-a-transaction), we described the typical lifecycle of a transaction (from transaction submission to transaction commit). Now let's look at the inter-component interactions of Aptos nodes as the blockchain processes transactions and responds to queries. This information will be most useful to those who:
 
 * Would like to get an idea of how the system works under the covers.
 * Are interested in eventually contributing to the Aptos blockchain.

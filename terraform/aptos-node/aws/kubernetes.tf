@@ -169,6 +169,12 @@ locals {
 
   # override the helm release name if an override exists, otherwise adopt the workspace name
   helm_release_name = var.helm_release_name_override != "" ? var.helm_release_name_override : local.workspace_name
+
+  # these values are the most likely to be changed by the user and may be managed by terraform to trigger re-deployment
+  helm_values_managed = {
+    "imageTag"  = var.image_tag
+    "chain.era" = var.era
+  }
 }
 
 resource "helm_release" "validator" {
@@ -178,11 +184,25 @@ resource "helm_release" "validator" {
   max_history = 5
   wait        = false
 
+  lifecycle {
+    ignore_changes = [
+      values,
+    ]
+  }
+
   values = [
     local.helm_values,
     var.helm_values_file != "" ? file(var.helm_values_file) : "{}",
     jsonencode(var.helm_values),
   ]
+
+  dynamic "set" {
+    for_each = var.manage_via_tf ? local.helm_values_managed : {}
+    content {
+      name  = set.key
+      value = set.value
+    }
+  }
 
   # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
