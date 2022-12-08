@@ -251,7 +251,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator">aggregator</a>.limit + value &gt; MAX_U128;
+<b>aborts_if</b> !<a href="aggregator.md#0x1_aggregator_spec_aggreator_exists">spec_aggreator_exists</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
 </code></pre>
 
 
@@ -268,7 +268,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator">aggregator</a>.limit - value &lt; 0;
+<b>aborts_if</b> !<a href="aggregator.md#0x1_aggregator_spec_aggreator_exists">spec_aggreator_exists</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
 </code></pre>
 
 
@@ -285,6 +285,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> !<a href="aggregator.md#0x1_aggregator_spec_aggreator_exists">spec_aggreator_exists</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
 </code></pre>
 
 
@@ -302,6 +303,15 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_aggreator_exists"></a>
+
+
+<pre><code><b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggreator_exists">spec_aggreator_exists</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): bool;
 </code></pre>
 
 
