@@ -342,27 +342,21 @@ Payload:
         NEWTYPE:
           SEQ:
             TYPENAME: SignedTransaction
-<<<<<<< HEAD
     1:
       InQuorumStore:
         NEWTYPE:
           TYPENAME: ProofWithData
-=======
->>>>>>> f336cfc341 (Quorum Store related changes to consensus networking.)
 ProofOfStore:
   STRUCT:
     - info:
         TYPENAME: SignedDigestInfo
     - multi_signature:
         TYPENAME: AggregateSignature
-<<<<<<< HEAD
 ProofWithData:
   STRUCT:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
-=======
->>>>>>> f336cfc341 (Quorum Store related changes to consensus networking.)
 ProposalMsg:
   STRUCT:
     - proposal:
@@ -403,8 +397,6 @@ SerializedTransaction:
     - bytes: BYTES
 Signature:
   NEWTYPESTRUCT: BYTES
-<<<<<<< HEAD
-=======
 SignedDigest:
   STRUCT:
     - epoch: U64
@@ -414,7 +406,6 @@ SignedDigest:
         TYPENAME: SignedDigestInfo
     - signature:
         TYPENAME: Signature
->>>>>>> f336cfc341 (Quorum Store related changes to consensus networking.)
 SignedDigestInfo:
   STRUCT:
     - digest:
