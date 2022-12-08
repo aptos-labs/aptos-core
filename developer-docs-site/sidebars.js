@@ -69,6 +69,7 @@ const sidebars = {
         "cli-tools/install-move-prover",
       ],
     },
+    "guides/system-integrators-guide",
     {
       type: "html",
       value: "Build Apps",
@@ -87,7 +88,7 @@ const sidebars = {
       label: "Read Blockchain Data",
       collapsible: true,
       collapsed: true,
-      items: ["guides/system-integrators-guide", "guides/indexing"],
+      items: ["guides/aptos-apis", "guides/indexing"],
     },
     {
       type: "category",

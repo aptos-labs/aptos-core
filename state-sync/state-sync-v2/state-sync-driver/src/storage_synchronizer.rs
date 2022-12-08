@@ -12,6 +12,7 @@ use crate::{
     utils,
 };
 use aptos_config::config::StateSyncDriverConfig;
+use aptos_data_streaming_service::data_notification::NotificationId;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::state_store::state_key::StateKey;
@@ -25,7 +26,6 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
-use data_streaming_service::data_notification::NotificationId;
 use event_notifications::EventSubscriptionService;
 use executor_types::ChunkExecutorTrait;
 use futures::channel::mpsc::UnboundedSender;
@@ -411,10 +411,18 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                 num_transactions
                             ))
                         );
+
+                        let operation_label =
+                            metrics::StorageSynchronizerOperations::ExecutedTransactions
+                                .get_label();
                         metrics::increment_gauge(
                             &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                            metrics::StorageSynchronizerOperations::ExecutedTransactions
-                                .get_label(),
+                            operation_label,
+                            num_transactions as u64,
+                        );
+                        metrics::observe_value(
+                            &metrics::STORAGE_SYNCHRONIZER_CHUNK_SIZES,
+                            operation_label,
                             num_transactions as u64,
                         );
                     }
@@ -451,10 +459,18 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                 num_outputs
                             ))
                         );
+
+                        let operation_label =
+                            metrics::StorageSynchronizerOperations::AppliedTransactionOutputs
+                                .get_label();
                         metrics::increment_gauge(
                             &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                            metrics::StorageSynchronizerOperations::AppliedTransactionOutputs
-                                .get_label(),
+                            operation_label,
+                            num_outputs as u64,
+                        );
+                        metrics::observe_value(
+                            &metrics::STORAGE_SYNCHRONIZER_CHUNK_SIZES,
+                            operation_label,
                             num_outputs as u64,
                         );
                     }
@@ -647,10 +663,18 @@ fn spawn_state_snapshot_receiver<
                                     last_committed_state_index
                                 ))
                             );
+
+                            let operation_label =
+                                metrics::StorageSynchronizerOperations::SyncedStates.get_label();
                             metrics::set_gauge(
                                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                                metrics::StorageSynchronizerOperations::SyncedStates.get_label(),
+                                operation_label,
                                 last_committed_state_index as u64,
+                            );
+                            metrics::observe_value(
+                                &metrics::STORAGE_SYNCHRONIZER_CHUNK_SIZES,
+                                operation_label,
+                                num_state_values as u64,
                             );
 
                             if !all_states_synced {

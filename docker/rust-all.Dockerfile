@@ -37,8 +37,12 @@ ARG PROFILE
 ENV PROFILE ${PROFILE}
 ARG FEATURES
 ENV FEATURES ${FEATURES}
+ARG GIT_CREDENTIALS
+ENV GIT_CREDENTIALS ${GIT_CREDENTIALS}
 
+RUN GIT_CREDENTIALS="$GIT_CREDENTIALS" git config --global credential.helper store && echo "${GIT_CREDENTIALS}" > ~/.git-credentials
 RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target
+RUN rm -rf ~/.git-credentials
 
 ### Validator Image ###
 FROM debian-base AS validator

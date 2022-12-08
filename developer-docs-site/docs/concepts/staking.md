@@ -8,17 +8,18 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Staking
 
 :::tip Consensus
-We strongly recommend that you read the consensus section of the [Life of a Transaction](../guides/basics-life-of-txn#consensus) before proceeding further. 
+We strongly recommend that you read the consensus section of [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn#consensus) before proceeding further. 
 :::
 
-In a distributed system like blockchain, executing a transaction is distinct from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before the results are persisted in storage and the state of the ledger is updated. 
+In a distributed system like blockchain, executing a transaction is distinct from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before these results are persisted in storage and the state of the ledger is updated. 
 
-A validator can participate in the consensus process. However, the validator can acquire the voting power only when they stake, i.e., place their utility coin into escrow. To encourage validators to participate in the consensus process, each validator's vote weight is made proportionate to the amount of validator's stake. In exchange, the validator is rewarded in proportion to the amount of validator's stake. Hence, the performance of the network, i.e., consensus, is aligned with the validator's interest, i.e., rewards.  
+Anyone can participate in the Aptos consensus process, if they stake sufficient utility coin, i.e., place their utility coin into escrow. To encourage validators to participate in the consensus process, each validator's vote weight is proportional to the amount of validator's stake. In exchange, the validator is rewarded proportionally to the amount staked. Hence, the performance of the Blockchain is aligned with the validator's interest, i.e., rewards.  
 
-Note that currently no slashing is implemented. See the data currently on-chain at:
-https://mainnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::staking_config::StakingConfig
+:::note 
+Currently slashing is not implemented.
+:::
 
-With the configuration set in [staking_config.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/configs/staking_config.move).
+The current on-chain data can be found [here](https://mainnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::staking_config::StakingConfig). With the configuration set defined in [staking_config.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/configs/staking_config.move).
 
 The rest of this document presents how staking works on the Aptos blockchain. See [Supporting documentation](#supporting-documentation) at the bottom for related resources.
 
@@ -36,8 +37,6 @@ Below is a summary flow diagram of how staking on the Aptos blockchain works. Th
 /> --->
 
 
-### How a custodian can stake on Aptos
-
 The Aptos staking module defines a capability that represents ownership. 
 
 :::tip Ownership
@@ -48,6 +47,7 @@ The `OwnerCapability` resource can be used to control the stake pool. Three pers
 - Owner
 - Operator
 - Voter
+
 
 Using this owner-operator-voter model, a custodian can assume the owner persona and stake on the Aptos blockchain and participate in the Aptos governance. This model allows delegations and staking services to be built as it separates the account that is control of the funds from the other accounts (operator, voter), hence allows secure delegations of responsibilities. 
 
@@ -86,13 +86,12 @@ This document describes staking. See [Governance](./governance.md) for how to pa
 
 ## Validation on the Aptos blockchain
 
-The following is a high-level description of how validation works on the Aptos blockchain:
+Throughout the duration of an epoch, the following flow of events occurs several times (thousands of times):
 
-- Throughout the duration of an epoch, the following flow of events occurs several times (thousands of times):
-  - A validator leader is selected by a deterministic formula based on the validator reputation determined by validator's performance (including whether the validator has voted in the past or not) and stake. **This leader selection is not done by voting.**
-  - The selected leader sends a proposal containing the collected quorum votes of the previous proposal and the leader's proposed order of transactions for the new block. 
-  - All the validators from the validator set will vote on the leader's proposal for the new block. Once consensus is reached the block can be finalized. Hence the actual list of votes to achieve consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validators, not to the voter validators.**
-  - The above flow repeats with the selection of another validator leader and repeating the steps for the next new block. Rewards are given at the end of the epoch. 
+- A validator leader is selected by a deterministic formula based on the validator reputation determined by validator's performance (including whether the validator has voted in the past or not) and stake. **This leader selection is not done by voting.**
+- The selected leader sends a proposal containing the collected quorum votes of the previous proposal and the leader's proposed order of transactions for the new block. 
+- All the validators from the validator set will vote on the leader's proposal for the new block. Once consensus is reached the block can be finalized. Hence the actual list of votes to achieve consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validators, not to the voter validators.**
+- The above flow repeats with the selection of another validator leader and repeating the steps for the next new block. Rewards are given at the end of the epoch. 
 
 ## Validator state and stake state
 
@@ -111,15 +110,7 @@ States are defined for a validator and the stake.
   
   These stake states are applicable for the existing validators in the validator set adding or removing their stake.
 
-### Validator state
-
-See the validator states in the below diagram. 
-
-### Validator state edge cases
-
-There are two edge cases to call out:
-1. A validator can be moved from active state directly to the inactive state during an epoch change if their stake drops below the required minimum. This happens during an epoch change.
-2. Aptos governance can also directly remove validators from the active set. **Note that governance proposals will always trigger an epoch change.**
+### Validator states
 
 <ThemedImage
 alt="Signed Transaction Flow"
@@ -129,17 +120,13 @@ sources={{
   }}
 />
 
-
-The below ruleset is applicable during the changes of a state:
-
-### Ruleset
-
-- Voting power can only change (increase or decrease) on epoch boundary.
-- A validator’s consensus key and the validator and validator fullnode network addresses can only change on epoch boundary.
-- Pending inactive stake cannot be moved into inactive (and thus withdrawable) until before lockup expires.
-- No validators in the active validator set can have their stake below the minimum required stake.
+There are two edge cases to call out:
+1. A validator can be moved from active state directly to the inactive state during an epoch change if their stake drops below the required minimum. This happens during an epoch change.
+2. Aptos governance can also directly remove validators from the active set. **Note that governance proposals will always trigger an epoch change.**
 
 ### Stake state
+
+The state of stake has more granularity than that of the validator, additional stake can be added and a portion of stake removed from an active validator.
 
 <ThemedImage
 alt="Signed Transaction Flow"
@@ -148,6 +135,15 @@ sources={{
     dark: useBaseUrl('/img/docs/stake-state-dark.svg'),
   }}
 />
+
+### Validator Ruleset
+
+The below ruleset is applicable during the changes of state:
+
+- Voting power can only change (increase or decrease) on epoch boundary.
+- A validator’s consensus key and the validator and validator fullnode network addresses can only change on epoch boundary.
+- Pending inactive stake cannot be moved into inactive (and thus withdrawable) until before lockup expires.
+- No validators in the active validator set can have their stake below the minimum required stake.
 
 ## Validator flow
 

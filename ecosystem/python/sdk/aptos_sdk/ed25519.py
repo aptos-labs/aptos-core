@@ -83,6 +83,8 @@ class PublicKey:
     @staticmethod
     def deserialize(deserializer: Deserializer) -> PublicKey:
         key = deserializer.to_bytes()
+        print(len(key))
+        print(key)
         if len(key) != PublicKey.LENGTH:
             raise Exception("Length mismatch")
 

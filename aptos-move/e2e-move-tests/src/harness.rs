@@ -3,6 +3,7 @@
 
 use crate::{assert_success, AptosPackageHooks};
 use aptos::move_tool::MemberId;
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, Uniform};
 use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
@@ -16,7 +17,6 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
-use cached_packages::aptos_stdlib;
 use framework::natives::code::PackageMetadata;
 use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{

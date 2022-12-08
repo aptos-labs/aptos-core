@@ -41,6 +41,11 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context};
 use aptos_config::config::{ConsensusConfig, NodeConfig};
+use aptos_consensus_types::{
+    common::{Author, Round},
+    epoch_retrieval::EpochRetrievalRequest,
+    request_response::ConsensusRequest,
+};
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -55,11 +60,6 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use channel::{aptos_channel, message_queues::QueueStyle};
-use consensus_types::{
-    common::{Author, Round},
-    epoch_retrieval::EpochRetrievalRequest,
-    request_response::ConsensusRequest,
-};
 use event_notifications::ReconfigNotificationListener;
 use fail::fail_point;
 use futures::{

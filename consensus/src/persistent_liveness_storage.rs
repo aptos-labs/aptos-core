@@ -4,14 +4,14 @@
 use crate::{consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError};
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::NodeConfig;
+use aptos_consensus_types::{
+    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
     block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     proof::TransactionAccumulatorSummary, transaction::Version,
-};
-use consensus_types::{
-    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
 use std::{cmp::max, collections::HashSet, sync::Arc};
 use storage_interface::DbReader;

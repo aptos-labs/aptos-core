@@ -12,7 +12,7 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction},
 };
 
-use accumulator::HashReader;
+use aptos_accumulator::HashReader;
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_types::{
     proof::position::Position,

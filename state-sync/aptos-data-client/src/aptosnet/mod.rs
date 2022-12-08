@@ -38,10 +38,13 @@ use std::{convert::TryFrom, fmt, sync::Arc, time::Duration};
 use storage_service_client::StorageServiceClient;
 use storage_service_types::requests::{
     DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-    NewTransactionsWithProofRequest, StateValuesWithProofRequest, StorageServiceRequest,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+    StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
+    TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
 };
-use storage_service_types::responses::{StorageServerSummary, StorageServiceResponse};
+use storage_service_types::responses::{
+    StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof,
+};
 use storage_service_types::Epoch;
 use tokio::{runtime::Handle, task::JoinHandle};
 
@@ -126,6 +129,11 @@ impl AptosNetDataClient {
     /// Returns true iff compression should be requested
     fn use_compression(&self) -> bool {
         self.data_client_config.use_compression
+    }
+
+    /// Returns the max number of output reductions as defined by the config
+    fn get_max_num_output_reductions(&self) -> u64 {
+        self.data_client_config.max_num_output_reductions
     }
 
     /// Generates a new response id
@@ -468,6 +476,22 @@ impl AptosNetDataClient {
             .write()
             .update_score_error(peer, error_type);
     }
+
+    /// Creates a storage service request using the given data request
+    /// and sends it across the network
+    async fn create_and_send_storage_request<T, E>(
+        &self,
+        request_timeout_ms: u64,
+        data_request: DataRequest,
+    ) -> Result<Response<T>>
+    where
+        T: TryFrom<StorageServiceResponse, Error = E>,
+        E: Into<Error>,
+    {
+        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
+        self.send_request_and_decode(storage_request, request_timeout_ms)
+            .await
+    }
 }
 
 #[async_trait]
@@ -486,9 +510,8 @@ impl AptosDataClient for AptosNetDataClient {
             start_epoch,
             expected_end_epoch,
         });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
         let response: Response<EpochChangeProof> = self
-            .send_request_and_decode(storage_request, request_timeout_ms)
+            .create_and_send_storage_request(request_timeout_ms, data_request)
             .await?;
         Ok(response.map(|epoch_change| epoch_change.ledger_info_with_sigs))
     }
@@ -504,8 +527,7 @@ impl AptosDataClient for AptosNetDataClient {
                 known_version,
                 known_epoch,
             });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request, request_timeout_ms)
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
 
@@ -522,8 +544,26 @@ impl AptosDataClient for AptosNetDataClient {
                 known_epoch,
                 include_events,
             });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request, request_timeout_ms)
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
+    }
+
+    async fn get_new_transactions_or_outputs_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>> {
+        let data_request = DataRequest::GetNewTransactionsOrOutputsWithProof(
+            NewTransactionsOrOutputsWithProofRequest {
+                known_version,
+                known_epoch,
+                include_events,
+                max_num_output_reductions: self.get_max_num_output_reductions(),
+            },
+        );
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
 
@@ -533,8 +573,7 @@ impl AptosDataClient for AptosNetDataClient {
         request_timeout_ms: u64,
     ) -> Result<Response<u64>> {
         let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request, request_timeout_ms)
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
 
@@ -550,8 +589,7 @@ impl AptosDataClient for AptosNetDataClient {
             start_index,
             end_index,
         });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request, request_timeout_ms)
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
 
@@ -568,8 +606,7 @@ impl AptosDataClient for AptosNetDataClient {
                 start_version,
                 end_version,
             });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request, request_timeout_ms)
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
 
@@ -587,8 +624,27 @@ impl AptosDataClient for AptosNetDataClient {
             end_version,
             include_events,
         });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request, request_timeout_ms)
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
+    }
+
+    async fn get_transactions_or_outputs_with_proof(
+        &self,
+        proof_version: Version,
+        start_version: Version,
+        end_version: Version,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> Result<Response<TransactionOrOutputListWithProof>> {
+        let data_request =
+            DataRequest::GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
+                proof_version,
+                start_version,
+                end_version,
+                include_events,
+                max_num_output_reductions: self.get_max_num_output_reductions(),
+            });
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
 }

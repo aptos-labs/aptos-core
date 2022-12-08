@@ -18,14 +18,14 @@ use crate::{
     },
 };
 use aptos_config::config::ContinuousSyncingMode;
-use aptos_infallible::Mutex;
-use aptos_types::transaction::{TransactionOutputListWithProof, Version};
-use claims::assert_matches;
-use consensus_notifications::ConsensusSyncNotification;
-use data_streaming_service::{
+use aptos_consensus_notifications::ConsensusSyncNotification;
+use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload},
     streaming_client::{NotificationAndFeedback, NotificationFeedback},
 };
+use aptos_infallible::Mutex;
+use aptos_types::transaction::{TransactionOutputListWithProof, Version};
+use claims::assert_matches;
 use futures::SinkExt;
 use mockall::{predicate::eq, Sequence};
 use std::sync::Arc;

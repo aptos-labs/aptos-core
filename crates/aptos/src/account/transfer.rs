@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
+use aptos_cached_packages::aptos_stdlib;
 use aptos_rest_client::aptos_api_types::HashValue;
 use aptos_rest_client::{
     aptos_api_types::{WriteResource, WriteSetChange},
@@ -9,7 +10,6 @@ use aptos_rest_client::{
 };
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
-use cached_packages::aptos_stdlib;
 use clap::Parser;
 use serde::Serialize;
 use std::collections::BTreeMap;

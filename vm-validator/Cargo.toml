@@ -23,13 +23,13 @@ scratchpad = { workspace = true }
 storage-interface = { workspace = true }
 
 [dev-dependencies]
+aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptosdb = { workspace = true }
-cached-packages = { workspace = true }
 executor-test-helpers = { workspace = true }
 move-core-types = { workspace = true }
 rand = { workspace = true }

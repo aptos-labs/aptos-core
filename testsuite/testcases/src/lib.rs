@@ -5,7 +5,6 @@ pub mod compatibility_test;
 pub mod consensus_reliability_tests;
 pub mod forge_setup_test;
 pub mod fullnode_reboot_stress_test;
-pub mod gas_price_test;
 pub mod load_vs_perf_benchmark;
 pub mod network_bandwidth_test;
 pub mod network_loss_test;
@@ -17,10 +16,11 @@ pub mod reconfiguration_test;
 pub mod state_sync_performance;
 pub mod three_region_simulation_test;
 pub mod twin_validator_test;
+pub mod two_traffics_test;
 pub mod validator_join_leave_test;
 pub mod validator_reboot_stress_test;
 
-use anyhow::{anyhow, ensure, Context};
+use anyhow::{anyhow, Context};
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use forge::{
@@ -62,42 +62,40 @@ pub fn create_emitter_and_request(
     swarm: &mut dyn Swarm,
     mut emit_job_request: EmitJobRequest,
     nodes: &[PeerId],
-    gas_price: u64,
     rng: StdRng,
 ) -> Result<(TxnEmitter, EmitJobRequest)> {
-    ensure!(gas_price > 0, "gas_price is required to be non zero");
-
     // as we are loading nodes, use higher client timeout
     let client_timeout = Duration::from_secs(30);
 
     let chain_info = swarm.chain_info();
-    let transaction_factory = TransactionFactory::new(chain_info.chain_id)
-        .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE);
+    let transaction_factory = TransactionFactory::new(chain_info.chain_id);
     let emitter = TxnEmitter::new(transaction_factory, rng);
 
-    emit_job_request = emit_job_request
-        .rest_clients(swarm.get_clients_for_peers(nodes, client_timeout))
-        .gas_price(gas_price);
+    emit_job_request =
+        emit_job_request.rest_clients(swarm.get_clients_for_peers(nodes, client_timeout));
     Ok((emitter, emit_job_request))
+}
+
+pub fn traffic_emitter_runtime() -> Result<Runtime> {
+    let mut runtime_builder = Builder::new_multi_thread();
+    runtime_builder.disable_lifo_slot().enable_all();
+    runtime_builder.worker_threads(64);
+    runtime_builder
+        .build()
+        .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))
 }
 
 pub fn generate_traffic(
     ctx: &mut NetworkContext<'_>,
     nodes: &[PeerId],
     duration: Duration,
-    gas_price: u64,
 ) -> Result<TxnStats> {
     let emit_job_request = ctx.emit_job.clone();
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
     let (mut emitter, emit_job_request) =
-        create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, gas_price, rng)?;
+        create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng)?;
 
-    let mut runtime_builder = Builder::new_multi_thread();
-    runtime_builder.disable_lifo_slot().enable_all();
-    runtime_builder.worker_threads(64);
-    let rt = runtime_builder
-        .build()
-        .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))?;
+    let rt = traffic_emitter_runtime()?;
     let stats = rt.block_on(emitter.emit_txn_for(
         ctx.swarm().chain_info().root_account,
         emit_job_request,
@@ -112,6 +110,20 @@ pub enum LoadDestination {
     AllValidators,
     AllFullnodes,
     Peers(Vec<PeerId>),
+}
+
+impl LoadDestination {
+    fn get_destination_nodes(self, swarm: &mut dyn Swarm) -> Vec<PeerId> {
+        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+        let all_fullnodes = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
+
+        match self {
+            LoadDestination::AllNodes => [&all_validators[..], &all_fullnodes[..]].concat(),
+            LoadDestination::AllValidators => all_validators,
+            LoadDestination::AllFullnodes => all_fullnodes,
+            LoadDestination::Peers(peers) => peers,
+        }
+    }
 }
 
 pub trait NetworkLoadTest: Test {
@@ -168,7 +180,7 @@ impl NetworkTest for dyn NetworkLoadTest {
 
         ctx.check_for_success(
             &txn_stat,
-            &actual_test_duration,
+            actual_test_duration,
             start_timestamp as i64,
             end_timestamp as i64,
             start_version,
@@ -190,43 +202,16 @@ impl dyn NetworkLoadTest {
         cooldown_duration_fraction: f32,
         rng: StdRng,
     ) -> Result<(TxnStats, Duration, u64)> {
-        let all_validators = ctx
-            .swarm()
-            .validators()
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
-
-        let all_fullnodes = ctx
-            .swarm()
-            .full_nodes()
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
-
-        let nodes_to_send_load_to = match self.setup(ctx).context("setup NetworkLoadTest")? {
-            LoadDestination::AllNodes => [&all_validators[..], &all_fullnodes[..]].concat(),
-            LoadDestination::AllValidators => all_validators,
-            LoadDestination::AllFullnodes => all_fullnodes,
-            LoadDestination::Peers(peers) => peers,
-        };
+        let destination = self.setup(ctx).context("setup NetworkLoadTest")?;
+        let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm());
 
         // Generate some traffic
 
-        let (mut emitter, emit_job_request) = create_emitter_and_request(
-            ctx.swarm(),
-            emit_job_request,
-            &nodes_to_send_load_to,
-            aptos_global_constants::GAS_UNIT_PRICE,
-            rng,
-        )
-        .context("create emitter")?;
+        let (mut emitter, emit_job_request) =
+            create_emitter_and_request(ctx.swarm(), emit_job_request, &nodes_to_send_load_to, rng)
+                .context("create emitter")?;
 
-        let mut runtime_builder = Builder::new_multi_thread();
-        runtime_builder.disable_lifo_slot().enable_all();
-        runtime_builder.worker_threads(64);
-        let rt = runtime_builder
-            .build()
-            .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))?;
-
+        let rt = traffic_emitter_runtime()?;
         let clients = ctx
             .swarm()
             .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));

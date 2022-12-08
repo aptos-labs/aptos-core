@@ -10,17 +10,17 @@ use crate::{
     utils::{SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
 use aptos_config::config::ContinuousSyncingMode;
+use aptos_data_streaming_service::streaming_client::NotificationAndFeedback;
+use aptos_data_streaming_service::{
+    data_notification::{DataNotification, DataPayload, NotificationId},
+    data_stream::DataStreamListener,
+    streaming_client::{DataStreamingClient, Epoch, NotificationFeedback},
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{prelude::*, sample, sample::SampleRate};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
-};
-use data_streaming_service::streaming_client::NotificationAndFeedback;
-use data_streaming_service::{
-    data_notification::{DataNotification, DataPayload, NotificationId},
-    data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, Epoch, NotificationFeedback},
 };
 use std::{sync::Arc, time::Duration};
 use storage_interface::DbReader;

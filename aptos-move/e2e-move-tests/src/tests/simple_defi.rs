@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
+use aptos_cached_packages::aptos_stdlib;
 use aptos_types::account_config::CoinStoreResource;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     transaction::{EntryFunction, TransactionPayload},
 };
-use cached_packages::aptos_stdlib;
 use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::account::Account;
 use move_core_types::{ident_str, language_storage::ModuleId, parser::parse_struct_tag};

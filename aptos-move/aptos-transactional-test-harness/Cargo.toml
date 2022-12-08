@@ -15,13 +15,13 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
-cached-packages = { workspace = true }
 clap = { workspace = true }
 framework = { workspace = true }
 hex = { workspace = true }

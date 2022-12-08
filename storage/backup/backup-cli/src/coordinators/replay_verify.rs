@@ -27,6 +27,7 @@ pub struct ReplayVerifyCoordinator {
     restore_handler: RestoreHandler,
     start_version: Version,
     end_version: Version,
+    validate_modules: bool,
 }
 
 impl ReplayVerifyCoordinator {
@@ -39,6 +40,7 @@ impl ReplayVerifyCoordinator {
         restore_handler: RestoreHandler,
         start_version: Version,
         end_version: Version,
+        validate_modules: bool,
     ) -> Result<Self> {
         Ok(Self {
             storage,
@@ -49,6 +51,7 @@ impl ReplayVerifyCoordinator {
             restore_handler,
             start_version,
             end_version,
+            validate_modules,
         })
     }
 
@@ -112,6 +115,7 @@ impl ReplayVerifyCoordinator {
                 StateSnapshotRestoreOpt {
                     manifest_handle: backup.manifest,
                     version: backup.version,
+                    validate_modules: self.validate_modules,
                 },
                 global_opt.clone(),
                 Arc::clone(&self.storage),

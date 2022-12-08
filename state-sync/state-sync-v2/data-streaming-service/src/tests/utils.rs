@@ -41,7 +41,7 @@ use storage_service_types::requests::{
     NewTransactionsWithProofRequest, StateValuesWithProofRequest,
     TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
-use storage_service_types::responses::CompleteDataRange;
+use storage_service_types::responses::{CompleteDataRange, TransactionOrOutputListWithProof};
 use storage_service_types::Epoch;
 use tokio::time::timeout;
 
@@ -435,6 +435,18 @@ impl AptosDataClient for MockAptosDataClient {
         }
     }
 
+    async fn get_new_transactions_or_outputs_with_proof(
+        &self,
+        _known_version: Version,
+        _known_epoch: Epoch,
+        _include_events: bool,
+        _request_timeout_ms: u64,
+    ) -> aptos_data_client::Result<
+        Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>,
+    > {
+        todo!() // Implement when we have a client side implementation
+    }
+
     async fn get_number_of_states(
         &self,
         version: Version,
@@ -512,6 +524,17 @@ impl AptosDataClient for MockAptosDataClient {
 
         // Return the transaction list with proofs
         Ok(create_data_client_response(transaction_list_with_proof))
+    }
+
+    async fn get_transactions_or_outputs_with_proof(
+        &self,
+        _proof_version: Version,
+        _start_version: Version,
+        _end_version: Version,
+        _include_events: bool,
+        _request_timeout_ms: u64,
+    ) -> aptos_data_client::Result<Response<TransactionOrOutputListWithProof>> {
+        todo!() // Implement when we have a client side implementation
     }
 }
 
