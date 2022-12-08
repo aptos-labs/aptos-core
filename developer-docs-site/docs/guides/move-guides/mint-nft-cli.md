@@ -44,9 +44,9 @@ Aptos CLI is now set up for account blah as profile nft-receiver!  Run `aptos --
 
 1. Note *blah* above is a placeholder for your private key. Record it someplace safe.
 
-1. Run `nano ~/.aptos/config.yaml` to find your address anytime.
-
 ## Find the NFT in your Petra wallet
+
+1. Run `more ~/.aptos/config.yaml` to see the `nft-receiver` private key and then copy it.
 
 1. Install the [Petra Wallet](../../guides/install-petra-wallet.md) Chrome extension.
 
@@ -56,7 +56,7 @@ Aptos CLI is now set up for account blah as profile nft-receiver!  Run `aptos --
 
 1. Go to *Petra > Settings > Switch account > Add Account > Import private key*.
 
-1. Paste your new account's private key there.
+1. Paste the `nft-receiver` private key there.
 
 1. Go to *Petra > Settings > Network > Testnet*.
 
