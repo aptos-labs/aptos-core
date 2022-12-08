@@ -13,8 +13,6 @@ To efficiently write smart contracts in Aptos, we recommend you first:
 1. Create an NFT
 1. Create resource account
 
-TODO: Include links to related materials from above (even if blog post in the case of security).
-
 ## Aptos Move guides
 
 Start here to learn how the Move language works on the Aptos blockchain. 

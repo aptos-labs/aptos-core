@@ -63,5 +63,3 @@ Aptos CLI is now set up for account blah as profile nft-receiver!  Run `aptos --
 1. Click **Library** at bottom.
 
 1. See the NFT in your wallet.
-
-TODO: Find out why I get "No collectibles yet." Confirm the private key is emitted in the output above as it says account. If not from there, where do they derive this essential ingredient?
