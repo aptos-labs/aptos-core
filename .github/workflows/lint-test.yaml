@@ -61,6 +61,14 @@ jobs:
       - run: yarn lint
         working-directory: developer-docs-site
 
+  rust-cryptohasher-domain-separation-check:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
+      - uses: ./.github/actions/rust-setup
+      - run: python3 scripts/check-cryptohasher-symbols.py
+
   rust-lint:
     runs-on: high-perf-docker
     steps:
@@ -110,7 +118,8 @@ jobs:
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
-      - name: Upload smoke test logs for failures
+      # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
+      - name: Upload smoke test logs for failed and flaky tests
         uses: actions/upload-artifact@v3
         if: failure()
         with:
@@ -119,7 +128,7 @@ jobs:
           path: |
             /tmp/.tmp*
             !/tmp/.tmp*/**/db/
-          retention-days: 1
+          retention-days: 14
 
   check-vm-features:
     runs-on: high-perf-docker
@@ -128,8 +137,8 @@ jobs:
       - uses: ./.github/actions/rust-setup
       - run: cargo test --locked --features check-vm-features -p aptos-node
 
-  python-unit-test:
-    uses: ./.github/workflows/python-unit-test.yaml
+  python-lint-test:
+    uses: ./.github/workflows/python-lint-test.yaml
 
   helm-lint:
     uses: ./.github/workflows/helm-lint.yaml
