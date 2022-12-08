@@ -13,6 +13,7 @@ Maintains the version number for the blockchain.
 -  [Function `set_version`](#0x1_version_set_version)
 -  [Function `initialize_for_test`](#0x1_version_initialize_for_test)
 -  [Specification](#@Specification_1)
+    -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `set_version`](#@Specification_1_set_version)
 
 
@@ -201,6 +202,32 @@ to update the version.
 ## Specification
 
 
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_strict;
+</code></pre>
+
+
+
+<a name="@Specification_1_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, initial_version: u64)
+</code></pre>
+
+
+Abort if resource already exists in <code>@aptos_framwork</code> when initializing.
+
+
+<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework) != @aptos_framework;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
 <a name="@Specification_1_set_version"></a>
 
 ### Function `set_version`
@@ -214,6 +241,15 @@ to update the version.
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>requires</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);
+<b>let</b> old_major = <b>global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major;
+<b>aborts_if</b> !(old_major &lt; major);
 </code></pre>
 
 

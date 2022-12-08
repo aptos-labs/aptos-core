@@ -24,9 +24,9 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::{
     deserialize_from_string,
     mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
-    AptosError, BcsBlock, Block, Bytecode, ExplainVMStatus, GasEstimation, HexEncodedBytes,
-    IndexResponse, MoveModuleId, TransactionData, TransactionOnChainData,
-    TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
+    AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse, MoveModuleId,
+    TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction,
+    VersionedEvent,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate};
@@ -36,16 +36,13 @@ use aptos_types::{
     contract_event::EventWithVersion,
     transaction::SignedTransaction,
 };
-use futures::executor::block_on;
-use move_binary_format::CompiledModule;
-use move_core_types::language_storage::{ModuleId, StructTag};
+use move_core_types::language_storage::StructTag;
 use reqwest::header::ACCEPT;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::future::Future;
-use std::rc::Rc;
 use std::time::Duration;
 use tokio::time::Instant;
 use url::Url;
@@ -314,6 +311,30 @@ impl Client {
     ) -> AptosResult<Response<Vec<UserTransaction>>> {
         let txn_payload = bcs::to_bytes(txn)?;
         let url = self.build_path("transactions/simulate")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        self.json(response).await
+    }
+
+    pub async fn simulate_with_gas_estimation(
+        &self,
+        txn: &SignedTransaction,
+        estimate_max_gas_amount: bool,
+        estimate_max_gas_unit_price: bool,
+    ) -> AptosResult<Response<Vec<UserTransaction>>> {
+        let txn_payload = bcs::to_bytes(txn)?;
+
+        let url = self.build_path(&format!(
+            "transactions/simulate?estimate_max_gas_amount={}&estimate_gas_unit_price={}",
+            estimate_max_gas_amount, estimate_max_gas_unit_price
+        ))?;
 
         let response = self
             .inner
@@ -1549,16 +1570,4 @@ enum WaitForTransactionResult<T> {
     FailedExecution(String),
     Pending(State),
     Success(Response<T>),
-}
-
-impl ExplainVMStatus for Client {
-    // TODO: Add some caching
-    fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
-        let bytes =
-            block_on(self.get_account_module_bcs(*module_id.address(), module_id.name().as_str()))?
-                .into_inner();
-
-        let compiled_module = CompiledModule::deserialize(bytes.as_ref())?;
-        Ok(Rc::new(compiled_module) as Rc<dyn Bytecode>)
-    }
 }
