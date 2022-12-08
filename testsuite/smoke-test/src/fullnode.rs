@@ -4,10 +4,10 @@
 use std::time::{Duration, Instant};
 
 use anyhow::bail;
+use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::NodeConfig;
 use aptos_rest_client::Client as RestClient;
 use aptos_types::account_address::AccountAddress;
-use cached_packages::aptos_stdlib;
 use forge::NodeExt;
 use forge::Result;
 use forge::Swarm;

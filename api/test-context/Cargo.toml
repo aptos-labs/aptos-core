@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-api = { workspace = true }
 aptos-api-types = { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-genesis = { workspace = true }
@@ -26,7 +27,6 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptosdb = { workspace = true, features = ["fuzzing"] }
 bytes = { workspace = true }
-cached-packages = { workspace = true }
 executor = { workspace = true }
 executor-types = { workspace = true }
 goldenfile = { workspace = true }

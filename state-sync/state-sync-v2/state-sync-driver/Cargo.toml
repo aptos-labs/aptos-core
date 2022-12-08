@@ -15,16 +15,16 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
+aptos-consensus-notifications = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-data-client = { workspace = true }
+aptos-data-streaming-service = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
-consensus-notifications = { workspace = true }
-data-streaming-service = { workspace = true }
 event-notifications = { workspace = true }
 executor-types = { workspace = true }
 futures = { workspace = true }

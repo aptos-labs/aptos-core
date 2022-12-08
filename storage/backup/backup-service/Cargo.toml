@@ -1,5 +1,5 @@
 [package]
-name = "backup-service"
+name = "aptos-backup-service"
 description = "Backup service"
 version = "0.1.0"
 

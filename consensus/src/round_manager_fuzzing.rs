@@ -17,6 +17,7 @@ use crate::{
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_config::config::ConsensusConfig;
+use aptos_consensus_types::proposal_msg::ProposalMsg;
 use aptos_infallible::Mutex;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
@@ -29,7 +30,6 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::proposal_msg::ProposalMsg;
 use futures::{channel::mpsc, executor::block_on};
 use network::{
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},

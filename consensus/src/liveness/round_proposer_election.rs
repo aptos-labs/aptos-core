@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::liveness::proposer_election::ProposerElection;
-use consensus_types::common::{Author, Round};
+use aptos_consensus_types::common::{Author, Round};
 
 use std::collections::HashMap;
 

@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::requests::DataRequest::{
-    GetEpochEndingLedgerInfos, GetNewTransactionOutputsWithProof, GetNewTransactionsWithProof,
-    GetNumberOfStatesAtVersion, GetServerProtocolVersion, GetStateValuesWithProof,
-    GetStorageServerSummary, GetTransactionOutputsWithProof, GetTransactionsWithProof,
+    GetEpochEndingLedgerInfos, GetNewTransactionOutputsWithProof,
+    GetNewTransactionsOrOutputsWithProof, GetNewTransactionsWithProof, GetNumberOfStatesAtVersion,
+    GetServerProtocolVersion, GetStateValuesWithProof, GetStorageServerSummary,
+    GetTransactionOutputsWithProof, GetTransactionsOrOutputsWithProof, GetTransactionsWithProof,
 };
 use crate::responses::Error::DegenerateRangeError;
 use crate::{Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL};
@@ -106,6 +107,12 @@ impl StorageServiceResponse {
     }
 }
 
+/// A useful type to hold optional transaction data
+pub type TransactionOrOutputListWithProof = (
+    Option<TransactionListWithProof>,
+    Option<TransactionOutputListWithProof>,
+);
+
 /// A single data response.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[allow(clippy::large_enum_variant)]
@@ -119,6 +126,8 @@ pub enum DataResponse {
     StorageServerSummary(StorageServerSummary),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
+    NewTransactionsOrOutputsWithProof((TransactionOrOutputListWithProof, LedgerInfoWithSignatures)),
+    TransactionsOrOutputsWithProof(TransactionOrOutputListWithProof),
 }
 
 impl DataResponse {
@@ -134,6 +143,8 @@ impl DataResponse {
             Self::StorageServerSummary(_) => "storage_server_summary",
             Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
             Self::TransactionsWithProof(_) => "transactions_with_proof",
+            Self::NewTransactionsOrOutputsWithProof(_) => "new_transactions_or_outputs_with_proof",
+            Self::TransactionsOrOutputsWithProof(_) => "transactions_or_outputs_with_proof",
         }
     }
 }
@@ -284,6 +295,36 @@ impl TryFrom<StorageServiceResponse> for TransactionListWithProof {
     }
 }
 
+impl TryFrom<StorageServiceResponse>
+    for (TransactionOrOutputListWithProof, LedgerInfoWithSignatures)
+{
+    type Error = crate::responses::Error;
+    fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::NewTransactionsOrOutputsWithProof(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
+                "expected new_transactions_or_outputs_with_proof, found {}",
+                data_response.get_label()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for TransactionOrOutputListWithProof {
+    type Error = crate::responses::Error;
+    fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::TransactionsOrOutputsWithProof(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
+                "expected transactions_or_outputs_with_proof, found {}",
+                data_response.get_label()
+            ))),
+        }
+    }
+}
+
 /// The protocol version run by this server. Clients request this first to
 /// identify what API calls and data requests the server supports.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -322,6 +363,7 @@ impl ProtocolMetadata {
         match &request.data_request {
             GetNewTransactionsWithProof(_)
             | GetNewTransactionOutputsWithProof(_)
+            | GetNewTransactionsOrOutputsWithProof(_)
             | GetNumberOfStatesAtVersion(_)
             | GetServerProtocolVersion
             | GetStorageServerSummary => true,
@@ -359,6 +401,16 @@ impl ProtocolMetadata {
             .map_or(false, |range| {
                 range.len().map_or(false, |chunk_size| {
                     self.max_transaction_chunk_size >= chunk_size
+                })
+            }),
+            GetTransactionsOrOutputsWithProof(request) => CompleteDataRange::new(
+                request.start_version,
+                request.end_version,
+            )
+            .map_or(false, |range| {
+                range.len().map_or(false, |chunk_size| {
+                    self.max_transaction_chunk_size >= chunk_size
+                        && self.max_transaction_output_chunk_size >= chunk_size
                 })
             }),
         }
@@ -480,6 +532,34 @@ impl DataSummary {
                     .unwrap_or(false);
 
                 can_serve_txns && can_create_proof
+            }
+            GetNewTransactionsOrOutputsWithProof(request) => {
+                self.can_service_optimistic_request(request.known_version)
+            }
+            GetTransactionsOrOutputsWithProof(request) => {
+                let desired_range =
+                    match CompleteDataRange::new(request.start_version, request.end_version) {
+                        Ok(desired_range) => desired_range,
+                        Err(_) => return false,
+                    };
+
+                let can_serve_txns = self
+                    .transactions
+                    .map(|range| range.superset_of(&desired_range))
+                    .unwrap_or(false);
+
+                let can_serve_outputs = self
+                    .transaction_outputs
+                    .map(|range| range.superset_of(&desired_range))
+                    .unwrap_or(false);
+
+                let can_create_proof = self
+                    .synced_ledger_info
+                    .as_ref()
+                    .map(|li| li.ledger_info().version() >= request.proof_version)
+                    .unwrap_or(false);
+
+                can_serve_txns && can_serve_outputs && can_create_proof
             }
         }
     }

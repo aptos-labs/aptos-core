@@ -258,7 +258,7 @@ async fn setup_git_dir(
 
 /// Add framework to git directory
 fn add_framework_to_dir(git_dir: &Path) {
-    cached_packages::head_release_bundle()
+    aptos_cached_packages::head_release_bundle()
         .write(git_dir.join(FRAMEWORK_NAME))
         .unwrap()
 }

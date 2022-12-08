@@ -11,6 +11,8 @@ use crate::{
     txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
+use aptos_consensus_notifications::ConsensusNotificationSender;
+use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
@@ -18,8 +20,6 @@ use aptos_types::{
     account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
-use consensus_notifications::ConsensusNotificationSender;
-use consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};

@@ -13,10 +13,10 @@ use crate::{
     util::time_service::ClockTimeService,
 };
 use aptos_config::config::NodeConfig;
+use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_vm::AptosVM;
-use consensus_notifications::ConsensusNotificationSender;
 use event_notifications::ReconfigNotificationListener;
 use executor::block_executor::BlockExecutor;
 use futures::channel::mpsc;

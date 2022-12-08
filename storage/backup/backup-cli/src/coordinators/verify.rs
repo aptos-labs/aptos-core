@@ -100,6 +100,7 @@ impl VerifyCoordinator {
                 StateSnapshotRestoreOpt {
                     manifest_handle: backup.manifest,
                     version: backup.version,
+                    validate_modules: false,
                 },
                 global_opt.clone(),
                 Arc::clone(&self.storage),

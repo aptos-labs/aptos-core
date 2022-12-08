@@ -4,8 +4,8 @@
 use crate::error::QuorumStoreError;
 use crate::monitor;
 use anyhow::{format_err, Result};
+use aptos_consensus_types::{common::Round, request_response::ConsensusRequest};
 use aptos_infallible::Mutex;
-use consensus_types::{common::Round, request_response::ConsensusRequest};
 use futures::channel::{mpsc, mpsc::Sender, oneshot};
 use std::time::Duration;
 use tokio::time::timeout;

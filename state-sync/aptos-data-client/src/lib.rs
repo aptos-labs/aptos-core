@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{fmt, fmt::Display};
+use storage_service_types::responses::TransactionOrOutputListWithProof;
 use storage_service_types::{responses::CompleteDataRange, Epoch};
 use thiserror::Error;
 
@@ -102,6 +103,18 @@ pub trait AptosDataClient {
         request_timeout_ms: u64,
     ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
 
+    /// Fetches a new transaction or output list with proof. Versions start at
+    /// `known_version + 1` and `known_epoch` (inclusive). The end version
+    /// and proof version are specified by the server. If the data cannot be
+    /// fetched, an error is returned.
+    async fn get_new_transactions_or_outputs_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+
     /// Fetches the number of states at the specified version.
     async fn get_number_of_states(
         &self,
@@ -149,6 +162,21 @@ pub trait AptosDataClient {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> Result<Response<TransactionListWithProof>>;
+
+    /// Fetches a transaction or output list with proof, with data from
+    /// start to end versions (inclusive). The proof is relative to the
+    /// specified `proof_version`. If `include_events` is true, events are
+    /// included in the proof. In some cases, fewer data items may be returned
+    /// (e.g., to tolerate network or chunk limits). If the data cannot
+    /// be fetched, an error is returned.
+    async fn get_transactions_or_outputs_with_proof(
+        &self,
+        proof_version: Version,
+        start_version: Version,
+        end_version: Version,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> Result<Response<TransactionOrOutputListWithProof>>;
 }
 
 /// A response error that users of the Aptos Data Client can use to notify
@@ -271,11 +299,37 @@ impl From<(TransactionListWithProof, LedgerInfoWithSignatures)> for ResponsePayl
     }
 }
 
+impl TryFrom<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)> for ResponsePayload {
+    type Error = Error;
+
+    fn try_from(
+        inner: (TransactionOrOutputListWithProof, LedgerInfoWithSignatures),
+    ) -> Result<Self, Error> {
+        let ((transaction_list, output_list), ledger_info) = inner;
+        if let Some(transaction_list) = transaction_list {
+            Ok(Self::NewTransactionsWithProof((
+                transaction_list,
+                ledger_info,
+            )))
+        } else if let Some(output_list) = output_list {
+            Ok(Self::NewTransactionOutputsWithProof((
+                output_list,
+                ledger_info,
+            )))
+        } else {
+            Err(Error::InvalidResponse(
+                "Invalid response! No transaction or output list was returned!".into(),
+            ))
+        }
+    }
+}
+
 impl From<u64> for ResponsePayload {
     fn from(inner: u64) -> Self {
         Self::NumberOfStates(inner)
     }
 }
+
 impl From<TransactionOutputListWithProof> for ResponsePayload {
     fn from(inner: TransactionOutputListWithProof) -> Self {
         Self::TransactionOutputsWithProof(inner)
@@ -285,6 +339,23 @@ impl From<TransactionOutputListWithProof> for ResponsePayload {
 impl From<TransactionListWithProof> for ResponsePayload {
     fn from(inner: TransactionListWithProof) -> Self {
         Self::TransactionsWithProof(inner)
+    }
+}
+
+impl TryFrom<TransactionOrOutputListWithProof> for ResponsePayload {
+    type Error = Error;
+
+    fn try_from(inner: TransactionOrOutputListWithProof) -> Result<Self, Error> {
+        let (transaction_list, output_list) = inner;
+        if let Some(transaction_list) = transaction_list {
+            Ok(Self::TransactionsWithProof(transaction_list))
+        } else if let Some(output_list) = output_list {
+            Ok(Self::TransactionOutputsWithProof(output_list))
+        } else {
+            Err(Error::InvalidResponse(
+                "Invalid response! No transaction or output list was returned!".into(),
+            ))
+        }
     }
 }
 

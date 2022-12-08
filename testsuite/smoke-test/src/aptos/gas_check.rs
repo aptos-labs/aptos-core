@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use cached_packages::aptos_stdlib;
+use aptos_cached_packages::aptos_stdlib;
 use forge::Swarm;
 use std::time::Duration;
 

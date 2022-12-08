@@ -1,5 +1,5 @@
 [package]
-name = "bounded-executor"
+name = "aptos-bounded-executor"
 description = "Executor bounded by number of concurrent tasks"
 version = "0.1.0"
 

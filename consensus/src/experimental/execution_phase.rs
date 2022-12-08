@@ -3,9 +3,9 @@
 
 use crate::{experimental::pipeline_phase::StatelessPipeline, state_replication::StateComputer};
 use anyhow::Result;
+use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_crypto::HashValue;
 use async_trait::async_trait;
-use consensus_types::executed_block::ExecutedBlock;
 use executor_types::Error as ExecutionError;
 use std::{
     fmt::{Debug, Display, Formatter},

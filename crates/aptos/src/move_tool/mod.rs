@@ -597,7 +597,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
 
         // Send the compiled module and metadata using the code::publish_package_txn.
         let metadata = package.extract_metadata()?;
-        let payload = cached_packages::aptos_stdlib::code_publish_package_txn(
+        let payload = aptos_cached_packages::aptos_stdlib::code_publish_package_txn(
             bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
             compiled_units,
         );
@@ -606,7 +606,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include less artifacts via `--included_artifacts`. \
+                you may want to include less artifacts via `--included-artifacts`. \
                 You can also override this check with `--override-size-check",
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
@@ -689,7 +689,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         );
         prompt_yes_with_override(&message, txn_options.prompt_options)?;
 
-        let payload = cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
+        let payload = aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
             bcs::to_bytes(&seed)?,
             bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
             compiled_units,
@@ -699,7 +699,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include less artifacts via `--included_artifacts`. \
+                you may want to include less artifacts via `--included-artifacts`. \
                 You can also override this check with `--override-size-check",
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));

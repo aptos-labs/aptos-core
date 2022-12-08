@@ -6,12 +6,12 @@ use crate::common::types::{
 };
 use crate::common::utils::prompt_yes_with_override;
 use crate::node::{get_stake_pools, StakePoolType};
+use aptos_cached_packages::aptos_stdlib;
 use aptos_types::account_address::{
     create_vesting_contract_address, default_stake_pool_address, AccountAddress,
 };
 use aptos_types::vesting::VestingAdminStore;
 use async_trait::async_trait;
-use cached_packages::aptos_stdlib;
 use clap::Parser;
 
 /// Tool for manipulating stake and stake pools

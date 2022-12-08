@@ -15,12 +15,12 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-api-types = { workspace = true }
 aptos-config = { workspace = true }
+aptos-consensus = { workspace = true, features = ["fuzzing"] }
+aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
-consensus = { workspace = true, features = ["fuzzing"] }
-consensus-types = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 network = { workspace = true }
 rand = { workspace = true }

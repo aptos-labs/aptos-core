@@ -47,6 +47,7 @@ jobs:
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Login to ECR
         uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
@@ -65,3 +66,4 @@ jobs:
           PROFILE: ${{ env.PROFILE }}
           FEATURES: ${{ env.FEATURES }}
           BUILD_ADDL_TESTING_IMAGES: ${{ env.BUILD_ADDL_TESTING_IMAGES }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}

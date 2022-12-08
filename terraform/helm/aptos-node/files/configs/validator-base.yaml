@@ -19,7 +19,7 @@ consensus:
       type: "local"
     backend:
       type: "on_disk_storage"
-      path: /opt/aptos/data/secure-data.json
+      path: secure-data.json
       namespace: ~
     initial_safety_rules_config:
       from_file:
