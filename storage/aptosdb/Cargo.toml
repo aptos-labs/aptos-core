@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-accumulator = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-executor-types = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true }
 aptos-logger = { workspace = true }
@@ -32,7 +33,6 @@ arc-swap = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
-executor-types = { workspace = true }
 itertools = { workspace = true }
 lru = { workspace = true }
 move-core-types = { workspace = true }
@@ -49,11 +49,11 @@ storage-interface = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+aptos-executor-types = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true, features = ["fuzzing"] }
 aptos-proptest-helpers = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
-executor-types = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
@@ -62,4 +62,4 @@ scratchpad = { workspace = true, features = ["fuzzing"] }
 
 [features]
 default = []
-fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "executor-types/fuzzing", "schemadb/fuzzing", "scratchpad/fuzzing"]
+fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "aptos-executor-types/fuzzing", "schemadb/fuzzing", "scratchpad/fuzzing"]

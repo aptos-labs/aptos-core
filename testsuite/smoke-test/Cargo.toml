@@ -22,6 +22,8 @@ aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-debugger = { workspace = true }
 aptos-faucet = { workspace = true }
+aptos-forge = { workspace = true }
+aptos-framework = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
 aptos-global-constants = { workspace = true }
 aptos-indexer = { workspace = true }
@@ -36,8 +38,6 @@ aptos-vm = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 diesel = { workspace = true }
-forge = { workspace = true }
-framework = { workspace = true }
 hex = { workspace = true }
 move-core-types = { workspace = true }
 proptest = { workspace = true }

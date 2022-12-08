@@ -16,6 +16,9 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-executor = { workspace = true }
+aptos-executor-test-helpers = { workspace = true }
+aptos-executor-types = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true }
 aptos-logger = { workspace = true }
@@ -28,9 +31,6 @@ async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 clap = { workspace = true }
-executor = { workspace = true }
-executor-test-helpers = { workspace = true }
-executor-types = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
 move-binary-format = { workspace = true }
@@ -53,9 +53,9 @@ tokio-util = { workspace = true }
 [dev-dependencies]
 aptos-backup-service = { workspace = true }
 aptos-config = { workspace = true }
+aptos-executor-test-helpers = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptosdb = { workspace = true }
-executor-test-helpers = { workspace = true }
 proptest = { workspace = true }
 storage-interface = { workspace = true }
 warp = { workspace = true }

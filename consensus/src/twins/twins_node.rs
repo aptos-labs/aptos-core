@@ -18,6 +18,7 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_consensus_types::common::{Author, Round};
+use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -31,7 +32,6 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use network::{

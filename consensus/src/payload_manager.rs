@@ -9,11 +9,11 @@ use aptos_consensus_types::{
     request_response::PayloadRequest,
 };
 use aptos_crypto::HashValue;
+use aptos_executor_types::Error::DataNotFound;
+use aptos_executor_types::*;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, warn};
 use aptos_types::transaction::SignedTransaction;
-use executor_types::Error::DataNotFound;
-use executor_types::*;
 use futures::channel::mpsc::Sender;
 use futures::SinkExt;
 use tokio::sync::oneshot;
@@ -32,7 +32,7 @@ impl PayloadManager {
         batch_reader: &BatchReader,
     ) -> Vec<(
         HashValue,
-        oneshot::Receiver<Result<Vec<SignedTransaction>, executor_types::Error>>,
+        oneshot::Receiver<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
     )> {
         let mut receivers = Vec::new();
         for pos in proofs {

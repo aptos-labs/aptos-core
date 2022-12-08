@@ -238,15 +238,14 @@ aptos-consensus-notifications = { path = "state-sync/inter-component/consensus-n
 aptos-consensus-types = { path = "consensus/consensus-types" }
 aptos-crash-handler = { path = "crates/crash-handler" }
 aptos-data-streaming-service = { path = "state-sync/state-sync-v2/data-streaming-service" }
-event-notifications = { path = "state-sync/inter-component/event-notifications" }
-executor = { path = "execution/executor" }
-executor-test-helpers = { path = "execution/executor-test-helpers" }
-executor-types = { path = "execution/executor-types" }
-fallible = { path = "crates/fallible" }
-forge = { path = "testsuite/forge" }
-framework = { path = "aptos-move/framework" }
-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
-handlebars = "4.2.2"
+aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
+aptos-executor = { path = "execution/executor" }
+aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
+aptos-executor-types = { path = "execution/executor-types" }
+aptos-fallible = { path = "crates/fallible" }
+aptos-forge = { path = "testsuite/forge" }
+aptos-framework = { path = "aptos-move/framework" }
+aptos-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
 inspection-service = { path = "crates/inspection-service" }
 language-e2e-tests = { path = "aptos-move/e2e-tests" }
 mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
@@ -335,6 +334,7 @@ futures-util = "0.3.21"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
 goldenfile = "1.1.0"
+handlebars = "4.2.2"
 heck = "0.3.2"
 hex = "0.4.3"
 hkdf = "0.10.0"

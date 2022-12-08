@@ -5,12 +5,12 @@ use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
-use framework::natives::{
+use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     cryptography::ristretto255_point::NativeRistrettoPointContext,
     state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
 };
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_table_extension::NativeTableContext;

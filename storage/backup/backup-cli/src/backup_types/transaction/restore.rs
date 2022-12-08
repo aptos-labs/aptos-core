@@ -21,6 +21,8 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
+use aptos_executor::chunk_executor::ChunkExecutor;
+use aptos_executor_types::TransactionReplayer;
 use aptos_logger::prelude::*;
 use aptos_types::write_set::WriteSet;
 use aptos_types::{
@@ -32,8 +34,6 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use aptosdb::backup::restore_handler::RestoreHandler;
 use clap::Parser;
-use executor::chunk_executor::ChunkExecutor;
-use executor_types::TransactionReplayer;
 use futures::{
     future,
     future::TryFutureExt,

@@ -10,10 +10,10 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_config::config::NodeConfig;
+use aptos_forge::{get_highest_synced_version, LocalNode, Node, NodeExt, SwarmExt, Validator};
 use aptos_logger::prelude::*;
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
-use forge::{get_highest_synced_version, LocalNode, Node, NodeExt, SwarmExt, Validator};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use regex::Regex;
 use std::time::Instant;

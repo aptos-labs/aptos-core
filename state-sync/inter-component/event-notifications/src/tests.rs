@@ -7,6 +7,7 @@ use crate::{
     Error, EventNotificationListener, EventNotificationSender, EventSubscriptionService,
     ReconfigNotificationListener,
 };
+use aptos_executor_test_helpers::bootstrap_genesis;
 use aptos_infallible::RwLock;
 use aptos_types::{
     account_address::AccountAddress,
@@ -19,7 +20,6 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use claims::{assert_lt, assert_matches, assert_ok};
-use executor_test_helpers::bootstrap_genesis;
 use futures::{FutureExt, StreamExt};
 use move_core_types::language_storage::TypeTag;
 use serde::{Deserialize, Serialize};

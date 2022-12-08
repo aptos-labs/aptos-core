@@ -6,13 +6,13 @@ use crate::{
     test_utils::check_create_mint_transfer, workspace_builder, workspace_builder::workspace_root,
 };
 use aptos_crypto::ValidCryptoMaterialStringExt;
+use aptos_forge::Swarm;
 use aptos_gas::{AptosGasParameters, GasQuantity, InitialGasSchedule, ToOnChainGasSchedule};
 use aptos_release_builder::components::{
     feature_flags::{FeatureFlag, Features},
     gas::generate_gas_upgrade_proposal,
 };
 use aptos_temppath::TempPath;
-use forge::Swarm;
 use std::fs;
 use std::process::Command;
 

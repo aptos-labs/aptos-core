@@ -25,6 +25,10 @@ aptos-crash-handler = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-data-client = { workspace = true }
 aptos-data-streaming-service = { workspace = true }
+aptos-event-notifications = { workspace = true }
+aptos-executor = { workspace = true }
+aptos-executor-types = { workspace = true }
+aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-indexer = { workspace = true, optional = true }
 aptos-infallible = { workspace = true }
@@ -40,11 +44,7 @@ aptos-vm = { workspace = true }
 aptosdb = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
-event-notifications = { workspace = true }
-executor = { workspace = true }
-executor-types = { workspace = true }
 fail = { workspace = true }
-framework = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 inspection-service = { workspace = true }
@@ -66,6 +66,6 @@ jemallocator = { workspace = true }
 [features]
 default = []
 assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-cloneable"]
-failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
+failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
 indexer = ["aptos-indexer"]
 check-vm-features = []

@@ -10,6 +10,7 @@ use aptos_consensus_types::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
+use aptos_executor_types::StateComputeResult;
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
 use aptos_types::{
@@ -18,7 +19,6 @@ use aptos_types::{
     validator_verifier::random_validator_verifier,
     waypoint::Waypoint,
 };
-use executor_types::StateComputeResult;
 use safety_rules::{
     test_utils::{make_proposal_with_parent, make_proposal_with_qc},
     PersistentSafetyStorage, SafetyRulesManager,

@@ -21,6 +21,7 @@ aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-faucet = { workspace = true }
+aptos-framework = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-github-client = { workspace = true }
@@ -43,7 +44,6 @@ chrono = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }
 dirs = { workspace = true }
-framework = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }

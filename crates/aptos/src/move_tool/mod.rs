@@ -29,6 +29,10 @@ use crate::{
     },
     CliCommand, CliResult,
 };
+use aptos_framework::docgen::DocgenOptions;
+use aptos_framework::natives::code::UpgradePolicy;
+use aptos_framework::prover::ProverOptions;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
@@ -37,10 +41,6 @@ use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_types::transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
-use framework::docgen::DocgenOptions;
-use framework::natives::code::UpgradePolicy;
-use framework::prover::ProverOptions;
-use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
 use move_cli::base::test::UnitTestResult;
 use move_command_line_common::env::MOVE_HOME;

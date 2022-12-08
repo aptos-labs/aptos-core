@@ -10,11 +10,11 @@ use crate::{
     CliCommand,
 };
 use aptos_config::config::Token;
+use aptos_framework::ReleaseBundle;
 use aptos_genesis::config::Layout;
 use aptos_github_client::Client as GithubClient;
 use async_trait::async_trait;
 use clap::Parser;
-use framework::ReleaseBundle;
 use serde::{de::DeserializeOwned, Serialize};
 use std::path::Path;
 use std::{fmt::Debug, io::Read, path::PathBuf, str::FromStr};

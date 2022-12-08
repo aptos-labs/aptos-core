@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::helpers::make_module_natives;
-use gas_algebra_ext::{AbstractValueSize, InternalGasPerAbstractValueUnit};
+use aptos_gas_algebra_ext::{AbstractValueSize, InternalGasPerAbstractValueUnit};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};

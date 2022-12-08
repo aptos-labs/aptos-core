@@ -21,6 +21,7 @@ use crate::{
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
+use aptos_framework::ReleaseBundle;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
@@ -48,7 +49,6 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionId},
     AptosVM, VMExecutor, VMValidator,
 };
-use framework::ReleaseBundle;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,

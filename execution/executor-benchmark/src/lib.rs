@@ -22,8 +22,8 @@ use aptos_jellyfish_merkle::metrics::{
 use aptosdb::AptosDB;
 
 use crate::pipeline::Pipeline;
+use aptos_executor::block_executor::BlockExecutor;
 use aptos_vm::AptosVM;
-use executor::block_executor::BlockExecutor;
 use std::{fs, path::Path};
 use storage_interface::DbReaderWriter;
 

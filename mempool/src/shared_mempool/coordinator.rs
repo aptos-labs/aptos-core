@@ -18,10 +18,10 @@ use ::network::protocols::network::Event;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::common::TransactionSummary;
+use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::on_chain_config::OnChainConfigPayload;
-use event_notifications::ReconfigNotificationListener;
 use futures::{
     channel::mpsc,
     stream::{select_all, FuturesUnordered},

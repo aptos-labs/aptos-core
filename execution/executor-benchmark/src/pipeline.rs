@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{TransactionCommitter, TransactionExecutor};
+use aptos_executor::block_executor::BlockExecutor;
+use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
 use aptos_types::transaction::{Transaction, Version};
 use aptos_vm::AptosVM;
-use executor::block_executor::BlockExecutor;
-use executor_types::BlockExecutorTrait;
 use std::{
     sync::{mpsc, Arc},
     thread::JoinHandle,

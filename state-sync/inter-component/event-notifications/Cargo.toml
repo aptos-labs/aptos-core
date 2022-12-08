@@ -1,5 +1,5 @@
 [package]
-name = "event-notifications"
+name = "aptos-event-notifications"
 description = "The notification service offered by state sync for on-chain events"
 version = "0.1.0"
 
@@ -26,12 +26,12 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 aptos-crypto = { workspace = true }
+aptos-executor-test-helpers = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-vm = { workspace = true }
 aptosdb = { workspace = true }
 bcs = { workspace = true }
 claims = { workspace = true }
-executor-test-helpers = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 vm-genesis = { workspace = true }

@@ -14,6 +14,7 @@ use aptos_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
+use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_id_generator::U32IdGenerator;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::on_chain_config::OnChainConfigPayload;
@@ -23,7 +24,6 @@ use aptos_types::{
 };
 use channel::aptos_channel;
 use channel::message_queues::QueueStyle;
-use event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use futures::{channel::oneshot, SinkExt};
 use mempool_notifications::MempoolNotifier;
 use network::{

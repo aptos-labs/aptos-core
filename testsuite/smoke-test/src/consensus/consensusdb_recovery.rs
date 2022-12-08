@@ -6,7 +6,7 @@ use crate::{
     test_utils::{assert_balance, create_and_fund_account, transfer_coins},
 };
 use aptos_consensus::CONSENSUS_DB_NAME;
-use forge::{HealthCheckError, NodeExt, Swarm};
+use aptos_forge::{HealthCheckError, NodeExt, Swarm};
 use std::{
     fs,
     time::{Duration, Instant},

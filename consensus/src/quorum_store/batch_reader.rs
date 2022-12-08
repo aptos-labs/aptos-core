@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
+use aptos_executor_types::Error;
 use aptos_types::transaction::SignedTransaction;
-use executor_types::Error;
 use tokio::sync::oneshot;
 
 pub struct BatchReader {}

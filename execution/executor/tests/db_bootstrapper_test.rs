@@ -5,6 +5,14 @@
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_executor::{
+    block_executor::BlockExecutor,
+    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
+};
+use aptos_executor_test_helpers::{
+    bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
+};
+use aptos_executor_types::BlockExecutorTrait;
 use aptos_gas::LATEST_GAS_FEATURE_VERSION;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_temppath::TempPath;
@@ -29,14 +37,6 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use executor::{
-    block_executor::BlockExecutor,
-    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-};
-use executor_test_helpers::{
-    bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
-};
-use executor_types::BlockExecutorTrait;
 use move_core_types::{
     language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},

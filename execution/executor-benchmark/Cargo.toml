@@ -15,6 +15,8 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-executor = { workspace = true }
+aptos-executor-types = { workspace = true }
 aptos-genesis = { workspace = true, features = ["testing"] }
 aptos-infallible = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true }
@@ -27,8 +29,6 @@ aptos-vm = { workspace = true }
 aptosdb = { workspace = true }
 chrono = { workspace = true }
 criterion = { workspace = true }
-executor = { workspace = true }
-executor-types = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 num_cpus = { workspace = true }

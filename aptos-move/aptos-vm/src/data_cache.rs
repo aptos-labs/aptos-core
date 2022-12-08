@@ -6,6 +6,7 @@ use crate::{counters::CRITICAL_ERRORS, create_access_path, logging::AdapterLogSc
 #[allow(unused_imports)]
 use anyhow::format_err;
 use anyhow::Error;
+use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_logger::prelude::*;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
@@ -14,7 +15,6 @@ use aptos_types::{
     vm_status::StatusCode, write_set::WriteOp,
 };
 use fail::fail_point;
-use framework::natives::state_storage::StateStorageUsageResolver;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,

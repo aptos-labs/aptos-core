@@ -81,8 +81,8 @@ impl From<aptos_data_streaming_service::error::Error> for Error {
     }
 }
 
-impl From<event_notifications::Error> for Error {
-    fn from(error: event_notifications::Error) -> Self {
+impl From<aptos_event_notifications::Error> for Error {
+    fn from(error: aptos_event_notifications::Error) -> Self {
         Error::EventNotificationError(error.to_string())
     }
 }
