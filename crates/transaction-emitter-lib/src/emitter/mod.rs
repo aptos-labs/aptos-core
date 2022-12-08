@@ -142,7 +142,7 @@ impl Default for EmitJobRequest {
             transaction_mix: vec![(TransactionType::P2P, 1)],
             add_created_accounts_to_pool: true,
             max_account_working_set: 1_000_000,
-            txn_expiration_time_secs: 60,
+            txn_expiration_time_secs: 5 * 60 * 60,
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             prompt_before_spending: false,
@@ -274,7 +274,7 @@ impl EmitJobRequest {
                 // That's why we set wait_seconds conservativelly, to make sure all processing and
                 // client calls finish within that time.
 
-                let wait_seconds = self.txn_expiration_time_secs + 180;
+                let wait_seconds = 600;
                 // In case we set a very low TPS, we need to still be able to spread out
                 // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.

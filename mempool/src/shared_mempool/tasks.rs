@@ -11,7 +11,6 @@ use crate::{
         notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
         SharedMempoolNotification, SubmissionStatusBundle,
     },
-    thread_pool::IO_POOL,
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
@@ -25,12 +24,11 @@ use aptos_network::application::interface::NetworkInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
 use aptos_types::on_chain_config::OnChainConsensusConfig;
 use aptos_types::{
-    mempool_status::{MempoolStatus, MempoolStatusCode},
-    on_chain_config::OnChainConfigPayload,
+    mempool_status::MempoolStatusCode, on_chain_config::OnChainConfigPayload,
     transaction::SignedTransaction,
-    vm_status::DiscardedVMStatus,
 };
-use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
+use aptos_vm_validator::vm_validator::{self, get_account_sequence_number, TransactionValidation};
+
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use rayon::prelude::*;
 use std::{
@@ -235,6 +233,7 @@ pub(crate) fn update_ack_counter(
     }
 }
 
+#[cfg(feature = "no-validation")]
 /// Submits a list of SignedTransaction to the local mempool
 /// and returns a vector containing AdmissionControlStatus.
 pub(crate) fn process_incoming_transactions<V>(
@@ -245,6 +244,39 @@ pub(crate) fn process_incoming_transactions<V>(
 where
     V: TransactionValidation,
 {
+    use aptos_types::account_config::AccountSequenceInfo;
+
+    let mut statuses = vec![];
+    let mut mempool = smp.mempool.lock();
+    for transaction in transactions.into_iter() {
+        let mempool_status = mempool.add_txn(
+            transaction.clone(),
+            0,
+            AccountSequenceInfo::Sequential(0),
+            timeline_state,
+        );
+        statuses.push((transaction, (mempool_status, None)));
+    }
+    return statuses;
+}
+
+#[cfg(not(feature = "no-validation"))]
+/// Submits a list of SignedTransaction to the local mempool
+/// and returns a vector containing AdmissionControlStatus.
+pub(crate) fn process_incoming_transactions<V>(
+    smp: &SharedMempool<V>,
+    transactions: Vec<SignedTransaction>,
+    timeline_state: TimelineState,
+) -> Vec<SubmissionStatusBundle>
+where
+    V: TransactionValidation,
+{
+    use crate::thread_pool::IO_POOL;
+    use aptos_types::{mempool_status::MempoolStatus, vm_status::DiscardedVMStatus};
+    use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+    use storage_interface::state_view::LatestDbStateCheckpointView;
+    use vm_validator::vm_validator::get_account_sequence_number;
+
     let mut statuses = vec![];
 
     let start_storage_read = Instant::now();

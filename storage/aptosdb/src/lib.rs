@@ -15,6 +15,8 @@ pub mod test_helper;
 
 pub mod backup;
 pub mod errors;
+#[cfg(feature = "fake-persist")]
+pub mod fake_aptosdb;
 pub mod metrics;
 pub mod schema;
 pub mod state_restore;
@@ -1805,7 +1807,7 @@ impl GetRestoreHandler for Arc<AptosDB> {
     }
 }
 
-fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
+pub(crate) fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
 where
     F: FnOnce() -> Result<T>,
 {

@@ -75,3 +75,4 @@ tempfile = { workspace = true }
 default = []
 fuzzing = ["aptos-consensus-types/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-mempool/fuzzing", "aptos-types/fuzzing", "aptos-safety-rules/testing"]
 failpoints = ["fail/failpoints"]
+consensus-only = []

@@ -7,6 +7,7 @@ use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_executor_types::ExecutedChunk;
 use aptos_logger::{trace, warn};
+use aptos_state_view::{StateView, StateViewId};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     ExecutedTrees,
@@ -14,6 +15,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
+    write_set::WriteSet,
 };
 use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
@@ -24,7 +26,7 @@ pub struct ChunkOutput {
     /// Raw VM output.
     pub transaction_outputs: Vec<TransactionOutput>,
     /// Carries the frozen base state view, so all in-mem nodes involved won't drop before the
-    /// execution result is processed; as well as al the accounts touched during execution, together
+    /// execution result is processed; as well as all the accounts touched during execution, together
     /// with their proofs.
     pub state_cache: StateCache,
 }
@@ -34,7 +36,7 @@ impl ChunkOutput {
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<Self> {
-        let transaction_outputs = V::execute_block(transactions.clone(), &state_view)?;
+        let transaction_outputs = Self::execute_block::<V>(transactions.clone(), &state_view)?;
 
         // to print txn output for debugging, uncomment:
         // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
@@ -94,6 +96,36 @@ impl ChunkOutput {
         if !status.is_empty() {
             trace!("Execution status: {:?}", status);
         }
+    }
+
+    #[cfg(not(feature = "fake-execute"))]
+    fn execute_block<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: &CachedStateView,
+    ) -> Result<Vec<TransactionOutput>> {
+        Ok(V::execute_block(transactions, &state_view)?)
+    }
+
+    #[cfg(feature = "fake-execute")]
+    fn execute_block<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: &CachedStateView,
+    ) -> Result<Vec<TransactionOutput>> {
+        let transaction_outputs = match state_view.id() {
+            StateViewId::Miscellaneous => V::execute_block(transactions, &state_view)?,
+            _ => transactions
+                .iter()
+                .map(|_| {
+                    TransactionOutput::new(
+                        WriteSet::default(),
+                        Vec::new(),
+                        100,
+                        TransactionStatus::Keep(ExecutionStatus::Success),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        };
+        Ok(transaction_outputs)
     }
 }
 
