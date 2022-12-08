@@ -9,7 +9,7 @@ spec aptos_framework::chain_status {
     }
 
     spec schema RequiresIsOperating {
-        requires !is_operating();
+        requires is_operating();
     }
 
     spec assert_operating {
