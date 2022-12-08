@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::proof_of_store::ProofOfStore;
-use anyhow::Context;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
-use aptos_types::validator_verifier::{ValidatorVerifier, VerifyError};
+use aptos_types::validator_verifier::ValidatorVerifier;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use executor_types::Error;
 use rayon::prelude::*;
@@ -144,7 +143,11 @@ impl Payload {
                 }
                 Ok(())
             }
-            (_, _) => Err(VerifyError::WrongPayload).context("Failed to verify Payload"),
+            (_, _) => Err(anyhow::anyhow!(
+                "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
+                quorum_store_enabled,
+                self
+            )),
         }
     }
 }
@@ -167,7 +170,7 @@ impl fmt::Display for Payload {
 pub enum PayloadFilter {
     DirectMempool(Vec<TransactionSummary>),
     InQuorumStore(HashSet<HashValue>),
-    Empty, // TODO: consider removing it
+    Empty,
 }
 
 impl From<&Vec<&Payload>> for PayloadFilter {

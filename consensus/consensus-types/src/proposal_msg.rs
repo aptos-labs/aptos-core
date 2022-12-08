@@ -80,13 +80,11 @@ impl ProposalMsg {
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier, quorum_store_enabled: bool) -> Result<()> {
-        if self.proposal().payload().is_some() {
-            self.proposal()
-                .payload()
-                .unwrap()
-                .verify(validator, quorum_store_enabled)?;
-        }
-        self.proposal
+        self.proposal()
+            .payload()
+            .map_or(Ok(()), |p| p.verify(validator, quorum_store_enabled))?;
+
+        self.proposal()
             .validate_signature(validator)
             .map_err(|e| format_err!("{:?}", e))?;
         // if there is a timeout certificate, verify its signatures

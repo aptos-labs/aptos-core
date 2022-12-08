@@ -123,7 +123,7 @@ impl ProposalGenerator {
     pub fn new(
         author: Author,
         block_store: Arc<dyn BlockReader + Send + Sync>,
-        payload_manager: Arc<dyn PayloadClient>,
+        payload_client: Arc<dyn PayloadClient>,
         time_service: Arc<dyn TimeService>,
         max_block_txns: u64,
         max_block_bytes: u64,
@@ -134,7 +134,7 @@ impl ProposalGenerator {
         Self {
             author,
             block_store,
-            payload_client: payload_manager,
+            payload_client,
             time_service,
             max_block_txns,
             max_block_bytes,

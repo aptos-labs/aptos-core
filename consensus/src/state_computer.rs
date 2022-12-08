@@ -18,7 +18,6 @@ use aptos_types::{
     account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
-use arc_swap::ArcSwapOption;
 use consensus_notifications::ConsensusNotificationSender;
 use consensus_types::proof_of_store::LogicalTime;
 use consensus_types::{
@@ -50,7 +49,7 @@ pub struct ExecutionProxy {
     async_state_sync_notifier: channel::Sender<NotificationType>,
     validators: Mutex<Vec<AccountAddress>>,
     write_mutex: AsyncMutex<()>,
-    payload_manager: ArcSwapOption<PayloadManager>,
+    payload_manager: Mutex<Option<Arc<PayloadManager>>>,
 }
 
 impl ExecutionProxy {
@@ -75,7 +74,6 @@ impl ExecutionProxy {
                 callback();
             }
         });
-        channel::new::<CommitType>(10, &counters::PENDING_QUORUM_STORE_COMMIT_NOTIFICATION);
         Self {
             executor,
             txn_notifier,
@@ -83,7 +81,7 @@ impl ExecutionProxy {
             async_state_sync_notifier: tx,
             validators: Mutex::new(vec![]),
             write_mutex: AsyncMutex::new(()),
-            payload_manager: ArcSwapOption::from(None),
+            payload_manager: Mutex::new(None),
         }
     }
 }
@@ -109,13 +107,8 @@ impl StateComputer for ExecutionProxy {
             "Executing block",
         );
 
-        let txns = self
-            .payload_manager
-            .load()
-            .as_ref()
-            .unwrap()
-            .get_transactions(block)
-            .await?;
+        let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
+        let txns = payload_manager.get_transactions(block).await?;
 
         // TODO: figure out error handling for the prologue txn
         let executor = self.executor.clone();
@@ -163,6 +156,7 @@ impl StateComputer for ExecutionProxy {
         let mut latest_round: u64 = 0;
         let mut payloads = Vec::new();
 
+        let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
         for block in blocks {
             block_ids.push(block.id());
 
@@ -170,14 +164,7 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            debug!("QSE: getting data in commit, round {}", block.round());
-            let signed_txns = self
-                .payload_manager
-                .load()
-                .as_ref()
-                .unwrap()
-                .get_transactions(block.block())
-                .await?;
+            let signed_txns = payload_manager.get_transactions(block.block()).await?;
 
             txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
             reconfig_events.extend(block.reconfig_event());
@@ -214,10 +201,7 @@ impl StateComputer for ExecutionProxy {
         if skip_clean {
             return Ok(());
         }
-        self.payload_manager
-            .load()
-            .as_ref()
-            .unwrap()
+        payload_manager
             .notify_commit(LogicalTime::new(latest_epoch, latest_round), payloads)
             .await;
         Ok(())
@@ -233,8 +217,9 @@ impl StateComputer for ExecutionProxy {
 
         // This is to update QuorumStore with the latest known commit in the system,
         // so it can set batches expiration accordingly.
-        //Might be none if called from in recovery path.
-        if let Some(payload_manager) = self.payload_manager.load().as_ref() {
+        //Might be none if called in the recovery path.
+        let maybe_payload_manager = self.payload_manager.lock().as_ref().cloned();
+        if let Some(payload_manager) = maybe_payload_manager {
             payload_manager
                 .notify_commit(
                     LogicalTime::new(target.ledger_info().epoch(), target.ledger_info().round()),
@@ -271,6 +256,6 @@ impl StateComputer for ExecutionProxy {
             .verifier
             .get_ordered_account_addresses_iter()
             .collect();
-        self.payload_manager.swap(Some(payload_manager));
+        self.payload_manager.lock().replace(payload_manager);
     }
 }

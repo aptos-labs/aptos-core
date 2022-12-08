@@ -28,7 +28,6 @@ pub enum PayloadManager {
 
 impl PayloadManager {
     async fn request_transactions(
-        &self,
         proofs: Vec<ProofOfStore>,
         logical_time: LogicalTime,
         batch_reader: &BatchReader,
@@ -80,18 +79,21 @@ impl PayloadManager {
 
     /// Called from consensus to pre-fetch the transaction behind the batches in the block.
     pub async fn prefetch_payload_data(&self, block: &Block) {
+        let payload = match block.payload() {
+            Some(p) => p,
+            None => return,
+        };
         match self {
             PayloadManager::DirectMempool => {}
-            PayloadManager::InQuorumStore(batch_reader, _) => match block.payload().unwrap() {
+            PayloadManager::InQuorumStore(batch_reader, _) => match payload {
                 Payload::InQuorumStore(proof_with_status) => {
                     if proof_with_status.status.lock().is_none() {
-                        let receivers = self
-                            .request_transactions(
-                                proof_with_status.proofs.clone(),
-                                LogicalTime::new(block.epoch(), block.round()),
-                                batch_reader,
-                            )
-                            .await;
+                        let receivers = PayloadManager::request_transactions(
+                            proof_with_status.proofs.clone(),
+                            LogicalTime::new(block.epoch(), block.round()),
+                            batch_reader,
+                        )
+                        .await;
                         proof_with_status
                             .status
                             .lock()
@@ -108,85 +110,83 @@ impl PayloadManager {
     /// Extract transaction from a given block
     /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
     pub async fn get_transactions(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
-        if block.payload().is_none() {
-            return Ok(Vec::new());
-        }
+        let payload = match block.payload() {
+            Some(p) => p,
+            None => return Ok(Vec::new()),
+        };
 
-        match self {
-            PayloadManager::DirectMempool => match block.payload().unwrap() {
-                Payload::InQuorumStore(_) => unreachable!("should not use QuorumStore"),
-                Payload::DirectMempool(txns) => Ok(txns.clone()),
-            },
-            PayloadManager::InQuorumStore(batch_reader, _) => {
-                match block.payload().unwrap() {
-                    Payload::DirectMempool(_) => unreachable!("should use QuorumStore"),
-                    Payload::InQuorumStore(proof_with_data) => {
-                        let status = proof_with_data.status.lock().take();
-                        match status.expect("Should have been updated before") {
-                            DataStatus::Cached(data) => {
-                                proof_with_data
-                                    .status
-                                    .lock()
-                                    .replace(DataStatus::Cached(data.clone()));
-                                Ok(data)
-                            }
-                            DataStatus::Requested(receivers) => {
-                                let mut vec_ret = Vec::new();
-                                debug!("QSE: waiting for data on {} receivers", receivers.len());
-                                for (digest, rx) in receivers {
-                                    match rx.await {
-                                        Err(_) => {
-                                            // We probably advanced epoch already.
-                                            warn!("Oneshot channel to get a batch was dropped");
-                                            let new_receivers = self
-                                                .request_transactions(
-                                                    proof_with_data.proofs.clone(),
-                                                    LogicalTime::new(block.epoch(), block.round()),
-                                                    batch_reader,
-                                                )
-                                                .await;
-                                            // Could not get all data so requested again
-                                            proof_with_data
-                                                .status
-                                                .lock()
-                                                .replace(DataStatus::Requested(new_receivers));
-                                            return Err(DataNotFound(digest));
-                                        }
-                                        Ok(Ok(data)) => {
-                                            debug!("QSE: got data, len {}", data.len());
-                                            vec_ret.push(data);
-                                        }
-                                        Ok(Err(e)) => {
-                                            debug!("QS: got error from receiver {:?}", e);
-                                            let new_receivers = self
-                                                .request_transactions(
-                                                    proof_with_data.proofs.clone(),
-                                                    LogicalTime::new(block.epoch(), block.round()),
-                                                    batch_reader,
-                                                )
-                                                .await;
-                                            // Could not get all data so requested again
-                                            proof_with_data
-                                                .status
-                                                .lock()
-                                                .replace(DataStatus::Requested(new_receivers));
-                                            return Err(e);
-                                        }
-                                    }
+        match (self, payload) {
+            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => Ok(txns.clone()),
+            (
+                PayloadManager::InQuorumStore(batch_reader, _),
+                Payload::InQuorumStore(proof_with_data),
+            ) => {
+                let status = proof_with_data.status.lock().take();
+                match status.expect("Should have been updated before.") {
+                    DataStatus::Cached(data) => {
+                        proof_with_data
+                            .status
+                            .lock()
+                            .replace(DataStatus::Cached(data.clone()));
+                        Ok(data)
+                    }
+                    DataStatus::Requested(receivers) => {
+                        let mut vec_ret = Vec::new();
+                        debug!("QSE: waiting for data on {} receivers", receivers.len());
+                        for (digest, rx) in receivers {
+                            match rx.await {
+                                Err(e) => {
+                                    // We probably advanced epoch already.
+                                    warn!("Oneshot channel to get a batch was dropped with error {:?}", e);
+                                    let new_receivers = PayloadManager::request_transactions(
+                                        proof_with_data.proofs.clone(),
+                                        LogicalTime::new(block.epoch(), block.round()),
+                                        batch_reader,
+                                    )
+                                    .await;
+                                    // Could not get all data so requested again
+                                    proof_with_data
+                                        .status
+                                        .lock()
+                                        .replace(DataStatus::Requested(new_receivers));
+                                    return Err(DataNotFound(digest));
                                 }
-                                let ret: Vec<SignedTransaction> =
-                                    vec_ret.into_iter().flatten().collect();
-                                // execution asks for the data twice, so data is cached here for the second time.
-                                proof_with_data
-                                    .status
-                                    .lock()
-                                    .replace(DataStatus::Cached(ret.clone()));
-                                Ok(ret)
+                                Ok(Ok(data)) => {
+                                    vec_ret.push(data);
+                                }
+                                Ok(Err(e)) => {
+                                    let new_receivers = PayloadManager::request_transactions(
+                                        proof_with_data.proofs.clone(),
+                                        LogicalTime::new(block.epoch(), block.round()),
+                                        batch_reader,
+                                    )
+                                    .await;
+                                    // Could not get all data so requested again
+                                    proof_with_data
+                                        .status
+                                        .lock()
+                                        .replace(DataStatus::Requested(new_receivers));
+                                    return Err(e);
+                                }
                             }
                         }
+                        let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
+                        // execution asks for the data twice, so data is cached here for the second time.
+                        proof_with_data
+                            .status
+                            .lock()
+                            .replace(DataStatus::Cached(ret.clone()));
+                        Ok(ret)
                     }
                 }
             }
+            (_, _) => unreachable!(
+                "Wrong payload {} epoch {}, round {}, id {}",
+                payload,
+                block.block_data().epoch(),
+                block.block_data().round(),
+                block.id()
+            ),
         }
     }
 }

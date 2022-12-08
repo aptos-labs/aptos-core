@@ -55,8 +55,6 @@ pub enum VerifyError {
     InvalidBitVec,
     #[error("Failed to verify aggreagated signature")]
     FailedToVerifyAggregatedSignature,
-    #[error("Wrong payload type")]
-    WrongPayload, // TODO: consider moving somewhere else.
 }
 
 /// Helper struct to manage validator information for validation
