@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    commit_notifier::QuorumStoreCommitNotifier,
     counters,
     epoch_manager::EpochManager,
     experimental::buffer_manager::OrderedBlocks,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
     network_tests::{NetworkPlayground, TwinId},
+    payload_manager::PayloadManager,
     test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,
 };
@@ -95,7 +95,7 @@ impl SMRNode {
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
         };
-        let commit_notifier = Arc::new(QuorumStoreCommitNotifier::new(1_000));
+        let _commit_notifier = Arc::from(PayloadManager::DirectMempool);
         let mut configs = HashMap::new();
         configs.insert(
             ValidatorSet::CONFIG_ID,
@@ -145,7 +145,6 @@ impl SMRNode {
             state_computer.clone(),
             storage.clone(),
             reconfig_listener,
-            commit_notifier,
         );
         let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
 

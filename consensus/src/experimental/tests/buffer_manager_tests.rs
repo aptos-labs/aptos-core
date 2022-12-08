@@ -205,7 +205,9 @@ async fn loopback_commit_vote(
             if matches!(msg, ConsensusMsg::CommitVoteMsg(_)) {
                 let event: UnverifiedEvent = msg.into();
                 // verify the message and send the message into self loop
-                msg_tx.push(author, event.verify(verifier).unwrap()).ok();
+                msg_tx
+                    .push(author, event.verify(verifier, false).unwrap())
+                    .ok();
             }
         }
         _ => {

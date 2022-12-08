@@ -20,7 +20,7 @@ mod mock_payload_manager;
 mod mock_state_computer;
 mod mock_storage;
 
-use crate::util::mock_time_service::SimulatedTimeService;
+use crate::{payload_manager::PayloadManager, util::mock_time_service::SimulatedTimeService};
 use aptos_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
 use aptos_types::block_info::BlockInfo;
 pub use mock_payload_manager::MockPayloadManager;
@@ -74,6 +74,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
+        Arc::from(PayloadManager::DirectMempool),
     ))
 }
 
@@ -135,7 +136,7 @@ impl TreeInserter {
                 parent_qc,
                 parent.timestamp_usecs() + 1,
                 round,
-                Payload::empty(),
+                Payload::empty(false),
                 vec![],
             ))
             .await

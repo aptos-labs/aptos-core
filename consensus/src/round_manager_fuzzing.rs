@@ -11,6 +11,7 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     network::NetworkSender,
     network_interface::ConsensusNetworkSender,
+    payload_manager::PayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     round_manager::RoundManager,
     test_utils::{EmptyStateComputer, MockPayloadManager, MockStorage},
@@ -76,6 +77,7 @@ fn build_empty_store(
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
+        Arc::from(PayloadManager::DirectMempool),
     ))
 }
 
@@ -152,6 +154,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         1024,
         10,
         ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
 
     //
