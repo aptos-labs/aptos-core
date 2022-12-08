@@ -117,6 +117,7 @@ impl VerifyCoordinator {
             txn_manifests,
             None, /* replay_from_version */
             Some(epoch_history),
+            vec![],
         )
         .run()
         .await?;

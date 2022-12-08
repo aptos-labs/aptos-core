@@ -22,6 +22,13 @@ Provides the configuration for staking and rewards
 -  [Function `validate_required_stake`](#0x1_staking_config_validate_required_stake)
 -  [Specification](#@Specification_1)
     -  [Resource `StakingConfig`](#@Specification_1_StakingConfig)
+    -  [Function `initialize`](#@Specification_1_initialize)
+    -  [Function `get`](#@Specification_1_get)
+    -  [Function `update_required_stake`](#@Specification_1_update_required_stake)
+    -  [Function `update_recurring_lockup_duration_secs`](#@Specification_1_update_recurring_lockup_duration_secs)
+    -  [Function `update_rewards_rate`](#@Specification_1_update_rewards_rate)
+    -  [Function `update_voting_power_increase_limit`](#@Specification_1_update_voting_power_increase_limit)
+    -  [Function `validate_required_stake`](#@Specification_1_validate_required_stake)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -554,6 +561,8 @@ Can only be called as part of the Aptos governance proposal process established 
 
 
 <pre><code><b>invariant</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+<b>pragma</b> verify = ture;
+<b>pragma</b> aborts_if_is_strict;
 </code></pre>
 
 
@@ -618,6 +627,162 @@ Can only be called as part of the Aptos governance proposal process established 
 <pre><code><b>invariant</b> rewards_rate &lt;= <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
 <b>invariant</b> rewards_rate_denominator &gt; 0;
 <b>invariant</b> rewards_rate &lt;= rewards_rate_denominator;
+</code></pre>
+
+
+
+<a name="@Specification_1_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="staking_config.md#0x1_staking_config_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, allow_validator_set_change: bool, rewards_rate: u64, rewards_rate_denominator: u64, voting_power_increase_limit: u64)
+</code></pre>
+
+
+Caller must be @aptos_framework.
+The maximum_stake must be greater than maximum_stake in the range of Specified stake and the maximum_stake greater than zero.
+The rewards_rate_denominator must greater than zero.
+Only this %0-%50 of current total voting power is allowed to join the validator set in each epoch.
+The <code>rewards_rate</code> which is the numerator is limited to be <code>&lt;= <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a></code> in order to avoid the arithmetic overflow in the rewards calculation.
+rewards_rate/rewards_rate_denominator <= 1.
+StakingConfig does not exist under the aptos_framework before creating it.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> minimum_stake &gt; maximum_stake || maximum_stake &lt;= 0;
+<b>aborts_if</b> recurring_lockup_duration_secs &lt;= 0;
+<b>aborts_if</b> rewards_rate_denominator &lt;= 0;
+<b>aborts_if</b> voting_power_increase_limit &lt;= 0 || voting_power_increase_limit &gt; 50;
+<b>aborts_if</b> rewards_rate &gt; <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
+<b>aborts_if</b> rewards_rate &gt; rewards_rate_denominator;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(addr);
+</code></pre>
+
+
+
+<a name="@Specification_1_get"></a>
+
+### Function `get`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_get">get</a>(): <a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_update_required_stake"></a>
+
+### Function `update_required_stake`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_required_stake">update_required_stake</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, minimum_stake: u64, maximum_stake: u64)
+</code></pre>
+
+
+Caller must be @aptos_framework.
+The maximum_stake must be greater than maximum_stake in the range of Specified stake and the maximum_stake greater than zero.
+The StakingConfig is under @aptos_framework.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> minimum_stake &gt; maximum_stake || maximum_stake &lt;= 0;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_update_recurring_lockup_duration_secs"></a>
+
+### Function `update_recurring_lockup_duration_secs`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_recurring_lockup_duration_secs">update_recurring_lockup_duration_secs</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_recurring_lockup_duration_secs: u64)
+</code></pre>
+
+
+Caller must be @aptos_framework.
+The new_recurring_lockup_duration_secs must greater than zero.
+The StakingConfig is under @aptos_framework.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> new_recurring_lockup_duration_secs &lt;= 0;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_update_rewards_rate"></a>
+
+### Function `update_rewards_rate`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_rewards_rate">update_rewards_rate</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_rewards_rate: u64, new_rewards_rate_denominator: u64)
+</code></pre>
+
+
+Caller must be @aptos_framework.
+The new_rewards_rate_denominator must greater than zero.
+The StakingConfig is under @aptos_framework.
+The <code>rewards_rate</code> which is the numerator is limited to be <code>&lt;= <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a></code> in order to avoid the arithmetic overflow in the rewards calculation.
+rewards_rate/rewards_rate_denominator <= 1.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> new_rewards_rate_denominator &lt;= 0;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+<b>aborts_if</b> new_rewards_rate &gt; <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
+<b>aborts_if</b> new_rewards_rate &gt; new_rewards_rate_denominator;
+</code></pre>
+
+
+
+<a name="@Specification_1_update_voting_power_increase_limit"></a>
+
+### Function `update_voting_power_increase_limit`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_voting_power_increase_limit">update_voting_power_increase_limit</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_voting_power_increase_limit: u64)
+</code></pre>
+
+
+Caller must be @aptos_framework.
+Only this %0-%50 of current total voting power is allowed to join the validator set in each epoch.
+The StakingConfig is under @aptos_framework.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> new_voting_power_increase_limit &lt;= 0 || new_voting_power_increase_limit &gt; 50;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_validate_required_stake"></a>
+
+### Function `validate_required_stake`
+
+
+<pre><code><b>fun</b> <a href="staking_config.md#0x1_staking_config_validate_required_stake">validate_required_stake</a>(minimum_stake: u64, maximum_stake: u64)
+</code></pre>
+
+
+The maximum_stake must be greater than maximum_stake in the range of Specified stake and the maximum_stake greater than zero.
+
+
+<pre><code><b>aborts_if</b> minimum_stake &gt; maximum_stake || maximum_stake &lt;= 0;
 </code></pre>
 
 
