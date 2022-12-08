@@ -92,13 +92,11 @@ impl SignedDigest {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct ProofOfStore {
     info: SignedDigestInfo,
     multi_signature: AggregateSignature,
 }
 
-#[allow(dead_code)]
 impl ProofOfStore {
     pub fn new(info: SignedDigestInfo, multi_signature: AggregateSignature) -> Self {
         Self {
