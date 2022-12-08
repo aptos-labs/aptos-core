@@ -17,6 +17,8 @@ A module for generating globally unique identifiers
 -  [Function `creation_num`](#0x1_guid_creation_num)
 -  [Function `id_creation_num`](#0x1_guid_id_creation_num)
 -  [Function `eq_id`](#0x1_guid_eq_id)
+-  [Specification](#@Specification_1)
+    -  [Function `create`](#@Specification_1_create)
 
 
 <pre><code></code></pre>
@@ -306,6 +308,33 @@ Return true if the GUID's ID is <code>id</code>
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_strict;
+</code></pre>
+
+
+
+<a name="@Specification_1_create"></a>
+
+### Function `create`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="guid.md#0x1_guid_create">create</a>(addr: <b>address</b>, creation_num_ref: &<b>mut</b> u64): <a href="guid.md#0x1_guid_GUID">guid::GUID</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> creation_num_ref + 1 &gt; MAX_U64;
+<b>ensures</b> result.id.creation_num == <b>old</b>(creation_num_ref);
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html

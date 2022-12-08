@@ -234,7 +234,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
 </code></pre>
 
 
@@ -251,6 +251,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator">aggregator</a>.limit + value &gt; MAX_U128;
 </code></pre>
 
 
@@ -267,6 +268,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator">aggregator</a>.limit - value &lt; 0;
 </code></pre>
 
 
@@ -299,6 +301,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
