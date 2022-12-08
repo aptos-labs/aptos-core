@@ -3,7 +3,7 @@
 
 use move_core_types::gas_algebra::{GasQuantity, InternalGasUnit, UnitDiv};
 
-pub use gas_algebra_ext::{
+pub use aptos_gas_algebra_ext::{
     AbstractValueSize, AbstractValueSizePerArg, AbstractValueUnit, InternalGasPerAbstractValueUnit,
 };
 

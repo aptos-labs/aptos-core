@@ -9,6 +9,7 @@ use crate::{
 use aptos_types::ledger_info::generate_ledger_info_with_sig;
 
 use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
+use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -17,7 +18,6 @@ use aptos_types::{
     proof::accumulator::InMemoryAccumulator,
     proptest_types::{AccountInfoUniverse, BlockGen},
 };
-use executor_types::ProofReader;
 use proptest::sample::Index;
 use proptest::{collection::vec, prelude::*};
 use scratchpad::SparseMerkleTree;

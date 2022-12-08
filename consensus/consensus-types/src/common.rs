@@ -3,10 +3,10 @@
 
 use crate::proof_of_store::ProofOfStore;
 use aptos_crypto::HashValue;
+use aptos_executor_types::Error;
 use aptos_infallible::Mutex;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
-use executor_types::Error;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;

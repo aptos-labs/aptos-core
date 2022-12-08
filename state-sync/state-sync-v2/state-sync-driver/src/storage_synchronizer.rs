@@ -13,6 +13,8 @@ use crate::{
 };
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_data_streaming_service::data_notification::NotificationId;
+use aptos_event_notifications::EventSubscriptionService;
+use aptos_executor_types::ChunkExecutorTrait;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::state_store::state_key::StateKey;
@@ -26,8 +28,6 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
-use event_notifications::EventSubscriptionService;
-use executor_types::ChunkExecutorTrait;
 use futures::channel::mpsc::UnboundedSender;
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use mempool_notifications::MempoolNotificationSender;

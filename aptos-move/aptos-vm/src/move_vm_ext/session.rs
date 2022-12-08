@@ -12,16 +12,16 @@ use aptos_aggregator::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_framework::natives::{
+    aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
+    code::{NativeCodeContext, PublishRequest},
+};
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{ChangeSet, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
-};
-use framework::natives::{
-    aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
-    code::{NativeCodeContext, PublishRequest},
 };
 use move_binary_format::errors::{Location, VMResult};
 use move_core_types::{

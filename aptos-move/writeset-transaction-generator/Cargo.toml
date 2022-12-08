@@ -17,12 +17,12 @@ anyhow = { workspace = true }
 aptos-cached-packages =  { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-framework =  { workspace = true }
 aptos-gas = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
-framework =  { workspace = true }
 handlebars = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler = { workspace = true }

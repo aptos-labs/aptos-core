@@ -34,12 +34,12 @@ use aptos_types::{
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 
+use aptos_event_notifications::EventSubscriptionService;
+use aptos_executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
+use aptos_framework::ReleaseBundle;
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use clap::Parser;
-use event_notifications::EventSubscriptionService;
-use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
-use framework::ReleaseBundle;
 use futures::channel::mpsc;
 use hex::FromHex;
 use log_build_information::log_build_information;

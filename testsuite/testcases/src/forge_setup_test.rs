@@ -3,8 +3,8 @@
 
 use std::thread;
 
+use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
 use aptos_logger::info;
-use forge::{NetworkContext, NetworkTest, Result, Test};
 use rand::{
     rngs::{OsRng, StdRng},
     seq::IteratorRandom,

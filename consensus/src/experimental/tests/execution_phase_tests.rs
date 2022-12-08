@@ -17,8 +17,8 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
+use aptos_executor_types::{Error, StateComputeResult};
 use aptos_types::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
-use executor_types::{Error, StateComputeResult};
 use std::sync::Arc;
 
 pub fn prepare_execution_phase() -> (HashValue, ExecutionPhase) {

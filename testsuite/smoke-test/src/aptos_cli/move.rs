@@ -4,8 +4,8 @@
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos::move_tool::MemberId;
 use aptos::test::CliTestFramework;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_logger::info;
-use framework::{BuildOptions, BuiltPackage};
 use move_core_types::account_address::AccountAddress;
 use move_package::source_package::manifest_parser::parse_move_manifest_from_file;
 use std::collections::BTreeMap;

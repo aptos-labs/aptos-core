@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
+use aptos_framework::natives::code::{PackageRegistry, UpgradePolicy};
 use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_types::on_chain_config::FeatureFlag;
-use framework::natives::code::{PackageRegistry, UpgradePolicy};
 use move_core_types::parser::parse_struct_tag;
 use move_core_types::vm_status::StatusCode;
 use package_builder::PackageBuilder;
@@ -220,9 +220,9 @@ fn code_publishing_using_resource_account() {
         &format!("module 0x{}::m {{ public fun f() {{}} }}", module_address),
     );
     let pack_dir = pack.write_to_temp().unwrap();
-    let package = framework::BuiltPackage::build(
+    let package = aptos_framework::BuiltPackage::build(
         pack_dir.path().to_owned(),
-        framework::BuildOptions::default(),
+        aptos_framework::BuildOptions::default(),
     )
     .expect("building package must succeed");
 

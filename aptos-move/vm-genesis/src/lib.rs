@@ -11,6 +11,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue, PrivateKey, Uniform,
 };
+use aptos_framework::{ReleaseBundle, ReleasePackage};
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, InitialGasSchedule, NativeGasParameters,
     ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
@@ -28,7 +29,6 @@ use aptos_vm::{
     data_cache::{IntoMoveResolver, StateViewCache},
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use framework::{ReleaseBundle, ReleasePackage};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -642,10 +642,10 @@ pub fn generate_genesis_change_set_for_testing_with_count(
 ) -> ChangeSet {
     let framework = match genesis_options {
         GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
-        GenesisOptions::Testnet => framework::testnet_release_bundle(),
+        GenesisOptions::Testnet => aptos_framework::testnet_release_bundle(),
         GenesisOptions::Mainnet => {
             // We don't yet have mainnet, so returning testnet here
-            framework::testnet_release_bundle()
+            aptos_framework::testnet_release_bundle()
         }
     };
 
@@ -656,9 +656,9 @@ pub fn generate_genesis_change_set_for_testing_with_count(
 pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
     let framework = match genesis_options {
         GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
-        GenesisOptions::Testnet => framework::testnet_release_bundle(),
+        GenesisOptions::Testnet => aptos_framework::testnet_release_bundle(),
         // We don't yet have mainnet, so returning testnet here
-        GenesisOptions::Mainnet => framework::testnet_release_bundle(),
+        GenesisOptions::Mainnet => aptos_framework::testnet_release_bundle(),
     };
 
     generate_mainnet_genesis(framework, Some(1)).0

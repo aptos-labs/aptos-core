@@ -8,6 +8,7 @@ use crate::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::HashValue;
+use aptos_executor_types::StateComputeResult;
 use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     account_address::AccountAddress,
@@ -15,7 +16,6 @@ use aptos_types::{
     contract_event::ContractEvent,
     transaction::{Transaction, TransactionStatus},
 };
-use executor_types::StateComputeResult;
 use std::fmt::{Debug, Display, Formatter};
 
 /// ExecutedBlocks are managed in a speculative tree, the committed blocks form a chain. Besides

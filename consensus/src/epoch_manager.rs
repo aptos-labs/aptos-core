@@ -46,6 +46,7 @@ use aptos_consensus_types::{
     epoch_retrieval::EpochRetrievalRequest,
     request_response::PayloadRequest,
 };
+use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -60,7 +61,6 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use channel::{aptos_channel, message_queues::QueueStyle};
-use event_notifications::ReconfigNotificationListener;
 use fail::fail_point;
 use futures::{
     channel::{

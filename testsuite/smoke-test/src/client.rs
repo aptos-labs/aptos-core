@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use aptos_cached_packages::aptos_stdlib;
-use forge::{NodeExt, Swarm};
+use aptos_forge::{NodeExt, Swarm};
 use std::time::{Duration, Instant};
 
 #[tokio::test]

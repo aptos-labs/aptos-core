@@ -19,6 +19,8 @@ aptos-api-types = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-executor = { workspace = true }
+aptos-executor-types = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
 aptos-sdk = { workspace = true }
@@ -27,8 +29,6 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptosdb = { workspace = true, features = ["fuzzing"] }
 bytes = { workspace = true }
-executor = { workspace = true }
-executor-types = { workspace = true }
 goldenfile = { workspace = true }
 hyper = { workspace = true }
 mempool-notifications = { workspace = true }

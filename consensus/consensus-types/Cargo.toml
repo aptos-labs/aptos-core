@@ -17,10 +17,10 @@ anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-executor-types = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
-executor-types = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
 mirai-annotations = { workspace = true }

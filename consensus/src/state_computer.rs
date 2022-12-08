@@ -19,13 +19,13 @@ use aptos_consensus_types::{
     proof_of_store::LogicalTime,
 };
 use aptos_crypto::HashValue;
+use aptos_executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
-use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
 use std::cmp::max;

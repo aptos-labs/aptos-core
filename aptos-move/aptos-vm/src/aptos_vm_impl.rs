@@ -11,6 +11,7 @@ use crate::{
     transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::transaction::TransactionOutputExt;
+use aptos_framework::{RuntimeModuleMetadata, APTOS_METADATA_KEY};
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, FromOnChainGasSchedule, Gas,
     NativeGasParameters, StorageGasParameters,
@@ -31,7 +32,6 @@ use aptos_types::{
 };
 use dashmap::DashMap;
 use fail::fail_point;
-use framework::{RuntimeModuleMetadata, APTOS_METADATA_KEY};
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     language_storage::ModuleId,

@@ -31,7 +31,7 @@ impl TestValidator {
         let _db_path = aptos_temppath::TempPath::new();
         _db_path.create_as_dir().unwrap();
         let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(_db_path.path()));
-        executor_test_helpers::bootstrap_genesis::<AptosVM>(
+        aptos_executor_test_helpers::bootstrap_genesis::<AptosVM>(
             &db_rw,
             &vm_genesis::test_genesis_transaction(),
         )

@@ -3,12 +3,12 @@
 
 use crate::generate_traffic;
 use anyhow::bail;
-use aptos_logger::info;
-use aptos_sdk::move_types::account_address::AccountAddress;
-use forge::{
+use aptos_forge::{
     get_highest_synced_epoch, get_highest_synced_version, NetworkContext, NetworkTest, Result,
     SwarmExt, Test,
 };
+use aptos_logger::info;
+use aptos_sdk::move_types::account_address::AccountAddress;
 use std::time::Instant;
 use tokio::{runtime::Runtime, time::Duration};
 

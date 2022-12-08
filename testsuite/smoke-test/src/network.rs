@@ -10,10 +10,10 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_crypto::{x25519, x25519::PrivateKey};
+use aptos_forge::{FullNode, NodeExt, Swarm};
 use aptos_genesis::config::HostAndPort;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_temppath::TempPath;
-use forge::{FullNode, NodeExt, Swarm};
 use std::{
     collections::HashMap,
     path::Path,

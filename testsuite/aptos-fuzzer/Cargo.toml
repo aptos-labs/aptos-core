@@ -18,6 +18,8 @@ aptos-accumulator = { workspace = true, features = ["fuzzing"] }
 aptos-consensus = { workspace = true, features = ["fuzzing"] }
 aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
+aptos-executor = { workspace = true, features = ["fuzzing"] }
+aptos-executor-types = { workspace = true, features = ["fuzzing"] }
 aptos-jellyfish-merkle = { workspace = true, features = ["fuzzing"] }
 aptos-mempool = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
@@ -26,8 +28,6 @@ aptos-vault-client = { workspace = true, features = ["fuzzing"] }
 aptosdb = { workspace = true, features = ["fuzzing"] }
 bcs = { workspace = true }
 byteorder = { workspace = true }
-executor = { workspace = true, features = ["fuzzing"] }
-executor-types = { workspace = true, features = ["fuzzing"] }
 hex = { workspace = true }
 language-e2e-tests = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
