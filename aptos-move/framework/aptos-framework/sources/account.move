@@ -60,7 +60,7 @@ module aptos_framework::account {
         originator: address,
         // originating address
         current_auth_key: address,
-        // current auth key
+        /// current auth key
         new_public_key: vector<u8>,
     }
 
