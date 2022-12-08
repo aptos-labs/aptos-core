@@ -15,6 +15,7 @@ Maintains the version number for the blockchain.
 -  [Specification](#@Specification_1)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `set_version`](#@Specification_1_set_version)
+    -  [Function `initialize_for_test`](#@Specification_1_initialize_for_test)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -250,6 +251,23 @@ Abort if resource already exists in <code>@aptos_framwork</code> when initializi
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);
 <b>let</b> old_major = <b>global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major;
 <b>aborts_if</b> !(old_major &lt; major);
+</code></pre>
+
+
+
+<a name="@Specification_1_initialize_for_test"></a>
+
+### Function `initialize_for_test`
+
+
+<pre><code><b>fun</b> <a href="version.md#0x1_version_initialize_for_test">initialize_for_test</a>(core_resources: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+This module turns on <code>aborts_if_is_strict</code>, so need to add spec for test function <code>initialize_for_test</code>.
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
