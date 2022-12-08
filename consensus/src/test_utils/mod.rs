@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::block_storage::{BlockReader, BlockStore};
-use aptos_crypto::HashValue;
-use aptos_logger::Level;
-use aptos_types::{ledger_info::LedgerInfo, validator_signer::ValidatorSigner};
-use consensus_types::{
+use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::{Author, Round},
     executed_block::ExecutedBlock,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
 };
+use aptos_crypto::HashValue;
+use aptos_logger::Level;
+use aptos_types::{ledger_info::LedgerInfo, validator_signer::ValidatorSigner};
 use std::{future::Future, sync::Arc, time::Duration};
 use tokio::{runtime, time::timeout};
 
@@ -21,8 +21,8 @@ mod mock_state_computer;
 mod mock_storage;
 
 use crate::util::mock_time_service::SimulatedTimeService;
+use aptos_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
 use aptos_types::block_info::BlockInfo;
-use consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
 pub use mock_payload_manager::MockPayloadManager;
 pub use mock_state_computer::{
     EmptyStateComputer, MockStateComputer, RandomComputeResultStateComputer,

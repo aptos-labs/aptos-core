@@ -11,10 +11,10 @@ use crate::{
     workspace_builder::workspace_root,
 };
 use anyhow::{bail, Result};
+use aptos_backup_cli::metadata::view::BackupStorageState;
 use aptos_logger::info;
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
-use backup_cli::metadata::view::BackupStorageState;
 use forge::{reconfig, NodeExt, Swarm, SwarmExt};
 use std::{
     fs,

@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 02 December 2022
+
+- Distributed a survey asking how we can make the Aptos developer experience better: https://aptos.typeform.com/dev-survey
+
 ## 29 November 2022
 
 - Increased rate limits of https://indexer.mainnet.aptoslabs.com and https://fullnode.mainnet.aptoslabs.com to 1000 requests/5-minute interval by IP.

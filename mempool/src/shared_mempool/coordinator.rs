@@ -15,12 +15,12 @@ use crate::{
     MempoolEventsReceiver, QuorumStoreRequest,
 };
 use ::network::protocols::network::Event;
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_consensus_types::common::TransactionSummary;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::on_chain_config::OnChainConfigPayload;
-use bounded_executor::BoundedExecutor;
-use consensus_types::common::TransactionSummary;
 use event_notifications::ReconfigNotificationListener;
 use futures::{
     channel::mpsc,

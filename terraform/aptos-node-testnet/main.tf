@@ -19,6 +19,8 @@ locals {
 module "validator" {
   source = "../aptos-node/aws"
 
+  manage_via_tf = var.manage_via_tf
+
   maximize_single_az_capacity = var.maximize_single_az_capacity
 
   region   = var.region
@@ -92,13 +94,26 @@ provider "kubernetes" {
 
 locals {
   genesis_helm_chart_path = "${path.module}/../helm/genesis"
+
+  # these values are the most likely to be changed by the user and may be managed by terraform to trigger re-deployment
+  genesis_helm_values_managed = {
+    "imageTag"  = var.image_tag
+    "chain.era" = var.era
+  }
 }
+
 
 resource "helm_release" "genesis" {
   name        = "genesis"
   chart       = local.genesis_helm_chart_path
   max_history = 5
   wait        = false
+
+  lifecycle {
+    ignore_changes = [
+      values,
+    ]
+  }
 
   values = [
     jsonencode({
@@ -124,6 +139,15 @@ resource "helm_release" "genesis" {
     }),
     jsonencode(var.genesis_helm_values)
   ]
+
+  dynamic "set" {
+    for_each = var.manage_via_tf ? local.genesis_helm_values_managed : {}
+    content {
+      name  = set.key
+      value = set.value
+    }
+  }
+
   # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
     name  = "chart_sha1"

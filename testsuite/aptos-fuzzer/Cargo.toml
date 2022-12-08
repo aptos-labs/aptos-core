@@ -13,8 +13,10 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-accumulator = { workspace = true, features = ["fuzzing"] }
 anyhow = { workspace = true }
+aptos-accumulator = { workspace = true, features = ["fuzzing"] }
+aptos-consensus = { workspace = true, features = ["fuzzing"] }
+aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-jellyfish-merkle = { workspace = true, features = ["fuzzing"] }
 aptos-mempool = { workspace = true }
@@ -24,8 +26,6 @@ aptos-vault-client = { workspace = true, features = ["fuzzing"] }
 aptosdb = { workspace = true, features = ["fuzzing"] }
 bcs = { workspace = true }
 byteorder = { workspace = true }
-consensus = { workspace = true, features = ["fuzzing"] }
-consensus-types = { workspace = true, features = ["fuzzing"] }
 executor = { workspace = true, features = ["fuzzing"] }
 executor-types = { workspace = true, features = ["fuzzing"] }
 hex = { workspace = true }

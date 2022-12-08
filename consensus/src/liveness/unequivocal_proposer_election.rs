@@ -3,13 +3,13 @@
 
 use std::cmp::Ordering;
 
-use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
-use aptos_logger::{error, SecurityEvent};
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
 };
+use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
+use aptos_logger::{error, SecurityEvent};
 
 use super::proposer_election::ProposerElection;
 

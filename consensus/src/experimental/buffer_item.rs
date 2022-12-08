@@ -4,15 +4,15 @@
 use anyhow::anyhow;
 use itertools::zip_eq;
 
+use aptos_consensus_types::{
+    common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
+};
 use aptos_crypto::bls12381;
 use aptos_logger::prelude::*;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_verifier::ValidatorVerifier,
-};
-use consensus_types::{
-    common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
 };
 
 use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};

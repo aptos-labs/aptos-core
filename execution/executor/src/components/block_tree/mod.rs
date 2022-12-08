@@ -8,11 +8,11 @@ mod test;
 
 use crate::logging::{LogEntry, LogSchema};
 use anyhow::{anyhow, ensure, Result};
+use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
-use consensus_types::block::Block as ConsensusBlock;
 use executor_types::{Error, ExecutedChunk};
 use std::{
     collections::{hash_map::Entry, HashMap},

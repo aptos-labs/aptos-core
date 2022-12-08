@@ -566,7 +566,7 @@ impl FromStr for EncodingType {
 }
 
 /// An insertable option for use with prompts.
-#[derive(Clone, Copy, Debug, Default, Parser)]
+#[derive(Clone, Copy, Debug, Default, Parser, PartialEq, Eq)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
     #[clap(long, group = "prompt_options")]

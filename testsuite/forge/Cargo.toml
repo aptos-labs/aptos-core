@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 again = { workspace = true }
 anyhow = { workspace = true, features = ["backtrace"] }
 aptos = { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-global-constants = { workspace = true }
@@ -27,7 +28,6 @@ aptos-sdk = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptosdb = { workspace = true }
 async-trait = { workspace = true }
-cached-packages = { workspace = true }
 chrono = { workspace = true }
 either = { workspace = true }
 framework = { workspace = true }

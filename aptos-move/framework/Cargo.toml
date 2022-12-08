@@ -63,9 +63,9 @@ tempfile = { workspace = true }
 tiny-keccak = { workspace = true }
 
 [dev-dependencies]
+aptos-cached-packages = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
-cached-packages = { workspace = true }
 claims = { workspace = true }
 move-cli = { workspace = true }
 move-prover = { workspace = true }

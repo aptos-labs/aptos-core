@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos = { workspace = true }
 aptos-block-executor = { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
 aptos-keygen = { workspace = true }
@@ -25,7 +26,6 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
-cached-packages = { workspace = true }
 framework = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }

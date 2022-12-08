@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use aptos_cached_packages::aptos_stdlib;
 use aptos_debugger::AptosDebugger;
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
-use cached_packages::aptos_stdlib;
 use forge::Swarm;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]

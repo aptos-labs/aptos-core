@@ -133,6 +133,7 @@ fn test_end_to_end_impl(d: TestData) {
                 StateSnapshotRestoreOpt {
                     manifest_handle: state_snapshot_manifest.unwrap(),
                     version,
+                    validate_modules: false,
                 },
                 global_restore_opt.clone(),
                 Arc::clone(&store),

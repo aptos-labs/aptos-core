@@ -8,6 +8,13 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_data_streaming_service::data_stream::DataStreamId;
+use aptos_data_streaming_service::streaming_client::NotificationAndFeedback;
+use aptos_data_streaming_service::{
+    data_notification::NotificationId,
+    data_stream::DataStreamListener,
+    streaming_client::{DataStreamingClient, Epoch},
+};
 use aptos_types::epoch_state::EpochState;
 use aptos_types::{
     account_address::AccountAddress,
@@ -30,13 +37,6 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
-use data_streaming_service::data_stream::DataStreamId;
-use data_streaming_service::streaming_client::NotificationAndFeedback;
-use data_streaming_service::{
-    data_notification::NotificationId,
-    data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, Epoch},
-};
 use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
 use std::sync::Arc;
@@ -355,19 +355,19 @@ mock! {
             &self,
             version: Version,
             start_index: Option<u64>,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_epoch_ending_ledger_infos(
             &self,
             start_epoch: Epoch,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_transaction_outputs(
             &self,
             start_version: Version,
             end_version: Version,
             proof_version: Version,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_transactions(
             &self,
@@ -375,14 +375,14 @@ mock! {
             end_version: Version,
             proof_version: Version,
             include_events: bool,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn continuously_stream_transaction_outputs(
             &self,
             start_version: Version,
             start_epoch: Epoch,
             target: Option<LedgerInfoWithSignatures>,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn continuously_stream_transactions(
             &self,
@@ -390,13 +390,13 @@ mock! {
             start_epoch: Epoch,
             include_events: bool,
             target: Option<LedgerInfoWithSignatures>,
-        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn terminate_stream_with_feedback(
             &self,
             data_stream_id: DataStreamId,
             notification_and_feedback: Option<NotificationAndFeedback>,
-        ) -> Result<(), data_streaming_service::error::Error>;
+        ) -> Result<(), aptos_data_streaming_service::error::Error>;
     }
     impl Clone for StreamingClient {
         fn clone(&self) -> Self;

@@ -8,18 +8,18 @@ use crate::{
     util::mock_time_service::SimulatedTimeService,
 };
 
-use aptos_crypto::HashValue;
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::{
-    block_info::BlockInfo,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-};
-use consensus_types::{
+use aptos_consensus_types::{
     common::Round,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote_data::VoteData,
+};
+use aptos_crypto::HashValue;
+use aptos_types::aggregate_signature::AggregateSignature;
+use aptos_types::{
+    block_info::BlockInfo,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use futures::StreamExt;
 use std::{sync::Arc, time::Duration};
