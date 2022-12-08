@@ -48,6 +48,12 @@ struct Opt {
     end_version: Option<Version>,
     #[clap(long)]
     validate_modules: bool,
+    #[clap(
+        long,
+        multiple = true,
+        help = "Skip the execution for txns that are known to break compatibility."
+    )]
+    txns_to_skip: Vec<Version>,
 }
 
 #[tokio::main]
@@ -82,6 +88,7 @@ async fn main_impl() -> Result<()> {
         opt.start_version.unwrap_or(0),
         opt.end_version.unwrap_or(Version::MAX),
         opt.validate_modules,
+        opt.txns_to_skip,
     )?
     .run()
     .await

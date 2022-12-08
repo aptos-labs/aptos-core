@@ -154,6 +154,7 @@ fn test_end_to_end_impl(d: TestData) {
             global_restore_opt,
             store,
             None, /* epoch_history */
+            vec![],
         )
         .run(),
     )

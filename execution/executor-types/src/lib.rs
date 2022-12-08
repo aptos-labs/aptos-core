@@ -3,7 +3,11 @@
 
 #![forbid(unsafe_code)]
 
-use std::{cmp::max, collections::HashMap, sync::Arc};
+use std::{
+    cmp::max,
+    collections::{BTreeSet, HashMap},
+    sync::Arc,
+};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -122,6 +126,9 @@ pub trait TransactionReplayer: Send {
         &self,
         transactions: Vec<Transaction>,
         transaction_infos: Vec<TransactionInfo>,
+        writesets: Vec<WriteSet>,
+        events: Vec<Vec<ContractEvent>>,
+        txns_to_skip: Arc<BTreeSet<Version>>,
     ) -> Result<()>;
 
     fn commit(&self) -> Result<Arc<ExecutedChunk>>;

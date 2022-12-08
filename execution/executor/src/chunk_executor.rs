@@ -20,17 +20,20 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
 use aptos_types::{
+    contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
+        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionStatus, Version,
     },
+    write_set::WriteSet,
 };
 use aptos_vm::VMExecutor;
 use executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, TransactionReplayer,
 };
 use fail::fail_point;
-use std::{marker::PhantomData, sync::Arc};
+use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
 use storage_interface::{
     cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
     ExecutedTrees,
@@ -297,13 +300,18 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
         &self,
         transactions: Vec<Transaction>,
         transaction_infos: Vec<TransactionInfo>,
+        writesets: Vec<WriteSet>,
+        events: Vec<Vec<ContractEvent>>,
+        txns_to_skip: Arc<BTreeSet<Version>>,
     ) -> Result<()> {
         self.maybe_initialize()?;
-        self.inner
-            .read()
-            .as_ref()
-            .expect("not reset")
-            .replay(transactions, transaction_infos)
+        self.inner.read().as_ref().expect("not reset").replay(
+            transactions,
+            transaction_infos,
+            writesets,
+            events,
+            txns_to_skip,
+        )
     }
 
     fn commit(&self) -> Result<Arc<ExecutedChunk>> {
@@ -314,6 +322,60 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
 impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
     fn replay(
         &self,
+        mut transactions: Vec<Transaction>,
+        mut transaction_infos: Vec<TransactionInfo>,
+        writesets: Vec<WriteSet>,
+        events: Vec<Vec<ContractEvent>>,
+        txns_to_skip: Arc<BTreeSet<Version>>,
+    ) -> Result<()> {
+        let current_begin_version = {
+            self.commit_queue
+                .lock()
+                .persisted_and_latest_view()
+                .1
+                .version()
+                .ok_or_else(|| anyhow!("Current version is not available"))?
+        };
+
+        let mut offset = current_begin_version;
+        let total_length = transactions.len();
+
+        for version in txns_to_skip
+            .range(current_begin_version + 1..current_begin_version + total_length as u64 + 1)
+        {
+            let remaining = transactions.split_off((version - offset) as usize);
+            let remaining_info = transaction_infos.split_off((version - offset) as usize);
+            let txn_to_skip = transactions.pop().unwrap();
+            let txn_info = transaction_infos.pop().unwrap();
+
+            self.replay_impl(transactions, transaction_infos)?;
+
+            self.apply_transaction_and_output(
+                txn_to_skip,
+                TransactionOutput::new(
+                    writesets[(version - current_begin_version - 1) as usize].clone(),
+                    events[(version - current_begin_version - 1) as usize].clone(),
+                    txn_info.gas_used(),
+                    TransactionStatus::Keep(txn_info.status().clone()),
+                ),
+                txn_info,
+            )?;
+
+            transactions = remaining;
+            transaction_infos = remaining_info;
+            offset = version + 1;
+        }
+        self.replay_impl(transactions, transaction_infos)
+    }
+
+    fn commit(&self) -> Result<Arc<ExecutedChunk>> {
+        self.commit_chunk_impl()
+    }
+}
+
+impl<V: VMExecutor> ChunkExecutorInner<V> {
+    fn replay_impl(
+        &self,
         transactions: Vec<Transaction>,
         mut transaction_infos: Vec<TransactionInfo>,
     ) -> Result<()> {
@@ -322,13 +384,14 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 
         let mut executed_chunk = ExecutedChunk::default();
         let mut to_run = Some(transactions);
+
         while !to_run.as_ref().unwrap().is_empty() {
             // Execute transactions.
             let state_view = self.state_view(&latest_view)?;
             let txns = to_run.take().unwrap();
-            let (executed, to_discard, to_retry) =
-                ChunkOutput::by_transaction_execution::<V>(txns, state_view)?
-                    .apply_to_ledger(&latest_view)?;
+            let chunk_output = ChunkOutput::by_transaction_execution::<V>(txns, state_view)?;
+
+            let (executed, to_discard, to_retry) = chunk_output.apply_to_ledger(&latest_view)?;
 
             // Accumulate result and deal with retry
             ensure_no_discard(to_discard)?;
@@ -347,7 +410,30 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
         Ok(())
     }
 
-    fn commit(&self) -> Result<Arc<ExecutedChunk>> {
-        self.commit_chunk_impl()
+    fn apply_transaction_and_output(
+        &self,
+        txn: Transaction,
+        output: TransactionOutput,
+        expected_info: TransactionInfo,
+    ) -> Result<()> {
+        let (_persisted_view, latest_view) = self.commit_queue.lock().persisted_and_latest_view();
+
+        info!(
+            "Overiding the output of txn at version: {:?}",
+            latest_view.version().unwrap(),
+        );
+
+        let chunk_output = ChunkOutput::by_transaction_output(
+            vec![(txn, output)],
+            self.state_view(&latest_view)?,
+        )?;
+
+        let (executed, to_discard, _to_retry) = chunk_output.apply_to_ledger(&latest_view)?;
+
+        // Accumulate result and deal with retry
+        ensure_no_discard(to_discard)?;
+        executed.ensure_transaction_infos_match(&vec![expected_info])?;
+        self.commit_queue.lock().enqueue(executed);
+        Ok(())
     }
 }
