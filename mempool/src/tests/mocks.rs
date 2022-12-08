@@ -12,6 +12,7 @@ use aptos_config::{
     config::{NetworkConfig, NodeConfig},
     network_id::NetworkId,
 };
+use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{
@@ -19,7 +20,6 @@ use aptos_types::{
     transaction::SignedTransaction,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use futures::channel::mpsc;
 use mempool_notifications::{self, MempoolNotifier};
 use network::{

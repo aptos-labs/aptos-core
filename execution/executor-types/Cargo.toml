@@ -1,5 +1,5 @@
 [package]
-name = "executor-types"
+name = "aptos-executor-types"
 description = "Aptos executor interface types"
 version = "0.1.0"
 

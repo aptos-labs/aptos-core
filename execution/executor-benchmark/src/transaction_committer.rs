@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::hash::HashValue;
+use aptos_executor::{
+    block_executor::BlockExecutor,
+    metrics::{
+        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+    },
+};
+use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::prelude::*;
 use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
@@ -11,14 +19,6 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::metrics::API_LATENCY_SECONDS;
-use executor::{
-    block_executor::BlockExecutor,
-    metrics::{
-        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
-    },
-};
-use executor_types::BlockExecutorTrait;
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},

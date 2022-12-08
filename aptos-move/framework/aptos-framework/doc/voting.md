@@ -107,8 +107,9 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
  Currently, we have three attributes that are used by the voting flow.
  1. RESOLVABLE_TIME_METADATA_KEY: this is uesed to record the resolvable time to ensure that resolution has to be done non-atomically.
  2. IS_MULTI_STEP_PROPOSAL_KEY: this is used to track if a proposal is single-step or multi-step.
- 3. IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY: this attribute only exists for and applies to multi-step proposals. The value is used to
- indicate if a multi-step proposal is in execution. If yes, we will disable further voting for this multi-step proposal.
+ 3. IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY: this attribute only applies to multi-step proposals. A single-step proposal will not have
+ this field in its metadata map. The value is used to indicate if a multi-step proposal is in execution. If yes, we will disable further
+ voting for this multi-step proposal.
 </dd>
 <dt>
 <code>creation_time_secs: u64</code>
@@ -889,6 +890,7 @@ This guarantees that voting eligibility and voting power are controlled by the r
 
 ## Function `is_proposal_resolvable`
 
+Common checks on if a proposal is resolvable, regardless if the proposal is single-step or multi-step.
 
 
 <pre><code><b>fun</b> <a href="voting.md#0x1_voting_is_proposal_resolvable">is_proposal_resolvable</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64)
@@ -1019,6 +1021,7 @@ there are more yes votes than no. If either of these conditions is not met, this
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
 
+    // Update the <a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a> key <b>to</b> indicate that the multi-step proposal is in execution.
     <b>let</b> multi_step_in_execution_key = utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
     <b>if</b> (<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&proposal.metadata, &multi_step_in_execution_key)) {
         <b>let</b> is_multi_step_proposal_in_execution_value = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow_mut">simple_map::borrow_mut</a>(&<b>mut</b> proposal.metadata, &multi_step_in_execution_key);

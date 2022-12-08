@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-event-notifications = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-secure-storage = { workspace = true }
@@ -23,7 +24,6 @@ aptos-types = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 channel = { workspace = true }
-event-notifications = { workspace = true }
 futures = { workspace = true }
 netcore = { workspace = true }
 network = { workspace = true }

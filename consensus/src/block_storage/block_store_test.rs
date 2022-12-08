@@ -8,11 +8,7 @@ use crate::{
         build_empty_tree, build_simple_tree, consensus_runtime, timed_block_on, TreeInserter,
     },
 };
-use aptos_crypto::{HashValue, PrivateKey};
-use aptos_types::{
-    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
-};
-use consensus_types::{
+use aptos_consensus_types::{
     block::{
         block_test_utils::{
             self, certificate_for_genesis, gen_test_certificate, placeholder_certificate_for_block,
@@ -23,6 +19,10 @@ use consensus_types::{
     common::{Author, Payload},
     vote::Vote,
     vote_data::VoteData,
+};
+use aptos_crypto::{HashValue, PrivateKey};
+use aptos_types::{
+    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
 use proptest::prelude::*;
 use std::{cmp::min, collections::HashSet};
@@ -349,7 +349,7 @@ async fn test_illegal_timestamp() {
     let block_store = build_empty_tree();
     let genesis = block_store.ordered_root();
     let block_with_illegal_timestamp = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         0,
         // This timestamp is illegal, it is the same as genesis
         genesis.timestamp_usecs(),
@@ -454,7 +454,7 @@ async fn test_need_sync_for_ledger_info() {
             certificate_for_genesis(),
             1,
             round,
-            Payload::empty(),
+            Payload::empty(false),
             vec![],
         );
         gen_test_certificate(

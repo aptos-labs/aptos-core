@@ -1,5 +1,5 @@
 [package]
-name = "consensus"
+name = "aptos-consensus"
 description = "Aptos consensus"
 version = "0.1.0"
 
@@ -16,7 +16,13 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-config = { workspace = true }
+aptos-consensus-notifications = { workspace = true }
+aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-event-notifications = { workspace = true }
+aptos-executor = { workspace = true }
+aptos-executor-types = { workspace = true }
+aptos-fallible = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-mempool = { workspace = true }
@@ -25,18 +31,13 @@ aptos-secure-storage = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+arc-swap = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
 bytes = { workspace = true }
 channel = { workspace = true }
-consensus-notifications = { workspace = true }
-consensus-types = { workspace = true }
-event-notifications = { workspace = true }
-executor = { workspace = true }
-executor-types = { workspace = true }
 fail = { workspace = true }
-fallible = { workspace = true }
 futures = { workspace = true }
 futures-channel = { workspace = true }
 itertools = { workspace = true }
@@ -57,11 +58,11 @@ tokio = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true, features = ["fuzzing"] }
+aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
+aptos-executor-test-helpers = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
 claims = { workspace = true }
-consensus-types = { workspace = true, features = ["fuzzing"] }
-executor-test-helpers = { workspace = true }
 move-core-types = { workspace = true }
 network = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
@@ -71,5 +72,5 @@ vm-validator = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["consensus-types/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-mempool/fuzzing", "aptos-types/fuzzing", "safety-rules/testing"]
+fuzzing = ["aptos-consensus-types/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-mempool/fuzzing", "aptos-types/fuzzing", "safety-rules/testing"]
 failpoints = ["fail/failpoints"]

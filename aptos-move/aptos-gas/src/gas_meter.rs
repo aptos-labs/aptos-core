@@ -71,7 +71,7 @@ pub trait InitialGasSchedule: Sized {
 #[derive(Debug, Clone)]
 pub struct NativeGasParameters {
     pub move_stdlib: move_stdlib::natives::GasParameters,
-    pub aptos_framework: framework::natives::GasParameters,
+    pub aptos_framework: aptos_framework::natives::GasParameters,
     pub table: move_table_extension::GasParameters,
 }
 
@@ -98,7 +98,7 @@ impl NativeGasParameters {
     pub fn zeros() -> Self {
         Self {
             move_stdlib: move_stdlib::natives::GasParameters::zeros(),
-            aptos_framework: framework::natives::GasParameters::zeros(),
+            aptos_framework: aptos_framework::natives::GasParameters::zeros(),
             table: move_table_extension::GasParameters::zeros(),
         }
     }

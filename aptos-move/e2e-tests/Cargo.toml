@@ -15,7 +15,9 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
+aptos-cached-packages ={ workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
+aptos-framework = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
@@ -23,8 +25,6 @@ aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
-cached-packages ={ workspace = true }
-framework = { workspace = true }
 goldenfile = { workspace = true }
 hex = { workspace = true }
 move-binary-format = { workspace = true }

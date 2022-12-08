@@ -7,8 +7,8 @@ use crate::{
         assert_balance, check_create_mint_transfer, create_and_fund_account, transfer_coins,
     },
 };
-use cached_packages::aptos_stdlib;
-use forge::{NodeExt, Swarm};
+use aptos_cached_packages::aptos_stdlib;
+use aptos_forge::{NodeExt, Swarm};
 use std::time::{Duration, Instant};
 
 #[tokio::test]

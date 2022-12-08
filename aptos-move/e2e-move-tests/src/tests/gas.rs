@@ -3,9 +3,9 @@
 
 use crate::tests::common::test_dir_path;
 use crate::MoveHarness;
+use aptos_cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
-use cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
 
 /// Run with `cargo test test_gas -- --nocapture` to see output.
 #[test]

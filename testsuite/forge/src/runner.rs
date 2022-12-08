@@ -17,7 +17,7 @@ use tokio::runtime::Runtime;
 // TODO going to remove random seed once cluster deployment supports re-run genesis
 use crate::success_criteria::SuccessCriteria;
 use crate::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
-use framework::ReleaseBundle;
+use aptos_framework::ReleaseBundle;
 use rand::rngs::OsRng;
 
 #[derive(Debug, StructOpt)]

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::generate_traffic;
-use forge::{NetworkContext, NetworkTest, Result, Test};
+use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
 use std::thread;
 use tokio::{runtime::Runtime, time::Duration};
 

@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::Error, safety_rules::next_round, SafetyRules};
-use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
-use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block,
     safety_data::SafetyData,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::VoteProposal,
 };
+use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
+use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
 
 /// 2-chain safety rules implementation
 impl SafetyRules {

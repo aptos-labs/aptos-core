@@ -22,6 +22,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey,
 };
+use aptos_framework::ReleaseBundle;
 use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -30,7 +31,6 @@ use aptos_types::{
     transaction::Transaction,
     waypoint::Waypoint,
 };
-use framework::ReleaseBundle;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
