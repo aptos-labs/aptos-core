@@ -13,10 +13,10 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
-    proof_of_store::LogicalTime,
     block::Block,
     common::{Payload, Round},
     executed_block::ExecutedBlock,
+    proof_of_store::LogicalTime,
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;

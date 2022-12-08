@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::batch_reader::BatchReader;
+use aptos_consensus_types::{
+    block::Block,
+    common::{DataStatus, Payload},
+    proof_of_store::{LogicalTime, ProofOfStore},
+    request_response::PayloadRequest,
+};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, warn};
 use aptos_types::transaction::SignedTransaction;
-use aptos_consensus_types::{
-    block::Block,
-    common::{Payload,DataStatus},
-    proof_of_store::{LogicalTime, ProofOfStore},
-    request_response::PayloadRequest,
-};
 use executor_types::Error::DataNotFound;
 use executor_types::*;
 use futures::channel::mpsc::Sender;

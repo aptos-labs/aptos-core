@@ -3,7 +3,7 @@
 
 use crate::{error::MempoolError, monitor};
 use anyhow::{format_err, Result};
-use aptos_consensus_types::{common::RejectedTransactionSummary};
+use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::transaction::{SignedTransaction, TransactionStatus};
 use executor_types::StateComputeResult;
