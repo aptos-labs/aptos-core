@@ -6644,7 +6644,7 @@ paths:
           $ref: '#/components/schemas/U64'
         in: query
         description: |-
-          Ledger version to start list of transactions
+          Account sequence number to start list of transactions
 
           If not provided, defaults to showing the latest transactions
         required: false

@@ -8883,7 +8883,7 @@
               "$ref": "#/components/schemas/U64"
             },
             "in": "query",
-            "description": "Ledger version to start list of transactions\n\nIf not provided, defaults to showing the latest transactions",
+            "description": "Account sequence number to start list of transactions\n\nIf not provided, defaults to showing the latest transactions",
             "required": false,
             "deprecated": false,
             "explode": true
