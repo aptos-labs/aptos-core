@@ -192,7 +192,7 @@ async fn test_data_stream_transactions_with_target() {
         .unwrap_err();
     assert_matches!(error, Error::VerificationError(_));
 
-    // Drive progress to initialize the transaction output stream
+    // Drive progress to initialize the transaction output stream.
     continuous_syncer
         .drive_progress(sync_request.clone())
         .await
