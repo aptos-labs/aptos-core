@@ -70,6 +70,7 @@ members = [
     "crates/indexer",
     "crates/indexer-grpc",
     "crates/inspection-service",
+    "crates/moving-average",
     "crates/node-resource-metrics",
     "crates/num-variants",
     "crates/proxy",
@@ -256,6 +257,7 @@ inspection-service = { path = "crates/inspection-service" }
 language-e2e-tests = { path = "aptos-move/e2e-tests" }
 mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 memsocket = { path = "network/memsocket" }
+moving-average = { path = "crates/moving-average" }
 move-examples = { path = "aptos-move/move-examples" }
 mvhashmap = { path = "aptos-move/mvhashmap" }
 netcore = { path = "network/netcore" }

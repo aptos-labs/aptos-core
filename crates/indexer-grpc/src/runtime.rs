@@ -1,64 +1,41 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    counters::{self, FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
-    stream_coordinator::IndexerStreamCoordinator,
-};
-use anyhow::ensure;
-use aptos_protos::{
-    datastream::v1::{
-        indexer_stream_server::{IndexerStream, IndexerStreamServer},
-        raw_datastream_response, RawDatastreamRequest, RawDatastreamResponse, StreamStatus,
-        TransactionOutput, TransactionsOutput,
-    },
-    extractor::v1 as extractor,
-};
-use tonic::{Request, Response, Status};
-
-use crate::convert::convert_transaction;
+use crate::stream_coordinator::IndexerStreamCoordinator;
 use aptos_api::context::Context;
-use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
 use aptos_config::config::NodeConfig;
-use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
+use aptos_logger::{error, info};
 use aptos_mempool::MempoolClientSender;
-use aptos_types::chain_id::ChainId;
-use aptos_vm::data_cache::StorageAdapterOwned;
-use extractor::Transaction as TransactionPB;
-use futures::{channel::mpsc::channel, Stream};
-use prost::Message;
-use std::{
-    convert::TryInto, f32::consts::E, net::ToSocketAddrs, pin::Pin, sync::Arc, time::Duration,
+use aptos_protos::datastream::v1::{
+    indexer_stream_server::{IndexerStream, IndexerStreamServer},
+    raw_datastream_response,
+    stream_status::StatusType,
+    RawDatastreamRequest, RawDatastreamResponse, StreamStatus,
 };
-use storage_interface::{state_view::DbStateView, DbReader};
+use aptos_types::chain_id::ChainId;
+use futures::Stream;
+use moving_average::MovingAverage;
+use std::{net::ToSocketAddrs, pin::Pin, sync::Arc};
+use storage_interface::DbReader;
 use tokio::{
     runtime::{Builder, Runtime},
     sync::mpsc,
-    time::sleep,
 };
-use tokio_stream::{wrappers::ReceiverStream, StreamExt};
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::transport::Server;
+use tonic::{Request, Response, Status};
 
 // Default Values
-const DEFAULT_NUM_RETRIES: usize = 3;
-const RETRY_TIME_MILLIS: u64 = 300;
-const MAX_RETRY_TIME_MILLIS: u64 = 120000;
-const TRANSACTION_FETCH_BATCH_SIZE: u16 = 500;
+pub const DEFAULT_NUM_RETRIES: usize = 3;
+pub const RETRY_TIME_MILLIS: u64 = 300;
 const TRANSACTION_CHANNEL_SIZE: usize = 35;
+const DEFAULT_EMIT_SIZE: usize = 1000;
 
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<RawDatastreamResponse, Status>> + Send>>;
 
 // The GRPC server
 pub struct IndexerStreamService {
     pub context: Arc<Context>,
-    // pub resolver: Arc<StorageAdapterOwned<DbStateView>>,
-    // // Tracks start of a batch. The assumption is that every version before this has been processed.
-    // pub current_version: u64,
-    // // This is only ever used for testing
-    // pub mp_sender: MempoolClientSender,
-    // pub processor_batch_size: usize,
-    // pub processor_task_count: usize,
-    // pub highest_known_version: u64,
 }
 
 /// Creates a runtime which creates a thread pool which pushes firehose of block protobuf to SF endpoint
@@ -92,6 +69,7 @@ pub fn bootstrap(
             .serve("[::1]:50051".to_socket_addrs().unwrap().next().unwrap())
             .await
             .unwrap();
+        info!("[indexer-grpc] Started GRPC server at 50051");
     });
     Some(Ok(runtime))
 }
@@ -113,6 +91,7 @@ impl IndexerStream for IndexerStreamService {
 
         let (tx, rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
         let context = self.context.clone();
+        let mut ma = MovingAverage::new(10_000);
 
         tokio::spawn(async move {
             let mut coordinator = IndexerStreamCoordinator::new(
@@ -124,21 +103,17 @@ impl IndexerStream for IndexerStreamService {
                 output_batch_size,
                 tx.clone(),
             );
-            // send init signal, TODO: move this into helper functions
-            let item = RawDatastreamResponse {
-                response: Some(raw_datastream_response::Response::Status(StreamStatus {
-                    r#type: 0,
-                    start_version: starting_version,
-                    end_version: None,
-                })),
-                ..RawDatastreamResponse::default()
-            };
-            match tx.send(Result::<_, Status>::Ok(item)).await {
-                Ok(_) => {}
+            let init_status = Self::get_status(StatusType::Init, starting_version, None);
+            match tx.send(Result::<_, Status>::Ok(init_status)).await {
+                Ok(_) => {
+                    // TODO: Add request details later
+                    info!("[indexer-grpc] Init connection");
+                }
                 Err(_) => {
-                    panic!("Unable to initialize stream");
+                    panic!("[indexer-grpc] Unable to initialize stream");
                 }
             }
+            let mut base: u64 = 0;
             loop {
                 let results = coordinator.process_next_batch().await;
                 let mut is_error = false;
@@ -158,28 +133,53 @@ impl IndexerStream for IndexerStreamService {
                 if is_error {
                     break;
                 }
-                // send end signal, TODO: move this into helper functions
-                let item = RawDatastreamResponse {
-                    response: Some(raw_datastream_response::Response::Status(StreamStatus {
-                        r#type: 1,
-                        start_version: coordinator.current_version,
-                        end_version: Some(max_version),
-                    })),
-                    ..RawDatastreamResponse::default()
-                };
-                match tx.send(Result::<_, Status>::Ok(item)).await {
-                    Ok(_) => {}
+                let init_status = Self::get_status(
+                    StatusType::BatchEnd,
+                    coordinator.current_version,
+                    Some(max_version),
+                );
+                match tx.send(Result::<_, Status>::Ok(init_status)).await {
+                    Ok(_) => {
+                        let new_base: u64 = ma.sum() / (DEFAULT_EMIT_SIZE as u64);
+                        ma.tick_now(max_version - coordinator.current_version + 1);
+                        if base != new_base {
+                            base = new_base;
+
+                            info!(
+                                batch_start_version = coordinator.current_version,
+                                batch_end_version = max_version,
+                                versions_processed = ma.sum(),
+                                tps = (ma.avg() * 1000.0) as u64,
+                                "[indexer-grpc] Sent batch successfully"
+                            );
+                        }
+                    }
                     Err(_) => {
-                        panic!("Unable to initialize stream");
+                        panic!("[indexer-grpc] Unable to initialize stream");
                     }
                 }
                 coordinator.current_version = max_version + 1;
             }
         });
-
         let output_stream = ReceiverStream::new(rx);
         Ok(Response::new(
             Box::pin(output_stream) as Self::RawDatastreamStream
         ))
+    }
+}
+
+impl IndexerStreamService {
+    pub fn get_status(
+        status_type: StatusType,
+        start_version: u64,
+        end_version: Option<u64>,
+    ) -> RawDatastreamResponse {
+        RawDatastreamResponse {
+            response: Some(raw_datastream_response::Response::Status(StreamStatus {
+                r#type: status_type as i32,
+                start_version,
+                end_version,
+            })),
+        }
     }
 }

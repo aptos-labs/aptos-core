@@ -1,45 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters::{self, FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
-use anyhow::ensure;
-use aptos_protos::{
-    datastream::v1::{
-        indexer_stream_server::{IndexerStream, IndexerStreamServer},
-        raw_datastream_response, RawDatastreamRequest, RawDatastreamResponse, TransactionOutput,
-        TransactionsOutput,
-    },
-    extractor::v1 as extractor,
-};
-use tonic::{Request, Response, Status};
-
 use crate::convert::convert_transaction;
+use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
+use crate::runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS};
 use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
-use aptos_config::config::NodeConfig;
-use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
-use aptos_mempool::MempoolClientSender;
-use aptos_types::chain_id::ChainId;
-use aptos_vm::data_cache::StorageAdapterOwned;
-use extractor::Transaction as TransactionPB;
-use futures::{channel::mpsc::channel, Stream};
-use prost::Message;
-use std::{convert::TryInto, net::ToSocketAddrs, pin::Pin, sync::Arc, time::Duration};
-use storage_interface::{state_view::DbStateView, DbReader};
-use tokio::{
-    runtime::{Builder, Runtime},
-    sync::mpsc,
-    time::sleep,
+use aptos_logger::{error, info, sample, sample::SampleRate};
+use aptos_protos::datastream::v1::{
+    raw_datastream_response, RawDatastreamResponse, TransactionOutput, TransactionsOutput,
 };
-use tokio_stream::{wrappers::ReceiverStream, StreamExt};
-use tonic::transport::Server;
-
-// Default Values
-const DEFAULT_NUM_RETRIES: usize = 3;
-const RETRY_TIME_MILLIS: u64 = 300;
-const MAX_RETRY_TIME_MILLIS: u64 = 120000;
-const TRANSACTION_FETCH_BATCH_SIZE: u16 = 500;
-const TRANSACTION_CHANNEL_SIZE: usize = 35;
+use aptos_protos::extractor::v1::Transaction as TransactionPB;
+use prost::Message;
+use std::{sync::Arc, time::Duration};
+use tokio::sync::mpsc;
+use tonic::Status;
 
 type EndVersion = u64;
 
@@ -110,7 +85,6 @@ impl IndexerStreamCoordinator {
                                 transactions: chunk.to_vec(),
                             },
                         )),
-                        ..RawDatastreamResponse::default()
                     };
                     match transaction_sender.send(Result::<_, Status>::Ok(item)).await {
                         Ok(_) => {}
@@ -321,7 +295,7 @@ impl IndexerStreamCoordinator {
             .iter()
             .map(|txn| {
                 let info = txn.transaction_info().unwrap();
-                convert_transaction(&txn, info.block_height.unwrap().0, info.epoch.unwrap().0)
+                convert_transaction(txn, info.block_height.unwrap().0, info.epoch.unwrap().0)
             })
             .collect()
     }

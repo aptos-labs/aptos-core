@@ -39,6 +39,7 @@ aptos-metrics-core = { workspace = true }
 aptos-protos = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+moving-average = { workspace = true }
 storage-interface = { workspace = true }
 
 move-binary-format = { workspace = true }

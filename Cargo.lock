@@ -764,6 +764,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-package",
+ "moving-average",
  "once_cell",
  "prost",
  "rand 0.7.3",
@@ -6412,6 +6413,13 @@ dependencies = [
  "proptest",
  "serde 1.0.144",
  "smallvec",
+]
+
+[[package]]
+name = "moving-average"
+version = "0.1.0"
+dependencies = [
+ "chrono",
 ]
 
 [[package]]
