@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::{QuorumStoreError, StateSyncError};
+use crate::payload_manager::PayloadManager;
 use anyhow::Result;
 use aptos_consensus_types::{
     block::Block,
-    common::{Payload, PayloadFilter},
+    common::{Payload, PayloadFilter, Round},
     executed_block::ExecutedBlock,
 };
 use aptos_crypto::HashValue;
@@ -18,9 +19,10 @@ pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<ExecutedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
 
 #[async_trait::async_trait]
-pub trait PayloadManager: Send + Sync {
+pub trait PayloadClient: Send + Sync {
     async fn pull_payload(
         &self,
+        round: Round,
         max_items: u64,
         max_bytes: u64,
         exclude: PayloadFilter,
@@ -62,5 +64,5 @@ pub trait StateComputer: Send + Sync {
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
 
     // Reconfigure to execute transactions for a new epoch.
-    fn new_epoch(&self, epoch_state: &EpochState);
+    fn new_epoch(&self, epoch_state: &EpochState, payload_manager: Arc<PayloadManager>);
 }

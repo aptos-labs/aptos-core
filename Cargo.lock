@@ -519,6 +519,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "arc-swap",
  "async-trait",
  "bcs 0.1.3 (git+https://github.com/aptos-labs/bcs?rev=2cde3e8446c460cb17b0c1d6bac7e27e964ac169)",
  "byteorder",
@@ -589,6 +590,7 @@ dependencies = [
  "serde 1.0.144",
  "serde_json",
  "short-hex-str",
+ "tokio",
 ]
 
 [[package]]
