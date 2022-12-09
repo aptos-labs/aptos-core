@@ -2634,6 +2634,9 @@ module aptos_framework::stake {
         assert!(!table::contains(fees_table, validator_addr), 0);
     }
 
+    #[test_only]
+    const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
+
     #[test(aptos_framework = @0x1, validator_1 = @0x123, validator_2 = @0x234, validator_3 = @0x345)]
     fun test_distribute_validator_fees(
         aptos_framework: &signer,
@@ -2642,7 +2645,7 @@ module aptos_framework::stake {
         validator_3: &signer,
     ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
         // Make sure that fees collection and distribution is enabled.
-        features::change_feature_flags(aptos_framework, vector[5], vector[]);
+        features::change_feature_flags(aptos_framework, vector[COLLECT_AND_DISTRIBUTE_GAS_FEES], vector[]);
         assert!(features::collect_and_distribute_gas_fees(), 0);
 
         // Initialize staking and validator fees table.
