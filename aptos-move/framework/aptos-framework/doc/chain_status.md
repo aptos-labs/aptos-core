@@ -242,7 +242,7 @@ Helper function to assert genesis state.
 
 
 <pre><code><b>schema</b> <a href="chain_status.md#0x1_chain_status_RequiresIsOperating">RequiresIsOperating</a> {
-    <b>requires</b> !<a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>();
+    <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>();
 }
 </code></pre>
 
