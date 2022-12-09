@@ -27,6 +27,8 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V5
+//   - u16, u32, u256
 // - V4
 //   - Consider memory leaked for event natives
 // - V3
@@ -41,7 +43,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 4;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 5;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
@@ -71,7 +73,7 @@ pub trait InitialGasSchedule: Sized {
 #[derive(Debug, Clone)]
 pub struct NativeGasParameters {
     pub move_stdlib: move_stdlib::natives::GasParameters,
-    pub aptos_framework: framework::natives::GasParameters,
+    pub aptos_framework: aptos_framework::natives::GasParameters,
     pub table: move_table_extension::GasParameters,
 }
 
@@ -98,7 +100,7 @@ impl NativeGasParameters {
     pub fn zeros() -> Self {
         Self {
             move_stdlib: move_stdlib::natives::GasParameters::zeros(),
-            aptos_framework: framework::natives::GasParameters::zeros(),
+            aptos_framework: aptos_framework::natives::GasParameters::zeros(),
             table: move_table_extension::GasParameters::zeros(),
         }
     }

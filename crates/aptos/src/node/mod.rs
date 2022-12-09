@@ -26,6 +26,7 @@ use aptos_backup_cli::storage::command_adapter::{config::CommandAdapterConfig, C
 use aptos_backup_cli::utils::{
     ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt,
 };
+use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::NodeConfig;
 use aptos_crypto::bls12381::PublicKey;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
@@ -45,7 +46,6 @@ use aptos_types::vesting::VestingAdminStore;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
 use bcs::Result;
-use cached_packages::aptos_stdlib;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
 use hex::FromHex;
@@ -1113,7 +1113,7 @@ impl CliCommand<()> for RunLocalTestnet {
                 Some(test_dir_copy),
                 false,
                 false,
-                cached_packages::head_release_bundle(),
+                aptos_cached_packages::head_release_bundle(),
                 rng,
             );
             eprintln!("Node stopped unexpectedly {:#?}", result);

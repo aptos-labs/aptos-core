@@ -48,7 +48,7 @@ With your development environment ready, now you can proceed below.
 To deploy multiple local validators, run:
 
 ```bash
-cargo run -p forge-cli \
+cargo run -p aptos-forge-cli \
         -- \
         --suite "run_forever" \
         --num-validators 4 test local-swarm
@@ -110,7 +110,7 @@ Also see how to use the [Aptos CLI](https://aptos.dev/cli-tools/aptos-cli-tool/u
 
 To also run validator fullnodes inside the network, use the `--num-validator-fullnodes` flag. For example:
 ```bash
-cargo run -p forge-cli \
+cargo run -p aptos-forge-cli \
         -- \
         --suite "run_forever" \
         --num-validators 3 \
@@ -121,5 +121,5 @@ cargo run -p forge-cli \
 
 To see all tool usage options, run:
 ```bash
-cargo run -p forge-cli --help
+cargo run -p aptos-forge-cli --help
 ```

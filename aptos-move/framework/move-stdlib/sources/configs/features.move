@@ -69,9 +69,19 @@ module std::features {
         is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
     }
 
+    /// Whether to allow the use of binary format version v6.
+    /// Lifetime: transient
+    const VM_BINARY_FORMAT_V6: u64 = 5;
+
+    public fun get_vm_binary_format_v6(): u64 { VM_BINARY_FORMAT_V6 }
+
+    public fun allow_vm_binary_format_v6(): bool acquires Features {
+        is_enabled(VM_BINARY_FORMAT_V6)
+    }
+    
     /// Whether gas fees are collected and distributed to the block proposers.
     /// Lifetime: transient
-    const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 5;
+    const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
 
     public fun get_collect_and_distribute_gas_fees_feature(): u64 { COLLECT_AND_DISTRIBUTE_GAS_FEES }
 

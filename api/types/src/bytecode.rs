@@ -63,8 +63,11 @@ pub trait Bytecode {
         match token {
             SignatureToken::Bool => MoveType::Bool,
             SignatureToken::U8 => MoveType::U8,
+            SignatureToken::U16 => MoveType::U16,
+            SignatureToken::U32 => MoveType::U32,
             SignatureToken::U64 => MoveType::U64,
             SignatureToken::U128 => MoveType::U128,
+            SignatureToken::U256 => MoveType::U256,
             SignatureToken::Address => MoveType::Address,
             SignatureToken::Signer => MoveType::Signer,
             SignatureToken::Vector(t) => MoveType::Vector {

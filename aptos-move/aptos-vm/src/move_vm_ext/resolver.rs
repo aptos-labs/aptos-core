@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use framework::natives::state_storage::StateStorageUsageResolver;
+use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use move_core_types::resolver::MoveResolver;
 use move_table_extension::TableResolver;
 use std::fmt::Debug;

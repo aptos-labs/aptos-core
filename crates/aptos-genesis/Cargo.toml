@@ -14,8 +14,11 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-executor = { workspace = true }
+aptos-framework = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-state-view =  { workspace = true }
@@ -24,9 +27,6 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptosdb = { workspace = true }
 bcs = { workspace = true }
-cached-packages = { workspace = true }
-executor = { workspace = true }
-framework = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }

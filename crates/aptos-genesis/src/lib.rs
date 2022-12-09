@@ -17,6 +17,7 @@ use aptos_config::config::{
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_framework::ReleaseBundle;
 use aptos_temppath::TempPath;
 use aptos_types::{
     chain_id::ChainId,
@@ -26,7 +27,6 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use framework::ReleaseBundle;
 use std::convert::TryInto;
 use storage_interface::DbReaderWriter;
 use vm_genesis::Validator;
@@ -155,6 +155,6 @@ impl GenesisInfo {
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);
-        executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
+        aptos_executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
     }
 }

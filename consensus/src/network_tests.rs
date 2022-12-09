@@ -7,10 +7,7 @@ use crate::{
     test_utils::{self, consensus_runtime, placeholder_ledger_info, timed_block_on},
 };
 use aptos_config::network_id::NetworkId;
-use aptos_infallible::{Mutex, RwLock};
-use aptos_types::{block_info::BlockInfo, PeerId};
-use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::{
+use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
     proposal_msg::ProposalMsg,
@@ -19,6 +16,9 @@ use consensus_types::{
     vote_data::VoteData,
     vote_msg::VoteMsg,
 };
+use aptos_infallible::{Mutex, RwLock};
+use aptos_types::{block_info::BlockInfo, PeerId};
+use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use network::{
     application::storage::PeerMetadataStorage,
@@ -482,13 +482,13 @@ mod tests {
     use super::*;
     use crate::network::NetworkTask;
     use aptos_config::network_id::NetworkId;
-    use aptos_crypto::HashValue;
-    use aptos_types::validator_verifier::random_validator_verifier;
-    use bytes::Bytes;
-    use consensus_types::{
+    use aptos_consensus_types::{
         block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus},
         common::Payload,
     };
+    use aptos_crypto::HashValue;
+    use aptos_types::validator_verifier::random_validator_verifier;
+    use bytes::Bytes;
     use futures::{channel::oneshot, future};
     use network::{
         application::storage::PeerMetadataStorage, protocols::direct_send::Message,
@@ -618,7 +618,7 @@ mod tests {
         let previous_qc = certificate_for_genesis();
         let proposal = ProposalMsg::new(
             Block::new_proposal(
-                Payload::empty(),
+                Payload::empty(false),
                 1,
                 1,
                 previous_qc.clone(),

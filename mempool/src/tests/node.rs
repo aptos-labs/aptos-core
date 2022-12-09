@@ -14,12 +14,12 @@ use aptos_config::{
     network_id::{NetworkContext, NetworkId, PeerNetworkId},
 };
 use aptos_crypto::{x25519::PrivateKey, Uniform};
+use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, MutexGuard, RwLock};
 use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{account_config::AccountSequenceInfo, PeerId};
 use channel::{aptos_channel, message_queues::QueueStyle};
 use enum_dispatch::enum_dispatch;
-use event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use futures::{
     channel::mpsc::{self, unbounded, UnboundedReceiver},
     FutureExt, StreamExt,

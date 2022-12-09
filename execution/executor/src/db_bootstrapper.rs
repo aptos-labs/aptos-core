@@ -6,6 +6,7 @@
 use crate::components::chunk_output::ChunkOutput;
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
+use aptos_executor_types::ExecutedChunk;
 use aptos_logger::prelude::*;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::aggregate_signature::AggregateSignature;
@@ -21,7 +22,6 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
-use executor_types::ExecutedChunk;
 use move_core_types::move_resource::MoveResource;
 use std::sync::Arc;
 use storage_interface::{

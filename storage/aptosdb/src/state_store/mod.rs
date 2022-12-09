@@ -22,6 +22,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_executor_types::in_memory_state_calculator::InMemoryStateCalculator;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
@@ -36,7 +37,6 @@ use aptos_types::{
     },
     transaction::Version,
 };
-use executor_types::in_memory_state_calculator::InMemoryStateCalculator;
 use once_cell::sync::Lazy;
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{

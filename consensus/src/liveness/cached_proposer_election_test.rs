@@ -3,8 +3,8 @@
 
 use std::{cell::Cell, sync::Arc};
 
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
-use consensus_types::common::{Author, Round};
 
 use crate::liveness::cached_proposer_election::CachedProposerElection;
 

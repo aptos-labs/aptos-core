@@ -6,12 +6,12 @@ use crate::{
     logging::{self, LogEntry, LogEvent},
     Error,
 };
+use aptos_consensus_types::{common::Author, safety_data::SafetyData};
 use aptos_crypto::{bls12381, PrivateKey};
 use aptos_global_constants::{CONSENSUS_KEY, OWNER_ACCOUNT, SAFETY_DATA, WAYPOINT};
 use aptos_logger::prelude::*;
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::waypoint::Waypoint;
-use consensus_types::{common::Author, safety_data::SafetyData};
 
 /// SafetyRules needs an abstract storage interface to act as a common utility for storing
 /// persistent data to local disk, cloud, secrets managers, or even memory (for tests)

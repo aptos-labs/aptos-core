@@ -24,14 +24,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context, Result};
 use aptos_config::config::ConsensusConfig;
-use aptos_infallible::{checked, Mutex};
-use aptos_logger::prelude::*;
-use aptos_types::{
-    epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
-    validator_verifier::ValidatorVerifier,
-};
-use channel::aptos_channel;
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
@@ -42,6 +35,13 @@ use consensus_types::{
     vote::Vote,
     vote_msg::VoteMsg,
 };
+use aptos_infallible::{checked, Mutex};
+use aptos_logger::prelude::*;
+use aptos_types::{
+    epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
+    validator_verifier::ValidatorVerifier,
+};
+use channel::aptos_channel;
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 #[cfg(test)]
@@ -67,10 +67,14 @@ pub enum UnverifiedEvent {
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
 
 impl UnverifiedEvent {
-    pub fn verify(self, validator: &ValidatorVerifier) -> Result<VerifiedEvent, VerifyError> {
+    pub fn verify(
+        self,
+        validator: &ValidatorVerifier,
+        quorum_store_enabled: bool,
+    ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
             UnverifiedEvent::ProposalMsg(p) => {
-                p.verify(validator)?;
+                p.verify(validator, quorum_store_enabled)?;
                 VerifiedEvent::ProposalMsg(p)
             }
             UnverifiedEvent::VoteMsg(v) => {

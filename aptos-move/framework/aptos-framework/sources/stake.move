@@ -1540,7 +1540,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10007)]
+    #[expected_failure(abort_code = 0x10007, location = Self)]
     public entry fun test_inactive_validator_can_add_stake_if_exceeding_max_allowed(
         aptos_framework: &signer,
         validator: &signer,
@@ -1554,7 +1554,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @0x1, validator_1 = @0x123, validator_2 = @0x234)]
-    #[expected_failure(abort_code = 0x10007)]
+    #[expected_failure(abort_code = 0x10007, location = Self)]
     public entry fun test_pending_active_validator_cannot_add_stake_if_exceeding_max_allowed(
         aptos_framework: &signer,
         validator_1: &signer,
@@ -1574,7 +1574,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10007)]
+    #[expected_failure(abort_code = 0x10007, location = Self)]
     public entry fun test_active_validator_cannot_add_stake_if_exceeding_max_allowed(
         aptos_framework: &signer,
         validator: &signer,
@@ -1589,7 +1589,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10007)]
+    #[expected_failure(abort_code = 0x10007, location = Self)]
     public entry fun test_active_validator_with_pending_inactive_stake_cannot_add_stake_if_exceeding_max_allowed(
         aptos_framework: &signer,
         validator: &signer,
@@ -1608,7 +1608,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator_1 = @0x123, validator_2 = @0x234)]
-    #[expected_failure(abort_code = 0x10007)]
+    #[expected_failure(abort_code = 0x10007, location = Self)]
     public entry fun test_pending_inactive_cannot_add_stake_if_exceeding_max_allowed(
         aptos_framework: &signer,
         validator_1: &signer,
@@ -1710,7 +1710,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10012)]
+    #[expected_failure(abort_code = 0x10012, location = Self)]
     public entry fun test_cannot_reduce_lockup(
         aptos_framework: &signer,
         validator: &signer,
@@ -1728,7 +1728,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator_1 = @0x123, validator_2 = @0x234)]
-    #[expected_failure(abort_code = 0x1000D)]
+    #[expected_failure(abort_code = 0x1000D, location = Self)]
     public entry fun test_inactive_validator_cannot_join_if_exceed_increase_limit(
         aptos_framework: &signer,
         validator_1: &signer,
@@ -1772,7 +1772,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator_1 = @0x123, validator_2 = @0x234)]
-    #[expected_failure(abort_code = 0x1000D)]
+    #[expected_failure(abort_code = 0x1000D, location = Self)]
     public entry fun test_pending_active_validator_cannot_add_more_stake_than_limit(
         aptos_framework: &signer,
         validator_1: &signer,
@@ -1817,7 +1817,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x1000D)]
+    #[expected_failure(abort_code = 0x1000D, location = Self)]
     public entry fun test_active_validator_cannot_add_more_stake_than_limit_in_multiple_epochs(
         aptos_framework: &signer,
         validator: &signer,
@@ -1839,7 +1839,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x1000D)]
+    #[expected_failure(abort_code = 0x1000D, location = Self)]
     public entry fun test_active_validator_cannot_add_more_stake_than_limit(
         aptos_framework: &signer,
         validator: &signer,
@@ -2238,7 +2238,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x1000A)]
+    #[expected_failure(abort_code = 0x1000A, location = Self)]
     public entry fun test_validator_cannot_join_post_genesis(
         aptos_framework: &signer,
         validator: &signer,
@@ -2251,7 +2251,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x1000E)]
+    #[expected_failure(abort_code = 0x1000E, location = Self)]
     public entry fun test_invalid_pool_address(
         aptos_framework: &signer,
         validator: &signer,
@@ -2263,7 +2263,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x1000A)]
+    #[expected_failure(abort_code = 0x1000A, location = Self)]
     public entry fun test_validator_cannot_leave_post_genesis(
         aptos_framework: &signer,
         validator: &signer,
@@ -2433,7 +2433,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x1000B)]
+    #[expected_failure(abort_code = 0x1000B, location = Self)]
     public entry fun test_invalid_config(
         aptos_framework: &signer,
         validator: &signer,
@@ -2602,7 +2602,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @0x1, validator = @0x123)]
-    #[expected_failure(abort_code = 0x60011)]
+    #[expected_failure(abort_code = 0x60011, location = Self)]
     public entry fun test_not_allowed_validators(
         aptos_framework: &signer,
         validator: &signer,

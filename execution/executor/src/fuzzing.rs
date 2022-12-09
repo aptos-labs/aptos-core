@@ -4,6 +4,7 @@
 use crate::block_executor::BlockExecutor;
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_executor_types::BlockExecutorTrait;
 use aptos_state_view::StateView;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -11,7 +12,6 @@ use aptos_types::{
     vm_status::VMStatus,
 };
 use aptos_vm::VMExecutor;
-use executor_types::BlockExecutorTrait;
 use storage_interface::{state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter};
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {

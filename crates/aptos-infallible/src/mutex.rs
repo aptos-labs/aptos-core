@@ -7,7 +7,7 @@ pub use std::sync::MutexGuard;
 
 /// A simple wrapper around the lock() function of a std::sync::Mutex
 /// The only difference is that you don't need to call unwrap() on it.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Mutex<T>(StdMutex<T>);
 
 impl<T> Mutex<T> {

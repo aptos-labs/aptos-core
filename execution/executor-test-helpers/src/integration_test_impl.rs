@@ -3,6 +3,10 @@
 
 use crate::{bootstrap_genesis, gen_block_id, gen_ledger_info_with_sigs};
 use anyhow::{anyhow, ensure, Result};
+use aptos_cached_packages::aptos_stdlib;
+use aptos_consensus_types::block::Block;
+use aptos_executor::block_executor::BlockExecutor;
+use aptos_executor_types::BlockExecutorTrait;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},
@@ -24,10 +28,6 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use cached_packages::aptos_stdlib;
-use consensus_types::block::Block;
-use executor::block_executor::BlockExecutor;
-use executor_types::BlockExecutorTrait;
 use rand::SeedableRng;
 use std::sync::Arc;
 

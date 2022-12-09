@@ -3,8 +3,8 @@
 
 use std::cmp::Ordering;
 
-use consensus_types::common::{Author, Round};
-use fallible::copy_from_slice::copy_slice_to_vec;
+use aptos_consensus_types::common::{Author, Round};
+use aptos_fallible::copy_from_slice::copy_slice_to_vec;
 use num_traits::CheckedAdd;
 
 /// ProposerElection incorporates the logic of choosing a leader among multiple candidates.

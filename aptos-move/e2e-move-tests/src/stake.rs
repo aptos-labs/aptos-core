@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::harness::MoveHarness;
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
     on_chain_config::ValidatorSet, stake_pool::StakePool, transaction::TransactionStatus,
     validator_config::ValidatorConfig,
 };
-use cached_packages::aptos_stdlib;
 use language_e2e_tests::account::Account;
 use move_core_types::parser::parse_struct_tag;
 

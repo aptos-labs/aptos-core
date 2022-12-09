@@ -27,8 +27,8 @@ structopt = { workspace = true }
 textwrap = { workspace = true }
 
 [dev-dependencies]
-cached-packages = { workspace = true }
-framework = { workspace = true }
+aptos-cached-packages = { workspace = true }
+aptos-framework = { workspace = true }
 tempfile = { workspace = true }
 which = { workspace = true }
 

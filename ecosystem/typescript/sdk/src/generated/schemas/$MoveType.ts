@@ -7,8 +7,11 @@ export const $MoveType = {
     Values:
     - bool
     - u8
+    - u16
+    - u32
     - u64
     - u128
+    - u256
     - address
     - signer
     - vector: \`vector<{non-reference MoveTypeId}>\`

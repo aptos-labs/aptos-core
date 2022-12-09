@@ -39,7 +39,7 @@ A transaction that is successfully submitted but ultimately discarded may have n
 The submitter can try to increase the gas cost by a trivial amount to help make progress and adjust for whatever may have been causing the discarding of the transaction further downstream.
 
 :::tip Read more
-See [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn) for a comprehensive description of the Aptos transaction lifecycle.
+See [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn.md) for a comprehensive description of the Aptos transaction lifecycle.
 :::
 
 ### Contents of a Transaction
@@ -77,14 +77,14 @@ See the tutorial on [Your First Transaction](../tutorials/first-transaction.md) 
 :::
 
 :::note Transaction generation
-The Aptos REST API supports generating BCS encoded transactions from JSON. This is useful for rapid prototyping, but be cautious using it in Mainnet as this places a lot of trust on the fullnode generating the transaction.
+The Aptos REST API supports generating BCS-encoded transactions from JSON. This is useful for rapid prototyping, but be cautious using it in Mainnet as this places a lot of trust on the fullnode generating the transaction.
 :::
 
 ## States
 
 The Aptos blockchain's ledger state, or global state, represents the state of all accounts in the Aptos blockchain. Each validator node in the blockchain must know the latest version of the global state to execute any transaction.
 
-Anyone can submit a transaction to the Aptos blockchain to modify the ledger state. Upon execution of a transaction, a transaction output is generated. A transaction output contains zero or more operations to manipulate the ledger state, called **write sets**: a vector of resulting events, the amount of gas consumed, and the executed transaction status.
+Anyone can submit a transaction to the Aptos blockchain to modify the ledger state. Upon execution of a transaction, a transaction output is generated. A transaction output contains zero or more operations to manipulate the ledger state called **write sets** emitting a vector of resulting events, the amount of gas consumed, and the executed transaction status.
 
 ### Proofs
 

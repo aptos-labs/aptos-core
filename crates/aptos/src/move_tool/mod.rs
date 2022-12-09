@@ -29,6 +29,10 @@ use crate::{
     },
     CliCommand, CliResult,
 };
+use aptos_framework::docgen::DocgenOptions;
+use aptos_framework::natives::code::UpgradePolicy;
+use aptos_framework::prover::ProverOptions;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
@@ -37,10 +41,6 @@ use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_types::transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
-use framework::docgen::DocgenOptions;
-use framework::natives::code::UpgradePolicy;
-use framework::prover::ProverOptions;
-use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
 use move_cli::base::test::UnitTestResult;
 use move_command_line_common::env::MOVE_HOME;
@@ -50,6 +50,7 @@ use std::ops::Deref;
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
+    env,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -108,6 +109,20 @@ impl MoveTool {
                 tool.execute_serialized_success().await
             }
         }
+    }
+}
+
+const VAR_BYTECODE_VERSION: &str = "MOVE_BYTECODE_VERSION";
+
+fn set_bytecode_version(version: Option<u32>) {
+    // Note: this is a bit of a hack to get the compiler emit bytecode with the right
+    //       version. In the future, we should add an option to the Move package system
+    //       that would allow us to configure this directly instead of relying on
+    //       environment variables.
+    if let Some(ver) = version {
+        env::set_var(VAR_BYTECODE_VERSION, ver.to_string());
+    } else if env::var(VAR_BYTECODE_VERSION) == Err(env::VarError::NotPresent) {
+        env::set_var(VAR_BYTECODE_VERSION, "5");
     }
 }
 
@@ -281,6 +296,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<String>> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
             ..self
@@ -339,6 +355,7 @@ impl CliCommand<&'static str> for TestPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
@@ -411,6 +428,7 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let ProvePackage {
             move_options,
             prover_options,
@@ -450,6 +468,7 @@ impl CliCommand<&'static str> for DocumentPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let DocumentPackage {
             move_options,
             docgen_options,
@@ -581,6 +600,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let PublishPackage {
             move_options,
             txn_options,
@@ -597,7 +617,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
 
         // Send the compiled module and metadata using the code::publish_package_txn.
         let metadata = package.extract_metadata()?;
-        let payload = cached_packages::aptos_stdlib::code_publish_package_txn(
+        let payload = aptos_cached_packages::aptos_stdlib::code_publish_package_txn(
             bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
             compiled_units,
         );
@@ -646,6 +666,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let CreateResourceAccountAndPublishPackage {
             seed,
             address_name,
@@ -689,7 +710,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         );
         prompt_yes_with_override(&message, txn_options.prompt_options)?;
 
-        let payload = cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
+        let payload = aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
             bcs::to_bytes(&seed)?,
             bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
             compiled_units,
@@ -796,6 +817,7 @@ impl CliCommand<&'static str> for VerifyPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
         // First build the package locally to get the package metadata
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
@@ -916,6 +938,7 @@ impl CliCommand<&'static str> for CleanPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let path = self.move_options.get_package_path()?;
         let build_dir = path.join("build");
         // Only remove the build dir if it exists, allowing for users to still clean their cache

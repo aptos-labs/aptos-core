@@ -90,6 +90,7 @@ fn end_to_end() {
             .unwrap(),
             store,
             None, /* epoch_history */
+            vec![],
         )
         .run(),
     )

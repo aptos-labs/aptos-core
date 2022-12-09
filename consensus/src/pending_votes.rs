@@ -7,16 +7,16 @@
 //! when enough votes (or timeout votes) have been observed.
 //! Votes are automatically dropped when the structure goes out of scope.
 
+use aptos_consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
+use aptos_consensus_types::{
+    common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     ledger_info::LedgerInfoWithPartialSignatures,
     validator_verifier::{ValidatorVerifier, VerifyError},
-};
-use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
-use consensus_types::{
-    common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -269,13 +269,13 @@ impl fmt::Display for PendingVotes {
 #[cfg(test)]
 mod tests {
     use super::{PendingVotes, VoteReceptionResult};
+    use aptos_consensus_types::{
+        block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
+    };
     use aptos_crypto::HashValue;
     use aptos_types::{
         block_info::BlockInfo, ledger_info::LedgerInfo,
         validator_verifier::random_validator_verifier,
-    };
-    use consensus_types::{
-        block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
     };
     use itertools::Itertools;
 

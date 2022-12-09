@@ -17,6 +17,9 @@ can be enabled for the public.
 -  [Function `create_aggregator`](#0x1_aggregator_factory_create_aggregator)
 -  [Function `new_aggregator`](#0x1_aggregator_factory_new_aggregator)
 -  [Specification](#@Specification_1)
+    -  [Function `initialize_aggregator_factory`](#@Specification_1_initialize_aggregator_factory)
+    -  [Function `create_aggregator_internal`](#@Specification_1_create_aggregator_internal)
+    -  [Function `create_aggregator`](#@Specification_1_create_aggregator)
     -  [Function `new_aggregator`](#@Specification_1_new_aggregator)
 
 
@@ -190,7 +193,65 @@ Returns a new aggregator.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_strict;
+</code></pre>
+
+
+
+<a name="@Specification_1_initialize_aggregator_factory"></a>
+
+### Function `initialize_aggregator_factory`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_initialize_aggregator_factory">initialize_aggregator_factory</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+Make sure the caller is @aptos_framework.
+AggregatorFactory is not under the caller before creating the resource.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>&gt;(addr);
+<b>ensures</b> <b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>&gt;(addr);
+</code></pre>
+
+
+
+<a name="@Specification_1_create_aggregator_internal"></a>
+
+### Function `create_aggregator_internal`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator_internal">create_aggregator_internal</a>(limit: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_create_aggregator"></a>
+
+### Function `create_aggregator`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator">create_aggregator</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, limit: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>
+</code></pre>
+
+
+Make sure the caller is @aptos_framework.
+AggregatorFactory existed under the @aptos_framework when Creating a new aggregator.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>&gt;(@aptos_framework);
 </code></pre>
 
 

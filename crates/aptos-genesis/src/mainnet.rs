@@ -6,11 +6,11 @@ use aptos_config::config::{
     RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
+use aptos_framework::ReleaseBundle;
 use aptos_temppath::TempPath;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use framework::ReleaseBundle;
 use storage_interface::DbReaderWriter;
 use vm_genesis::{AccountBalance, EmployeePool, ValidatorWithCommissionRate};
 
@@ -143,6 +143,6 @@ impl MainnetGenesisInfo {
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);
-        executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
+        aptos_executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
     }
 }

@@ -15,8 +15,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `sha_512_and_ripemd_160_enabled`](#0x1_features_sha_512_and_ripemd_160_enabled)
 -  [Function `get_aptos_stdlib_chain_id_feature`](#0x1_features_get_aptos_stdlib_chain_id_feature)
 -  [Function `aptos_stdlib_chain_id_enabled`](#0x1_features_aptos_stdlib_chain_id_enabled)
--  [Function `get_collect_and_distribute_gas_fees_feature`](#0x1_features_get_collect_and_distribute_gas_fees_feature)
--  [Function `collect_and_distribute_gas_fees`](#0x1_features_collect_and_distribute_gas_fees)
+-  [Function `get_vm_binary_format_v6`](#0x1_features_get_vm_binary_format_v6)
+-  [Function `allow_vm_binary_format_v6`](#0x1_features_allow_vm_binary_format_v6)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -133,6 +133,17 @@ Lifetime: ephemeral
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_TREAT_FRIEND_AS_PRIVATE">TREAT_FRIEND_AS_PRIVATE</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="0x1_features_VM_BINARY_FORMAT_V6"></a>
+
+Whether to allow the use of binary format version v6.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V6">VM_BINARY_FORMAT_V6</a>: u64 = 5;
 </code></pre>
 
 
@@ -277,13 +288,13 @@ Lifetime: ephemeral
 
 </details>
 
-<a name="0x1_features_get_collect_and_distribute_gas_fees_feature"></a>
+<a name="0x1_features_get_vm_binary_format_v6"></a>
 
-## Function `get_collect_and_distribute_gas_fees_feature`
+## Function `get_vm_binary_format_v6`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collect_and_distribute_gas_fees_feature">get_collect_and_distribute_gas_fees_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_vm_binary_format_v6">get_vm_binary_format_v6</a>(): u64
 </code></pre>
 
 
@@ -292,20 +303,20 @@ Lifetime: ephemeral
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collect_and_distribute_gas_fees_feature">get_collect_and_distribute_gas_fees_feature</a>(): u64 { <a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_vm_binary_format_v6">get_vm_binary_format_v6</a>(): u64 { <a href="features.md#0x1_features_VM_BINARY_FORMAT_V6">VM_BINARY_FORMAT_V6</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_collect_and_distribute_gas_fees"></a>
+<a name="0x1_features_allow_vm_binary_format_v6"></a>
 
-## Function `collect_and_distribute_gas_fees`
+## Function `allow_vm_binary_format_v6`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_and_distribute_gas_fees">collect_and_distribute_gas_fees</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_allow_vm_binary_format_v6">allow_vm_binary_format_v6</a>(): bool
 </code></pre>
 
 
@@ -314,8 +325,9 @@ Lifetime: ephemeral
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_and_distribute_gas_fees">collect_and_distribute_gas_fees</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>)
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_allow_vm_binary_format_v6">allow_vm_binary_format_v6</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_VM_BINARY_FORMAT_V6">VM_BINARY_FORMAT_V6</a>)
 }
 </code></pre>
 

@@ -12,6 +12,9 @@ use crate::{
     utils,
 };
 use aptos_config::config::StateSyncDriverConfig;
+use aptos_data_streaming_service::data_notification::NotificationId;
+use aptos_event_notifications::EventSubscriptionService;
+use aptos_executor_types::ChunkExecutorTrait;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::state_store::state_key::StateKey;
@@ -25,9 +28,6 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
-use data_streaming_service::data_notification::NotificationId;
-use event_notifications::EventSubscriptionService;
-use executor_types::ChunkExecutorTrait;
 use futures::channel::mpsc::UnboundedSender;
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use mempool_notifications::MempoolNotificationSender;
@@ -663,10 +663,18 @@ fn spawn_state_snapshot_receiver<
                                     last_committed_state_index
                                 ))
                             );
+
+                            let operation_label =
+                                metrics::StorageSynchronizerOperations::SyncedStates.get_label();
                             metrics::set_gauge(
                                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                                metrics::StorageSynchronizerOperations::SyncedStates.get_label(),
+                                operation_label,
                                 last_committed_state_index as u64,
+                            );
+                            metrics::observe_value(
+                                &metrics::STORAGE_SYNCHRONIZER_CHUNK_SIZES,
+                                operation_label,
+                                num_state_values as u64,
                             );
 
                             if !all_states_synced {
