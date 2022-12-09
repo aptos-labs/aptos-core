@@ -1,5 +1,6 @@
 import React from "react";
 import Footer from "@theme-original/DocItem/Footer";
+import BrowserOnly from "@docusaurus/BrowserOnly";
 
 const Contributor = ({ contributor }) => {
   const { username, name, email } = contributor;
@@ -31,12 +32,16 @@ const Contributors = ({ contributors }) => {
 };
 
 export default function FooterWrapper(props) {
-  const contributorsNode = document.getElementById("aptos-doc-contributors")?.textContent;
-  const contributors = contributorsNode ? JSON.parse(contributorsNode) : [];
   return (
     <>
       <Footer {...props} />
-      {contributors.length > 0 && <Contributors contributors={contributors} />}
+      <BrowserOnly>
+        {() => {
+          const contributorsNode = document.getElementById("aptos-doc-contributors")?.textContent;
+          const contributors = contributorsNode ? JSON.parse(contributorsNode) : [];
+          return contributors.length > 0 && <Contributors contributors={contributors} />;
+        }}
+      </BrowserOnly>
     </>
   );
 }
