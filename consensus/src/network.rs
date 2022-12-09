@@ -66,10 +66,14 @@ pub struct NetworkReceivers {
 }
 
 #[async_trait::async_trait]
-pub trait QuorumStoreSender {
+pub(crate) trait QuorumStoreSender {
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
     async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>);
+
+    async fn broadcast_fragment(&mut self, fragment: Fragment);
+
+    async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore);
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -244,22 +248,6 @@ impl NetworkSender {
         self.send(msg, vec![recipient]).await
     }
 
-    // TODO: remove allow(dead_code) when quorum store implementation is added
-    #[allow(dead_code)]
-    pub async fn broadcast_fragment(&mut self, fragment: Fragment) {
-        fail_point!("consensus::send::broadcast_fragment", |_| ());
-        let msg = ConsensusMsg::FragmentMsg(Box::new(fragment));
-        self.broadcast_without_self(msg).await
-    }
-
-    // TODO: remove allow(dead_code) when quorum store implementation is added
-    #[allow(dead_code)]
-    pub async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore) {
-        fail_point!("consensus::send::proof_of_store", |_| ());
-        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(proof_of_store));
-        self.broadcast_without_self(msg).await
-    }
-
     /// Sends the vote to the chosen recipients (typically that would be the recipients that
     /// we believe could serve as proposers in the next round). The recipients on the receiving
     /// end are going to be notified about a new vote in the vote queue.
@@ -319,6 +307,18 @@ impl QuorumStoreSender for NetworkSender {
         fail_point!("consensus::send_signed_digest", |_| ());
         let msg = ConsensusMsg::SignedDigestMsg(Box::new(signed_digest));
         self.send(msg, recipients).await
+    }
+
+    async fn broadcast_fragment(&mut self, fragment: Fragment) {
+        fail_point!("consensus::send::broadcast_fragment", |_| ());
+        let msg = ConsensusMsg::FragmentMsg(Box::new(fragment));
+        self.broadcast_without_self(msg).await
+    }
+
+    async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore) {
+        fail_point!("consensus::send::proof_of_store", |_| ());
+        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(proof_of_store));
+        self.broadcast_without_self(msg).await
     }
 }
 

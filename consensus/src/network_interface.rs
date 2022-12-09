@@ -73,7 +73,7 @@ pub enum ConsensusMsg {
     /// Quorum Store: Send a signed batch digest. This is a vote for the batch and a promise that
     /// the batch of transactions was received and will be persisted until batch expiration.
     SignedDigestMsg(Box<SignedDigest>),
-    /// Quorum Store: Broadcast a completed proof of store (a digest that received 2f+1 votes).
+    /// Quorum Store: Broadcast a certified proof of store (a digest that received 2f+1 votes).
     ProofOfStoreMsg(Box<ProofOfStore>),
 }
 
