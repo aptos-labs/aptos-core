@@ -47,6 +47,7 @@ dirs = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
+move-binary-format = { workspace = true }
 move-cli = { workspace = true }
 move-command-line-common = { workspace = true }
 move-core-types = { workspace = true }

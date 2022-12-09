@@ -55,6 +55,7 @@ pub struct AptosVMImpl {
     version: Option<Version>,
     transaction_validation: Option<TransactionValidation>,
     metadata_cache: DashMap<ModuleId, Option<RuntimeModuleMetadata>>,
+    features: Features,
 }
 
 impl AptosVMImpl {
@@ -122,6 +123,7 @@ impl AptosVMImpl {
             abs_val_size_gas_params,
             gas_feature_version,
             features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+            features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             chain_id.id(),
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
@@ -134,6 +136,7 @@ impl AptosVMImpl {
             version: None,
             transaction_validation: None,
             metadata_cache: Default::default(),
+            features,
         };
         vm.version = Version::fetch_config(&storage);
         vm.transaction_validation = Self::get_transaction_validation(&StorageAdapter::new(state));
@@ -206,6 +209,10 @@ impl AptosVMImpl {
             error!("VM Startup Failed. Version Not Found");
             VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
         })
+    }
+
+    pub fn get_features(&self) -> &Features {
+        &self.features
     }
 
     pub fn check_gas<S: MoveResolverExt>(

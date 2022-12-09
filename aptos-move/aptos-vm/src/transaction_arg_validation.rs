@@ -106,7 +106,7 @@ fn is_valid_txn_arg<S: MoveResolverExt>(session: &SessionExt<S>, typ: &Type) -> 
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
     match typ {
-        Bool | U8 | U64 | U128 | Address => (true, false),
+        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => (true, false),
         Vector(inner) => is_valid_txn_arg(session, inner),
         Struct(idx) | StructInstantiation(idx, _) => {
             if let Some(st) = session.get_struct_type(*idx) {
@@ -201,8 +201,10 @@ fn validate_arg<S: MoveResolverExt>(
         // this is unreachable given the check in `is_valid_txn_arg` and the
         // fact we collect all arguments that involve strings and we validate
         // them and them only
-        Bool | U8 | U64 | U128 | Address | Signer | Reference(_) | MutableReference(_)
-        | TyParam(_) => unreachable!("Validation is only for arguments with String"),
+        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Reference(_)
+        | MutableReference(_) | TyParam(_) => {
+            unreachable!("Validation is only for arguments with String")
+        }
     })
 }
 

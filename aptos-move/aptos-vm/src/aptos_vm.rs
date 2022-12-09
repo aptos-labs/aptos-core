@@ -34,7 +34,7 @@ use aptos_types::{
     account_config,
     account_config::new_block_event_key,
     block_metadata::BlockMetadata,
-    on_chain_config::new_epoch_event_key,
+    on_chain_config::{new_epoch_event_key, FeatureFlag},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -46,6 +46,7 @@ use aptos_types::{
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
+    compatibility::Compatibility,
     errors::{verification_error, Location, PartialVMError, VMError, VMResult},
     CompiledModule, IndexKind,
 };
@@ -56,7 +57,6 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::move_vm::RuntimeConfig;
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::OnceCell;
@@ -72,7 +72,7 @@ use std::{
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
-static RUNTIME_CHECKS: OnceCell<RuntimeConfig> = OnceCell::new();
+static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 
 /// Remove this once the bundle is removed from the code.
@@ -116,25 +116,16 @@ impl AptosVM {
     }
 
     /// Sets runtime config when invoked the first time.
-    pub fn set_runtime_config(paranoid_type_checks: bool, paranoid_hot_potato_checks: bool) {
+    pub fn set_paranoid_type_checks(enable: bool) {
         // Only the first call succeeds, due to OnceCell semantics.
-        RUNTIME_CHECKS
-            .set(RuntimeConfig {
-                paranoid_type_checks,
-                paranoid_hot_potato_checks,
-            })
-            .ok();
+        PARANOID_TYPE_CHECKS.set(enable).ok();
     }
 
-    /// Get the concurrency level if already set, otherwise return default true
-    /// (paranoid execution mode).
-    pub fn get_runtime_config() -> RuntimeConfig {
-        match RUNTIME_CHECKS.get() {
-            Some(config) => *config,
-            None => RuntimeConfig {
-                paranoid_type_checks: true,
-                paranoid_hot_potato_checks: true,
-            },
+    /// Get the paranoid type check flag if already set, otherwise return default true
+    pub fn get_paranoid_checks() -> bool {
+        match PARANOID_TYPE_CHECKS.get() {
+            Some(enable) => *enable,
+            None => true,
         }
     }
 
@@ -528,7 +519,19 @@ impl AptosVM {
 
         Self::verify_module_bundle(&mut session, modules)?;
         session
-            .publish_module_bundle(modules.clone().into_inner(), txn_data.sender(), gas_meter)
+            .publish_module_bundle_with_compat_config(
+                modules.clone().into_inner(),
+                txn_data.sender(),
+                gas_meter,
+                Compatibility::new(
+                    true,
+                    true,
+                    !self
+                        .0
+                        .get_features()
+                        .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                ),
+            )
             .map_err(|e| e.into_vm_status())?;
 
         // call init function of the each module
@@ -585,7 +588,19 @@ impl AptosVM {
 
             // Publish the bundle and execute initializers
             session
-                .publish_module_bundle(bundle.into_inner(), destination, gas_meter)
+                .publish_module_bundle_with_compat_config(
+                    bundle.into_inner(),
+                    destination,
+                    gas_meter,
+                    Compatibility::new(
+                        true,
+                        true,
+                        !self
+                            .0
+                            .get_features()
+                            .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                    ),
+                )
                 .and_then(|_| {
                     self.execute_module_initialization(
                         session,

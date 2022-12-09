@@ -84,6 +84,7 @@ export type { TransactionSignature_Ed25519Signature } from './models/Transaction
 export type { TransactionSignature_MultiAgentSignature } from './models/TransactionSignature_MultiAgentSignature';
 export type { TransactionSignature_MultiEd25519Signature } from './models/TransactionSignature_MultiEd25519Signature';
 export type { U128 } from './models/U128';
+export type { U256 } from './models/U256';
 export type { U64 } from './models/U64';
 export type { UserTransaction } from './models/UserTransaction';
 export type { VersionedEvent } from './models/VersionedEvent';
@@ -177,6 +178,7 @@ export { $TransactionSignature_Ed25519Signature } from './schemas/$TransactionSi
 export { $TransactionSignature_MultiAgentSignature } from './schemas/$TransactionSignature_MultiAgentSignature';
 export { $TransactionSignature_MultiEd25519Signature } from './schemas/$TransactionSignature_MultiEd25519Signature';
 export { $U128 } from './schemas/$U128';
+export { $U256 } from './schemas/$U256';
 export { $U64 } from './schemas/$U64';
 export { $UserTransaction } from './schemas/$UserTransaction';
 export { $VersionedEvent } from './schemas/$VersionedEvent';

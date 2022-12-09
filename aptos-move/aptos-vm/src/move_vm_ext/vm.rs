@@ -14,6 +14,7 @@ use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_table_extension::NativeTableContext;
+use move_vm_runtime::config::VMConfig;
 use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
 use std::ops::Deref;
 
@@ -28,20 +29,30 @@ impl MoveVmExt {
         abs_val_size_gas_params: AbstractValueSizeGasParameters,
         gas_feature_version: u64,
         treat_friend_as_private: bool,
+        allow_binary_format_v6: bool,
         chain_id: u8,
     ) -> VMResult<Self> {
-        let mut config = verifier_config();
-        config.treat_friend_as_private = treat_friend_as_private;
+        // Note: binary format v6 adds a few new integer types and their corresponding instructions.
+        //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
+        //       the gas schedule hasn't been updated yet.
+        let max_binary_format_version = if allow_binary_format_v6 && gas_feature_version >= 5 {
+            6
+        } else {
+            5
+        };
 
         Ok(Self {
-            inner: MoveVM::new_with_configs(
+            inner: MoveVM::new_with_config(
                 aptos_natives(
                     native_gas_params,
                     abs_val_size_gas_params,
                     gas_feature_version,
                 ),
-                config,
-                crate::AptosVM::get_runtime_config(),
+                VMConfig {
+                    verifier: verifier_config(treat_friend_as_private),
+                    max_binary_format_version,
+                    paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
+                },
             )?,
             chain_id,
         })
@@ -92,14 +103,16 @@ impl Deref for MoveVmExt {
     }
 }
 
-pub fn verifier_config() -> VerifierConfig {
+pub fn verifier_config(treat_friend_as_private: bool) -> VerifierConfig {
     VerifierConfig {
         max_loop_depth: Some(5),
-        treat_friend_as_private: false,
+        treat_friend_as_private,
         max_generic_instantiation_length: Some(32),
         max_function_parameters: Some(128),
         max_basic_blocks: Some(1024),
         max_value_stack_size: 1024,
         max_type_nodes: Some(256),
+        max_dependency_depth: 256,
+        max_push_size: Some(10000),
     }
 }

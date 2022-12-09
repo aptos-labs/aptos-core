@@ -159,7 +159,7 @@ module aptos_framework::managed_coin {
     }
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
-    #[expected_failure(abort_code = 0x60001)]
+    #[expected_failure(abort_code = 0x60001, location = Self)]
     public entry fun fail_mint(
         source: signer,
         destination: signer,
@@ -181,7 +181,7 @@ module aptos_framework::managed_coin {
     }
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
-    #[expected_failure(abort_code = 0x60001)]
+    #[expected_failure(abort_code = 0x60001, location = Self)]
     public entry fun fail_burn(
         source: signer,
         destination: signer,

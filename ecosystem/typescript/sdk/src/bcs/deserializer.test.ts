@@ -89,6 +89,17 @@ describe("BCS Deserializer", () => {
     );
     expect(deserializer.deserializeU128()).toEqual(BigInt("1311768467750121216"));
   });
+  it("deserializes a uint256", () => {
+    let deserializer = new Deserializer(
+      new Uint8Array([
+        0x31, 0x30, 0x29, 0x28, 0x27, 0x26, 0x25, 0x24, 0x23, 0x22, 0x21, 0x20, 0x19, 0x18, 0x17, 0x16, 0x15, 0x14,
+        0x13, 0x12, 0x11, 0x10, 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00,
+      ]),
+    );
+    expect(deserializer.deserializeU256()).toEqual(
+      BigInt("0x0001020304050607080910111213141516171819202122232425262728293031"),
+    );
+  });
 
   it("deserializes a uleb128", () => {
     let deserializer = new Deserializer(new Uint8Array([0xcd, 0xea, 0xec, 0x31]));

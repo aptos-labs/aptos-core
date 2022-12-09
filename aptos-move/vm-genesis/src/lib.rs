@@ -107,6 +107,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         ChainId::test().id(),
     )
     .unwrap();
@@ -212,6 +213,7 @@ pub fn encode_genesis_change_set(
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         ChainId::test().id(),
     )
     .unwrap();
@@ -391,7 +393,7 @@ fn initialize(
 }
 
 fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
-    let features: Vec<u64> = vec![1, 2];
+    let features: Vec<u64> = vec![1, 2, 5];
 
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(bcs::to_bytes(&features).unwrap());
@@ -862,6 +864,7 @@ pub fn test_genesis_module_publishing() {
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         false,
+        true,
         ChainId::test().id(),
     )
     .unwrap();

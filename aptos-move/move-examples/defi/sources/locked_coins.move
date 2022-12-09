@@ -236,7 +236,7 @@ module defi::locked_coins {
     }
 
     #[test(aptos_framework = @0x1, sponsor = @0x123, recipient = @0x234)]
-    #[expected_failure(abort_code = 0x30002)]
+    #[expected_failure(abort_code = 0x30002, location = Self)]
     public entry fun test_recipient_cannot_claim_coins_if_lockup_has_not_expired(
         aptos_framework: &signer, sponsor: &signer, recipient: &signer) acquires Locks {
         let recipient_addr = signer::address_of(recipient);
@@ -249,7 +249,7 @@ module defi::locked_coins {
     }
 
     #[test(aptos_framework = @0x1, sponsor = @0x123, recipient = @0x234)]
-    #[expected_failure(abort_code = 0x60001)]
+    #[expected_failure(abort_code = 0x60001, location = Self)]
     public entry fun test_recipient_cannot_claim_twice(
         aptos_framework: &signer, sponsor: &signer, recipient: &signer) acquires Locks {
         let recipient_addr = signer::address_of(recipient);

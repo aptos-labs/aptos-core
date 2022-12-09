@@ -13,4 +13,19 @@ spec std::features {
         pragma opaque = true;
     }
 
+    spec set {
+        pragma opaque;
+    }
+
+    spec contains {
+        pragma opaque;
+    }
+
+    spec is_enabled(feature: u64): bool {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_is_enabled(feature);
+    }
+
+    spec fun spec_is_enabled(feature: u64): bool;
 }
