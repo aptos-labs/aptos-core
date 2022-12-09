@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainConsensusConfig {
     V1(ConsensusConfigV1),
-    V2(ConsensusConfigV2),
+    V2(ConsensusConfigV1),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -66,7 +66,7 @@ impl OnChainConsensusConfig {
     pub fn enable_quorum_store(&self) -> bool {
         match &self {
             OnChainConsensusConfig::V1(_config) => false,
-            OnChainConsensusConfig::V2(config) => config.enable_quorum_store,
+            OnChainConsensusConfig::V2(_config) => true,
         }
     }
 }
@@ -74,7 +74,7 @@ impl OnChainConsensusConfig {
 /// This is used when on-chain config is not initialized.
 impl Default for OnChainConsensusConfig {
     fn default() -> Self {
-        OnChainConsensusConfig::V2(ConsensusConfigV2::default())
+        OnChainConsensusConfig::V1(ConsensusConfigV1::default())
     }
 }
 
@@ -128,44 +128,6 @@ impl Default for ConsensusConfigV1 {
                     use_history_from_previous_epoch_max_count: 5,
                 }),
             ),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-pub struct ConsensusConfigV2 {
-    pub decoupled_execution: bool,
-    pub back_pressure_limit: u64,
-    pub exclude_round: u64,
-    pub proposer_election_type: ProposerElectionType,
-    pub max_failed_authors_to_store: usize,
-    pub enable_quorum_store: bool,
-}
-
-impl Default for ConsensusConfigV2 {
-    fn default() -> Self {
-        Self {
-            decoupled_execution: true,
-            back_pressure_limit: 10,
-            exclude_round: 20,
-            max_failed_authors_to_store: 10,
-            proposer_election_type: ProposerElectionType::LeaderReputation(
-                LeaderReputationType::ProposerAndVoter(ProposerAndVoterConfig {
-                    active_weight: 1000,
-                    inactive_weight: 10,
-                    failed_weight: 1,
-                    failure_threshold_percent: 10, // = 10%
-                    // In each round we get stastics for the single proposer
-                    // and large number of validators. So the window for
-                    // the proposers needs to be significantly larger
-                    // to have enough useful statistics.
-                    proposer_window_num_validators_multiplier: 10,
-                    voter_window_num_validators_multiplier: 1,
-                    weight_by_voting_power: true,
-                    use_history_from_previous_epoch_max_count: 5,
-                }),
-            ),
-            enable_quorum_store: false,
         }
     }
 }
