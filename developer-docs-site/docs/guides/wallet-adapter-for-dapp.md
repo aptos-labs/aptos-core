@@ -3,7 +3,7 @@ title: "For Dapps"
 id: "wallet-adapter-for-dapp"
 ---
 
-# Wallet Adapter For Dapp builders
+# Wallet Adapter For Dapp Builders
 
 Imagine you have a great idea for a dapp and you want to start building it. Eventually, you will need to integrate a wallet or multiple wallets so your users can interact with the Aptos blockchain.
 Implementing wallet integration can be difficult in supporting all edge cases, new features, unsupported functionality. And it can be even harder to support multiple wallets.
