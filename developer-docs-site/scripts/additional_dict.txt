@@ -164,6 +164,7 @@ STM
 SYNACK
 Scalable
 SeaLevel
+SHA
 SignMessagePayload
 SignerCap
 Skylake

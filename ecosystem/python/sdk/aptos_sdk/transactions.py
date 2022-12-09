@@ -256,6 +256,9 @@ class ScriptArgument:
     ADDRESS: int = 3
     U8_VECTOR: int = 4
     BOOL: int = 5
+    U16: int = 6
+    U32: int = 7
+    U256: int = 8
 
     variant: int
     value: typing.Any
@@ -272,10 +275,16 @@ class ScriptArgument:
         variant = deserializer.u8()
         if variant == ScriptArgument.U8:
             value: typing.Any = deserializer.u8()
+        elif variant == ScriptArgument.U16:
+            value = deserializer.u16()
+        elif variant == ScriptArgument.U32:
+            value = deserializer.u32()
         elif variant == ScriptArgument.U64:
             value = deserializer.u64()
         elif variant == ScriptArgument.U128:
             value = deserializer.u128()
+        elif variant == ScriptArgument.U256:
+            value = deserializer.u256()
         elif variant == ScriptArgument.ADDRESS:
             value = AccountAddress.deserialize(deserializer)
         elif variant == ScriptArgument.U8_VECTOR:
@@ -290,10 +299,16 @@ class ScriptArgument:
         serializer.u8(self.variant)
         if self.variant == ScriptArgument.U8:
             serializer.u8(self.value)
+        if self.variant == ScriptArgument.U16:
+            serializer.u16(self.value)
+        if self.variant == ScriptArgument.U32:
+            serializer.u32(self.value)
         elif self.variant == ScriptArgument.U64:
             serializer.u64(self.value)
         elif self.variant == ScriptArgument.U128:
             serializer.u128(self.value)
+        if self.variant == ScriptArgument.U256:
+            serializer.u256(self.value)
         elif self.variant == ScriptArgument.ADDRESS:
             serializer.struct(self.value)
         elif self.variant == ScriptArgument.U8_VECTOR:

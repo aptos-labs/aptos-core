@@ -3,14 +3,14 @@ module std::fixed_point32_tests {
     use std::fixed_point32;
 
     #[test]
-    #[expected_failure(abort_code = 0x10001)]
+    #[expected_failure(abort_code = 0x10001, location = Self)]
     fun create_div_zero() {
         // A denominator of zero should cause an arithmetic error.
         fixed_point32::create_from_rational(2, 0);
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20005)]
+    #[expected_failure(abort_code = 0x20005, location = Self)]
     fun create_overflow() {
         // The maximum value is 2^32 - 1. Check that anything larger aborts
         // with an overflow.
@@ -18,7 +18,7 @@ module std::fixed_point32_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20005)]
+    #[expected_failure(abort_code = 0x20005, location = Self)]
     fun create_underflow() {
         // The minimum non-zero value is 2^-32. Check that anything smaller
         // aborts.
@@ -32,7 +32,7 @@ module std::fixed_point32_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x10004)]
+    #[expected_failure(abort_code = 0x10004, location = Self)]
     fun divide_by_zero() {
         // Dividing by zero should cause an arithmetic error.
         let f = fixed_point32::create_from_raw_value(0);
@@ -40,7 +40,7 @@ module std::fixed_point32_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20002)]
+    #[expected_failure(abort_code = 0x20002, location = Self)]
     fun divide_overflow_small_divisore() {
         let f = fixed_point32::create_from_raw_value(1); // 0x0.00000001
         // Divide 2^32 by the minimum fractional value. This should overflow.
@@ -48,7 +48,7 @@ module std::fixed_point32_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20002)]
+    #[expected_failure(abort_code = 0x20002, location = Self)]
     fun divide_overflow_large_numerator() {
         let f = fixed_point32::create_from_rational(1, 2); // 0.5
         // Divide the maximum u64 value by 0.5. This should overflow.
@@ -56,7 +56,7 @@ module std::fixed_point32_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20003)]
+    #[expected_failure(abort_code = 0x20003, location = Self)]
     fun multiply_overflow_small_multiplier() {
         let f = fixed_point32::create_from_rational(3, 2); // 1.5
         // Multiply the maximum u64 value by 1.5. This should overflow.
@@ -64,7 +64,7 @@ module std::fixed_point32_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20003)]
+    #[expected_failure(abort_code = 0x20003, location = Self)]
     fun multiply_overflow_large_multiplier() {
         let f = fixed_point32::create_from_raw_value(18446744073709551615);
         // Multiply 2^33 by the maximum fixed-point value. This should overflow.

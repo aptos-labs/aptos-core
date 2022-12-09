@@ -7,7 +7,7 @@ id: "blocks"
 
 Aptos is a per-transaction versioned database. When transactions are executed, the resulting state of each transaction is stored separately and thus allows for more granular data access. This is different from other blockchains where only the resulting state of a block (a group of transactions) is stored.
 
-Blocks are still a fundamental unit within Aptos. Transactions are batched and executed together in a block. In addition, the [proofs](../concepts/txns-states/#proofs) within storage are at the block-level granularity. The number of transactions within a block varies depending on network activity and a configurable maximum block size limit. As the blockchain becomes busier, blocks will likely contain more transactions.
+Blocks are still a fundamental unit within Aptos. Transactions are batched and executed together in a block. In addition, the [proofs](./txns-states.md#proofs) within storage are at the block-level granularity. The number of transactions within a block varies depending on network activity and a configurable maximum block size limit. As the blockchain becomes busier, blocks will likely contain more transactions.
 
 ## System transactions
 
