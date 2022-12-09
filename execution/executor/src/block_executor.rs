@@ -206,7 +206,8 @@ where
                 });
                 ChunkOutput::by_transaction_execution::<V>(transactions, state_view)?
             };
-            chunk_output.trace_log_transaction_status();
+            // to print txn status for debugging, uncomment:
+            //  chunk_output.trace_log_transaction_status();
 
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["apply_to_ledger"])

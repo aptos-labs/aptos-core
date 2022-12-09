@@ -10,6 +10,7 @@ use crate::{
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
+use aptos_metrics_core::{exponential_buckets, register_histogram, Histogram};
 use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_state_view::TStateView;
 use num_cpus;
@@ -22,6 +23,50 @@ pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .thread_name(|index| format!("par_exec_{}", index))
         .build()
         .unwrap()
+});
+
+pub static BLOCK_EXECUTOR_WORK_TASK_WITH_SCOPE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "block_executor_work_task_with_scope_seconds",
+        // metric description
+        "The time spent in seconds of vm block execution in Aptos executor",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static BLOCK_EXECUTOR_EXECUTOR_INIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "block_executor_executor_init_seconds",
+        // metric description
+        "The time spent in seconds of vm block execution in Aptos executor",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static BLOCK_EXECUTOR_TASK_VALIDATE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "block_executor_task_validate_seconds",
+        // metric description
+        "The time spent in seconds of vm block execution in Aptos executor",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static BLOCK_EXECUTOR_TASK_EXECUTE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "block_executor_task_execute_seconds",
+        // metric description
+        "The time spent in seconds of vm block execution in Aptos executor",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
 });
 
 pub struct BlockExecutor<T, E, S> {
@@ -62,6 +107,7 @@ where
         executor: &E,
         base_view: &S,
     ) -> SchedulerTask<'a> {
+        let _timer = BLOCK_EXECUTOR_TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute];
 
@@ -137,6 +183,7 @@ where
     ) -> SchedulerTask<'a> {
         use MVHashMapError::*;
         use MVHashMapOutput::*;
+        let _timer = BLOCK_EXECUTOR_TASK_VALIDATE_SECONDS.start_timer();
 
         let (idx_to_validate, incarnation) = version_to_validate;
         let read_set = last_input_output
@@ -185,8 +232,11 @@ where
         scheduler: &Scheduler,
         base_view: &S,
     ) {
+        let _timer = BLOCK_EXECUTOR_WORK_TASK_WITH_SCOPE_SECONDS.start_timer();
         // Make executor for each task. TODO: fast concurrent executor.
+        let init_timer = BLOCK_EXECUTOR_EXECUTOR_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
+        drop(init_timer);
 
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {

@@ -150,7 +150,7 @@ fn run_and_assert<K, V>(
     transaction_gens: Vec<(Index, Operator<V>)>,
 ) -> Result<(), TestCaseError>
 where
-    K: PartialOrd + Send + Clone + Hash + Eq + Sync,
+    K: Debug + PartialOrd + Send + Clone + Hash + Eq + Sync,
     V: Send + Into<Vec<u8>> + Debug + Clone + PartialEq + Sync,
 {
     let transactions: Vec<(K, Operator<V>)> = transaction_gens
