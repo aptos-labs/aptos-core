@@ -524,5 +524,5 @@ pub(crate) async fn process_config_update<V>(
         );
     }
     *broadcast_within_validator_network.write() =
-        !consensus_config.unwrap_or_default().enable_quorum_store();
+        !consensus_config.unwrap_or_default().quorum_store_enabled();
 }
