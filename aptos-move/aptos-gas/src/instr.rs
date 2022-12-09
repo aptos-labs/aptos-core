@@ -30,8 +30,11 @@ crate::params::define_gas_parameters!(
         // stack
         [pop: InternalGas, "pop", 40 * MUL],
         [ld_u8: InternalGas, "ld_u8", 60 * MUL],
+        [ld_u16: InternalGas, optional "ld_u16", 60 * MUL],
+        [ld_u32: InternalGas, optional "ld_u32", 60 * MUL],
         [ld_u64: InternalGas, "ld_u64", 60 * MUL],
         [ld_u128: InternalGas, "ld_u128", 80 * MUL],
+        [ld_u256: InternalGas, optional "ld_u256", 80 * MUL],
         [ld_true: InternalGas, "ld_true", 60 * MUL],
         [ld_false: InternalGas, "ld_false", 60 * MUL],
         [ld_const_base: InternalGas, "ld_const.base", 650 * MUL],
@@ -108,8 +111,11 @@ crate::params::define_gas_parameters!(
         [freeze_ref: InternalGas, "freeze_ref", 10 * MUL],
         // casting
         [cast_u8: InternalGas, "cast_u8", 120 * MUL],
+        [cast_u16: InternalGas, optional "cast_u16", 120 * MUL],
+        [cast_u32: InternalGas, optional "cast_u32", 120 * MUL],
         [cast_u64: InternalGas, "cast_u64", 120 * MUL],
         [cast_u128: InternalGas, "cast_u128", 120 * MUL],
+        [cast_u256: InternalGas, optional "cast_u256", 120 * MUL],
         // arithmetic
         [add: InternalGas, "add", 160 * MUL],
         [sub: InternalGas, "sub", 160 * MUL],
@@ -218,8 +224,11 @@ impl InstructionGasParameters {
             Branch => self.branch,
 
             LdU8 => self.ld_u8,
+            LdU16 => self.ld_u16,
+            LdU32 => self.ld_u32,
             LdU64 => self.ld_u64,
             LdU128 => self.ld_u128,
+            LdU256 => self.ld_u256,
             LdTrue => self.ld_true,
             LdFalse => self.ld_false,
 
@@ -232,8 +241,11 @@ impl InstructionGasParameters {
             FreezeRef => self.freeze_ref,
 
             CastU8 => self.cast_u8,
+            CastU16 => self.cast_u16,
+            CastU32 => self.cast_u32,
             CastU64 => self.cast_u64,
             CastU128 => self.cast_u128,
+            CastU256 => self.cast_u256,
 
             Add => self.add,
             Sub => self.sub,

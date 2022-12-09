@@ -27,10 +27,10 @@ use aptos_data_client::AptosDataClient;
 use aptos_data_streaming_service::streaming_client::{
     DataStreamingClient, NotificationAndFeedback, NotificationFeedback,
 };
+use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::waypoint::Waypoint;
-use event_notifications::EventSubscriptionService;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
 use std::{sync::Arc, time::SystemTime};

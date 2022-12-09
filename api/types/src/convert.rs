@@ -600,8 +600,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         Ok(match layout {
             MoveTypeLayout::Bool => Bool(serde_json::from_value::<bool>(val)?),
             MoveTypeLayout::U8 => U8(serde_json::from_value::<u8>(val)?),
+            MoveTypeLayout::U16 => U16(serde_json::from_value::<u16>(val)?),
+            MoveTypeLayout::U32 => U32(serde_json::from_value::<u32>(val)?),
             MoveTypeLayout::U64 => serde_json::from_value::<crate::U64>(val)?.into(),
             MoveTypeLayout::U128 => serde_json::from_value::<crate::U128>(val)?.into(),
+            MoveTypeLayout::U256 => serde_json::from_value::<crate::U256>(val)?.into(),
             MoveTypeLayout::Address => serde_json::from_value::<crate::Address>(val)?.into(),
             MoveTypeLayout::Vector(item_layout) => {
                 self.try_into_vm_value_vector(item_layout.as_ref(), val)?

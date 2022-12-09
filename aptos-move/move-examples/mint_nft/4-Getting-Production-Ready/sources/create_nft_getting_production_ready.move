@@ -358,7 +358,7 @@ module mint_nft::create_nft_getting_production_ready {
     }
 
     #[test (origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x50002)]
+    #[expected_failure(abort_code = 0x50002, location = mint_nft::create_nft_getting_production_ready)]
     public entry fun test_minting_expired(origin_account: signer, resource_account: signer, nft_receiver: signer, aptos_framework: signer) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
         set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 100000000001);
@@ -373,7 +373,7 @@ module mint_nft::create_nft_getting_production_ready {
     }
 
     #[test (origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, admin = @admin_addr, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x50002)]
+    #[expected_failure(abort_code = 0x50002, location = mint_nft::create_nft_getting_production_ready)]
     public entry fun test_update_expiration_time(origin_account: signer, resource_account: signer, admin: signer, nft_receiver: signer, aptos_framework: signer) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
         set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);
@@ -392,7 +392,7 @@ module mint_nft::create_nft_getting_production_ready {
     }
 
     #[test (origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, admin = @admin_addr, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x50003)]
+    #[expected_failure(abort_code = 0x50003, location = mint_nft::create_nft_getting_production_ready)]
     public entry fun test_update_minting_enabled(origin_account: signer, resource_account: signer, admin: signer, nft_receiver: signer, aptos_framework: signer) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
         set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);
@@ -411,7 +411,7 @@ module mint_nft::create_nft_getting_production_ready {
     }
 
     #[test (origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x10006)]
+    #[expected_failure(abort_code = 0x10006, location = mint_nft::create_nft_getting_production_ready)]
     public entry fun test_invalid_signature(origin_account: signer, resource_account: signer, nft_receiver: signer, aptos_framework: signer) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
         set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);

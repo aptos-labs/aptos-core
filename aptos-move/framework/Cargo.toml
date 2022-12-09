@@ -1,5 +1,5 @@
 [package]
-name = "framework"
+name = "aptos-framework"
 description = "Aptos stdlib"
 version = "0.1.0"
 
@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
+aptos-gas-algebra-ext =  { workspace = true }
 aptos-module-verifier = { workspace = true }
 aptos-sdk-builder = { workspace = true }
 aptos-state-view = { workspace = true }
@@ -27,7 +28,6 @@ clap = { workspace = true }
 codespan-reporting = { workspace = true }
 curve25519-dalek = { workspace = true }
 flate2 = { workspace = true }
-gas-algebra-ext =  { workspace = true }
 include_dir = { workspace = true }
 itertools = { workspace = true }
 libsecp256k1 = { workspace = true }

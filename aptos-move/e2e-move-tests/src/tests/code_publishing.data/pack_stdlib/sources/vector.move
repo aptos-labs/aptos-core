@@ -192,6 +192,11 @@ module std::vector {
             v1[0..i] == v2[0..i] &&
             v1[i..len(v1)] == v2[i + 1..len(v2)]
         }
+
+        /// Check if `v` contains `e`.
+        fun spec_contains<Element>(v: vector<Element>, e: Element): bool {
+            exists x in v: x == e
+        }
     }
 
 }

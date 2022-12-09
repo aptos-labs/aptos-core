@@ -17,13 +17,13 @@ anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-framework = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
-framework = { workspace = true }
 hex = { workspace = true }
 language-e2e-tests = { workspace = true }
 move-binary-format = { workspace = true, features = [ "fuzzing" ] }

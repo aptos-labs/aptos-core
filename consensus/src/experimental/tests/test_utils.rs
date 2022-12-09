@@ -10,6 +10,7 @@ use aptos_consensus_types::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
+use aptos_executor_types::StateComputeResult;
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
 use aptos_types::{
@@ -18,7 +19,6 @@ use aptos_types::{
     validator_verifier::random_validator_verifier,
     waypoint::Waypoint,
 };
-use executor_types::StateComputeResult;
 use safety_rules::{
     test_utils::{make_proposal_with_parent, make_proposal_with_qc},
     PersistentSafetyStorage, SafetyRulesManager,
@@ -69,7 +69,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
     assert!(num_blocks > 0);
 
     let p1 = if let Some(parent) = some_parent {
-        make_proposal_with_parent(Payload::empty(), init_round, &parent, None, signer)
+        make_proposal_with_parent(Payload::empty(false), init_round, &parent, None, signer)
     } else {
         make_proposal_with_qc(init_round, init_qc.unwrap(), signer)
     };
@@ -80,7 +80,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
         println!("Generating {}", i);
         let parent = proposals.last().unwrap();
         let proposal =
-            make_proposal_with_parent(Payload::empty(), init_round + i, parent, None, signer);
+            make_proposal_with_parent(Payload::empty(false), init_round + i, parent, None, signer);
         proposals.push(proposal);
     }
 

@@ -6,6 +6,7 @@
 use crate::logging::{LogEntry, LogSchema};
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
@@ -14,7 +15,6 @@ use aptos_types::{
     transaction::Transaction,
 };
 use aptos_vm::VMExecutor;
-use executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use fail::fail_point;
 use scratchpad::SparseMerkleTree;
 use std::{marker::PhantomData, sync::Arc};

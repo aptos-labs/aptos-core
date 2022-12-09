@@ -9278,9 +9278,9 @@ components:
 
         Move `bool` type value is serialized into `boolean`.
 
-        Move `u8` type value is serialized into `integer`.
+        Move `u8`, `u16` and `u32` type value is serialized into `integer`.
 
-        Move `u64` and `u128` type value is serialized into `string`.
+        Move `u64`, `u128` and `u256` type value is serialized into `string`.
 
         Move `address` type value (32 byte Aptos account address) is serialized into a HexEncodedBytes string.
         For example:
@@ -9326,8 +9326,11 @@ components:
             Values:
               - bool
               - u8
+              - u16
+              - u32
               - u64
               - u128
+              - u256
               - address
               - signer
               - vector: `vector<{non-reference MoveTypeId}>`
@@ -9352,8 +9355,13 @@ components:
       anyOf:
       - type: integer
         format: uint8
+      - type: integer
+        format: uint16
+      - type: integer
+        format: uint32
       - $ref: '#/components/schemas/U64'
       - $ref: '#/components/schemas/U128'
+      - $ref: '#/components/schemas/U256'
       - type: boolean
       - $ref: '#/components/schemas/Address'
       - type: array
@@ -9757,12 +9765,21 @@ components:
             $ref: '#/components/schemas/TransactionsBatchSingleSubmissionFailure'
     U128:
       type: string
-      format: uint64
+      format: uint128
       description: |
         A string containing a 128-bit unsigned integer.
 
         We represent u128 values as a string to ensure compatibility with languages such
-        as JavaScript that do not parse u64s in JSON natively.
+        as JavaScript that do not parse u128s in JSON natively.
+      example: '340282366920938463463374607431768211454'
+    U256:
+      type: string
+      format: uint256
+      description: |
+        A string containing a 256-bit unsigned integer.
+
+        We represent u256 values as a string to ensure compatibility with languages such
+        as JavaScript that do not parse u256s in JSON natively.
       example: '340282366920938463463374607431768211454'
     U64:
       type: string

@@ -92,6 +92,7 @@ async fn main_impl() -> Result<()> {
                 global_opt,
                 storage.init_storage().await?,
                 None, /* epoch_history */
+                vec![],
             )
             .run()
             .await?;

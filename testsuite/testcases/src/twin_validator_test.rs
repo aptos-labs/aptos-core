@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
+use aptos_forge::{NetworkContext, NetworkTest, NodeExt, Test};
 use aptos_sdk::move_types::account_address::AccountAddress;
-use forge::{NetworkContext, NetworkTest, NodeExt, Test};
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 

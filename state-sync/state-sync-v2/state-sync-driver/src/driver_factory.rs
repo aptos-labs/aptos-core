@@ -15,10 +15,10 @@ use aptos_config::config::NodeConfig;
 use aptos_consensus_notifications::ConsensusNotificationListener;
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_data_streaming_service::streaming_client::StreamingServiceClient;
+use aptos_event_notifications::{EventNotificationSender, EventSubscriptionService};
+use aptos_executor_types::ChunkExecutorTrait;
 use aptos_infallible::Mutex;
 use aptos_types::{move_resource::MoveStorage, waypoint::Waypoint};
-use event_notifications::{EventNotificationSender, EventSubscriptionService};
-use executor_types::ChunkExecutorTrait;
 use futures::{channel::mpsc, executor::block_on};
 use mempool_notifications::MempoolNotificationSender;
 use std::sync::{

@@ -3,11 +3,11 @@
 
 use crate::{LoadDestination, NetworkLoadTest};
 use anyhow::{anyhow, bail, Context};
-use aptos_logger::{info, warn};
-use forge::test_utils::consensus_utils::{
+use aptos_forge::test_utils::consensus_utils::{
     test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
 };
-use forge::{NetworkContext, NetworkTest, Result, Swarm, SwarmExt, Test};
+use aptos_forge::{NetworkContext, NetworkTest, Result, Swarm, SwarmExt, Test};
+use aptos_logger::{info, warn};
 use rand::Rng;
 use std::collections::HashSet;
 use std::time::Duration;

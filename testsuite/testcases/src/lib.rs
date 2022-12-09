@@ -21,12 +21,12 @@ pub mod validator_join_leave_test;
 pub mod validator_reboot_stress_test;
 
 use anyhow::{anyhow, Context};
-use aptos_logger::info;
-use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
-use forge::{
+use aptos_forge::{
     EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
     TxnEmitter, TxnStats, Version,
 };
+use aptos_logger::info;
+use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};

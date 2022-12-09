@@ -13,13 +13,13 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
     test_utils::{create_and_fund_account, transfer_coins_non_blocking},
 };
-use aptos_logger::info;
-use forge::{
+use aptos_forge::{
     test_utils::consensus_utils::{
         no_failure_injection, test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
     },
     LocalSwarm, Swarm, SwarmExt,
 };
+use aptos_logger::info;
 use rand::{self, rngs::SmallRng, Rng, SeedableRng};
 
 pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {

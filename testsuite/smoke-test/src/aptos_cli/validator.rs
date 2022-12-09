@@ -10,6 +10,7 @@ use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_bitvec::BitVec;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
+use aptos_forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::{Client, State};
@@ -20,7 +21,6 @@ use aptos_types::on_chain_config::{
     ProposerElectionType, ValidatorSet,
 };
 use aptos_types::PeerId;
-use forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt::Write;

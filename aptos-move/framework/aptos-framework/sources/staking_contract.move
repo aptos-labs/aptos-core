@@ -873,7 +873,7 @@ module aptos_framework::staking_contract {
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
-    #[expected_failure(abort_code = 0x80006)]
+    #[expected_failure(abort_code = 0x80006, location = Self)]
     public entry fun test_staker_cannot_create_same_staking_contract_multiple_times(
         aptos_framework: &signer,
         staker: &signer,
@@ -886,7 +886,7 @@ module aptos_framework::staking_contract {
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
-    #[expected_failure(abort_code = 0x10002)]
+    #[expected_failure(abort_code = 0x10002, location = Self)]
     public entry fun test_staker_cannot_create_staking_contract_with_invalid_commission(
         aptos_framework: &signer,
         staker: &signer,
@@ -896,7 +896,7 @@ module aptos_framework::staking_contract {
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
-    #[expected_failure(abort_code = 0x10001)]
+    #[expected_failure(abort_code = 0x10001, location = Self)]
     public entry fun test_staker_cannot_create_staking_contract_with_less_than_min_stake_required(
         aptos_framework: &signer,
         staker: &signer,

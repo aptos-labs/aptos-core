@@ -56,10 +56,10 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::{collections::BTreeMap, mem, path::PathBuf, str::FromStr, time::Duration};
 use tempfile::TempDir;
-use thiserror::private::PathAsDisplay;
+use thiserror::__private::PathAsDisplay;
 
 #[cfg(feature = "cli-framework-test-move")]
-use thiserror::private::PathAsDisplay;
+use thiserror::__private::PathAsDisplay;
 
 use tokio::time::{sleep, Instant};
 
@@ -951,6 +951,7 @@ impl CliTestFramework {
             output_dir: None,
             named_addresses: Self::named_addresses(account_strs),
             skip_fetch_latest_git_deps: true,
+            bytecode_version: None,
         }
     }
 

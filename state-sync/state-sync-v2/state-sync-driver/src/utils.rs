@@ -15,13 +15,13 @@ use aptos_data_streaming_service::{
     data_notification::DataNotification, data_stream::DataStreamListener,
     streaming_client::DataStreamingClient,
 };
+use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
     transaction::Version,
 };
-use event_notifications::EventSubscriptionService;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
 use std::{sync::Arc, time::Duration};

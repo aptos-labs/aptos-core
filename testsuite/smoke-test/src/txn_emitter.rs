@@ -3,10 +3,10 @@
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 use anyhow::ensure;
-use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
-use forge::{
+use aptos_forge::{
     EmitJobMode, EmitJobRequest, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats,
 };
+use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use rand::{rngs::OsRng, SeedableRng};
 use std::time::Duration;
 use tokio::runtime::Builder;

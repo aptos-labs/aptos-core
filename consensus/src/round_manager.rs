@@ -67,10 +67,14 @@ pub enum UnverifiedEvent {
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
 
 impl UnverifiedEvent {
-    pub fn verify(self, validator: &ValidatorVerifier) -> Result<VerifiedEvent, VerifyError> {
+    pub fn verify(
+        self,
+        validator: &ValidatorVerifier,
+        quorum_store_enabled: bool,
+    ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
             UnverifiedEvent::ProposalMsg(p) => {
-                p.verify(validator)?;
+                p.verify(validator, quorum_store_enabled)?;
                 VerifiedEvent::ProposalMsg(p)
             }
             UnverifiedEvent::VoteMsg(v) => {

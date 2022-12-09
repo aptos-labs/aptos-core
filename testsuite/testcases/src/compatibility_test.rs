@@ -3,8 +3,8 @@
 
 use crate::{batch_update, generate_traffic};
 use anyhow::bail;
+use aptos_forge::{NetworkContext, NetworkTest, Result, SwarmExt, Test};
 use aptos_logger::info;
-use forge::{NetworkContext, NetworkTest, Result, SwarmExt, Test};
 use tokio::{runtime::Runtime, time::Duration};
 
 pub struct SimpleValidatorUpgrade;

@@ -4,18 +4,19 @@
 use crate::{
     error::StateSyncError,
     experimental::buffer_manager::OrderedBlocks,
+    payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
 };
 use anyhow::{format_err, Result};
 use aptos_consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
+use aptos_executor_types::{Error, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
 };
-use executor_types::{Error, StateComputeResult};
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
 use std::{collections::HashMap, sync::Arc};
@@ -25,6 +26,7 @@ pub struct MockStateComputer {
     executor_channel: UnboundedSender<OrderedBlocks>,
     consensus_db: Arc<MockStorage>,
     block_cache: Mutex<HashMap<HashValue, Payload>>,
+    payload_manager: Arc<PayloadManager>,
 }
 
 impl MockStateComputer {
@@ -38,6 +40,7 @@ impl MockStateComputer {
             executor_channel,
             consensus_db,
             block_cache: Mutex::new(HashMap::new()),
+            payload_manager: Arc::from(PayloadManager::DirectMempool),
         }
     }
 
@@ -50,18 +53,15 @@ impl MockStateComputer {
 
         self.consensus_db
             .commit_to_storage(ordered_proof.ledger_info().clone());
-
         // mock sending commit notif to state sync
         let mut txns = vec![];
         for block in &ordered_blocks {
-            let mut payload = self
-                .block_cache
+            self.block_cache
                 .lock()
                 .remove(&block.id())
-                .ok_or_else(|| format_err!("Cannot find block"))?
-                .into_iter()
-                .collect();
-            txns.append(&mut payload);
+                .ok_or_else(|| format_err!("Cannot find block"))?;
+            let mut payload_txns = self.payload_manager.get_transactions(block.block()).await?;
+            txns.append(&mut payload_txns);
         }
         // they may fail during shutdown
         let _ = self.state_sync_client.unbounded_send(txns);
@@ -84,7 +84,7 @@ impl StateComputer for MockStateComputer {
     ) -> Result<StateComputeResult, Error> {
         self.block_cache.lock().insert(
             block.id(),
-            block.payload().unwrap_or(&Payload::empty()).clone(),
+            block.payload().unwrap_or(&Payload::empty(false)).clone(),
         );
         let result = StateComputeResult::new_dummy();
         Ok(result)
@@ -131,7 +131,7 @@ impl StateComputer for MockStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState) {}
+    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>) {}
 }
 
 pub struct EmptyStateComputer;
@@ -159,7 +159,7 @@ impl StateComputer for EmptyStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState) {}
+    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>) {}
 }
 
 /// Random Compute Result State Computer
@@ -210,5 +210,5 @@ impl StateComputer for RandomComputeResultStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState) {}
+    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>) {}
 }

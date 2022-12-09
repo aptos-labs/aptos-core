@@ -19,6 +19,7 @@ pub struct Features {
 pub enum FeatureFlag {
     CodeDependencyCheck,
     TreatFriendAsPrivate,
+    VMBinaryFormatV6,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -85,6 +86,7 @@ impl From<FeatureFlag> for AFeatureFlag {
         match f {
             FeatureFlag::CodeDependencyCheck => AFeatureFlag::CODE_DEPENDENCY_CHECK,
             FeatureFlag::TreatFriendAsPrivate => AFeatureFlag::TREAT_FRIEND_AS_PRIVATE,
+            FeatureFlag::VMBinaryFormatV6 => AFeatureFlag::VM_BINARY_FORMAT_V6,
         }
     }
 }
@@ -95,6 +97,7 @@ impl From<AFeatureFlag> for FeatureFlag {
         match f {
             AFeatureFlag::CODE_DEPENDENCY_CHECK => FeatureFlag::CodeDependencyCheck,
             AFeatureFlag::TREAT_FRIEND_AS_PRIVATE => FeatureFlag::TreatFriendAsPrivate,
+            AFeatureFlag::VM_BINARY_FORMAT_V6 => FeatureFlag::VMBinaryFormatV6,
         }
     }
 }

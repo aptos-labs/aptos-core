@@ -330,7 +330,7 @@ class ForgeRunnerTests(unittest.TestCase):
                 "run",
                 "--cargo-arg",
                 "-p",
-                "forge-cli",
+                "aptos-forge-cli",
                 "--",
                 "--suite",
                 "banana",

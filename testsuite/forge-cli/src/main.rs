@@ -3,12 +3,12 @@
 
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::ConsensusConfig;
+use aptos_forge::success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria};
+use aptos_forge::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
+use aptos_forge::{ForgeConfig, Options, *};
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
-use forge::success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria};
-use forge::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
-use forge::{ForgeConfig, Options, *};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{env, num::NonZeroUsize, process, thread, time::Duration};

@@ -11,6 +11,7 @@ use aptos_config::{
     keys::ConfigKey,
     network_id::NetworkId,
 };
+use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
@@ -21,7 +22,6 @@ use aptos_sdk::{
         PeerId,
     },
 };
-use framework::ReleaseBundle;
 use prometheus_http_query::response::PromqlResult;
 use std::{
     collections::HashMap,

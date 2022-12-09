@@ -1,5 +1,5 @@
 [package]
-name = "executor"
+name = "aptos-executor"
 description = "Aptos executor"
 version = "0.1.0"
 
@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-executor-types = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
@@ -25,7 +26,6 @@ aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
-executor-types = { workspace = true }
 fail = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }
@@ -38,11 +38,11 @@ storage-interface = { workspace = true }
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
+aptos-executor-test-helpers = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptosdb = { workspace = true }
-executor-test-helpers = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
 storage-interface = { workspace = true }

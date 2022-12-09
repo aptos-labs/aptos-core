@@ -231,8 +231,11 @@ impl<'a> TableInfoParser<'a> {
 
             // there won't be tables in primitives
             AnnotatedMoveValue::U8(_) => {}
+            AnnotatedMoveValue::U16(_) => {}
+            AnnotatedMoveValue::U32(_) => {}
             AnnotatedMoveValue::U64(_) => {}
             AnnotatedMoveValue::U128(_) => {}
+            AnnotatedMoveValue::U256(_) => {}
             AnnotatedMoveValue::Bool(_) => {}
             AnnotatedMoveValue::Address(_) => {}
             AnnotatedMoveValue::Bytes(_) => {}

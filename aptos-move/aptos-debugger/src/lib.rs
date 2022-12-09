@@ -156,6 +156,7 @@ impl AptosDebugger {
             AbstractValueSizeGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
             true,
+            true,
             ChainId::test().id(),
         )
         .unwrap();

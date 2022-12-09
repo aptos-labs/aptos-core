@@ -34,12 +34,12 @@ use aptos_types::{
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 
+use aptos_event_notifications::EventSubscriptionService;
+use aptos_executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
+use aptos_framework::ReleaseBundle;
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use clap::Parser;
-use event_notifications::EventSubscriptionService;
-use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
-use framework::ReleaseBundle;
 use futures::channel::mpsc;
 use hex::FromHex;
 use log_build_information::log_build_information;
@@ -651,10 +651,7 @@ pub fn setup_environment(
     } else {
         info!("Genesis txn not provided, it's fine if you don't expect to apply it otherwise please double check config");
     }
-    AptosVM::set_runtime_config(
-        node_config.execution.paranoid_type_verification,
-        node_config.execution.paranoid_hot_potato_verification,
-    );
+    AptosVM::set_paranoid_type_checks(node_config.execution.paranoid_type_verification);
     AptosVM::set_concurrency_level_once(node_config.execution.concurrency_level as usize);
     AptosVM::set_num_proof_reading_threads_once(
         node_config.execution.num_proof_reading_threads as usize,

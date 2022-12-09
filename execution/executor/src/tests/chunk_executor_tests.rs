@@ -11,13 +11,13 @@ use crate::{
     tests,
 };
 use aptos_crypto::HashValue;
+use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     test_helpers::transaction_test_helpers::block,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof},
 };
 use aptosdb::AptosDB;
-use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use rand::Rng;
 use storage_interface::DbReaderWriter;
 

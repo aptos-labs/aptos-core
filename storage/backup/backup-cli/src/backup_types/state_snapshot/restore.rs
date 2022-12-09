@@ -219,7 +219,7 @@ impl StateSnapshotRestoreController {
     }
 
     fn validate_modules(blob: &[(StateKey, StateValue)]) {
-        let config = verifier_config();
+        let config = verifier_config(false);
         for (key, value) in blob {
             if let StateKey::AccessPath(p) = key {
                 if let Path::Code(module_id) = p.get_path() {

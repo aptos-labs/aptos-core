@@ -77,7 +77,13 @@ pub fn make_proposal_with_qc(
     qc: QuorumCert,
     validator_signer: &ValidatorSigner,
 ) -> VoteProposal {
-    make_proposal_with_qc_and_proof(Payload::empty(), round, empty_proof(), qc, validator_signer)
+    make_proposal_with_qc_and_proof(
+        Payload::empty(false),
+        round,
+        empty_proof(),
+        qc,
+        validator_signer,
+    )
 }
 
 pub fn make_proposal_with_parent_and_overrides(

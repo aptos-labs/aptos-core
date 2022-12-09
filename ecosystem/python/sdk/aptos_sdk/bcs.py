@@ -17,7 +17,7 @@ MAX_U16 = 2**16 - 1
 MAX_U32 = 2**32 - 1
 MAX_U64 = 2**64 - 1
 MAX_U128 = 2**128 - 1
-
+MAX_U256 = 2**256 - 1
 
 class Deserializer:
     _input: io.BytesIO
@@ -88,6 +88,9 @@ class Deserializer:
 
     def u128(self) -> int:
         return self._read_int(16)
+
+    def u256(self) -> int:
+        return self._read_int(32)
 
     def uleb128(self) -> int:
         value = 0
@@ -206,6 +209,12 @@ class Serializer:
             raise Exception(f"Cannot encode {value} into u128")
 
         self._write_int(value, 16)
+
+    def u256(self, value: int):
+        if value > MAX_U256:
+            raise Exception(f"Cannot encode {value} into u256")
+
+        self._write_int(value, 32)
 
     def uleb128(self, value: int):
         if value > MAX_U32:
@@ -358,6 +367,16 @@ class Test(unittest.TestCase):
         ser.u128(in_value)
         der = Deserializer(ser.output())
         out_value = der.u128()
+
+        self.assertEqual(in_value, out_value)
+
+    def test_u256(self):
+        in_value = 111111111111111111111111111111111111111111111111111111111111111111111111111115
+
+        ser = Serializer()
+        ser.u256(in_value)
+        der = Deserializer(ser.output())
+        out_value = der.u256()
 
         self.assertEqual(in_value, out_value)
 
