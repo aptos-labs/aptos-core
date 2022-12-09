@@ -20,7 +20,7 @@ This page shows the key updates to the developer documentation on this site.
     - [New chain_id native function + corresponding new gas schedule entry](https://github.com/aptos-labs/aptos-core/pull/5288).
   - Blockchain
     - Added automatic chain-health based back pressure to improve reliability. Automatic slow-down (through max block size reduction) is triggered in some scenarios.
-    - Improved timeouts for state synchronization: (i) lower timeouts for optimistic fetch (to help reduce end-to-end latencies); and (ii) exponential back-off for low-bandwidth nodes.
+    - Improved timeouts for state synchronization: (i) lower timeouts for optimistic fetch (to help reduce end-to-end latency); and (ii) exponential back-off for low-bandwidth nodes.
 
   Resolved issues:
   - Move
