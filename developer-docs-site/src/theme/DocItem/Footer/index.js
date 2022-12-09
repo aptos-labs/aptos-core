@@ -1,5 +1,4 @@
 import React from "react";
-import { useDoc } from "@docusaurus/theme-common/internal";
 import Footer from "@theme-original/DocItem/Footer";
 
 const Contributor = ({ contributor }) => {
@@ -17,7 +16,7 @@ const Contributor = ({ contributor }) => {
 const Contributors = ({ contributors }) => {
   return (
     <div class="aptos-contributors">
-      <h2 class="docusaurus-mt-lg">Contributors</h2>
+      <h2 class="docusaurus-mt-lg">Authors</h2>
       <div>
         {contributors.map((contributor) => {
           return (
@@ -32,7 +31,6 @@ const Contributors = ({ contributors }) => {
 };
 
 export default function FooterWrapper(props) {
-  const doc = useDoc();
   const contributorsNode = document.getElementById("aptos-doc-contributors")?.textContent;
   const contributors = contributorsNode ? JSON.parse(contributorsNode) : [];
   return (
