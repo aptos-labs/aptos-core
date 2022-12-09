@@ -350,10 +350,10 @@ export class TokenClient {
    * @param optIn boolean value indicates user want to opt-in or out of direct transfer
    * @returns The hash of the transaction submitted to the API
    */
-  async optInTokenTransfer(sender: AptosAccount, optIn: boolean): Promise<string> {
+  async optInTokenTransfer(sender: AptosAccount, optIn: boolean, extraArgs?: OptionalTransactionArgs): Promise<string> {
     const payload = this.transactionBuilder.buildTransactionPayload("0x3::token::opt_in_direct_transfer", [], [optIn]);
 
-    return this.aptosClient.generateSignSubmitTransaction(sender, payload);
+    return this.aptosClient.generateSignSubmitTransaction(sender, payload, extraArgs);
   }
 
   /**
@@ -375,6 +375,7 @@ export class TokenClient {
     propertyVersion: AnyNumber,
     receiver: MaybeHexString,
     amount: AnyNumber,
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     // compile script to invoke public transfer function
     const payload = new TransactionPayloadScript(
@@ -392,7 +393,7 @@ export class TokenClient {
       ),
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(sender, payload);
+    return this.aptosClient.generateSignSubmitTransaction(sender, payload, extraArgs);
   }
 
   /**
@@ -413,6 +414,7 @@ export class TokenClient {
     name: String,
     PropertyVersion: AnyNumber,
     amount: AnyNumber,
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     const payload = this.transactionBuilder.buildTransactionPayload(
       "0x3::token::burn_by_creator",
@@ -420,7 +422,7 @@ export class TokenClient {
       [ownerAddress, collection, name, PropertyVersion, amount],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(creator, payload);
+    return this.aptosClient.generateSignSubmitTransaction(creator, payload, extraArgs);
   }
 
   /**
@@ -441,6 +443,7 @@ export class TokenClient {
     name: String,
     PropertyVersion: AnyNumber,
     amount: AnyNumber,
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     const payload = this.transactionBuilder.buildTransactionPayload(
       "0x3::token::burn",
@@ -448,7 +451,7 @@ export class TokenClient {
       [creatorAddress, collection, name, PropertyVersion, amount],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(owner, payload);
+    return this.aptosClient.generateSignSubmitTransaction(owner, payload, extraArgs);
   }
 
   /**
@@ -475,6 +478,7 @@ export class TokenClient {
     keys: Array<string>,
     values: Array<Bytes>,
     types: Array<string>,
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     const payload = this.transactionBuilder.buildTransactionPayload(
       "0x3::token::mutate_token_properties",
@@ -482,7 +486,7 @@ export class TokenClient {
       [tokenOwner, creator, collection_name, tokenName, propertyVersion, amount, keys, values, types],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(account, payload);
+    return this.aptosClient.generateSignSubmitTransaction(account, payload, extraArgs);
   }
 
   /**
