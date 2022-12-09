@@ -117,10 +117,13 @@ module aptos_framework::reconfiguration {
             return
         };
 
-        // Reconfiguration "forces the block" to end, as mentioned above. Therefore, we
-        // must assign the collected fees explicitly so that staking can distribute them.
-        // In particular, this is necessary when validators are removed, but still have to
-        // get their fees.
+        // Reconfiguration "forces the block" to end, as mentioned above. Therefore, we must process the collected fees
+        // explicitly so that staking can distribute them.
+        //
+        // This also handles the case when a validator is removed due to the governance proposal. In particular, removing
+        // the validator causes a reconfiguration. We explicitly process fees, i.e. we drain aggregatable coin and populate
+        // the fees table, prior to calling `on_new_epoch()`. That call, in turn, distributes transaction fees for all active
+        // and pending_inactive validators, which include any validator that is to be removed.
         if (features::collect_and_distribute_gas_fees()) {
             // All transactions after reconfiguration are Retry. Therefore, when the next
             // block starts and tries to assign/burn collected fees it will be just 0 and

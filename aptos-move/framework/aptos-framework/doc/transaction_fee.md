@@ -322,6 +322,13 @@ at the beginning of the block or during reconfiguration.
     // Otherwise get the collected fee, and check <b>if</b> it can distributed later.
     <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_drain_aggregatable_coin">coin::drain_aggregatable_coin</a>(&<b>mut</b> collected_fees.amount);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&collected_fees.proposer)) {
+        // Extract the <b>address</b> of proposer here and reset it <b>to</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(). This
+        // is particularly useful <b>to</b> avoid <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> undesired side-effects <b>where</b> coins are
+        // collected but never distributed or distributed <b>to</b> the wrong <a href="account.md#0x1_account">account</a>.
+        // With this design, processing collected fees enforces that all fees will be burnt
+        // unless the proposer is specified in the <a href="block.md#0x1_block">block</a> prologue. When we have a governance
+        // proposal that triggers <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a>, we distribute pending fees and burn the
+        // fee for the proposal. Otherwise, that fee would be leaked <b>to</b> the next <a href="block.md#0x1_block">block</a>.
         <b>let</b> proposer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> collected_fees.proposer);
         <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, collected_fees.burn_percentage);
         <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(proposer_addr, <a href="coin.md#0x1_coin">coin</a>);

@@ -111,6 +111,13 @@ module aptos_framework::transaction_fee {
         // Otherwise get the collected fee, and check if it can distributed later.
         let coin = coin::drain_aggregatable_coin(&mut collected_fees.amount);
         if (option::is_some(&collected_fees.proposer)) {
+            // Extract the address of proposer here and reset it to option::none(). This
+            // is particularly useful to avoid any undesired side-effects where coins are
+            // collected but never distributed or distributed to the wrong account.
+            // With this design, processing collected fees enforces that all fees will be burnt
+            // unless the proposer is specified in the block prologue. When we have a governance
+            // proposal that triggers reconfiguration, we distribute pending fees and burn the
+            // fee for the proposal. Otherwise, that fee would be leaked to the next block.
             let proposer_addr = option::extract(&mut collected_fees.proposer);
             burn_coin_fraction(&mut coin, collected_fees.burn_percentage);
             stake::add_transaction_fee(proposer_addr, coin);
