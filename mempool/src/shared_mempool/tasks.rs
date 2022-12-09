@@ -516,13 +516,16 @@ pub(crate) async fn process_config_update<V>(
         error!(LogSchema::event_log(LogEntry::ReconfigUpdate, LogEvent::VMUpdateFail).error(&e));
     }
 
-    let consensus_config: anyhow::Result<OnChainConsensusConfig> = config_update.get();
-    if let Err(error) = &consensus_config {
-        error!(
-            "Failed to read on-chain consensus config, using default: {}",
-            error
-        );
+    match config_update.get() {
+        Ok(consensus_config) => {
+            *broadcast_within_validator_network.write() = !consensus_config.quorum_store_enabled();
+        }
+        Err(e) => {
+            error!(
+                "Failed to read on-chain consensus config, keeping value broadcast_within_validator_network={}: {}",
+                *broadcast_within_validator_network.read(),
+                e
+            );
+        }
     }
-    *broadcast_within_validator_network.write() =
-        !consensus_config.unwrap_or_default().quorum_store_enabled();
 }

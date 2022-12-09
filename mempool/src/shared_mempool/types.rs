@@ -81,6 +81,12 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
     }
 
     pub fn broadcast_within_validator_network(&self) -> bool {
+        // This value will be changed true -> false via onchain config when quorum store is enabled.
+        // On the transition from true -> false, all transactions in mempool will be eligible for
+        // at least one of mempool broadcast or quorum store batch.
+        // A transition from false -> true is unexpected -- it would only be triggered if quorum
+        // store needs an emergency rollback. In this case, some transactions may not be propagated,
+        // they will neither go through a mempool broadcast or quorum store batch.
         *self.broadcast_within_validator_network.read()
     }
 }
