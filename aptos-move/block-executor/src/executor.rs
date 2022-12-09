@@ -597,9 +597,30 @@ where
         let mut data_map = BTreeMap::new();
 
         let mut ret = Vec::with_capacity(num_txns);
+
+        let mut current_gas = 0;
+        let max_gas = u64::MAX; //  TODO: import max_gas properly.
+
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             // this call internally materializes deltas.
             let res = executor.execute_transaction_btree_view(&data_map, txn, idx);
+
+            // Per-block gas limit for sequential execution.
+            // Read the gas from the execution output.
+            let txn_gas = match &res {
+                ExecutionStatus::Success(t) => t.gas_used(),
+                ExecutionStatus::SkipRest(t) => t.gas_used(),
+                ExecutionStatus::Abort(_) => 0,
+            };
+            current_gas += txn_gas;
+            // If the per-block gas limit is exceeded, halt sequential execution.
+            if current_gas > max_gas {
+                println!(
+                    "[Sequential Execution]: halts at transaction idx {} due to per-block gas limit.",
+                    idx
+                );
+                break;
+            }
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
 
