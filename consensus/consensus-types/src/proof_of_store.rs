@@ -86,19 +86,7 @@ impl SignedDigest {
         self.epoch
     }
 
-    pub fn verify(
-        &self,
-        peer_id: PeerId,
-        validator: &ValidatorVerifier,
-        quorum_store_enabled: bool,
-    ) -> anyhow::Result<()> {
-        if !quorum_store_enabled {
-            return Err(anyhow::anyhow!(
-                "Quorum store is not enabled locally. Sender: {}, epoch: {}",
-                peer_id,
-                self.epoch(),
-            ));
-        }
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         Ok(validator.verify(self.peer_id, &self.info, &self.signature)?)
     }
 }
@@ -129,19 +117,7 @@ impl ProofOfStore {
         self.info.expiration
     }
 
-    pub fn verify(
-        &self,
-        peer_id: PeerId,
-        validator: &ValidatorVerifier,
-        quorum_store_enabled: bool,
-    ) -> anyhow::Result<()> {
-        if !quorum_store_enabled {
-            return Err(anyhow::anyhow!(
-                "Quorum store is not enabled locally. Sender: {}, epoch: {}",
-                peer_id,
-                self.epoch(),
-            ));
-        }
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
             .verify_multi_signatures(&self.info, &self.multi_signature)
             .context("Failed to verify ProofOfStore")

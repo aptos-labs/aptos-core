@@ -4,7 +4,6 @@
 use crate::{block::Block, common::Author, sync_info::SyncInfo};
 use anyhow::{anyhow, ensure, format_err, Context, Result};
 use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::PeerId;
 use serde::{Deserialize, Serialize};
 use short_hex_str::AsShortHexStr;
 use std::fmt;
@@ -80,15 +79,10 @@ impl ProposalMsg {
         Ok(())
     }
 
-    pub fn verify(
-        &self,
-        peer_id: PeerId,
-        validator: &ValidatorVerifier,
-        quorum_store_enabled: bool,
-    ) -> Result<()> {
-        self.proposal().payload().map_or(Ok(()), |p| {
-            p.verify(peer_id, validator, quorum_store_enabled)
-        })?;
+    pub fn verify(&self, validator: &ValidatorVerifier, quorum_store_enabled: bool) -> Result<()> {
+        self.proposal()
+            .payload()
+            .map_or(Ok(()), |p| p.verify(validator, quorum_store_enabled))?;
 
         self.proposal()
             .validate_signature(validator)

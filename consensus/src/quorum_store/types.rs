@@ -109,14 +109,7 @@ impl Fragment {
         }
     }
 
-    pub(crate) fn verify(&self, peer_id: PeerId, quorum_store_enabled: bool) -> anyhow::Result<()> {
-        if !quorum_store_enabled {
-            return Err(anyhow::anyhow!(
-                "Quorum store is not enabled locally. Sender: {}, epoch: {}",
-                peer_id,
-                self.epoch(),
-            ));
-        }
+    pub(crate) fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
         if let Some(expiration) = &self.fragment_info.maybe_expiration {
             if expiration.epoch() != self.fragment_info.epoch {
                 return Err(anyhow::anyhow!(
@@ -196,14 +189,7 @@ impl Batch {
     }
 
     // Check the source == the sender. To protect from DDoS we check is Payload matches digest later.
-    pub fn verify(&self, peer_id: PeerId, quorum_store_enabled: bool) -> anyhow::Result<()> {
-        if !quorum_store_enabled {
-            return Err(anyhow::anyhow!(
-                "Quorum store is not enabled locally. Sender: {}, epoch: {}",
-                peer_id,
-                self.epoch(),
-            ));
-        }
+    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
         if self.source == peer_id {
             Ok(())
         } else {

@@ -756,6 +756,10 @@ impl EpochManager {
         let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
 
         if let Some(unverified_event) = maybe_unverified_event {
+            // quorum store messages are only expected in epochs where it is enabled
+            self.check_quorum_store_enabled(peer_id, &unverified_event)
+                .await?;
+
             // same epoch -> run well-formedness + signature check
             let verified_event = monitor!(
                 "verify_message",
@@ -840,6 +844,29 @@ impl EpochManager {
             }
         }
         Ok(None)
+    }
+
+    async fn check_quorum_store_enabled(
+        &mut self,
+        peer_id: AccountAddress,
+        event: &UnverifiedEvent,
+    ) -> anyhow::Result<()> {
+        match event {
+            UnverifiedEvent::FragmentMsg(_)
+            | UnverifiedEvent::BatchMsg(_)
+            | UnverifiedEvent::SignedDigestMsg(_)
+            | UnverifiedEvent::ProofOfStoreMsg(_) => {
+                if self.quorum_store_enabled {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Quorum store is not enabled locally, but received msg from sender: {}",
+                        peer_id,
+                    ))
+                }
+            }
+            _ => Ok(()),
+        }
     }
 
     fn process_event(
