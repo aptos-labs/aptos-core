@@ -516,7 +516,8 @@ pub(crate) async fn process_config_update<V>(
         error!(LogSchema::event_log(LogEntry::ReconfigUpdate, LogEvent::VMUpdateFail).error(&e));
     }
 
-    match config_update.get() {
+    let consensus_config: anyhow::Result<OnChainConsensusConfig> = config_update.get();
+    match consensus_config {
         Ok(consensus_config) => {
             *broadcast_within_validator_network.write() = !consensus_config.quorum_store_enabled();
         }
