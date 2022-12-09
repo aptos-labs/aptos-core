@@ -14,9 +14,11 @@ use aptos_config::{
 use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
 };
+use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
     channel::{mpsc, mpsc::UnboundedSender, oneshot},
     future::Future,
@@ -33,9 +35,7 @@ use std::{
     task::Waker,
     time::{Instant, SystemTime},
 };
-use storage_interface::DbReader;
 use tokio::runtime::Handle;
-use vm_validator::vm_validator::TransactionValidation;
 
 /// Struct that owns all dependencies required by shared mempool routines.
 #[derive(Clone)]

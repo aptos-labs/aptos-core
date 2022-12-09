@@ -15,6 +15,8 @@ use aptos_infallible::{Mutex, RwLock};
 
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_logger::Level;
+use aptos_storage_interface::DbReader;
+use aptos_vm_validator::vm_validator::{TransactionValidation, VMValidator};
 use futures::channel::mpsc::{self, Receiver, UnboundedSender};
 use mempool_notifications::MempoolNotificationListener;
 use network::application::storage::PeerMetadataStorage;
@@ -25,9 +27,7 @@ use std::{
         Arc,
     },
 };
-use storage_interface::DbReader;
 use tokio::runtime::{Builder, Handle, Runtime};
-use vm_validator::vm_validator::{TransactionValidation, VMValidator};
 
 /// Bootstrap of SharedMempool.
 /// Creates a separate Tokio Runtime that runs the following routines:

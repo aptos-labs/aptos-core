@@ -9,6 +9,7 @@ use aptos_crypto::{
     ValidCryptoMaterialStringExt,
 };
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
+use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -27,8 +28,8 @@ use aptos_vm::{
     data_cache::{AsMoveResolver, IntoMoveResolver, StorageAdapterOwned},
     AptosVM, VMExecutor,
 };
+use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::StructOpt;
-use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -38,7 +39,6 @@ use std::{
     string::String,
     sync::Arc,
 };
-use vm_genesis::GENESIS_KEYPAIR;
 use {
     move_binary_format::file_format::{CompiledModule, CompiledScript},
     move_command_line_common::{
@@ -250,7 +250,7 @@ impl SignerAndKeyPair {
 
 pub struct FakeDbReader {}
 
-impl storage_interface::DbReader for FakeDbReader {
+impl aptos_storage_interface::DbReader for FakeDbReader {
     fn indexer_enabled(&self) -> bool {
         false
     }

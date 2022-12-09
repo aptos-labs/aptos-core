@@ -5,6 +5,7 @@ use crate::account_generator::{AccountCache, AccountGenerator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::aptos_test_root_address,
@@ -24,7 +25,6 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
-use storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 
 const META_FILENAME: &str = "metadata.toml";
 const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;

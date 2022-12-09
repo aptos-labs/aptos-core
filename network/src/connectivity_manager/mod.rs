@@ -39,6 +39,7 @@ use aptos_config::{
 use aptos_crypto::x25519;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::{
@@ -53,7 +54,6 @@ use rand::{
     seq::SliceRandom,
 };
 use serde::Serialize;
-use short_hex_str::AsShortHexStr;
 use std::{
     cmp::{min, Ordering},
     collections::{hash_map::Entry, HashMap, HashSet},

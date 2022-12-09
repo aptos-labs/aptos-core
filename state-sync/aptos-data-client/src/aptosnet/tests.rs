@@ -8,6 +8,19 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::HashValue;
+use aptos_storage_service_client::{StorageServiceClient, StorageServiceNetworkSender};
+use aptos_storage_service_server::network::{NetworkRequest, ResponseSender};
+use aptos_storage_service_types::{
+    requests::{
+        DataRequest, NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        StorageServiceRequest, TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    },
+    responses::{
+        CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, StorageServerSummary,
+        StorageServiceResponse, OPTIMISTIC_FETCH_VERSION_DELTA,
+    },
+    StorageServiceError, StorageServiceMessage,
+};
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     aggregate_signature::AggregateSignature,
@@ -28,19 +41,6 @@ use network::{
     transport::ConnectionMetadata,
 };
 use std::{collections::hash_map::Entry, sync::Arc, time::Duration};
-use storage_service_client::{StorageServiceClient, StorageServiceNetworkSender};
-use storage_service_server::network::{NetworkRequest, ResponseSender};
-use storage_service_types::{
-    requests::{
-        DataRequest, NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        StorageServiceRequest, TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
-    },
-    responses::{
-        CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, StorageServerSummary,
-        StorageServiceResponse, OPTIMISTIC_FETCH_VERSION_DELTA,
-    },
-    StorageServiceError, StorageServiceMessage,
-};
 
 fn mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {
     LedgerInfoWithSignatures::new(

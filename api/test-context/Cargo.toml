@@ -24,9 +24,11 @@ aptos-executor-types = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
 aptos-sdk = { workspace = true }
+aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-validator = { workspace = true }
 aptosdb = { workspace = true, features = ["fuzzing"] }
 bytes = { workspace = true }
 goldenfile = { workspace = true }
@@ -40,9 +42,7 @@ regex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-storage-interface = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
-vm-validator = { workspace = true }
 warp = { workspace = true }
 warp-reverse-proxy = { workspace = true }

@@ -6,6 +6,7 @@
 use crate::{StateComputeResult, TransactionData};
 use anyhow::{bail, ensure, Result};
 use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
+use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -14,7 +15,6 @@ use aptos_types::{
     transaction::{Transaction, TransactionInfo, TransactionStatus, TransactionToCommit},
 };
 use std::sync::Arc;
-use storage_interface::ExecutedTrees;
 
 #[derive(Default)]
 pub struct ExecutedChunk {

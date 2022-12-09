@@ -122,7 +122,7 @@ jobs:
       - uses: taiki-e/install-action@v1.5.6
         with:
           tool: nextest
-      - run: cargo nextest run --profile ci --locked --workspace --exclude smoke-test --exclude testcases --retries 3 --no-fail-fast
+      - run: cargo nextest run --profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 

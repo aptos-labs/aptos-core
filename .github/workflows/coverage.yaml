@@ -33,7 +33,7 @@ jobs:
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov --ignore-run-fail --workspace --exclude smoke-test --exclude testcases --lcov --jobs 32 --output-path lcov_unit.info
+      - run: cargo llvm-cov --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases --lcov --jobs 32 --output-path lcov_unit.info
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
       - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin@v3

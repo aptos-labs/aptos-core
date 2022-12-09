@@ -15,6 +15,7 @@ use aptos_executor_test_helpers::{
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_gas::{ChangeSetConfigs, LATEST_GAS_FEATURE_VERSION};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath,
@@ -42,11 +43,10 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
 };
 use rand::SeedableRng;
-use storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 
 #[test]
 fn test_empty_db() {
-    let genesis = vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis.0));
     let tmp_dir = TempPath::new();
     let db_rw = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
@@ -187,8 +187,8 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
 
 #[test]
 fn test_new_genesis() {
-    let genesis = vm_genesis::test_genesis_change_set_and_validators(Some(1));
-    let genesis_key = &vm_genesis::GENESIS_KEYPAIR.0;
+    let genesis = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis_key = &aptos_vm_genesis::GENESIS_KEYPAIR.0;
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis.0));
     // Create bootstrapped DB.
     let tmp_dir = TempPath::new();

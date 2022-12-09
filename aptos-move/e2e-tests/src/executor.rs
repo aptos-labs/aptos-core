@@ -52,6 +52,7 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionId},
     AptosVM, VMExecutor, VMValidator,
 };
+use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -60,7 +61,6 @@ use move_core_types::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
-use vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -225,7 +225,7 @@ impl FakeExecutor {
 
     /// Creates fresh genesis from the framework passed in.
     pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts);
+        let genesis = aptos_vm_genesis::generate_test_genesis(framework, validator_accounts);
         Self::from_genesis(genesis.0.write_set(), ChainId::test())
     }
 

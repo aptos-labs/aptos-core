@@ -61,6 +61,7 @@ use anyhow::anyhow;
 use aptos_config::network_id::NetworkContext;
 use aptos_id_generator::{IdGenerator, U32IdGenerator};
 use aptos_logger::prelude::*;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{timeout, TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
 use bytes::Bytes;
@@ -73,7 +74,6 @@ use futures::{
     stream::{FuturesUnordered, StreamExt},
 };
 use serde::Serialize;
-use short_hex_str::AsShortHexStr;
 use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, time::Duration};
 
 pub mod error;

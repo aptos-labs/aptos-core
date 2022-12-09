@@ -7,6 +7,7 @@ use aptos_config::config::{
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_executor::db_bootstrapper::calculate_genesis;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
@@ -15,7 +16,6 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
 };
-use storage_interface::DbReaderWriter;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]

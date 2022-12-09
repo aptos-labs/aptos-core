@@ -143,11 +143,13 @@ dependencies = [
  "aptos-node",
  "aptos-rest-client",
  "aptos-sdk",
+ "aptos-storage-interface",
  "aptos-telemetry",
  "aptos-temppath",
  "aptos-transactional-test-harness",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-genesis",
  "async-trait",
  "base64 0.13.0",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
@@ -176,14 +178,12 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "shadow-rs",
- "storage-interface",
  "tempfile",
  "termcolor",
  "thiserror",
  "tokio",
  "tokio-util 0.7.3",
  "toml",
- "vm-genesis",
  "walkdir",
 ]
 
@@ -233,6 +233,7 @@ dependencies = [
  "aptos-proptest-helpers",
  "aptos-sdk",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
  "async-trait",
@@ -257,7 +258,6 @@ dependencies = [
  "reqwest",
  "serde 1.0.149",
  "serde_json",
- "storage-interface",
  "tokio",
  "url",
  "warp",
@@ -278,9 +278,11 @@ dependencies = [
  "aptos-genesis",
  "aptos-mempool",
  "aptos-sdk",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-validator",
  "aptosdb",
  "bytes 1.2.1",
  "goldenfile",
@@ -294,10 +296,8 @@ dependencies = [
  "reqwest",
  "serde 1.0.149",
  "serde_json",
- "storage-interface",
  "tokio",
  "url",
- "vm-validator",
  "warp",
  "warp-reverse-proxy",
 ]
@@ -310,6 +310,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-openapi",
+ "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
  "async-trait",
@@ -323,7 +324,6 @@ dependencies = [
  "poem-openapi",
  "serde 1.0.149",
  "serde_json",
- "storage-interface",
 ]
 
 [[package]]
@@ -342,6 +342,8 @@ dependencies = [
  "aptos-logger",
  "aptos-proptest-helpers",
  "aptos-push-metrics",
+ "aptos-scratchpad",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
@@ -361,11 +363,9 @@ dependencies = [
  "rand 0.7.3",
  "regex",
  "reqwest",
- "scratchpad",
  "serde 1.0.149",
  "serde_json",
  "serde_yaml 0.8.26",
- "storage-interface",
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.3",
@@ -381,6 +381,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptosdb",
@@ -390,7 +391,6 @@ dependencies = [
  "once_cell",
  "reqwest",
  "serde 1.0.149",
- "storage-interface",
  "tokio",
  "warp",
 ]
@@ -487,6 +487,7 @@ dependencies = [
  "aptos-global-constants",
  "aptos-logger",
  "aptos-secure-storage",
+ "aptos-short-hex-str",
  "aptos-temppath",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
@@ -497,7 +498,6 @@ dependencies = [
  "rand 0.7.3",
  "serde 1.0.149",
  "serde_yaml 0.8.26",
- "short-hex-str",
  "thiserror",
 ]
 
@@ -522,9 +522,12 @@ dependencies = [
  "aptos-mempool",
  "aptos-metrics-core",
  "aptos-secure-storage",
+ "aptos-short-hex-str",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-validator",
  "arc-swap",
  "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
@@ -548,12 +551,9 @@ dependencies = [
  "schemadb",
  "serde 1.0.149",
  "serde_json",
- "short-hex-str",
- "storage-interface",
  "tempfile",
  "thiserror",
  "tokio",
- "vm-validator",
 ]
 
 [[package]]
@@ -581,6 +581,7 @@ dependencies = [
  "aptos-crypto-derive",
  "aptos-executor-types",
  "aptos-infallible",
+ "aptos-short-hex-str",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "futures",
@@ -590,7 +591,6 @@ dependencies = [
  "rayon",
  "serde 1.0.149",
  "serde_json",
- "short-hex-str",
  "tokio",
 ]
 
@@ -662,6 +662,9 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-storage-service-client",
+ "aptos-storage-service-server",
+ "aptos-storage-service-types",
  "aptos-time-service",
  "aptos-types",
  "async-trait",
@@ -675,9 +678,6 @@ dependencies = [
  "network",
  "rand 0.7.3",
  "serde 1.0.149",
- "storage-service-client",
- "storage-service-server",
- "storage-service-types",
  "thiserror",
  "tokio",
 ]
@@ -693,6 +693,8 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-short-hex-str",
+ "aptos-storage-service-types",
  "aptos-types",
  "async-trait",
  "channel",
@@ -703,8 +705,6 @@ dependencies = [
  "once_cell",
  "rand 0.7.3",
  "serde 1.0.149",
- "short-hex-str",
- "storage-service-types",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -741,9 +741,11 @@ dependencies = [
  "aptos-id-generator",
  "aptos-infallible",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-genesis",
  "aptosdb",
  "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
@@ -753,9 +755,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "serde 1.0.149",
- "storage-interface",
  "thiserror",
- "vm-genesis",
 ]
 
 [[package]]
@@ -774,11 +774,14 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-scratchpad",
  "aptos-secure-net",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-genesis",
  "aptosdb",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "fail 0.5.0",
@@ -788,10 +791,7 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "rayon",
- "scratchpad",
  "serde 1.0.149",
- "storage-interface",
- "vm-genesis",
 ]
 
 [[package]]
@@ -808,13 +808,13 @@ dependencies = [
  "aptos-genesis",
  "aptos-sdk",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-genesis",
  "aptosdb",
  "rand 0.7.3",
- "storage-interface",
- "vm-genesis",
 ]
 
 [[package]]
@@ -823,15 +823,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-scratchpad",
  "aptos-secure-net",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "itertools",
  "once_cell",
- "scratchpad",
  "serde 1.0.149",
- "storage-interface",
  "thiserror",
 ]
 
@@ -919,11 +919,14 @@ dependencies = [
  "aptos-genesis",
  "aptos-global-constants",
  "aptos-infallible",
+ "aptos-inspection-service",
  "aptos-logger",
  "aptos-rest-client",
  "aptos-retrier",
  "aptos-sdk",
  "aptos-secure-storage",
+ "aptos-state-sync-driver",
+ "aptos-transaction-emitter-lib",
  "aptosdb",
  "async-trait",
  "chrono",
@@ -932,7 +935,6 @@ dependencies = [
  "hex",
  "hyper",
  "hyper-tls",
- "inspection-service",
  "itertools",
  "json-patch",
  "k8s-openapi",
@@ -947,13 +949,11 @@ dependencies = [
  "serde 1.0.149",
  "serde_json",
  "serde_yaml 0.8.26",
- "state-sync-driver",
  "structopt",
  "tempfile",
  "termcolor",
  "thiserror",
  "tokio",
- "transaction-emitter-lib",
  "url",
 ]
 
@@ -970,11 +970,11 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
+ "aptos-testcases",
  "async-trait",
  "jemallocator",
  "serde_yaml 0.8.26",
  "structopt",
- "testcases",
  "tokio",
  "url",
 ]
@@ -1060,8 +1060,11 @@ dependencies = [
  "aptos-executor",
  "aptos-executor-types",
  "aptos-jellyfish-merkle",
+ "aptos-language-e2e-tests",
  "aptos-mempool",
  "aptos-proptest-helpers",
+ "aptos-scratchpad",
+ "aptos-storage-interface",
  "aptos-types",
  "aptos-vault-client",
  "aptosdb",
@@ -1069,7 +1072,6 @@ dependencies = [
  "byteorder",
  "datatest-stable",
  "hex",
- "language-e2e-tests",
  "move-binary-format",
  "move-core-types",
  "move-vm-types",
@@ -1080,10 +1082,8 @@ dependencies = [
  "rand 0.7.3",
  "rusty-fork",
  "safety-rules",
- "scratchpad",
  "sha-1 0.10.0",
  "stats_alloc",
- "storage-interface",
  "structopt",
 ]
 
@@ -1128,16 +1128,16 @@ dependencies = [
  "aptos-keygen",
  "aptos-logger",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-genesis",
  "aptosdb",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "rand 0.7.3",
  "serde 1.0.149",
  "serde_yaml 0.8.26",
- "storage-interface",
- "vm-genesis",
 ]
 
 [[package]]
@@ -1173,6 +1173,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
  "async-trait",
@@ -1193,7 +1194,6 @@ dependencies = [
  "serde 1.0.149",
  "serde_json",
  "sha2 0.9.9",
- "storage-interface",
  "tokio",
  "url",
 ]
@@ -1201,6 +1201,29 @@ dependencies = [
 [[package]]
 name = "aptos-infallible"
 version = "0.1.0"
+
+[[package]]
+name = "aptos-inspection-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-build-info",
+ "aptos-config",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-telemetry",
+ "assert_approx_eq",
+ "futures",
+ "hyper",
+ "once_cell",
+ "prometheus",
+ "reqwest",
+ "rusty-fork",
+ "serde_json",
+ "sysinfo",
+ "tokio",
+]
 
 [[package]]
 name = "aptos-jellyfish-merkle"
@@ -1212,6 +1235,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-storage-interface",
  "aptos-types",
  "aptosdb",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
@@ -1225,7 +1249,6 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde 1.0.149",
- "storage-interface",
  "thiserror",
 ]
 
@@ -1236,6 +1259,38 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "rand 0.7.3",
+]
+
+[[package]]
+name = "aptos-language-e2e-tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-bitvec",
+ "aptos-cached-packages",
+ "aptos-crypto",
+ "aptos-framework",
+ "aptos-gas",
+ "aptos-keygen",
+ "aptos-proptest-helpers",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-genesis",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "goldenfile",
+ "hex",
+ "move-binary-format",
+ "move-command-line-common",
+ "move-core-types",
+ "move-ir-compiler",
+ "move-vm-types",
+ "num_cpus",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "rand 0.7.3",
+ "serde 1.0.149",
 ]
 
 [[package]]
@@ -1287,7 +1342,10 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
+ "aptos-short-hex-str",
+ "aptos-storage-interface",
  "aptos-types",
+ "aptos-vm-validator",
  "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "channel",
@@ -1304,12 +1362,9 @@ dependencies = [
  "rayon",
  "serde 1.0.149",
  "serde_json",
- "short-hex-str",
- "storage-interface",
  "thiserror",
  "tokio",
  "tokio-stream",
- "vm-validator",
 ]
 
 [[package]]
@@ -1368,10 +1423,15 @@ dependencies = [
  "aptos-genesis",
  "aptos-indexer",
  "aptos-infallible",
+ "aptos-inspection-service",
  "aptos-logger",
  "aptos-mempool",
  "aptos-secure-storage",
+ "aptos-state-sync-driver",
  "aptos-state-view",
+ "aptos-storage-interface",
+ "aptos-storage-service-client",
+ "aptos-storage-service-server",
  "aptos-telemetry",
  "aptos-temppath",
  "aptos-time-service",
@@ -1383,17 +1443,12 @@ dependencies = [
  "fail 0.5.0",
  "futures",
  "hex",
- "inspection-service",
  "jemallocator",
  "mempool-notifications",
  "network",
  "network-builder",
  "rand 0.7.3",
  "rayon",
- "state-sync-driver",
- "storage-interface",
- "storage-service-client",
- "storage-service-server",
  "tokio",
  "tokio-stream",
 ]
@@ -1410,6 +1465,7 @@ dependencies = [
  "aptos-network-checker",
  "aptos-rest-client",
  "aptos-sdk",
+ "aptos-transaction-emitter-lib",
  "async-trait",
  "clap 3.2.17",
  "const_format",
@@ -1426,7 +1482,6 @@ dependencies = [
  "serde_yaml 0.8.26",
  "thiserror",
  "tokio",
- "transaction-emitter-lib",
  "url",
 ]
 
@@ -1450,9 +1505,9 @@ dependencies = [
  "aptos-api",
  "aptos-config",
  "aptos-mempool",
+ "aptos-storage-interface",
  "aptos-types",
  "clap 3.2.17",
- "storage-interface",
 ]
 
 [[package]]
@@ -1605,6 +1660,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-scratchpad"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-metrics-core",
+ "aptos-types",
+ "bitvec 0.19.6",
+ "criterion",
+ "itertools",
+ "once_cell",
+ "proptest",
+ "rand 0.7.3",
+ "rayon",
+ "thiserror",
+]
+
+[[package]]
 name = "aptos-sdk"
 version = "0.0.3"
 dependencies = [
@@ -1685,6 +1758,64 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-short-hex-str"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "mirai-annotations",
+ "proptest",
+ "serde 1.0.149",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
+name = "aptos-state-sync-driver"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-consensus-notifications",
+ "aptos-crypto",
+ "aptos-data-client",
+ "aptos-data-streaming-service",
+ "aptos-event-notifications",
+ "aptos-executor",
+ "aptos-executor-test-helpers",
+ "aptos-executor-types",
+ "aptos-genesis",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-scratchpad",
+ "aptos-storage-interface",
+ "aptos-storage-service-client",
+ "aptos-storage-service-types",
+ "aptos-temppath",
+ "aptos-time-service",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-genesis",
+ "aptosdb",
+ "async-trait",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "channel",
+ "claims",
+ "futures",
+ "mempool-notifications",
+ "mockall",
+ "move-core-types",
+ "network",
+ "once_cell",
+ "rand 0.7.3",
+ "schemadb",
+ "serde 1.0.149",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "aptos-state-view"
 version = "0.1.0"
 dependencies = [
@@ -1695,6 +1826,90 @@ dependencies = [
  "serde 1.0.149",
  "serde_bytes",
  "serde_json",
+]
+
+[[package]]
+name = "aptos-storage-interface"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-scratchpad",
+ "aptos-secure-net",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-vm",
+ "assert_unordered",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "crossbeam-channel",
+ "move-core-types",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "rayon",
+ "serde 1.0.149",
+ "thiserror",
+]
+
+[[package]]
+name = "aptos-storage-service-client"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-storage-service-types",
+ "aptos-types",
+ "async-trait",
+ "channel",
+ "network",
+ "thiserror",
+]
+
+[[package]]
+name = "aptos-storage-service-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-bitvec",
+ "aptos-bounded-executor",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-storage-interface",
+ "aptos-storage-service-types",
+ "aptos-time-service",
+ "aptos-types",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "bytes 1.2.1",
+ "channel",
+ "claims",
+ "futures",
+ "lru",
+ "mockall",
+ "network",
+ "once_cell",
+ "rand 0.7.3",
+ "serde 1.0.149",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-storage-service-types"
+version = "0.1.0"
+dependencies = [
+ "aptos-compression",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-types",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "claims",
+ "num-traits 0.2.15",
+ "proptest",
+ "serde 1.0.149",
+ "thiserror",
 ]
 
 [[package]]
@@ -1710,6 +1925,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-state-sync-driver",
  "aptos-telemetry-service",
  "aptos-types",
  "aptosdb",
@@ -1727,7 +1943,6 @@ dependencies = [
  "reqwest-retry",
  "serde 1.0.149",
  "serde_json",
- "state-sync-driver",
  "sysinfo",
  "thiserror",
  "tokio",
@@ -1788,6 +2003,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-testcases"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aptos",
+ "aptos-forge",
+ "aptos-genesis",
+ "aptos-global-constants",
+ "aptos-keygen",
+ "aptos-logger",
+ "aptos-rest-client",
+ "aptos-sdk",
+ "aptos-types",
+ "futures",
+ "hex",
+ "move-examples",
+ "rand 0.7.3",
+ "reqwest",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-time-service"
 version = "0.1.0"
 dependencies = [
@@ -1807,13 +2045,40 @@ dependencies = [
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-gas",
+ "aptos-language-e2e-tests",
  "aptos-types",
  "aptos-vm",
  "criterion",
  "criterion-cpu-time",
- "language-e2e-tests",
  "num_cpus",
  "proptest",
+]
+
+[[package]]
+name = "aptos-transaction-emitter-lib"
+version = "0.0.0"
+dependencies = [
+ "again",
+ "anyhow",
+ "aptos",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-global-constants",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-rest-client",
+ "aptos-sdk",
+ "async-trait",
+ "clap 3.2.17",
+ "futures",
+ "itertools",
+ "once_cell",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "reqwest",
+ "serde 1.0.149",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -1826,14 +2091,16 @@ dependencies = [
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas",
+ "aptos-language-e2e-tests",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-genesis",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "clap 3.2.17",
  "datatest-stable",
  "hex",
- "language-e2e-tests",
  "move-binary-format",
  "move-command-line-common",
  "move-compiler",
@@ -1844,8 +2111,6 @@ dependencies = [
  "once_cell",
  "serde 1.0.149",
  "serde_json",
- "storage-interface",
- "vm-genesis",
 ]
 
 [[package]]
@@ -1887,11 +2152,11 @@ dependencies = [
  "aptos-config",
  "aptos-rest-client",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-types",
  "aptosdb",
  "async-trait",
  "move-binary-format",
- "storage-interface",
  "tokio",
 ]
 
@@ -1955,6 +2220,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-vm-genesis"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-cached-packages",
+ "aptos-crypto",
+ "aptos-framework",
+ "aptos-gas",
+ "aptos-proptest-helpers",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-vm",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "move-core-types",
+ "move-vm-types",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "rand 0.7.3",
+ "serde 1.0.149",
+]
+
+[[package]]
+name = "aptos-vm-validator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-cached-packages",
+ "aptos-crypto",
+ "aptos-executor-test-helpers",
+ "aptos-gas",
+ "aptos-scratchpad",
+ "aptos-state-view",
+ "aptos-storage-interface",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-genesis",
+ "aptosdb",
+ "fail 0.5.0",
+ "move-core-types",
+ "rand 0.7.3",
+]
+
+[[package]]
 name = "aptos-warp-webserver"
 version = "0.1.0"
 dependencies = [
@@ -2008,7 +2318,9 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-rocksdb-options",
+ "aptos-scratchpad",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
@@ -2028,9 +2340,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "schemadb",
- "scratchpad",
  "serde 1.0.149",
- "storage-interface",
  "thiserror",
 ]
 
@@ -2046,7 +2356,9 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-rocksdb-options",
+ "aptos-scratchpad",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
@@ -2059,9 +2371,7 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "schemadb",
- "scratchpad",
  "serde 1.0.149",
- "storage-interface",
 ]
 
 [[package]]
@@ -3529,12 +3839,12 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-executor",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
  "aptosdb",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "storage-interface",
  "structopt",
 ]
 
@@ -3732,15 +4042,16 @@ dependencies = [
  "aptos-framework",
  "aptos-gas",
  "aptos-keygen",
+ "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-genesis",
  "aptos-writeset-generator",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "hex",
  "itertools",
- "language-e2e-tests",
  "move-core-types",
  "move-package",
  "move-symbol-pool",
@@ -3751,7 +4062,6 @@ dependencies = [
  "rstest",
  "serde 1.0.149",
  "tempfile",
- "vm-genesis",
 ]
 
 [[package]]
@@ -3929,8 +4239,10 @@ dependencies = [
  "aptos-jellyfish-merkle",
  "aptos-logger",
  "aptos-push-metrics",
+ "aptos-scratchpad",
  "aptos-sdk",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
@@ -3944,9 +4256,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "schemadb",
- "scratchpad",
  "serde 1.0.149",
- "storage-interface",
  "structopt",
  "toml",
 ]
@@ -4897,29 +5207,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adab1eaa3408fb7f0c777a73e7465fd5656136fc93b670eb6df3c88c2c1344e3"
 
 [[package]]
-name = "inspection-service"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-build-info",
- "aptos-config",
- "aptos-infallible",
- "aptos-logger",
- "aptos-metrics-core",
- "aptos-telemetry",
- "assert_approx_eq",
- "futures",
- "hyper",
- "once_cell",
- "prometheus",
- "reqwest",
- "rusty-fork",
- "serde_json",
- "sysinfo",
- "tokio",
-]
-
-[[package]]
 name = "instant"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5182,38 +5469,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "language-e2e-tests"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-bitvec",
- "aptos-cached-packages",
- "aptos-crypto",
- "aptos-framework",
- "aptos-gas",
- "aptos-keygen",
- "aptos-proptest-helpers",
- "aptos-state-view",
- "aptos-types",
- "aptos-vm",
- "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "goldenfile",
- "hex",
- "move-binary-format",
- "move-command-line-common",
- "move-core-types",
- "move-ir-compiler",
- "move-vm-types",
- "num_cpus",
- "once_cell",
- "proptest",
- "proptest-derive",
- "rand 0.7.3",
- "serde 1.0.149",
- "vm-genesis",
-]
-
-[[package]]
 name = "language-e2e-testsuite"
 version = "0.1.0"
 dependencies = [
@@ -5223,21 +5478,21 @@ dependencies = [
  "aptos-framework",
  "aptos-gas",
  "aptos-keygen",
+ "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-genesis",
  "aptos-writeset-generator",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "itertools",
- "language-e2e-tests",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
  "move-ir-compiler",
  "proptest",
  "serde 1.0.149",
- "vm-genesis",
 ]
 
 [[package]]
@@ -6523,6 +6778,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-rate-limiter",
+ "aptos-short-hex-str",
  "aptos-time-service",
  "aptos-types",
  "async-trait",
@@ -6546,7 +6802,6 @@ dependencies = [
  "serde 1.0.149",
  "serde_bytes",
  "serde_json",
- "short-hex-str",
  "thiserror",
  "tokio",
  "tokio-retry",
@@ -6588,6 +6843,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-secure-storage",
+ "aptos-short-hex-str",
  "aptos-temppath",
  "aptos-time-service",
  "aptos-types",
@@ -6599,7 +6855,6 @@ dependencies = [
  "once_cell",
  "rand 0.7.3",
  "serde_yaml 0.8.26",
- "short-hex-str",
  "tokio",
 ]
 
@@ -8400,24 +8655,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
-name = "scratchpad"
-version = "0.1.0"
-dependencies = [
- "aptos-crypto",
- "aptos-infallible",
- "aptos-metrics-core",
- "aptos-types",
- "bitvec 0.19.6",
- "criterion",
- "itertools",
- "once_cell",
- "proptest",
- "rand 0.7.3",
- "rayon",
- "thiserror",
-]
-
-[[package]]
 name = "sct"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8747,18 +8984,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
 
 [[package]]
-name = "short-hex-str"
-version = "0.1.0"
-dependencies = [
- "hex",
- "mirai-annotations",
- "proptest",
- "serde 1.0.149",
- "static_assertions",
- "thiserror",
-]
-
-[[package]]
 name = "signal-hook"
 version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8975,52 +9200,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
-name = "state-sync-driver"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-consensus-notifications",
- "aptos-crypto",
- "aptos-data-client",
- "aptos-data-streaming-service",
- "aptos-event-notifications",
- "aptos-executor",
- "aptos-executor-test-helpers",
- "aptos-executor-types",
- "aptos-genesis",
- "aptos-infallible",
- "aptos-logger",
- "aptos-metrics-core",
- "aptos-temppath",
- "aptos-time-service",
- "aptos-types",
- "aptos-vm",
- "aptosdb",
- "async-trait",
- "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "channel",
- "claims",
- "futures",
- "mempool-notifications",
- "mockall",
- "move-core-types",
- "network",
- "once_cell",
- "rand 0.7.3",
- "schemadb",
- "scratchpad",
- "serde 1.0.149",
- "storage-interface",
- "storage-service-client",
- "storage-service-types",
- "thiserror",
- "tokio",
- "tokio-stream",
- "vm-genesis",
-]
-
-[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9031,90 +9210,6 @@ name = "stats_alloc"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c0e04424e733e69714ca1bbb9204c1a57f09f5493439520f9f68c132ad25eec"
-
-[[package]]
-name = "storage-interface"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-logger",
- "aptos-metrics-core",
- "aptos-secure-net",
- "aptos-state-view",
- "aptos-types",
- "aptos-vm",
- "assert_unordered",
- "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "crossbeam-channel",
- "move-core-types",
- "once_cell",
- "parking_lot 0.12.1",
- "rayon",
- "scratchpad",
- "serde 1.0.149",
- "thiserror",
-]
-
-[[package]]
-name = "storage-service-client"
-version = "0.1.0"
-dependencies = [
- "aptos-config",
- "aptos-types",
- "async-trait",
- "channel",
- "network",
- "storage-service-types",
- "thiserror",
-]
-
-[[package]]
-name = "storage-service-server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-bitvec",
- "aptos-bounded-executor",
- "aptos-config",
- "aptos-crypto",
- "aptos-infallible",
- "aptos-logger",
- "aptos-metrics-core",
- "aptos-time-service",
- "aptos-types",
- "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "bytes 1.2.1",
- "channel",
- "claims",
- "futures",
- "lru",
- "mockall",
- "network",
- "once_cell",
- "rand 0.7.3",
- "serde 1.0.149",
- "storage-interface",
- "storage-service-types",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "storage-service-types"
-version = "0.1.0"
-dependencies = [
- "aptos-compression",
- "aptos-config",
- "aptos-crypto",
- "aptos-types",
- "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "claims",
- "num-traits 0.2.15",
- "proptest",
- "serde 1.0.149",
- "thiserror",
-]
 
 [[package]]
 name = "string_cache"
@@ -9331,29 +9426,6 @@ name = "termtree"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "507e9898683b6c43a9aa55b64259b721b52ba226e0f3779137e50ad114a4c90b"
-
-[[package]]
-name = "testcases"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "aptos",
- "aptos-forge",
- "aptos-genesis",
- "aptos-global-constants",
- "aptos-keygen",
- "aptos-logger",
- "aptos-rest-client",
- "aptos-sdk",
- "aptos-types",
- "futures",
- "hex",
- "move-examples",
- "rand 0.7.3",
- "reqwest",
- "serde_json",
- "tokio",
-]
 
 [[package]]
 name = "textwrap"
@@ -9851,40 +9923,13 @@ dependencies = [
  "aptos-global-constants",
  "aptos-logger",
  "aptos-sdk",
+ "aptos-transaction-emitter-lib",
  "clap 3.2.17",
  "futures",
  "itertools",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "tokio",
- "transaction-emitter-lib",
-]
-
-[[package]]
-name = "transaction-emitter-lib"
-version = "0.0.0"
-dependencies = [
- "again",
- "anyhow",
- "aptos",
- "aptos-config",
- "aptos-crypto",
- "aptos-global-constants",
- "aptos-infallible",
- "aptos-logger",
- "aptos-rest-client",
- "aptos-sdk",
- "async-trait",
- "clap 3.2.17",
- "futures",
- "itertools",
- "once_cell",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "reqwest",
- "serde 1.0.149",
- "tokio",
- "url",
 ]
 
 [[package]]
@@ -10272,51 +10317,6 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
-
-[[package]]
-name = "vm-genesis"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-cached-packages",
- "aptos-crypto",
- "aptos-framework",
- "aptos-gas",
- "aptos-proptest-helpers",
- "aptos-state-view",
- "aptos-types",
- "aptos-vm",
- "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "move-core-types",
- "move-vm-types",
- "once_cell",
- "proptest",
- "proptest-derive",
- "rand 0.7.3",
- "serde 1.0.149",
-]
-
-[[package]]
-name = "vm-validator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-cached-packages",
- "aptos-crypto",
- "aptos-executor-test-helpers",
- "aptos-gas",
- "aptos-state-view",
- "aptos-temppath",
- "aptos-types",
- "aptos-vm",
- "aptosdb",
- "fail 0.5.0",
- "move-core-types",
- "rand 0.7.3",
- "scratchpad",
- "storage-interface",
- "vm-genesis",
-]
 
 [[package]]
 name = "wait-timeout"

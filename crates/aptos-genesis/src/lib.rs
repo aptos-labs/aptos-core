@@ -18,6 +18,7 @@ use aptos_config::config::{
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_framework::ReleaseBundle;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_temppath::TempPath;
 use aptos_types::{
     chain_id::ChainId,
@@ -26,10 +27,9 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
+use aptos_vm_genesis::Validator;
 use aptosdb::AptosDB;
 use std::convert::TryInto;
-use storage_interface::DbReaderWriter;
-use vm_genesis::Validator;
 
 /// Holder object for all pieces needed to generate a genesis transaction
 #[derive(Clone)]
@@ -117,12 +117,12 @@ impl GenesisInfo {
     }
 
     fn generate_genesis_txn(&self) -> Transaction {
-        vm_genesis::encode_genesis_transaction(
+        aptos_vm_genesis::encode_genesis_transaction(
             self.root_key.clone(),
             &self.validators,
             &self.framework,
             self.chain_id,
-            &vm_genesis::GenesisConfiguration {
+            &aptos_vm_genesis::GenesisConfiguration {
                 allow_new_validators: self.allow_new_validators,
                 epoch_duration_secs: self.epoch_duration_secs,
                 is_test: true,

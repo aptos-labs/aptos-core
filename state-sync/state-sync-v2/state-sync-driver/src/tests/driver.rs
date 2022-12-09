@@ -19,6 +19,8 @@ use aptos_event_notifications::{
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_test_helpers::bootstrap_genesis;
 use aptos_infallible::RwLock;
+use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_service_client::StorageServiceClient;
 use aptos_time_service::TimeService;
 use aptos_types::{
     event::EventKey,
@@ -33,8 +35,6 @@ use futures::{FutureExt, StreamExt};
 use mempool_notifications::MempoolNotificationListener;
 use network::application::{interface::MultiNetworkSender, storage::PeerMetadataStorage};
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::DbReaderWriter;
-use storage_service_client::StorageServiceClient;
 
 // TODO(joshlind): extend these tests to cover more functionality!
 
@@ -231,7 +231,7 @@ async fn create_driver_for_tests(
     let (_, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
 
     // Bootstrap the genesis transaction
-    let (genesis, _) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let (genesis, _) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
     bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn).unwrap();
 

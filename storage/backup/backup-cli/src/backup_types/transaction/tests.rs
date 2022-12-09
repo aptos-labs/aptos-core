@@ -14,11 +14,11 @@ use crate::{
         ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, RocksdbOpt, TrustedWaypointOpt,
     },
 };
+use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
 use aptosdb::AptosDB;
 use std::{convert::TryInto, mem::size_of, sync::Arc};
-use storage_interface::DbReader;
 use tokio::time::Duration;
 
 #[test]

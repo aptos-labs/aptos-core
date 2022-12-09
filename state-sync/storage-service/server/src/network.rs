@@ -3,6 +3,9 @@
 
 use crate::metrics;
 use aptos_config::config::StorageServiceConfig;
+use aptos_storage_service_types::requests::StorageServiceRequest;
+use aptos_storage_service_types::responses::StorageServiceResponse;
+use aptos_storage_service_types::{Result, StorageServiceMessage};
 use aptos_types::PeerId;
 use bytes::Bytes;
 use channel::{aptos_channel, message_queues::QueueStyle};
@@ -20,9 +23,6 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use storage_service_types::requests::StorageServiceRequest;
-use storage_service_types::responses::StorageServiceResponse;
-use storage_service_types::{Result, StorageServiceMessage};
 
 pub fn network_endpoint_config(storage_config: StorageServiceConfig) -> AppConfig {
     let max_network_channel_size = storage_config.max_network_channel_size as usize;

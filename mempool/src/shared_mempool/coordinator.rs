@@ -22,6 +22,7 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::on_chain_config::OnChainConfigPayload;
+use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
     channel::mpsc,
     stream::{select_all, FuturesUnordered},
@@ -34,7 +35,6 @@ use std::{
 };
 use tokio::{runtime::Handle, time::interval};
 use tokio_stream::wrappers::IntervalStream;
-use vm_validator::vm_validator::TransactionValidation;
 
 use super::types::MempoolClientRequest;
 

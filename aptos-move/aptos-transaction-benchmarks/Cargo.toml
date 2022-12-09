@@ -16,11 +16,11 @@ rust-version = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
+aptos-language-e2e-tests = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 criterion = { workspace = true }
 criterion-cpu-time = { workspace = true }
-language-e2e-tests = { workspace = true }
 num_cpus = { workspace = true }
 proptest = { workspace = true }
 

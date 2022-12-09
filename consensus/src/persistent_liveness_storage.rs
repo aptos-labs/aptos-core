@@ -9,12 +9,12 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     proof::TransactionAccumulatorSummary, transaction::Version,
 };
 use std::{cmp::max, collections::HashSet, sync::Arc};
-use storage_interface::DbReader;
 
 /// PersistentLivenessStorage is essential for maintaining liveness when a node crashes.  Specifically,
 /// upon a restart, a correct node will recover.  Even if all nodes crash, liveness is

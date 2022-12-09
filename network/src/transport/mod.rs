@@ -16,6 +16,7 @@ use aptos_config::{
 use aptos_crypto::x25519;
 use aptos_id_generator::{IdGenerator, U32IdGenerator};
 use aptos_logger::prelude::*;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{timeout, TimeService, TimeServiceTrait};
 use aptos_types::{
     chain_id::ChainId,
@@ -29,7 +30,6 @@ use futures::{
 };
 use netcore::transport::{proxy_protocol, tcp, ConnectionOrigin, Transport};
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
 
 // Re-exposed for aptos-network-checker

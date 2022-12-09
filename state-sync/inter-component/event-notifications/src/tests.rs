@@ -9,6 +9,7 @@ use crate::{
 };
 use aptos_executor_test_helpers::bootstrap_genesis;
 use aptos_infallible::RwLock;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
@@ -24,7 +25,6 @@ use futures::{FutureExt, StreamExt};
 use move_core_types::language_storage::TypeTag;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, sync::Arc};
-use storage_interface::DbReaderWriter;
 
 #[test]
 fn test_all_configs_returned() {
@@ -544,7 +544,7 @@ fn create_event_subscription_service() -> EventSubscriptionService {
 
 fn create_database() -> Arc<RwLock<DbReaderWriter>> {
     // Generate a genesis change set
-    let (genesis, _) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let (genesis, _) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
 
     // Create test aptos database
     let db_path = aptos_temppath::TempPath::new();

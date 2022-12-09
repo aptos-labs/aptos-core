@@ -23,7 +23,10 @@ aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-proptest-helpers = { workspace = true, optional = true }
+aptos-short-hex-str = { workspace = true }
+aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm-validator = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 channel = { workspace = true }
@@ -39,23 +42,20 @@ rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-short-hex-str = { workspace = true }
-storage-interface = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
-vm-validator = { workspace = true }
 
 [dev-dependencies]
 aptos-compression = { workspace = true }
 aptos-config = { workspace = true }
 aptos-id-generator = { workspace = true }
+aptos-storage-interface = { workspace = true, features = ["fuzzing"] }
 enum_dispatch = { workspace = true }
 network = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
-storage-interface = { workspace = true, features = ["fuzzing"] }
 
 [features]
 default = []
-failpoints = ["fail/failpoints", "vm-validator/failpoints"]
-fuzzing = ["proptest", "aptos-types/fuzzing", "storage-interface/fuzzing", "aptos-config/fuzzing"]
+failpoints = ["fail/failpoints", "aptos-vm-validator/failpoints"]
+fuzzing = ["proptest", "aptos-types/fuzzing", "aptos-storage-interface/fuzzing", "aptos-config/fuzzing"]

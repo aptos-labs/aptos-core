@@ -10,6 +10,8 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_logger::prelude::*;
+use aptos_storage_service_types::requests::StorageServiceRequest;
+use aptos_storage_service_types::responses::StorageServerSummary;
 use itertools::Itertools;
 use netcore::transport::ConnectionOrigin;
 use network::application::storage::PeerMetadataStorage;
@@ -18,8 +20,6 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use storage_service_types::requests::StorageServiceRequest;
-use storage_service_types::responses::StorageServerSummary;
 
 /// Scores for peer rankings based on preferences and behavior.
 const MAX_SCORE: f64 = 100.0;
