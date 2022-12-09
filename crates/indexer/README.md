@@ -114,4 +114,4 @@ then run `brew services restart postgresql`
 ```bash
 alias testnet="cd ~/Desktop/aptos-core; CARGO_NET_GIT_FETCH_WITH_CLI=true cargo run -p aptos-node -- --test"
 ```
-Then run `source ~/.zshrc`, and start testnet by running `testnet` in your terminal
+Then  run `source ~/.zshrc`, and start testnet by running `testnet` in your terminal
