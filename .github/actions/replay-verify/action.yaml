@@ -43,6 +43,7 @@ runs:
           --replay-concurrency-level 4 \
           --metadata-cache-dir ./$NAME/metadata-cache \
           --target-db-dir ./$NAME/db \
+          --txns-to-skip 12253479 12277499 \
           --start-version $START \
           --end-version $END \
           command-adapter --config terraform/helm/fullnode/files/backup/s3-public.yaml 2>&1 \
