@@ -52,7 +52,7 @@ pub struct AccessPath {
     pub path: Vec<u8>,
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 pub enum Path {
     Code(ModuleId),
     Resource(StructTag),
@@ -178,5 +178,22 @@ impl TryFrom<&Vec<u8>> for Path {
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Self::Error> {
         bcs::from_bytes::<Path>(bytes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::access_path::AccessPath;
+    use move_core_types::account_address::AccountAddress;
+
+    #[test]
+    fn test_type_tag_serde() {
+        let address = AccountAddress::from_hex_literal(
+            "0x0c8065159db786706eeefdda828b9849e69491439f610af26b9c47ccbd0ca1be",
+        )
+        .unwrap();
+        let path = hex::decode("01000000000000000000000000000000000000000000000000000000000000000104636f696e09436f696e53746f7265010700000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e00").unwrap();
+        let access_path = AccessPath::new(address, path);
+        println!("{:?}", access_path.get_path());
     }
 }

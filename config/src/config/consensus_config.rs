@@ -48,10 +48,10 @@ pub struct ChainHealthBackoffValues {
 impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
-            max_sending_block_txns: 2500,
+            max_sending_block_txns: 3500,
             // defaulting to under 0.5s to broadcast the proposal to 100 validators
             // over 1gbps link
-            max_sending_block_bytes: 600 * 1024, // 600 KB
+            max_sending_block_bytes: 2 * 1024 * 1024, // 600 KB
             max_receiving_block_txns: 10000,
             max_receiving_block_bytes: 3 * 1024 * 1024, // 3MB
             max_pruned_blocks_in_mem: 100,
@@ -72,33 +72,33 @@ impl Default for ConsensusConfig {
 
             window_for_chain_health: 100,
             chain_health_backoff: vec![
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 80,
-                    max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 500 * 1024,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 77,
-                    max_sending_block_txns_override: 1000,
-                    max_sending_block_bytes_override: 250 * 1024,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 75,
-                    max_sending_block_txns_override: 400,
-                    max_sending_block_bytes_override: 100 * 1024,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 72,
-                    max_sending_block_txns_override: 200,
-                    max_sending_block_bytes_override: 50 * 1024,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 69,
-                    // in practice, latencies make it such that 2-4 blocks/s is max,
-                    // meaning that most aggressively we limit to ~200-400 TPS
-                    max_sending_block_txns_override: 100,
-                    max_sending_block_bytes_override: 25 * 1024,
-                },
+                // ChainHealthBackoffValues {
+                //     backoff_if_below_participating_voting_power_percentage: 80,
+                //     max_sending_block_txns_override: 2000,
+                //     max_sending_block_bytes_override: 500 * 1024,
+                // },
+                // ChainHealthBackoffValues {
+                //     backoff_if_below_participating_voting_power_percentage: 77,
+                //     max_sending_block_txns_override: 1000,
+                //     max_sending_block_bytes_override: 250 * 1024,
+                // },
+                // ChainHealthBackoffValues {
+                //     backoff_if_below_participating_voting_power_percentage: 75,
+                //     max_sending_block_txns_override: 400,
+                //     max_sending_block_bytes_override: 100 * 1024,
+                // },
+                // ChainHealthBackoffValues {
+                //     backoff_if_below_participating_voting_power_percentage: 72,
+                //     max_sending_block_txns_override: 200,
+                //     max_sending_block_bytes_override: 50 * 1024,
+                // },
+                // ChainHealthBackoffValues {
+                //     backoff_if_below_participating_voting_power_percentage: 69,
+                //     // in practice, latencies make it such that 2-4 blocks/s is max,
+                //     // meaning that most aggressively we limit to ~200-400 TPS
+                //     max_sending_block_txns_override: 100,
+                //     max_sending_block_bytes_override: 25 * 1024,
+                // },
             ],
         }
     }

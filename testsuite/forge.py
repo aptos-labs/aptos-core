@@ -813,6 +813,8 @@ async def write_cluster_config(
                 "update-kubeconfig",
                 "--name",
                 forge_cluster_name,
+		"--region",
+		"us-east-1",
                 "--kubeconfig",
                 temp,
             ]
@@ -1185,6 +1187,8 @@ def test(
     test_args: Optional[List[str]],
     test_suites: Tuple[str],
 ) -> None:
+    forge_enable_performance = "true"
+    forge_test_suite = "land_blocking"
     """Run a forge test"""
     shell = LocalShell(verbose == "true")
     git = Git(shell)
@@ -1252,6 +1256,8 @@ def test(
     if not forge_cluster_name or balance_clusters:
         cluster_names = config.get("enabled_clusters")
         forge_cluster_name = random.choice(cluster_names)
+
+    forge_cluster_name = "aptos-forge-big-east-0"
 
     assert forge_cluster_name, "Forge cluster name is required"
 

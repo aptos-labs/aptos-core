@@ -5,6 +5,7 @@ use aptos_aggregator::{delta_change_set::DeltaOp, transaction::AggregatorValue};
 use aptos_types::write_set::TransactionWrite;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
+use std::fmt::Debug;
 use std::{
     collections::btree_map::BTreeMap,
     hash::Hash,
@@ -108,7 +109,7 @@ pub enum MVHashMapOutput<V> {
 
 pub type Result<V> = anyhow::Result<MVHashMapOutput<V>, MVHashMapError>;
 
-impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
+impl<K: Hash + Clone + Eq + Debug, V: TransactionWrite> MVHashMap<K, V> {
     pub fn new() -> MVHashMap<K, V> {
         MVHashMap {
             data: DashMap::new(),
@@ -185,6 +186,10 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
 
                     if flag == FLAG_ESTIMATE {
                         // Found a dependency.
+                        // error!(
+                        //     "Found a dependency for path {:?} of txn id {} with txn id  {} ",
+                        //     *key, txn_idx, *idx
+                        // );
                         return Err(Dependency(*idx));
                     }
 

@@ -5,14 +5,17 @@ use crate::view::ResolvedData;
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_mvhashmap::{EntryCell, MVHashMap};
 use aptos_types::write_set::{TransactionWrite, WriteOp};
+use std::fmt::Debug;
 use std::{hash::Hash, thread::spawn};
 
 pub struct OutputDeltaResolver<K, V> {
     versioned_outputs: MVHashMap<K, V>,
 }
 
-impl<K: Hash + Clone + Eq + Send + 'static, V: TransactionWrite + Send + Sync + 'static>
-    OutputDeltaResolver<K, V>
+impl<
+        K: Hash + Clone + Eq + Send + Debug + 'static,
+        V: TransactionWrite + Send + Sync + 'static,
+    > OutputDeltaResolver<K, V>
 {
     pub fn new(versioned_outputs: MVHashMap<K, V>) -> Self {
         Self { versioned_outputs }
