@@ -13,10 +13,10 @@ use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
 use aptos_secure_storage::SECURE_STORAGE_DB_NAME;
+use aptos_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use reqwest::Url;
 use serde_json::Value;
-use state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use std::{
     fmt::{Debug, Formatter},
     process::{Command, Stdio},

@@ -19,6 +19,7 @@ aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-infallible = { workspace = true }
+aptos-short-hex-str = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 futures = { workspace = true }
@@ -27,7 +28,6 @@ mirai-annotations = { workspace = true }
 proptest = { workspace = true, optional = true }
 rayon = { workspace = true }
 serde = { workspace = true }
-short-hex-str = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]

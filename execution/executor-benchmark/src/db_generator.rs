@@ -11,10 +11,10 @@ use aptos_config::config::{
     PrunerConfig, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
+use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use std::{fs, path::Path};
-use storage_interface::DbReaderWriter;
 
 pub fn run(
     num_accounts: usize,

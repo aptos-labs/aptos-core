@@ -7,6 +7,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_storage_interface::jmt_update_refs;
 use aptos_types::{
     proof::{SparseMerkleInternalNode, SparseMerkleRangeProof},
     transaction::Version,
@@ -21,7 +22,6 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ops::Bound,
 };
-use storage_interface::jmt_update_refs;
 
 #[derive(
     Arbitrary,

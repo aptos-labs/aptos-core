@@ -5,12 +5,12 @@ use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
 use aptos_api::Context;
 use aptos_api_types::{AsConverter, LedgerInfo, Transaction, TransactionOnChainData};
 use aptos_logger::prelude::*;
+use aptos_storage_interface::state_view::DbStateView;
 use aptos_vm::data_cache::StorageAdapterOwned;
 use futures::channel::mpsc;
 use futures::SinkExt;
 use std::sync::Arc;
 use std::time::Duration;
-use storage_interface::state_view::DbStateView;
 use tokio::task::JoinHandle;
 
 // Default Values

@@ -16,6 +16,7 @@ use anyhow::{bail, ensure, Result};
 use aptos_config::config::RocksdbConfig;
 use aptos_logger::warn;
 use aptos_rocksdb_options::gen_rocksdb_options;
+use aptos_storage_interface::{state_view::DbStateView, DbReader};
 use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
@@ -38,7 +39,6 @@ use std::{
     convert::TryInto,
     sync::{atomic::Ordering, Arc},
 };
-use storage_interface::{state_view::DbStateView, DbReader};
 
 #[derive(Debug)]
 pub struct Indexer {

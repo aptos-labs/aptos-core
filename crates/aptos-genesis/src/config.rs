@@ -10,6 +10,7 @@ use aptos_types::{
     network_address::{DnsName, NetworkAddress, Protocol},
     transaction::authenticator::AuthenticationKey,
 };
+use aptos_vm_genesis::{AccountBalance, EmployeePool, Validator, ValidatorWithCommissionRate};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{BTreeMap, HashSet};
 use std::{
@@ -20,7 +21,6 @@ use std::{
     path::Path,
     str::FromStr,
 };
-use vm_genesis::{AccountBalance, EmployeePool, Validator, ValidatorWithCommissionRate};
 
 /// Template for setting up Github for Genesis
 ///

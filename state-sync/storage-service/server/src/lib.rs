@@ -14,6 +14,17 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::StorageServiceConfig;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
+use aptos_storage_interface::DbReader;
+use aptos_storage_service_types::requests::{
+    DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest, StorageServiceRequest,
+    TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+    TransactionsWithProofRequest,
+};
+use aptos_storage_service_types::responses::{
+    CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, ServerProtocolVersion,
+    StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof,
+};
+use aptos_storage_service_types::{Result, StorageServiceError};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     account_address::AccountAddress,
@@ -31,17 +42,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use storage_interface::DbReader;
-use storage_service_types::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest, StorageServiceRequest,
-    TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
-    TransactionsWithProofRequest,
-};
-use storage_service_types::responses::{
-    CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, ServerProtocolVersion,
-    StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof,
-};
-use storage_service_types::{Result, StorageServiceError};
 use thiserror::Error;
 use tokio::runtime::Handle;
 
@@ -77,8 +77,8 @@ impl Error {
     }
 }
 
-impl From<storage_service_types::responses::Error> for Error {
-    fn from(error: storage_service_types::responses::Error) -> Self {
+impl From<aptos_storage_service_types::responses::Error> for Error {
+    fn from(error: aptos_storage_service_types::responses::Error) -> Self {
         Error::UnexpectedErrorEncountered(error.to_string())
     }
 }

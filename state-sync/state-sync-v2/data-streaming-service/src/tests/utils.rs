@@ -10,6 +10,13 @@ use aptos_data_client::{
 };
 use aptos_infallible::Mutex;
 use aptos_logger::Level;
+use aptos_storage_service_types::requests::{
+    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+    NewTransactionsWithProofRequest, StateValuesWithProofRequest,
+    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+};
+use aptos_storage_service_types::responses::{CompleteDataRange, TransactionOrOutputListWithProof};
+use aptos_storage_service_types::Epoch;
 use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     account_address::AccountAddress,
@@ -36,13 +43,6 @@ use std::cmp::min;
 use std::ops::DerefMut;
 use std::sync::Arc;
 use std::{collections::HashMap, thread, time::Duration};
-use storage_service_types::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-    NewTransactionsWithProofRequest, StateValuesWithProofRequest,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
-};
-use storage_service_types::responses::{CompleteDataRange, TransactionOrOutputListWithProof};
-use storage_service_types::Epoch;
 use tokio::time::timeout;
 
 // TODO(joshlind): provide a better way to mock the data client.

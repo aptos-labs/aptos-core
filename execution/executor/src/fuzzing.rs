@@ -6,13 +6,13 @@ use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_state_view::StateView;
+use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
     vm_status::VMStatus,
 };
 use aptos_vm::VMExecutor;
-use storage_interface::{state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter};
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
     // setup fake db

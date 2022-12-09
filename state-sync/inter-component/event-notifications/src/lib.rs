@@ -6,6 +6,7 @@
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     account_view::AccountView,
@@ -27,7 +28,6 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter};
 use thiserror::Error;
 
 #[cfg(test)]

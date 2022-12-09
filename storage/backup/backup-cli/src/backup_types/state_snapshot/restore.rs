@@ -25,6 +25,7 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::StateSnapshotReceiver;
 use aptos_types::{
     access_path::Path,
     ledger_info::LedgerInfoWithSignatures,
@@ -38,7 +39,6 @@ use futures::{stream, TryStreamExt};
 use move_binary_format::CompiledModule;
 use move_bytecode_verifier::verify_module_with_config;
 use std::sync::Arc;
-use storage_interface::StateSnapshotReceiver;
 use tokio::time::Instant;
 
 #[derive(Parser)]

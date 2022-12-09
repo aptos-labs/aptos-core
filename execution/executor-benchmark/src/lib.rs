@@ -23,9 +23,9 @@ use aptosdb::AptosDB;
 
 use crate::pipeline::Pipeline;
 use aptos_executor::block_executor::BlockExecutor;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
 use std::{fs, path::Path};
-use storage_interface::DbReaderWriter;
 
 pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<AptosVM>) {
     let db = DbReaderWriter::new(

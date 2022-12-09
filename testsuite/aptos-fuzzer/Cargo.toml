@@ -21,15 +21,17 @@ aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-executor = { workspace = true, features = ["fuzzing"] }
 aptos-executor-types = { workspace = true, features = ["fuzzing"] }
 aptos-jellyfish-merkle = { workspace = true, features = ["fuzzing"] }
+aptos-language-e2e-tests = { workspace = true }
 aptos-mempool = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
+aptos-scratchpad =  { workspace = true, features = ["fuzzing"] }
+aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 aptos-vault-client = { workspace = true, features = ["fuzzing"] }
 aptosdb = { workspace = true, features = ["fuzzing"] }
 bcs = { workspace = true }
 byteorder = { workspace = true }
 hex = { workspace = true }
-language-e2e-tests = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 move-vm-types = { workspace = true, features = ["fuzzing"] }
@@ -40,9 +42,7 @@ proptest-derive =  { workspace = true }
 rand =  { workspace = true }
 rusty-fork = { workspace = true }
 safety-rules =  { workspace = true, features = ["fuzzing", "testing"] }
-scratchpad =  { workspace = true, features = ["fuzzing"] }
 sha-1 =  { workspace = true }
-storage-interface = { workspace = true }
 structopt = { workspace = true }
 
 [dev-dependencies]

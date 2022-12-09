@@ -1,5 +1,5 @@
 [package]
-name = "storage-service-types"
+name = "aptos-storage-service-types"
 description = "Common types offered by the Aptos storage service"
 version = "0.1.0"
 

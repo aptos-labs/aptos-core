@@ -18,6 +18,7 @@ use aptos_data_streaming_service::{
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
     transaction::Version,
@@ -25,7 +26,6 @@ use aptos_types::{
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
 use std::{sync::Arc, time::Duration};
-use storage_interface::DbReader;
 use tokio::time::timeout;
 
 pub const PENDING_DATA_LOG_FREQ_SECS: u64 = 3;

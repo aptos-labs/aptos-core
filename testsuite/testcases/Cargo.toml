@@ -1,5 +1,5 @@
 [package]
-name = "testcases"
+name = "aptos-testcases"
 description = "Aptos compatibility tests"
 version = "0.0.0"
 

@@ -14,10 +14,14 @@ use aptos_config::{
 };
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
+use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{
     account_config::AccountSequenceInfo, mempool_status::MempoolStatusCode,
     transaction::SignedTransaction,
+};
+use aptos_vm_validator::{
+    mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::channel::mpsc;
@@ -29,11 +33,7 @@ use network::{
 };
 use std::collections::HashMap;
 use std::{collections::HashSet, sync::Arc};
-use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use tokio::runtime::{Builder, Handle, Runtime};
-use vm_validator::{
-    mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
-};
 
 /// Mock of a running instance of shared mempool.
 pub struct MockSharedMempool {

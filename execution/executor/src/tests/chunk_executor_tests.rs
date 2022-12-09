@@ -12,6 +12,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
+use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     test_helpers::transaction_test_helpers::block,
@@ -19,7 +20,6 @@ use aptos_types::{
 };
 use aptosdb::AptosDB;
 use rand::Rng;
-use storage_interface::DbReaderWriter;
 
 pub struct TestExecutor {
     _path: aptos_temppath::TempPath,
@@ -32,7 +32,7 @@ impl TestExecutor {
         let path = aptos_temppath::TempPath::new();
         path.create_as_dir().unwrap();
         let db = DbReaderWriter::new(AptosDB::new_for_test(path.path()));
-        let genesis = vm_genesis::test_genesis_transaction();
+        let genesis = aptos_vm_genesis::test_genesis_transaction();
         let waypoint = generate_waypoint::<MockVM>(&db, &genesis).unwrap();
         maybe_bootstrap::<MockVM>(&db, &genesis, waypoint).unwrap();
         let executor = ChunkExecutor::new(db.clone());
