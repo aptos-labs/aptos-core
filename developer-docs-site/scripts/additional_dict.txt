@@ -42,6 +42,7 @@ Dapps
 dapps
 DDoS
 DECL
+doesnt
 DM
 DNS
 Dev
@@ -339,6 +340,7 @@ quickstart
 quickstarts
 repo
 repos
+requiers
 ruleset
 runtime
 scalability
