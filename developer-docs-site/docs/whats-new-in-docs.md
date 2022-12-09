@@ -7,6 +7,37 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 08 December 2022
+
+- Released a new version to Mainnet:
+
+  Framework upgrade through governance voting:
+  - Testnet upgrade - Nov 30th
+  - Mainnet upgrade - Dec 12th - 19th (7 days voting period)
+
+  New features and enhancements:
+  - Move
+    - [New chain_id native function + corresponding new gas schedule entry](https://github.com/aptos-labs/aptos-core/pull/5288).
+  - Blockchain
+    - Added automatic chain-health based back pressure to improve reliability. Automatic slow-down (through max block size reduction) is triggered in some scenarios.
+    - Improved timeouts for state synchronization: (i) lower timeouts for optimistic fetch (to help reduce end-to-end latency); and (ii) exponential back-off for low-bandwidth nodes.
+
+  Resolved issues:
+  - Move
+    - Explicit error codes in resource account.
+    - Improved Leader Election (gated behind feature flag).
+
+  See these resources for more details on the release:
+    - [#mainnet-release](https://discord.com/channels/945856774056083548/1042502400507916349) Discord channel for more detailed descriptions of the above changes.
+    - [Aptos Releases](https://github.com/aptos-labs/aptos-core/releases) list for all releases.
+    - [`testnet`](https://github.com/aptos-labs/aptos-core/commits/testnet) branch commits for the changes landing in mainnet today.
+
+## 05 December 2022
+
+- Moved recently pared down System Integrators Guide to [Use the Aptos REST Read API](guides/aptos-apis.md).
+- Resurrected last full version of the [Aptos System Integrators Guide](guides/system-integrators-guide.md).
+- Renamed System Integrators Guide to [Integrate Aptos with Your Platform](guides/system-integrators-guide.md) and updated it with our latest guidance.
+
 ## 02 December 2022
 
 - Distributed a survey asking how we can make the Aptos developer experience better: https://aptos.typeform.com/dev-survey
