@@ -6,7 +6,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
 use aptos_infallible::Mutex;
 use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
+use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction, PeerId};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -132,6 +132,7 @@ impl Payload {
 
     pub fn verify(
         &self,
+        peer_id: PeerId,
         validator: &ValidatorVerifier,
         quorum_store_enabled: bool,
     ) -> anyhow::Result<()> {
@@ -139,7 +140,7 @@ impl Payload {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {
                 for proof in proof_with_status.proofs.iter() {
-                    proof.verify(validator)?;
+                    proof.verify(peer_id, validator, quorum_store_enabled)?;
                 }
                 Ok(())
             }

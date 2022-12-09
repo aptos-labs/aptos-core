@@ -81,7 +81,7 @@ impl UnverifiedEvent {
     ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
             UnverifiedEvent::ProposalMsg(p) => {
-                p.verify(validator, quorum_store_enabled)?;
+                p.verify(peer_id, validator, quorum_store_enabled)?;
                 VerifiedEvent::ProposalMsg(p)
             }
             UnverifiedEvent::VoteMsg(v) => {
@@ -99,20 +99,20 @@ impl UnverifiedEvent {
                 VerifiedEvent::CommitDecision(cd)
             }
             UnverifiedEvent::FragmentMsg(f) => {
-                f.verify(peer_id)?;
+                f.verify(peer_id, quorum_store_enabled)?;
                 VerifiedEvent::FragmentMsg(f)
             }
             // Only sender is verified. Remaining verification is on-demand (when it's used).
             UnverifiedEvent::BatchMsg(b) => {
-                b.verify(peer_id)?;
+                b.verify(peer_id, quorum_store_enabled)?;
                 VerifiedEvent::UnverifiedBatchMsg(b)
             }
             UnverifiedEvent::SignedDigestMsg(sd) => {
-                sd.verify(validator)?;
+                sd.verify(peer_id, validator, quorum_store_enabled)?;
                 VerifiedEvent::SignedDigestMsg(sd)
             }
             UnverifiedEvent::ProofOfStoreMsg(p) => {
-                p.verify(validator)?;
+                p.verify(peer_id, validator, quorum_store_enabled)?;
                 VerifiedEvent::ProofOfStoreMsg(p)
             }
         })
