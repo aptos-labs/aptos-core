@@ -138,6 +138,13 @@ const sidebars = {
       ],
     },
     {
+      type: "category",
+      label: "Aptos Wallet Adapter",
+      collapsible: true,
+      collapsed: true,
+      items: ["concepts/wallet-adapter-concept", "guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
+    },
+    {
       type: "html",
       value: "Run Nodes",
       className: "sidebar-title",
