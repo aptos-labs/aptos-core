@@ -28,7 +28,7 @@ The [Adapter Core package](https://github.com/aptos-labs/aptos-wallet-adapter/tr
 - Holds the current wallet state and the installed wallets
 - Emits events on different actions and much more
 
-Dapps should not *know* this package as dapps interact with the provider, which in turn interacts with the core package; some Types are exposed from the core package for the dapp to use.
+Dapps should not _know_ this package as dapps interact with the provider, which in turn interacts with the core package; some Types are exposed from the core package for the dapp to use.
 
 Wallets should implement their own plugin class that extends the basic plugin class (properties + events) interface that lives in the core package.
 
@@ -56,20 +56,20 @@ When we started building a wallet adapter, we wanted a structure that can be eas
 
 We did research on the existing adapters, got some feedback from our community, and designed this structure to help wallets and dapps in development and when going to production. This structure offers the following benefits:
 
-* Modularity (separation of concerns) - separating the adapter into three components can help having more freedom in design, implementation, deployment and usage.
-* Wallets create and own their plugin implementation (instead of having all in the same monorepo):
-   - Reduces the packages bundle size used by dapps.
-   - Lets them be self-service and support themselves without too much friction.
-   - Prevents build failures in case of any bugs/bad implementation/wrong config files/etc.
-* Simplicity - keeps the Provider package very light and small as the major logic is implemented in the core package.
-* Flexibility - for wallets in creating and implementing custom functions.
+- Modularity (separation of concerns) - separating the adapter into three components can help having more freedom in design, implementation, deployment and usage.
+- Wallets create and own their plugin implementation (instead of having all in the same monorepo):
+  - Reduces the packages bundle size used by dapps.
+  - Lets them be self-service and support themselves without too much friction.
+  - Prevents build failures in case of any bugs/bad implementation/wrong config files/etc.
+- Simplicity - keeps the Provider package very light and small as the major logic is implemented in the core package.
+- Flexibility - for wallets in creating and implementing custom functions.
 
 <center>
 <ThemedImage
 alt="Wallet Adapter Concept"
 sources={{
-    light: useBaseUrl('/img/docs/10-adapter-chart-light.svg'),
-    dark: useBaseUrl('/img/docs/10-adapter-chart-dark.svg'),
+    light: useBaseUrl('/img/docs/wallet-adapter-chart-light.svg'),
+    dark: useBaseUrl('/img/docs/wallet-adapter-chart-dark.svg'),
   }}
 />
 </center>

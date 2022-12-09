@@ -24,7 +24,7 @@ The Aptos Wallet Adapter provides:
 
 ## Setup
 
-Currently, the adapter supports a *React provider* for you to include in your app.
+Currently, the adapter supports a _React provider_ for you to include in your app.
 
 Install wallet dependencies you want to include in your app. You can find a list of the wallets in the Aptos Wallet Adapter [README](https://github.com/aptos-labs/aptos-wallet-adapter#supported-wallet-packages).
 
@@ -34,13 +34,14 @@ Install the React provider:
 npm install @aptos-labs/wallet-adapter-react
 ```
 
-Import dependencies:
-TODO: How?
+### Import dependencies:
 
-On the App.jsx file, Import the installed wallets:
+On the App.jsx file,
+
+Import the installed wallets:
 
 ```js
-import { AptosWallet } from "some-aptos-wallet-package";
+import { PetraWallet } from "petra-plugin-wallet-adapter";
 ```
 
 Import the AptosWalletAdapterProvider:
@@ -52,13 +53,13 @@ import { AptosWalletAdapterProvider } from "@aptos-labs/wallet-adapter-react";
 Wrap your app with the Provider, pass it the plugins (wallets) you want to have on your app as an array, and include an autoConnect option (set to false by default)
 
 ```js
-const wallets = [new AptosWallet()];
+const wallets = [new PetraWallet()];
 <AptosWalletAdapterProvider plugins={wallets} autoConnect={true}>
   <App />
 </AptosWalletAdapterProvider>;
 ```
 
-## Use
+### Use
 
 On any page you want to use the wallet properties, import `useWallet` from `@aptos-labs/wallet-adapter-react`:
 
