@@ -22,7 +22,7 @@ The Aptos Wallet Adapter provides:
 - Listens to wallet events, such as account and network changes.
 - A well-developed and maintained reference implementation by the Aptos ecosystem team.
 
-## Setup
+## Install
 
 Currently, the adapter supports a _React provider_ for you to include in your app.
 
@@ -34,9 +34,9 @@ Install the React provider:
 npm install @aptos-labs/wallet-adapter-react
 ```
 
-### Import dependencies:
+## Import dependencies
 
-On the App.jsx file,
+In the `App.jsx` file:
 
 Import the installed wallets:
 
@@ -44,13 +44,13 @@ Import the installed wallets:
 import { PetraWallet } from "petra-plugin-wallet-adapter";
 ```
 
-Import the AptosWalletAdapterProvider:
+Import the `AptosWalletAdapterProvider`:
 
 ```js
 import { AptosWalletAdapterProvider } from "@aptos-labs/wallet-adapter-react";
 ```
 
-Wrap your app with the Provider, pass it the plugins (wallets) you want to have on your app as an array, and include an autoConnect option (set to false by default)
+Wrap your app with the Provider, pass it the plugins (wallets) you want to have on your app as an array, and include an autoConnect option (set to false by default):
 
 ```js
 const wallets = [new PetraWallet()];
