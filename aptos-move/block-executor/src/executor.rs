@@ -45,6 +45,8 @@ pub struct MVHashMapView<'a, K, V> {
     txn_idx: TxnIndex,
     scheduler: &'a Scheduler,
     captured_reads: Mutex<Vec<ReadDescriptor<K>>>,
+    // If the parallel execution ends earlier due to exceeding the per-block gas limit,
+    // the poisoned will be set to be true so that all threads' reads return immediately
     poisoned: AtomicBool,
 }
 
@@ -58,8 +60,8 @@ pub enum ReadResult<V> {
     U128(u128),
     // Read failed while resolving a delta.
     Unresolved(DeltaOp),
-    // Parallel execution error
-    PEerror(usize),
+    // Parallel execution error, indicating that PE finishes due to per-block gas limit
+    PEError(usize),
     // Read did not return anything.
     None,
 }
@@ -81,8 +83,10 @@ impl<
         use MVHashMapError::*;
         use MVHashMapOutput::*;
 
+        // If the parallel execution ends earlier due to exceeding the per-block gas limit,
+        // the poisoned will be set to be true so that all threads' reads return immediately
         if self.poisoned.load(Ordering::SeqCst) {
-            return ReadResult::PEerror(0);
+            return ReadResult::PEError(0);
         }
         loop {
             match self.versioned_map.read(key, self.txn_idx) {
@@ -135,20 +139,19 @@ impl<
                             // eventually finish and lead to unblocking txn_idx, contradiction.
                             let (lock, cvar) = &*dep_condition;
                             let mut dep_resolved = lock.lock();
+                            // dep_resolved.0 indicates whether the read dependency is resolved.
                             while !(*dep_resolved).0 {
+                                // If the PE finishes (due to per block gas), read should return immediately.
                                 if self.scheduler.done() {
-                                    return ReadResult::PEerror(0);
+                                    return ReadResult::PEError(0);
                                 }
-                                // println!("thread {} waiting suspended txn {} dep {}", rayon::current_thread_index().unwrap(), self.txn_idx, dep_idx);
-
                                 dep_resolved = cvar.wait(dep_resolved).unwrap();
-                                // out of gas
-                                // println!("thread {} resume suspended txn {} dep {}", rayon::current_thread_index().unwrap(), self.txn_idx, dep_idx);
+                                // dep_resolved.1 indicates whether PE finishes due to per-block gas limit.
                                 if (*dep_resolved).1 {
-                                    // println!("thread {} abort suspended txn {} dep {}", rayon::current_thread_index().unwrap(), self.txn_idx, dep_idx);
-                                    // return error
+                                    // When exceeding per-block gas limit, should poison the hashmap and
+                                    // return PEError to the storage_wrapper so it can properly log the error.
                                     self.poisoned.store(true, Ordering::SeqCst);
-                                    return ReadResult::PEerror(0);
+                                    return ReadResult::PEError(0);
                                 }
                             }
                         }
@@ -173,6 +176,7 @@ impl<
         self.txn_idx
     }
 
+    /// The MVHashMapView is poisoned when PE finishes due to exceeding per-block gas limit.
     pub fn is_poisoned(&self) -> bool {
         self.poisoned.load(Ordering::SeqCst)
     }
@@ -231,6 +235,7 @@ where
 
         // VM execution.
         let execute_result = executor.execute_transaction_mvhashmap_view(&state_view, txn);
+        // Small optimization. When the PE already finishes, return immediately.
         if state_view.is_poisoned() {
             assert!(scheduler.done());
             return SchedulerTask::NoTask;
@@ -342,22 +347,21 @@ where
         }
     }
 
+    /// Perform the validation. If the validation passed, return true; otherwise return false.
     fn validate_for_commit<'a>(
         &self,
         version_to_validate: Version,
-        guard: TaskGuard<'a>,
         last_input_output: &TxnLastInputOutput<
             <T as Transaction>::Key,
             <E as ExecutorTask>::Output,
             <E as ExecutorTask>::Error,
         >,
         versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
-        scheduler: &'a Scheduler,
     ) -> bool {
         use MVHashMapError::*;
         use MVHashMapOutput::*;
 
-        let (idx_to_validate, incarnation) = version_to_validate;
+        let (idx_to_validate, _) = version_to_validate;
         let read_set = last_input_output
             .read_set(idx_to_validate)
             .expect("Prior read-set must be recorded");
@@ -399,27 +403,29 @@ where
 
         let mut scheduler_task = SchedulerTask::NoTask;
 
+        // The commit thread locally maintains the committed transaction index.
         let mut local_cmt_idx = 0;
+        // The commit thread locally maintains the total gas of committed transactions.
         let mut current_gas = 0;
+        // The thread that grabs is_first=true will be the commit thread.
         let is_first = scheduler.is_first();
 
         if is_first {
+            // The commit thread keeps validating the next transaction.
+            // If validated, it increment the local commit index.
             while !scheduler.done() {
                 let num_txns = scheduler.num_txn_to_execute();
 
                 while local_cmt_idx < num_txns {
-                    // validate txn sequentially
-                    if let Some((version, guard)) = scheduler.produce_validation_task(local_cmt_idx)
-                    {
+                    // The commit thread validates transactions sequentially.
+                    if let Some((version, _)) = scheduler.produce_validation_task(local_cmt_idx) {
+                        // If the validation succeeded, calculate the gas.
                         if self.validate_for_commit(
                             version,
-                            guard,
                             last_input_output,
                             versioned_data_cache,
-                            scheduler,
                         ) {
-                            // println!("validated txn {:?}", version);
-                            // add gas
+                            // Read the gas from the execution output.
                             let txn_gas = match last_input_output.write_set(local_cmt_idx).as_ref()
                             {
                                 ExecutionStatus::Success(t) => t.gas_used(),
@@ -427,9 +433,10 @@ where
                                 ExecutionStatus::Abort(_) => 0,
                             };
                             current_gas += txn_gas;
+                            // If the per-block gas limit is exceeded, the commit thread halts PE.
                             if current_gas > scheduler.max_gas() {
                                 println!(
-                                    "thread {} set done local_cmt_idx {}",
+                                    "[Parallel Execution]: commit thread {} halts PE at local_cmt_idx {}",
                                     rayon::current_thread_index().unwrap(),
                                     local_cmt_idx
                                 );
@@ -437,16 +444,13 @@ where
                                 break;
                             }
                             local_cmt_idx += 1;
-                        } else {
-                            // println!("validation txn {:?} fails", version);
                         }
-                    } else {
-                        // println!("cannot produce validation task {:?}", local_cmt_idx);
                     }
                 }
+                // The commit thread commits all the transactions in the block, can finish PE.
                 if local_cmt_idx == num_txns {
                     println!(
-                        "thread {} set done local_cmt_idx {}",
+                        "[Parallel Execution]: commit thread {} halts PE at local_cmt_idx {}",
                         rayon::current_thread_index().unwrap(),
                         local_cmt_idx
                     );
@@ -454,13 +458,14 @@ where
                     break;
                 }
             }
-            // help other threads
+            // The commit thread helps other threads that may be pending on the read dependency.
+            // See the comment of the function resolve_condvar().
             for txn_idx in 0..scheduler.num_txn_to_execute() {
                 scheduler.resolve_condvar(txn_idx);
             }
         } else {
+            // Other threads perform execution/vaidation tasks.
             loop {
-                // println!("loop id {}", rayon::current_thread_index().unwrap());
                 scheduler_task = match scheduler_task {
                     SchedulerTask::ValidationTask(version_to_validate, guard) => self.validate(
                         version_to_validate,
@@ -494,11 +499,6 @@ where
                 }
             }
         }
-        // println!(
-        //     "thread finish {} is_first {}",
-        //     rayon::current_thread_index().unwrap(),
-        //     is_first
-        // );
     }
 
     pub fn execute_transactions_parallel(
@@ -514,7 +514,6 @@ where
     > {
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
-        println!("");
         println!("");
         println!("PE starts level {}", self.concurrency_level);
 
@@ -545,7 +544,6 @@ where
         println!("all threads finish");
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.
-        // let num_txns = scheduler.num_txn_to_execute();
         let num_txns = scheduler.num_txn_to_commit();
 
         let mut final_results = Vec::with_capacity(num_txns);

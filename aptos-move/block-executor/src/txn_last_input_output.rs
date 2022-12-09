@@ -215,9 +215,9 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
     }
 
     pub fn write_set(&self, txn_idx: TxnIndex) -> Arc<ExecutionStatus<T, Error<E>>> {
-        self.outputs[txn_idx]
-            .load_full()
-            .expect("PE Reading Gas: Output must be recorded after execution")
+        self.outputs[txn_idx].load_full().expect(
+            "[Parallel Execution] Reading the amount of gas used before transaction execution",
+        )
     }
 
     // Extracts a set of paths written or updated during execution from transaction

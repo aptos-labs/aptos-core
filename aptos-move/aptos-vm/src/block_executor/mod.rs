@@ -82,6 +82,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         )))
     }
 
+    // Return the amount of gas used by the transaction
     fn gas_used(&self) -> u64 {
         self.0.txn_output().gas_used()
     }
