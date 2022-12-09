@@ -8,9 +8,25 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Aptos Wallet Adapter
 
-Aptos provides an [Aptos Wallet Adapter](https://github.com/aptos-labs/aptos-wallet-adapter) monorepo for wallet and dapps creators to ease development and ensure a smooth process in building projects on the Aptos network.
+Building a dapp requiers to provide a wallet for the user to interact with the Aptos chain, and for a good user experience, it requires to provide multiple wallets so users can chose the one they want to use.
 
-The Aptos Wallet Adapter acts as a service between dapps and wallets and exposes APIs for dapps to interact with the wallets by following our [Wallet Standard](../guides/wallet-standard).
+Implementing wallet integration can be difficult for dapps in:
+
+1. Support and test all edge cases
+2. Implement and maintain different wallet APIs
+3. Provide users with needed functionality the wallet itself doesnt support
+4. Keep track on all the different wallets in our ecosystem
+
+In addition, creating and implementing a wallet is also not an easy task,
+
+1. Provide a wallet that follows a known standard so it is easy to integrate with
+2. Getting visibility and exposure in the ecosystem among all the other wallets
+3. Dapp projects need to dedicate time and resource to integrate the wallet within their app
+
+When we started building a wallet adapter, we wanted to provide an adapter that can be easy enough for wallets to integrate with and for dapps to use and implement.
+
+For that, we provide an [Aptos Wallet Adapter](https://github.com/aptos-labs/aptos-wallet-adapter) monorepo for wallet and dapps creators to ease development and ensure a smooth process in building projects on the Aptos network.
+The Aptos Wallet Adapter acts as a service between dapps and wallets and exposes APIs for dapps to interact with the wallets by following our [Wallet Standard](../guides/wallet-standard). This in turns allows dapps to support many wallets with minimal integration efforts, and for wallets to follow a known standard and gain visibility.
 
 ## Adapter structure
 
@@ -19,6 +35,16 @@ The adapter has three different components, the:
 1. Adapter Core package
 2. Adapter React provider (for dapps)
 3. Adapter Template plugin (for wallets)
+
+This structure offers the following benefits:
+
+- Modularity (separation of concerns) - separating the adapter into three components can help having more freedom in design, implementation, deployment and usage.
+- Wallets create and own their plugin implementation (instead of having all in the same monorepo):
+  - Reduces the packages bundle size used by dapps.
+  - Lets them be self-service and support themselves without too much friction.
+  - Prevents build failures in case of any bugs/bad implementation/wrong config files/etc.
+- Simplicity - keeps the Provider package very light and small as the major logic is implemented in the core package.
+- Flexibility - for wallets in creating and implementing custom functions.
 
 ### Adapter Core package
 
@@ -49,20 +75,6 @@ Wallets looking to integrate with the adapter should implement their own wallet 
 The [Wallet Adapter Plugin Template repo](https://github.com/aptos-labs/wallet-adapter-plugin-template) holds a pre-made class, a test file, and some config files to help you build and publish the plugin as an NPM package.
 
 Follow the [Wallet Adapter For Wallet Builders](../guides/wallet-adapter-for-wallets.md) on how to use the template to implement and publish your wallet plugin.
-
-### Why we use this structure?
-
-When we started building a wallet adapter, we wanted a structure that can be easy enough for wallets to integrate with and for dapps to use and implement.
-
-We did research on the existing adapters, got some feedback from our community, and designed this structure to help wallets and dapps in development and when going to production. This structure offers the following benefits:
-
-- Modularity (separation of concerns) - separating the adapter into three components can help having more freedom in design, implementation, deployment and usage.
-- Wallets create and own their plugin implementation (instead of having all in the same monorepo):
-  - Reduces the packages bundle size used by dapps.
-  - Lets them be self-service and support themselves without too much friction.
-  - Prevents build failures in case of any bugs/bad implementation/wrong config files/etc.
-- Simplicity - keeps the Provider package very light and small as the major logic is implemented in the core package.
-- Flexibility - for wallets in creating and implementing custom functions.
 
 <center>
 <ThemedImage
