@@ -23,6 +23,8 @@ use crate::{
     ProtocolId,
 };
 use aptos_config::{config::PeerRole, network_id::NetworkContext};
+use aptos_memsocket::MemorySocket;
+use aptos_netcore::transport::ConnectionOrigin;
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
@@ -34,8 +36,6 @@ use futures::{
     stream::{StreamExt, TryStreamExt},
     SinkExt,
 };
-use memsocket::MemorySocket;
-use netcore::transport::ConnectionOrigin;
 use std::{collections::HashSet, str::FromStr, time::Duration};
 use tokio::runtime::{Handle, Runtime};
 use tokio_util::compat::{

@@ -12,6 +12,7 @@ use aptos_data_streaming_service::{
     data_notification::DataNotification, data_stream::DataStreamListener, streaming_client::Epoch,
 };
 use aptos_event_notifications::EventNotificationListener;
+use aptos_mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use aptos_storage_service_types::responses::CompleteDataRange;
 use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::on_chain_config::ValidatorSet;
@@ -37,7 +38,6 @@ use aptos_types::{
 };
 use futures::channel::mpsc;
 use futures::StreamExt;
-use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use move_core_types::language_storage::TypeTag;
 use rand::rngs::OsRng;
 use rand::Rng;

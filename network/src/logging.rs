@@ -8,7 +8,7 @@
 //! use aptos_config::network_id::NetworkContext;
 //! use aptos_logger::info;
 //! use aptos_types::{PeerId, network_address::NetworkAddress};
-//! use network::logging::NetworkSchema;
+//! use aptos_network::logging::NetworkSchema;
 //!
 //! info!(
 //!   NetworkSchema::new(&NetworkContext::mock())
@@ -26,8 +26,8 @@ use crate::{
 };
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::Schema;
+use aptos_netcore::transport::ConnectionOrigin;
 use aptos_types::{network_address::NetworkAddress, PeerId};
-use netcore::transport::ConnectionOrigin;
 
 #[derive(Schema)]
 pub struct NetworkSchema<'a> {

@@ -3,6 +3,11 @@
 
 use crate::metrics;
 use aptos_config::config::StorageServiceConfig;
+use aptos_network::{
+    peer_manager::{ConnectionNotification, PeerManagerNotification},
+    protocols::network::{AppConfig, Event, NetworkEvents, NewNetworkEvents, RpcError},
+    ProtocolId,
+};
 use aptos_storage_service_types::requests::StorageServiceRequest;
 use aptos_storage_service_types::responses::StorageServiceResponse;
 use aptos_storage_service_types::{Result, StorageServiceMessage};
@@ -13,11 +18,6 @@ use futures::{
     channel::oneshot,
     future,
     stream::{BoxStream, Stream, StreamExt},
-};
-use network::{
-    peer_manager::{ConnectionNotification, PeerManagerNotification},
-    protocols::network::{AppConfig, Event, NetworkEvents, NewNetworkEvents, RpcError},
-    ProtocolId,
 };
 use std::{
     pin::Pin,

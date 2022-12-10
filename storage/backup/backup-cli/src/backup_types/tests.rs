@@ -20,11 +20,11 @@ use crate::{
         RocksdbOpt, TrustedWaypointOpt,
     },
 };
+use aptos_db::AptosDB;
 use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
-use aptosdb::AptosDB;
 use proptest::{prelude::*, sample::Index};
 use std::{convert::TryInto, sync::Arc};
 use tokio::time::Duration;

@@ -7,10 +7,10 @@ use crate::{
 };
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_infallible::{Mutex, RwLock};
+use aptos_network::application::storage::PeerMetadataStorage;
 use aptos_storage_interface::mock::MockDbReaderWriter;
 use aptos_types::transaction::SignedTransaction;
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
-use network::application::storage::PeerMetadataStorage;
 use proptest::{
     arbitrary::any,
     prelude::*,

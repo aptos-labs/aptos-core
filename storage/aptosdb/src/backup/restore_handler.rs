@@ -9,6 +9,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_schemadb::DB;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -17,7 +18,6 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
-use schemadb::DB;
 use std::sync::Arc;
 
 /// Provides functionalities for AptosDB data restore.

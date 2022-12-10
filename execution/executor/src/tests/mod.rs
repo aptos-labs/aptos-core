@@ -6,6 +6,7 @@ use std::{collections::BTreeSet, iter::once, sync::Arc};
 use proptest::prelude::*;
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+use aptos_db::AptosDB;
 use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
@@ -27,7 +28,6 @@ use aptos_types::{
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use aptosdb::AptosDB;
 
 use crate::{
     block_executor::BlockExecutor,

@@ -6,11 +6,11 @@ use aptos_config::config::{
     RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
+use aptos_db::AptosDB;
 use aptos_executor::db_bootstrapper::calculate_genesis;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
 use std::{
     fs::File,
     io::Read,

@@ -17,10 +17,7 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
 };
 use aptos_infallible::{Mutex, RwLock};
-use aptos_types::{block_info::BlockInfo, PeerId};
-use channel::{self, aptos_channel, message_queues::QueueStyle};
-use futures::{channel::mpsc, SinkExt, StreamExt};
-use network::{
+use aptos_network::{
     application::storage::PeerMetadataStorage,
     peer_manager::{
         conn_notifs_channel, ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
@@ -33,6 +30,9 @@ use network::{
     },
     ProtocolId,
 };
+use aptos_types::{block_info::BlockInfo, PeerId};
+use channel::{self, aptos_channel, message_queues::QueueStyle};
+use futures::{channel::mpsc, SinkExt, StreamExt};
 use std::{
     collections::{HashMap, HashSet},
     iter::FromIterator,
@@ -191,7 +191,7 @@ impl NetworkPlayground {
         // `Sender` side of this queue is usually wrapped in a
         // `ConsensusNetworkSender` adapter.
         network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-        conn_mgr_reqs_rx: channel::Receiver<network::ConnectivityRequest>,
+        conn_mgr_reqs_rx: channel::Receiver<aptos_network::ConnectivityRequest>,
     ) {
         self.node_consensus_txs.lock().insert(twin_id, consensus_tx);
         self.drop_config.write().add_node(twin_id);
@@ -487,13 +487,13 @@ mod tests {
         common::Payload,
     };
     use aptos_crypto::HashValue;
-    use aptos_types::validator_verifier::random_validator_verifier;
-    use bytes::Bytes;
-    use futures::{channel::oneshot, future};
-    use network::{
+    use aptos_network::{
         application::storage::PeerMetadataStorage, protocols::direct_send::Message,
         transport::ConnectionMetadata,
     };
+    use aptos_types::validator_verifier::random_validator_verifier;
+    use bytes::Bytes;
+    use futures::{channel::oneshot, future};
 
     #[test]
     fn test_split_network_round() {

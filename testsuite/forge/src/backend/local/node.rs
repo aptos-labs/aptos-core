@@ -4,13 +4,13 @@
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
+use aptos_db::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use aptos_logger::{debug, info};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{account_address::AccountAddress, PeerId},
 };
 use aptos_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
-use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use std::{
     env,
     fs::{self, OpenOptions},

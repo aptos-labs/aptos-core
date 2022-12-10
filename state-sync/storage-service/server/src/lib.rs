@@ -9,11 +9,11 @@ use crate::{
     metrics::{increment_counter, start_timer, LRU_CACHE_HIT, LRU_CACHE_PROBE},
     network::{ResponseSender, StorageServiceNetworkEvents},
 };
-use ::network::ProtocolId;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::StorageServiceConfig;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
+use aptos_network::ProtocolId;
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_types::requests::{
     DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest, StorageServiceRequest,

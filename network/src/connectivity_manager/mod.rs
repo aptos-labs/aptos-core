@@ -39,6 +39,8 @@ use aptos_config::{
 use aptos_crypto::x25519;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_num_variants::NumVariants;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
@@ -47,8 +49,6 @@ use futures::{
     future::{BoxFuture, FutureExt},
     stream::{FuturesUnordered, StreamExt},
 };
-use netcore::transport::ConnectionOrigin;
-use num_variants::NumVariants;
 use rand::{
     prelude::{SeedableRng, SmallRng},
     seq::SliceRandom,

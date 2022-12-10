@@ -13,12 +13,12 @@
 use crate::schema::{ensure_slice_len_eq, TRANSACTION_ACCUMULATOR_CF_NAME};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_types::proof::position::Position;
-use byteorder::{BigEndian, ReadBytesExt};
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
+use aptos_types::proof::position::Position;
+use byteorder::{BigEndian, ReadBytesExt};
 use std::mem::size_of;
 
 define_schema!(

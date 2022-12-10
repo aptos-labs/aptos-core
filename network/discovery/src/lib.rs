@@ -6,13 +6,13 @@ use aptos_config::{config::PeerSet, network_id::NetworkContext};
 use aptos_crypto::x25519;
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_logger::prelude::*;
-use aptos_time_service::TimeService;
-use futures::{Stream, StreamExt};
-use network::{
+use aptos_network::{
     connectivity_manager::{ConnectivityRequest, DiscoverySource},
     counters::inc_by_with_context,
     logging::NetworkSchema,
 };
+use aptos_time_service::TimeService;
+use futures::{Stream, StreamExt};
 use std::{
     path::Path,
     pin::Pin,

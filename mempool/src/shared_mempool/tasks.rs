@@ -21,6 +21,7 @@ use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::HistogramTimer;
+use aptos_network::application::interface::NetworkInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
 use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
@@ -30,7 +31,6 @@ use aptos_types::{
 };
 use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
 use futures::{channel::oneshot, stream::FuturesUnordered};
-use network::application::interface::NetworkInterface;
 use rayon::prelude::*;
 use std::{
     cmp,

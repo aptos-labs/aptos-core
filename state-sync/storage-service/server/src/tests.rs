@@ -9,6 +9,12 @@ use aptos_bitvec::BitVec;
 use aptos_config::config::StorageServiceConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_logger::Level;
+use aptos_network::{
+    peer_manager::PeerManagerNotification,
+    protocols::{
+        network::NewNetworkEvents, rpc::InboundRpcRequest, wire::handshake::v1::ProtocolId,
+    },
+};
 use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
 use aptos_storage_service_types::requests::{
     NewTransactionsOrOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
@@ -60,12 +66,6 @@ use mockall::{
     mock,
     predicate::{always, eq},
     Sequence,
-};
-use network::{
-    peer_manager::PeerManagerNotification,
-    protocols::{
-        network::NewNetworkEvents, rpc::InboundRpcRequest, wire::handshake::v1::ProtocolId,
-    },
 };
 use rand::Rng;
 use std::{sync::Arc, time::Duration};
@@ -1834,7 +1834,7 @@ impl MockClient {
     async fn send_request(
         &mut self,
         request: StorageServiceRequest,
-    ) -> Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>> {
+    ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
         // Create the inbound rpc request
         let peer_id = PeerId::ZERO;
         let protocol_id = ProtocolId::StorageServiceRpc;
@@ -1860,7 +1860,7 @@ impl MockClient {
     /// Helper method to wait for and deserialize a response on the specified receiver
     async fn wait_for_response(
         &mut self,
-        receiver: Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>>,
+        receiver: Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>>,
     ) -> Result<StorageServiceResponse, StorageServiceError> {
         if let Ok(response) =
             timeout(Duration::from_secs(MAX_RESPONSE_TIMEOUT_SECS), receiver).await
@@ -2418,7 +2418,7 @@ async fn get_new_outputs_with_proof(
     mock_client: &mut MockClient,
     known_version: u64,
     known_epoch: u64,
-) -> Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>> {
+) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
     let data_request =
         DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
             known_version,
@@ -2434,7 +2434,7 @@ async fn get_new_transactions_with_proof(
     known_version: u64,
     known_epoch: u64,
     include_events: bool,
-) -> Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>> {
+) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
     let data_request = DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
         known_version,
         known_epoch,
@@ -2451,7 +2451,7 @@ async fn get_new_transactions_or_outputs_with_proof(
     known_epoch: u64,
     include_events: bool,
     max_num_output_reductions: u64,
-) -> Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>> {
+) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
     let data_request = DataRequest::GetNewTransactionsOrOutputsWithProof(
         NewTransactionsOrOutputsWithProofRequest {
             known_version,
@@ -2811,7 +2811,7 @@ fn create_transaction_list_using_sizes(
 /// and that the response contains the correct data.
 async fn verify_new_transaction_outputs_with_proof(
     mock_client: &mut MockClient,
-    receiver: Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>>,
+    receiver: Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>>,
     output_list_with_proof: TransactionOutputListWithProof,
     expected_ledger_info: LedgerInfoWithSignatures,
 ) {
@@ -2837,7 +2837,7 @@ async fn verify_new_transaction_outputs_with_proof(
 /// and that the response contains the correct data.
 async fn verify_new_transactions_with_proof(
     mock_client: &mut MockClient,
-    receiver: Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>>,
+    receiver: Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>>,
     expected_transactions_with_proof: TransactionListWithProof,
     expected_ledger_info: LedgerInfoWithSignatures,
 ) {
@@ -2863,7 +2863,7 @@ async fn verify_new_transactions_with_proof(
 /// and that the response contains the correct data.
 async fn verify_new_transactions_or_outputs_with_proof(
     mock_client: &mut MockClient,
-    receiver: Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>>,
+    receiver: Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>>,
     expected_transaction_list_with_proof: Option<TransactionListWithProof>,
     expected_output_list_with_proof: Option<TransactionOutputListWithProof>,
     expected_ledger_info: LedgerInfoWithSignatures,

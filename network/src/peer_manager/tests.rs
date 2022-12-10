@@ -26,16 +26,16 @@ use aptos_config::{
     network_id::NetworkContext,
 };
 use aptos_infallible::RwLock;
+use aptos_memsocket::MemorySocket;
+use aptos_netcore::transport::{
+    boxed::BoxedTransport, memory::MemoryTransport, ConnectionOrigin, TransportExt,
+};
 use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{channel::oneshot, io::AsyncWriteExt, stream::StreamExt};
-use memsocket::MemorySocket;
-use netcore::transport::{
-    boxed::BoxedTransport, memory::MemoryTransport, ConnectionOrigin, TransportExt,
-};
 use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Handle;
 use tokio_util::compat::{

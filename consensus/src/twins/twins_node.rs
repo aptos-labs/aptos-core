@@ -20,6 +20,15 @@ use aptos_config::{
 use aptos_consensus_types::common::{Author, Round};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_mempool::mocks::MockSharedMempool;
+use aptos_network::{
+    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
+    protocols::{
+        network::{NewNetworkEvents, NewNetworkSender},
+        wire::handshake::v1::ProtocolIdSet,
+    },
+    transport::ConnectionMetadata,
+    ProtocolId,
+};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
@@ -34,15 +43,6 @@ use aptos_types::{
 use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::channel::mpsc;
 use futures::StreamExt;
-use network::{
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::{
-        network::{NewNetworkEvents, NewNetworkSender},
-        wire::handshake::v1::ProtocolIdSet,
-    },
-    transport::ConnectionMetadata,
-    ProtocolId,
-};
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
 use tokio::runtime::{Builder, Runtime};
 

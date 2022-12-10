@@ -15,10 +15,10 @@ use aptos_config::{
     config::{PeerRole, RoleType},
     network_id::{NetworkContext, NetworkId, PeerNetworkId},
 };
+use aptos_netcore::transport::ConnectionOrigin;
 use aptos_types::PeerId;
 use async_trait::async_trait;
 use futures::StreamExt;
-use netcore::transport::ConnectionOrigin;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// A sender to a node to mock an inbound network message from [`PeerManager`]

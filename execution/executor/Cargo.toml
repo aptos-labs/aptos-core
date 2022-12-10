@@ -38,13 +38,13 @@ serde = { workspace = true }
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
+aptos-db = { workspace = true }
 aptos-executor-test-helpers = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-genesis = { workspace = true }
-aptosdb = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
 

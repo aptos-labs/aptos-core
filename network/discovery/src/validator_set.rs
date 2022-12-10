@@ -12,10 +12,10 @@ use aptos_config::{
 use aptos_crypto::x25519;
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_logger::prelude::*;
+use aptos_network::{counters::inc_by_with_context, logging::NetworkSchema};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::on_chain_config::{OnChainConfigPayload, ValidatorSet};
 use futures::Stream;
-use network::{counters::inc_by_with_context, logging::NetworkSchema};
 use std::{
     collections::HashSet,
     pin::Pin,

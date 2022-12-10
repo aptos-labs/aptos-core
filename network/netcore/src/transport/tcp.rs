@@ -3,6 +3,7 @@
 
 //! TCP Transport
 use crate::transport::Transport;
+use aptos_proxy::Proxy;
 use aptos_types::{
     network_address::{parse_dns_tcp, parse_ip_tcp, parse_tcp, IpFilter, NetworkAddress},
     PeerId,
@@ -13,7 +14,6 @@ use futures::{
     ready,
     stream::Stream,
 };
-use proxy::Proxy;
 use std::{
     fmt::Debug,
     io,

@@ -7,12 +7,12 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_logger::prelude::*;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
     ColumnFamilyName, Options, SchemaBatch, DB,
 };
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Arc, time::Instant};
 

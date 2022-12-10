@@ -356,10 +356,10 @@ use crate::aggregate_signature::{AggregateSignature, PartialSignatures};
 use crate::validator_verifier::generate_validator_verifier;
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_verifier::random_validator_verifier;
-#[cfg(any(test, feature = "fuzzing"))]
-use ::proptest::prelude::*;
 use aptos_bitvec::BitVec;
 use itertools::Itertools;
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::prelude::*;
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for LedgerInfoWithV0 {

@@ -12,11 +12,11 @@
 use crate::schema::DB_METADATA_CF_NAME;
 use crate::state_restore::StateSnapshotProgress;
 use anyhow::Result;
-use aptos_types::transaction::Version;
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
+use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

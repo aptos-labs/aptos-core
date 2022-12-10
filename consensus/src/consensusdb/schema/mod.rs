@@ -6,7 +6,7 @@ pub(crate) mod quorum_certificate;
 pub(crate) mod single_entry;
 
 use anyhow::{ensure, Result};
-use schemadb::ColumnFamilyName;
+use aptos_schemadb::ColumnFamilyName;
 
 pub(super) const BLOCK_CF_NAME: ColumnFamilyName = "block";
 pub(super) const QC_CF_NAME: ColumnFamilyName = "quorum_certificate";

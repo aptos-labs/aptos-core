@@ -29,6 +29,11 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
+use aptos_network::{
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
+    protocols::network::{Event, NewNetworkSender},
+};
+use aptos_safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use aptos_secure_storage::Storage;
 use aptos_types::{
     account_address::AccountAddress,
@@ -40,11 +45,6 @@ use aptos_types::{
 use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{channel::oneshot, FutureExt, SinkExt, StreamExt};
 use itertools::enumerate;
-use network::{
-    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{Event, NewNetworkSender},
-};
-use safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 

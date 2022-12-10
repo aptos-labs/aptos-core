@@ -21,16 +21,16 @@ use aptos_config::{
 use aptos_crypto::x25519;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+#[cfg(any(test, feature = "testing", feature = "fuzzing"))]
+use aptos_netcore::transport::memory::MemoryTransport;
+use aptos_netcore::transport::{
+    tcp::{TCPBufferCfg, TcpSocket, TcpTransport},
+    Transport,
+};
 use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-#[cfg(any(test, feature = "testing", feature = "fuzzing"))]
-use netcore::transport::memory::MemoryTransport;
-use netcore::transport::{
-    tcp::{TCPBufferCfg, TcpSocket, TcpTransport},
-    Transport,
-};
 use std::{clone::Clone, collections::HashMap, fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::runtime::Handle;
 
@@ -150,7 +150,7 @@ impl PeerManagerContext {
 
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 type MemoryPeerManager =
-    PeerManager<AptosNetTransport<MemoryTransport>, NoiseStream<memsocket::MemorySocket>>;
+    PeerManager<AptosNetTransport<MemoryTransport>, NoiseStream<aptos_memsocket::MemorySocket>>;
 type TcpPeerManager = PeerManager<AptosNetTransport<TcpTransport>, NoiseStream<TcpSocket>>;
 
 enum TransportPeerManager {

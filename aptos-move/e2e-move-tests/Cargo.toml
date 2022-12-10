@@ -23,6 +23,7 @@ aptos-gas = { workspace = true, features = ["testing"] }
 aptos-keygen = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-package-builder = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
@@ -34,7 +35,6 @@ itertools = { workspace = true }
 move-core-types = { workspace = true }
 move-package = { workspace = true }
 move-symbol-pool = { workspace = true }
-package-builder = { workspace = true }
 project-root = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }

@@ -61,11 +61,11 @@ mod tests {
         config::{Peer, PeerRole},
         network_id::NetworkContext,
     };
+    use aptos_network::connectivity_manager::{ConnectivityRequest, DiscoverySource};
     use aptos_temppath::TempPath;
     use aptos_types::{network_address::NetworkAddress, PeerId};
     use channel::Receiver;
     use futures::StreamExt;
-    use network::connectivity_manager::{ConnectivityRequest, DiscoverySource};
     use std::{collections::HashSet, str::FromStr, sync::Arc};
     use tokio::time::sleep;
 
@@ -73,8 +73,10 @@ mod tests {
         let check_interval = Duration::from_millis(5);
         // TODO: Figure out why mock time doesn't work right
         let time_service = TimeService::real();
-        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) =
-            channel::new(1, &network::counters::PENDING_CONNECTIVITY_MANAGER_REQUESTS);
+        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new(
+            1,
+            &aptos_network::counters::PENDING_CONNECTIVITY_MANAGER_REQUESTS,
+        );
         let listener_task = async move {
             let listener = DiscoveryChangeListener::file(
                 NetworkContext::mock(),

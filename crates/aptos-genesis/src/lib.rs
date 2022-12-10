@@ -17,6 +17,7 @@ use aptos_config::config::{
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_db::AptosDB;
 use aptos_framework::ReleaseBundle;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_temppath::TempPath;
@@ -28,7 +29,6 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptos_vm_genesis::Validator;
-use aptosdb::AptosDB;
 use std::convert::TryInto;
 
 /// Holder object for all pieces needed to generate a genesis transaction
