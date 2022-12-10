@@ -581,6 +581,9 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                             assert_eq!(applied_delta.unwrap(), expected_result.1.unwrap());
                         }
                     }
+                    ReadResult::PEError(_) => {
+                        // TODO
+                    }
                     ReadResult::None => {
                         assert_eq!(expected_result.0, None);
                         assert_eq!(expected_result.1, None);

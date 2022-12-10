@@ -16,7 +16,10 @@ use std::{
 pub type TxnIndex = usize;
 pub type Incarnation = usize;
 pub type Version = (TxnIndex, Incarnation);
-type DependencyCondvar = Arc<(Mutex<bool>, Condvar)>;
+// The first boolean indicates whether the dependency is resolved.
+// The second boolean indicates whether parallel execution is halted
+// earlier due to reasons like module r/w intersection.
+type DependencyCondvar = Arc<(Mutex<(bool, bool)>, Condvar)>;
 
 // A struct to track the number of active tasks in the scheduler using RAII.
 pub struct TaskGuard<'a> {
@@ -135,6 +138,9 @@ pub struct Scheduler {
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
     /// An index i maps to the most up-to-date status of transaction i.
     txn_status: Vec<CachePadded<Mutex<TransactionStatus>>>,
+    /// An atomic variable that helps to elect one thread (referred as the commit thread) dedicated for
+    /// resolving the pending read dependencies (by notifying the conditional variables) of any other thread.
+    is_first: AtomicBool,
 }
 
 /// Public Interfaces for the Scheduler
@@ -153,6 +159,7 @@ impl Scheduler {
             txn_status: (0..num_txns)
                 .map(|_| CachePadded::new(Mutex::new(TransactionStatus::ReadyToExecute(0, None))))
                 .collect(),
+            is_first: AtomicBool::new(true),
         }
     }
 
@@ -216,7 +223,7 @@ impl Scheduler {
         // usually has just observed the read dependency.
 
         // Create a condition variable associated with the dependency.
-        let dep_condvar = Arc::new((Mutex::new(false), Condvar::new()));
+        let dep_condvar = Arc::new((Mutex::new((false, false)), Condvar::new()));
 
         let mut stored_deps = self.txn_dependency[dep_txn_idx].lock();
 
@@ -329,6 +336,50 @@ impl Scheduler {
         }
 
         SchedulerTask::NoTask
+    }
+
+    /// Set the done marker. Should only be called when there is a module r/w intersection.
+    pub fn set_done(&self) {
+        self.done_marker.store(true, Ordering::SeqCst);
+    }
+
+    /// Checks whether the done marker is set. The marker can only be set by 'check_done' and 'set_done'.
+    pub fn done(&self) -> bool {
+        self.done_marker.load(Ordering::Acquire)
+    }
+
+    /// Whichever thread that first sets this atomic variable to false (and thus returns true)
+    /// will be in charge of waking up the pending threads.
+    pub fn is_first(&self) -> bool {
+        self.is_first.fetch_and(false, Ordering::SeqCst)
+    }
+
+    /// When the parallel execution encountered a module r/w intersection and can abort earlier, some of the threads
+    /// may still be working on execution, and waiting for dependency (indicated by the condition variable `condvar`).
+    /// Therefore the commit thread needs to wake up all such pending threads, by sending notification to the condition
+    /// variable and setting the lock variables properly.
+    pub fn resolve_condvar(&self, txn_idx: TxnIndex) {
+        let status = self.txn_status[txn_idx].lock();
+        {
+            // Only transactions with status Suspended or ReadyToExecute may have the condition variable of pending threads.
+            if let TransactionStatus::Suspended(_, condvar) = &*status {
+                let (lock, cvar) = &**condvar;
+                // Mark dependency resolved.
+                (*lock.lock()).0 = true;
+                // Mark parallel execution halted due to reasons like module r/w intersection.
+                (*lock.lock()).1 = true;
+                // Wake up the process waiting for dependency.
+                cvar.notify_one();
+            } else if let TransactionStatus::ReadyToExecute(_, Some(condvar)) = &*status {
+                let (lock, cvar) = &**condvar;
+                // Mark dependency resolved.
+                (*lock.lock()).0 = true;
+                // Mark parallel execution halted due to reasons like module r/w intersection.
+                (*lock.lock()).1 = true;
+                // Wake up the process waiting for dependency.
+                cvar.notify_one();
+            }
+        }
     }
 }
 
@@ -452,7 +503,8 @@ impl Scheduler {
 
         if let TransactionStatus::Executing(incarnation) = *status {
             *status = TransactionStatus::Suspended(incarnation, dep_condvar);
-        } else {
+        } else if !self.done() {
+            // The check self.done() above is not necessary but just to be safe
             unreachable!();
         }
     }
@@ -464,7 +516,8 @@ impl Scheduler {
         let mut status = self.txn_status[txn_idx].lock();
         if let TransactionStatus::Suspended(incarnation, dep_condvar) = &*status {
             *status = TransactionStatus::ReadyToExecute(*incarnation, Some(dep_condvar.clone()));
-        } else {
+        } else if !self.done() {
+            // The check self.done() above is not necessary but just to be safe
             unreachable!();
         }
     }
@@ -473,8 +526,11 @@ impl Scheduler {
     fn set_executed_status(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
         let mut status = self.txn_status[txn_idx].lock();
 
-        // Only makes sense when the current status is 'Executing'.
-        debug_assert!(*status == TransactionStatus::Executing(incarnation));
+        if !self.done() {
+            // The check self.done() above is not necessary but just to be safe
+            // Only makes sense when the current status is 'Executing'.
+            debug_assert!(*status == TransactionStatus::Executing(incarnation));
+        }
 
         *status = TransactionStatus::Executed(incarnation);
     }
@@ -503,6 +559,9 @@ impl Scheduler {
     /// 'decrease_execution_idx' functions, which is to increment the decrease_cnt++.
     /// Final check will then detect a change in decrease_cnt and not allow a false positive.
     fn check_done(&self) -> bool {
+        if self.done() {
+            return true;
+        }
         let observed_cnt = self.decrease_cnt.load(Ordering::SeqCst);
 
         let val_idx = self.validation_idx.load(Ordering::SeqCst);
@@ -520,10 +579,5 @@ impl Scheduler {
         } else {
             false
         }
-    }
-
-    /// Checks whether the done marker is set. The marker can only be set by 'check_done'.
-    fn done(&self) -> bool {
-        self.done_marker.load(Ordering::Acquire)
     }
 }

@@ -180,7 +180,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
         txn_idx: TxnIndex,
         input: Vec<ReadDescriptor<K>>,
         output: ExecutionStatus<T, Error<E>>,
-    ) {
+    ) -> bool {
         let read_modules: Vec<AccessPath> =
             input.iter().filter_map(|desc| desc.module_path()).collect();
         let written_modules: Vec<AccessPath> = match &output {
@@ -192,6 +192,8 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
             ExecutionStatus::Abort(_) => Vec::new(),
         };
 
+        let mut module_read_write_intersection = false;
+
         if !self.module_read_write_intersection.load(Ordering::Relaxed) {
             // Check if adding new read & write modules leads to intersections.
             if Self::append_and_check(read_modules, &self.module_reads, &self.module_writes)
@@ -199,11 +201,13 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
             {
                 self.module_read_write_intersection
                     .store(true, Ordering::Release);
+                module_read_write_intersection = true;
             }
         }
 
         self.inputs[txn_idx].store(Some(Arc::new(input)));
         self.outputs[txn_idx].store(Some(Arc::new(output)));
+        module_read_write_intersection
     }
 
     pub fn module_publishing_may_race(&self) -> bool {
