@@ -118,9 +118,18 @@ module aptos_framework::transaction_fee {
             // unless the proposer is specified in the block prologue. When we have a governance
             // proposal that triggers reconfiguration, we distribute pending fees and burn the
             // fee for the proposal. Otherwise, that fee would be leaked to the next block.
-            let proposer_addr = option::extract(&mut collected_fees.proposer);
+            let proposer = option::extract(&mut collected_fees.proposer);
+
+            // Since the block can be produced by the VM itself, we have to make sure we catch
+            // this case.
+            if (proposer == @vm_reserved) {
+                burn_coin_fraction(&mut coin, 100);
+                coin::destroy_zero(coin);
+                return
+            };
+
             burn_coin_fraction(&mut coin, collected_fees.burn_percentage);
-            stake::add_transaction_fee(proposer_addr, coin);
+            stake::add_transaction_fee(proposer, coin);
             return
         };
 
@@ -146,7 +155,7 @@ module aptos_framework::transaction_fee {
         // or we cannot redistribute fees later for some reason (e.g. account cannot receive AptoCoin)
         // we burn them all at once. This way we avoid having a check for every transaction epilogue.
         let collected_amount = &mut collected_fees.amount;
-        coin::collect_from_into_aggregatable_coin<AptosCoin>(account, fee, collected_amount);
+        coin::collect_into_aggregatable_coin<AptosCoin>(account, fee, collected_amount);
     }
 
     /// Only called during genesis.

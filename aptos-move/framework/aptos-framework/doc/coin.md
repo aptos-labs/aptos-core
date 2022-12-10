@@ -23,7 +23,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `is_aggregatable_coin_zero`](#0x1_coin_is_aggregatable_coin_zero)
 -  [Function `drain_aggregatable_coin`](#0x1_coin_drain_aggregatable_coin)
 -  [Function `merge_aggregatable_coin`](#0x1_coin_merge_aggregatable_coin)
--  [Function `collect_from_into_aggregatable_coin`](#0x1_coin_collect_from_into_aggregatable_coin)
+-  [Function `collect_into_aggregatable_coin`](#0x1_coin_collect_into_aggregatable_coin)
 -  [Function `coin_address`](#0x1_coin_coin_address)
 -  [Function `balance`](#0x1_coin_balance)
 -  [Function `is_coin_initialized`](#0x1_coin_is_coin_initialized)
@@ -761,14 +761,14 @@ Merges <code><a href="coin.md#0x1_coin">coin</a></code> into aggregatable coin (
 
 </details>
 
-<a name="0x1_coin_collect_from_into_aggregatable_coin"></a>
+<a name="0x1_coin_collect_into_aggregatable_coin"></a>
 
-## Function `collect_from_into_aggregatable_coin`
+## Function `collect_into_aggregatable_coin`
 
 Collects a specified amount of coin form an account into aggregatable coin.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_collect_from_into_aggregatable_coin">collect_from_into_aggregatable_coin</a>&lt;CoinType&gt;(account_addr: <b>address</b>, amount: u64, dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_collect_into_aggregatable_coin">collect_into_aggregatable_coin</a>&lt;CoinType&gt;(account_addr: <b>address</b>, amount: u64, dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;)
 </code></pre>
 
 
@@ -777,7 +777,7 @@ Collects a specified amount of coin form an account into aggregatable coin.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_collect_from_into_aggregatable_coin">collect_from_into_aggregatable_coin</a>&lt;CoinType&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_collect_into_aggregatable_coin">collect_into_aggregatable_coin</a>&lt;CoinType&gt;(
     account_addr: <b>address</b>,
     amount: u64,
     dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt;,

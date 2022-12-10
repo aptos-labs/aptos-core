@@ -329,9 +329,18 @@ at the beginning of the block or during reconfiguration.
         // unless the proposer is specified in the <a href="block.md#0x1_block">block</a> prologue. When we have a governance
         // proposal that triggers <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a>, we distribute pending fees and burn the
         // fee for the proposal. Otherwise, that fee would be leaked <b>to</b> the next <a href="block.md#0x1_block">block</a>.
-        <b>let</b> proposer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> collected_fees.proposer);
+        <b>let</b> proposer = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> collected_fees.proposer);
+
+        // Since the <a href="block.md#0x1_block">block</a> can be produced by the VM itself, we have <b>to</b> make sure we catch
+        // this case.
+        <b>if</b> (proposer == @vm_reserved) {
+            <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, 100);
+            <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(<a href="coin.md#0x1_coin">coin</a>);
+            <b>return</b>
+        };
+
         <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, collected_fees.burn_percentage);
-        <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(proposer_addr, <a href="coin.md#0x1_coin">coin</a>);
+        <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(proposer, <a href="coin.md#0x1_coin">coin</a>);
         <b>return</b>
     };
 
@@ -397,7 +406,7 @@ Collect transaction fees in epilogue.
     // or we cannot redistribute fees later for some reason (e.g. <a href="account.md#0x1_account">account</a> cannot receive AptoCoin)
     // we burn them all at once. This way we avoid having a check for every transaction epilogue.
     <b>let</b> collected_amount = &<b>mut</b> collected_fees.amount;
-    <a href="coin.md#0x1_coin_collect_from_into_aggregatable_coin">coin::collect_from_into_aggregatable_coin</a>&lt;AptosCoin&gt;(<a href="account.md#0x1_account">account</a>, fee, collected_amount);
+    <a href="coin.md#0x1_coin_collect_into_aggregatable_coin">coin::collect_into_aggregatable_coin</a>&lt;AptosCoin&gt;(<a href="account.md#0x1_account">account</a>, fee, collected_amount);
 }
 </code></pre>
 

@@ -194,7 +194,7 @@ module aptos_framework::coin {
     }
 
     /// Collects a specified amount of coin form an account into aggregatable coin.
-    public(friend) fun collect_from_into_aggregatable_coin<CoinType>(
+    public(friend) fun collect_into_aggregatable_coin<CoinType>(
         account_addr: address,
         amount: u64,
         dst_coin: &mut AggregatableCoin<CoinType>,
@@ -1048,7 +1048,7 @@ module aptos_framework::coin {
         assert!(*option::borrow(&supply<FakeMoney>()) == 100, 0);
 
         let aggregatable_coin = initialize_aggregatable_coin<FakeMoney>(&framework);
-        collect_from_into_aggregatable_coin<FakeMoney>(framework_addr, 10, &mut aggregatable_coin);
+        collect_into_aggregatable_coin<FakeMoney>(framework_addr, 10, &mut aggregatable_coin);
 
         // Check that aggregatable coin has the right amount.
         let collected_coin = drain_aggregatable_coin(&mut aggregatable_coin);
