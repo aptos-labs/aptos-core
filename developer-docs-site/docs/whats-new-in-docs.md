@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 09 December 2022
+
+- Added an [Aptos Wallet Adapter overview](concepts/wallet-adapter-concept.md) and instructions for both [dApp](guides/wallet-adapter-for-dapp.md) and [wallet](guides/wallet-adapter-for-wallets.md) builders.
+
 ## 08 December 2022
 
 - Released a new version to Mainnet:
