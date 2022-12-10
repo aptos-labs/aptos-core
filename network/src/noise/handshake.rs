@@ -18,10 +18,10 @@ use aptos_config::{
 use aptos_crypto::{noise, x25519};
 use aptos_infallible::{duration_since_epoch, RwLock};
 use aptos_logger::trace;
+use aptos_netcore::transport::ConnectionOrigin;
 use aptos_short_hex_str::{AsShortHexStr, ShortHexStr};
 use aptos_types::PeerId;
 use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use netcore::transport::ConnectionOrigin;
 use std::{collections::HashMap, convert::TryFrom as _, fmt::Debug, sync::Arc};
 
 /// In a mutually authenticated network, a client message is accompanied with a timestamp.
@@ -467,8 +467,8 @@ mod test {
     use crate::testutils::fake_socket::ReadWriteTestSocket;
     use aptos_config::config::{Peer, PeerRole};
     use aptos_crypto::{test_utils::TEST_SEED, traits::Uniform as _};
+    use aptos_memsocket::MemorySocket;
     use futures::{executor::block_on, future::join};
-    use memsocket::MemorySocket;
     use rand::SeedableRng as _;
 
     const TEST_SEED_2: [u8; 32] = [42; 32];

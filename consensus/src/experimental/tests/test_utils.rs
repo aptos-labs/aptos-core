@@ -12,16 +12,16 @@ use aptos_consensus_types::{
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::StateComputeResult;
 use aptos_infallible::Mutex;
+use aptos_safety_rules::{
+    test_utils::{make_proposal_with_parent, make_proposal_with_qc},
+    PersistentSafetyStorage, SafetyRulesManager,
+};
 use aptos_secure_storage::Storage;
 use aptos_types::{
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
     validator_verifier::random_validator_verifier,
     waypoint::Waypoint,
-};
-use safety_rules::{
-    test_utils::{make_proposal_with_parent, make_proposal_with_qc},
-    PersistentSafetyStorage, SafetyRulesManager,
 };
 use std::sync::Arc;
 

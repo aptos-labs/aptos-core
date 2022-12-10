@@ -22,9 +22,7 @@ use aptos_crypto::x25519::PublicKey;
 use aptos_event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, network_address::NetworkAddress};
-use network::{
+use aptos_network::{
     application::storage::PeerMetadataStorage,
     connectivity_manager::{builder::ConnectivityManagerBuilder, ConnectivityRequest},
     constants::MAX_MESSAGE_SIZE,
@@ -38,9 +36,11 @@ use network::{
         network::{AppConfig, NewNetworkEvents, NewNetworkSender},
     },
 };
+use aptos_time_service::TimeService;
+use aptos_types::{chain_id::ChainId, network_address::NetworkAddress};
 
-use netcore::transport::tcp::TCPBufferCfg;
-use network_discovery::DiscoveryChangeListener;
+use aptos_netcore::transport::tcp::TCPBufferCfg;
+use aptos_network_discovery::DiscoveryChangeListener;
 use std::{
     clone::Clone,
     collections::{HashMap, HashSet},

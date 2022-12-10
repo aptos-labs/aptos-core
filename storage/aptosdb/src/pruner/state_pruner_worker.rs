@@ -9,8 +9,8 @@ use aptos_logger::{
     error,
     prelude::{sample, SampleRate},
 };
+use aptos_schemadb::schema::KeyCodec;
 use aptos_types::transaction::Version;
-use schemadb::schema::KeyCodec;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::sleep;

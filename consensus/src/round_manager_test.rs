@@ -40,6 +40,16 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::info;
+use aptos_network::{
+    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
+    protocols::{
+        network::{Event, NewNetworkEvents, NewNetworkSender},
+        wire::handshake::v1::ProtocolIdSet,
+    },
+    transport::ConnectionMetadata,
+    ProtocolId,
+};
+use aptos_safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use aptos_secure_storage::Storage;
 use aptos_types::{
     epoch_state::EpochState,
@@ -57,16 +67,6 @@ use futures::{
     stream::select,
     FutureExt, Stream, StreamExt,
 };
-use network::{
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::{
-        network::{Event, NewNetworkEvents, NewNetworkSender},
-        wire::handshake::v1::ProtocolIdSet,
-    },
-    transport::ConnectionMetadata,
-    ProtocolId,
-};
-use safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use std::{
     iter::FromIterator,
     sync::{

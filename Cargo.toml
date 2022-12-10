@@ -188,6 +188,8 @@ aptos-crypto = { path = "crates/aptos-crypto" }
 aptos-crypto-derive = { path = "crates/aptos-crypto-derive" }
 aptos-data-client = { path = "state-sync/aptos-data-client" }
 aptos-data-streaming-service = { path = "state-sync/state-sync-v2/data-streaming-service" }
+aptos-db = { path = "storage/aptosdb" }
+aptos-db-indexer = { path = "storage/indexer" }
 aptos-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
 aptos-executor = { path = "execution/executor" }
@@ -213,14 +215,27 @@ aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-log-derive = { path = "crates/aptos-log-derive" }
 aptos-logger = { path = "crates/aptos-logger" }
 aptos-mempool = { path = "mempool" }
+aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
+aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-module-verifier = { path = "aptos-move/aptos-module-verifier" }
+aptos-move-examples = { path = "aptos-move/move-examples" }
+aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
+aptos-netcore = { path = "network/netcore" }
+aptos-network = { path = "network" }
+aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
+aptos-network-discovery = { path = "network/discovery" }
 aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
+aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
+aptos-num-variants = { path = "crates/num-variants" }
 aptos-openapi = { path = "crates/aptos-openapi" }
+aptos-package-builder = { path = "aptos-move/package-builder" }
+aptos-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }
+aptos-proxy = { path = "crates/proxy" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }
 aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }
 aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
@@ -229,6 +244,8 @@ aptos-rest-client = { path = "crates/aptos-rest-client" }
 aptos-retrier = { path = "crates/aptos-retrier" }
 aptos-rocksdb-options = { path = "storage/rocksdb-options" }
 aptos-rosetta = { path = "crates/aptos-rosetta" }
+aptos-safety-rules = { path = "consensus/safety-rules" }
+aptos-schemadb = { path = "storage/schemadb" }
 aptos-scratchpad = { path = "storage/scratchpad" }
 aptos-sdk = { path = "sdk" }
 aptos-sdk-builder = { path = "aptos-move/aptos-sdk-builder" }
@@ -256,24 +273,7 @@ aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
-aptosdb = { path = "storage/aptosdb" }
-aptosdb-indexer = { path = "storage/indexer" }
 channel = { path = "crates/channel" }
-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
-memsocket = { path = "network/memsocket" }
-move-examples = { path = "aptos-move/move-examples" }
-mvhashmap = { path = "aptos-move/mvhashmap" }
-netcore = { path = "network/netcore" }
-network = { path = "network" }
-network-builder = { path = "network/builder" }
-network-discovery = { path = "network/discovery" }
-node-resource-metrics = { path = "crates/node-resource-metrics" }
-num-variants = { path = "crates/num-variants" }
-package-builder = { path = "aptos-move/package-builder" }
-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
-proxy = { path = "crates/proxy" }
-safety-rules = { path = "consensus/safety-rules" }
-schemadb = { path = "storage/schemadb" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.

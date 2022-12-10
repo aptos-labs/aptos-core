@@ -17,6 +17,7 @@ use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor_types::ChunkExecutorTrait;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::{DbReader, DbReaderWriter, StateSnapshotReceiver};
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::state_store::state_value::StateValue;
@@ -31,7 +32,6 @@ use aptos_types::{
 use async_trait::async_trait;
 use futures::channel::mpsc::UnboundedSender;
 use futures::{channel::mpsc, SinkExt, StreamExt};
-use mempool_notifications::MempoolNotificationSender;
 use std::{
     future::Future,
     sync::{

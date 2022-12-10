@@ -7,9 +7,9 @@ use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
     Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
+use aptos_netcore::transport::ConnectionOrigin;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
-use netcore::transport::ConnectionOrigin;
 use once_cell::sync::Lazy;
 
 // some type labels

@@ -10,13 +10,8 @@ use aptos_config::{
 };
 use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
 use aptos_infallible::RwLock;
-use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
-use async_trait::async_trait;
-use channel::aptos_channel;
-use futures::{executor::block_on, StreamExt};
-use netcore::transport::ConnectionOrigin;
-use network::{
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::{
     application::storage::PeerMetadataStorage,
     error::NetworkError,
     peer_manager::{
@@ -31,6 +26,11 @@ use network::{
     },
     ProtocolId,
 };
+use aptos_time_service::TimeService;
+use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
+use async_trait::async_trait;
+use channel::aptos_channel;
+use futures::{executor::block_on, StreamExt};
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{

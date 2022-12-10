@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-genesis = { workspace = true, features = ["testing"] }
@@ -22,13 +23,13 @@ aptos-infallible = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-push-metrics =  { workspace = true }
+aptos-schemadb = { workspace = true }
 aptos-scratchpad = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-aptosdb = { workspace = true }
 chrono = { workspace = true }
 criterion = { workspace = true }
 indicatif = { workspace = true }
@@ -36,7 +37,6 @@ itertools = { workspace = true }
 num_cpus = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
-schemadb = { workspace = true }
 serde = { workspace = true }
 structopt = { workspace = true }
 toml = { workspace = true }

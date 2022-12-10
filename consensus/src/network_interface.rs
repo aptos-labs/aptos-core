@@ -15,10 +15,7 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
 };
 use aptos_logger::prelude::*;
-use aptos_types::{epoch_change::EpochChangeProof, PeerId};
-use async_trait::async_trait;
-use channel::{aptos_channel, message_queues::QueueStyle};
-use network::{
+use aptos_network::{
     application::storage::PeerMetadataStorage,
     constants::NETWORK_CHANNEL_SIZE,
     error::NetworkError,
@@ -32,6 +29,9 @@ use network::{
     },
     ProtocolId,
 };
+use aptos_types::{epoch_change::EpochChangeProof, PeerId};
+use async_trait::async_trait;
+use channel::{aptos_channel, message_queues::QueueStyle};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 

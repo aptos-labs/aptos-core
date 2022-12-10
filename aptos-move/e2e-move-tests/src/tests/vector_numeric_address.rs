@@ -3,8 +3,8 @@
 
 use crate::tests::common;
 use crate::{assert_success, MoveHarness};
+use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
-use package_builder::PackageBuilder;
 
 /// Test whether `0x1::vector` (and not just `std::vector`) works as expected.
 #[test]

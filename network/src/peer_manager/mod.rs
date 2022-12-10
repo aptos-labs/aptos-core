@@ -23,6 +23,7 @@ use crate::{
 };
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::{ConnectionOrigin, Transport};
 use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -34,7 +35,6 @@ use futures::{
     sink::SinkExt,
     stream::StreamExt,
 };
-use netcore::transport::{ConnectionOrigin, Transport};
 use std::{
     collections::{hash_map::Entry, HashMap},
     marker::PhantomData,

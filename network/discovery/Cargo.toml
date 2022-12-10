@@ -1,5 +1,5 @@
 [package]
-name = "network-discovery"
+name = "aptos-network-discovery"
 description = "Aptos Network Peer Discovery"
 version = "0.1.0"
 
@@ -19,6 +19,7 @@ aptos-crypto = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-network = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-time-service = { workspace = true }
@@ -26,13 +27,12 @@ aptos-types = { workspace = true }
 bcs = { workspace = true }
 channel = { workspace = true }
 futures = { workspace = true }
-network = { workspace = true }
 once_cell = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true, features = ["testing"] }
+aptos-netcore = { workspace = true, features = ["fuzzing"] }
 aptos-temppath = { workspace = true }
-netcore = { workspace = true, features = ["fuzzing"] }
 rand = { workspace = true }

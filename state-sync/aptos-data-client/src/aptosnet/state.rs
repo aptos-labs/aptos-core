@@ -10,11 +10,11 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::application::storage::PeerMetadataStorage;
 use aptos_storage_service_types::requests::StorageServiceRequest;
 use aptos_storage_service_types::responses::StorageServerSummary;
 use itertools::Itertools;
-use netcore::transport::ConnectionOrigin;
-use network::application::storage::PeerMetadataStorage;
 use std::{
     cmp::min,
     collections::{HashMap, HashSet},

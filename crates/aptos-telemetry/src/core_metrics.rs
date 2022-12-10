@@ -144,18 +144,18 @@ fn collect_state_sync_metrics(
 fn collect_storage_metrics(core_metrics: &mut BTreeMap<String, String>) {
     core_metrics.insert(
         STORAGE_LEDGER_VERSION.into(),
-        aptosdb::metrics::LEDGER_VERSION.get().to_string(),
+        aptos_db::metrics::LEDGER_VERSION.get().to_string(),
     );
     core_metrics.insert(
         STORAGE_MIN_READABLE_LEDGER_VERSION.into(),
-        aptosdb::metrics::PRUNER_LEAST_READABLE_VERSION
+        aptos_db::metrics::PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["ledger_pruner"])
             .get()
             .to_string(),
     );
     core_metrics.insert(
         STORAGE_MIN_READABLE_STATE_VERSION.into(),
-        aptosdb::metrics::PRUNER_LEAST_READABLE_VERSION
+        aptos_db::metrics::PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["state_store"])
             .get()
             .to_string(),

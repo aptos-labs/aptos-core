@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
+use aptos_mvhashmap::{EntryCell, MVHashMap};
 use aptos_types::write_set::{TransactionWrite, WriteOp};
-use mvhashmap::{EntryCell, MVHashMap};
 use std::{hash::Hash, thread::spawn};
 
 /// Resolved and serialized data for WriteOps, None means deletion.

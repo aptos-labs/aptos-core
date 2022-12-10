@@ -26,11 +26,11 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
 aptos-executor-test-helpers = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
-aptosdb = { workspace = true }
 bcs = { workspace = true }
 claims = { workspace = true }
 move-binary-format = { workspace = true }

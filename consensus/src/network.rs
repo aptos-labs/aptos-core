@@ -18,6 +18,13 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
 };
 use aptos_logger::prelude::*;
+use aptos_network::{
+    protocols::{
+        network::{ApplicationNetworkSender, Event},
+        rpc::error::RpcError,
+    },
+    ProtocolId,
+};
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
@@ -26,13 +33,6 @@ use bytes::Bytes;
 use channel::{self, aptos_channel, message_queues::QueueStyle};
 use fail::fail_point;
 use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
-use network::{
-    protocols::{
-        network::{ApplicationNetworkSender, Event},
-        rpc::error::RpcError,
-    },
-    ProtocolId,
-};
 use std::{
     mem::{discriminant, Discriminant},
     time::Duration,

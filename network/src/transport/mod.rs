@@ -16,6 +16,7 @@ use aptos_config::{
 use aptos_crypto::x25519;
 use aptos_id_generator::{IdGenerator, U32IdGenerator};
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::{proxy_protocol, tcp, ConnectionOrigin, Transport};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{timeout, TimeService, TimeServiceTrait};
 use aptos_types::{
@@ -28,12 +29,11 @@ use futures::{
     io::{AsyncRead, AsyncWrite},
     stream::{Stream, StreamExt, TryStreamExt},
 };
-use netcore::transport::{proxy_protocol, tcp, ConnectionOrigin, Transport};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
 
 // Re-exposed for aptos-network-checker
-pub use netcore::transport::tcp::{resolve_and_connect, TCPBufferCfg, TcpSocket};
+pub use aptos_netcore::transport::tcp::{resolve_and_connect, TCPBufferCfg, TcpSocket};
 
 #[cfg(test)]
 mod test;

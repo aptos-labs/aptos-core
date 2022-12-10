@@ -25,17 +25,17 @@ fail = { workspace = true }
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
 aptos-executor-test-helpers = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
-aptosdb = { workspace = true }
 move-core-types = { workspace = true }
 rand = { workspace = true }
 
 [features]
 default = []
 failpoints = ["fail/failpoints"]
-fuzzing = ["aptos-types/fuzzing", "aptos-crypto/fuzzing", "aptosdb/fuzzing"]
+fuzzing = ["aptos-types/fuzzing", "aptos-crypto/fuzzing", "aptos-db/fuzzing"]

@@ -20,13 +20,13 @@ aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-network = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
 channel = { workspace = true }
 enum_dispatch = { workspace = true }
 futures = { workspace = true }
-network = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

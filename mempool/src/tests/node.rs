@@ -16,6 +16,17 @@ use aptos_config::{
 use aptos_crypto::{x25519::PrivateKey, Uniform};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, MutexGuard, RwLock};
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::{
+    application::storage::PeerMetadataStorage,
+    peer_manager::{
+        conn_notifs_channel, ConnectionNotification, ConnectionRequestSender,
+        PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
+    },
+    protocols::network::{NetworkEvents, NewNetworkEvents, NewNetworkSender},
+    transport::ConnectionMetadata,
+    ProtocolId,
+};
 use aptos_storage_interface::mock::MockDbReaderWriter;
 use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{account_config::AccountSequenceInfo, PeerId};
@@ -25,17 +36,6 @@ use enum_dispatch::enum_dispatch;
 use futures::{
     channel::mpsc::{self, unbounded, UnboundedReceiver},
     FutureExt, StreamExt,
-};
-use netcore::transport::ConnectionOrigin;
-use network::{
-    application::storage::PeerMetadataStorage,
-    peer_manager::{
-        conn_notifs_channel, ConnectionNotification, ConnectionRequestSender,
-        PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
-    },
-    protocols::network::{NetworkEvents, NewNetworkEvents, NewNetworkSender},
-    transport::ConnectionMetadata,
-    ProtocolId,
 };
 use rand::rngs::StdRng;
 use std::{
@@ -571,7 +571,7 @@ fn start_node_mempool(
     let (_ac_endpoint_sender, ac_endpoint_receiver) = mpsc::channel(1_024);
     let (_quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
     let (_mempool_notifier, mempool_listener) =
-        mempool_notifications::new_mempool_notifier_listener_pair();
+        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
     let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
     let reconfig_event_subscriber = ReconfigNotificationListener {
         notification_receiver: reconfig_events,

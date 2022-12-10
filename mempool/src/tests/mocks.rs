@@ -14,6 +14,12 @@ use aptos_config::{
 };
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
+use aptos_mempool_notifications::{self, MempoolNotifier};
+use aptos_network::{
+    application::storage::PeerMetadataStorage,
+    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
+    protocols::network::{NewNetworkEvents, NewNetworkSender},
+};
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{
@@ -25,12 +31,6 @@ use aptos_vm_validator::{
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::channel::mpsc;
-use mempool_notifications::{self, MempoolNotifier};
-use network::{
-    application::storage::PeerMetadataStorage,
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{NewNetworkEvents, NewNetworkSender},
-};
 use std::collections::HashMap;
 use std::{collections::HashSet, sync::Arc};
 use tokio::runtime::{Builder, Handle, Runtime};
@@ -116,7 +116,7 @@ impl MockSharedMempool {
         let (ac_client, client_events) = mpsc::channel(1_024);
         let (quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
         let (mempool_notifier, mempool_listener) =
-            mempool_notifications::new_mempool_notifier_listener_pair();
+            aptos_mempool_notifications::new_mempool_notifier_listener_pair();
         let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
         let reconfig_event_subscriber = ReconfigNotificationListener {
             notification_receiver: reconfig_events,

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::AptosDB;
 use anyhow::Result;
+use aptos_schemadb::SchemaBatch;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
@@ -12,7 +13,6 @@ use proptest::{
     collection::vec,
     prelude::Strategy,
 };
-use schemadb::SchemaBatch;
 use std::path::Path;
 
 pub fn arb_ledger_infos_with_sigs() -> impl Strategy<Value = Vec<LedgerInfoWithSignatures>> {

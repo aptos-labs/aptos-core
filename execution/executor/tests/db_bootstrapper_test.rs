@@ -5,6 +5,7 @@
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_db::AptosDB;
 use aptos_executor::{
     block_executor::BlockExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
@@ -37,7 +38,6 @@ use aptos_types::{
     write_set::{WriteOp, WriteSetMut},
 };
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
 use move_core_types::{
     language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},

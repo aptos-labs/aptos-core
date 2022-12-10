@@ -9,6 +9,7 @@ use crate::{
 use anyhow::format_err;
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::{ConnectionOrigin, Transport};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
@@ -20,7 +21,6 @@ use futures::{
     sink::SinkExt,
     stream::{Fuse, FuturesUnordered, StreamExt},
 };
-use netcore::transport::{ConnectionOrigin, Transport};
 use std::time::Instant;
 
 #[derive(Debug)]

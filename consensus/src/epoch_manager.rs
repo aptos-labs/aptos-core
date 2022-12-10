@@ -50,6 +50,8 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
+use aptos_network::protocols::network::{ApplicationNetworkSender, Event};
+use aptos_safety_rules::SafetyRulesManager;
 use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
@@ -71,8 +73,6 @@ use futures::{
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
-use network::protocols::network::{ApplicationNetworkSender, Event};
-use safety_rules::SafetyRulesManager;
 use std::{
     cmp::Ordering,
     collections::HashMap,

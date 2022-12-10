@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transport::Transport;
+use aptos_memsocket::{MemoryListener, MemorySocket};
 use aptos_types::{
     network_address::{parse_memory, NetworkAddress, Protocol},
     PeerId,
 };
 use futures::{future, stream::Stream};
-use memsocket::{MemoryListener, MemorySocket};
 use std::{
     io,
     pin::Pin,

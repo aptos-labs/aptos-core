@@ -17,10 +17,10 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
+use aptos_network::application::storage::PeerMetadataStorage;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
 use futures::channel::mpsc;
-use network::application::storage::PeerMetadataStorage;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,

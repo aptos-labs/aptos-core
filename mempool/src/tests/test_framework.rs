@@ -17,18 +17,8 @@ use aptos_config::{
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_id_generator::U32IdGenerator;
 use aptos_infallible::{Mutex, RwLock};
-use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::on_chain_config::OnChainConfigPayload;
-use aptos_types::{
-    account_address::AccountAddress, mempool_status::MempoolStatusCode,
-    transaction::SignedTransaction,
-};
-use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
-use channel::aptos_channel;
-use channel::message_queues::QueueStyle;
-use futures::{channel::oneshot, SinkExt};
-use mempool_notifications::MempoolNotifier;
-use network::{
+use aptos_mempool_notifications::MempoolNotifier;
+use aptos_network::{
     application::storage::PeerMetadataStorage,
     peer_manager::{PeerManagerNotification, PeerManagerRequest},
     protocols::{direct_send::Message, rpc::InboundRpcRequest},
@@ -42,6 +32,16 @@ use network::{
     },
     ProtocolId,
 };
+use aptos_storage_interface::mock::MockDbReaderWriter;
+use aptos_types::on_chain_config::OnChainConfigPayload;
+use aptos_types::{
+    account_address::AccountAddress, mempool_status::MempoolStatusCode,
+    transaction::SignedTransaction,
+};
+use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use channel::aptos_channel;
+use channel::message_queues::QueueStyle;
+use futures::{channel::oneshot, SinkExt};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -487,7 +487,7 @@ fn setup_mempool(
     let (ac_endpoint_sender, ac_endpoint_receiver) = mpsc_channel();
     let (quorum_store_sender, quorum_store_receiver) = mpsc_channel();
     let (mempool_notifier, mempool_listener) =
-        mempool_notifications::new_mempool_notifier_listener_pair();
+        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
 
     let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));

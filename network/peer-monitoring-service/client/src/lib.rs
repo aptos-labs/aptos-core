@@ -4,9 +4,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::network_id::PeerNetworkId;
-use aptos_types::PeerId;
-use async_trait::async_trait;
-use network::{
+use aptos_network::{
     application::{
         interface::{MultiNetworkSender, NetworkInterface},
         storage::{LockingHashMap, PeerMetadataStorage},
@@ -17,10 +15,12 @@ use network::{
     },
     ProtocolId,
 };
-use peer_monitoring_service_types::{
+use aptos_peer_monitoring_service_types::{
     PeerMonitoringServiceError, PeerMonitoringServiceMessage, PeerMonitoringServiceRequest,
     PeerMonitoringServiceResponse,
 };
+use aptos_types::PeerId;
+use async_trait::async_trait;
 use std::{sync::Arc, time::Duration};
 use thiserror::Error;
 
