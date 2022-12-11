@@ -33,7 +33,7 @@ sources={{
 
 ## Who can propose
 
-- To either propose or vote, you must stake, but you are not required to run a validator node. However, we recommend that you be a validator with a stake and be a part of the validator set. 
+- To either propose or vote, you must stake, but you are not required to run a validator node. However, we recommend that you run validator with a stake as part of the validator set to gain rewards from your stake.
 - To create a proposal, the proposer's backing stake pool must have the minimum required proposer stake. The proposer's stake must be locked up for at least as long as the proposal's voting period. This is to avoid potential spammy proposals. 
 - Proposers can create a proposal by calling [`aptos_governance::create_proposal`](https://github.com/aptos-labs/aptos-core/blob/27a255ebc662817944435349afc4ec33ea317e64/aptos-move/framework/aptos-framework/sources/aptos_governance.move#L183).
 
