@@ -117,9 +117,6 @@ module aptos_token::token {
     /// Cannot burn 0 Token
     const ENO_BURN_TOKEN_WITH_ZERO_AMOUNT: u64 = 29;
 
-    /// Withdraw proof expires
-    const EWITHDRAW_PROOF_EXPIRES: u64 = 29;
-
     /// Token is not burnable by owner
     const EOWNER_CANNOT_BURN_TOKEN: u64 = 30;
 
@@ -148,6 +145,9 @@ module aptos_token::token {
 
     /// Withdraw capability doesn't have sufficient amount
     const EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT: u64 = 38;
+
+    /// Withdraw proof expires
+    const EWITHDRAW_PROOF_EXPIRES: u64 = 39;
 
     //
     // Core data structures for holding tokens
