@@ -1476,7 +1476,7 @@ pub enum Transaction {
     ///       transaction types we had in our codebase.
     UserTransaction(SignedTransaction),
 
-    /// Transaction that applies a WriteSet to the current storage, it's applied manually via db-bootstrapper.
+    /// Transaction that applies a WriteSet to the current storage, it's applied manually via aptos-db-bootstrapper.
     GenesisTransaction(WriteSetPayload),
 
     /// Transaction to update the block metadata resource at the beginning of a block.
