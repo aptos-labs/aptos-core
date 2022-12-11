@@ -4,7 +4,7 @@
 use crate::{
     executor::BlockExecutor,
     proptest_types::types::{ExpectedOutput, KeyType, Task, Transaction, ValueType},
-    scheduler::{Scheduler, SchedulerTask, TaskGuard},
+    scheduler::{DependencyResult, Scheduler, SchedulerTask, TaskGuard},
     task::ModulePath,
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
@@ -401,8 +401,20 @@ fn scheduler_dependency() {
         SchedulerTask::ExecutionTask((5, 0), None, _)
     ));
 
-    assert!(s.wait_for_dependency(3, 0).is_none());
-    assert!(s.wait_for_dependency(4, 2).is_some());
+    assert!(
+        if let DependencyResult::Resolved = s.wait_for_dependency(3, 0) {
+            true
+        } else {
+            false
+        }
+    );
+    assert!(
+        if let DependencyResult::Dependency(_) = s.wait_for_dependency(4, 2) {
+            true
+        } else {
+            false
+        }
+    );
 
     assert!(matches!(
         s.finish_execution(2, 0, false, TaskGuard::new(&fake_counter)),
@@ -429,8 +441,20 @@ fn scheduler_incarnation() {
     }
 
     // execution index = 5
-    assert!(s.wait_for_dependency(1, 0).is_some());
-    assert!(s.wait_for_dependency(3, 0).is_some());
+    assert!(
+        if let DependencyResult::Dependency(_) = s.wait_for_dependency(1, 0) {
+            true
+        } else {
+            false
+        }
+    );
+    assert!(
+        if let DependencyResult::Dependency(_) = s.wait_for_dependency(3, 0) {
+            true
+        } else {
+            false
+        }
+    );
 
     assert!(matches!(
         s.finish_execution(2, 0, true, TaskGuard::new(&fake_counter)),

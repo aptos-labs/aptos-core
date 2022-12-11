@@ -6,6 +6,7 @@ use crate::{
     scheduler::{Incarnation, TxnIndex, Version},
     task::{ExecutionStatus, ModulePath, Transaction, TransactionOutput},
 };
+use anyhow::anyhow;
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::access_path::AccessPath;
 use arc_swap::ArcSwapOption;
@@ -180,7 +181,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
         txn_idx: TxnIndex,
         input: Vec<ReadDescriptor<K>>,
         output: ExecutionStatus<T, Error<E>>,
-    ) -> bool {
+    ) -> anyhow::Result<()> {
         let read_modules: Vec<AccessPath> =
             input.iter().filter_map(|desc| desc.module_path()).collect();
         let written_modules: Vec<AccessPath> = match &output {
@@ -192,8 +193,6 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
             ExecutionStatus::Abort(_) => Vec::new(),
         };
 
-        let mut module_read_write_intersection = false;
-
         if !self.module_read_write_intersection.load(Ordering::Relaxed) {
             // Check if adding new read & write modules leads to intersections.
             if Self::append_and_check(read_modules, &self.module_reads, &self.module_writes)
@@ -201,13 +200,16 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
             {
                 self.module_read_write_intersection
                     .store(true, Ordering::Release);
-                module_read_write_intersection = true;
+                return Err(anyhow!(
+                    "Parallel execution detects module r/w intersection!"
+                ));
             }
         }
 
         self.inputs[txn_idx].store(Some(Arc::new(input)));
         self.outputs[txn_idx].store(Some(Arc::new(output)));
-        module_read_write_intersection
+
+        Ok(())
     }
 
     pub fn module_publishing_may_race(&self) -> bool {

@@ -5,7 +5,9 @@ use crate::{
     counters,
     errors::*,
     output_delta_resolver::OutputDeltaResolver,
-    scheduler::{Scheduler, SchedulerTask, TaskGuard, TxnIndex, Version},
+    scheduler::{
+        DependencyResult, DependencyStatus, Scheduler, SchedulerTask, TaskGuard, TxnIndex, Version,
+    },
     task::{ExecutionStatus, ExecutorTask, ModulePath, Transaction, TransactionOutput},
     txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
 };
@@ -49,9 +51,8 @@ pub enum ReadResult<V> {
     U128(u128),
     // Read failed while resolving a delta.
     Unresolved(DeltaOp),
-    // Parallel execution error, indicating that PE halts due to reasons
-    // like module r/w intersection or exceeding per-block gas limit.
-    PEError(usize),
+    // Parallel execution halts due to reasons like module r/w intersection.
+    ExecutionHalted,
     // Read did not return anything.
     None,
 }
@@ -73,10 +74,6 @@ impl<
         use MVHashMapError::*;
         use MVHashMapOutput::*;
         loop {
-            // If the PE halts, read should return immediately.
-            if self.scheduler.done() {
-                return ReadResult::PEError(0);
-            }
             match self.versioned_map.read(key, self.txn_idx) {
                 Ok(Version(version, v)) => {
                     let (txn_idx, incarnation) = version;
@@ -110,7 +107,7 @@ impl<
                 Err(Dependency(dep_idx)) => {
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     match self.scheduler.wait_for_dependency(self.txn_idx, dep_idx) {
-                        Some(dep_condition) => {
+                        DependencyResult::Dependency(dep_condition) => {
                             // Wait on a condition variable corresponding to the encountered
                             // read dependency. Once the dep_idx finishes re-execution, scheduler
                             // will mark the dependency as resolved, and then the txn_idx will be
@@ -127,20 +124,14 @@ impl<
                             // eventually finish and lead to unblocking txn_idx, contradiction.
                             let (lock, cvar) = &*dep_condition;
                             let mut dep_resolved = lock.lock();
-                            // dep_resolved.0 indicates whether the read dependency is resolved.
-                            while !(*dep_resolved).0 {
-                                // If the PE halts, read should return immediately.
-                                if self.scheduler.done() {
-                                    return ReadResult::PEError(0);
-                                }
+                            while let DependencyStatus::Unresolved = *dep_resolved {
                                 dep_resolved = cvar.wait(dep_resolved).unwrap();
-                                // dep_resolved.1 indicates whether PE already halts.
-                                if (*dep_resolved).1 {
-                                    return ReadResult::PEError(0);
-                                }
                             }
                         }
-                        None => continue,
+                        DependencyResult::ExecutionHalted => {
+                            return ReadResult::ExecutionHalted;
+                        }
+                        DependencyResult::Resolved => continue,
                     }
                 }
                 Err(DeltaApplicationFailure) => {
@@ -214,10 +205,6 @@ where
 
         // VM execution.
         let execute_result = executor.execute_transaction_mvhashmap_view(&state_view, txn);
-        // Optimization. If PE halts, can return immediately.
-        if scheduler.done() {
-            return SchedulerTask::NoTask;
-        }
         let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
@@ -267,11 +254,14 @@ where
             versioned_data_cache.delete(&k, idx_to_execute);
         }
 
-        if last_input_output.record(idx_to_execute, state_view.take_reads(), result) {
+        if last_input_output
+            .record(idx_to_execute, state_view.take_reads(), result)
+            .is_err()
+        {
             // Optimization for module publishing fallback.
             // When there is module r/w intersection, can halt parallel execution
             // and fallback to sequential execution immediately.
-            scheduler.set_done();
+            scheduler.halt();
             return SchedulerTask::NoTask;
         }
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside, guard)
@@ -367,7 +357,7 @@ where
                 SchedulerTask::ExecutionTask(_, Some(condvar), _guard) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
-                    (*lock.lock()).0 = true;
+                    *lock.lock() = DependencyStatus::Resolved;
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
 
@@ -377,13 +367,6 @@ where
                 SchedulerTask::Done => {
                     break;
                 }
-            }
-        }
-        if scheduler.is_first() {
-            // The first thread helps other threads that may be pending on the read dependency.
-            // See the comment of the function resolve_condvar().
-            for txn_idx in 0..scheduler.num_txn_to_execute() {
-                scheduler.resolve_condvar(txn_idx);
             }
         }
     }
