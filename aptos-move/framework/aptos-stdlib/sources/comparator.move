@@ -24,9 +24,9 @@ module aptos_std::comparator {
     }
 
     // Performs a comparison of two types after BCS serialization.
-    // BCS uses little endian encoding for all integer types, 
+    // BCS uses little endian encoding for all integer types,
     // so comparison between primitive integer types will not behave as expected.
-    // For example, 1(0x1) will be larger than 256(0x100) after BCS serialization. 
+    // For example, 1(0x1) will be larger than 256(0x100) after BCS serialization.
     public fun compare<T>(left: &T, right: &T): Result {
         let left_bytes = bcs::to_bytes(left);
         let right_bytes = bcs::to_bytes(right);
@@ -87,7 +87,7 @@ module aptos_std::comparator {
     #[test]
     #[expected_failure]
     public fun test_integer() {
-        // 1(0x1) will be larger than 256(0x100) after BCS serialization. 
+        // 1(0x1) will be larger than 256(0x100) after BCS serialization.
         let value0: u128 = 1;
         let value1: u128 = 256;
 
