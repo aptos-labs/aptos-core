@@ -160,6 +160,7 @@ module aptos_framework::aptos_coin {
         initialize(aptos_framework)
     }
 
+    // This is particularly useful if the aggregator_factory is already initialized via another call path.
     #[test_only]
     public fun initialize_for_test_without_aggregator_factory(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         initialize(aptos_framework)
