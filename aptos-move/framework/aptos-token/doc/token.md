@@ -68,6 +68,7 @@ Checkout our developer doc on our token standard https://aptos.dev/concepts/coin
 -  [Function `get_token_supply`](#0x3_token_get_token_supply)
 -  [Function `get_tokendata_largest_property_version`](#0x3_token_get_tokendata_largest_property_version)
 -  [Function `get_token_id`](#0x3_token_get_token_id)
+-  [Function `get_direct_transfer`](#0x3_token_get_direct_transfer)
 -  [Function `create_token_mutability_config`](#0x3_token_create_token_mutability_config)
 -  [Function `create_collection_mutability_config`](#0x3_token_create_collection_mutability_config)
 -  [Function `mint_token`](#0x3_token_mint_token)
@@ -3184,6 +3185,34 @@ return the TokenId for a given Token
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_token_id">get_token_id</a>(<a href="token.md#0x3_token">token</a>: &<a href="token.md#0x3_token_Token">Token</a>): <a href="token.md#0x3_token_TokenId">TokenId</a> {
     <a href="token.md#0x3_token">token</a>.id
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_direct_transfer"></a>
+
+## Function `get_direct_transfer`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_direct_transfer">get_direct_transfer</a>(receiver: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_direct_transfer">get_direct_transfer</a>(receiver: <b>address</b>): bool <b>acquires</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a> {
+    <b>if</b> (!<b>exists</b>&lt;<a href="token.md#0x3_token_TokenStore">TokenStore</a>&gt;(receiver)) {
+        <b>return</b> <b>false</b>
+    };
+
+    <b>borrow_global</b>&lt;<a href="token.md#0x3_token_TokenStore">TokenStore</a>&gt;(receiver).direct_transfer
 }
 </code></pre>
 
