@@ -57,7 +57,7 @@ To keep up with new AIPs, check the #aip-announcements channel on Aptos' discord
 To view and vote on on-chain proposals, go to [`Aptos' Governance website`](https://governance.aptosfoundation.org/). 
 
 ## Technical Implementation of Aptos Governance
-The majority of governance logic are in [`aptos_governance.move and voting.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources). 
+The majority of the governance logic is in [`aptos_governance.move and voting.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources). 
 The `aptos_governance` module outlines how users can interact with Aptos Governance. It's the external-facing module of the Aptos on-chain governance process and contains logic and checks that are specific to Aptos Governance.
 The `voting` module is the Aptos governance standard that can be used by DAOs on the Aptos chain to create their own on-chain governance process.
 
