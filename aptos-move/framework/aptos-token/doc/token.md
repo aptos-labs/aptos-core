@@ -1367,7 +1367,7 @@ User didn't opt-in direct transfer
 Withdraw proof expires
 
 
-<pre><code><b>const</b> <a href="token.md#0x3_token_EWITHDRAW_PROOF_EXPIRES">EWITHDRAW_PROOF_EXPIRES</a>: u64 = 29;
+<pre><code><b>const</b> <a href="token.md#0x3_token_EWITHDRAW_PROOF_EXPIRES">EWITHDRAW_PROOF_EXPIRES</a>: u64 = 39;
 </code></pre>
 
 
