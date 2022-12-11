@@ -47,7 +47,7 @@ Each stake pool can only be used to vote on each proposal exactly once.
 :::
 
 ## Who can resolve
-- Anyone can resolve an on-chain proposal that has passed voting requirements. To resolve a proposal, you can use the `aptos governance execute-proposal` command from Aptos CLI. 
+- Anyone can resolve an on-chain proposal that has passed voting requirements by using the `aptos governance execute-proposal` command from Aptos CLI. 
 
 ## Aptos Improvement Proposals (AIPs)
 
