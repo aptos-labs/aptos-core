@@ -58,6 +58,7 @@ use crate::{
     ProtocolId,
 };
 use anyhow::anyhow;
+use aptos_channels::aptos_channel;
 use aptos_config::network_id::NetworkContext;
 use aptos_id_generator::{IdGenerator, U32IdGenerator};
 use aptos_logger::prelude::*;
@@ -65,7 +66,6 @@ use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{timeout, TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
 use bytes::Bytes;
-use channel::aptos_channel;
 use error::RpcError;
 use futures::{
     channel::oneshot,
@@ -296,7 +296,7 @@ impl InboundRpcs {
     /// the outbound write queue.
     pub async fn send_outbound_response(
         &mut self,
-        write_reqs_tx: &mut channel::Sender<NetworkMessage>,
+        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
         maybe_response: Result<RpcResponse, RpcError>,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
@@ -379,7 +379,7 @@ impl OutboundRpcs {
     pub async fn handle_outbound_request(
         &mut self,
         request: OutboundRpcRequest,
-        write_reqs_tx: &mut channel::Sender<NetworkMessage>,
+        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
         let peer_id = &self.remote_peer_id;

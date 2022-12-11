@@ -21,6 +21,7 @@ use crate::{
     },
     ProtocolId,
 };
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::{ConnectionOrigin, Transport};
@@ -28,7 +29,6 @@ use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
-use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
@@ -102,13 +102,13 @@ where
     /// Channels to send NewPeer/LostPeer notifications to.
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
     /// Channel used to send Dial requests to the ConnectionHandler actor
-    transport_reqs_tx: channel::Sender<TransportRequest>,
+    transport_reqs_tx: aptos_channels::Sender<TransportRequest>,
     /// Sender for connection events.
-    transport_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
+    transport_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
     /// Receiver for connection requests.
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
     /// Receiver for connection events.
-    transport_notifs_rx: channel::Receiver<TransportNotification<TSocket>>,
+    transport_notifs_rx: aptos_channels::Receiver<TransportNotification<TSocket>>,
     /// A map of outstanding disconnect requests.
     outstanding_disconnect_requests:
         HashMap<ConnectionId, oneshot::Sender<Result<(), PeerManagerError>>>,
@@ -160,12 +160,12 @@ where
         inbound_rate_limiters: IpAddrTokenBucketLimiter,
         outbound_rate_limiters: IpAddrTokenBucketLimiter,
     ) -> Self {
-        let (transport_notifs_tx, transport_notifs_rx) = channel::new(
+        let (transport_notifs_tx, transport_notifs_rx) = aptos_channels::new(
             channel_size,
             &counters::PENDING_CONNECTION_HANDLER_NOTIFICATIONS,
         );
         let (transport_reqs_tx, transport_reqs_rx) =
-            channel::new(channel_size, &counters::PENDING_PEER_MANAGER_DIAL_REQUESTS);
+            aptos_channels::new(channel_size, &counters::PENDING_PEER_MANAGER_DIAL_REQUESTS);
         //TODO now that you can only listen on a socket inside of a tokio runtime we'll need to
         // rethink how we init the PeerManager so we don't have to do this funny thing.
         let transport_notifs_tx_clone = transport_notifs_tx.clone();

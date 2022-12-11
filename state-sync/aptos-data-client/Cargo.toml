@@ -34,11 +34,11 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+aptos-channels = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-storage-service-server = { workspace = true }
 aptos-time-service = { workspace = true, features = ["async", "testing"] }
 bcs = { workspace = true }
-channel = { workspace = true }
 claims = { workspace = true }
 maplit = { workspace = true }
 tokio = { workspace = true }

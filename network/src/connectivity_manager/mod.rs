@@ -96,7 +96,7 @@ pub struct ConnectivityManager<TBackoff> {
     /// Channel to receive notifications from PeerManager.
     connection_notifs_rx: conn_notifs_channel::Receiver,
     /// Channel over which we receive requests from other actors.
-    requests_rx: channel::Receiver<ConnectivityRequest>,
+    requests_rx: aptos_channels::Receiver<ConnectivityRequest>,
     /// Peers queued to be dialed, potentially with some delay. The dial can be canceled by
     /// sending over (or dropping) the associated oneshot sender.
     dial_queue: HashMap<PeerId, oneshot::Sender<()>>,
@@ -307,7 +307,7 @@ where
         seeds: PeerSet,
         connection_reqs_tx: ConnectionRequestSender,
         connection_notifs_rx: conn_notifs_channel::Receiver,
-        requests_rx: channel::Receiver<ConnectivityRequest>,
+        requests_rx: aptos_channels::Receiver<ConnectivityRequest>,
         connectivity_check_interval: Duration,
         backoff_strategy: TBackoff,
         max_delay: Duration,

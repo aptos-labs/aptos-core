@@ -33,6 +33,7 @@ use crate::{
     transport::{self, Connection, ConnectionMetadata},
     ProtocolId,
 };
+use aptos_channels::aptos_channel;
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
 use aptos_rate_limiter::rate_limit::SharedBucket;
@@ -40,7 +41,6 @@ use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
 use bytes::Bytes;
-use channel::aptos_channel;
 use futures::{
     self,
     channel::oneshot,
@@ -121,7 +121,7 @@ pub struct Peer<TSocket> {
     /// Underlying connection.
     connection: Option<TSocket>,
     /// Channel to notify PeerManager that we've disconnected.
-    connection_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
+    connection_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
     /// Channel to receive requests from PeerManager to send messages and rpcs.
     peer_reqs_rx: aptos_channel::Receiver<ProtocolId, PeerRequest>,
     /// Channel to notifty PeerManager of new inbound messages and rpcs.
@@ -154,7 +154,7 @@ where
         executor: Handle,
         time_service: TimeService,
         connection: Connection<TSocket>,
-        connection_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
+        connection_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
         peer_reqs_rx: aptos_channel::Receiver<ProtocolId, PeerRequest>,
         peer_notifs_tx: aptos_channel::Sender<ProtocolId, PeerNotification>,
         inbound_rpc_timeout: Duration,
@@ -322,15 +322,15 @@ where
         mut writer: MultiplexMessageSink<impl AsyncWrite + Unpin + Send + 'static>,
         max_frame_size: usize,
         max_message_size: usize,
-    ) -> (channel::Sender<NetworkMessage>, oneshot::Sender<()>) {
+    ) -> (aptos_channels::Sender<NetworkMessage>, oneshot::Sender<()>) {
         let remote_peer_id = connection_metadata.remote_peer_id;
-        let (write_reqs_tx, mut write_reqs_rx): (channel::Sender<NetworkMessage>, _) =
-            channel::new(1024, &counters::PENDING_WIRE_MESSAGES);
+        let (write_reqs_tx, mut write_reqs_rx): (aptos_channels::Sender<NetworkMessage>, _) =
+            aptos_channels::new(1024, &counters::PENDING_WIRE_MESSAGES);
         let (close_tx, mut close_rx) = oneshot::channel();
 
-        let (mut msg_tx, msg_rx) = channel::new(1024, &counters::PENDING_MULTIPLEX_MESSAGE);
+        let (mut msg_tx, msg_rx) = aptos_channels::new(1024, &counters::PENDING_MULTIPLEX_MESSAGE);
         let (stream_msg_tx, stream_msg_rx) =
-            channel::new(1024, &counters::PENDING_MULTIPLEX_STREAM);
+            aptos_channels::new(1024, &counters::PENDING_MULTIPLEX_STREAM);
 
         // this task ends when the multiplex task ends (by dropping the senders)
         let writer_task = async move {
@@ -482,7 +482,7 @@ where
     async fn handle_inbound_message(
         &mut self,
         message: Result<MultiplexMessage, ReadError>,
-        write_reqs_tx: &mut channel::Sender<NetworkMessage>,
+        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
     ) -> Result<(), PeerManagerError> {
         trace!(
             NetworkSchema::new(&self.network_context)
@@ -563,7 +563,7 @@ where
     async fn handle_outbound_request(
         &mut self,
         request: PeerRequest,
-        write_reqs_tx: &mut channel::Sender<NetworkMessage>,
+        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
     ) {
         trace!(
             "Peer {} PeerRequest::{:?}",

@@ -14,6 +14,7 @@ use crate::{
         },
     },
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{MempoolConfig, PeerRole, RoleType},
     network_id::{NetworkId, PeerNetworkId},
@@ -38,7 +39,6 @@ use aptos_network::{
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use async_trait::async_trait;
-use channel::{aptos_channel, message_queues::QueueStyle};
 use fail::fail_point;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};

@@ -17,6 +17,7 @@ use crate::{
     test_utils::{EmptyStateComputer, MockPayloadManager, MockStorage},
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::proposal_msg::ProposalMsg;
 use aptos_infallible::Mutex;
@@ -35,7 +36,6 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
-use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::{channel::mpsc, executor::block_on};
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
@@ -95,7 +95,7 @@ fn make_initial_epoch_change_proof(signer: &ValidatorSigner) -> EpochChangeProof
 fn create_round_state() -> RoundState {
     let base_timeout = std::time::Duration::new(60, 0);
     let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
-    let (round_timeout_sender, _) = channel::new_test(1_024);
+    let (round_timeout_sender, _) = aptos_channels::new_test(1_024);
     let time_service = Arc::new(SimulatedTimeService::new());
     RoundState::new(time_interval, time_service, round_timeout_sender)
 }
@@ -124,7 +124,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
-    let (self_sender, _self_receiver) = channel::new_test(8);
+    let (self_sender, _self_receiver) = aptos_channels::new_test(8);
 
     let epoch_state = EpochState {
         epoch: 1,

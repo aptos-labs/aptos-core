@@ -327,7 +327,7 @@ impl NetworkBuilder {
         self.network_context
     }
 
-    pub fn conn_mgr_reqs_tx(&self) -> Option<channel::Sender<ConnectivityRequest>> {
+    pub fn conn_mgr_reqs_tx(&self) -> Option<aptos_channels::Sender<ConnectivityRequest>> {
         self.connectivity_manager_builder
             .as_ref()
             .map(|conn_mgr_builder| conn_mgr_builder.conn_mgr_reqs_tx())

@@ -63,8 +63,9 @@ pub fn start_consensus(
 
     let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
-    let (timeout_sender, timeout_receiver) = channel::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
-    let (self_sender, self_receiver) = channel::new(1_024, &counters::PENDING_SELF_MESSAGES);
+    let (timeout_sender, timeout_receiver) =
+        aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
+    let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
     network_sender.initialize(peer_metadata_storage);
 
     let epoch_mgr = EpochManager::new(

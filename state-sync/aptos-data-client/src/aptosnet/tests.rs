@@ -3,6 +3,7 @@
 
 use super::{AptosDataClient, AptosNetDataClient, DataSummaryPoller, Error};
 use crate::aptosnet::{poll_peer, state::calculate_optimal_chunk_sizes};
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig, RoleType, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
@@ -36,7 +37,6 @@ use aptos_types::{
     transaction::{TransactionListWithProof, Version},
     PeerId,
 };
-use channel::{aptos_channel, message_queues::QueueStyle};
 use claims::{assert_err, assert_matches, assert_none};
 use futures::StreamExt;
 use maplit::hashmap;

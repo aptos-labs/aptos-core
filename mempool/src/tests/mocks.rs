@@ -8,6 +8,7 @@ use crate::{
     MempoolClientSender, QuorumStoreRequest,
 };
 use anyhow::{format_err, Result};
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{NetworkConfig, NodeConfig},
     network_id::NetworkId,
@@ -29,7 +30,6 @@ use aptos_types::{
 use aptos_vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
 };
-use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::channel::mpsc;
 use std::collections::HashMap;
 use std::{collections::HashSet, sync::Arc};

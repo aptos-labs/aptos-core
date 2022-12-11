@@ -22,13 +22,13 @@ use crate::{
     transport::{Connection, ConnectionId, ConnectionMetadata},
     ProtocolId,
 };
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::PeerRole, network_id::NetworkContext};
 use aptos_memsocket::MemorySocket;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
-use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     future::{self, FutureExt},
@@ -52,7 +52,7 @@ fn build_test_peer(
     Peer<MemorySocket>,
     PeerHandle,
     MemorySocket,
-    channel::Receiver<TransportNotification<MemorySocket>>,
+    aptos_channels::Receiver<TransportNotification<MemorySocket>>,
     aptos_channel::Receiver<ProtocolId, PeerNotification>,
 ) {
     let (a, b) = MemorySocket::new_pair();
@@ -70,7 +70,7 @@ fn build_test_peer(
         socket: a,
     };
 
-    let (connection_notifs_tx, connection_notifs_rx) = channel::new_test(1);
+    let (connection_notifs_tx, connection_notifs_rx) = aptos_channels::new_test(1);
     let (peer_reqs_tx, peer_reqs_rx) =
         aptos_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
     let (peer_notifs_tx, peer_notifs_rx) =
@@ -104,13 +104,13 @@ fn build_test_connected_peers(
     (
         Peer<MemorySocket>,
         PeerHandle,
-        channel::Receiver<TransportNotification<MemorySocket>>,
+        aptos_channels::Receiver<TransportNotification<MemorySocket>>,
         aptos_channel::Receiver<ProtocolId, PeerNotification>,
     ),
     (
         Peer<MemorySocket>,
         PeerHandle,
-        channel::Receiver<TransportNotification<MemorySocket>>,
+        aptos_channels::Receiver<TransportNotification<MemorySocket>>,
         aptos_channel::Receiver<ProtocolId, PeerNotification>,
     ),
 ) {
@@ -156,7 +156,7 @@ fn build_network_sink_stream(
 async fn assert_disconnected_event(
     peer_id: PeerId,
     reason: DisconnectReason,
-    connection_notifs_rx: &mut channel::Receiver<TransportNotification<MemorySocket>>,
+    connection_notifs_rx: &mut aptos_channels::Receiver<TransportNotification<MemorySocket>>,
 ) {
     match connection_notifs_rx.next().await {
         Some(TransportNotification::Disconnected(metadata, actual_reason)) => {

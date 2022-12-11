@@ -1,5 +1,5 @@
 [package]
-name = "db-bootstrapper"
+name = "aptos-db-bootstrapper"
 description = "Aptos DB-Bootstrapper"
 version = "0.1.0"
 

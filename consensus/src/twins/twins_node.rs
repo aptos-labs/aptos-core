@@ -12,6 +12,7 @@ use crate::{
     test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,
 };
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{NodeConfig, WaypointConfig},
     generator::{self, ValidatorSwarm},
@@ -40,7 +41,6 @@ use aptos_types::{
     validator_info::ValidatorInfo,
     waypoint::Waypoint,
 };
-use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
@@ -71,7 +71,7 @@ impl SMRNode {
         let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
+        let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
         let (_, conn_notifs_channel) = conn_notifs_channel::new();
         let mut network_sender = ConsensusNetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
@@ -132,8 +132,9 @@ impl SMRNode {
         let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
         let (timeout_sender, timeout_receiver) =
-            channel::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
-        let (self_sender, self_receiver) = channel::new(1_024, &counters::PENDING_SELF_MESSAGES);
+            aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
+        let (self_sender, self_receiver) =
+            aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
 
         let epoch_mgr = EpochManager::new(
             &config,

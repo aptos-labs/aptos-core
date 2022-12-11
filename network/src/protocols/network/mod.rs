@@ -13,12 +13,12 @@ use crate::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
+use aptos_channels::aptos_channel;
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use async_trait::async_trait;
 use bytes::Bytes;
-use channel::aptos_channel;
 use futures::{
     channel::oneshot,
     future,

@@ -7,13 +7,13 @@ use crate::{
     transport::Connection,
 };
 use anyhow::format_err;
+use aptos_channels::{self};
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::{ConnectionOrigin, Transport};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
-use channel::{self};
 use futures::{
     channel::oneshot,
     future::{BoxFuture, FutureExt},
@@ -43,8 +43,8 @@ where
     /// [`Transport`] that is used to establish connections
     transport: TTransport,
     listener: Fuse<TTransport::Listener>,
-    transport_reqs_rx: channel::Receiver<TransportRequest>,
-    transport_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
+    transport_reqs_rx: aptos_channels::Receiver<TransportRequest>,
+    transport_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
 }
 
 impl<TTransport, TSocket> TransportHandler<TTransport, TSocket>
@@ -60,8 +60,8 @@ where
         time_service: TimeService,
         transport: TTransport,
         listen_addr: NetworkAddress,
-        transport_reqs_rx: channel::Receiver<TransportRequest>,
-        transport_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
+        transport_reqs_rx: aptos_channels::Receiver<TransportRequest>,
+        transport_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
     ) -> (Self, NetworkAddress) {
         let addr_string = format!("{}", listen_addr);
         let (listener, listen_addr) = transport

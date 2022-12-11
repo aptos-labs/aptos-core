@@ -10,6 +10,8 @@ use crate::{
     tests::common::TestTransaction,
     MempoolClientRequest, MempoolClientSender, QuorumStoreRequest,
 };
+use aptos_channels::aptos_channel;
+use aptos_channels::message_queues::QueueStyle;
 use aptos_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
@@ -39,8 +41,6 @@ use aptos_types::{
     transaction::SignedTransaction,
 };
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
-use channel::aptos_channel;
-use channel::message_queues::QueueStyle;
 use futures::{channel::oneshot, SinkExt};
 use std::{
     collections::{HashMap, HashSet},
