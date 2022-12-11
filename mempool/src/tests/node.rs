@@ -9,6 +9,7 @@ use crate::{
     },
     tests::common::TestTransaction,
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{Identity, NodeConfig, PeerRole, RoleType},
     network_id::{NetworkContext, NetworkId, PeerNetworkId},
@@ -31,7 +32,6 @@ use aptos_storage_interface::mock::MockDbReaderWriter;
 use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{account_config::AccountSequenceInfo, PeerId};
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
-use channel::{aptos_channel, message_queues::QueueStyle};
 use enum_dispatch::enum_dispatch;
 use futures::{
     channel::mpsc::{self, unbounded, UnboundedReceiver},

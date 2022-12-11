@@ -154,7 +154,7 @@ COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/db-restore
 COPY --link --from=builder /aptos/dist/aptos /usr/local/bin/aptos
 COPY --link --from=builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
 COPY --link --from=builder /aptos/dist/aptos-fn-check-client /usr/local/bin/aptos-fn-check-client
-COPY --link --from=builder /aptos/dist/transaction-emitter /usr/local/bin/transaction-emitter
+COPY --link --from=builder /aptos/dist/aptos-transaction-emitter /usr/local/bin/aptos-transaction-emitter
 
 ### Get Aptos Move releases for genesis ceremony
 RUN mkdir -p /aptos-framework/move

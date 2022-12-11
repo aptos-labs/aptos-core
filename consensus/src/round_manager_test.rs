@@ -23,6 +23,7 @@ use crate::{
     },
     util::time_service::{ClockTimeService, TimeService},
 };
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
 use aptos_consensus_types::{
     block::{
@@ -60,7 +61,6 @@ use aptos_types::{
     validator_verifier::{generate_validator_verifier, random_validator_verifier},
     waypoint::Waypoint,
 };
-use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::{mpsc, oneshot},
     executor::block_on,
@@ -101,7 +101,7 @@ impl NodeSetup {
     fn create_round_state(time_service: Arc<dyn TimeService>) -> RoundState {
         let base_timeout = Duration::new(60, 0);
         let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
-        let (round_timeout_sender, _) = channel::new_test(1_024);
+        let (round_timeout_sender, _) = aptos_channels::new_test(1_024);
         RoundState::new(time_interval, time_service, round_timeout_sender)
     }
 
@@ -181,7 +181,7 @@ impl NodeSetup {
         let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
+        let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
         let (_, conn_status_rx) = conn_notifs_channel::new();
         let mut network_sender = ConsensusNetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
@@ -195,7 +195,7 @@ impl NodeSetup {
 
         playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
-        let (self_sender, self_receiver) = channel::new_test(1000);
+        let (self_sender, self_receiver) = aptos_channels::new_test(1000);
         let network = NetworkSender::new(author, network_sender, self_sender, validators);
 
         let all_network_events = Box::new(select(network_events, self_receiver));

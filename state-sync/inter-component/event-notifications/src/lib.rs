@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -17,7 +18,6 @@ use aptos_types::{
     on_chain_config::{ConfigID, OnChainConfigPayload},
     transaction::Version,
 };
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{channel::mpsc::SendError, stream::FusedStream, Stream};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -347,7 +347,7 @@ type SubscriptionId = u64;
 #[derive(Debug)]
 struct EventSubscription {
     pub event_buffer: Vec<ContractEvent>,
-    pub notification_sender: channel::aptos_channel::Sender<(), EventNotification>,
+    pub notification_sender: aptos_channels::aptos_channel::Sender<(), EventNotification>,
 }
 
 impl EventSubscription {
@@ -371,7 +371,7 @@ impl EventSubscription {
 /// corresponding notifications.
 #[derive(Debug)]
 struct ReconfigSubscription {
-    pub notification_sender: channel::aptos_channel::Sender<(), ReconfigNotification>,
+    pub notification_sender: aptos_channels::aptos_channel::Sender<(), ReconfigNotification>,
 }
 
 impl ReconfigSubscription {
@@ -414,7 +414,7 @@ pub type ReconfigNotificationListener = NotificationListener<ReconfigNotificatio
 /// The component responsible for listening to subscription notifications.
 #[derive(Debug)]
 pub struct NotificationListener<T> {
-    pub notification_receiver: channel::aptos_channel::Receiver<(), T>,
+    pub notification_receiver: aptos_channels::aptos_channel::Receiver<(), T>,
 }
 
 impl<T> Stream for NotificationListener<T> {

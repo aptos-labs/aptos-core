@@ -21,7 +21,7 @@ cargo build --locked --profile=$PROFILE \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
     -p db-bootstrapper \
-    -p transaction-emitter \
+    -p aptos-transaction-emitter \
     "$@"
 
 # Build aptos-node separately
@@ -49,7 +49,7 @@ BINS=(
     db-bootstrapper
     db-restore
     forge
-    transaction-emitter
+    aptos-transaction-emitter
 )
 
 mkdir dist

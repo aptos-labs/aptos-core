@@ -14,6 +14,7 @@ use crate::{
     transport::{self, AptosNetTransport, Connection, APTOS_TCP_TRANSPORT},
     ProtocolId,
 };
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{PeerSet, RateLimitConfig, HANDSHAKE_VERSION},
     network_id::NetworkContext,
@@ -30,7 +31,6 @@ use aptos_netcore::transport::{
 use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
-use channel::{self, aptos_channel, message_queues::QueueStyle};
 use std::{clone::Clone, collections::HashMap, fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::runtime::Handle;
 

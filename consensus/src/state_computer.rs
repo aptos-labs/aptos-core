@@ -46,7 +46,7 @@ pub struct ExecutionProxy {
     executor: Arc<dyn BlockExecutorTrait>,
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-    async_state_sync_notifier: channel::Sender<NotificationType>,
+    async_state_sync_notifier: aptos_channels::Sender<NotificationType>,
     validators: Mutex<Vec<AccountAddress>>,
     write_mutex: AsyncMutex<()>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
@@ -60,7 +60,7 @@ impl ExecutionProxy {
         handle: &tokio::runtime::Handle,
     ) -> Self {
         let (tx, mut rx) =
-            channel::new::<NotificationType>(10, &counters::PENDING_STATE_SYNC_NOTIFICATION);
+            aptos_channels::new::<NotificationType>(10, &counters::PENDING_STATE_SYNC_NOTIFICATION);
         let notifier = state_sync_notifier.clone();
         handle.spawn(async move {
             while let Some((callback, txns, reconfig_events)) = rx.next().await {

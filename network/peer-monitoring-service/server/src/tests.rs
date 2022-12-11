@@ -6,6 +6,7 @@
 use crate::{
     PeerMonitoringServiceNetworkEvents, PeerMonitoringServiceServer, PEER_MONITORING_SERVER_VERSION,
 };
+use aptos_channels::aptos_channel;
 use aptos_config::{
     config::{PeerMonitoringServiceConfig, PeerRole},
     network_id::{NetworkId, PeerNetworkId},
@@ -30,7 +31,6 @@ use aptos_peer_monitoring_service_types::{
     PeerMonitoringServiceRequest, PeerMonitoringServiceResponse, ServerProtocolVersionResponse,
 };
 use aptos_types::{network_address::NetworkAddress, PeerId};
-use channel::aptos_channel;
 use futures::channel::oneshot;
 use std::{
     collections::{hash_map::Entry, HashMap},

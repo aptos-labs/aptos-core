@@ -1,5 +1,5 @@
 [package]
-name = "executor-benchmark"
+name = "aptos-executor-benchmark"
 description = "Aptos executor benchmark"
 version = "0.1.0"
 

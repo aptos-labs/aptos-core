@@ -10,11 +10,11 @@ use crate::{
         OutboundMessageReceiver,
     },
 };
+use aptos_channels::message_queues::QueueStyle;
 use aptos_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use channel::message_queues::QueueStyle;
 use std::{collections::HashMap, hash::Hash, sync::Arc, vec::Vec};
 
 /// A trait describing a test framework for a specific application
@@ -98,9 +98,9 @@ fn setup_network<NetworkSender: NewNetworkSender, NetworkEvents: NewNetworkEvent
 
 /// A generic FIFO Aptos channel
 fn aptos_channel<K: Eq + Hash + Clone, T>() -> (
-    channel::aptos_channel::Sender<K, T>,
-    channel::aptos_channel::Receiver<K, T>,
+    aptos_channels::aptos_channel::Sender<K, T>,
+    aptos_channels::aptos_channel::Receiver<K, T>,
 ) {
     static MAX_QUEUE_SIZE: usize = 8;
-    channel::aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None)
+    aptos_channels::aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None)
 }

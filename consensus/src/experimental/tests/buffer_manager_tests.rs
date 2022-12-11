@@ -23,6 +23,7 @@ use crate::{
         RandomComputeResultStateComputer,
     },
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis, executed_block::ExecutedBlock,
     vote_proposal::VoteProposal,
@@ -42,7 +43,6 @@ use aptos_types::{
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
     waypoint::Waypoint,
 };
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{channel::oneshot, FutureExt, SinkExt, StreamExt};
 use itertools::enumerate;
 use std::sync::Arc;
@@ -53,7 +53,7 @@ pub fn prepare_buffer_manager() -> (
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-    channel::Receiver<Event<ConsensusMsg>>,
+    aptos_channels::Receiver<Event<ConsensusMsg>>,
     PipelinePhase<ExecutionPhase>,
     PipelinePhase<SigningPhase>,
     PipelinePhase<PersistingPhase>,
@@ -95,7 +95,7 @@ pub fn prepare_buffer_manager() -> (
         ConnectionRequestSender::new(connection_reqs_tx),
     );
 
-    let (self_loop_tx, self_loop_rx) = channel::new_test(1000);
+    let (self_loop_tx, self_loop_rx) = aptos_channels::new_test(1000);
     let network = NetworkSender::new(author, network_sender, self_loop_tx, validators.clone());
 
     let (msg_tx, msg_rx) =
@@ -153,7 +153,7 @@ pub fn launch_buffer_manager() -> (
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-    channel::Receiver<Event<ConsensusMsg>>,
+    aptos_channels::Receiver<Event<ConsensusMsg>>,
     HashValue,
     Runtime,
     Vec<ValidatorSigner>,
@@ -196,7 +196,7 @@ pub fn launch_buffer_manager() -> (
 }
 
 async fn loopback_commit_vote(
-    self_loop_rx: &mut channel::Receiver<Event<ConsensusMsg>>,
+    self_loop_rx: &mut aptos_channels::Receiver<Event<ConsensusMsg>>,
     msg_tx: &aptos_channel::Sender<AccountAddress, VerifiedEvent>,
     verifier: &ValidatorVerifier,
 ) {

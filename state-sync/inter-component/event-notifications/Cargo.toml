@@ -13,13 +13,13 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-channels = { workspace = true }
 aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
-channel = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

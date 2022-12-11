@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-bounded-executor = { workspace = true }
+aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -32,7 +33,6 @@ aptos-types = { workspace = true }
 aptos-vm-validator = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
-channel = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }

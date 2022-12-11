@@ -5,6 +5,7 @@
 
 use crate::counters;
 use anyhow::anyhow;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
@@ -31,7 +32,6 @@ use aptos_network::{
 };
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 use async_trait::async_trait;
-use channel::{aptos_channel, message_queues::QueueStyle};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 

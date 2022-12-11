@@ -21,6 +21,7 @@ use crate::{
     ProtocolId,
 };
 use anyhow::anyhow;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{PeerRole, MAX_INBOUND_CONNECTIONS},
     network_id::NetworkContext,
@@ -34,7 +35,6 @@ use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{channel::oneshot, io::AsyncWriteExt, stream::StreamExt};
 use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Handle;

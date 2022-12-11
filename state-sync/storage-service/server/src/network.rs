@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::StorageServiceConfig;
 use aptos_network::{
     peer_manager::{ConnectionNotification, PeerManagerNotification},
@@ -13,7 +14,6 @@ use aptos_storage_service_types::responses::StorageServiceResponse;
 use aptos_storage_service_types::{Result, StorageServiceMessage};
 use aptos_types::PeerId;
 use bytes::Bytes;
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     future,

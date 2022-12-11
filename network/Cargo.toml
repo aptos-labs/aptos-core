@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
+aptos-channels = { workspace = true }
 aptos-compression = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -34,7 +35,6 @@ aptos-types = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
-channel = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
 hex = { workspace = true }

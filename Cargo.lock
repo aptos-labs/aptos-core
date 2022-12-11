@@ -463,6 +463,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-channels"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-infallible",
+ "aptos-metrics-core",
+ "aptos-types",
+ "futures",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-compression"
 version = "0.1.0"
 dependencies = [
@@ -507,6 +519,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-channels",
  "aptos-config",
  "aptos-consensus-notifications",
  "aptos-consensus-types",
@@ -536,7 +549,6 @@ dependencies = [
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "byteorder",
  "bytes 1.2.1",
- "channel",
  "claims",
  "fail 0.5.0",
  "futures",
@@ -656,6 +668,7 @@ dependencies = [
 name = "aptos-data-client"
 version = "0.1.0"
 dependencies = [
+ "aptos-channels",
  "aptos-config",
  "aptos-crypto",
  "aptos-id-generator",
@@ -671,7 +684,6 @@ dependencies = [
  "aptos-types",
  "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "channel",
  "claims",
  "futures",
  "itertools",
@@ -686,6 +698,7 @@ dependencies = [
 name = "aptos-data-streaming-service"
 version = "0.1.0"
 dependencies = [
+ "aptos-channels",
  "aptos-config",
  "aptos-crypto",
  "aptos-data-client",
@@ -698,7 +711,6 @@ dependencies = [
  "aptos-storage-service-types",
  "aptos-types",
  "async-trait",
- "channel",
  "claims",
  "enum_dispatch",
  "futures",
@@ -749,6 +761,23 @@ dependencies = [
  "rayon",
  "serde 1.0.149",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-db-bootstrapper"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-db",
+ "aptos-executor",
+ "aptos-storage-interface",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "structopt",
 ]
 
 [[package]]
@@ -807,6 +836,7 @@ dependencies = [
 name = "aptos-event-notifications"
 version = "0.1.0"
 dependencies = [
+ "aptos-channels",
  "aptos-crypto",
  "aptos-db",
  "aptos-executor-test-helpers",
@@ -820,7 +850,6 @@ dependencies = [
  "aptos-vm-genesis",
  "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "channel",
  "claims",
  "futures",
  "move-binary-format",
@@ -863,6 +892,41 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde 1.0.149",
+]
+
+[[package]]
+name = "aptos-executor-benchmark"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-db",
+ "aptos-executor",
+ "aptos-executor-types",
+ "aptos-genesis",
+ "aptos-infallible",
+ "aptos-jellyfish-merkle",
+ "aptos-logger",
+ "aptos-push-metrics",
+ "aptos-schemadb",
+ "aptos-scratchpad",
+ "aptos-sdk",
+ "aptos-state-view",
+ "aptos-storage-interface",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "chrono",
+ "criterion",
+ "indicatif",
+ "itertools",
+ "jemallocator",
+ "num_cpus",
+ "rand 0.7.3",
+ "rayon",
+ "serde 1.0.149",
+ "structopt",
+ "toml",
 ]
 
 [[package]]
@@ -1403,6 +1467,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bounded-executor",
+ "aptos-channels",
  "aptos-compression",
  "aptos-config",
  "aptos-consensus-types",
@@ -1422,7 +1487,6 @@ dependencies = [
  "aptos-vm-validator",
  "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "channel",
  "enum_dispatch",
  "fail 0.5.0",
  "futures",
@@ -1532,6 +1596,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-channels",
  "aptos-compression",
  "aptos-config",
  "aptos-crypto",
@@ -1551,7 +1616,6 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "bytes 1.2.1",
- "channel",
  "futures",
  "futures-util",
  "hex",
@@ -1576,6 +1640,7 @@ dependencies = [
 name = "aptos-network-builder"
 version = "0.1.0"
 dependencies = [
+ "aptos-channels",
  "aptos-config",
  "aptos-crypto",
  "aptos-event-notifications",
@@ -1589,7 +1654,6 @@ dependencies = [
  "aptos-types",
  "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "channel",
  "futures",
  "rand 0.7.3",
  "serde 1.0.149",
@@ -1617,6 +1681,7 @@ name = "aptos-network-discovery"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-channels",
  "aptos-config",
  "aptos-crypto",
  "aptos-event-notifications",
@@ -1630,7 +1695,6 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "channel",
  "futures",
  "once_cell",
  "rand 0.7.3",
@@ -1787,12 +1851,12 @@ dependencies = [
 name = "aptos-peer-monitoring-service-client"
 version = "0.1.0"
 dependencies = [
+ "aptos-channels",
  "aptos-config",
  "aptos-network",
  "aptos-peer-monitoring-service-types",
  "aptos-types",
  "async-trait",
- "channel",
  "thiserror",
 ]
 
@@ -1801,6 +1865,7 @@ name = "aptos-peer-monitoring-service-server"
 version = "0.1.0"
 dependencies = [
  "aptos-bounded-executor",
+ "aptos-channels",
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
@@ -1810,7 +1875,6 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "bytes 1.2.1",
- "channel",
  "futures",
  "once_cell",
  "serde 1.0.149",
@@ -2142,6 +2206,7 @@ name = "aptos-state-sync-driver"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-channels",
  "aptos-config",
  "aptos-consensus-notifications",
  "aptos-crypto",
@@ -2170,7 +2235,6 @@ dependencies = [
  "aptos-vm-genesis",
  "async-trait",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "channel",
  "claims",
  "futures",
  "mockall",
@@ -2224,12 +2288,12 @@ dependencies = [
 name = "aptos-storage-service-client"
 version = "0.1.0"
 dependencies = [
+ "aptos-channels",
  "aptos-config",
  "aptos-network",
  "aptos-storage-service-types",
  "aptos-types",
  "async-trait",
- "channel",
  "thiserror",
 ]
 
@@ -2240,6 +2304,7 @@ dependencies = [
  "anyhow",
  "aptos-bitvec",
  "aptos-bounded-executor",
+ "aptos-channels",
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",
@@ -2252,7 +2317,6 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "bytes 1.2.1",
- "channel",
  "claims",
  "futures",
  "lru",
@@ -2420,6 +2484,23 @@ dependencies = [
  "criterion-cpu-time",
  "num_cpus",
  "proptest",
+]
+
+[[package]]
+name = "aptos-transaction-emitter"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-global-constants",
+ "aptos-logger",
+ "aptos-sdk",
+ "aptos-transaction-emitter-lib",
+ "clap 3.2.17",
+ "futures",
+ "itertools",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "tokio",
 ]
 
 [[package]]
@@ -3407,18 +3488,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "channel"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-infallible",
- "aptos-metrics-core",
- "aptos-types",
- "futures",
- "tokio",
-]
-
-[[package]]
 name = "chrono"
 version = "0.4.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4129,23 +4198,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "db-bootstrapper"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-db",
- "aptos-executor",
- "aptos-storage-interface",
- "aptos-temppath",
- "aptos-types",
- "aptos-vm",
- "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
- "structopt",
-]
-
-[[package]]
 name = "debug-ignore"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4522,41 +4574,6 @@ name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
-
-[[package]]
-name = "executor-benchmark"
-version = "0.1.0"
-dependencies = [
- "aptos-config",
- "aptos-crypto",
- "aptos-db",
- "aptos-executor",
- "aptos-executor-types",
- "aptos-genesis",
- "aptos-infallible",
- "aptos-jellyfish-merkle",
- "aptos-logger",
- "aptos-push-metrics",
- "aptos-schemadb",
- "aptos-scratchpad",
- "aptos-sdk",
- "aptos-state-view",
- "aptos-storage-interface",
- "aptos-temppath",
- "aptos-types",
- "aptos-vm",
- "chrono",
- "criterion",
- "indicatif",
- "itertools",
- "jemallocator",
- "num_cpus",
- "rand 0.7.3",
- "rayon",
- "serde 1.0.149",
- "structopt",
- "toml",
-]
 
 [[package]]
 name = "fail"
@@ -9913,23 +9930,6 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
-]
-
-[[package]]
-name = "transaction-emitter"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "aptos-global-constants",
- "aptos-logger",
- "aptos-sdk",
- "aptos-transaction-emitter-lib",
- "clap 3.2.17",
- "futures",
- "itertools",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "tokio",
 ]
 
 [[package]]

@@ -40,6 +40,7 @@ tokio-stream = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+aptos-channels = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
 aptos-executor = { workspace = true }
@@ -54,7 +55,6 @@ aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
-channel = { workspace = true }
 claims = { workspace = true }
 mockall = { workspace = true }
 move-core-types = { workspace = true }

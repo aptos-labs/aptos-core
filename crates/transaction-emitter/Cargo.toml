@@ -1,5 +1,5 @@
 [package]
-name = "transaction-emitter"
+name = "aptos-transaction-emitter"
 description = "Aptos transaction emitter for testing"
 version = "0.0.0"
 

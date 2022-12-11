@@ -6,6 +6,7 @@
 use crate::{network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer};
 use anyhow::{format_err, Result};
 use aptos_bitvec::BitVec;
+use aptos_channels::aptos_channel;
 use aptos_config::config::StorageServiceConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_logger::Level;
@@ -59,7 +60,6 @@ use aptos_types::{
     write_set::WriteSet,
     PeerId,
 };
-use channel::aptos_channel;
 use claims::{assert_matches, assert_none};
 use futures::channel::{oneshot, oneshot::Receiver};
 use mockall::{

@@ -40,6 +40,7 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, Context};
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{ConsensusConfig, NodeConfig};
 use aptos_consensus_types::{
     common::{Author, Round},
@@ -62,7 +63,6 @@ use aptos_types::{
     },
     validator_verifier::ValidatorVerifier,
 };
-use channel::{aptos_channel, message_queues::QueueStyle};
 use fail::fail_point;
 use futures::{
     channel::{
@@ -100,9 +100,9 @@ pub struct EpochManager {
     author: Author,
     config: ConsensusConfig,
     time_service: Arc<dyn TimeService>,
-    self_sender: channel::Sender<Event<ConsensusMsg>>,
+    self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkSender,
-    timeout_sender: channel::Sender<Round>,
+    timeout_sender: aptos_channels::Sender<Round>,
     quorum_store_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     commit_state_computer: Arc<dyn StateComputer>,
@@ -126,9 +126,9 @@ impl EpochManager {
     pub fn new(
         node_config: &NodeConfig,
         time_service: Arc<dyn TimeService>,
-        self_sender: channel::Sender<Event<ConsensusMsg>>,
+        self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
         network_sender: ConsensusNetworkSender,
-        timeout_sender: channel::Sender<Round>,
+        timeout_sender: aptos_channels::Sender<Round>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
@@ -173,7 +173,7 @@ impl EpochManager {
     fn create_round_state(
         &self,
         time_service: Arc<dyn TimeService>,
-        timeout_sender: channel::Sender<Round>,
+        timeout_sender: aptos_channels::Sender<Round>,
     ) -> RoundState {
         let time_interval = Box::new(ExponentialTimeInterval::new(
             Duration::from_millis(self.config.round_initial_timeout_ms),
@@ -904,7 +904,7 @@ impl EpochManager {
 
     pub async fn start(
         mut self,
-        mut round_timeout_sender_rx: channel::Receiver<Round>,
+        mut round_timeout_sender_rx: aptos_channels::Receiver<Round>,
         mut network_receivers: NetworkReceivers,
     ) {
         // initial start of the processor
