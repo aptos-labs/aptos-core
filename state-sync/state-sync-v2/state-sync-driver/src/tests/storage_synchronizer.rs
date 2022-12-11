@@ -23,21 +23,21 @@ use crate::{
 };
 use anyhow::format_err;
 use aptos_config::config::StateSyncDriverConfig;
+use aptos_data_streaming_service::data_notification::NotificationId;
+use aptos_event_notifications::EventSubscriptionService;
+use aptos_executor_types::ChunkCommitNotification;
 use aptos_infallible::{Mutex, RwLock};
+use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
     transaction::{TransactionOutputListWithProof, Version},
 };
 use claims::assert_matches;
-use data_streaming_service::data_notification::NotificationId;
-use event_notifications::EventSubscriptionService;
-use executor_types::ChunkCommitNotification;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationListener;
 use mockall::predicate::always;
 use std::{sync::Arc, time::Duration};
-use storage_interface::DbReaderWriter;
 use tokio::task::JoinHandle;
 
 #[tokio::test(flavor = "multi_thread")]

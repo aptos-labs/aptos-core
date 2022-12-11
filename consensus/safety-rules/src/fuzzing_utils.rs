@@ -2,6 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::serializer::SafetyRulesInput;
+#[cfg(any(test, feature = "fuzzing"))]
+use aptos_consensus_types::block::Block;
+use aptos_consensus_types::{
+    block_data::{BlockData, BlockType},
+    common::Payload,
+    quorum_cert::QuorumCert,
+    timeout_2chain::TwoChainTimeout,
+    vote_data::VoteData,
+    vote_proposal::VoteProposal,
+};
 use aptos_crypto::{
     bls12381,
     hash::{HashValue, TransactionAccumulatorHasher},
@@ -17,16 +27,6 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, BlockInfoGen},
     transaction::SignedTransaction,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
-};
-#[cfg(any(test, feature = "fuzzing"))]
-use consensus_types::block::Block;
-use consensus_types::{
-    block_data::{BlockData, BlockType},
-    common::Payload,
-    quorum_cert::QuorumCert,
-    timeout_2chain::TwoChainTimeout,
-    vote_data::VoteData,
-    vote_proposal::VoteProposal,
 };
 use proptest::prelude::*;
 use rand::{rngs::StdRng, SeedableRng};
@@ -236,12 +236,12 @@ pub fn arb_safety_rules_input() -> impl Strategy<Value = SafetyRulesInput> {
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod fuzzing {
     use crate::{error::Error, serializer::SafetyRulesInput, test_utils, TSafetyRules};
-    use aptos_crypto::bls12381;
-    use aptos_types::epoch_change::EpochChangeProof;
-    use consensus_types::{
+    use aptos_consensus_types::{
         block_data::BlockData, timeout_2chain::TwoChainTimeout, vote::Vote,
         vote_proposal::VoteProposal,
     };
+    use aptos_crypto::bls12381;
+    use aptos_types::epoch_change::EpochChangeProof;
 
     pub fn fuzz_initialize(proof: EpochChangeProof) -> Result<(), Error> {
         let mut safety_rules = test_utils::test_safety_rules_uninitialized();

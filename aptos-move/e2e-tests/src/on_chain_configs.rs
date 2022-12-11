@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{account::Account, executor::FakeExecutor};
+use aptos_cached_packages::aptos_stdlib;
 use aptos_types::{account_config::CORE_CODE_ADDRESS, on_chain_config::Version};
 use aptos_vm::AptosVM;
-use cached_packages::aptos_stdlib;
 
 pub fn set_aptos_version(executor: &mut FakeExecutor, version: Version) {
     let account = Account::new_genesis_account(CORE_CODE_ADDRESS);

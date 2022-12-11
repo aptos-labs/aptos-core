@@ -263,7 +263,7 @@ fn test_reconfiguration_suffix() {
         ),
     );
     let reconfig_suffix_block = BlockData::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         AccountAddress::random(),
         Vec::new(),
         2,

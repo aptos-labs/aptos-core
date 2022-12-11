@@ -8,6 +8,11 @@ use aptos_crypto::{
     HashValue, PrivateKey, Uniform,
 };
 use aptos_data_client::GlobalDataSummary;
+use aptos_data_streaming_service::{
+    data_notification::DataNotification, data_stream::DataStreamListener, streaming_client::Epoch,
+};
+use aptos_event_notifications::EventNotificationListener;
+use aptos_storage_service_types::responses::CompleteDataRange;
 use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::on_chain_config::ValidatorSet;
 use aptos_types::{
@@ -30,17 +35,12 @@ use aptos_types::{
     waypoint::Waypoint,
     write_set::WriteSet,
 };
-use data_streaming_service::{
-    data_notification::DataNotification, data_stream::DataStreamListener, streaming_client::Epoch,
-};
-use event_notifications::EventNotificationListener;
 use futures::channel::mpsc;
 use futures::StreamExt;
 use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use move_core_types::language_storage::TypeTag;
 use rand::rngs::OsRng;
 use rand::Rng;
-use storage_service_types::responses::CompleteDataRange;
 
 /// Creates a new data stream listener and notification sender pair
 pub fn create_data_stream_listener() -> (mpsc::Sender<DataNotification>, DataStreamListener) {

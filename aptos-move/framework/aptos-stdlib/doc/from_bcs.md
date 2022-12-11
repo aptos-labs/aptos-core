@@ -228,6 +228,17 @@ owned.
 ## Specification
 
 
+
+<a name="0x1_from_bcs_deserialize"></a>
+
+
+<pre><code><b>fun</b> <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
+<a name="0x1_from_bcs_deserializable"></a>
+<b>fun</b> <a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+</code></pre>
+
+
+
 <a name="@Specification_1_from_bytes"></a>
 
 ### Function `from_bytes`
@@ -240,6 +251,8 @@ owned.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> !<a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(bytes);
+<b>ensures</b> result == <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(bytes);
 </code></pre>
 
 

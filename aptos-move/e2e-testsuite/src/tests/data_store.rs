@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_language_e2e_tests::{
+    account::AccountData, compile::compile_script, current_function_name, executor::FakeExecutor,
+};
 use aptos_types::transaction::{
     ExecutionStatus, Module, SignedTransaction, Transaction, TransactionStatus,
-};
-use language_e2e_tests::{
-    account::AccountData, compile::compile_script, current_function_name, executor::FakeExecutor,
 };
 use move_binary_format::CompiledModule;
 use move_bytecode_verifier::verify_module;
@@ -247,7 +247,7 @@ fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, Signed
         sender.address(),
     );
 
-    let framework_modules = cached_packages::head_release_bundle().compiled_modules();
+    let framework_modules = aptos_cached_packages::head_release_bundle().compiled_modules();
     let compiler = Compiler {
         deps: framework_modules.iter().collect(),
     };

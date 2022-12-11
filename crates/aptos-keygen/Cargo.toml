@@ -13,8 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-rand = "0.7.3"
-
-aptos-crypto = { path = "../aptos-crypto" }
-aptos-types = { path = "../../types" }
+aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
+rand = { workspace = true }
 

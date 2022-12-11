@@ -1,0 +1,53 @@
+# This defines the rules used by https://mergify.com/
+
+pull_request_rules:
+  - name: required checks
+    conditions:
+      - base=main
+      - or:
+          - and:
+              - check-success=docs-lint
+              - check-success=rust-lint
+              - check-success=ecosystem-lint
+              - check-success=permission-check
+              - check-success=scripts-lint
+              - check-success=python-lint-test / python-unit-test
+              - check-success=helm-lint / helm-lint
+              - check-success=terraform-lint
+              - check-success=rust-unit-test
+              - check-success=rust-doc-test
+              - check-success=rust-smoke-test
+              - check-success=forge-e2e-test / forge
+              - check-success=forge-compat-test / forge
+              - check-success=sdk-release / test-sdk-confirm-client-generated-publish
+              - check-success=rust-images / rust-all
+          - and:
+              # for doc-only changes we only require docs-lint to pass
+              - check-success=docs-lint
+              - -files~=^(?!developer-docs-site/)
+    actions:
+      # Create an additional PR checklist item
+      # The title of which displays the test status, since mergify cannot distinguish between pending and failed
+      post_check:
+        title: |
+          {% if not check_succeed %}
+          {% if check_pending|length > 0 %}
+          Ignore the red X, it just means some checks are still pending, please wait...
+          {% elif check_skipped|length > 0 %}
+          Some checks were skipped (try rebasing, toggling automerge, or applying the corresponding labels)...
+          {% else %}
+          Tests failed
+          {% endif %}
+          {% else %}
+          Tests passed
+          {% endif %}
+        summary: |
+          {% if not check_succeed %}
+          {{ check_conditions }}
+          {% endif %}
+          {{ check_failure|length }} failure {{ check_failure }}
+          {{ check_neutral|length }} neutral {{ check_neutral }}
+          {{ check_pending|length }} pending {{ check_pending }}
+          {{ check_skipped|length }} skipped {{ check_skipped }}
+          {{ check_success|length }} success {{ check_success }}
+

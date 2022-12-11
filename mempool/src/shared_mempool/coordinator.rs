@@ -15,13 +15,14 @@ use crate::{
     MempoolEventsReceiver, QuorumStoreRequest,
 };
 use ::network::protocols::network::Event;
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_consensus_types::common::TransactionSummary;
+use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::on_chain_config::OnChainConfigPayload;
-use bounded_executor::BoundedExecutor;
-use consensus_types::common::TransactionSummary;
-use event_notifications::ReconfigNotificationListener;
+use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
     channel::mpsc,
     stream::{select_all, FuturesUnordered},
@@ -34,7 +35,6 @@ use std::{
 };
 use tokio::{runtime::Handle, time::interval};
 use tokio_stream::wrappers::IntervalStream;
-use vm_validator::vm_validator::TransactionValidation;
 
 use super::types::MempoolClientRequest;
 
@@ -66,6 +66,17 @@ pub(crate) async fn coordinator<V>(
     // worker tasks that can process incoming transactions.
     let workers_available = smp.config.shared_mempool_max_concurrent_inbound_syncs;
     let bounded_executor = BoundedExecutor::new(workers_available, executor.clone());
+
+    let initial_reconfig = mempool_reconfig_events
+        .next()
+        .await
+        .expect("Reconfig sender dropped, unable to start mempool");
+    handle_mempool_reconfig_event(
+        &mut smp,
+        &bounded_executor,
+        initial_reconfig.on_chain_configs,
+    )
+    .await;
 
     loop {
         let _timer = counters::MAIN_LOOP.start_timer();

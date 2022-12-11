@@ -217,7 +217,7 @@ module aptos_framework::block {
     }
 
     #[test(aptos_framework = @aptos_framework, account = @0x123)]
-    #[expected_failure(abort_code = 0x50003)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
     public entry fun test_update_epoch_interval_unauthorized_should_fail(
         aptos_framework: signer,
         account: signer,

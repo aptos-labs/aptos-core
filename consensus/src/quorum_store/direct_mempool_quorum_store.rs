@@ -3,13 +3,13 @@
 
 use crate::{monitor, quorum_store::counters};
 use anyhow::Result;
+use aptos_consensus_types::{
+    common::{Payload, PayloadFilter, TransactionSummary},
+    request_response::{ConsensusResponse, PayloadRequest},
+};
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
-use consensus_types::{
-    common::{Payload, PayloadFilter, TransactionSummary},
-    request_response::{ConsensusRequest, ConsensusResponse},
-};
 use futures::{
     channel::{
         mpsc::{Receiver, Sender},
@@ -21,14 +21,14 @@ use std::time::{Duration, Instant};
 use tokio::time::timeout;
 
 pub struct DirectMempoolQuorumStore {
-    consensus_receiver: Receiver<ConsensusRequest>,
+    consensus_receiver: Receiver<PayloadRequest>,
     mempool_sender: Sender<QuorumStoreRequest>,
     mempool_txn_pull_timeout_ms: u64,
 }
 
 impl DirectMempoolQuorumStore {
     pub fn new(
-        consensus_receiver: Receiver<ConsensusRequest>,
+        consensus_receiver: Receiver<PayloadRequest>,
         mempool_sender: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
     ) -> Self {
@@ -80,16 +80,20 @@ impl DirectMempoolQuorumStore {
         callback: oneshot::Sender<Result<ConsensusResponse>>,
     ) {
         let get_batch_start_time = Instant::now();
-        let (txns, result) = match payload_filter {
-            PayloadFilter::DirectMempool(exclude_txns) => {
-                match self.pull_internal(max_txns, max_bytes, exclude_txns).await {
-                    Err(e) => {
-                        error!("GetBatch failed {:?}", e);
-                        (vec![], counters::REQUEST_FAIL_LABEL)
-                    }
-                    Ok(txns) => (txns, counters::REQUEST_SUCCESS_LABEL),
-                }
+        let exclude_txns = match payload_filter {
+            PayloadFilter::DirectMempool(exclude_txns) => exclude_txns,
+            PayloadFilter::InQuorumStore(_) => {
+                unreachable!("Unknown payload_filter: {}", payload_filter)
             }
+            PayloadFilter::Empty => Vec::new(),
+        };
+
+        let (txns, result) = match self.pull_internal(max_txns, max_bytes, exclude_txns).await {
+            Err(_) => {
+                error!("GetBatch failed");
+                (vec![], counters::REQUEST_FAIL_LABEL)
+            }
+            Ok(txns) => (txns, counters::REQUEST_SUCCESS_LABEL),
         };
         counters::quorum_store_service_latency(
             counters::GET_BATCH_LABEL,
@@ -113,24 +117,20 @@ impl DirectMempoolQuorumStore {
         );
     }
 
-    async fn handle_clean_request(&self, callback: oneshot::Sender<Result<ConsensusResponse>>) {
-        match callback.send(Ok(ConsensusResponse::CleanResponse())) {
-            Err(_) => {
-                error!("Callback failed");
-                counters::CALLBACK_FAIL_LABEL
-            }
-            Ok(_) => counters::CALLBACK_SUCCESS_LABEL,
-        };
-    }
-
-    async fn handle_consensus_request(&self, req: ConsensusRequest) {
+    async fn handle_consensus_request(&self, req: PayloadRequest) {
         match req {
-            ConsensusRequest::GetBlockRequest(max_txns, max_bytes, payload_filter, callback) => {
+            PayloadRequest::GetBlockRequest(
+                _round,
+                max_txns,
+                max_bytes,
+                payload_filter,
+                callback,
+            ) => {
                 self.handle_block_request(max_txns, max_bytes, payload_filter, callback)
                     .await;
             }
-            ConsensusRequest::CleanRequest(_, _, callback) => {
-                self.handle_clean_request(callback).await;
+            PayloadRequest::CleanRequest(..) => {
+                unreachable!()
             }
         }
     }

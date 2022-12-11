@@ -729,8 +729,11 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         let (constructor, expr) = match type_tag {
             Bool => ("Bool", "Some(value)".to_string()),
             U8 => ("U8", "Some(value)".to_string()),
+            U16 => ("U16", "Some(value)".to_string()),
+            U32 => ("U32", "Some(value)".to_string()),
             U64 => ("U64", "Some(value)".to_string()),
             U128 => ("U128", "Some(value)".to_string()),
+            U256 => ("U256", "Some(value)".to_string()),
             Address => ("Address", "Some(value)".to_string()),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => ("U8Vector", "Some(value)".to_string()),
@@ -864,8 +867,11 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
         match type_tag {
             Bool => "bool".into(),
             U8 => "u8".into(),
+            U16 => "u16".into(),
+            U32 => "u32".into(),
             U64 => "u64".into(),
             U128 => "u128".into(),
+            U256 => "U256".into(),
             Address => "AccountAddress".into(),
             Vector(type_tag) => {
                 format!("Vec<{}>", Self::quote_type(type_tag.as_ref(), local_types))
@@ -892,8 +898,11 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
         match type_tag {
             Bool => format!("TransactionArgument::Bool({})", name),
             U8 => format!("TransactionArgument::U8({})", name),
+            U16 => format!("TransactionArgument::U16({})", name),
+            U32 => format!("TransactionArgument::U32({})", name),
             U64 => format!("TransactionArgument::U64({})", name),
             U128 => format!("TransactionArgument::U128({})", name),
+            U256 => format!("TransactionArgument::U256({})", name),
             Address => format!("TransactionArgument::Address({})", name),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => format!("TransactionArgument::U8Vector({})", name),

@@ -1,8 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{hash::CryptoHash, PrivateKey};
+use aptos_executor_test_helpers::{
+    gen_block_id, gen_ledger_info_with_sigs, get_test_signed_transaction,
+    integration_test_impl::{
+        create_db_and_executor, test_execution_with_storage_impl, verify_committed_txn_status,
+    },
+};
+use aptos_executor_types::BlockExecutorTrait;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::state_view::DbStateViewAtVersion;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
@@ -13,22 +22,13 @@ use aptos_types::{
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
 };
-use cached_packages::aptos_stdlib;
-use executor_test_helpers::{
-    gen_block_id, gen_ledger_info_with_sigs, get_test_signed_transaction,
-    integration_test_impl::{
-        create_db_and_executor, test_execution_with_storage_impl, verify_committed_txn_status,
-    },
-};
-use executor_types::BlockExecutorTrait;
 use move_core_types::move_resource::MoveStructType;
-use storage_interface::state_view::DbStateViewAtVersion;
 
 #[test]
 fn test_genesis() {
     let path = aptos_temppath::TempPath::new();
     path.create_as_dir().unwrap();
-    let genesis = vm_genesis::test_genesis_transaction();
+    let genesis = aptos_vm_genesis::test_genesis_transaction();
     let (_, db, _executor, waypoint) = create_db_and_executor(path.path(), &genesis);
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
@@ -68,8 +68,8 @@ fn test_reconfiguration() {
 
     let path = aptos_temppath::TempPath::new();
     path.create_as_dir().unwrap();
-    let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
-    let genesis_key = &vm_genesis::GENESIS_KEYPAIR.0;
+    let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis_key = &aptos_vm_genesis::GENESIS_KEYPAIR.0;
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
     let (_, db, executor, _waypoint) = create_db_and_executor(path.path(), &genesis_txn);
     let parent_block_id = executor.committed_block_id();

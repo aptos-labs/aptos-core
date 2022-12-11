@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    adapter_common,
     adapter_common::{
         discard_error_output, discard_error_vm_status, validate_signature_checked_transaction,
         validate_signed_transaction, PreprocessedTransaction, VMAdapter,
     },
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
+    block_executor::BlockAptosVM,
     counters::*,
-    data_cache::{AsMoveResolver, IntoMoveResolver, StateViewCache},
+    data_cache::{AsMoveResolver, IntoMoveResolver},
     delta_state_view::DeltaStateView,
     errors::expect_only_successful_execution,
     logging::AdapterLogSchema,
@@ -25,7 +25,8 @@ use aptos_aggregator::{
     transaction::{ChangeSetExt, TransactionOutputExt},
 };
 use aptos_crypto::HashValue;
-use aptos_gas::AptosGasMeter;
+use aptos_framework::natives::code::PublishRequest;
+use aptos_gas::{AptosGasMeter, ChangeSetConfigs};
 use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
@@ -33,7 +34,7 @@ use aptos_types::{
     account_config,
     account_config::new_block_event_key,
     block_metadata::BlockMetadata,
-    on_chain_config::new_epoch_event_key,
+    on_chain_config::{new_epoch_event_key, FeatureFlag},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -43,9 +44,9 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use fail::fail_point;
-use framework::natives::code::PublishRequest;
 use move_binary_format::{
     access::ModuleAccess,
+    compatibility::Compatibility,
     errors::{verification_error, Location, PartialVMError, VMError, VMResult},
     CompiledModule, IndexKind,
 };
@@ -56,7 +57,6 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::move_vm::RuntimeConfig;
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::OnceCell;
@@ -72,7 +72,7 @@ use std::{
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
-static RUNTIME_CHECKS: OnceCell<RuntimeConfig> = OnceCell::new();
+static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 
 /// Remove this once the bundle is removed from the code.
@@ -116,25 +116,16 @@ impl AptosVM {
     }
 
     /// Sets runtime config when invoked the first time.
-    pub fn set_runtime_config(paranoid_type_checks: bool, paranoid_hot_potato_checks: bool) {
+    pub fn set_paranoid_type_checks(enable: bool) {
         // Only the first call succeeds, due to OnceCell semantics.
-        RUNTIME_CHECKS
-            .set(RuntimeConfig {
-                paranoid_type_checks,
-                paranoid_hot_potato_checks,
-            })
-            .ok();
+        PARANOID_TYPE_CHECKS.set(enable).ok();
     }
 
-    /// Get the concurrency level if already set, otherwise return default true
-    /// (paranoid execution mode).
-    pub fn get_runtime_config() -> RuntimeConfig {
-        match RUNTIME_CHECKS.get() {
-            Some(config) => *config,
-            None => RuntimeConfig {
-                paranoid_type_checks: true,
-                paranoid_hot_potato_checks: true,
-            },
+    /// Get the paranoid type check flag if already set, otherwise return default true
+    pub fn get_paranoid_checks() -> bool {
+        match PARANOID_TYPE_CHECKS.get() {
+            Some(enable) => *enable,
+            None => true,
         }
     }
 
@@ -250,7 +241,7 @@ impl AptosVM {
                     gas_meter.balance(),
                     txn_data,
                     status,
-                    gas_meter.feature_version(),
+                    gas_meter.change_set_configs(),
                 )
                 .unwrap_or_else(|e| discard_error_vm_status(e).1);
                 (error_code, txn_output)
@@ -301,7 +292,7 @@ impl AptosVM {
         let epilogue_change_set_ext = session
             .finish()
             .map_err(|e| e.into_vm_status())?
-            .into_change_set(&mut (), gas_meter.feature_version())?;
+            .into_change_set(&mut (), gas_meter.change_set_configs())?;
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
@@ -401,7 +392,7 @@ impl AptosVM {
 
             let session_output = session.finish().map_err(|e| e.into_vm_status())?;
             let change_set_ext =
-                session_output.into_change_set(&mut (), gas_meter.feature_version())?;
+                session_output.into_change_set(&mut (), gas_meter.change_set_configs())?;
 
             // Charge gas for write set
             gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -528,7 +519,19 @@ impl AptosVM {
 
         Self::verify_module_bundle(&mut session, modules)?;
         session
-            .publish_module_bundle(modules.clone().into_inner(), txn_data.sender(), gas_meter)
+            .publish_module_bundle_with_compat_config(
+                modules.clone().into_inner(),
+                txn_data.sender(),
+                gas_meter,
+                Compatibility::new(
+                    true,
+                    true,
+                    !self
+                        .0
+                        .get_features()
+                        .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                ),
+            )
             .map_err(|e| e.into_vm_status())?;
 
         // call init function of the each module
@@ -542,7 +545,7 @@ impl AptosVM {
 
         let session_output = session.finish().map_err(|e| e.into_vm_status())?;
         let change_set_ext =
-            session_output.into_change_set(&mut (), gas_meter.feature_version())?;
+            session_output.into_change_set(&mut (), gas_meter.change_set_configs())?;
 
         // Charge gas for write set
         gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -585,7 +588,19 @@ impl AptosVM {
 
             // Publish the bundle and execute initializers
             session
-                .publish_module_bundle(bundle.into_inner(), destination, gas_meter)
+                .publish_module_bundle_with_compat_config(
+                    bundle.into_inner(),
+                    destination,
+                    gas_meter,
+                    Compatibility::new(
+                        true,
+                        true,
+                        !self
+                            .0
+                            .get_features()
+                            .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                    ),
+                )
                 .and_then(|_| {
                     self.execute_module_initialization(
                         session,
@@ -695,7 +710,7 @@ impl AptosVM {
         let mut gas_meter = AptosGasMeter::new(
             self.0.get_gas_feature_version(),
             gas_params.clone(),
-            storage_gas_params.cloned(),
+            storage_gas_params.clone(),
             txn_data.max_gas_amount(),
         );
 
@@ -748,12 +763,14 @@ impl AptosVM {
         session_id: SessionId,
     ) -> Result<ChangeSetExt, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
         let mut gas_meter = UnmeteredGasMeter;
+        let change_set_configs =
+            ChangeSetConfigs::unlimited_at_gas_feature_version(self.0.get_gas_feature_version());
 
         Ok(match writeset_payload {
             WriteSetPayload::Direct(change_set) => ChangeSetExt::new(
                 DeltaChangeSet::empty(),
                 change_set.clone(),
-                self.0.get_gas_feature_version(),
+                Arc::new(change_set_configs),
             ),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage, session_id);
@@ -785,7 +802,7 @@ impl AptosVM {
 
                 match execution_result {
                     Ok(session_out) => session_out
-                        .into_change_set(&mut (), self.0.get_gas_feature_version())
+                        .into_change_set(&mut (), &change_set_configs)
                         .map_err(Err)?,
                     Err(e) => {
                         return Err(Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET))));
@@ -907,24 +924,12 @@ impl AptosVM {
             0.into(),
             &txn_data,
             ExecutionStatus::Success,
-            self.0.get_gas_feature_version(),
+            &self
+                .0
+                .get_storage_gas_parameters(log_context)?
+                .change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
-    }
-
-    /// Alternate form of 'execute_block' that keeps the vm_status before it goes into the
-    /// `TransactionOutput`
-    pub fn execute_block_and_keep_vm_status(
-        transactions: Vec<Transaction>,
-        state_view: &impl StateView,
-    ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
-        let mut state_view_cache = StateViewCache::new(state_view);
-        let count = transactions.len();
-        let vm = AptosVM::new(&state_view_cache);
-        let res = adapter_common::execute_block_impl(&vm, transactions, &mut state_view_cache)?;
-        // Record the histogram count for transactions per block.
-        BLOCK_TRANSACTION_COUNT.observe(count as f64);
-        Ok(res)
     }
 
     pub fn simulate_signed_transaction(
@@ -983,22 +988,21 @@ impl VMExecutor for AptosVM {
             ))
         });
 
-        let concurrency_level = Self::get_concurrency_level();
-        if concurrency_level > 1 {
-            let (result, err) = crate::parallel_executor::ParallelAptosVM::execute_block(
-                transactions,
-                state_view,
-                concurrency_level,
-            )?;
-            debug!("Parallel execution error {:?}", err);
-            Ok(result)
-        } else {
-            let output = Self::execute_block_and_keep_vm_status(transactions, state_view)?;
-            Ok(output
-                .into_iter()
-                .map(|(_vm_status, txn_output)| txn_output)
-                .collect())
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        info!(
+            log_context,
+            "Executing block, transaction count: {}",
+            transactions.len()
+        );
+
+        let count = transactions.len();
+        let ret =
+            BlockAptosVM::execute_block(transactions, state_view, Self::get_concurrency_level());
+        if ret.is_ok() {
+            // Record the histogram count for transactions per block.
+            BLOCK_TRANSACTION_COUNT.observe(count as f64);
         }
+        ret
     }
 }
 
@@ -1093,6 +1097,7 @@ impl VMAdapter for AptosVM {
                 (vm_status, output, Some("waypoint_write_set".to_string()))
             }
             PreprocessedTransaction::UserTransaction(txn) => {
+                fail_point!("aptos_vm::execution::user_transaction");
                 let sender = txn.sender().to_string();
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
                 let (vm_status, output) =
@@ -1213,7 +1218,7 @@ impl AptosSimulationVM {
         let mut gas_meter = AptosGasMeter::new(
             self.0 .0.get_gas_feature_version(),
             gas_params.clone(),
-            storage_gas_params.cloned(),
+            storage_gas_params.clone(),
             txn_data.max_gas_amount(),
         );
 

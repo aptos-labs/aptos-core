@@ -99,7 +99,7 @@ export class AptosAccount {
   /**
    * This key enables account owners to rotate their private key(s)
    * associated with the account without changing the address that hosts their account.
-   * See here for more info: {@link https://aptos.dev/basics/basics-accounts#single-signer-authentication}
+   * See here for more info: {@link https://aptos.dev/concepts/accounts#single-signer-authentication}
    * @returns Authentication key for the associated account
    */
   @Memoize()
@@ -176,4 +176,9 @@ export class AptosAccount {
       privateKeyHex: HexString.fromUint8Array(this.signingKey.secretKey.slice(0, 32)).hex(),
     };
   }
+}
+
+// Returns an account address as a HexString given either an AptosAccount or a MaybeHexString.
+export function getAddressFromAccountOrAddress(accountOrAddress: AptosAccount | MaybeHexString): HexString {
+  return accountOrAddress instanceof AptosAccount ? accountOrAddress.address() : HexString.ensure(accountOrAddress);
 }

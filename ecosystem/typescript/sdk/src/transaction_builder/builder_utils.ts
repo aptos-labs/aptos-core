@@ -6,8 +6,11 @@ import {
   TypeTag,
   TypeTagBool,
   TypeTagU8,
+  TypeTagU16,
+  TypeTagU32,
   TypeTagU64,
   TypeTagU128,
+  TypeTagU256,
   TypeTagAddress,
   AccountAddress,
   TypeTagVector,
@@ -16,13 +19,23 @@ import {
   Identifier,
   TransactionArgument,
   TransactionArgumentBool,
+  TransactionArgumentU16,
+  TransactionArgumentU32,
   TransactionArgumentU64,
   TransactionArgumentU128,
+  TransactionArgumentU256,
   TransactionArgumentAddress,
   TransactionArgumentU8,
   TransactionArgumentU8Vector,
 } from "../aptos_types";
 import { Serializer } from "../bcs";
+
+export const stringStructTag = new StructTag(
+  AccountAddress.fromHex("0x1"),
+  new Identifier("string"),
+  new Identifier("String"),
+  [],
+);
 
 function assertType(val: any, types: string[] | string, message?: string) {
   if (!types?.includes(typeof val)) {
@@ -160,11 +173,20 @@ export class TypeTagParser {
     if (tokenVal === "u8") {
       return new TypeTagU8();
     }
+    if (tokenVal === "u16") {
+      return new TypeTagU16();
+    }
+    if (tokenVal === "u32") {
+      return new TypeTagU32();
+    }
     if (tokenVal === "u64") {
       return new TypeTagU64();
     }
     if (tokenVal === "u128") {
       return new TypeTagU128();
+    }
+    if (tokenVal === "u256") {
+      return new TypeTagU256();
     }
     if (tokenVal === "bool") {
       return new TypeTagBool();
@@ -256,12 +278,24 @@ export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializ
     serializer.serializeU8(ensureNumber(argVal));
     return;
   }
+  if (argType instanceof TypeTagU16) {
+    serializer.serializeU16(ensureNumber(argVal));
+    return;
+  }
+  if (argType instanceof TypeTagU32) {
+    serializer.serializeU32(ensureNumber(argVal));
+    return;
+  }
   if (argType instanceof TypeTagU64) {
     serializer.serializeU64(ensureBigInt(argVal));
     return;
   }
   if (argType instanceof TypeTagU128) {
     serializer.serializeU128(ensureBigInt(argVal));
+    return;
+  }
+  if (argType instanceof TypeTagU256) {
+    serializer.serializeU256(ensureBigInt(argVal));
     return;
   }
   if (argType instanceof TypeTagAddress) {
@@ -323,11 +357,20 @@ export function argToTransactionArgument(argVal: any, argType: TypeTag): Transac
   if (argType instanceof TypeTagU8) {
     return new TransactionArgumentU8(ensureNumber(argVal));
   }
+  if (argType instanceof TypeTagU16) {
+    return new TransactionArgumentU16(ensureNumber(argVal));
+  }
+  if (argType instanceof TypeTagU32) {
+    return new TransactionArgumentU32(ensureNumber(argVal));
+  }
   if (argType instanceof TypeTagU64) {
     return new TransactionArgumentU64(ensureBigInt(argVal));
   }
   if (argType instanceof TypeTagU128) {
     return new TransactionArgumentU128(ensureBigInt(argVal));
+  }
+  if (argType instanceof TypeTagU256) {
+    return new TransactionArgumentU256(ensureBigInt(argVal));
   }
   if (argType instanceof TypeTagAddress) {
     let addr: AccountAddress;

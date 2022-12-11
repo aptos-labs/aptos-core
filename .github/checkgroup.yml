@@ -1,0 +1,30 @@
+# This file leverages https://github.com/tianhaoz95/check-group
+# to define groups of status checks which are required depending on the files changed in a PR.
+# This allows us to make certain checks required/optional depending on the PR content,
+# which is useful in a Monorepo context.
+# Example: If only a doc change was made (in developer-docs-site) require only the `docs-lint` check to pass.
+# In GitHub's branch protection rule we only mark the result of the check group service as required,
+# not the individual checks.
+custom_service_name: Required checks
+subprojects:
+  - id: docs
+    paths:
+      - developer-docs-site/**
+    checks:
+      - docs-lint
+      # - netlify/aptos-developer-docs/deploy-preview # somehow checkgroup doesnt' recognize this check, so commenting it out for now
+  # everything, but docs
+  - id: catch_all
+    paths:
+      - "!developer-docs-site/**"
+    checks:
+      - rust-lint
+      - ecosystem-lint
+      - scripts-lint
+      - rust-unit-test
+      - rust-doc-test
+      - rust-smoke-test
+      - forge-e2e-test / forge
+      - sdk-release / test-sdk-confirm-client-generated-publish
+      - rust-images / rust-all
+      - terraform-lint

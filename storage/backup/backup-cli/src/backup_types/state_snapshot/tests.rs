@@ -14,10 +14,10 @@ use crate::{
         ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, RocksdbOpt, TrustedWaypointOpt,
     },
 };
+use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptosdb::AptosDB;
 use std::{convert::TryInto, sync::Arc};
-use storage_interface::DbReader;
 use tokio::time::Duration;
 
 #[test]
@@ -76,6 +76,7 @@ fn end_to_end() {
             StateSnapshotRestoreOpt {
                 manifest_handle,
                 version,
+                validate_modules: false,
             },
             GlobalRestoreOpt {
                 dry_run: false,

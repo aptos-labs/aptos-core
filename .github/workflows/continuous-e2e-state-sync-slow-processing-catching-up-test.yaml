@@ -7,17 +7,16 @@ permissions:
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 */3 * * *"
+    - cron: "0 */12 * * *"
 
 jobs:
-  ### Please remember to use different namespace for different tests
-  run-state-sync-slow-processing-catching-up-test:
+  run-forge-state-sync-slow-processing-catching-up-test:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-state-sync-slow-processing-catching-up-test
       FORGE_CLUSTER_NAME: aptos-forge-big-1
       FORGE_RUNNER_DURATION_SECS: 900
-      FORGE_TEST_SUITE: slow_processing_catching_up
+      FORGE_TEST_SUITE: state_sync_slow_processing_catching_up
       POST_TO_SLACK: true
       FORGE_ENABLE_FAILPOINTS: true

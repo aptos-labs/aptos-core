@@ -37,8 +37,12 @@ ARG PROFILE
 ENV PROFILE ${PROFILE}
 ARG FEATURES
 ENV FEATURES ${FEATURES}
+ARG GIT_CREDENTIALS
+ENV GIT_CREDENTIALS ${GIT_CREDENTIALS}
 
+RUN GIT_CREDENTIALS="$GIT_CREDENTIALS" git config --global credential.helper store && echo "${GIT_CREDENTIALS}" > ~/.git-credentials
 RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target
+RUN rm -rf ~/.git-credentials
 
 ### Validator Image ###
 FROM debian-base AS validator
@@ -279,6 +283,7 @@ FROM validator AS validator-testing
 RUN apt-get update && apt-get install -y \
     # Extra goodies for debugging
     less \
+    git \
     vim \
     nano \
     libjemalloc-dev \
@@ -287,12 +292,29 @@ RUN apt-get update && apt-get install -y \
     ghostscript \
     strace \
     htop \
+    sysstat \
     valgrind \
-    bpfcc-tools \
-    python3-bpfcc \
-    libbpfcc \
-    libbpfcc-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
+
+RUN echo "deb http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+RUN echo "deb-src http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+
+RUN apt-get update && apt-get install -y \
+		arping bison clang-format cmake dh-python \
+		dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
+		libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
+		libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
+		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+RUN git clone https://github.com/aptos-labs/bcc.git --depth 1
+RUN mkdir bcc/build
+WORKDIR  bcc/build
+RUN cmake ..
+RUN make
+RUN make install
+WORKDIR ..
+RUN cp -r rust_demangler /usr/lib/python3/dist-packages/rust_demangler
 
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1

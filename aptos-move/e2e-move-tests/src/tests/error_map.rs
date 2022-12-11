@@ -4,9 +4,9 @@
 extern crate core;
 
 use crate::{assert_success, tests::common, MoveHarness};
+use aptos_framework::BuildOptions;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
-use framework::BuildOptions;
 use move_core_types::value::MoveValue;
 use serde::{Deserialize, Serialize};
 

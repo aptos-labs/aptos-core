@@ -15,12 +15,18 @@ class HelmLintTestCase(unittest.TestCase):
             b"[ERROR] templates/: parse error at (testnet-addons/templates/load"
             b"test.yaml:75): function alkajsdfl not defined"
         )
-        shell = SpyShell(OrderedDict([
-            ("helm lint testsuite/fixtures/helm", RunResult(0, error)),
-        ]))
+        shell = SpyShell(
+            OrderedDict(
+                [
+                    ("helm lint testsuite/fixtures/helm", RunResult(0, error)),
+                ]
+            )
+        )
         with patch.object(lint, "LocalShell", lambda *_: shell):
             runner = CliRunner()
-            result = runner.invoke(main, ["helm", "testsuite/fixtures/helm"], catch_exceptions=False)
+            result = runner.invoke(
+                main, ["helm", "testsuite/fixtures/helm"], catch_exceptions=False
+            )
 
         shell.assert_commands(self)
         expected_error = (

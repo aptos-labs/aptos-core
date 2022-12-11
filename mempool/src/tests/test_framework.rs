@@ -14,13 +14,18 @@ use aptos_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
+use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_id_generator::U32IdGenerator;
 use aptos_infallible::{Mutex, RwLock};
+use aptos_storage_interface::mock::MockDbReaderWriter;
+use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{
     account_address::AccountAddress, mempool_status::MempoolStatusCode,
-    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, transaction::SignedTransaction,
+    transaction::SignedTransaction,
 };
-use event_notifications::EventSubscriptionService;
+use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use channel::aptos_channel;
+use channel::message_queues::QueueStyle;
 use futures::{channel::oneshot, SinkExt};
 use mempool_notifications::MempoolNotifier;
 use network::{
@@ -41,10 +46,8 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use tokio::{runtime::Handle, time::Duration};
 use tokio_stream::StreamExt;
-use vm_validator::mocks::mock_vm_validator::MockVMValidator;
 
 /// An individual mempool node that runs in it's own runtime.
 ///
@@ -488,11 +491,21 @@ fn setup_mempool(
 
     let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));
-    let db_rw = Arc::new(RwLock::new(DbReaderWriter::new(MockDbReaderWriter)));
     let db_ro = Arc::new(MockDbReaderWriter);
 
-    let mut event_subscriber = EventSubscriptionService::new(ON_CHAIN_CONFIG_REGISTRY, db_rw);
-    let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
+    let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+    let reconfig_event_subscriber = ReconfigNotificationListener {
+        notification_receiver: reconfig_events,
+    };
+    reconfig_sender
+        .push(
+            (),
+            ReconfigNotification {
+                version: 1,
+                on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+            },
+        )
+        .unwrap();
 
     start_shared_mempool(
         &Handle::current(),

@@ -13,7 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-ureq = { version = "1.5.4", features = ["json", "native-tls"], default-features = false }
-
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
+ureq = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }

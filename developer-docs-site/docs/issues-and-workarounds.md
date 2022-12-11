@@ -13,6 +13,17 @@ If you found an issue that is not on this page, submit a [GitHub Issue](https://
 
 ## Nodes
 
+### Logs slowing down system and hindering performance
+
+#### Description
+
+Encountered problems with very large logs that were written to the system. They accumulate quickly and could easily be more than 1G in a couple of days, greatly slowing down the system and the performance of the disk.
+
+#### Workaround
+
+Run `aptos-node` as a system service and forward logs to syslog. See the following issue for a detailed description of the problem and suggested solution:
+https://github.com/aptos-labs/aptos-core/issues/5522
+
 ### Invalid EpochChangeProof: Waypoint value mismatch
 
 #### Description

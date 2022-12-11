@@ -13,15 +13,15 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.62"
-aptos-node-checker = { path = "../" }
-aptos-sdk = { path = "../../../sdk" }
-clap = "3.2.17"
-env_logger = "0.9.0"
-futures = "0.3.21"
-gcp-bigquery-client = "0.13.0"
-log = "0.4.17"
-reqwest = "0.11.11"
-serde = "1.0.144"
-serde_json = "1.0.85"
-tokio = { version = "1.21.0", features = ["macros", "rt-multi-thread"] }
+anyhow = { workspace = true }
+aptos-node-checker = { workspace = true }
+aptos-sdk = { workspace = true }
+clap = { workspace = true }
+env_logger = { workspace = true }
+futures = { workspace = true }
+gcp-bigquery-client = { workspace = true }
+log = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }

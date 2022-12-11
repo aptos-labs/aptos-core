@@ -10,8 +10,17 @@ use crate::{
     },
 };
 use aptos_config::config::{NodeConfig, RoleType};
+use aptos_consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
 use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
+use aptos_event_notifications::{
+    EventNotificationListener, EventSubscriptionService, ReconfigNotificationListener,
+};
+use aptos_executor::chunk_executor::ChunkExecutor;
+use aptos_executor_test_helpers::bootstrap_genesis;
 use aptos_infallible::RwLock;
+use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_service_client::StorageServiceClient;
 use aptos_time_service::TimeService;
 use aptos_types::{
     event::EventKey,
@@ -22,19 +31,10 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use claims::{assert_err, assert_none};
-use consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
-use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
-use event_notifications::{
-    EventNotificationListener, EventSubscriptionService, ReconfigNotificationListener,
-};
-use executor::chunk_executor::ChunkExecutor;
-use executor_test_helpers::bootstrap_genesis;
 use futures::{FutureExt, StreamExt};
 use mempool_notifications::MempoolNotificationListener;
 use network::application::{interface::MultiNetworkSender, storage::PeerMetadataStorage};
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::DbReaderWriter;
-use storage_service_client::StorageServiceClient;
 
 // TODO(joshlind): extend these tests to cover more functionality!
 
@@ -231,7 +231,7 @@ async fn create_driver_for_tests(
     let (_, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
 
     // Bootstrap the genesis transaction
-    let (genesis, _) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let (genesis, _) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
     bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn).unwrap();
 
@@ -251,7 +251,7 @@ async fn create_driver_for_tests(
 
     // Create consensus and mempool notifiers and listeners
     let (consensus_notifier, consensus_listener) =
-        consensus_notifications::new_consensus_notifier_listener_pair(5000);
+        aptos_consensus_notifications::new_consensus_notifier_listener_pair(5000);
     let (mempool_notifier, mempool_listener) =
         mempool_notifications::new_mempool_notifier_listener_pair();
 

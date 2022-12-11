@@ -15,6 +15,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
+    transaction::SignedTransaction,
     transaction::{Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -331,17 +332,15 @@ impl Block {
         Ok(())
     }
 
-    pub fn transactions_to_execute(&self, validators: &[AccountAddress]) -> Vec<Transaction> {
+    pub fn transactions_to_execute(
+        &self,
+        validators: &[AccountAddress],
+        txns: Vec<SignedTransaction>,
+    ) -> Vec<Transaction> {
         once(Transaction::BlockMetadata(
             self.new_block_metadata(validators),
         ))
-        .chain(
-            self.payload()
-                .unwrap_or(&Payload::empty())
-                .clone()
-                .into_iter()
-                .map(Transaction::UserTransaction),
-        )
+        .chain(txns.into_iter().map(Transaction::UserTransaction))
         .chain(once(Transaction::StateCheckpoint(self.id)))
         .collect()
     }

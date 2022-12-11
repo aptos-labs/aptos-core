@@ -16,6 +16,9 @@ import {
   TypeTagBool,
   TypeTagStruct,
   TypeTagU128,
+  TypeTagU16,
+  TypeTagU256,
+  TypeTagU32,
   TypeTagU64,
   TypeTagU8,
   TypeTagVector,
@@ -39,12 +42,24 @@ describe("BuilderUtils", () => {
     expect(new TypeTagParser("u8").parseTypeTag() instanceof TypeTagU8).toBeTruthy();
   });
 
+  it("parses a u16 TypeTag", async () => {
+    expect(new TypeTagParser("u16").parseTypeTag() instanceof TypeTagU16).toBeTruthy();
+  });
+
+  it("parses a u32 TypeTag", async () => {
+    expect(new TypeTagParser("u32").parseTypeTag() instanceof TypeTagU32).toBeTruthy();
+  });
+
   it("parses a u64 TypeTag", async () => {
     expect(new TypeTagParser("u64").parseTypeTag() instanceof TypeTagU64).toBeTruthy();
   });
 
   it("parses a u128 TypeTag", async () => {
     expect(new TypeTagParser("u128").parseTypeTag() instanceof TypeTagU128).toBeTruthy();
+  });
+
+  it("parses a u256 TypeTag", async () => {
+    expect(new TypeTagParser("u256").parseTypeTag() instanceof TypeTagU256).toBeTruthy();
   });
 
   it("parses a address TypeTag", async () => {
@@ -143,7 +158,7 @@ describe("BuilderUtils", () => {
     }).toThrow("Invalid type tag.");
 
     expect(() => {
-      new TypeTagParser("u32").parseTypeTag();
+      new TypeTagParser("u3").parseTypeTag();
     }).toThrow("Invalid type tag.");
   });
 
@@ -168,6 +183,28 @@ describe("BuilderUtils", () => {
     }).toThrow(/Invalid number string/);
   });
 
+  it("serializes a u16 arg", async () => {
+    let serializer = new Serializer();
+    serializeArg(0x7fff, new TypeTagU16(), serializer);
+    expect(serializer.getBytes()).toEqual(new Uint8Array([0xff, 0x7f]));
+
+    serializer = new Serializer();
+    expect(() => {
+      serializeArg("u16", new TypeTagU16(), serializer);
+    }).toThrow(/Invalid number string/);
+  });
+
+  it("serializes a u32 arg", async () => {
+    let serializer = new Serializer();
+    serializeArg(0x01020304, new TypeTagU32(), serializer);
+    expect(serializer.getBytes()).toEqual(new Uint8Array([0x04, 0x03, 0x02, 0x01]));
+
+    serializer = new Serializer();
+    expect(() => {
+      serializeArg("u32", new TypeTagU32(), serializer);
+    }).toThrow(/Invalid number string/);
+  });
+
   it("serializes a u64 arg", async () => {
     let serializer = new Serializer();
     serializeArg(BigInt("18446744073709551615"), new TypeTagU64(), serializer);
@@ -189,6 +226,26 @@ describe("BuilderUtils", () => {
     serializer = new Serializer();
     expect(() => {
       serializeArg("u128", new TypeTagU128(), serializer);
+    }).toThrow(/^Cannot convert/);
+  });
+
+  it("serializes a u256 arg", async () => {
+    let serializer = new Serializer();
+    serializeArg(
+      BigInt("0x0001020304050607080910111213141516171819202122232425262728293031"),
+      new TypeTagU256(),
+      serializer,
+    );
+    expect(serializer.getBytes()).toEqual(
+      new Uint8Array([
+        0x31, 0x30, 0x29, 0x28, 0x27, 0x26, 0x25, 0x24, 0x23, 0x22, 0x21, 0x20, 0x19, 0x18, 0x17, 0x16, 0x15, 0x14,
+        0x13, 0x12, 0x11, 0x10, 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00,
+      ]),
+    );
+
+    serializer = new Serializer();
+    expect(() => {
+      serializeArg("u256", new TypeTagU256(), serializer);
     }).toThrow(/^Cannot convert/);
   });
 

@@ -18,6 +18,8 @@ import {
   deserializeVector,
   serializeVector,
   bcsToBytes,
+  Uint16,
+  Uint256,
 } from "../bcs";
 import { AccountAddress } from "./account_address";
 import { TransactionAuthenticator } from "./authenticator";
@@ -420,6 +422,12 @@ export abstract class TransactionArgument {
         return TransactionArgumentU8Vector.load(deserializer);
       case 5:
         return TransactionArgumentBool.load(deserializer);
+      case 6:
+        return TransactionArgumentU16.load(deserializer);
+      case 7:
+        return TransactionArgumentU32.load(deserializer);
+      case 8:
+        return TransactionArgumentU256.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionArgument: ${index}`);
     }
@@ -439,6 +447,38 @@ export class TransactionArgumentU8 extends TransactionArgument {
   static load(deserializer: Deserializer): TransactionArgumentU8 {
     const value = deserializer.deserializeU8();
     return new TransactionArgumentU8(value);
+  }
+}
+
+export class TransactionArgumentU16 extends TransactionArgument {
+  constructor(public readonly value: Uint16) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(6);
+    serializer.serializeU16(this.value);
+  }
+
+  static load(deserializer: Deserializer): TransactionArgumentU16 {
+    const value = deserializer.deserializeU16();
+    return new TransactionArgumentU16(value);
+  }
+}
+
+export class TransactionArgumentU32 extends TransactionArgument {
+  constructor(public readonly value: Uint16) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(7);
+    serializer.serializeU32(this.value);
+  }
+
+  static load(deserializer: Deserializer): TransactionArgumentU32 {
+    const value = deserializer.deserializeU32();
+    return new TransactionArgumentU32(value);
   }
 }
 
@@ -471,6 +511,22 @@ export class TransactionArgumentU128 extends TransactionArgument {
   static load(deserializer: Deserializer): TransactionArgumentU128 {
     const value = deserializer.deserializeU128();
     return new TransactionArgumentU128(value);
+  }
+}
+
+export class TransactionArgumentU256 extends TransactionArgument {
+  constructor(public readonly value: Uint256) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(8);
+    serializer.serializeU256(this.value);
+  }
+
+  static load(deserializer: Deserializer): TransactionArgumentU256 {
+    const value = deserializer.deserializeU256();
+    return new TransactionArgumentU256(value);
   }
 }
 

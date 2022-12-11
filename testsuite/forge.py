@@ -18,7 +18,8 @@ from enum import Enum
 from typing import (
     Any,
     Callable,
-    Dict,
+    Iterator,
+    Mapping,
     Generator,
     List,
     Optional,
@@ -51,10 +52,10 @@ class RunResult:
         return self.exit_code == 0
 
 
-def get_prompt_answer(prompt: str, answer: Optional[str]=None) -> bool:
+def get_prompt_answer(prompt: str, answer: Optional[str] = None) -> bool:
     """Get a yes/no answer from the user, or use the default answer if provided."""
     if not answer and not os.getenv("CI"):
-        answer = input(f"{prompt} (y/n) ").strip().lower() 
+        answer = input(f"{prompt} (y/n) ").strip().lower()
     return answer in ("y", "yes", "yeet", "yessir", "si", "true")
 
 
@@ -319,7 +320,7 @@ def get_dashboard_link(
         raise Exception(f"Invalid refresh argument: {time_filter}")
 
     return (
-        f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}"
+        f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}&var-metrics_source=All"
         f"&var-chain_name={forge_chain_name}{grafana_time_filter}"
     )
 
@@ -351,9 +352,9 @@ def milliseconds(timestamp: datetime) -> int:
 
 
 def apply_humio_time_filter(
-    urlparts: Dict[str, Union[str, bool, int]],
+    urlparts: Mapping[str, Union[str, bool, int]],
     time_filter: Union[bool, Tuple[datetime, datetime]],
-) -> Dict:
+) -> Mapping:
     if time_filter is True:
         urlparts = {
             **urlparts,
@@ -378,6 +379,7 @@ def get_humio_forge_link(
     forge_namespace: str,
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
+    """Get a link to the forge test runner logs in humio for a given test run in a given namespace"""
     columns = [
         {
             "type": "field",
@@ -419,7 +421,8 @@ def get_humio_logs_link(
     forge_namespace: str,
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
-    query = f"$forgeLogs(validator_instance=*) | {forge_namespace}"
+    """Get a link to the node logs in humio for a given test run in a given namespace"""
+    query = f'$forgeLogs(validator_instance=*) | "k8s.namespace" = "{forge_namespace}"'
     columns = [
         {
             "type": "field",
@@ -966,7 +969,7 @@ def create_forge_command(
         forge_args.extend(
             [
                 "-p",
-                "forge-cli",
+                "aptos-forge-cli",
                 "--",
             ]
         )
@@ -1609,23 +1612,23 @@ class TestConfig(TypedDict):
 
 class TestSuite(TypedDict):
     name: str
-    all_tests: Dict[str, TestConfig]
-    enabled_tests: Dict[str, TestConfig]
+    all_tests: Mapping[str, TestConfig]
+    enabled_tests: Mapping[str, TestConfig]
 
 
 # All changes to this struct must be backwards compatible
 # i.e. its ok to add a new field, but not to remove one
-
-
 class ForgeConfigValue(TypedDict):
     enabled_clusters: List[str]
     all_clusters: List[str]
-    test_suites: Dict[str, TestSuite]
-    default_helm_values: Dict
+    test_suites: Mapping[str, TestSuite]
+    default_helm_values: Mapping
 
 
 def default_forge_config() -> ForgeConfigValue:
-    return {
+    # Return a default config with not all the fields, as they are not mandatory
+    # This ensures we check for backwards compatibility
+    return {  # type: ignore
         "enabled_clusters": [],
         "all_clusters": [],
     }
@@ -1670,7 +1673,12 @@ def ensure_forge_config(value: Any) -> ForgeConfigValue:
         raise Exception("Type had errors:\n" + "\n".join(errors))
     return value
 
-def get_forge_config_diff(old_config: dict, new_config: dict, full_diff: Optional[bool]=False) -> list:
+
+def get_forge_config_diff(
+    old_config: ForgeConfigValue,
+    new_config: ForgeConfigValue,
+    full_diff: Optional[bool] = False,
+) -> Iterator[str]:
     """Returns a list of diffs between the old and new config"""
     config_string = json.dumps(new_config, indent=2)
     old_config_string = json.dumps(old_config, indent=2)
@@ -1681,6 +1689,7 @@ def get_forge_config_diff(old_config: dict, new_config: dict, full_diff: Optiona
         return diff.compare(old_lines, new_lines)
     else:
         return difflib.unified_diff(old_lines, new_lines)
+
 
 class ForgeConfigBackend:
     def create(self) -> None:
@@ -1887,7 +1896,7 @@ def config_edit(ctx: click.Context) -> None:
     shell = LocalShell(True)
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes, time)
+    context = SystemContext(shell, filesystem, processes, SystemTime())
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
 
@@ -1999,7 +2008,7 @@ def cluster_config_delete(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes, time)
+    context = SystemContext(shell, filesystem, processes, SystemTime())
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2176,7 +2185,7 @@ def test_config_add(
         raise Exception(f"Test {test_name} already exists")
 
     if test_name:
-        test_suite["all_tests"][test_name]: TestConfig = {
+        test_suite["all_tests"][test_name] = {
             "name": test_name,
         }
 
@@ -2321,6 +2330,7 @@ def test_config_enable(
     else:
         print("Config not updated")
 
+
 @test_config.command("disable")
 @click.argument("suite_name")
 @click.argument("test_name")
@@ -2360,6 +2370,7 @@ def test_config_disable(
         config.flush()
     else:
         print("Config not updated")
+
 
 if __name__ == "__main__":
     main()

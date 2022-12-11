@@ -76,13 +76,15 @@ class PublicKey:
     def verify(self, data: bytes, signature: Signature) -> bool:
         try:
             self.key.verify(data, signature.data())
-        except:
+        except Exception:
             return False
         return True
 
     @staticmethod
     def deserialize(deserializer: Deserializer) -> PublicKey:
         key = deserializer.to_bytes()
+        print(len(key))
+        print(key)
         if len(key) != PublicKey.LENGTH:
             raise Exception("Length mismatch")
 

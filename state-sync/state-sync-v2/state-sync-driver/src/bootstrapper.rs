@@ -12,7 +12,13 @@ use crate::{
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
+use aptos_data_streaming_service::{
+    data_notification::{DataNotification, DataPayload, NotificationId},
+    data_stream::DataStreamListener,
+    streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
+};
 use aptos_logger::{prelude::*, sample::SampleRate};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
@@ -21,14 +27,8 @@ use aptos_types::{
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
 };
-use data_streaming_service::{
-    data_notification::{DataNotification, DataPayload, NotificationId},
-    data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
-};
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
-use storage_interface::DbReader;
 
 /// The expected version of the genesis transaction
 pub const GENESIS_TRANSACTION_VERSION: u64 = 0;

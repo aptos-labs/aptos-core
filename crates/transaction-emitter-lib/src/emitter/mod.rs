@@ -6,7 +6,7 @@ pub mod stats;
 pub mod submission_worker;
 
 use again::RetryPolicy;
-use anyhow::{anyhow, format_err, Result};
+use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
@@ -125,7 +125,7 @@ pub struct EmitJobRequest {
     txn_expiration_time_secs: u64,
     expected_max_txns: u64,
     expected_gas_per_txn: u64,
-    promt_before_spending: bool,
+    prompt_before_spending: bool,
 }
 
 impl Default for EmitJobRequest {
@@ -145,7 +145,7 @@ impl Default for EmitJobRequest {
             txn_expiration_time_secs: 60,
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
-            promt_before_spending: false,
+            prompt_before_spending: false,
         }
     }
 }
@@ -175,8 +175,8 @@ impl EmitJobRequest {
         self
     }
 
-    pub fn promt_before_spending(mut self) -> Self {
-        self.promt_before_spending = true;
+    pub fn prompt_before_spending(mut self) -> Self {
+        self.prompt_before_spending = true;
         self
     }
 
@@ -398,6 +398,8 @@ impl TxnEmitter {
         req: EmitJobRequest,
         stats_tracking_phases: usize,
     ) -> Result<EmitJob> {
+        ensure!(req.gas_price > 0, "gas_price is required to be non zero");
+
         let mode_params = req.calculate_mode_params();
         let workers_per_endpoint = mode_params.workers_per_endpoint;
         let num_workers = req.rest_clients.len() * workers_per_endpoint;
@@ -406,8 +408,15 @@ impl TxnEmitter {
             "Will use {} workers per endpoint for a total of {} endpoint clients and {} accounts",
             workers_per_endpoint, num_workers, num_accounts
         );
+
+        let txn_factory = self
+            .txn_factory
+            .clone()
+            .with_transaction_expiration_time(mode_params.txn_expiration_time_secs)
+            .with_gas_unit_price(req.gas_price);
+
         let mut account_minter =
-            AccountMinter::new(root_account, self.txn_factory.clone(), self.rng.clone());
+            AccountMinter::new(root_account, txn_factory.clone(), self.rng.clone());
         let mut new_accounts = account_minter
             .create_accounts(&req, &mode_params, num_accounts)
             .await?;
@@ -419,10 +428,7 @@ impl TxnEmitter {
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
-        let txn_factory = self
-            .txn_factory
-            .clone()
-            .with_transaction_expiration_time(mode_params.txn_expiration_time_secs);
+
         let mut txn_generator_creator_mix: Vec<(Box<dyn TransactionGeneratorCreator>, usize)> =
             Vec::new();
         for (transaction_type, weight) in req.transaction_mix {
@@ -613,7 +619,9 @@ async fn wait_for_single_account_sequence(
                     SampleRate::Duration(Duration::from_secs(60)),
                     warn!(
                         "Failed to query sequence number for account {:?} for instance {:?} : {:?}",
-                        account, client, e
+                        account,
+                        client.path_prefix_string(),
+                        e
                     )
                 );
             }
@@ -622,7 +630,7 @@ async fn wait_for_single_account_sequence(
     Err(anyhow!(
         "Timed out waiting for single account {:?} sequence number for instance {:?}",
         account,
-        client
+        client.path_prefix_string()
     ))
 }
 

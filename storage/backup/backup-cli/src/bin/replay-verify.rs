@@ -2,6 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_backup_cli::utils::ReplayConcurrencyLevelOpt;
+use aptos_backup_cli::{
+    coordinators::replay_verify::ReplayVerifyCoordinator,
+    metadata::cache::MetadataCacheOpt,
+    storage::StorageOpt,
+    utils::{ConcurrentDownloadsOpt, RocksdbOpt, TrustedWaypointOpt},
+};
 use aptos_config::config::{
     BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
@@ -9,13 +16,6 @@ use aptos_config::config::{
 use aptos_logger::{prelude::*, Level, Logger};
 use aptos_types::transaction::Version;
 use aptosdb::{AptosDB, GetRestoreHandler};
-use backup_cli::utils::ReplayConcurrencyLevelOpt;
-use backup_cli::{
-    coordinators::replay_verify::ReplayVerifyCoordinator,
-    metadata::cache::MetadataCacheOpt,
-    storage::StorageOpt,
-    utils::{ConcurrentDownloadsOpt, RocksdbOpt, TrustedWaypointOpt},
-};
 use clap::Parser;
 use std::{path::PathBuf, sync::Arc};
 
@@ -46,6 +46,14 @@ struct Opt {
         in the backup). [Defaults to the latest version available] "
     )]
     end_version: Option<Version>,
+    #[clap(long)]
+    validate_modules: bool,
+    #[clap(
+        long,
+        multiple = true,
+        help = "Skip the execution for txns that are known to break compatibility."
+    )]
+    txns_to_skip: Vec<Version>,
 }
 
 #[tokio::main]
@@ -57,7 +65,7 @@ async fn main() -> Result<()> {
 }
 
 async fn main_impl() -> Result<()> {
-    Logger::new().level(Level::Info).read_env().init();
+    Logger::new().level(Level::Info).init();
 
     let opt = Opt::from_args();
     let restore_handler = Arc::new(AptosDB::open(
@@ -79,6 +87,8 @@ async fn main_impl() -> Result<()> {
         restore_handler,
         opt.start_version.unwrap_or(0),
         opt.end_version.unwrap_or(Version::MAX),
+        opt.validate_modules,
+        opt.txns_to_skip,
     )?
     .run()
     .await

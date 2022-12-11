@@ -1,10 +1,10 @@
 ---
-title: "Nodes Home"
+title: "Aptos Nodes Overview"
 slug: "nodes-landing"
 hide_table_of_contents: true
 ---
 
-# Nodes Home
+# Aptos Nodes Overview
 
 The Aptos network is comprised of nodes of three types: validator node, validator fullnode and public fullnode. To participate in consensus, you are required to run both a validator node and a validator fullnode, and stake. This section describes everything you need to stake and participate in consensus and governance. Also learn how to run a public fullnode on a local network and connect to either a testnet or a devnet. 
 
@@ -224,7 +224,7 @@ The Aptos network is comprised of nodes of three types: validator node, validato
             <div class="d-flex w-100 justify-content-between align-items-start">
               <h4 class="mb-1">Data pruning</h4>
             </div>
-            <small>Manage your validator node's disk space by controling the pruning settings. Proceed with caution.</small>
+            <small>Manage your validator node's disk space by controlling the pruning settings. Proceed with caution.</small>
           </a>
           <a href="/nodes/node-health-checker/index" class="list-group-item">
             <div class="d-flex w-100 justify-content-between align-items-start">

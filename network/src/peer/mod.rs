@@ -36,6 +36,7 @@ use crate::{
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
 use aptos_rate_limiter::rate_limit::SharedBucket;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
 use bytes::Bytes;
@@ -49,7 +50,6 @@ use futures::{
 };
 use futures_util::stream::select;
 use serde::Serialize;
-use short_hex_str::AsShortHexStr;
 use std::{fmt, panic, time::Duration};
 use tokio::runtime::Handle;
 use tokio_util::compat::{

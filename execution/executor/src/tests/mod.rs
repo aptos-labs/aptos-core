@@ -1,12 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{iter::once, sync::Arc};
+use std::{collections::BTreeSet, iter::once, sync::Arc};
 
 use proptest::prelude::*;
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
 use aptos_state_view::StateViewId;
+use aptos_storage_interface::{
+    sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees,
+};
 use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     account_address::AccountAddress,
@@ -24,8 +28,6 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptosdb::AptosDB;
-use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
-use storage_interface::{sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees};
 
 use crate::{
     block_executor::BlockExecutor,
@@ -70,7 +72,7 @@ impl TestExecutor {
         let path = aptos_temppath::TempPath::new();
         path.create_as_dir().unwrap();
         let db = DbReaderWriter::new(AptosDB::new_for_test(path.path()));
-        let genesis = vm_genesis::test_genesis_transaction();
+        let genesis = aptos_vm_genesis::test_genesis_transaction();
         let waypoint = generate_waypoint::<MockVM>(&db, &genesis).unwrap();
         maybe_bootstrap::<MockVM>(&db, &genesis, waypoint).unwrap();
         let executor = BlockExecutor::new(db.clone());
@@ -661,7 +663,7 @@ proptest! {
             // replay txns in one batch across epoch boundary,
             // and the replayer should deal with `Retry`s automatically
             let replayer = chunk_executor_tests::TestExecutor::new();
-            replayer.executor.replay(block.txns, txn_infos).unwrap();
+            replayer.executor.replay(block.txns, txn_infos, vec![], vec![], Arc::new(BTreeSet::new())).unwrap();
             replayer.executor.commit().unwrap();
             let replayed_db = replayer.db.reader.clone();
             prop_assert_eq!(

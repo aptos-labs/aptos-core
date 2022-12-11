@@ -1,10 +1,10 @@
 processed 4 tasks
 
 task 1 'publish'. lines 4-30:
-Error: Transaction discarded. VMStatus: status MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS of type Validation
+Error: Transaction discarded. VM status code: MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
 
 task 2 'run'. lines 33-33:
-Error: Transaction discarded. VMStatus: status MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS of type Validation
+Error: Transaction discarded. VM status code: MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
 
 task 3 'view'. lines 35-35:
 [No Resource Exists]

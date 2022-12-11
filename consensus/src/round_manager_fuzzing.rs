@@ -4,19 +4,21 @@
 use crate::{
     block_storage::BlockStore,
     liveness::{
-        proposal_generator::ProposalGenerator,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
         rotating_proposer_election::RotatingProposer,
         round_state::{ExponentialTimeInterval, NewRoundEvent, NewRoundReason, RoundState},
     },
     metrics_safety_rules::MetricsSafetyRules,
     network::NetworkSender,
     network_interface::ConsensusNetworkSender,
+    payload_manager::PayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     round_manager::RoundManager,
     test_utils::{EmptyStateComputer, MockPayloadManager, MockStorage},
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_config::config::ConsensusConfig;
+use aptos_consensus_types::proposal_msg::ProposalMsg;
 use aptos_infallible::Mutex;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
@@ -29,7 +31,6 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::proposal_msg::ProposalMsg;
 use futures::{channel::mpsc, executor::block_on};
 use network::{
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
@@ -76,6 +77,7 @@ fn build_empty_store(
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
+        Arc::from(PayloadManager::DirectMempool),
     ))
 }
 
@@ -151,6 +153,8 @@ fn create_node_for_fuzzing() -> RoundManager {
         1,
         1024,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
 
     //

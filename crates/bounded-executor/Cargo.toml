@@ -1,5 +1,5 @@
 [package]
-name = "bounded-executor"
+name = "aptos-bounded-executor"
 description = "Executor bounded by number of concurrent tasks"
 version = "0.1.0"
 
@@ -13,8 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-futures = "0.3.21"
-tokio = { version = "1.21.0", features = ["sync", "rt"] }
+futures = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
-tokio = { version = "1.21.0", features = ["full"] }
+tokio = { workspace = true }

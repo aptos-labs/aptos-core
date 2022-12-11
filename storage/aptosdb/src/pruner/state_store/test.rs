@@ -6,6 +6,7 @@ use proptest::{prelude::*, proptest};
 use std::{collections::HashMap, sync::Arc};
 
 use aptos_crypto::HashValue;
+use aptos_storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 use aptos_temppath::TempPath;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::state_store::state_value::StaleStateValueIndex;
@@ -14,7 +15,6 @@ use aptos_types::{
     transaction::Version,
 };
 use schemadb::{ReadOptions, SchemaBatch, DB};
-use storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 
 use crate::stale_state_value_index::StaleStateValueIndexSchema;
 use crate::{

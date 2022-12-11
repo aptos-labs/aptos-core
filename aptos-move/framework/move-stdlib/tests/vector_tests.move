@@ -90,7 +90,7 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 1)]
+    #[expected_failure(abort_code = 1, location = Self)]
     fun borrow_out_of_range() {
         let v = V::empty();
         V::push_back(&mut v, 7);
@@ -133,7 +133,7 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 3)]
+    #[expected_failure(abort_code = 3, location = Self)]
     fun destroy_non_empty() {
         let v = V::empty();
         V::push_back(&mut v, 42);
@@ -154,7 +154,7 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 2)]
+    #[expected_failure(abort_code = 2, location = Self)]
     fun pop_out_of_range() {
         let v = V::empty<u64>();
         V::pop_back(&mut v);
@@ -228,14 +228,14 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20000)]
+    #[expected_failure(abort_code = 0x20000, location = Self)]
     fun remove_empty_vector() {
         let v = V::empty<u64>();
         V::remove(&mut v, 0);
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20000)]
+    #[expected_failure(abort_code = 0x20000, location = Self)]
     fun remove_out_of_bound_index() {
         let v = V::empty<u64>();
         V::push_back(&mut v, 0);
@@ -299,14 +299,14 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 1)]
+    #[expected_failure(abort_code = 1, location = Self)]
     fun swap_empty() {
         let v = V::empty<u64>();
         V::swap(&mut v, 0, 0);
     }
 
     #[test]
-    #[expected_failure(abort_code = 1)]
+    #[expected_failure(abort_code = 1, location = Self)]
     fun swap_out_of_range() {
         let v = V::empty<u64>();
 
@@ -319,7 +319,7 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20000)]
+    #[expected_failure(abort_code = 0x20000, location = Self)]
     fun swap_remove_empty() {
         let v = V::empty<u64>();
         V::swap_remove(&mut v, 0);
@@ -377,7 +377,7 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 1)]
+    #[expected_failure(abort_code = 1, location = Self)]
     fun swap_remove_out_of_range() {
         let v = V::empty();
         V::push_back(&mut v, 0);

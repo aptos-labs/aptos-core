@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{corpus_from_strategy, fuzz_data_to_value, FuzzTargetImpl};
-use aptos_proptest_helpers::ValueGenerator;
-use aptos_types::transaction::SignedTransaction;
-use language_e2e_tests::account_universe::{
+use aptos_language_e2e_tests::account_universe::{
     all_transactions_strategy, log_balance_strategy, run_and_assert_universe, AUTransactionGen,
     AccountUniverseGen,
 };
+use aptos_proptest_helpers::ValueGenerator;
+use aptos_types::transaction::SignedTransaction;
 use once_cell::sync::Lazy;
 use proptest::{
     collection::vec,

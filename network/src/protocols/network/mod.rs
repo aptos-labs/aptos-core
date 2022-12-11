@@ -14,6 +14,7 @@ use crate::{
     ProtocolId,
 };
 use aptos_logger::prelude::*;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -26,7 +27,6 @@ use futures::{
 };
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::{cmp::min, iter::FromIterator, marker::PhantomData, pin::Pin, time::Duration};
 
 use super::wire::handshake::v1::ProtocolIdSet;

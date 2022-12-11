@@ -6,9 +6,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use clap::Parser;
 
-use aptos_logger::{prelude::*, Level, Logger};
-use aptos_push_metrics::MetricsPusher;
-use backup_cli::{
+use aptos_backup_cli::{
     backup_types::{
         epoch_ending::backup::{EpochEndingBackupController, EpochEndingBackupOpt},
         state_snapshot::backup::{StateSnapshotBackupController, StateSnapshotBackupOpt},
@@ -22,6 +20,8 @@ use backup_cli::{
         ConcurrentDownloadsOpt, GlobalBackupOpt,
     },
 };
+use aptos_logger::{prelude::*, Level, Logger};
+use aptos_push_metrics::MetricsPusher;
 
 #[derive(Parser)]
 #[clap(about = "Ledger backup tool.")]
@@ -142,7 +142,7 @@ async fn main() -> Result<()> {
 }
 
 async fn main_impl() -> Result<()> {
-    Logger::new().level(Level::Info).read_env().init();
+    Logger::new().level(Level::Info).init();
     #[allow(deprecated)]
     let _mp = MetricsPusher::start();
 

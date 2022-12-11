@@ -2,33 +2,39 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Context, Result};
+use aptos_config::config::ConsensusConfig;
+use aptos_forge::success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria};
+use aptos_forge::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
+use aptos_forge::{ForgeConfig, Options, *};
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
-use forge::success_criteria::{StateProgressThreshold, SuccessCriteria};
-use forge::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
-use forge::{ForgeConfig, Options, *};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::{env, num::NonZeroUsize, process, thread, time::Duration};
-use structopt::StructOpt;
-use testcases::consensus_reliability_tests::ChangingWorkingQuorumTest;
-use testcases::fullnode_reboot_stress_test::FullNodeRebootStressTest;
-use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
-use testcases::network_bandwidth_test::NetworkBandwidthTest;
-use testcases::network_loss_test::NetworkLossTest;
-use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
-use testcases::state_sync_performance::StateSyncValidatorPerformance;
-use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
-use testcases::twin_validator_test::TwinValidatorTest;
-use testcases::validator_join_leave_test::ValidatorJoinLeaveTest;
-use testcases::validator_reboot_stress_test::ValidatorRebootStressTest;
-use testcases::{
+use aptos_testcases::consensus_reliability_tests::ChangingWorkingQuorumTest;
+use aptos_testcases::fullnode_reboot_stress_test::FullNodeRebootStressTest;
+use aptos_testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
+use aptos_testcases::network_bandwidth_test::NetworkBandwidthTest;
+use aptos_testcases::network_loss_test::NetworkLossTest;
+use aptos_testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
+use aptos_testcases::state_sync_performance::{
+    StateSyncFullnodeFastSyncPerformance, StateSyncValidatorPerformance,
+};
+use aptos_testcases::three_region_simulation_test::{
+    ExecutionDelayConfig, ThreeRegionSimulationTest,
+};
+use aptos_testcases::twin_validator_test::TwinValidatorTest;
+use aptos_testcases::two_traffics_test::TwoTrafficsTest;
+use aptos_testcases::validator_join_leave_test::ValidatorJoinLeaveTest;
+use aptos_testcases::validator_reboot_stress_test::ValidatorRebootStressTest;
+use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
     network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
     reconfiguration_test::ReconfigurationTest,
     state_sync_performance::StateSyncFullnodePerformance,
 };
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::{env, num::NonZeroUsize, process, thread, time::Duration};
+use structopt::StructOpt;
 use tokio::runtime::Runtime;
 use url::Url;
 
@@ -179,11 +185,7 @@ struct Resize {
 
 fn main() -> Result<()> {
     let mut logger = aptos_logger::Logger::new();
-    logger
-        .channel_size(1000)
-        .is_async(false)
-        .level(Level::Info)
-        .read_env();
+    logger.channel_size(1000).is_async(false).level(Level::Info);
     logger.build();
 
     let args = Args::from_args();
@@ -223,7 +225,6 @@ fn main() -> Result<()> {
                 TestCommand::LocalSwarm(..) => {
                     // Loosen all criteria for local runs
                     test_suite.get_success_criteria_mut().avg_tps = 400;
-                    test_suite.get_success_criteria_mut().max_latency_ms = 60000;
                     let previous_emit_job = test_suite.get_emit_job().clone();
                     let test_suite =
                         test_suite.with_emit_job(previous_emit_job.mode(EmitJobMode::MaxLoad {
@@ -400,7 +401,7 @@ fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'s
 fn run_forever() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_admin_tests(vec![&GetMetadata])
-        .with_genesis_module_bundle(cached_packages::head_release_bundle().clone())
+        .with_genesis_module_bundle(aptos_cached_packages::head_release_bundle().clone())
         .with_aptos_tests(vec![&RunForever])
 }
 
@@ -409,7 +410,7 @@ fn local_test_suite() -> ForgeConfig<'static> {
         .with_aptos_tests(vec![&FundAccount, &TransferCoins])
         .with_admin_tests(vec![&GetMetadata])
         .with_network_tests(vec![&RestartValidator, &EmitTransaction])
-        .with_genesis_module_bundle(cached_packages::head_release_bundle().clone())
+        .with_genesis_module_bundle(aptos_cached_packages::head_release_bundle().clone())
 }
 
 fn k8s_test_suite() -> ForgeConfig<'static> {
@@ -441,19 +442,13 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "state_sync_perf_fullnodes_execute_transactions" => {
             state_sync_perf_fullnodes_execute_transactions(config)
         }
+        "state_sync_perf_fullnodes_fast_sync" => state_sync_perf_fullnodes_fast_sync(config),
         "state_sync_perf_validators" => state_sync_perf_validators(config),
         "validators_join_and_leave" => validators_join_and_leave(config),
         "compat" => config
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
             .with_network_tests(vec![&SimpleValidatorUpgrade])
-            .with_success_criteria(SuccessCriteria::new(
-                5000,
-                10000,
-                false,
-                Some(Duration::from_secs(240)),
-                None,
-                None,
-            ))
+            .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 30.into();
             })),
@@ -461,21 +456,59 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "network_partition" => config
             .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
             .with_network_tests(vec![&NetworkPartitionTest])
-            .with_success_criteria(SuccessCriteria::new(
-                3000,
-                10000,
-                true,
-                Some(Duration::from_secs(240)),
-                None,
-                None,
-            )),
+            .with_success_criteria(
+                SuccessCriteria::new(3000)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(240),
+            ),
         "three_region_simulation" => config
             .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
             .with_initial_fullnode_count(12)
             .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-            .with_network_tests(vec![&ThreeRegionSimulationTest])
+            .with_network_tests(vec![&ThreeRegionSimulationTest {
+                add_execution_delay: None,
+            }])
             // TODO(rustielin): tune these success critiera after we have a better idea of the test behavior
-            .with_success_criteria(SuccessCriteria::new(3000, 100000, true, None, None, None)),
+            .with_success_criteria(
+                SuccessCriteria::new(3000)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(240)
+                    .add_chain_progress(StateProgressThreshold {
+                        max_no_progress_secs: 20.0,
+                        max_round_gap: 6,
+                    }),
+            ),
+        "three_region_simulation_with_different_node_speed" => config
+            .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+            .with_initial_fullnode_count(30)
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+            .with_network_tests(vec![&ThreeRegionSimulationTest {
+                add_execution_delay: Some(ExecutionDelayConfig {
+                    inject_delay_node_fraction: 0.5,
+                    inject_delay_max_transaction_percentage: 40,
+                    inject_delay_per_transaction_ms: 2,
+                }),
+            }])
+            .with_node_helm_config_fn(Arc::new(move |helm_values| {
+                helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
+                // helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                //     4000.into();
+                // helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+                //     1000000.into();
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+            }))
+            .with_success_criteria(
+                SuccessCriteria::new(1000)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(240)
+                    .add_chain_progress(StateProgressThreshold {
+                        max_no_progress_secs: 20.0,
+                        max_round_gap: 6,
+                    }),
+            ),
         "network_bandwidth" => config
             .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
             .with_network_tests(vec![&NetworkBandwidthTest]),
@@ -486,26 +519,16 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_validator_count(NonZeroUsize::new(1).unwrap())
             .with_initial_fullnode_count(1)
             .with_network_tests(vec![&PerformanceBenchmarkWithFN])
-            .with_success_criteria(SuccessCriteria::new(
-                5000,
-                10000,
-                true,
-                Some(Duration::from_secs(240)),
-                None,
-                None,
-            )),
+            .with_success_criteria(
+                SuccessCriteria::new(5000)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(240),
+            ),
         "validator_reboot_stress_test" => config
             .with_initial_validator_count(NonZeroUsize::new(15).unwrap())
             .with_initial_fullnode_count(1)
             .with_network_tests(vec![&ValidatorRebootStressTest])
-            .with_success_criteria(SuccessCriteria::new(
-                2000,
-                50000,
-                false,
-                Some(Duration::from_secs(600)),
-                None,
-                None,
-            ))
+            .with_success_criteria(SuccessCriteria::new(2000).add_wait_for_catchup_s(600))
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 120.into();
             })),
@@ -514,14 +537,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_fullnode_count(10)
             .with_network_tests(vec![&FullNodeRebootStressTest])
             .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-            .with_success_criteria(SuccessCriteria::new(
-                2000,
-                50000,
-                false,
-                Some(Duration::from_secs(600)),
-                None,
-                None,
-            )),
+            .with_success_criteria(SuccessCriteria::new(2000).add_wait_for_catchup_s(600)),
         "account_creation" | "nft_mint" => config
             .with_network_tests(vec![&PerformanceBenchmarkWithFN])
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
@@ -540,43 +556,58 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                         TransactionType::NftMintAndTransfer
                     }),
             )
-            .with_success_criteria(SuccessCriteria::new(
-                4000,
-                10000,
-                true,
-                Some(Duration::from_secs(240)),
-                None,
-                None,
-            )),
-        // TODO: Add tracing latency of high-gas-fee transactions
+            .with_success_criteria(
+                SuccessCriteria::new(4000)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(240)
+                    .add_chain_progress(StateProgressThreshold {
+                        max_no_progress_secs: 20.0,
+                        max_round_gap: 6,
+                    }),
+            ),
         "graceful_overload" => config
             .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
-            // if we have smaller number of full nodes, TPS drops.
+            // if we have full nodes for subset of validators, TPS drops.
             // Validators without VFN are proposing almost empty blocks,
             // as no useful transaction reach their mempool.
             // something to potentially improve upon.
-            .with_initial_fullnode_count(8)
-            .with_network_tests(vec![&PerformanceBenchmarkWithFN])
-            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 15000 }))
+            // So having VFNs for all validators
+            .with_initial_fullnode_count(10)
+            .with_network_tests(vec![&TwoTrafficsTest {
+                inner_tps: 15000,
+                inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
+                // Additionally - we are not really gracefully handling overlaods,
+                // setting limits based on current reality, to make sure they
+                // don't regress, but something to investigate
+                avg_tps: 4000,
+                latency_thresholds: &[],
+            }])
+            // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
+            .with_emit_job(
+                EmitJobRequest::default()
+                    .mode(EmitJobMode::ConstTps { tps: 1000 })
+                    .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
+            )
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 300.into();
             }))
-            .with_success_criteria(SuccessCriteria::new(
-                6500,
-                50000,
-                true,
-                Some(Duration::from_secs(120)),
-                Some(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
-                    // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
-                )),
-                Some(StateProgressThreshold {
-                    max_no_progress_secs: 30.0,
-                    max_round_gap: 10,
-                }),
-            )),
+            .with_success_criteria(
+                SuccessCriteria::new(900)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(120)
+                    .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                        // Check that we don't use more than 12 CPU cores for 30% of the time.
+                        MetricsThreshold::new(12, 30),
+                        // Check that we don't use more than 5 GB of memory for 30% of the time.
+                        MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                    ))
+                    .add_latency_threshold(10.0, LatencyType::P50)
+                    .add_latency_threshold(30.0, LatencyType::P90)
+                    .add_chain_progress(StateProgressThreshold {
+                        max_no_progress_secs: 30.0,
+                        max_round_gap: 10,
+                    }),
+            ),
         // not scheduled on continuous
         "load_vs_perf_benchmark" => config
             .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
@@ -591,14 +622,15 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 // no epoch change.
                 helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
             }))
-            .with_success_criteria(SuccessCriteria::new(
-                0,
-                10000,
-                true,
-                Some(Duration::from_secs(60)),
-                None,
-                None,
-            )),
+            .with_success_criteria(
+                SuccessCriteria::new(0)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(60)
+                    .add_chain_progress(StateProgressThreshold {
+                        max_no_progress_secs: 30.0,
+                        max_round_gap: 10,
+                    }),
+            ),
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
         // reusing changing_working_quorum_test just for invariants/asserts, but with max_down_nodes = 0.
@@ -607,16 +639,14 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             60,
             100,
             80,
+            true,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 10,
                 max_down_nodes: 0,
                 num_large_validators: 0,
                 add_execution_delay: false,
-                // Check that every 27s all nodes make progress,
-                // without any failures.
-                // (make epoch length (120s) and this duration (27s) not be multiples of one another,
-                // to test different timings)
                 check_period_s: 27,
             },
         ),
@@ -625,17 +655,17 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
+            true,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 15,
                 always_healthy_nodes: 0,
                 max_down_nodes: 20,
                 num_large_validators: 0,
                 add_execution_delay: false,
-                // Check that every 27s all nodes make progress,
-                // without any failures.
-                // (make epoch length (120s) and this duration (27s) not be multiples of one another,
-                // to test different timings)
-                check_period_s: 27,
+                // Use longer check duration, as we are bringing enough nodes
+                // to require state-sync to catch up to have consensus.
+                check_period_s: 53,
             },
         ),
         "changing_working_quorum_test_high_load" => changing_working_quorum_test(
@@ -643,17 +673,17 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             500,
             300,
+            true,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 0,
                 max_down_nodes: 20,
                 num_large_validators: 0,
                 add_execution_delay: false,
-                // Check that every 27s all nodes make progress,
-                // without any failures.
-                // (make epoch length (120s) and this duration (27s) not be multiples of one another,
-                // to test different timings)
-                check_period_s: 27,
+                // Use longer check duration, as we are bringing enough nodes
+                // to require state-sync to catch up to have consensus.
+                check_period_s: 53,
             },
         ),
         // not scheduled on continuous
@@ -662,6 +692,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
+            false,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 40,
@@ -676,6 +708,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             120,
             100,
             70,
+            true,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 6,
@@ -685,11 +719,13 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 check_period_s: 27,
             },
         ),
-        "slow_processing_catching_up" => changing_working_quorum_test(
+        "state_sync_slow_processing_catching_up" => changing_working_quorum_test(
             10,
             300,
             3000,
             2500,
+            true,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 1500,
                 always_healthy_nodes: 2,
@@ -699,11 +735,13 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 check_period_s: 57,
             },
         ),
-        "failures_catching_up" => changing_working_quorum_test(
+        "state_sync_failures_catching_up" => changing_working_quorum_test(
             10,
             300,
             3000,
             2500,
+            true,
+            false,
             &ChangingWorkingQuorumTest {
                 min_tps: 1500,
                 always_healthy_nodes: 2,
@@ -720,22 +758,21 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 300.into();
             }))
-            .with_success_criteria(SuccessCriteria::new(
-                6000,
-                10000,
-                true,
-                Some(Duration::from_secs(60)),
-                Some(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
-                    // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
-                )),
-                Some(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
-            )),
+            .with_success_criteria(
+                SuccessCriteria::new(6000)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(60)
+                    .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                        // Check that we don't use more than 12 CPU cores for 30% of the time.
+                        MetricsThreshold::new(12, 30),
+                        // Check that we don't use more than 5 GB of memory for 30% of the time.
+                        MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                    ))
+                    .add_chain_progress(StateProgressThreshold {
+                        max_no_progress_secs: 10.0,
+                        max_round_gap: 4,
+                    }),
+            ),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -746,7 +783,6 @@ fn state_sync_perf_fullnodes_config(forge_config: ForgeConfig<'static>) -> Forge
     forge_config
         .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .with_initial_fullnode_count(4)
-        .with_network_tests(vec![&StateSyncFullnodePerformance])
 }
 
 /// The config for running a state sync performance test when applying
@@ -755,6 +791,7 @@ fn state_sync_perf_fullnodes_apply_outputs(
     forge_config: ForgeConfig<'static>,
 ) -> ForgeConfig<'static> {
     state_sync_perf_fullnodes_config(forge_config)
+        .with_network_tests(vec![&StateSyncFullnodePerformance])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
@@ -764,7 +801,7 @@ fn state_sync_perf_fullnodes_apply_outputs(
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
         }))
-        .with_success_criteria(SuccessCriteria::new(10000, 10000, false, None, None, None))
+        .with_success_criteria(SuccessCriteria::new(10000))
 }
 
 /// The config for running a state sync performance test when executing
@@ -773,6 +810,7 @@ fn state_sync_perf_fullnodes_execute_transactions(
     forge_config: ForgeConfig<'static>,
 ) -> ForgeConfig<'static> {
     state_sync_perf_fullnodes_config(forge_config)
+        .with_network_tests(vec![&StateSyncFullnodePerformance])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
@@ -782,7 +820,30 @@ fn state_sync_perf_fullnodes_execute_transactions(
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["continuous_syncing_mode"] = "ExecuteTransactions".into();
         }))
-        .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None, None))
+        .with_success_criteria(SuccessCriteria::new(5000))
+}
+
+/// The config for running a state sync performance test when fast syncing
+/// to the latest epoch.
+fn state_sync_perf_fullnodes_fast_sync(forge_config: ForgeConfig<'static>) -> ForgeConfig<'static> {
+    state_sync_perf_fullnodes_config(forge_config)
+        .with_network_tests(vec![&StateSyncFullnodeFastSyncPerformance])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 180.into(); // Frequent epochs
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 30000,
+                })
+                .transaction_type(TransactionType::AccountGeneration), // Create many state values
+        )
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "DownloadLatestStates".into();
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+        }))
 }
 
 /// The config for running a state sync performance test when applying
@@ -800,7 +861,7 @@ fn state_sync_perf_validators(forge_config: ForgeConfig<'static>) -> ForgeConfig
                 ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
         }))
         .with_network_tests(vec![&StateSyncValidatorPerformance])
-        .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None, None))
+        .with_success_criteria(SuccessCriteria::new(5000))
 }
 
 /// The config for running a validator join and leave test.
@@ -812,22 +873,21 @@ fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<
             helm_values["chain"]["allow_new_validators"] = true.into();
         }))
         .with_network_tests(vec![&ValidatorJoinLeaveTest])
-        .with_success_criteria(SuccessCriteria::new(
-            5000,
-            10000,
-            true,
-            Some(Duration::from_secs(240)),
-            Some(SystemMetricsThreshold::new(
-                // Check that we don't use more than 12 CPU cores for 30% of the time.
-                MetricsThreshold::new(12, 30),
-                // Check that we don't use more than 10 GB of memory for 30% of the time.
-                MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-            )),
-            Some(StateProgressThreshold {
-                max_no_progress_secs: 10.0,
-                max_round_gap: 4,
-            }),
-        ))
+        .with_success_criteria(
+            SuccessCriteria::new(5000)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(240)
+                .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 10 GB of memory for 30% of the time.
+                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                ))
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+        )
 }
 
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
@@ -839,30 +899,28 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
-        .with_success_criteria(SuccessCriteria::new(
-            if duration.as_secs() > 1200 {
+        .with_success_criteria(
+            SuccessCriteria::new(if duration.as_secs() > 1200 {
                 5000
             } else {
                 6000
-            },
-            10000,
-            true,
-            Some(Duration::from_secs(if duration.as_secs() > 1200 {
-                240
-            } else {
-                60
-            })),
-            Some(SystemMetricsThreshold::new(
+            })
+            .add_no_restarts()
+            .add_wait_for_catchup_s(
+                // Give at least 60s for catchup, give 10% of the run for longer durations.
+                (duration.as_secs() / 10).max(60),
+            )
+            .add_system_metrics_threshold(SystemMetricsThreshold::new(
                 // Check that we don't use more than 12 CPU cores for 30% of the time.
                 MetricsThreshold::new(12, 30),
                 // Check that we don't use more than 10 GB of memory for 30% of the time.
                 MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-            )),
-            Some(StateProgressThreshold {
+            ))
+            .add_chain_progress(StateProgressThreshold {
                 max_no_progress_secs: 10.0,
                 max_round_gap: 4,
             }),
-        ))
+        )
 }
 
 fn pre_release_suite() -> ForgeConfig<'static> {
@@ -876,26 +934,25 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(vec![
             &NetworkBandwidthTest,
-            &ThreeRegionSimulationTest,
+            &ThreeRegionSimulationTest {
+                add_execution_delay: None,
+            },
             &NetworkLossTest,
         ])
-        .with_success_criteria(SuccessCriteria::new(
-            if duration > Duration::from_secs(1200) {
+        .with_success_criteria(
+            SuccessCriteria::new(if duration > Duration::from_secs(1200) {
                 100
             } else {
                 1000
-            },
-            10000,
-            true,
-            None,
-            Some(SystemMetricsThreshold::new(
+            })
+            .add_no_restarts()
+            .add_system_metrics_threshold(SystemMetricsThreshold::new(
                 // Check that we don't use more than 12 CPU cores for 30% of the time.
                 MetricsThreshold::new(12, 30),
                 // Check that we don't use more than 5 GB of memory for 30% of the time.
                 MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
             )),
-            None,
-        ))
+        )
 }
 
 fn changing_working_quorum_test(
@@ -903,6 +960,8 @@ fn changing_working_quorum_test(
     epoch_duration: usize,
     target_tps: usize,
     min_avg_tps: usize,
+    apply_txn_outputs: bool,
+    use_chain_backoff: bool,
     test: &'static ChangingWorkingQuorumTest,
 ) -> ForgeConfig<'static> {
     let config = ForgeConfig::default();
@@ -922,15 +981,47 @@ fn changing_working_quorum_test(
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
+            let block_size = (target_tps / 4) as u64;
             helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
-                (target_tps / 4).into();
+                block_size.into();
             helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                (target_tps / 4).into();
+                block_size.into();
             helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
                 500.into();
             helm_values["validator"]["config"]["consensus"]
                 ["round_timeout_backoff_exponent_base"] = 1.0.into();
             helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] = 1.into();
+
+            let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
+            if use_chain_backoff {
+                // Generally if we are stress testing the consensus, we don't want to slow it down.
+                chain_health_backoff = vec![];
+            } else {
+                for (i, item) in chain_health_backoff.iter_mut().enumerate() {
+                    // as we have lower TPS, make limits smaller
+                    item.max_sending_block_txns_override =
+                        (block_size / 2_u64.pow(i as u32 + 1)).max(2);
+                    // as we have fewer nodes, make backoff triggered earlier:
+                    item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
+                }
+            }
+
+            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
+                serde_yaml::to_value(chain_health_backoff).unwrap();
+
+            // Override the syncing mode of all nodes to use transaction output syncing.
+            // TODO(joshlind): remove me once we move back to output syncing by default.
+            if apply_txn_outputs {
+                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+            }
         }))
         .with_emit_job(
             EmitJobRequest::default()
@@ -940,29 +1031,27 @@ fn changing_working_quorum_test(
                     (TransactionType::AccountGeneration, 20),
                 ]),
         )
-        .with_success_criteria(SuccessCriteria::new(
-            min_avg_tps,
-            10000,
-            true,
-            Some(Duration::from_secs(30)),
-            None,
-            Some(StateProgressThreshold {
-                max_no_progress_secs: if test.max_down_nodes == 0 {
-                    // very aggressive if no nodes are expected to be down
-                    3.0
-                } else if test.max_down_nodes * 3 + 1 + 2 < num_validators {
-                    // number of down nodes is at least 2 below the quorum limit, so
-                    // we can still be reasonably aggressive
-                    15.0
-                } else {
-                    // number of down nodes is close to the quorum limit, so
-                    // make a check a bit looser, as state sync might be required
-                    // to get the quorum back.
-                    30.0
-                },
-                max_round_gap: 6,
-            }),
-        ))
+        .with_success_criteria(
+            SuccessCriteria::new(min_avg_tps)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(30)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: if test.max_down_nodes == 0 {
+                        // very aggressive if no nodes are expected to be down
+                        3.0
+                    } else if test.max_down_nodes * 3 + 1 + 2 < num_validators {
+                        // number of down nodes is at least 2 below the quorum limit, so
+                        // we can still be reasonably aggressive
+                        15.0
+                    } else {
+                        // number of down nodes is close to the quorum limit, so
+                        // make a check a bit looser, as state sync might be required
+                        // to get the quorum back.
+                        30.0
+                    },
+                    max_round_gap: 6,
+                }),
+        )
 }
 
 /// A simple test that runs the swarm forever. This is useful for
@@ -1121,13 +1210,7 @@ impl NetworkTest for EmitTransaction {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let stats = generate_traffic(
-            ctx,
-            &all_validators,
-            duration,
-            aptos_global_constants::GAS_UNIT_PRICE,
-        )
-        .unwrap();
+        let stats = generate_traffic(ctx, &all_validators, duration).unwrap();
         ctx.report
             .report_txn_stats(self.name().to_string(), &stats, duration);
 

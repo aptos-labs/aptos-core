@@ -20,21 +20,21 @@ use crate::{
     utils::PENDING_DATA_LOG_FREQ_SECS,
 };
 use aptos_config::config::{RoleType, StateSyncDriverConfig};
-use aptos_data_client::AptosDataClient;
-use aptos_infallible::Mutex;
-use aptos_logger::prelude::*;
-use aptos_types::waypoint::Waypoint;
-use consensus_notifications::{
+use aptos_consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
 };
-use data_streaming_service::streaming_client::{
+use aptos_data_client::AptosDataClient;
+use aptos_data_streaming_service::streaming_client::{
     DataStreamingClient, NotificationAndFeedback, NotificationFeedback,
 };
-use event_notifications::EventSubscriptionService;
+use aptos_event_notifications::EventSubscriptionService;
+use aptos_infallible::Mutex;
+use aptos_logger::prelude::*;
+use aptos_storage_interface::DbReader;
+use aptos_types::waypoint::Waypoint;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
 use std::{sync::Arc, time::SystemTime};
-use storage_interface::DbReader;
 use tokio::task::yield_now;
 use tokio::time::{interval, Duration};
 use tokio_stream::wrappers::IntervalStream;

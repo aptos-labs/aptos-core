@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use framework::ReleaseTarget;
+use aptos_framework::ReleaseTarget;
 use std::env::current_dir;
 use std::path::PathBuf;
 

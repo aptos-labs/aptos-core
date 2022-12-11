@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{corpus_from_strategy, fuzz_data_to_value, FuzzTargetImpl};
-use accumulator::test_helpers::{
+use aptos_accumulator::test_helpers::{
     arb_hash_batch, arb_list_of_hash_batches, arb_three_hash_batches, arb_two_hash_batches,
     test_append_empty_impl, test_append_many_impl, test_consistency_proof_impl,
     test_get_frozen_subtree_hashes_impl, test_proof_impl, test_range_proof_impl,
@@ -14,6 +14,9 @@ use aptos_jellyfish_merkle::test_helper::{
     test_get_with_proof_with_distinct_last_nibble,
 };
 use aptos_proptest_helpers::ValueGenerator;
+use aptos_scratchpad::test_utils::proptest_helpers::{
+    arb_smt_correctness_case, test_smt_correctness_impl,
+};
 use aptos_types::state_store::state_key::StateKey;
 use aptosdb::{
     schema::fuzzing::fuzz_decode,
@@ -22,9 +25,6 @@ use aptosdb::{
 use proptest::{
     collection::{hash_set, vec},
     prelude::*,
-};
-use scratchpad::test_utils::proptest_helpers::{
-    arb_smt_correctness_case, test_smt_correctness_impl,
 };
 
 #[derive(Clone, Debug, Default)]

@@ -4,12 +4,13 @@
 //! This module contains the official gas meter implementation, along with some top-level gas
 //! parameters and traits to help manipulate them.
 
+use crate::transaction::ChangeSetConfigs;
 use crate::{
     algebra::{AbstractValueSize, Gas},
     instr::InstructionGasParameters,
     misc::MiscGasParameters,
-    transaction::StorageGasParameters,
     transaction::TransactionGasParameters,
+    StorageGasParameters,
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey, write_set::WriteOp,
@@ -27,6 +28,12 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V5
+//   - u16, u32, u256
+//   - free_write_bytes_quota
+//   - configurable ChangeSetConfigs
+// - V4
+//   - Consider memory leaked for event natives
 // - V3
 //   - Add memory quota
 //   - Storage charges:
@@ -39,7 +46,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 4;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 5;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
@@ -69,7 +76,7 @@ pub trait InitialGasSchedule: Sized {
 #[derive(Debug, Clone)]
 pub struct NativeGasParameters {
     pub move_stdlib: move_stdlib::natives::GasParameters,
-    pub aptos_framework: framework::natives::GasParameters,
+    pub aptos_framework: aptos_framework::natives::GasParameters,
     pub table: move_table_extension::GasParameters,
 }
 
@@ -96,7 +103,7 @@ impl NativeGasParameters {
     pub fn zeros() -> Self {
         Self {
             move_stdlib: move_stdlib::natives::GasParameters::zeros(),
-            aptos_framework: framework::natives::GasParameters::zeros(),
+            aptos_framework: aptos_framework::natives::GasParameters::zeros(),
             table: move_table_extension::GasParameters::zeros(),
         }
     }
@@ -171,26 +178,20 @@ impl InitialGasSchedule for AptosGasParameters {
 pub struct AptosGasMeter {
     feature_version: u64,
     gas_params: AptosGasParameters,
-    storage_gas_params: Option<StorageGasParameters>,
+    storage_gas_params: StorageGasParameters,
     balance: InternalGas,
     memory_quota: AbstractValueSize,
 
-    is_call_table: bool,
+    should_leak_memory_for_native: bool,
 }
 
 impl AptosGasMeter {
     pub fn new(
         gas_feature_version: u64,
         gas_params: AptosGasParameters,
-        storage_gas_params: Option<StorageGasParameters>,
+        storage_gas_params: StorageGasParameters,
         balance: impl Into<Gas>,
     ) -> Self {
-        assert!(
-            (gas_feature_version == 0 && storage_gas_params.is_none())
-                || (gas_feature_version > 0 && storage_gas_params.is_some()),
-            "Invalid gas meter configuration"
-        );
-
         let memory_quota = gas_params.txn.memory_quota;
         let balance = balance.into().to_unit_with_params(&gas_params.txn);
 
@@ -200,7 +201,7 @@ impl AptosGasMeter {
             storage_gas_params,
             balance,
             memory_quota,
-            is_call_table: false,
+            should_leak_memory_for_native: false,
         }
     }
 
@@ -251,6 +252,10 @@ impl AptosGasMeter {
     pub fn feature_version(&self) -> u64 {
         self.feature_version
     }
+
+    pub fn change_set_configs(&self) -> &ChangeSetConfigs {
+        &self.storage_gas_params.change_set_configs
+    }
 }
 
 impl GasMeter for AptosGasMeter {
@@ -266,13 +271,8 @@ impl GasMeter for AptosGasMeter {
         _ty_args: impl ExactSizeIterator<Item = impl TypeView>,
         args: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
-        // TODO(Gas): The table extension maintains its own memory space and currently it's hard
-        //            for us to track when values are created or dropped there.
-        //            Therefore as a temporary hack, we do not consider the memory released when
-        //            values enter the table module, "leaking them" conceptually.
-        //            This special handling should be removed once we build proper memory tracking
-        //            into the table extension itself.
-        if self.is_call_table {
+        // TODO(Gas): https://github.com/aptos-labs/aptos-core/issues/5485
+        if self.should_leak_memory_for_native {
             return Ok(());
         }
 
@@ -311,37 +311,21 @@ impl GasMeter for AptosGasMeter {
         &mut self,
         loaded: Option<(NumBytes, impl ValueView)>,
     ) -> PartialVMResult<()> {
-        let cost = match self.feature_version {
-            0 => {
-                let txn_params = &self.gas_params.txn;
-
-                txn_params.load_data_base
-                    + match loaded {
-                        Some((num_bytes, _)) => txn_params.load_data_per_byte * num_bytes,
-                        None => txn_params.load_data_failure,
-                    }
+        if self.feature_version != 0 {
+            // TODO(Gas): Rewrite this in a better way.
+            if let Some((_, val)) = &loaded {
+                self.use_heap_memory(
+                    self.gas_params
+                        .misc
+                        .abs_val
+                        .abstract_heap_size(val, self.feature_version),
+                )?;
             }
-            _ => {
-                // TODO(Gas): Rewrite this in a better way.
-                if let Some((_, val)) = &loaded {
-                    self.use_heap_memory(
-                        self.gas_params
-                            .misc
-                            .abs_val
-                            .abstract_heap_size(val, self.feature_version),
-                    )?;
-                }
-
-                let storage_params = self.storage_gas_params.as_ref().unwrap();
-
-                storage_params.per_item_read * (NumArgs::from(1))
-                    + match loaded {
-                        Some((num_bytes, _)) => storage_params.per_byte_read * num_bytes,
-                        None => 0.into(),
-                    }
-            }
-        };
-
+        }
+        let cost = self
+            .storage_gas_params
+            .pricing
+            .calculate_read_gas(loaded.map(|(num_bytes, _)| num_bytes));
         self.charge(cost)
     }
 
@@ -385,8 +369,11 @@ impl GasMeter for AptosGasMeter {
         num_locals: NumArgs,
     ) -> PartialVMResult<()> {
         // Save the info for charge_native_function_before_execution.
-        self.is_call_table =
-            *module_id.address() == CORE_CODE_ADDRESS && module_id.name().as_str() == "table";
+        self.should_leak_memory_for_native = (*module_id.address() == CORE_CODE_ADDRESS
+            && module_id.name().as_str() == "table")
+            || (self.feature_version >= 4
+                && *module_id.address() == CORE_CODE_ADDRESS
+                && module_id.name().as_str() == "event");
 
         let params = &self.gas_params.instr;
 
@@ -757,14 +744,7 @@ impl AptosGasMeter {
         &mut self,
         ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
     ) -> VMResult<()> {
-        let cost = match self.feature_version {
-            0 => self.gas_params.txn.calculate_write_set_gas(ops),
-            _ => self
-                .storage_gas_params
-                .as_ref()
-                .unwrap()
-                .calculate_write_set_gas(ops, self.feature_version),
-        };
+        let cost = self.storage_gas_params.pricing.calculate_write_set_gas(ops);
         self.charge(cost).map_err(|e| e.finish(Location::Undefined))
     }
 }

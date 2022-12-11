@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 
 # Your First Coin
 
-This tutorial introduces how you can compile, deploy, and mint your own coin, named MoonCoin.
+This tutorial introduces how you can compile, deploy, and mint your own coin, named [MoonCoin](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/moon_coin).
 
 ## Step 1: Pick an SDK
 
@@ -250,27 +250,14 @@ MoonCoin calls this `initialize` function automatically upon package publishing.
 To use a coin, an entity must register a `CoinStore` for it on their account:
 
 ```rust
-public fun register<CoinType>(account: &signer) {
-    let account_addr = signer::address_of(account);
-    assert!(
-        !is_account_registered<CoinType>(account_addr),
-        error::already_exists(ECOIN_STORE_ALREADY_PUBLISHED),
-    );
-
-    account::register_coin<CoinType>(account_addr);
-    let coin_store = CoinStore<CoinType> {
-        coin: Coin { value: 0 },
-        frozen: false,
-        deposit_events: account::new_event_handle<DepositEvent>(account),
-        withdraw_events: account::new_event_handle<WithdrawEvent>(account),
-    };
-    move_to(account, coin_store);
-}
+public entry fun registerCoinType(account: &signer) {
 ```
 
-As this is a `public fun` and not a `public entry fun`, coins will need to provide their own means for registering or users can construct Move `scripts` to call the function.
+MoonCoin uses `ManagedCoin` that provides an entry function wrapper: `managed_coin::register`. Here is an example script for registration:
 
-MoonCoin uses `ManagedCoin` that provides an entry function wrapper: `managed_coin::register`.
+```rust
+:!: static/move-examples/moon_coin/scripts/register.move moon
+```
 
 ---
 
@@ -310,9 +297,10 @@ Aptos provides several building blocks to support coin transfers:
 - `coin::transfer<CoinType>`: Leverages withdraw and deposit to perform an end-to-end transfer.
 
 :::tip important
-Aptos does not emit transfer events, but instead it leverages withdraw and deposit events.
+Aptos does not emit transfer events; instead it leverages withdraw and deposit events.
 :::
 
+## Supporting documentation
 * [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)

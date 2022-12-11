@@ -5,10 +5,10 @@ mod diag;
 
 use ::aptos_logger::{Level, Logger};
 use anyhow::{Context, Result};
+use aptos_transaction_emitter_lib::{emit_transactions, Cluster, ClusterArgs, EmitArgs};
 use clap::{Parser, Subcommand};
 use diag::diag;
 use std::time::Duration;
-use transaction_emitter_lib::{emit_transactions, Cluster, ClusterArgs, EmitArgs};
 
 #[derive(Parser, Debug)]
 struct Args {

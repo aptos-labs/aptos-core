@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use consensus_types::block::block_test_utils::certificate_for_genesis;
+use aptos_consensus_types::block::block_test_utils::certificate_for_genesis;
 use schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
 
 #[test]

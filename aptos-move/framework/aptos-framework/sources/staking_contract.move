@@ -729,7 +729,8 @@ module aptos_framework::staking_contract {
         assert!(last_recorded_principal(staker_address, operator_address) == INITIAL_BALANCE, 0);
 
         // Operator joins the validator set.
-        stake::join_validator_set_for_test(operator, pool_address, true);
+        let (_sk, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.
@@ -825,7 +826,8 @@ module aptos_framework::staking_contract {
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         // Operator joins the validator set.
-        stake::join_validator_set_for_test(operator, pool_address, true);
+        let (_sk, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.
@@ -852,7 +854,8 @@ module aptos_framework::staking_contract {
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         // Operator joins the validator set.
-        stake::join_validator_set_for_test(operator, pool_address, true);
+        let (_sk, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.
@@ -870,7 +873,7 @@ module aptos_framework::staking_contract {
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
-    #[expected_failure(abort_code = 0x80006)]
+    #[expected_failure(abort_code = 0x80006, location = Self)]
     public entry fun test_staker_cannot_create_same_staking_contract_multiple_times(
         aptos_framework: &signer,
         staker: &signer,
@@ -883,7 +886,7 @@ module aptos_framework::staking_contract {
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
-    #[expected_failure(abort_code = 0x10002)]
+    #[expected_failure(abort_code = 0x10002, location = Self)]
     public entry fun test_staker_cannot_create_staking_contract_with_invalid_commission(
         aptos_framework: &signer,
         staker: &signer,
@@ -893,7 +896,7 @@ module aptos_framework::staking_contract {
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
-    #[expected_failure(abort_code = 0x10001)]
+    #[expected_failure(abort_code = 0x10001, location = Self)]
     public entry fun test_staker_cannot_create_staking_contract_with_less_than_min_stake_required(
         aptos_framework: &signer,
         staker: &signer,
@@ -951,7 +954,8 @@ module aptos_framework::staking_contract {
 
         // Join validator set and earn some rewards.
         let pool_address = stake_pool_address(staker_address, operator_1_address);
-        stake::join_validator_set_for_test(operator_1, pool_address, true);
+        let (_sk, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator_1, pool_address, true);
         stake::end_epoch();
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 0);
 
@@ -1041,7 +1045,8 @@ module aptos_framework::staking_contract {
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         // Operator joins the validator set so rewards are generated.
-        stake::join_validator_set_for_test(operator, pool_address, true);
+        let (_sk, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.
@@ -1123,7 +1128,8 @@ module aptos_framework::staking_contract {
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         // Operator joins the validator set so rewards are generated.
-        stake::join_validator_set_for_test(operator, pool_address, true);
+        let (_sk, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.

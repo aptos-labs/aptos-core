@@ -42,6 +42,8 @@ pub enum DataRequest {
     GetStorageServerSummary,             // Fetches a summary of the storage server state
     GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest), // Fetches a list of transaction outputs with a proof
     GetTransactionsWithProof(TransactionsWithProofRequest), // Fetches a list of transactions with a proof
+    GetNewTransactionsOrOutputsWithProof(NewTransactionsOrOutputsWithProofRequest), // Subscribes to new transactions or outputs with a proof
+    GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest), // Fetches a list of transactions or outputs with a proof
 }
 
 impl DataRequest {
@@ -57,6 +59,10 @@ impl DataRequest {
             Self::GetStorageServerSummary => "get_storage_server_summary",
             Self::GetTransactionOutputsWithProof(_) => "get_transaction_outputs_with_proof",
             Self::GetTransactionsWithProof(_) => "get_transactions_with_proof",
+            Self::GetNewTransactionsOrOutputsWithProof(_) => {
+                "get_new_transactions_or_outputs_with_proof"
+            }
+            Self::GetTransactionsOrOutputsWithProof(_) => "get_transactions_or_outputs_with_proof",
         }
     }
 
@@ -67,6 +73,7 @@ impl DataRequest {
     pub fn is_data_subscription_request(&self) -> bool {
         matches!(self, &Self::GetNewTransactionOutputsWithProof(_))
             || matches!(self, &Self::GetNewTransactionsWithProof(_))
+            || matches!(self, Self::GetNewTransactionsOrOutputsWithProof(_))
     }
 
     pub fn is_protocol_version_request(&self) -> bool {
@@ -124,4 +131,25 @@ pub struct TransactionsWithProofRequest {
     pub start_version: u64,   // The starting version of the transaction list
     pub end_version: u64,     // The ending version of the transaction list (inclusive)
     pub include_events: bool, // Whether or not to include events in the response
+}
+
+/// A storage service request for fetching a new transaction or output list
+/// beyond the already known version and epoch.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct NewTransactionsOrOutputsWithProofRequest {
+    pub known_version: u64,             // The highest known version
+    pub known_epoch: u64,               // The highest known epoch
+    pub include_events: bool,           // Whether or not to include events in the response
+    pub max_num_output_reductions: u64, // The max num of output reductions before transactions are returned
+}
+
+/// A storage service request for fetching a transaction list with a
+/// corresponding proof or an output list with a corresponding proof.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct TransactionsOrOutputsWithProofRequest {
+    pub proof_version: u64,   // The version the proof should be relative to
+    pub start_version: u64,   // The starting version of the transaction/output list
+    pub end_version: u64,     // The ending version of the transaction/output list (inclusive)
+    pub include_events: bool, // Whether or not to include events (if transactions are returned)
+    pub max_num_output_reductions: u64, // The max num of output reductions before transactions are returned
 }

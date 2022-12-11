@@ -19,9 +19,14 @@ This module defines a struct storing the metadata of the block and new block eve
 -  [Function `emit_genesis_block_event`](#0x1_block_emit_genesis_block_event)
 -  [Function `emit_writeset_block_event`](#0x1_block_emit_writeset_block_event)
 -  [Specification](#@Specification_1)
+    -  [Function `initialize`](#@Specification_1_initialize)
+    -  [Function `update_epoch_interval_microsecs`](#@Specification_1_update_epoch_interval_microsecs)
+    -  [Function `get_epoch_interval_secs`](#@Specification_1_get_epoch_interval_secs)
     -  [Function `block_prologue`](#@Specification_1_block_prologue)
+    -  [Function `get_current_block_height`](#@Specification_1_get_current_block_height)
     -  [Function `emit_new_block_event`](#@Specification_1_emit_new_block_event)
     -  [Function `emit_genesis_block_event`](#@Specification_1_emit_genesis_block_event)
+    -  [Function `emit_writeset_block_event`](#@Specification_1_emit_writeset_block_event)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -551,6 +556,114 @@ new block event for WriteSetPayload.
 
 
 
+<a name="@Specification_1_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="block.md#0x1_block_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch_interval_microsecs: u64)
+</code></pre>
+
+
+The caller is aptos_framework.
+The new_epoch_interval must be greater than 0.
+The BlockResource is not under the caller before initializing.
+The Account is not under the caller until the BlockResource is created for the caller.
+Make sure The BlockResource under the caller existed after initializing.
+The number of new events created does not exceed MAX_U64.
+
+
+<pre><code><b>include</b> <a href="block.md#0x1_block_Initialize">Initialize</a>;
+<b>include</b> <a href="block.md#0x1_block_NewEventHandle">NewEventHandle</a>;
+</code></pre>
+
+
+
+
+<a name="0x1_block_Initialize"></a>
+
+
+<pre><code><b>schema</b> <a href="block.md#0x1_block_Initialize">Initialize</a> {
+    aptos_framework: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    epoch_interval_microsecs: u64;
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+    <b>aborts_if</b> addr != @aptos_framework;
+    <b>aborts_if</b> epoch_interval_microsecs &lt;= 0;
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
+    <b>ensures</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
+}
+</code></pre>
+
+
+
+
+<a name="0x1_block_NewEventHandle"></a>
+
+
+<pre><code><b>schema</b> <a href="block.md#0x1_block_NewEventHandle">NewEventHandle</a> {
+    aptos_framework: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+    <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+    <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 2 &gt; <a href="block.md#0x1_block_MAX_U64">MAX_U64</a>;
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_update_epoch_interval_microsecs"></a>
+
+### Function `update_epoch_interval_microsecs`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_update_epoch_interval_microsecs">update_epoch_interval_microsecs</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_epoch_interval: u64)
+</code></pre>
+
+
+The caller is @aptos_framework.
+The new_epoch_interval must be greater than 0.
+The BlockResource existed under the @aptos_framework.
+
+
+<pre><code><b>include</b> <a href="block.md#0x1_block_UpdateEpochIntervalMicrosecs">UpdateEpochIntervalMicrosecs</a>;
+</code></pre>
+
+
+
+
+<a name="0x1_block_UpdateEpochIntervalMicrosecs"></a>
+
+
+<pre><code><b>schema</b> <a href="block.md#0x1_block_UpdateEpochIntervalMicrosecs">UpdateEpochIntervalMicrosecs</a> {
+    aptos_framework: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    new_epoch_interval: u64;
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+    <b>aborts_if</b> addr != @aptos_framework;
+    <b>aborts_if</b> new_epoch_interval &lt;= 0;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
+    <b>let</b> <b>post</b> block_resource = <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
+    <b>ensures</b> block_resource.epoch_interval == new_epoch_interval;
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_get_epoch_interval_secs"></a>
+
+### Function `get_epoch_interval_secs`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_epoch_interval_secs">get_epoch_interval_secs</a>(): u64
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
 <a name="@Specification_1_block_prologue"></a>
 
 ### Function `block_prologue`
@@ -569,6 +682,22 @@ new block event for WriteSetPayload.
 <b>requires</b> (proposer == @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == <a href="timestamp.md#0x1_timestamp">timestamp</a>);
 <b>requires</b> (proposer != @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &lt; <a href="timestamp.md#0x1_timestamp">timestamp</a>);
 <b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_get_current_block_height"></a>
+
+### Function `get_current_block_height`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_current_block_height">get_current_block_height</a>(): u64
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -612,6 +741,42 @@ new block event for WriteSetPayload.
 <b>requires</b> <a href="event.md#0x1_event_counter">event::counter</a>(<b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework).new_block_events) == 0;
 <b>requires</b> (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == 0);
 <b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_emit_writeset_block_event"></a>
+
+### Function `emit_writeset_block_event`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_emit_writeset_block_event">emit_writeset_block_event</a>(vm_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fake_block_hash: <b>address</b>)
+</code></pre>
+
+
+The caller is @vm_reserved.
+The BlockResource existed under the @aptos_framework.
+The Configuration existed under the @aptos_framework.
+The CurrentTimeMicroseconds existed under the @aptos_framework.
+
+
+<pre><code><b>include</b> <a href="block.md#0x1_block_EmitWritesetBlockEvent">EmitWritesetBlockEvent</a>;
+</code></pre>
+
+
+
+
+<a name="0x1_block_EmitWritesetBlockEvent"></a>
+
+
+<pre><code><b>schema</b> <a href="block.md#0x1_block_EmitWritesetBlockEvent">EmitWritesetBlockEvent</a> {
+    vm_signer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(vm_signer);
+    <b>aborts_if</b> addr != @vm_reserved;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">reconfiguration::Configuration</a>&gt;(@aptos_framework);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+}
 </code></pre>
 
 
