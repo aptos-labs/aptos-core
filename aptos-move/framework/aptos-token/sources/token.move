@@ -1228,6 +1228,14 @@ module aptos_token::token {
         token.id
     }
 
+    public fun get_direct_transfer(receiver: address): bool acquires TokenStore {
+        if (!exists<TokenStore>(receiver)) {
+            return false
+        };
+
+        borrow_global<TokenStore>(receiver).direct_transfer
+    }
+
     public fun create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig {
         TokenMutabilityConfig {
             maximum: *vector::borrow(mutate_setting, TOKEN_MAX_MUTABLE_IND),
