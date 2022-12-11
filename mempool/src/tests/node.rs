@@ -16,8 +16,10 @@ use aptos_config::{
 use aptos_crypto::{x25519::PrivateKey, Uniform};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, MutexGuard, RwLock};
+use aptos_storage_interface::mock::MockDbReaderWriter;
 use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{account_config::AccountSequenceInfo, PeerId};
+use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use channel::{aptos_channel, message_queues::QueueStyle};
 use enum_dispatch::enum_dispatch;
 use futures::{
@@ -40,9 +42,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use storage_interface::mock::MockDbReaderWriter;
 use tokio::runtime::{Builder, Runtime};
-use vm_validator::mocks::mock_vm_validator::MockVMValidator;
 
 type MempoolNetworkHandle = (
     NetworkId,

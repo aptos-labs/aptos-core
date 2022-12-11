@@ -1,5 +1,5 @@
 [package]
-name = "vm-genesis"
+name = "aptos-vm-genesis"
 description = "Aptos vm genesis"
 version = "0.1.0"
 

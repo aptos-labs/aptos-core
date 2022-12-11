@@ -21,6 +21,7 @@ use aptos_config::{
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_vm_validator::vm_validator::TransactionValidation;
 use async_trait::async_trait;
 use channel::{aptos_channel, message_queues::QueueStyle};
 use fail::fail_point;
@@ -53,7 +54,6 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 use thiserror::Error;
-use vm_validator::vm_validator::TransactionValidation;
 
 /// Container for exchanging transactions with other Mempools.
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -24,6 +24,7 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_types::TransactionReplayer;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_types::write_set::WriteSet;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -49,7 +50,6 @@ use std::{
     sync::Arc,
     time::Instant,
 };
-use storage_interface::DbReaderWriter;
 use tokio::io::BufReader;
 
 const BATCH_SIZE: usize = if cfg!(test) { 2 } else { 10000 };

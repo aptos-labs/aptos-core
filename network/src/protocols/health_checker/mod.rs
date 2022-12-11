@@ -36,6 +36,7 @@ use crate::{
 };
 use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
 use async_trait::async_trait;
@@ -47,7 +48,6 @@ use futures::{
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::{collections::hash_map::Entry, time::Duration};
 
 pub mod builder;

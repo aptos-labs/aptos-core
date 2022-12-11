@@ -21,12 +21,14 @@ use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::HistogramTimer;
+use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
 use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::OnChainConfigPayload,
     transaction::SignedTransaction,
     vm_status::DiscardedVMStatus,
 };
+use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use network::application::interface::NetworkInterface;
 use rayon::prelude::*;
@@ -36,9 +38,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use storage_interface::state_view::LatestDbStateCheckpointView;
 use tokio::runtime::Handle;
-use vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
 
 // ============================== //
 //  broadcast_coordinator tasks  //

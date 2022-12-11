@@ -18,10 +18,10 @@ use aptos_config::{
 use aptos_crypto::{noise, x25519};
 use aptos_infallible::{duration_since_epoch, RwLock};
 use aptos_logger::trace;
+use aptos_short_hex_str::{AsShortHexStr, ShortHexStr};
 use aptos_types::PeerId;
 use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use netcore::transport::ConnectionOrigin;
-use short_hex_str::{AsShortHexStr, ShortHexStr};
 use std::{collections::HashMap, convert::TryFrom as _, fmt::Debug, sync::Arc};
 
 /// In a mutually authenticated network, a client message is accompanied with a timestamp.

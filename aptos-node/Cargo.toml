@@ -32,10 +32,15 @@ aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-indexer = { workspace = true, optional = true }
 aptos-infallible = { workspace = true }
+aptos-inspection-service = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-mempool = { workspace = true }
 aptos-secure-storage = { workspace = true }
+aptos-state-sync-driver = { workspace = true }
 aptos-state-view = { workspace = true }
+aptos-storage-interface = { workspace = true }
+aptos-storage-service-client = { workspace = true }
+aptos-storage-service-server = { workspace = true }
 aptos-telemetry = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-time-service = { workspace = true }
@@ -47,16 +52,11 @@ clap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
-inspection-service = { workspace = true }
 mempool-notifications = { workspace = true }
 network = { workspace = true }
 network-builder = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
-state-sync-driver = { workspace = true }
-storage-interface = { workspace = true }
-storage-service-client = { workspace = true }
-storage-service-server = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 

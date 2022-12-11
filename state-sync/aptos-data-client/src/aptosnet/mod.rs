@@ -20,6 +20,17 @@ use aptos_config::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_storage_service_client::StorageServiceClient;
+use aptos_storage_service_types::requests::{
+    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+    NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+    StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
+    TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+};
+use aptos_storage_service_types::responses::{
+    StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof,
+};
+use aptos_storage_service_types::Epoch;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     epoch_change::EpochChangeProof,
@@ -35,17 +46,6 @@ use network::{
 };
 use rand::seq::SliceRandom;
 use std::{convert::TryFrom, fmt, sync::Arc, time::Duration};
-use storage_service_client::StorageServiceClient;
-use storage_service_types::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-    NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-    StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
-    TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
-};
-use storage_service_types::responses::{
-    StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof,
-};
-use storage_service_types::Epoch;
 use tokio::{runtime::Handle, task::JoinHandle};
 
 mod logging;
@@ -433,12 +433,12 @@ impl AptosNetDataClient {
                 // data client errors. Also categorize the error type for scoring
                 // purposes.
                 let client_error = match error {
-                    storage_service_client::Error::RpcError(err) => match err {
+                    aptos_storage_service_client::Error::RpcError(err) => match err {
                         RpcError::NotConnected(_) => Error::DataIsUnavailable(err.to_string()),
                         RpcError::TimedOut => Error::TimeoutWaitingForResponse(err.to_string()),
                         _ => Error::UnexpectedErrorEncountered(err.to_string()),
                     },
-                    storage_service_client::Error::StorageServiceError(err) => {
+                    aptos_storage_service_client::Error::StorageServiceError(err) => {
                         Error::UnexpectedErrorEncountered(err.to_string())
                     }
                 };

@@ -31,17 +31,17 @@ use aptosdb::AptosDB;
 use rand::SeedableRng;
 use std::sync::Arc;
 
-use storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter, Order};
+use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter, Order};
 
 pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     const B: u64 = 1_000_000_000;
 
-    let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
 
     let mut core_resources_account: LocalAccount = LocalAccount::new(
         aptos_test_root_address(),
-        AccountKey::from_private_key(vm_genesis::GENESIS_KEYPAIR.0.clone()),
+        AccountKey::from_private_key(aptos_vm_genesis::GENESIS_KEYPAIR.0.clone()),
         0,
     );
 

@@ -3,9 +3,9 @@
 
 use crate::{utils, utils::sum_all_histogram_counts};
 use aptos_config::config::NodeConfig;
+use aptos_state_sync_driver::metrics::StorageSynchronizerOperations;
 use aptos_telemetry_service::types::telemetry::TelemetryEvent;
 use prometheus::core::Collector;
-use state_sync_driver::metrics::StorageSynchronizerOperations;
 use std::collections::BTreeMap;
 
 /// Core metrics event name
@@ -112,14 +112,14 @@ fn collect_state_sync_metrics(
 
     core_metrics.insert(
         STATE_SYNC_SYNCED_EPOCH.into(),
-        state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
+        aptos_state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
             .with_label_values(&[StorageSynchronizerOperations::SyncedEpoch.get_label()])
             .get()
             .to_string(),
     );
     core_metrics.insert(
         STATE_SYNC_SYNCED_VERSION.into(),
-        state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
+        aptos_state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
             .with_label_values(&[StorageSynchronizerOperations::Synced.get_label()])
             .get()
             .to_string(),

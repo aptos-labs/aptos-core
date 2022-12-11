@@ -6,8 +6,8 @@ use aptos_forge::{
     success_criteria::{StateProgressThreshold, SuccessCriteria},
     EmitJobMode, EmitJobRequest, ForgeConfig, InitialVersion, LocalFactory, Options, Result,
 };
+use aptos_testcases::performance_test::PerformanceBenchmark;
 use std::num::NonZeroUsize;
-use testcases::performance_test::PerformanceBenchmark;
 
 fn main() -> Result<()> {
     ::aptos_logger::Logger::init_for_testing();

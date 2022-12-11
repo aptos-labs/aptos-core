@@ -17,6 +17,7 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
 use futures::channel::mpsc;
 use network::application::storage::PeerMetadataStorage;
@@ -24,7 +25,6 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use storage_interface::DbReaderWriter;
 use tokio::runtime::{self, Runtime};
 
 /// Helper function to start consensus based on configuration and return the runtime

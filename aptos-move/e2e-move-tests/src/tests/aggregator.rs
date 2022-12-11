@@ -10,8 +10,8 @@ use crate::{
     tests::common,
     MoveHarness,
 };
+use aptos_language_e2e_tests::account::Account;
 use aptos_types::transaction::SignedTransaction;
-use language_e2e_tests::account::Account;
 
 fn setup() -> (MoveHarness, Account) {
     initialize(common::test_dir_path("aggregator.data/pack"))

@@ -7,6 +7,7 @@ use aptos_config::config::{
     RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
+use aptos_storage_interface::{DbReader, MAX_REQUEST_LIMIT};
 use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
@@ -15,7 +16,6 @@ use aptos_types::{
 };
 use aptosdb::AptosDB;
 use std::{path::Path, sync::Arc};
-use storage_interface::{DbReader, MAX_REQUEST_LIMIT};
 
 pub struct DBDebuggerInterface(Arc<dyn DbReader>);
 

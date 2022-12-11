@@ -20,6 +20,7 @@ aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-short-hex-str = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
 channel = { workspace = true }
@@ -28,14 +29,13 @@ futures = { workspace = true }
 network = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
-short-hex-str = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 
 [dev-dependencies]
+aptos-storage-service-types = { workspace = true }
 aptos-types = { workspace = true }
 claims = { workspace = true }
 rand = { workspace = true }
-storage-service-types = { workspace = true }
 tokio = { workspace = true }

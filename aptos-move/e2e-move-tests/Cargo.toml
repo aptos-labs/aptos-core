@@ -21,15 +21,16 @@ aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
 aptos-keygen = { workspace = true }
+aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-genesis = { workspace = true }
 aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
-language-e2e-tests = { workspace = true }
 move-core-types = { workspace = true }
 move-package = { workspace = true }
 move-symbol-pool = { workspace = true }
@@ -40,7 +41,6 @@ rand = { workspace = true }
 rstest = { workspace = true }
 serde = { workspace = true }
 tempfile = { workspace = true }
-vm-genesis = { workspace = true }
 
 [lib]
 doctest = false

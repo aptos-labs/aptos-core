@@ -1,5 +1,5 @@
 [package]
-name = "transaction-emitter-lib"
+name = "aptos-transaction-emitter-lib"
 description = "Library for Aptos transaction emitter"
 version = "0.0.0"
 

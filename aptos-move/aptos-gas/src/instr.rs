@@ -5,8 +5,7 @@
 //! initial values in the genesis and a mapping between the Rust representation and the on-chain
 //! gas schedule.
 
-use crate::algebra::InternalGasPerAbstractValueUnit;
-use crate::gas_meter::EXECUTION_GAS_MULTIPLIER as MUL;
+use crate::{algebra::InternalGasPerAbstractValueUnit, gas_meter::EXECUTION_GAS_MULTIPLIER as MUL};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte};
 use move_vm_types::gas::SimpleInstruction;

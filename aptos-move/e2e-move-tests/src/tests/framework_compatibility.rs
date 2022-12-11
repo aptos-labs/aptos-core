@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{tests::common, MoveHarness};
+use aptos_language_e2e_tests::account::Account;
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
-use language_e2e_tests::account::Account;
 use move_core_types::account_address::AccountAddress;
 
 #[test]

@@ -118,6 +118,7 @@ impl ExecutionConfig {
 mod test {
     use super::*;
     use aptos_temppath::TempPath;
+    use aptos_types::transaction::NoOpChangeSetChecker;
     use aptos_types::{
         transaction::{ChangeSet, Transaction, WriteSetPayload},
         write_set::WriteSetMut,
@@ -136,7 +137,12 @@ mod test {
     #[test]
     fn test_some_and_load_genesis() {
         let fake_genesis = Transaction::GenesisTransaction(WriteSetPayload::Direct(
-            ChangeSet::new(WriteSetMut::new(vec![]).freeze().unwrap(), vec![], 3).unwrap(),
+            ChangeSet::new(
+                WriteSetMut::new(vec![]).freeze().unwrap(),
+                vec![],
+                &NoOpChangeSetChecker,
+            )
+            .unwrap(),
         ));
         let (mut config, path) = generate_config();
         config.genesis = Some(fake_genesis.clone());

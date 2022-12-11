@@ -116,7 +116,7 @@ use crate::{
     stale_node_index::StaleNodeIndexSchema,
     stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
 };
-use storage_interface::{
+use aptos_storage_interface::{
     state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };

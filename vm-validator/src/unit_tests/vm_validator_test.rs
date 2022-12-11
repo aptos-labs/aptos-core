@@ -5,6 +5,8 @@ use crate::vm_validator::{get_account_sequence_number, TransactionValidation, VM
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
+use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     account_address, account_config,
     chain_id::ChainId,
@@ -16,8 +18,6 @@ use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use move_core_types::account_address::AccountAddress;
 use rand::SeedableRng;
-use storage_interface::state_view::LatestDbStateCheckpointView;
-use storage_interface::DbReaderWriter;
 
 const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 
@@ -33,7 +33,7 @@ impl TestValidator {
         let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(_db_path.path()));
         aptos_executor_test_helpers::bootstrap_genesis::<AptosVM>(
             &db_rw,
-            &vm_genesis::test_genesis_transaction(),
+            &aptos_vm_genesis::test_genesis_transaction(),
         )
         .expect("Db-bootstrapper should not fail.");
 
@@ -84,8 +84,8 @@ fn test_validate_transaction() {
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
@@ -106,7 +106,7 @@ fn test_validate_invalid_signature() {
         address,
         1,
         &other_private_key,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         program,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
@@ -121,8 +121,8 @@ fn test_validate_known_script_too_large_args() {
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(TransactionPayload::Script(Script::new(
             vec![42; MAX_TRANSACTION_SIZE_IN_BYTES as usize],
             vec![],
@@ -151,8 +151,8 @@ fn test_validate_max_gas_units_above_max() {
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         None,
         0,
         0,              /* max gas price */
@@ -181,8 +181,8 @@ fn test_validate_max_gas_units_below_min() {
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(TransactionPayload::Script(Script::new(
             vec![42; u64::from(txn_bytes) as usize],
             vec![],
@@ -233,8 +233,8 @@ fn test_validate_max_gas_price_above_bounds() {
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         None,
         0,
         u64::MAX, /* max gas price */
@@ -259,8 +259,8 @@ fn test_validate_max_gas_price_below_bounds() {
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
         // Initial Time was set to 0 with a TTL 86400 secs.
         40000,
@@ -306,8 +306,8 @@ fn test_validate_account_doesnt_exist() {
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         random_account_addr,
         1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
         u64::MAX,
         1, /* max gas price */
@@ -329,8 +329,8 @@ fn test_validate_sequence_number_too_new() {
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
@@ -346,8 +346,8 @@ fn test_validate_invalid_arguments() {
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
     );
     let _ret = vm_validator.validate_transaction(transaction).unwrap();
@@ -363,8 +363,8 @@ fn test_validate_expiration_time() {
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1, /* sequence_number */
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         None, /* script */
         0,    /* expiration_time */
         0,    /* gas_unit_price */
@@ -382,8 +382,8 @@ fn test_validate_chain_id() {
     let transaction = transaction_test_helpers::get_test_txn_with_chain_id(
         address,
         0, /* sequence_number */
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         // all tests use ChainId::test() for chain_id, so pick something different
         ChainId::new(ChainId::test().id() + 1),
     );

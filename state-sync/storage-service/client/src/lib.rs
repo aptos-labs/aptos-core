@@ -4,6 +4,9 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::network_id::PeerNetworkId;
+use aptos_storage_service_types::requests::StorageServiceRequest;
+use aptos_storage_service_types::responses::StorageServiceResponse;
+use aptos_storage_service_types::{StorageServiceError, StorageServiceMessage};
 use aptos_types::PeerId;
 use async_trait::async_trait;
 use network::{
@@ -18,9 +21,6 @@ use network::{
     ProtocolId,
 };
 use std::{sync::Arc, time::Duration};
-use storage_service_types::requests::StorageServiceRequest;
-use storage_service_types::responses::StorageServiceResponse;
-use storage_service_types::{StorageServiceError, StorageServiceMessage};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
