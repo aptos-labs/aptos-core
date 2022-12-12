@@ -25,6 +25,7 @@ tempfile = "3.3.0"
 
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-types = { path = "../../types" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
 
 [[bin]]
 name = "aptos-release-builder"
