@@ -401,20 +401,14 @@ fn scheduler_dependency() {
         SchedulerTask::ExecutionTask((5, 0), None, _)
     ));
 
-    assert!(
-        if let DependencyResult::Resolved = s.wait_for_dependency(3, 0) {
-            true
-        } else {
-            false
-        }
-    );
-    assert!(
-        if let DependencyResult::Dependency(_) = s.wait_for_dependency(4, 2) {
-            true
-        } else {
-            false
-        }
-    );
+    assert!(matches!(
+        s.wait_for_dependency(3, 0),
+        DependencyResult::Resolved
+    ));
+    assert!(matches!(
+        s.wait_for_dependency(4, 2),
+        DependencyResult::Dependency(_)
+    ));
 
     assert!(matches!(
         s.finish_execution(2, 0, false, TaskGuard::new(&fake_counter)),
@@ -441,20 +435,14 @@ fn scheduler_incarnation() {
     }
 
     // execution index = 5
-    assert!(
-        if let DependencyResult::Dependency(_) = s.wait_for_dependency(1, 0) {
-            true
-        } else {
-            false
-        }
-    );
-    assert!(
-        if let DependencyResult::Dependency(_) = s.wait_for_dependency(3, 0) {
-            true
-        } else {
-            false
-        }
-    );
+    assert!(matches!(
+        s.wait_for_dependency(1, 0),
+        DependencyResult::Dependency(_)
+    ));
+    assert!(matches!(
+        s.wait_for_dependency(3, 0),
+        DependencyResult::Dependency(_)
+    ));
 
     assert!(matches!(
         s.finish_execution(2, 0, true, TaskGuard::new(&fake_counter)),

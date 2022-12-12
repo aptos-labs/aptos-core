@@ -582,7 +582,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                         }
                     }
                     ReadResult::ExecutionHalted => {
-                        // TODO
+                        unreachable!();
                     }
                     ReadResult::None => {
                         assert_eq!(expected_result.0, None);

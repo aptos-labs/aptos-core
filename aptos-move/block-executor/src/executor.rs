@@ -127,6 +127,9 @@ impl<
                             while let DependencyStatus::Unresolved = *dep_resolved {
                                 dep_resolved = cvar.wait(dep_resolved).unwrap();
                             }
+                            if let DependencyStatus::ExecutionHalted = *dep_resolved {
+                                return ReadResult::ExecutionHalted;
+                            }
                         }
                         DependencyResult::ExecutionHalted => {
                             return ReadResult::ExecutionHalted;

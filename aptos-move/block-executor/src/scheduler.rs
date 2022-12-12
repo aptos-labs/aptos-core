@@ -268,6 +268,7 @@ impl Scheduler {
         // and it will be observed. Otherwise, the status will be observed by the terminating thread and
         // condvar will be notified.
         if self.done() {
+            *self.txn_status[txn_idx].lock() = TransactionStatus::ExecutionHalted;
             return DependencyResult::ExecutionHalted;
         }
 
@@ -387,11 +388,11 @@ impl Scheduler {
                 TransactionStatus::Suspended(_, condvar)
                 | TransactionStatus::ReadyToExecute(_, Some(condvar)) => {
                     let (lock, cvar) = &*(condvar.clone());
-                    // Mark parallel execution halted due to reasons like module r/w intersection.
-                    *lock.lock() = DependencyStatus::ExecutionHalted;
                     // Set the transaction status to be ExecutionHalted, so it can be ignored when
                     // we check the invariants for transaction status.
                     *status = TransactionStatus::ExecutionHalted;
+                    // Mark parallel execution halted due to reasons like module r/w intersection.
+                    *lock.lock() = DependencyStatus::ExecutionHalted;
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
                 }
@@ -525,12 +526,8 @@ impl Scheduler {
             }
             TransactionStatus::ExecutionHalted => {
                 // Ignore the transaction status due to ExecutionHalted.
-                // println!("ExecutionHalted {:?}", status);
             }
-            _ => {
-                println!("suspend {:?}", status);
-                // unreachable!();
-            }
+            _ => unreachable!(),
         }
     }
 
@@ -547,17 +544,13 @@ impl Scheduler {
             }
             TransactionStatus::ExecutionHalted => {
                 // Ignore the transaction status due to ExecutionHalted.
-                // println!("ExecutionHalted {:?}", status);
             }
-            _ => {
-                println!("resume {:?}", status);
-                // unreachable!();
-            }
+            _ => unreachable!(),
         }
     }
 
     /// Set status of the transaction to Executed(incarnation).
-    fn set_executed_status(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
+    fn set_executed_status(&self, txn_idx: TxnIndex, _incarnation: Incarnation) {
         let mut status = self.txn_status[txn_idx].lock();
 
         // Only makes sense when the current status is 'Executing'.
@@ -567,12 +560,8 @@ impl Scheduler {
             }
             TransactionStatus::ExecutionHalted => {
                 // Ignore the transaction status due to ExecutionHalted.
-                // println!("ExecutionHalted {:?}", status);
             }
-            _ => {
-                println!("set_executed_status {:?}", status);
-                // unreachable!();
-            }
+            _ => unreachable!(),
         }
     }
 
