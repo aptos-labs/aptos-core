@@ -1,10 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Instant;
+
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
     account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
+    data_store::FakeDataStoreLatency,
     executor::FakeExecutor,
     gas_costs::TXN_RESERVED,
 };
@@ -26,6 +29,7 @@ use proptest::{
 pub struct TransactionBencher<S> {
     num_accounts: usize,
     num_transactions: usize,
+    latency: FakeDataStoreLatency,
     strategy: S,
 }
 
@@ -35,16 +39,19 @@ where
     S::Value: AUTransactionGen,
 {
     /// The number of accounts created by default.
-    pub const DEFAULT_NUM_ACCOUNTS: usize = 100;
+    pub const DEFAULT_NUM_ACCOUNTS: usize = 200;
 
     /// The number of transactions created by default.
-    pub const DEFAULT_NUM_TRANSACTIONS: usize = 1000;
+    pub const DEFAULT_NUM_TRANSACTIONS: usize = 10000;
+
+    pub const DEFAULT_LATENCY: FakeDataStoreLatency = FakeDataStoreLatency::NONE;
 
     /// Creates a new transaction bencher with default settings.
     pub fn new(strategy: S) -> Self {
         Self {
             num_accounts: Self::DEFAULT_NUM_ACCOUNTS,
             num_transactions: Self::DEFAULT_NUM_TRANSACTIONS,
+            latency: Self::DEFAULT_LATENCY,
             strategy,
         }
     }
@@ -69,6 +76,7 @@ where
                     &self.strategy,
                     self.num_accounts,
                     self.num_transactions,
+                    self.latency,
                 )
             },
             |state| state.execute(),
@@ -85,6 +93,7 @@ where
                     &self.strategy,
                     self.num_accounts,
                     self.num_transactions,
+                    self.latency,
                 )
             },
             |state| state.execute_parallel(),
@@ -111,7 +120,12 @@ struct TransactionBenchState {
 
 impl TransactionBenchState {
     /// Creates a new benchmark state with the given number of accounts and transactions.
-    fn with_size<S>(strategy: S, num_accounts: usize, num_transactions: usize) -> Self
+    fn with_size<S>(
+        strategy: S,
+        num_accounts: usize,
+        num_transactions: usize,
+        latency: FakeDataStoreLatency,
+    ) -> Self
     where
         S: Strategy,
         S::Value: AUTransactionGen,
@@ -120,6 +134,7 @@ impl TransactionBenchState {
             strategy,
             universe_strategy(num_accounts, num_transactions),
             num_transactions,
+            latency,
         );
 
         // Insert a blockmetadata transaction at the beginning to better simulate the real life traffic.
@@ -150,6 +165,7 @@ impl TransactionBenchState {
         strategy: S,
         universe_strategy: impl Strategy<Value = AccountUniverseGen>,
         num_transactions: usize,
+        latency: FakeDataStoreLatency,
     ) -> Self
     where
         S: Strategy,
@@ -161,7 +177,7 @@ impl TransactionBenchState {
             .expect("creating a new value should succeed")
             .current();
 
-        let mut executor = FakeExecutor::from_head_genesis();
+        let mut executor = FakeExecutor::from_head_genesis_with_latency(latency);
         // Run in gas-cost-stability mode for now -- this ensures that new accounts are ignored.
         // XXX We may want to include new accounts in case they have interesting performance
         // characteristics.
@@ -194,12 +210,22 @@ impl TransactionBenchState {
     fn execute_parallel(self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
+
+        let start = Instant::now();
+        let num_transactions = self.transactions.len();
         BlockAptosVM::execute_block(
             self.transactions,
             self.executor.get_state_view(),
             num_cpus::get(),
         )
         .expect("VM should not fail to start");
+
+        let elapsed = start.elapsed();
+        println!(
+            "Bench run: time {}ms, TPS: {:.0}",
+            elapsed.as_millis(),
+            num_transactions as f32 / elapsed.as_secs_f32()
+        );
     }
 }
 

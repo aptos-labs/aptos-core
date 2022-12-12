@@ -9,7 +9,9 @@ use aptos_crypto::{
     ValidCryptoMaterialStringExt,
 };
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
-use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
+use aptos_language_e2e_tests::data_store::{
+    FakeDataStore, FakeDataStoreLatency, GENESIS_CHANGE_SET_HEAD,
+};
 use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -576,7 +578,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         }
 
         // Genesis modules
-        let mut storage = FakeDataStore::new(HashMap::new()).into_move_resolver();
+        let mut storage = FakeDataStore::new(FakeDataStoreLatency::NONE).into_move_resolver();
         storage.add_write_set(GENESIS_CHANGE_SET_HEAD.write_set());
 
         // Builtin private key mapping
