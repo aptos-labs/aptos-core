@@ -94,6 +94,7 @@ fn test_new_initialized_configs() {
         event_subscription_service,
         aptos_data_client,
         streaming_service_client,
+        TimeService::mock(),
     );
 
     // Verify the initial configs were notified

@@ -9,6 +9,7 @@ use crate::{
         verify_mempool_and_event_notification,
     },
 };
+use aptos_config::config::StateSyncDriverConfig;
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
 use aptos_data_client::aptosnet::AptosNetDataClient;
@@ -34,6 +35,7 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use claims::{assert_err, assert_none};
 use futures::{FutureExt, StreamExt};
+use std::time::Duration;
 use std::{collections::HashMap, sync::Arc};
 
 // TODO(joshlind): extend these tests to cover more functionality!
@@ -41,17 +43,37 @@ use std::{collections::HashMap, sync::Arc};
 #[tokio::test(flavor = "multi_thread")]
 async fn test_auto_bootstrapping() {
     // Create a driver for a validator with a waypoint at version 0
-    let (validator_driver, _, _, _, _) = create_validator_driver(None).await;
+    let (validator_driver, consensus_notifier, _, _, _, time_service) =
+        create_validator_driver(None).await;
+
+    // Spawn a driver client that's blocked on bootstrapping
+    let driver_client = validator_driver.create_driver_client();
+    let join_handle = tokio::spawn(async move {
+        driver_client.notify_once_bootstrapped().await.unwrap();
+    });
+
+    // Verify auto-bootstrapping hasn't happened yet
+    let result = consensus_notifier
+        .sync_to_target(create_ledger_info_at_version(0))
+        .await;
+    assert_err!(result);
+
+    // Elapse enough time on the time service for auto-bootstrapping
+    time_service
+        .into_mock()
+        .advance_async(Duration::from_secs(
+            StateSyncDriverConfig::default().max_connection_deadline_secs,
+        ))
+        .await;
 
     // Wait until the validator is bootstrapped (auto-bootstrapping should occur)
-    let driver_client = validator_driver.create_driver_client();
-    driver_client.notify_once_bootstrapped().await.unwrap();
+    join_handle.await.unwrap();
 }
 
 #[tokio::test]
 async fn test_consensus_commit_notification() {
     // Create a driver for a full node
-    let (_full_node_driver, consensus_notifier, _, _, _) = create_full_node_driver(None).await;
+    let (_full_node_driver, consensus_notifier, _, _, _, _) = create_full_node_driver(None).await;
 
     // Verify that full nodes can't process commit notifications
     let result = consensus_notifier
@@ -60,7 +82,7 @@ async fn test_consensus_commit_notification() {
     assert_err!(result);
 
     // Create a driver for a validator with a waypoint at version 0
-    let (_validator_driver, consensus_notifier, _, _, _) = create_validator_driver(None).await;
+    let (_validator_driver, consensus_notifier, _, _, _, _) = create_validator_driver(None).await;
 
     // Send a new commit notification and verify the node isn't bootstrapped
     let result = consensus_notifier
@@ -69,12 +91,26 @@ async fn test_consensus_commit_notification() {
     assert_err!(result);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_mempool_commit_notifications() {
     // Create a driver for a validator with a waypoint at version 0
     let subscription_event_key = EventKey::random();
-    let (validator_driver, consensus_notifier, mut mempool_listener, _, mut event_listener) =
-        create_validator_driver(Some(vec![subscription_event_key])).await;
+    let (
+        validator_driver,
+        consensus_notifier,
+        mut mempool_listener,
+        _,
+        mut event_listener,
+        time_service,
+    ) = create_validator_driver(Some(vec![subscription_event_key])).await;
+
+    // Elapse enough time on the time service for auto-bootstrapping
+    time_service
+        .into_mock()
+        .advance_async(Duration::from_secs(
+            StateSyncDriverConfig::default().max_connection_deadline_secs,
+        ))
+        .await;
 
     // Wait until the validator is bootstrapped
     let driver_client = validator_driver.create_driver_client();
@@ -110,11 +146,25 @@ async fn test_mempool_commit_notifications() {
     join_handle.await.unwrap();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_reconfiguration_notifications() {
     // Create a driver for a validator with a waypoint at version 0
-    let (validator_driver, consensus_notifier, mut mempool_listener, mut reconfig_listener, _) =
-        create_validator_driver(None).await;
+    let (
+        validator_driver,
+        consensus_notifier,
+        mut mempool_listener,
+        mut reconfig_listener,
+        _,
+        time_service,
+    ) = create_validator_driver(None).await;
+
+    // Elapse enough time on the time service for auto-bootstrapping
+    time_service
+        .into_mock()
+        .advance_async(Duration::from_secs(
+            StateSyncDriverConfig::default().max_connection_deadline_secs,
+        ))
+        .await;
 
     // Wait until the validator is bootstrapped
     let driver_client = validator_driver.create_driver_client();
@@ -163,7 +213,7 @@ async fn test_reconfiguration_notifications() {
 #[tokio::test]
 async fn test_consensus_sync_request() {
     // Create a driver for a full node
-    let (_full_node_driver, consensus_notifier, _, _, _) = create_full_node_driver(None).await;
+    let (_full_node_driver, consensus_notifier, _, _, _, _) = create_full_node_driver(None).await;
 
     // Verify that full nodes can't process sync requests
     let result = consensus_notifier
@@ -172,7 +222,7 @@ async fn test_consensus_sync_request() {
     assert_err!(result);
 
     // Create a driver for a validator with a waypoint at version 0
-    let (_validator_driver, consensus_notifier, _, _, _) = create_validator_driver(None).await;
+    let (_validator_driver, consensus_notifier, _, _, _, _) = create_validator_driver(None).await;
 
     // Send a new sync request and verify the node isn't bootstrapped
     let result = consensus_notifier
@@ -190,6 +240,7 @@ async fn create_validator_driver(
     MempoolNotificationListener,
     ReconfigNotificationListener,
     EventNotificationListener,
+    TimeService,
 ) {
     let mut node_config = NodeConfig::default();
     node_config.base.role = RoleType::Validator;
@@ -206,6 +257,7 @@ async fn create_full_node_driver(
     MempoolNotificationListener,
     ReconfigNotificationListener,
     EventNotificationListener,
+    TimeService,
 ) {
     let mut node_config = NodeConfig::default();
     node_config.base.role = RoleType::FullNode;
@@ -224,6 +276,7 @@ async fn create_driver_for_tests(
     MempoolNotificationListener,
     ReconfigNotificationListener,
     EventNotificationListener,
+    TimeService,
 ) {
     // Create test aptos database
     let db_path = aptos_temppath::TempPath::new();
@@ -262,6 +315,7 @@ async fn create_driver_for_tests(
     let (streaming_service_client, _) = new_streaming_service_client_listener_pair();
 
     // Create a test aptos data client
+    let time_service = TimeService::mock();
     let network_client = StorageServiceClient::new(
         MultiNetworkSender::new(HashMap::new()),
         PeerMetadataStorage::new(&[]),
@@ -270,7 +324,7 @@ async fn create_driver_for_tests(
         node_config.state_sync.aptos_data_client,
         node_config.base.clone(),
         node_config.state_sync.storage_service,
-        TimeService::mock(),
+        time_service.clone(),
         network_client,
         None,
     );
@@ -291,6 +345,7 @@ async fn create_driver_for_tests(
         event_subscription_service,
         aptos_data_client,
         streaming_service_client,
+        time_service.clone(),
     );
 
     // The driver will notify reconfiguration subscribers of the initial configs.
@@ -303,5 +358,6 @@ async fn create_driver_for_tests(
         mempool_listener,
         reconfiguration_subscriber,
         event_subscriber,
+        time_service,
     )
 }
