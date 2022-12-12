@@ -78,7 +78,7 @@ module std::features {
     public fun allow_vm_binary_format_v6(): bool acquires Features {
         is_enabled(VM_BINARY_FORMAT_V6)
     }
-   
+
     /// Whether gas fees are collected and distributed to the block proposers.
     /// Lifetime: transient
     const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
