@@ -1,5 +1,5 @@
 [package]
-name = "db-bootstrapper"
+name = "aptos-db-bootstrapper"
 description = "Aptos DB-Bootstrapper"
 version = "0.1.0"
 
@@ -16,11 +16,11 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
+aptos-executor = { workspace = true }
+aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-aptosdb = { workspace = true }
 bcs = { workspace = true }
-executor = { workspace = true }
-storage-interface = { workspace = true }
 structopt = { workspace = true }

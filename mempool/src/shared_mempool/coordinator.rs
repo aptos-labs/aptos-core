@@ -14,27 +14,27 @@ use crate::{
     },
     MempoolEventsReceiver, QuorumStoreRequest,
 };
-use ::network::protocols::network::Event;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::common::TransactionSummary;
+use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
+use aptos_network::protocols::network::Event;
 use aptos_types::on_chain_config::OnChainConfigPayload;
-use event_notifications::ReconfigNotificationListener;
+use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
     channel::mpsc,
     stream::{select_all, FuturesUnordered},
     StreamExt,
 };
-use mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
 use std::{
     sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
 use tokio::{runtime::Handle, time::interval};
 use tokio_stream::wrappers::IntervalStream;
-use vm_validator::vm_validator::TransactionValidation;
 
 use super::types::MempoolClientRequest;
 

@@ -1,5 +1,5 @@
 [package]
-name = "node-resource-metrics"
+name = "aptos-node-resource-metrics"
 description = "System resource metrics collector"
 version = "0.1.0"
 

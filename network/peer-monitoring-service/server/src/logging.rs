@@ -3,7 +3,7 @@
 
 use crate::Error;
 use aptos_logger::Schema;
-use peer_monitoring_service_types::PeerMonitoringServiceRequest;
+use aptos_peer_monitoring_service_types::PeerMonitoringServiceRequest;
 use serde::Serialize;
 
 #[derive(Schema)]

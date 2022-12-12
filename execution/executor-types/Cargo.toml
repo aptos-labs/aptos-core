@@ -1,5 +1,5 @@
 [package]
-name = "executor-types"
+name = "aptos-executor-types"
 description = "Aptos executor interface types"
 version = "0.1.0"
 
@@ -15,15 +15,15 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-scratchpad = { workspace = true }
 aptos-secure-net = { workspace = true }
 aptos-state-view = { workspace = true }
+aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
-scratchpad = { workspace = true }
 serde = { workspace = true }
-storage-interface = { workspace = true }
 thiserror = { workspace = true }
 
 [features]

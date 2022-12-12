@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use criterion::{criterion_group, criterion_main, measurement::Measurement, BatchSize, Criterion};
-use executor_benchmark::{
+use aptos_executor_benchmark::{
     init_db_and_executor, transaction_executor::TransactionExecutor,
     transaction_generator::TransactionGenerator,
 };
-use executor_types::BlockExecutorTrait;
+use aptos_executor_types::BlockExecutorTrait;
+use criterion::{criterion_group, criterion_main, measurement::Measurement, BatchSize, Criterion};
 use std::sync::Arc;
 
 pub const NUM_ACCOUNTS: usize = 1000;

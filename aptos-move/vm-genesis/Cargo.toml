@@ -1,5 +1,5 @@
 [package]
-name = "vm-genesis"
+name = "aptos-vm-genesis"
 description = "Aptos vm genesis"
 version = "0.1.0"
 
@@ -16,12 +16,12 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-cached-packages =  { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-framework =  { workspace = true }
 aptos-gas = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
-framework =  { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }
 once_cell = { workspace = true }

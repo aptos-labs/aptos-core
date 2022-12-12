@@ -4,15 +4,15 @@
 use crate::{counters::DISCOVERY_COUNTS, file::FileStream, validator_set::ValidatorSetStream};
 use aptos_config::{config::PeerSet, network_id::NetworkContext};
 use aptos_crypto::x25519;
+use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_logger::prelude::*;
-use aptos_time_service::TimeService;
-use event_notifications::ReconfigNotificationListener;
-use futures::{Stream, StreamExt};
-use network::{
+use aptos_network::{
     connectivity_manager::{ConnectivityRequest, DiscoverySource},
     counters::inc_by_with_context,
     logging::NetworkSchema,
 };
+use aptos_time_service::TimeService;
+use futures::{Stream, StreamExt};
 use std::{
     path::Path,
     pin::Pin,
@@ -35,7 +35,7 @@ pub enum DiscoveryError {
 pub struct DiscoveryChangeListener {
     discovery_source: DiscoverySource,
     network_context: NetworkContext,
-    update_channel: channel::Sender<ConnectivityRequest>,
+    update_channel: aptos_channels::Sender<ConnectivityRequest>,
     source_stream: DiscoveryChangeStream,
 }
 
@@ -58,7 +58,7 @@ impl Stream for DiscoveryChangeStream {
 impl DiscoveryChangeListener {
     pub fn validator_set(
         network_context: NetworkContext,
-        update_channel: channel::Sender<ConnectivityRequest>,
+        update_channel: aptos_channels::Sender<ConnectivityRequest>,
         expected_pubkey: x25519::PublicKey,
         reconfig_events: ReconfigNotificationListener,
     ) -> Self {
@@ -77,7 +77,7 @@ impl DiscoveryChangeListener {
 
     pub fn file(
         network_context: NetworkContext,
-        update_channel: channel::Sender<ConnectivityRequest>,
+        update_channel: aptos_channels::Sender<ConnectivityRequest>,
         file_path: &Path,
         interval_duration: Duration,
         time_service: TimeService,

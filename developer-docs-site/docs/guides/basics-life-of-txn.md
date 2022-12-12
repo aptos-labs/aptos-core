@@ -12,10 +12,10 @@ For a deeper understanding of the lifecycle of an Aptos transaction (from an ope
 
 ## Life of a Transaction
 
-* Alice and Bob are two users who each have an [account](/reference/glossary#account) on the Aptos blockchain.
+* Alice and Bob are two users who each have an [account](../reference/glossary.md#account) on the Aptos blockchain.
 * Alice's account has 110 Aptos Coins.
 * Alice is sending 10 Aptos Coins to Bob.
-* The current [sequence number](/reference/glossary#sequence-number) of Alice's account is 5 (which indicates that 5 transactions have already been sent from Alice's account).
+* The current [sequence number](../reference/glossary.md#sequence-number) of Alice's account is 5 (which indicates that 5 transactions have already been sent from Alice's account).
 * There are a total of 100 validator nodes &mdash; V<sub>1</sub> to V<sub>100</sub> on the network.
 * An Aptos client submits Alice's transaction to a REST service on an Aptos Fullnode. The fullnode forwards this transaction to a validator fullnode which in turn forwards it to validator V<sub>1</sub>.
 * Validator V<sub>1</sub> is a proposer/leader for the current round.
@@ -62,12 +62,12 @@ The raw transaction includes the following fields:
 
 | Fields | Description |
 | ------ | ----------- |
-| [Account address](/reference/glossary#account-address) | Alice's account address |
-| Move module | A module (or program) that indicates the actions to be performed on Alice's behalf. In this case, it contains:  <br />- A Move bytecode peer-to-peer [transaction script](/reference/glossary#transaction-script) <br />- A list of inputs to the script (for this example the list would contain Bob's account address and the payment amount in Aptos Coins). |
-| [Maximum gas amount](/reference/glossary#maximum-gas-amount) | The maximum gas amount Alice is willing to pay for this transaction. Gas is a way to pay for computation and storage. A gas unit is an abstract measurement of computation. |
-| [Gas price](/reference/glossary#gas-price) | The amount (in Aptos Coins) Alice is willing to pay per unit of gas, to execute the transaction. |
-| [Expiration time](/reference/glossary#expiration-time) | Expiration time of the transaction. |
-| [Sequence number](/reference/glossary#sequence-number)  | The sequence number (5, in this example) for an account indicates the number of transactions that have been submitted and committed on-chain from that account. In this case, 5 transactions have been submitted from Alice’s account, including Traw<sub>5</sub>. Note: a transaction with sequence number 5 can only be committed on-chain if the account sequence number is 5. |
+| [Account address](../reference/glossary.md#account-address) | Alice's account address |
+| Move module | A module (or program) that indicates the actions to be performed on Alice's behalf. In this case, it contains:  <br />- A Move bytecode peer-to-peer [transaction script](../reference/glossary.md#transaction-script) <br />- A list of inputs to the script (for this example the list would contain Bob's account address and the payment amount in Aptos Coins). |
+| [Maximum gas amount](../reference/glossary.md#maximum-gas-amount) | The maximum gas amount Alice is willing to pay for this transaction. Gas is a way to pay for computation and storage. A gas unit is an abstract measurement of computation. |
+| [Gas price](../reference/glossary.md#gas-price) | The amount (in Aptos Coins) Alice is willing to pay per unit of gas, to execute the transaction. |
+| [Expiration time](../reference/glossary.md#expiration-time) | Expiration time of the transaction. |
+| [Sequence number](../reference/glossary.md#sequence-number)  | The sequence number (5, in this example) for an account indicates the number of transactions that have been submitted and committed on-chain from that account. In this case, 5 transactions have been submitted from Alice’s account, including Traw<sub>5</sub>. Note: a transaction with sequence number 5 can only be committed on-chain if the account sequence number is 5. |
 | [Chain ID](https://github.com/aptos-labs/aptos-core/blob/main/types/src/chain_id.rs) | An identifier that distinguishes the Aptos network deployments (to prevent cross-network attacks). |
 
 ### Accepting the transaction
@@ -112,7 +112,7 @@ Alice's account will now have 100 Aptos Coins, and its sequence number will be 6
 
 ## Aptos node component interactions
 
-In the [previous section](#life-of-a-transaction), we described the typical lifecycle of a transaction (from transaction submission to transaction commit). Now let's look at the inter-component interactions of Aptos nodes as the blockchain processes transactions and responds to queries. This information will be most useful to those who:
+In the [Life of a Transaction](#life-of-a-transaction) section, we described the typical lifecycle of a transaction (from transaction submission to transaction commit). Now let's look at the inter-component interactions of Aptos nodes as the blockchain processes transactions and responds to queries. This information will be most useful to those who:
 
 * Would like to get an idea of how the system works under the covers.
 * Are interested in eventually contributing to the Aptos blockchain.

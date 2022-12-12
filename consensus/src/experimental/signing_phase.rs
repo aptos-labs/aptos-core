@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use safety_rules::TSafetyRules;
+use aptos_safety_rules::TSafetyRules;
 use std::{
     fmt::{Debug, Display, Formatter},
     sync::Arc,
@@ -12,9 +12,9 @@ use crate::{
 };
 use aptos_crypto::bls12381;
 use aptos_infallible::Mutex;
+use aptos_safety_rules::Error;
 use aptos_types::ledger_info::{LedgerInfo, LedgerInfoWithSignatures};
 use async_trait::async_trait;
-use safety_rules::Error;
 
 /// [ This class is used when consensus.decoupled = true ]
 /// SigningPhase is a singleton that receives executed blocks from

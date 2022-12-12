@@ -1,5 +1,5 @@
 [package]
-name = "vm-validator"
+name = "aptos-vm-validator"
 description = "Aptos vm validator"
 version = "0.1.0"
 
@@ -15,27 +15,27 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-gas = { workspace = true }
+aptos-scratchpad = { workspace = true }
 aptos-state-view = { workspace = true }
+aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 fail = { workspace = true }
-scratchpad = { workspace = true }
-storage-interface = { workspace = true }
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
+aptos-executor-test-helpers = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-aptosdb = { workspace = true }
-executor-test-helpers = { workspace = true }
+aptos-vm-genesis = { workspace = true }
 move-core-types = { workspace = true }
 rand = { workspace = true }
-vm-genesis = { workspace = true }
 
 [features]
 default = []
 failpoints = ["fail/failpoints"]
-fuzzing = ["aptos-types/fuzzing", "aptos-crypto/fuzzing", "aptosdb/fuzzing"]
+fuzzing = ["aptos-types/fuzzing", "aptos-crypto/fuzzing", "aptos-db/fuzzing"]

@@ -7,11 +7,11 @@ use crate::{
     create_emitter_and_request, traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
 };
 use anyhow::bail;
-use aptos_logger::info;
-use forge::{
+use aptos_forge::{
     success_criteria::{LatencyType, SuccessCriteriaChecker},
     EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test,
 };
+use aptos_logger::info;
 use rand::{rngs::OsRng, Rng, SeedableRng};
 
 pub struct TwoTrafficsTest {

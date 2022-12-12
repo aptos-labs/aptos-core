@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-openapi = { workspace = true }
+aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 async-trait = { workspace = true }
@@ -30,4 +31,3 @@ poem = { workspace = true }
 poem-openapi = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-storage-interface = { workspace = true }

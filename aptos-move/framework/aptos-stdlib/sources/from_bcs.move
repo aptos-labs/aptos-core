@@ -67,7 +67,7 @@ module aptos_std::from_bcs {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x10001)]
+    #[expected_failure(abort_code = 0x10001, location = Self)]
     fun test_address_fail() {
         let bad_vec = b"01";
         to_address(bad_vec);

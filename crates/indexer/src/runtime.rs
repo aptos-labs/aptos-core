@@ -18,10 +18,10 @@ use aptos_api::context::Context;
 use aptos_config::config::{IndexerConfig, NodeConfig};
 use aptos_logger::{error, info};
 use aptos_mempool::MempoolClientSender;
+use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
 use std::collections::VecDeque;
 use std::sync::Arc;
-use storage_interface::DbReader;
 use tokio::runtime::{Builder, Runtime};
 
 pub struct MovingAverage {

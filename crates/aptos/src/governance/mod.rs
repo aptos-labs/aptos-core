@@ -12,6 +12,7 @@ use crate::move_tool::{FrameworkPackageArgs, IncludedArtifacts};
 use crate::{CliCommand, CliResult};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::HashValue;
+use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::{Address, HexEncodedBytes, U128, U64};
 use aptos_rest_client::{Client, Transaction};
@@ -26,7 +27,6 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use clap::Parser;
-use framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use move_core_types::transaction_argument::TransactionArgument;
 use reqwest::Url;
 use serde::Deserialize;

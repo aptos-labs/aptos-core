@@ -5,8 +5,8 @@ use crate::{experimental::pipeline_phase::StatelessPipeline, state_replication::
 use anyhow::Result;
 use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_crypto::HashValue;
+use aptos_executor_types::Error as ExecutionError;
 use async_trait::async_trait;
-use executor_types::Error as ExecutionError;
 use std::{
     fmt::{Debug, Display, Formatter},
     sync::Arc,

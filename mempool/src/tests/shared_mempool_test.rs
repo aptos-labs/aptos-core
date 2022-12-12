@@ -7,9 +7,9 @@ use crate::{
     QuorumStoreRequest,
 };
 use aptos_consensus_types::common::RejectedTransactionSummary;
+use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_types::transaction::Transaction;
 use futures::{channel::oneshot, executor::block_on, sink::SinkExt};
-use mempool_notifications::MempoolNotificationSender;
 use tokio::runtime::Builder;
 
 #[test]

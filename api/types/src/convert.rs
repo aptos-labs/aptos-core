@@ -15,6 +15,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
@@ -41,7 +42,6 @@ use std::{
     rc::Rc,
     sync::Arc,
 };
-use storage_interface::DbReader;
 
 /// The Move converter for converting Move types to JSON
 ///
@@ -600,8 +600,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         Ok(match layout {
             MoveTypeLayout::Bool => Bool(serde_json::from_value::<bool>(val)?),
             MoveTypeLayout::U8 => U8(serde_json::from_value::<u8>(val)?),
+            MoveTypeLayout::U16 => U16(serde_json::from_value::<u16>(val)?),
+            MoveTypeLayout::U32 => U32(serde_json::from_value::<u32>(val)?),
             MoveTypeLayout::U64 => serde_json::from_value::<crate::U64>(val)?.into(),
             MoveTypeLayout::U128 => serde_json::from_value::<crate::U128>(val)?.into(),
+            MoveTypeLayout::U256 => serde_json::from_value::<crate::U256>(val)?.into(),
             MoveTypeLayout::Address => serde_json::from_value::<crate::Address>(val)?.into(),
             MoveTypeLayout::Vector(item_layout) => {
                 self.try_into_vm_value_vector(item_layout.as_ref(), val)?

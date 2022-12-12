@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_cached_packages::aptos_stdlib::aptos_token_stdlib;
+use aptos_forge::{AptosPublicInfo, Result, Swarm};
 use aptos_indexer::{
     database::{new_db_pool, PgDbPool, PgPoolConnection},
     models::transactions::TransactionQuery,
 };
 use aptos_sdk::types::LocalAccount;
 use diesel::RunQueryDsl;
-use forge::{AptosPublicInfo, Result, Swarm};
 use std::sync::Arc;
 
 pub fn wipe_database(conn: &mut PgPoolConnection) {

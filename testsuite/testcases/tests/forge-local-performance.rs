@@ -1,13 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use forge::{
+use aptos_forge::{
     forge_main,
     success_criteria::{StateProgressThreshold, SuccessCriteria},
     EmitJobMode, EmitJobRequest, ForgeConfig, InitialVersion, LocalFactory, Options, Result,
 };
+use aptos_testcases::performance_test::PerformanceBenchmark;
 use std::num::NonZeroUsize;
-use testcases::performance_test::PerformanceBenchmark;
 
 fn main() -> Result<()> {
     ::aptos_logger::Logger::init_for_testing();

@@ -12,10 +12,10 @@ use crate::{
     utils::{GlobalRestoreOptions, RestoreRunMode, TrustedWaypointOpt},
 };
 use anyhow::{ensure, Result};
+use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
 use aptos_vm::AptosVM;
-use aptosdb::backup::restore_handler::RestoreHandler;
 use std::sync::Arc;
 
 pub struct ReplayVerifyCoordinator {
@@ -28,6 +28,7 @@ pub struct ReplayVerifyCoordinator {
     start_version: Version,
     end_version: Version,
     validate_modules: bool,
+    txns_to_skip: Vec<Version>,
 }
 
 impl ReplayVerifyCoordinator {
@@ -41,6 +42,7 @@ impl ReplayVerifyCoordinator {
         start_version: Version,
         end_version: Version,
         validate_modules: bool,
+        txns_to_skip: Vec<Version>,
     ) -> Result<Self> {
         Ok(Self {
             storage,
@@ -52,6 +54,7 @@ impl ReplayVerifyCoordinator {
             start_version,
             end_version,
             validate_modules,
+            txns_to_skip,
         })
     }
 
@@ -132,6 +135,7 @@ impl ReplayVerifyCoordinator {
             txn_manifests,
             Some(replay_transactions_from_version), /* replay_from_version */
             None,                                   /* epoch_history */
+            self.txns_to_skip,
         )
         .run()
         .await?;

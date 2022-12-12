@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
-use schemadb::iterator::SchemaIterator;
-use schemadb::{
+use aptos_schemadb::iterator::SchemaIterator;
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
     DB,
 };
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
 
 define_schema!(TestSchema, TestKey, TestValue, "TestCF");
 

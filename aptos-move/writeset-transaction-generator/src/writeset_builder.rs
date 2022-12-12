@@ -3,7 +3,10 @@
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas::{
+    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters,
+    LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
@@ -111,6 +114,7 @@ where
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         chain_id,
     )
     .unwrap();
@@ -133,7 +137,10 @@ where
 
     // Genesis never produces the delta change set.
     let (_, change_set) = session_out
-        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+        .into_change_set(
+            &mut (),
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+        )
         .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
         .unwrap()
         .into_inner();

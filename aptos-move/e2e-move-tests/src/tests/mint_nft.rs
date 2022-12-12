@@ -53,7 +53,7 @@ fn mint_nft_e2e() {
     let resource_address = create_resource_address(*acc.address(), &[]);
 
     // give a named address to the `mint_nft` module publisher
-    let mut build_options = framework::BuildOptions::default();
+    let mut build_options = aptos_framework::BuildOptions::default();
     build_options
         .named_addresses
         .insert("mint_nft".to_string(), resource_address);
@@ -62,7 +62,7 @@ fn mint_nft_e2e() {
         .insert("source_addr".to_string(), *acc.address());
 
     // build the package from our example code
-    let package = framework::BuiltPackage::build(
+    let package = aptos_framework::BuiltPackage::build(
         common::test_dir_path("../../../move-examples/mint_nft/4-Getting-Production-Ready"),
         build_options,
     )

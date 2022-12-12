@@ -8,15 +8,15 @@ use aptos_config::{
     network_id::{NetworkContext, NetworkId},
 };
 use aptos_crypto::x25519::{self, PRIVATE_KEY_SIZE};
-use aptos_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
-use futures::{AsyncReadExt, AsyncWriteExt};
-use network::transport::TCPBufferCfg;
-use network::{
+use aptos_network::transport::TCPBufferCfg;
+use aptos_network::{
     noise::{HandshakeAuthMode, NoiseUpgrader},
     protocols::wire::handshake::v1::ProtocolIdSet,
     transport::{resolve_and_connect, TcpSocket},
     transport::{upgrade_outbound, UpgradeContext, SUPPORTED_MESSAGING_PROTOCOL},
 };
+use aptos_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
+use futures::{AsyncReadExt, AsyncWriteExt};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 

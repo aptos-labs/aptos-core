@@ -69,6 +69,16 @@ module std::features {
         is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
     }
 
+    /// Whether to allow the use of binary format version v6.
+    /// Lifetime: transient
+    const VM_BINARY_FORMAT_V6: u64 = 5;
+
+    public fun get_vm_binary_format_v6(): u64 { VM_BINARY_FORMAT_V6 }
+
+    public fun allow_vm_binary_format_v6(): bool acquires Features {
+        is_enabled(VM_BINARY_FORMAT_V6)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

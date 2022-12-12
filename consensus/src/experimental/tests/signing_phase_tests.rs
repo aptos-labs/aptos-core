@@ -17,13 +17,13 @@ use crate::{
     test_utils::consensus_runtime,
 };
 use aptos_crypto::HashValue;
+use aptos_safety_rules::Error;
 use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
 };
-use safety_rules::Error;
 
 pub fn prepare_signing_pipeline(
     signing_phase: SigningPhase,

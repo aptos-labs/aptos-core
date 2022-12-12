@@ -19,10 +19,10 @@ aptos-consensus = { workspace = true, features = ["fuzzing"] }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-network = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
-network = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde-reflection = { workspace = true }

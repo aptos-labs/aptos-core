@@ -10,7 +10,7 @@ runs:
         sudo apt-get update -y && sudo apt-get install -y expect
     - name: Build CLI binaries in release mode
       shell: bash
-      run: cargo build --release -p backup-cli --bin replay-verify --bin db-backup
+      run: cargo build --release -p aptos-backup-cli --bin replay-verify --bin db-backup
     - name: query latest version in backup, at the same time, pre-heat metadata cache
       shell: bash
       run: |

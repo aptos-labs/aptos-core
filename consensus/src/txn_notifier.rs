@@ -4,9 +4,9 @@
 use crate::{error::MempoolError, monitor};
 use anyhow::{format_err, Result};
 use aptos_consensus_types::common::RejectedTransactionSummary;
+use aptos_executor_types::StateComputeResult;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::transaction::{SignedTransaction, TransactionStatus};
-use executor_types::StateComputeResult;
 use futures::channel::{mpsc, oneshot};
 use itertools::Itertools;
 use std::time::Duration;

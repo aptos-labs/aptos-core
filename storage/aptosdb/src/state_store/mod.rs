@@ -22,10 +22,16 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_executor_types::in_memory_state_calculator::InMemoryStateCalculator;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_state_view::StateViewId;
+use aptos_storage_interface::{
+    cached_state_view::CachedStateView, state_delta::StateDelta,
+    sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
+};
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
@@ -36,17 +42,11 @@ use aptos_types::{
     },
     transaction::Version,
 };
-use executor_types::in_memory_state_calculator::InMemoryStateCalculator;
 use once_cell::sync::Lazy;
-use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{
     collections::{HashMap, HashSet},
     ops::Deref,
     sync::Arc,
-};
-use storage_interface::{
-    cached_state_view::CachedStateView, state_delta::StateDelta,
-    sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
 };
 
 pub(crate) mod buffered_state;

@@ -21,6 +21,7 @@ aptos-logger = { workspace = true }
 aptos-network-checker = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
+aptos-transaction-emitter-lib = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 const_format = { workspace = true }
@@ -37,7 +38,6 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-transaction-emitter-lib = { workspace = true }
 url = { workspace = true }
 
 [lib]

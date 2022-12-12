@@ -1,5 +1,5 @@
 [package]
-name = "storage-service-client"
+name = "aptos-storage-service-client"
 description = "The Aptos storage service (client-side)"
 version = "0.1.0"
 
@@ -13,10 +13,10 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
+aptos-network = { workspace = true }
+aptos-storage-service-types = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
-channel = { workspace = true }
-network = { workspace = true }
-storage-service-types = { workspace = true }
 thiserror = { workspace = true }

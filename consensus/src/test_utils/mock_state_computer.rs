@@ -11,12 +11,12 @@ use crate::{
 use anyhow::{format_err, Result};
 use aptos_consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
+use aptos_executor_types::{Error, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
 };
-use executor_types::{Error, StateComputeResult};
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
 use std::{collections::HashMap, sync::Arc};

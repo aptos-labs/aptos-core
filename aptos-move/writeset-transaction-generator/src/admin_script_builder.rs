@@ -24,7 +24,7 @@ pub fn compile_script(source_file_str: String) -> Vec<u8> {
         aptos_cached_packages::head_release_bundle()
             .files()
             .unwrap(),
-        framework::named_addresses().clone(),
+        aptos_framework::named_addresses().clone(),
     )
     .set_flags(Flags::empty().set_sources_shadow_deps(false))
     .build_and_report()

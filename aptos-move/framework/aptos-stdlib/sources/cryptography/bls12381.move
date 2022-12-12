@@ -516,7 +516,7 @@ module aptos_std::bls12381 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 65537)]
+    #[expected_failure(abort_code = 65537, location = Self)]
     fun test_empty_pubkey_aggregation() {
         // First, make sure if no inputs are given, the function returns None
         // assert!(aggregate_pop_verified_pubkeys(vector::empty()) == option::none(), 1);

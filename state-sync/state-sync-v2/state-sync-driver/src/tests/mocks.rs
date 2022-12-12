@@ -15,6 +15,11 @@ use aptos_data_streaming_service::{
     data_stream::DataStreamListener,
     streaming_client::{DataStreamingClient, Epoch},
 };
+use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
+use aptos_storage_interface::{
+    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
+    StateSnapshotReceiver,
+};
 use aptos_types::epoch_state::EpochState;
 use aptos_types::{
     account_address::AccountAddress,
@@ -37,13 +42,8 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
-use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
 use std::sync::Arc;
-use storage_interface::{
-    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
-    StateSnapshotReceiver,
-};
 use tokio::task::JoinHandle;
 
 // TODO(joshlind): if we see these as generally useful, we should

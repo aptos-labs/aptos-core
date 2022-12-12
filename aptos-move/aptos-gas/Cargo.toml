@@ -14,19 +14,19 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-framework = { workspace = true }
+aptos-gas-algebra-ext = { workspace = true }
 aptos-global-constants = { workspace = true }
+aptos-package-builder = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
-framework = { workspace = true }
-gas-algebra-ext = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 move-stdlib = { workspace = true }
 move-table-extension = { workspace = true }
 move-vm-types = { workspace = true }
-package-builder = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -8,7 +8,9 @@ use once_cell::sync::Lazy;
 
 use crate::{ParsedTransactionOutput, ProofReader};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
 use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
+use aptos_storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
@@ -20,8 +22,6 @@ use aptos_types::{
     transaction::{Transaction, Version},
     write_set::{WriteOp, WriteSet},
 };
-use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
-use storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 

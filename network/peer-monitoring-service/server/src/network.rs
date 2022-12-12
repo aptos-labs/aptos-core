@@ -2,23 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::PeerMonitoringServiceConfig;
-use aptos_types::PeerId;
-use bytes::Bytes;
-use channel::{aptos_channel, message_queues::QueueStyle};
-use futures::{
-    channel::oneshot,
-    future,
-    stream::{BoxStream, Stream, StreamExt},
-};
-use network::{
+use aptos_network::{
     peer_manager::{ConnectionNotification, PeerManagerNotification},
     protocols::network::{AppConfig, Event, NetworkEvents, NewNetworkEvents, RpcError},
     ProtocolId,
 };
-use peer_monitoring_service_types::{
+use aptos_peer_monitoring_service_types::{
     PeerMonitoringServiceMessage, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
     Result,
+};
+use aptos_types::PeerId;
+use bytes::Bytes;
+use futures::{
+    channel::oneshot,
+    future,
+    stream::{BoxStream, Stream, StreamExt},
 };
 use std::{
     pin::Pin,

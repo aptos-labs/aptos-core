@@ -13,9 +13,9 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-framework = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 bcs = { workspace = true }
-framework = { workspace = true }
 include_dir = { workspace = true }
 move-core-types = { workspace = true }
 once_cell = { workspace = true }
@@ -23,7 +23,7 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 
 [build-dependencies]
-framework = { workspace = true }
+aptos-framework = { workspace = true }
 
 [features]
 default = []
