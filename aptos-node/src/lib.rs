@@ -3,11 +3,11 @@
 
 #![forbid(unsafe_code)]
 
+mod bootstrap;
 mod log_build_information;
 
 use anyhow::{anyhow, Context};
 use aptos_api::bootstrap as bootstrap_api;
-use aptos_backup_service::start_backup_service;
 use aptos_build_info::build_information;
 use aptos_config::{
     config::{
@@ -38,6 +38,7 @@ use aptos_db::AptosDB;
 use aptos_event_notifications::{EventNotificationSender, EventSubscriptionService};
 use aptos_executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
 use aptos_framework::ReleaseBundle;
+use aptos_mempool::MempoolClientSender;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_network::application::storage::PeerMetadataStorage;
 use aptos_network_builder::builder::NetworkBuilder;
@@ -71,7 +72,7 @@ use std::{
 };
 use tokio::runtime::{Builder, Runtime};
 
-use aptos_mempool::MempoolClientSender;
+use crate::bootstrap::bootstrap_db;
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -172,10 +173,7 @@ pub struct AptosHandle {
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
     _index_runtime: Option<Runtime>,
-    #[cfg(not(feature = "consensus-only"))]
     _state_sync_runtimes: StateSyncRuntimes,
-    #[cfg(feature = "consensus-only")]
-    _state_sync_runtimes: Runtime,
     _telemetry_runtime: Option<Runtime>,
 }
 
@@ -667,7 +665,6 @@ fn create_checkpoint_and_change_working_dir(
         .expect("StateSyncDB checkpoint creation failed.");
 }
 
-#[cfg(not(feature = "consensus-only"))]
 pub fn setup_environment(
     mut node_config: NodeConfig,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
@@ -688,22 +685,7 @@ pub fn setup_environment(
 
     // Open the database
     let mut instant = Instant::now();
-    let (aptos_db, db_rw) = DbReaderWriter::wrap(
-        AptosDB::open(
-            &node_config.storage.dir(),
-            false, /* readonly */
-            node_config.storage.storage_pruner_config,
-            node_config.storage.rocksdb_configs,
-            node_config.storage.enable_indexer,
-            node_config.storage.buffered_state_target_items,
-            node_config.storage.max_num_nodes_per_lru_cache_shard,
-        )
-        .map_err(|err| anyhow!("DB failed to open {}", err))?,
-    );
-    let backup_service = start_backup_service(
-        node_config.storage.backup_service_address,
-        Arc::clone(&aptos_db),
-    );
+    let (aptos_db, db_rw, backup_service) = bootstrap_db(&node_config)?;
 
     let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
     // if there's genesis txn and waypoint, commit it if the result matches.
@@ -963,324 +945,7 @@ pub fn setup_environment(
 
     Ok(AptosHandle {
         _api: api_runtime,
-        _backup: Some(backup_service),
-        _consensus_runtime: consensus_runtime,
-        _mempool: mempool,
-        _network_runtimes: network_runtimes,
-        _index_runtime: index_runtime,
-        _fh_stream: sf_runtime,
-        _state_sync_runtimes: state_sync_runtimes,
-        _telemetry_runtime: telemetry_runtime,
-    })
-}
-
-#[cfg(feature = "consensus-only")]
-pub fn setup_environment(
-    node_config: NodeConfig,
-    remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
-    logger_filter_update_job: Option<LoggerFilterUpdater>,
-) -> anyhow::Result<AptosHandle> {
-    // Start the node inspection service
-
-    use aptos_db::fake_aptosdb::FakeAptosDB;
-    let node_config_clone = node_config.clone();
-    thread::spawn(move || {
-        aptos_inspection_service::inspection_service::start_inspection_service(node_config_clone)
-    });
-
-    // Open the database
-    let mut instant = Instant::now();
-    let (aptos_db, db_rw) = DbReaderWriter::wrap(FakeAptosDB::new(
-        AptosDB::open(
-            &node_config.storage.dir(),
-            false, /* readonly */
-            node_config.storage.storage_pruner_config,
-            node_config.storage.rocksdb_configs,
-            node_config.storage.enable_indexer,
-            node_config.storage.buffered_state_target_items,
-            node_config.storage.max_num_nodes_per_lru_cache_shard,
-        )
-        .map_err(|err| anyhow!("DB failed to open {}", err))?,
-    ));
-
-    let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
-    // if there's genesis txn and waypoint, commit it if the result matches.
-    if let Some(genesis) = get_genesis_txn(&node_config) {
-        maybe_bootstrap::<AptosVM>(&db_rw, genesis, genesis_waypoint)
-            .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
-    } else {
-        info!("Genesis txn not provided, it's fine if you don't expect to apply it otherwise please double check config");
-    }
-    AptosVM::set_concurrency_level_once(node_config.execution.concurrency_level as usize);
-    AptosVM::set_num_proof_reading_threads_once(
-        node_config.execution.num_proof_reading_threads as usize,
-    );
-    if node_config
-        .execution
-        .processed_transactions_detailed_counters
-    {
-        AptosVM::set_processed_transactions_detailed_counters();
-    }
-
-    debug!(
-        "Storage service started in {} ms",
-        instant.elapsed().as_millis()
-    );
-
-    let mut network_runtimes = vec![];
-    let mut mempool_network_handles = vec![];
-    let mut consensus_network_handles = None;
-    // let mut storage_service_server_network_handles = vec![];
-    // let mut storage_service_client_network_handles = HashMap::new();
-
-    // Create an event subscription service so that components can be notified of events and reconfigs
-    let mut event_subscription_service = EventSubscriptionService::new(
-        ON_CHAIN_CONFIG_REGISTRY,
-        Arc::new(RwLock::new(db_rw.clone())),
-    );
-    let mempool_reconfig_subscription =
-        event_subscription_service.subscribe_to_reconfigurations()?;
-
-    // Create a consensus subscription for reconfiguration events (if this node is a validator).
-    let consensus_reconfig_subscription = if node_config.base.role.is_validator() {
-        Some(event_subscription_service.subscribe_to_reconfigurations()?)
-    } else {
-        None
-    };
-
-    // Gather all network configs into a single vector.
-    let mut network_configs: Vec<&NetworkConfig> = node_config.full_node_networks.iter().collect();
-    if let Some(network_config) = node_config.validator_network.as_ref() {
-        // Ensure that mutual authentication is enabled by default!
-        if !network_config.mutual_authentication {
-            panic!("Validator networks must always have mutual_authentication enabled!");
-        }
-        network_configs.push(network_config);
-    }
-
-    // Instantiate every network and collect the requisite endpoints for state_sync, mempool, and consensus.
-    let mut network_ids = HashSet::new();
-    network_configs.iter().for_each(|config| {
-        let network_id = config.network_id;
-        // Guarantee there is only one of this network
-        if network_ids.contains(&network_id) {
-            panic!(
-                "Duplicate NetworkId: '{}'.  Can't start node with duplicate networks",
-                network_id
-            );
-        }
-        network_ids.insert(network_id);
-    });
-    let network_ids: Vec<_> = network_ids.into_iter().collect();
-    let peer_metadata_storage = PeerMetadataStorage::new(&network_ids);
-
-    let chain_id = fetch_chain_id(&db_rw)?;
-
-    let build_info = build_information!();
-    // Start the telemetry service as early as possible and before any blocking calls
-    // We have all the necesary info here to start the telemetry service
-    let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
-        node_config.clone(),
-        chain_id,
-        build_info,
-        remote_log_rx,
-        logger_filter_update_job,
-    );
-
-    for network_config in network_configs.into_iter() {
-        let network_id = network_config.network_id;
-        debug!("Creating runtime for {}", network_id);
-        let mut runtime_builder = Builder::new_multi_thread();
-        runtime_builder
-            .disable_lifo_slot()
-            .thread_name_fn(move || {
-                static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-                let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-                format!(
-                    "network-{}-{}",
-                    network_id.as_str().chars().take(3).collect::<String>(),
-                    id
-                )
-            })
-            .enable_all();
-        if let Some(runtime_threads) = network_config.runtime_threads {
-            runtime_builder.worker_threads(runtime_threads);
-        }
-        let runtime = runtime_builder.build().map_err(|err| {
-            anyhow!(
-                "Failed to start runtime.  Won't be able to start networking. {}",
-                err
-            )
-        })?;
-
-        // Entering here gives us a runtime to instantiate all the pieces of the builder
-        let _enter = runtime.enter();
-
-        // Perform common instantiation steps
-        let mut network_builder = NetworkBuilder::create(
-            chain_id,
-            node_config.base.role,
-            network_config,
-            TimeService::real(),
-            Some(&mut event_subscription_service),
-            peer_metadata_storage.clone(),
-        );
-        let network_id = network_config.network_id;
-
-        // TODO(philiphayes): configure which networks we serve the storage service
-        // on? for example, if we're a light node we wouldn't want to provide the
-        // storage service at all.
-
-        // // Register the network-facing storage service with Network.
-        // let storage_service_events =
-        //     network_builder.add_service(&storage_service_server::network::network_endpoint_config(
-        //         node_config.state_sync.storage_service,
-        //     ));
-        // storage_service_server_network_handles.push(storage_service_events);
-
-        // // Register the storage-service clients with Network
-        // let storage_service_sender =
-        //     network_builder.add_client(&storage_service_client::network_endpoint_config());
-        // storage_service_client_network_handles.insert(network_id, storage_service_sender);
-
-        // Create the endpoints to connect the Network to mempool.
-        let (mempool_sender, mempool_events) = network_builder.add_p2p_service(
-            &aptos_mempool::network::network_endpoint_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
-        );
-        mempool_network_handles.push((network_id, mempool_sender, mempool_events));
-
-        // Create the endpoints to connect the Network to mempool.
-        let (mempool_sender, mempool_events) = network_builder.add_p2p_service(
-            &aptos_mempool::network::network_endpoint_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
-        );
-        mempool_network_handles.push((network_id, mempool_sender, mempool_events));
-
-        // Perform steps relevant specifically to Validator networks.
-        if network_id.is_validator_network() {
-            // A valid config is allowed to have at most one ValidatorNetwork
-            // TODO:  `expect_none` would be perfect here, once it is stable.
-            if consensus_network_handles.is_some() {
-                panic!("There can be at most one validator network!");
-            }
-
-            consensus_network_handles =
-                Some(network_builder.add_p2p_service(
-                    &aptos_consensus::network_interface::network_endpoint_config(),
-                ));
-        }
-
-        let network_context = network_builder.network_context();
-        network_builder.build(runtime.handle().clone());
-        network_builder.start();
-        debug!("Network built for network context: {}", network_context);
-        network_runtimes.push(runtime);
-    }
-
-    // TODO set up on-chain discovery network based on UpstreamConfig.fallback_network
-    // and pass network handles to mempool/state sync
-
-    // For state sync to send notifications to mempool and receive notifications from consensus.
-    let (mempool_notifier, mempool_listener) =
-        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
-    let (consensus_notifier, consensus_listener) =
-        aptos_consensus_notifications::new_consensus_notifier_listener_pair(
-            node_config
-                .state_sync
-                .state_sync_driver
-                .commit_notification_timeout_ms,
-        );
-
-    // Create the state sync runtimes
-    // let state_sync_runtimes = create_state_sync_runtimes(
-    //     &node_config,
-    //     storage_service_server_network_handles,
-    //     storage_service_client_network_handles,
-    //     peer_metadata_storage.clone(),
-    //     mempool_notifier,
-    //     consensus_listener,
-    //     genesis_waypoint,
-    //     event_subscription_service,
-    //     db_rw.clone(),
-    // )?;
-    let state_sync_runtimes = create_no_state_sync_runtime(
-        consensus_listener,
-        event_subscription_service,
-        db_rw.clone(),
-    )?;
-
-    let (mp_client_sender, mp_client_events) = mpsc::channel(AC_SMP_CHANNEL_BUFFER_SIZE);
-
-    let api_runtime = if node_config.api.enabled {
-        Some(bootstrap_api(
-            &node_config,
-            chain_id,
-            aptos_db.clone(),
-            mp_client_sender.clone(),
-        )?)
-    } else {
-        None
-    };
-
-    let index_runtime = bootstrap_indexer(&node_config, chain_id, aptos_db, mp_client_sender)?;
-
-    let mut consensus_runtime = None;
-    let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
-        mpsc::channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
-
-    instant = Instant::now();
-    let mempool = aptos_mempool::bootstrap(
-        &node_config,
-        Arc::clone(&db_rw.reader),
-        mempool_network_handles,
-        mp_client_events,
-        consensus_to_mempool_receiver,
-        mempool_listener,
-        mempool_reconfig_subscription,
-        peer_metadata_storage.clone(),
-    );
-    debug!("Mempool started in {} ms", instant.elapsed().as_millis());
-
-    assert!(
-        !node_config.consensus.use_quorum_store,
-        "QuorumStore is not yet implemented"
-    );
-    assert_ne!(
-        node_config.consensus.use_quorum_store,
-        node_config.mempool.shared_mempool_validator_broadcast,
-        "Shared mempool validator broadcast must be turned off when QuorumStore is on, and vice versa"
-    );
-
-    // StateSync should be instantiated and started before Consensus to avoid a cyclic dependency:
-    // network provider -> consensus -> state synchronizer -> network provider.  This has resulted
-    // in a deadlock as observed in GitHub issue #749.
-    if let Some((consensus_network_sender, consensus_network_events)) = consensus_network_handles {
-        // Make sure that state synchronizer is caught up at least to its waypoint
-        // (in case it's present). There is no sense to start consensus prior to that.
-        // TODO: Note that we need the networking layer to be able to discover & connect to the
-        // peers with potentially outdated network identity public keys.
-        // debug!("Wait until state sync is initialized");
-        // state_sync_runtimes.block_until_initialized();
-        // debug!("State sync initialization complete.");
-
-        // Initialize and start consensus.
-        instant = Instant::now();
-        consensus_runtime = Some(start_consensus(
-            &node_config,
-            consensus_network_sender,
-            consensus_network_events,
-            Arc::new(consensus_notifier),
-            consensus_to_mempool_sender,
-            db_rw,
-            consensus_reconfig_subscription
-                .expect("Consensus requires a reconfiguration subscription!"),
-            peer_metadata_storage,
-        ));
-        debug!("Consensus started in {} ms", instant.elapsed().as_millis());
-    }
-
-    Ok(AptosHandle {
-        _api: api_runtime,
-        _backup: None,
+        _backup: backup_service,
         _consensus_runtime: consensus_runtime,
         _mempool: mempool,
         _network_runtimes: network_runtimes,
