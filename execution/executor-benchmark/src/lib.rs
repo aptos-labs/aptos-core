@@ -75,6 +75,7 @@ pub fn run_benchmark(
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
     pruner_config: PrunerConfig,
+    split_stages: bool,
 ) {
     create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
 
@@ -85,7 +86,7 @@ pub fn run_benchmark(
     let (db, executor) = init_db_and_executor(&config);
     let version = db.reader.get_latest_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(executor, version);
+    let (pipeline, block_sender) = Pipeline::new(executor, version, split_stages);
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
@@ -141,7 +142,7 @@ fn add_accounts_impl(
 
     let version = db.reader.get_latest_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(executor, version);
+    let (pipeline, block_sender) = Pipeline::new(executor, version, false);
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
