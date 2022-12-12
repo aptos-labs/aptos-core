@@ -1935,6 +1935,7 @@ name = "aptos-release-builder"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
  "aptos-gas",
  "aptos-temppath",
  "aptos-types",

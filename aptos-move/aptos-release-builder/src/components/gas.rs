@@ -9,6 +9,7 @@ use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 pub fn generate_gas_upgrade_proposal(
     gas_schedule: &GasScheduleV2,
     is_testnet: bool,
+    next_execution_hash: String,
 ) -> Result<Vec<(String, String)>> {
     let mut result = vec![];
 
@@ -36,6 +37,7 @@ pub fn generate_gas_upgrade_proposal(
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
+        &next_execution_hash,
         "aptos_framework::gas_schedule",
         |writer| {
             let gas_schedule_blob = bcs::to_bytes(gas_schedule).unwrap();
