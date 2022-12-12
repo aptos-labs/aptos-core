@@ -324,8 +324,6 @@ RUN apt-get update && apt-get install -y \
         libslang2-dev \
         python3-setuptools
 
-RUN git clone https://github.com/amazonlinux/linux.git --depth 1
-
 RUN git clone https://github.com/aptos-labs/bcc.git --depth 1
 
 RUN mkdir bcc/build
@@ -335,6 +333,7 @@ RUN make
 RUN make install
 WORKDIR ..
 RUN cp -r rust_demangler /usr/lib/python3/dist-packages/rust_demangler
+RUN cp -r perf_serde /usr/lib/python3/dist-packages/perf_serde
 
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1
