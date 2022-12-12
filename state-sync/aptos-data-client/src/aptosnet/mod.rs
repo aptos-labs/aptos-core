@@ -20,6 +20,10 @@ use aptos_config::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_network::{
+    application::interface::NetworkInterface,
+    protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
+};
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_types::requests::{
     DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
@@ -40,10 +44,6 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use futures::StreamExt;
-use network::{
-    application::interface::NetworkInterface,
-    protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
-};
 use rand::seq::SliceRandom;
 use std::{convert::TryFrom, fmt, sync::Arc, time::Duration};
 use tokio::{runtime::Handle, task::JoinHandle};

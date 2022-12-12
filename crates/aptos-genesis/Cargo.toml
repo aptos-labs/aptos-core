@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-keygen = { workspace = true }
@@ -27,7 +28,6 @@ aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
-aptosdb = { workspace = true }
 bcs = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }

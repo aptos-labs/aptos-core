@@ -1,5 +1,5 @@
 [package]
-name = "aptosdb"
+name = "aptos-db"
 description = "Aptos database"
 version = "0.1.0"
 
@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-accumulator = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-db-indexer = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true }
@@ -24,13 +25,13 @@ aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-proptest-helpers = { workspace = true, optional = true }
 aptos-rocksdb-options = { workspace = true }
+aptos-schemadb = { workspace = true }
 aptos-scratchpad = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true, optional = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-aptosdb-indexer = { workspace = true }
 arc-swap = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
@@ -44,7 +45,6 @@ once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rayon = { workspace = true }
-schemadb = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
@@ -52,14 +52,14 @@ thiserror = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true, features = ["fuzzing"] }
 aptos-proptest-helpers = { workspace = true }
+aptos-schemadb = { workspace = true, features = ["fuzzing"] }
 aptos-scratchpad = { workspace = true, features = ["fuzzing"] }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
-schemadb = { workspace = true, features = ["fuzzing"] }
 
 [features]
 default = []
-fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "aptos-executor-types/fuzzing", "schemadb/fuzzing", "aptos-scratchpad/fuzzing"]
+fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "aptos-executor-types/fuzzing", "aptos-schemadb/fuzzing", "aptos-scratchpad/fuzzing"]

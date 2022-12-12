@@ -3,11 +3,19 @@
 
 use super::{AptosDataClient, AptosNetDataClient, DataSummaryPoller, Error};
 use crate::aptosnet::{poll_peer, state::calculate_optimal_chunk_sizes};
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig, RoleType, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::HashValue;
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::{
+    application::{interface::MultiNetworkSender, storage::PeerMetadataStorage, types::PeerState},
+    peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
+    protocols::{network::NewNetworkSender, wire::handshake::v1::ProtocolId},
+    transport::ConnectionMetadata,
+};
 use aptos_storage_service_client::{StorageServiceClient, StorageServiceNetworkSender};
 use aptos_storage_service_server::network::{NetworkRequest, ResponseSender};
 use aptos_storage_service_types::{
@@ -29,17 +37,9 @@ use aptos_types::{
     transaction::{TransactionListWithProof, Version},
     PeerId,
 };
-use channel::{aptos_channel, message_queues::QueueStyle};
 use claims::{assert_err, assert_matches, assert_none};
 use futures::StreamExt;
 use maplit::hashmap;
-use netcore::transport::ConnectionOrigin;
-use network::{
-    application::{interface::MultiNetworkSender, storage::PeerMetadataStorage, types::PeerState},
-    peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
-    protocols::{network::NewNetworkSender, wire::handshake::v1::ProtocolId},
-    transport::ConnectionMetadata,
-};
 use std::{collections::hash_map::Entry, sync::Arc, time::Duration};
 
 fn mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {

@@ -3,8 +3,8 @@
 
 //! Integration tests for validator_network.
 use crate::dummy::{setup_network, DummyMsg};
+use aptos_network::protocols::network::{ApplicationNetworkSender, Event};
 use futures::{future::join, StreamExt};
-use network::protocols::network::{ApplicationNetworkSender, Event};
 use std::time::Duration;
 
 #[test]

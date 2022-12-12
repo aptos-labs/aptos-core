@@ -14,6 +14,7 @@ use aptos_config::{
 use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
+use aptos_network::{application::storage::PeerMetadataStorage, transport::ConnectionMetadata};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
@@ -24,7 +25,6 @@ use futures::{
     future::Future,
     task::{Context, Poll},
 };
-use network::{application::storage::PeerMetadataStorage, transport::ConnectionMetadata};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::{

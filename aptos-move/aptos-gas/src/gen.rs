@@ -5,11 +5,11 @@ use crate::gas_meter::{
     AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use anyhow::Result;
+use aptos_package_builder::PackageBuilder;
 use aptos_types::on_chain_config::GasScheduleV2;
 use clap::Parser;
 use move_core_types::account_address::AccountAddress;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
-use package_builder::PackageBuilder;
 use std::path::{Path, PathBuf};
 
 pub fn current_gas_schedule() -> GasScheduleV2 {

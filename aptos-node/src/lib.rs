@@ -34,9 +34,13 @@ use aptos_types::{
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 
+use aptos_db::AptosDB;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
 use aptos_framework::ReleaseBundle;
+use aptos_mempool_notifications::MempoolNotificationSender;
+use aptos_network::application::storage::PeerMetadataStorage;
+use aptos_network_builder::builder::NetworkBuilder;
 use aptos_state_sync_driver::{
     driver_factory::{DriverFactory, StateSyncRuntimes},
     metadata_storage::PersistentMetadataStorage,
@@ -47,14 +51,10 @@ use aptos_storage_service_server::{
     network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
 };
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::FromHex;
 use log_build_information::log_build_information;
-use mempool_notifications::MempoolNotificationSender;
-use network::application::storage::PeerMetadataStorage;
-use network_builder::builder::NetworkBuilder;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     boxed::Box,
@@ -817,7 +817,7 @@ pub fn setup_environment(
 
     // For state sync to send notifications to mempool and receive notifications from consensus.
     let (mempool_notifier, mempool_listener) =
-        mempool_notifications::new_mempool_notifier_listener_pair();
+        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
     let (consensus_notifier, consensus_listener) =
         aptos_consensus_notifications::new_consensus_notifier_listener_pair(
             node_config

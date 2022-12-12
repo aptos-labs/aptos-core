@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, MoveHarness};
+use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
 use move_core_types::{u256::U256, value::MoveValue};
-use package_builder::PackageBuilder;
 
 #[test]
 fn use_new_integer_types() {

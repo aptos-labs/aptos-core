@@ -12,21 +12,21 @@ use aptos_config::{
 use aptos_consensus_notifications::new_consensus_notifier_listener_pair;
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
+use aptos_db::AptosDB;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_test_helpers::bootstrap_genesis;
 use aptos_genesis::test_utils::test_config;
 use aptos_infallible::RwLock;
+use aptos_mempool_notifications::new_mempool_notifier_listener_pair;
+use aptos_network::application::{interface::MultiNetworkSender, storage::PeerMetadataStorage};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_temppath::TempPath;
 use aptos_time_service::TimeService;
 use aptos_types::on_chain_config::ON_CHAIN_CONFIG_REGISTRY;
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
 use futures::{FutureExt, StreamExt};
-use mempool_notifications::new_mempool_notifier_listener_pair;
-use network::application::{interface::MultiNetworkSender, storage::PeerMetadataStorage};
 use std::{collections::HashMap, sync::Arc};
 
 #[test]

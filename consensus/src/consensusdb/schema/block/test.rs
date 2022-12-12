@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
+use aptos_schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
 
 #[test]
 fn test_encode_decode() {

@@ -14,6 +14,7 @@ use aptos_types::{
 
 use aptos_accumulator::HashReader;
 use aptos_config::config::LedgerPrunerConfig;
+use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     proof::position::Position,
@@ -21,7 +22,6 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use proptest::{collection::vec, prelude::*};
-use schemadb::SchemaBatch;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]

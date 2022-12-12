@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use proxy::Proxy;
+use aptos_proxy::Proxy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;

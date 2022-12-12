@@ -12,9 +12,11 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::{hash::HashValue, SigningKey};
+use aptos_db::AptosDB;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_mempool::mocks::MockSharedMempool;
+use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{
@@ -33,10 +35,8 @@ use aptos_types::{
     transaction::{Transaction, TransactionStatus},
 };
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
-use mempool_notifications::MempoolNotificationSender;
 
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;

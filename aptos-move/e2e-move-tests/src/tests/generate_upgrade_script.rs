@@ -3,9 +3,9 @@
 
 use crate::{tests::common, MoveHarness};
 use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
+use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
 use move_package::compilation::package_layout::CompiledPackageLayout;
-use package_builder::PackageBuilder;
 
 #[test]
 fn generate_upgrade_script() {

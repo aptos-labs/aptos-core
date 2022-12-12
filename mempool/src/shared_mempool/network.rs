@@ -14,20 +14,15 @@ use crate::{
         },
     },
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{MempoolConfig, PeerRole, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_types::{transaction::SignedTransaction, PeerId};
-use aptos_vm_validator::vm_validator::TransactionValidation;
-use async_trait::async_trait;
-use channel::{aptos_channel, message_queues::QueueStyle};
-use fail::fail_point;
-use itertools::Itertools;
-use netcore::transport::ConnectionOrigin;
-use network::{
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::{
     application::{
         interface::{MultiNetworkSender, NetworkInterface},
         storage::{LockingHashMap, PeerMetadataStorage},
@@ -41,6 +36,11 @@ use network::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
+use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_vm_validator::vm_validator::TransactionValidation;
+use async_trait::async_trait;
+use fail::fail_point;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::RandomState;
 use std::collections::BTreeSet;

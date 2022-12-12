@@ -11,6 +11,7 @@ use crate::{
     tests,
 };
 use aptos_crypto::HashValue;
+use aptos_db::AptosDB;
 use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
@@ -18,7 +19,6 @@ use aptos_types::{
     test_helpers::transaction_test_helpers::block,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof},
 };
-use aptosdb::AptosDB;
 use rand::Rng;
 
 pub struct TestExecutor {

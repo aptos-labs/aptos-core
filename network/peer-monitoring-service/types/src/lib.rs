@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::network_id::PeerNetworkId;
-use network::application::types::PeerInfo;
+use aptos_network::application::types::PeerInfo;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryFrom};
 use thiserror::Error;

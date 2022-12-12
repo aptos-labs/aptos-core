@@ -19,21 +19,21 @@ aptos-api-types = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-db = { workspace = true, features = ["fuzzing"] }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
+aptos-mempool-notifications = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-validator = { workspace = true }
-aptosdb = { workspace = true, features = ["fuzzing"] }
 bytes = { workspace = true }
 goldenfile = { workspace = true }
 hyper = { workspace = true }
-mempool-notifications = { workspace = true }
 poem = { workspace = true }
 poem-openapi = { workspace = true }
 proptest = { workspace = true }

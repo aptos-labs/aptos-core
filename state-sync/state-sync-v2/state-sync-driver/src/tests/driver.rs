@@ -13,12 +13,15 @@ use aptos_config::config::{NodeConfig, RoleType};
 use aptos_consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
+use aptos_db::AptosDB;
 use aptos_event_notifications::{
     EventNotificationListener, EventSubscriptionService, ReconfigNotificationListener,
 };
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_test_helpers::bootstrap_genesis;
 use aptos_infallible::RwLock;
+use aptos_mempool_notifications::MempoolNotificationListener;
+use aptos_network::application::{interface::MultiNetworkSender, storage::PeerMetadataStorage};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_time_service::TimeService;
@@ -29,11 +32,8 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
 use claims::{assert_err, assert_none};
 use futures::{FutureExt, StreamExt};
-use mempool_notifications::MempoolNotificationListener;
-use network::application::{interface::MultiNetworkSender, storage::PeerMetadataStorage};
 use std::{collections::HashMap, sync::Arc};
 
 // TODO(joshlind): extend these tests to cover more functionality!
@@ -253,7 +253,7 @@ async fn create_driver_for_tests(
     let (consensus_notifier, consensus_listener) =
         aptos_consensus_notifications::new_consensus_notifier_listener_pair(5000);
     let (mempool_notifier, mempool_listener) =
-        mempool_notifications::new_mempool_notifier_listener_pair();
+        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
 
     // Create the chunk executor
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));

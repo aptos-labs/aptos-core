@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::{pruner::db_sub_pruner::DBSubPruner, TransactionStore};
+use aptos_schemadb::SchemaBatch;
 use aptos_types::transaction::{Transaction, Version};
-use schemadb::SchemaBatch;
 use std::sync::Arc;
 
 #[derive(Debug)]

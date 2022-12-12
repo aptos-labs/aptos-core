@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-test-helpers = { workspace = true }
 aptos-executor-types = { workspace = true }
@@ -28,7 +29,6 @@ aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-aptosdb = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -53,12 +53,12 @@ tokio-util = { workspace = true }
 [dev-dependencies]
 aptos-backup-service = { workspace = true }
 aptos-config = { workspace = true }
+aptos-db = { workspace = true }
 aptos-executor-test-helpers = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-storage-interface = { workspace = true }
-aptosdb = { workspace = true }
 proptest = { workspace = true }
 warp = { workspace = true }
 
 [features]
-fuzzing = ["aptosdb/fuzzing"]
+fuzzing = ["aptos-db/fuzzing"]

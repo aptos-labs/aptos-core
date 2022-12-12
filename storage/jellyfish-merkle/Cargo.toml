@@ -35,8 +35,8 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
-aptosdb = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
