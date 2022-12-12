@@ -1,0 +1,9 @@
+[package]
+name = "NFTs as Accounts"
+version = "0.0.0"
+
+[addresses]
+nfts_as_accounts = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }

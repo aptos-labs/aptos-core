@@ -111,6 +111,11 @@ fn test_minter() {
 }
 
 #[test]
+fn test_nfts_as_accounts() {
+    test_common("nfts_as_accounts");
+}
+
+#[test]
 fn test_resource_account() {
     test_resource_account_common("resource_account");
 }
