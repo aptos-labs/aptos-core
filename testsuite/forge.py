@@ -813,6 +813,8 @@ async def write_cluster_config(
                 "update-kubeconfig",
                 "--name",
                 forge_cluster_name,
+                "--region",
+		"us-east-1",
                 "--kubeconfig",
                 temp,
             ]
@@ -1253,6 +1255,8 @@ def test(
         cluster_names = config.get("enabled_clusters")
         forge_cluster_name = random.choice(cluster_names)
 
+    forge_cluster_name = "aptos-forge-big-east-0"
+        
     assert forge_cluster_name, "Forge cluster name is required"
 
     # These features and profile flags are set as strings

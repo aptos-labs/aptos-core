@@ -6,25 +6,27 @@ use crate::{proof_fetcher::ProofFetcher, DbReader};
 use crate::metrics::TIMER;
 use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_logger::{error, sample, sample::SampleRate};
+use aptos_infallible::Mutex;
+// use aptos_logger::{error, sample, sample::SampleRate};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 use aptos_vm::AptosVM;
-use crossbeam_channel::{unbounded, Receiver, Sender};
+// use crossbeam_channel::{unbounded, Receiver, Sender};
 use once_cell::sync::Lazy;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     collections::HashMap,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    time::Duration,
+    // time::Duration,
 };
 
-static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+pub static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .num_threads(AptosVM::get_num_proof_reading_threads())
         .thread_name(|index| format!("proof_reader_{}", index))
@@ -32,27 +34,29 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-struct Proof {
-    state_key_hash: HashValue,
-    proof: SparseMerkleProofExt,
-}
+// struct Proof {
+//     state_key_hash: HashValue,
+//     proof: SparseMerkleProofExt,
+// }
 
 pub struct AsyncProofFetcher {
     reader: Arc<dyn DbReader>,
-    data_sender: Sender<Proof>,
-    data_receiver: Receiver<Proof>,
+    // data_sender: Sender<Proof>,
+    // data_receiver: Receiver<Proof>,
     num_proofs_to_read: AtomicUsize,
+    proof_reads: Mutex<Vec<(StateKey, Version, Option<HashValue>, Option<HashValue>)>>,
 }
 
 impl AsyncProofFetcher {
     pub fn new(reader: Arc<dyn DbReader>) -> Self {
-        let (data_sender, data_receiver) = unbounded();
+        // let (data_sender, data_receiver) = unbounded();
 
         Self {
             reader,
-            data_sender,
-            data_receiver,
+            // data_sender,
+            // data_receiver,
             num_proofs_to_read: AtomicUsize::new(0),
+            proof_reads: Mutex::new(Vec::new()),
         }
     }
 
@@ -61,19 +65,54 @@ impl AsyncProofFetcher {
     // This is only expected to be called in a single thread, after all reads being scheduled.
     fn wait(&self) -> HashMap<HashValue, SparseMerkleProofExt> {
         let _timer = TIMER.with_label_values(&["wait_async_proof"]).start_timer();
+
+        let mut reads = self.proof_reads.lock();
+        let r: Vec<(StateKey, Version, Option<HashValue>, Option<HashValue>)> =
+            std::mem::take(&mut reads);
+
+        let proofs = IO_POOL.install(|| {
+            r.into_par_iter()
+                .map(|(state_key, version, root_hash, value_hash)| {
+                        let proof = self.reader
+                            .get_state_proof_by_version_ext(&state_key, version)
+                            .expect("Proof reading should succeed.");
+                        if let Some(root_hash) = root_hash {
+                            proof
+                                .verify_by_hash(root_hash, state_key.hash(), value_hash)
+                                .map_err(|err| {
+                                    anyhow!(
+                                        "Proof is invalid for key {:?} with state root hash {:?}, at version {}: {}.",
+                                        state_key,
+                                        root_hash,
+                                        version,
+                                        err
+                                    )
+                                })
+                                .expect("Failed to verify proof.");
+                        }
+                    (
+                        state_key.hash(),
+                        // Proof {
+                            // state_key_hash: state_key.hash(),
+                            proof,
+                        // },
+                    )
+                })
+                .collect::<HashMap<HashValue, SparseMerkleProofExt>>()
+        });
         // TODO(grao): Find a way to verify the proof.
-        let mut proofs = HashMap::new();
-        for _ in 0..self.num_proofs_to_read.load(Ordering::SeqCst) {
-            let data = self
-                .data_receiver
-                .recv()
-                .expect("Failed to receive proof on the channel.");
-            let Proof {
-                state_key_hash,
-                proof,
-            } = data;
-            proofs.insert(state_key_hash, proof);
-        }
+        // let mut proofs = HashMap::new();
+        // for _ in 0..self.num_proofs_to_read.load(Ordering::SeqCst) {
+        //     let data = self
+        //         .data_receiver
+        //         .recv()
+        //         .expect("Failed to receive proof on the channel.");
+        //     let Proof {
+        //         state_key_hash,
+        //         proof,
+        //     } = data;
+        //     proofs.insert(state_key_hash, proof);
+        // }
         self.num_proofs_to_read.store(0, Ordering::SeqCst);
         proofs
     }
@@ -86,43 +125,47 @@ impl AsyncProofFetcher {
         root_hash: Option<HashValue>,
         value_hash: Option<HashValue>,
     ) {
-        let _timer = TIMER
-            .with_label_values(&["schedule_async_proof_read"])
-            .start_timer();
-        self.num_proofs_to_read.fetch_add(1, Ordering::SeqCst);
-        let reader = self.reader.clone();
-        let data_sender = self.data_sender.clone();
-        IO_POOL.spawn(move || {
-            let proof = reader
-                .get_state_proof_by_version_ext(&state_key, version)
-                .expect("Proof reading should succeed.");
-            if let Some(root_hash) = root_hash {
-                proof
-                    .verify_by_hash(root_hash, state_key.hash(), value_hash)
-                    .map_err(|err| {
-                        anyhow!(
-                            "Proof is invalid for key {:?} with state root hash {:?}, at version {}: {}.",
-                            state_key,
-                            root_hash,
-                            version,
-                            err
-                        )
-                    })
-                    .expect("Failed to verify proof.");
-            }
-            match data_sender.send(Proof {
-                state_key_hash: state_key.hash(),
-                proof,
-            }) {
-                Ok(_) => {}
-                Err(_) => {
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(5)),
-                        error!("Failed to send proof, something is wrong in execution.")
-                    );
-                }
-            }
-        });
+        self.proof_reads
+            .lock()
+            .push((state_key, version, root_hash, value_hash));
+
+        // let _timer = TIMER
+        //     .with_label_values(&["schedule_async_proof_read"])
+        //     .start_timer();
+        // self.num_proofs_to_read.fetch_add(1, Ordering::SeqCst);
+        // let reader = self.reader.clone();
+        // let data_sender = self.data_sender.clone();
+        // IO_POOL.spawn(move || {
+        //     let proof = reader
+        //         .get_state_proof_by_version_ext(&state_key, version)
+        //         .expect("Proof reading should succeed.");
+        //     if let Some(root_hash) = root_hash {
+        //         proof
+        //             .verify_by_hash(root_hash, state_key.hash(), value_hash)
+        //             .map_err(|err| {
+        //                 anyhow!(
+        //                     "Proof is invalid for key {:?} with state root hash {:?}, at version {}: {}.",
+        //                     state_key,
+        //                     root_hash,
+        //                     version,
+        //                     err
+        //                 )
+        //             })
+        //             .expect("Failed to verify proof.");
+        //     }
+        //     match data_sender.send(Proof {
+        //         state_key_hash: state_key.hash(),
+        //         proof,
+        //     }) {
+        //         Ok(_) => {}
+        //         Err(_) => {
+        //             sample!(
+        //                 SampleRate::Duration(Duration::from_secs(5)),
+        //                 error!("Failed to send proof, something is wrong in execution.")
+        //             );
+        //         }
+        //     }
+        // });
     }
 }
 

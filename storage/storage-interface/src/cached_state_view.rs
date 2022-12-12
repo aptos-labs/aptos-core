@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
+use crate::{
+    async_proof_fetcher::IO_POOL, proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader,
+};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
@@ -13,20 +15,20 @@ use aptos_types::{
     transaction::Version,
     write_set::WriteSet,
 };
-use once_cell::sync::Lazy;
+// use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
 
-static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
-        .thread_name(|index| format!("kv_reader_{}", index))
-        .build()
-        .unwrap()
-});
+// static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+//     rayon::ThreadPoolBuilder::new()
+//         .num_threads(32)
+//         .thread_name(|index| format!("kv_reader_{}", index))
+//         .build()
+//         .unwrap()
+// });
 
 /// `CachedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
