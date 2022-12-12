@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use byteorder::{LittleEndian, ReadBytesExt};
-use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, Schema, ValueCodec},
     ColumnFamilyName, SchemaBatch, DB,
 };
+use byteorder::{LittleEndian, ReadBytesExt};
+use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
 
 // Creating two schemas that share exactly the same structure but are stored in different column
 // families. Also note that the key and value are of the same type `TestField`. By implementing

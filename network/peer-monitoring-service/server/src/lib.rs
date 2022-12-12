@@ -8,15 +8,15 @@ use crate::{
     metrics::{increment_counter, start_timer},
     network::PeerMonitoringServiceNetworkEvents,
 };
-use ::network::{application::storage::PeerMetadataStorage, ProtocolId};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::PeerMonitoringServiceConfig;
 use aptos_logger::prelude::*;
-use futures::stream::StreamExt;
-use peer_monitoring_service_types::{
+use aptos_network::{application::storage::PeerMetadataStorage, ProtocolId};
+use aptos_peer_monitoring_service_types::{
     ConnectedPeersResponse, PeerMonitoringServiceError, PeerMonitoringServiceRequest,
     PeerMonitoringServiceResponse, Result, ServerProtocolVersionResponse,
 };
+use futures::stream::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;

@@ -9,6 +9,10 @@ use aptos_crypto::{PrivateKey, Uniform};
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
+use aptos_language_e2e_tests::{
+    account::{Account, AccountData},
+    executor::FakeExecutor,
+};
 use aptos_types::contract_event::ContractEvent;
 use aptos_types::on_chain_config::{FeatureFlag, GasScheduleV2};
 use aptos_types::transaction::TransactionOutput;
@@ -18,10 +22,6 @@ use aptos_types::{
     account_config::AccountResource,
     state_store::state_key::StateKey,
     transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
-};
-use language_e2e_tests::{
-    account::{Account, AccountData},
-    executor::FakeExecutor,
 };
 use move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
 use move_core_types::move_resource::MoveStructType;
@@ -460,7 +460,10 @@ impl MoveHarness {
 #[macro_export]
 macro_rules! enable_golden {
     ($h:expr) => {
-        $h.internal_set_golden(std::file!(), language_e2e_tests::current_function_name!())
+        $h.internal_set_golden(
+            std::file!(),
+            aptos_language_e2e_tests::current_function_name!(),
+        )
     };
 }
 

@@ -7,16 +7,16 @@ use crate::{
 };
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_infallible::{Mutex, RwLock};
+use aptos_network::application::storage::PeerMetadataStorage;
+use aptos_storage_interface::mock::MockDbReaderWriter;
 use aptos_types::transaction::SignedTransaction;
-use network::application::storage::PeerMetadataStorage;
+use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use proptest::{
     arbitrary::any,
     prelude::*,
     strategy::{Just, Strategy},
 };
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::mock::MockDbReaderWriter;
-use vm_validator::mocks::mock_vm_validator::MockVMValidator;
 
 pub fn mempool_incoming_transactions_strategy(
 ) -> impl Strategy<Value = (Vec<SignedTransaction>, TimelineState)> {

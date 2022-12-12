@@ -12,12 +12,12 @@
 
 use crate::schema::{ensure_slice_len_eq, TRANSACTION_BY_ACCOUNT_CF_NAME};
 use anyhow::Result;
-use aptos_types::{account_address::AccountAddress, transaction::Version};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
+use aptos_types::{account_address::AccountAddress, transaction::Version};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{convert::TryFrom, mem::size_of};
 
 define_schema!(

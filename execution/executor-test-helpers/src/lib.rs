@@ -10,6 +10,7 @@ use aptos_crypto::{
 };
 use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
 use aptos_executor_types::StateComputeResult;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_types::ledger_info::generate_ledger_info_with_sig;
 use aptos_types::{
     account_address::AccountAddress,
@@ -21,7 +22,6 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
-use storage_interface::DbReaderWriter;
 
 /// Helper function for test to blindly bootstrap without waypoint.
 pub fn bootstrap_genesis<V: VMExecutor>(

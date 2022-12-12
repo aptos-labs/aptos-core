@@ -12,6 +12,7 @@ use anyhow::Context as AnyhowContext;
 use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
+use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
 use poem::{
     http::{header, Method},
@@ -21,7 +22,6 @@ use poem::{
 };
 use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use storage_interface::DbReader;
 use tokio::runtime::{Builder, Handle, Runtime};
 
 const VERSION: &str = include_str!("../doc/.version");

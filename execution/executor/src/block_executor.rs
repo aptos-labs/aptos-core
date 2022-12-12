@@ -9,16 +9,16 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_state_view::StateViewId;
+use aptos_storage_interface::async_proof_fetcher::AsyncProofFetcher;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, state_store::state_value::StateValue,
     transaction::Transaction,
 };
 use aptos_vm::VMExecutor;
 use fail::fail_point;
-use scratchpad::SparseMerkleTree;
 use std::{marker::PhantomData, sync::Arc};
-use storage_interface::async_proof_fetcher::AsyncProofFetcher;
 
 use crate::{
     components::{block_tree::BlockTree, chunk_output::ChunkOutput},
@@ -28,7 +28,7 @@ use crate::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use storage_interface::DbReaderWriter;
+use aptos_storage_interface::DbReaderWriter;
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,

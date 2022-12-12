@@ -1,5 +1,5 @@
 [package]
-name = "schemadb"
+name = "aptos-schemadb"
 description = "Aptos schemadb"
 version = "0.1.0"
 

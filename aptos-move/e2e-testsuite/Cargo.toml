@@ -19,21 +19,21 @@ aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
 aptos-keygen = { workspace = true }
+aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-genesis = { workspace = true }
 aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
 itertools = { workspace = true }
-language-e2e-tests = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-ir-compiler = { workspace = true }
 proptest = { workspace = true }
 serde = { workspace = true }
-vm-genesis = { workspace = true }
 
 [features]
 default = ["aptos-cached-packages/fuzzing"]

@@ -19,26 +19,26 @@ aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-netcore = { workspace = true }
+aptos-network = { workspace = true }
+aptos-storage-service-client = { workspace = true }
+aptos-storage-service-types = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
-netcore = { workspace = true }
-network = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
-storage-service-client = { workspace = true }
-storage-service-types = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+aptos-channels = { workspace = true }
+aptos-network = { workspace = true, features = ["fuzzing"] }
+aptos-storage-service-server = { workspace = true }
 aptos-time-service = { workspace = true, features = ["async", "testing"] }
 bcs = { workspace = true }
-channel = { workspace = true }
 claims = { workspace = true }
 maplit = { workspace = true }
-network = { workspace = true, features = ["fuzzing"] }
-storage-service-server = { workspace = true }
 tokio = { workspace = true }
