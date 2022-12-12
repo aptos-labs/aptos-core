@@ -20,6 +20,7 @@ use aptos_executor_types::ChunkExecutorTrait;
 use aptos_infallible::Mutex;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReaderWriter;
+use aptos_time_service::TimeService;
 use aptos_types::{move_resource::MoveStorage, waypoint::Waypoint};
 use futures::{channel::mpsc, executor::block_on};
 use std::sync::{
@@ -52,6 +53,7 @@ impl DriverFactory {
         mut event_subscription_service: EventSubscriptionService,
         aptos_data_client: AptosNetDataClient,
         streaming_service_client: StreamingServiceClient,
+        time_service: TimeService,
     ) -> Self {
         // Notify subscribers of the initial on-chain config values
         match (&*storage.reader).fetch_latest_state_checkpoint_version() {
@@ -133,6 +135,7 @@ impl DriverFactory {
             aptos_data_client,
             streaming_service_client,
             storage.reader,
+            time_service,
         );
 
         // Spawn the driver

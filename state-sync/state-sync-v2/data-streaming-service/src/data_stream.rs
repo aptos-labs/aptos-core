@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::data_notification::{
+    NewTransactionsOrOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+};
 use crate::metrics::increment_counter_multiple;
 use crate::{
     data_notification,
@@ -728,6 +731,15 @@ fn sanity_check_client_response(
                 ResponsePayload::NewTransactionsWithProof(_)
             )
         }
+        DataClientRequest::NewTransactionsOrOutputsWithProof(_) => {
+            matches!(
+                data_client_response.payload,
+                ResponsePayload::NewTransactionsWithProof(_)
+            ) || matches!(
+                data_client_response.payload,
+                ResponsePayload::NewTransactionOutputsWithProof(_)
+            )
+        }
         DataClientRequest::NumberOfStates(_) => {
             matches!(
                 data_client_response.payload,
@@ -748,6 +760,15 @@ fn sanity_check_client_response(
         }
         DataClientRequest::TransactionOutputsWithProof(_) => {
             matches!(
+                data_client_response.payload,
+                ResponsePayload::TransactionOutputsWithProof(_)
+            )
+        }
+        DataClientRequest::TransactionsOrOutputsWithProof(_) => {
+            matches!(
+                data_client_response.payload,
+                ResponsePayload::TransactionsWithProof(_)
+            ) || matches!(
                 data_client_response.payload,
                 ResponsePayload::TransactionOutputsWithProof(_)
             )
@@ -808,6 +829,14 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
                 )
                 .await
             }
+            DataClientRequest::NewTransactionsOrOutputsWithProof(request) => {
+                get_new_transactions_or_outputs_with_proof(
+                    aptos_data_client,
+                    request,
+                    request_timeout_ms,
+                )
+                .await
+            }
             DataClientRequest::NumberOfStates(request) => {
                 get_number_of_states(aptos_data_client, request, request_timeout_ms).await
             }
@@ -820,6 +849,14 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
             }
             DataClientRequest::TransactionsWithProof(request) => {
                 get_transactions_with_proof(aptos_data_client, request, request_timeout_ms).await
+            }
+            DataClientRequest::TransactionsOrOutputsWithProof(request) => {
+                get_transactions_or_outputs_with_proof(
+                    aptos_data_client,
+                    request,
+                    request_timeout_ms,
+                )
+                .await
             }
         };
 
@@ -903,6 +940,21 @@ async fn get_new_transactions_with_proof<T: AptosDataClient + Send + Clone + 'st
         .map(|response| response.map(ResponsePayload::from))
 }
 
+async fn get_new_transactions_or_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+    aptos_data_client: T,
+    request: NewTransactionsOrOutputsWithProofRequest,
+    request_timeout_ms: u64,
+) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+    let client_response = aptos_data_client.get_new_transactions_or_outputs_with_proof(
+        request.known_version,
+        request.known_epoch,
+        request.include_events,
+        request_timeout_ms,
+    );
+    let (context, payload) = client_response.await?.into_parts();
+    Ok(Response::new(context, ResponsePayload::try_from(payload)?))
+}
+
 async fn get_number_of_states<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: NumberOfStatesRequest,
@@ -948,11 +1000,31 @@ async fn get_transactions_with_proof<T: AptosDataClient + Send + Clone + 'static
         .map(|response| response.map(ResponsePayload::from))
 }
 
+async fn get_transactions_or_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+    aptos_data_client: T,
+    request: TransactionsOrOutputsWithProofRequest,
+    request_timeout_ms: u64,
+) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+    let client_response = aptos_data_client.get_transactions_or_outputs_with_proof(
+        request.proof_version,
+        request.start_version,
+        request.end_version,
+        request.include_events,
+        request_timeout_ms,
+    );
+    let (context, payload) = client_response.await?.into_parts();
+    Ok(Response::new(context, ResponsePayload::try_from(payload)?))
+}
+
 /// Returns true iff the given request is a subscription request
 fn is_subscription_request(request: &DataClientRequest) -> bool {
     matches!(request, DataClientRequest::NewTransactionsWithProof(_))
         || matches!(
             request,
             DataClientRequest::NewTransactionOutputsWithProof(_)
+        )
+        || matches!(
+            request,
+            DataClientRequest::NewTransactionsOrOutputsWithProof(_)
         )
 }
