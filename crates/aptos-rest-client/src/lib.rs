@@ -117,7 +117,7 @@ impl Client {
         Ok(self)
     }
 
-    fn build_path(&self, path: &str) -> AptosResult<Url> {
+    pub fn build_path(&self, path: &str) -> AptosResult<Url> {
         Ok(self.base_url.join(&self.version_path_base)?.join(path)?)
     }
 
