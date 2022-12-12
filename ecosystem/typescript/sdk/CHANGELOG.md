@@ -8,6 +8,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 - Export classes from property_map_serde
 - User can specify token string property type using "string", "String" or "0x1::string::String" to serde the string token property on-chain
+- Use `getAccountResource` to replace `getAccountResources` in `CoinClient#checkBalance`, which can reduce network load.
 
 ## 1.4.0 (2022-11-30)
 
