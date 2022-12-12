@@ -1,11 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::ExecutingComponent;
+use crate::utils::OutputFallbackHandler;
 use crate::{
     driver::DriverConfiguration,
     error::Error,
     logging::{LogEntry, LogSchema},
     metadata_storage::MetadataStorageInterface,
+    metrics,
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
     utils::{SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
@@ -290,6 +293,9 @@ pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
     // The storage to write metadata about the syncing progress
     metadata_storage: MetadataStorage,
 
+    // The handler for output fallback behaviour
+    output_fallback_handler: OutputFallbackHandler,
+
     // The speculative state tracking the active data stream
     speculative_stream_state: Option<SpeculativeStreamState>,
 
@@ -318,6 +324,7 @@ impl<
     pub fn new(
         driver_configuration: DriverConfiguration,
         metadata_storage: MetadataStorage,
+        output_fallback_handler: OutputFallbackHandler,
         streaming_client: StreamingClient,
         storage: Arc<dyn DbReader>,
         storage_synchronizer: StorageSyncer,
@@ -334,12 +341,18 @@ impl<
             bootstrapped: false,
             driver_configuration,
             metadata_storage,
+            output_fallback_handler,
             speculative_stream_state: None,
             streaming_client,
             storage,
             storage_synchronizer,
             verified_epoch_states,
         }
+    }
+
+    /// Returns the bootstrapping mode of the node
+    fn get_bootstrapping_mode(&self) -> BootstrappingMode {
+        self.driver_configuration.config.bootstrapping_mode
     }
 
     /// Returns true iff the node has already completed bootstrapping
@@ -455,11 +468,10 @@ impl<
 
         info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
             "Highest synced version is {}, highest_known_ledger_info is {:?}, bootstrapping_mode is {:?}.",
-            highest_synced_version, highest_known_ledger_info,
-            self.driver_configuration.config.bootstrapping_mode)));
+            highest_synced_version, highest_known_ledger_info, self.get_bootstrapping_mode())));
 
         // Bootstrap according to the mode
-        match self.driver_configuration.config.bootstrapping_mode {
+        match self.get_bootstrapping_mode() {
             BootstrappingMode::DownloadLatestStates => {
                 self.fetch_missing_state_snapshot_data(
                     highest_synced_version,
@@ -685,7 +697,7 @@ impl<
             .verified_epoch_states
             .next_epoch_ending_version(highest_synced_version)
             .expect("No higher epoch ending version known!");
-        let data_stream = match self.driver_configuration.config.bootstrapping_mode {
+        let data_stream = match self.get_bootstrapping_mode() {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 self.streaming_client
                     .get_all_transaction_outputs(
@@ -704,6 +716,36 @@ impl<
                         false,
                     )
                     .await?
+            }
+            BootstrappingMode::ExecuteOrApplyFromGenesis => {
+                if self.output_fallback_handler.in_fallback_mode() {
+                    metrics::set_gauge(
+                        &metrics::DRIVER_FALLBACK_MODE,
+                        ExecutingComponent::Bootstrapper.get_label(),
+                        1,
+                    );
+                    self.streaming_client
+                        .get_all_transaction_outputs(
+                            next_version,
+                            end_version,
+                            highest_known_ledger_version,
+                        )
+                        .await?
+                } else {
+                    metrics::set_gauge(
+                        &metrics::DRIVER_FALLBACK_MODE,
+                        ExecutingComponent::Bootstrapper.get_label(),
+                        0,
+                    );
+                    self.streaming_client
+                        .get_all_transactions_or_outputs(
+                            next_version,
+                            end_version,
+                            highest_known_ledger_version,
+                            false,
+                        )
+                        .await?
+                }
             }
             bootstrapping_mode => {
                 unreachable!("Bootstrapping mode not supported: {:?}", bootstrapping_mode)
@@ -877,7 +919,7 @@ impl<
         state_value_chunk_with_proof: StateValueChunkWithProof,
     ) -> Result<(), Error> {
         // Verify that we're expecting state value payloads
-        let bootstrapping_mode = self.driver_configuration.config.bootstrapping_mode;
+        let bootstrapping_mode = self.get_bootstrapping_mode();
         if self.should_fetch_epoch_ending_ledger_infos()
             || !matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
         {
@@ -1030,7 +1072,7 @@ impl<
         payload_start_version: Option<Version>,
     ) -> Result<(), Error> {
         // Verify that we're expecting transaction or output payloads
-        let bootstrapping_mode = self.driver_configuration.config.bootstrapping_mode;
+        let bootstrapping_mode = self.get_bootstrapping_mode();
         if self.should_fetch_epoch_ending_ledger_infos()
             || (matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
                 && self.state_value_syncer.transaction_output_to_sync.is_some())
@@ -1085,18 +1127,14 @@ impl<
         let num_transactions_or_outputs = match bootstrapping_mode {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
-                    let num_transaction_outputs = transaction_outputs_with_proof
-                        .transactions_and_outputs
-                        .len();
-                    self.storage_synchronizer
-                        .apply_transaction_outputs(
-                            notification_id,
-                            transaction_outputs_with_proof,
-                            proof_ledger_info,
-                            end_of_epoch_ledger_info,
-                        )
-                        .await?;
-                    num_transaction_outputs
+                    utils::apply_transaction_outputs(
+                        self.storage_synchronizer.clone(),
+                        notification_id,
+                        proof_ledger_info,
+                        end_of_epoch_ledger_info,
+                        transaction_outputs_with_proof,
+                    )
+                    .await?
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
@@ -1110,16 +1148,14 @@ impl<
             }
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
-                    let num_transactions = transaction_list_with_proof.transactions.len();
-                    self.storage_synchronizer
-                        .execute_transactions(
-                            notification_id,
-                            transaction_list_with_proof,
-                            proof_ledger_info,
-                            end_of_epoch_ledger_info,
-                        )
-                        .await?;
-                    num_transactions
+                    utils::execute_transactions(
+                        self.storage_synchronizer.clone(),
+                        notification_id,
+                        proof_ledger_info,
+                        end_of_epoch_ledger_info,
+                        transaction_list_with_proof,
+                    )
+                    .await?
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
@@ -1128,6 +1164,37 @@ impl<
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transactions with proof!".into(),
+                    ));
+                }
+            }
+            BootstrappingMode::ExecuteOrApplyFromGenesis => {
+                if let Some(transaction_list_with_proof) = transaction_list_with_proof {
+                    utils::execute_transactions(
+                        self.storage_synchronizer.clone(),
+                        notification_id,
+                        proof_ledger_info,
+                        end_of_epoch_ledger_info,
+                        transaction_list_with_proof,
+                    )
+                    .await?
+                } else if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof
+                {
+                    utils::apply_transaction_outputs(
+                        self.storage_synchronizer.clone(),
+                        notification_id,
+                        proof_ledger_info,
+                        end_of_epoch_ledger_info,
+                        transaction_outputs_with_proof,
+                    )
+                    .await?
+                } else {
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                        notification_id,
+                        NotificationFeedback::PayloadTypeIsIncorrect,
+                    )))
+                    .await?;
+                    return Err(Error::InvalidPayload(
+                        "Did not receive transactions or outputs with proof!".into(),
                     ));
                 }
             }
@@ -1260,7 +1327,7 @@ impl<
         transaction_outputs_with_proof: Option<&TransactionOutputListWithProof>,
     ) -> Result<Option<LedgerInfoWithSignatures>, Error> {
         // Calculate the payload end version
-        let num_versions = match self.driver_configuration.config.bootstrapping_mode {
+        let num_versions = match self.get_bootstrapping_mode() {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
                     transaction_outputs_with_proof
@@ -1288,6 +1355,22 @@ impl<
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transactions with proof!".into(),
+                    ));
+                }
+            }
+            BootstrappingMode::ExecuteOrApplyFromGenesis => {
+                if let Some(transaction_list_with_proof) = transaction_list_with_proof {
+                    transaction_list_with_proof.transactions.len()
+                } else if let Some(output_list_with_proof) = transaction_outputs_with_proof {
+                    output_list_with_proof.transactions_and_outputs.len()
+                } else {
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
+                        notification_id,
+                        NotificationFeedback::PayloadTypeIsIncorrect,
+                    )))
+                    .await?;
+                    return Err(Error::InvalidPayload(
+                        "Did not receive transactions or outputs with proof!".into(),
                     ));
                 }
             }
@@ -1358,6 +1441,28 @@ impl<
         self.speculative_stream_state
             .as_mut()
             .expect("Speculative stream state does not exist!")
+    }
+
+    /// Handles the storage synchronizer error sent by the driver
+    pub async fn handle_storage_synchronizer_error(
+        &mut self,
+        notification_and_feedback: NotificationAndFeedback,
+    ) -> Result<(), Error> {
+        // Reset the active stream
+        self.reset_active_stream(Some(notification_and_feedback))
+            .await?;
+
+        // Fallback to output syncing if we need to
+        if let BootstrappingMode::ExecuteOrApplyFromGenesis = self.get_bootstrapping_mode() {
+            self.output_fallback_handler.fallback_to_outputs();
+            metrics::set_gauge(
+                &metrics::DRIVER_FALLBACK_MODE,
+                ExecutingComponent::Bootstrapper.get_label(),
+                1,
+            );
+        }
+
+        Ok(())
     }
 
     /// Resets the currently active data stream and speculative state
