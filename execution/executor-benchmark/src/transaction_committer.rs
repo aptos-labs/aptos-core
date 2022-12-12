@@ -69,6 +69,14 @@ impl TransactionCommitter {
         let start_version = self.version;
         info!("Start with version: {}", start_version);
 
+        let mut agg_stats = AggStats {
+            total_blocks: 0,
+            total_transactions: 0,
+            total_execution_time: 0.0,
+            total_commit_time: 0.0,
+            total_latency: 0.0,
+        };
+
         while let Ok((
             block_id,
             root_hash,
@@ -93,9 +101,18 @@ impl TransactionCommitter {
                 execution_time,
                 Instant::now().duration_since(commit_start),
                 num_txns,
+                &mut agg_stats,
             );
         }
     }
+}
+
+struct AggStats {
+    total_blocks: usize,
+    total_transactions: u64,
+    total_execution_time: f64,
+    total_commit_time: f64,
+    total_latency: f64,
 }
 
 fn report_block(
@@ -106,17 +123,36 @@ fn report_block(
     execution_time: Duration,
     commit_time: Duration,
     block_size: usize,
+    agg_stats: &mut AggStats,
 ) {
     let total_versions = (version - start_version) as f64;
+    let latency = Instant::now().duration_since(execution_start_time);
+
+    agg_stats.total_blocks += 1;
+    agg_stats.total_transactions += block_size as u64;
+    agg_stats.total_execution_time += execution_time.as_secs_f64();
+    agg_stats.total_commit_time += commit_time.as_secs_f64();
+    agg_stats.total_latency += block_size as f64 * latency.as_secs_f64();
     info!(
-        "Version: {}. latency: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0}. Accumulative TPS: {:.0}",
+        "Version: {}. latency: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0} (execution: {:.0}, commit: {:.0}). Accumulative TPS: {:.0}",
         version,
-        Instant::now().duration_since(execution_start_time).as_millis(),
+        latency.as_millis(),
         execution_time.as_millis(),
         commit_time.as_millis(),
         block_size as f64 / (std::cmp::max(execution_time, commit_time)).as_secs_f64(),
+        block_size as f64 / execution_time.as_secs_f64(),
+        block_size as f64 / commit_time.as_secs_f64(),
         total_versions / global_start_time.elapsed().as_secs_f64(),
     );
+    info!(
+        "Accumulative TPS: {:.0}, execute time: {} ms. commit time: {} ms. execution TPS: {:.0}, commit TPS: {:.0}",
+        total_versions / global_start_time.elapsed().as_secs_f64(),
+        agg_stats.total_execution_time * 1000.0 / agg_stats.total_blocks as f64,
+        agg_stats.total_commit_time * 1000.0 / agg_stats.total_blocks as f64,
+        agg_stats.total_transactions as f64 / agg_stats.total_execution_time,
+        agg_stats.total_transactions as f64 / agg_stats.total_commit_time,
+    );
+
     info!(
             "Accumulative total: VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
             APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum(),

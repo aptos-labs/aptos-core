@@ -40,11 +40,11 @@ where
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(concurrency_level: usize) -> Self {
-        assert!(
-            concurrency_level > 0 && concurrency_level <= num_cpus::get(),
-            "Parallel execution concurrency level {} should be between 1 and number of CPUs",
-            concurrency_level
-        );
+        // assert!(
+        //     concurrency_level > 0 && concurrency_level <= num_cpus::get(),
+        //     "Parallel execution concurrency level {} should be between 1 and number of CPUs",
+        //     concurrency_level
+        // );
         Self {
             concurrency_level,
             phantom: PhantomData,

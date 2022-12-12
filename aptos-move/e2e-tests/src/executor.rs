@@ -14,7 +14,7 @@ use std::{
 use crate::{
     account::{Account, AccountData},
     data_store::{
-        FakeDataStore, GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_MAINNET,
+        FakeDataStore, FakeDataStoreLatency, GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_MAINNET,
         GENESIS_CHANGE_SET_TESTNET,
     },
     golden_outputs::GoldenOutputs,
@@ -94,9 +94,13 @@ pub struct FakeExecutor {
 
 impl FakeExecutor {
     /// Creates an executor from a genesis [`WriteSet`].
-    pub fn from_genesis(write_set: &WriteSet, chain_id: ChainId) -> Self {
+    pub fn from_genesis(
+        write_set: &WriteSet,
+        chain_id: ChainId,
+        latency: FakeDataStoreLatency,
+    ) -> Self {
         let mut executor = FakeExecutor {
-            data_store: FakeDataStore::default(),
+            data_store: FakeDataStore::new(latency),
             block_time: 0,
             executed_output: None,
             trace_dir: None,
@@ -119,7 +123,20 @@ impl FakeExecutor {
 
     /// Creates an executor from the genesis file GENESIS_FILE_LOCATION
     pub fn from_head_genesis() -> Self {
-        Self::from_genesis(GENESIS_CHANGE_SET_HEAD.clone().write_set(), ChainId::test())
+        Self::from_genesis(
+            GENESIS_CHANGE_SET_HEAD.clone().write_set(),
+            ChainId::test(),
+            FakeDataStoreLatency::NONE,
+        )
+    }
+
+    /// Creates an executor from the genesis file GENESIS_FILE_LOCATION
+    pub fn from_head_genesis_with_latency(latency: FakeDataStoreLatency) -> Self {
+        Self::from_genesis(
+            GENESIS_CHANGE_SET_HEAD.clone().write_set(),
+            ChainId::test(),
+            latency,
+        )
     }
 
     /// Creates an executor from the genesis file GENESIS_FILE_LOCATION
@@ -128,6 +145,7 @@ impl FakeExecutor {
             generate_genesis_change_set_for_testing_with_count(GenesisOptions::Head, count)
                 .write_set(),
             ChainId::test(),
+            FakeDataStoreLatency::NONE,
         )
     }
 
@@ -136,6 +154,7 @@ impl FakeExecutor {
         Self::from_genesis(
             GENESIS_CHANGE_SET_TESTNET.clone().write_set(),
             ChainId::testnet(),
+            FakeDataStoreLatency::NONE,
         )
     }
 
@@ -144,13 +163,14 @@ impl FakeExecutor {
         Self::from_genesis(
             GENESIS_CHANGE_SET_MAINNET.clone().write_set(),
             ChainId::mainnet(),
+            FakeDataStoreLatency::NONE,
         )
     }
 
     /// Creates an executor in which no genesis state has been applied yet.
-    pub fn no_genesis() -> Self {
+    pub fn no_genesis(latency: FakeDataStoreLatency) -> Self {
         FakeExecutor {
-            data_store: FakeDataStore::default(),
+            data_store: FakeDataStore::new(latency),
             block_time: 0,
             executed_output: None,
             trace_dir: None,
@@ -213,7 +233,7 @@ impl FakeExecutor {
     /// Creates an executor with only the standard library Move modules published and not other
     /// initialization done.
     pub fn stdlib_only_genesis() -> Self {
-        let mut genesis = Self::no_genesis();
+        let mut genesis = Self::no_genesis(FakeDataStoreLatency::NONE);
         for (bytes, module) in
             aptos_cached_packages::head_release_bundle().code_and_compiled_modules()
         {
@@ -226,7 +246,11 @@ impl FakeExecutor {
     /// Creates fresh genesis from the framework passed in.
     pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
         let genesis = aptos_vm_genesis::generate_test_genesis(framework, validator_accounts);
-        Self::from_genesis(genesis.0.write_set(), ChainId::test())
+        Self::from_genesis(
+            genesis.0.write_set(),
+            ChainId::test(),
+            FakeDataStoreLatency::NONE,
+        )
     }
 
     /// Create one instance of [`AccountData`] without saving it to data store.

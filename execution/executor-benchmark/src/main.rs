@@ -74,11 +74,17 @@ struct Opt {
     #[structopt(long)]
     concurrency_level: Option<usize>,
 
+    #[structopt(long)]
+    proof_reading_threads: Option<usize>,
+
     #[structopt(flatten)]
     pruner_opt: PrunerOpt,
 
     #[structopt(subcommand)]
     cmd: Command,
+
+    #[structopt(long)]
+    split_stages: bool,
 
     #[structopt(
         long,
@@ -99,6 +105,19 @@ impl Opt {
                 level
             }
             Some(level) => level,
+        }
+    }
+    fn proof_reading_threads(&self) -> usize {
+        match self.proof_reading_threads {
+            None => {
+                let threads = num_cpus::get();
+                println!(
+                    "\nproof_reading_threads defaults to num of cpus: {}\n",
+                    threads
+                );
+                threads
+            }
+            Some(threads) => threads,
         }
     }
 }
@@ -156,6 +175,7 @@ fn main() {
         .build_global()
         .expect("Failed to build rayon global thread pool.");
     AptosVM::set_concurrency_level_once(opt.concurrency_level());
+    AptosVM::set_num_proof_reading_threads_once(opt.proof_reading_threads());
 
     match opt.cmd {
         Command::CreateDb {
@@ -184,6 +204,7 @@ fn main() {
                 checkpoint_dir,
                 opt.verify_sequence_numbers,
                 opt.pruner_opt.pruner_config(),
+                opt.split_stages,
             );
         }
         Command::AddAccounts {

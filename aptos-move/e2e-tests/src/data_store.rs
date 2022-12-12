@@ -22,6 +22,7 @@ use move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 /// Dummy genesis ChangeSet for testing
 pub static GENESIS_CHANGE_SET_HEAD: Lazy<ChangeSet> =
@@ -33,19 +34,30 @@ pub static GENESIS_CHANGE_SET_TESTNET: Lazy<ChangeSet> =
 pub static GENESIS_CHANGE_SET_MAINNET: Lazy<ChangeSet> =
     Lazy::new(|| generate_genesis_change_set_for_mainnet(GenesisOptions::Mainnet));
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum FakeDataStoreLatency {
+    SLEEP(f32),
+    SPINLOOP(f32),
+    NONE,
+}
+
 /// An in-memory implementation of [`StateView`] and [`RemoteCache`] for the VM.
 ///
 /// Tests use this to set up state, and pass in a reference to the cache whenever a `StateView` or
 /// `RemoteCache` is needed.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FakeDataStore {
     state_data: HashMap<StateKey, Vec<u8>>,
+    latency: FakeDataStoreLatency,
 }
 
 impl FakeDataStore {
-    /// Creates a new `FakeDataStore` with the provided initial data.
-    pub fn new(data: HashMap<StateKey, Vec<u8>>) -> Self {
-        FakeDataStore { state_data: data }
+    /// Creates a new `FakeDataStore`
+    pub fn new(latency: FakeDataStoreLatency) -> Self {
+        FakeDataStore {
+            state_data: HashMap::new(),
+            latency,
+        }
     }
 
     /// Adds a [`WriteSet`] to this data store.
@@ -108,6 +120,24 @@ impl TStateView for FakeDataStore {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+        match self.latency {
+            FakeDataStoreLatency::SLEEP(secs) => {
+                std::thread::sleep(Duration::from_secs_f32(secs));
+            }
+            FakeDataStoreLatency::SPINLOOP(secs) => {
+                let now = Instant::now();
+                let mut counter = 0;
+                loop {
+                    counter += 1;
+                    if counter % 10 == 0 {
+                        if now.elapsed().as_secs_f32() > secs {
+                            break;
+                        }
+                    }
+                }
+            }
+            FakeDataStoreLatency::NONE => {}
+        };
         Ok(self.state_data.get(state_key).cloned())
     }
 
