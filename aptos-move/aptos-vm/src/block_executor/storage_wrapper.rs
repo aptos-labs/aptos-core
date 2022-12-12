@@ -57,7 +57,7 @@ impl<'a, S: StateView> StateView for VersionedView<'a, S> {
                 Ok(Some(serialize(&result)))
             }
             // TODO: generate parallel execution error for StatusCode.
-            // PEError indicates that the parallel execution is halted.
+            // ExecutionHalted indicates that the parallel execution is halted.
             // The read should return immediately and log the error.
             ReadResult::ExecutionHalted => Err(anyhow::Error::new(VMStatus::Error(
                 StatusCode::STORAGE_ERROR,
