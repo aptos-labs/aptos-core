@@ -52,7 +52,7 @@ impl SwitchBoard {
 /// ```rust,no_run
 /// use std::io::Result;
 ///
-/// use memsocket::{MemoryListener, MemorySocket};
+/// use aptos_memsocket::{MemoryListener, MemorySocket};
 /// use futures::prelude::*;
 ///
 /// async fn write_stormlight(mut stream: MemorySocket) -> Result<()> {
@@ -101,7 +101,7 @@ impl MemoryListener {
     /// Create a MemoryListener bound to port 16:
     ///
     /// ```rust,no_run
-    /// use memsocket::MemoryListener;
+    /// use aptos_memsocket::MemoryListener;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let listener = MemoryListener::bind(16)?;
@@ -161,7 +161,7 @@ impl MemoryListener {
     /// # Examples
     ///
     /// ```rust
-    /// use memsocket::MemoryListener;
+    /// use aptos_memsocket::MemoryListener;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let listener = MemoryListener::bind(16)?;
@@ -183,7 +183,7 @@ impl MemoryListener {
     ///
     /// ```rust,no_run
     /// use futures::prelude::*;
-    /// use memsocket::MemoryListener;
+    /// use aptos_memsocket::MemoryListener;
     ///
     /// # async fn work () -> ::std::io::Result<()> {
     /// let mut listener = MemoryListener::bind(16)?;
@@ -244,7 +244,7 @@ impl<'a> Stream for Incoming<'a> {
 ///
 /// ```rust, no_run
 /// use futures::prelude::*;
-/// use memsocket::MemorySocket;
+/// use aptos_memsocket::MemorySocket;
 ///
 /// # async fn run() -> ::std::io::Result<()> {
 /// let (mut socket_a, mut socket_b) = MemorySocket::new_pair();
@@ -276,7 +276,7 @@ impl MemorySocket {
     /// # Examples
     ///
     /// ```rust
-    /// use memsocket::MemorySocket;
+    /// use aptos_memsocket::MemorySocket;
     ///
     /// let (socket_a, socket_b) = MemorySocket::new_pair();
     /// ```
@@ -307,7 +307,7 @@ impl MemorySocket {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use memsocket::MemorySocket;
+    /// use aptos_memsocket::MemorySocket;
     ///
     /// # fn main () -> ::std::io::Result<()> {
     /// let socket = MemorySocket::connect(16)?;

@@ -1,5 +1,5 @@
 [package]
-name = "memsocket"
+name = "aptos-memsocket"
 description = "Aptos memsocket"
 version = "0.1.0"
 

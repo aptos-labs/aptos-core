@@ -17,12 +17,12 @@ use aptos_config::{
     config::{NodeConfig, PeerRole},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_types::{transaction::SignedTransaction, PeerId};
-use netcore::transport::ConnectionOrigin;
-use network::{
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::{
     peer_manager::{PeerManagerNotification, PeerManagerRequest},
     ProtocolId,
 };
+use aptos_types::{transaction::SignedTransaction, PeerId};
 use rand::{rngs::StdRng, SeedableRng};
 use std::collections::{HashMap, HashSet};
 

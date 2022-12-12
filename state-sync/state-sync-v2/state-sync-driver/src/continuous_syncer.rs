@@ -18,12 +18,12 @@ use aptos_data_streaming_service::{
 };
 use aptos_infallible::Mutex;
 use aptos_logger::{prelude::*, sample, sample::SampleRate};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use std::{sync::Arc, time::Duration};
-use storage_interface::DbReader;
 
 /// A simple component that manages the continuous syncing of the node
 pub struct ContinuousSyncer<StorageSyncer, StreamingClient> {

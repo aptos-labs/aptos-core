@@ -1,5 +1,5 @@
 [package]
-name = "peer-monitoring-service-client"
+name = "aptos-peer-monitoring-service-client"
 description = "The Aptos peer monitoring service (client-side)"
 version = "0.1.0"
 
@@ -13,10 +13,10 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
+aptos-network = { workspace = true }
+aptos-peer-monitoring-service-types = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
-channel = { workspace = true }
-network = { workspace = true }
-peer-monitoring-service-types = { workspace = true }
 thiserror = { workspace = true }

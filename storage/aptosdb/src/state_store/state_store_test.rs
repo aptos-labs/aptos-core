@@ -7,12 +7,14 @@ use crate::{
     AptosDB,
 };
 use aptos_jellyfish_merkle::TreeReader;
+use aptos_storage_interface::{
+    jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver,
+};
 use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
 };
 use proptest::{collection::hash_map, prelude::*};
-use storage_interface::{jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver};
 
 use super::*;
 

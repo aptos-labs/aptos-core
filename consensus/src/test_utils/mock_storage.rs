@@ -13,6 +13,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     epoch_change::EpochChangeProof,
@@ -20,7 +21,6 @@ use aptos_types::{
     on_chain_config::ValidatorSet,
 };
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::DbReader;
 
 pub struct MockSharedStorage {
     // Safety state

@@ -1,5 +1,5 @@
 [package]
-name = "peer-monitoring-service-types"
+name = "aptos-peer-monitoring-service-types"
 description = "Common types offered by the peer monitoring service"
 version = "0.1.0"
 
@@ -14,6 +14,6 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-config = { workspace = true }
-network = { workspace = true }
+aptos-network = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

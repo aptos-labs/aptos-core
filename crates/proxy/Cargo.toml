@@ -1,5 +1,5 @@
 [package]
-name = "proxy"
+name = "aptos-proxy"
 description = "Aptos proxy"
 version = "0.1.0"
 

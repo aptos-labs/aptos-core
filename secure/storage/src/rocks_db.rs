@@ -7,12 +7,12 @@ use anyhow::{anyhow, Result};
 use aptos_crypto::_once_cell::sync::Lazy;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
     ColumnFamilyName, Options, SchemaBatch, DB,
 };
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

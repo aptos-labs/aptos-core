@@ -1,5 +1,5 @@
 [package]
-name = "move-examples"
+name = "aptos-move-examples"
 description = "Move examples"
 version = "0.1.0"
 

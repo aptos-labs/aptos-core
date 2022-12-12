@@ -4,8 +4,8 @@
 use crate::utils::error_notes::ErrorNotes;
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_db::backup::backup_handler::DbState;
 use aptos_types::transaction::Version;
-use aptosdb::backup::backup_handler::DbState;
 use clap::Parser;
 use futures::TryStreamExt;
 use tokio::io::{AsyncRead, AsyncReadExt};

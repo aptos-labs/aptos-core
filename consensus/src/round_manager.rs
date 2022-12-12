@@ -23,6 +23,7 @@ use crate::{
     persistent_liveness_storage::PersistentLivenessStorage,
 };
 use anyhow::{bail, ensure, Context, Result};
+use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
@@ -37,16 +38,15 @@ use aptos_consensus_types::{
 };
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
+#[cfg(test)]
+use aptos_safety_rules::ConsensusState;
+use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
     validator_verifier::ValidatorVerifier,
 };
-use channel::aptos_channel;
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
-#[cfg(test)]
-use safety_rules::ConsensusState;
-use safety_rules::TSafetyRules;
 use serde::Serialize;
 use std::{
     mem::{discriminant, Discriminant},

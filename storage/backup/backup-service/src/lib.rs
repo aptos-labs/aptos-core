@@ -4,8 +4,8 @@
 mod handlers;
 
 use crate::handlers::get_routes;
+use aptos_db::AptosDB;
 use aptos_logger::prelude::*;
-use aptosdb::AptosDB;
 use std::{
     net::SocketAddr,
     sync::{

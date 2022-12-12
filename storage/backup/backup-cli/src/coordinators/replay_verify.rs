@@ -12,10 +12,10 @@ use crate::{
     utils::{GlobalRestoreOptions, RestoreRunMode, TrustedWaypointOpt},
 };
 use anyhow::{ensure, Result};
+use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
 use aptos_vm::AptosVM;
-use aptosdb::backup::restore_handler::RestoreHandler;
 use std::sync::Arc;
 
 pub struct ReplayVerifyCoordinator {

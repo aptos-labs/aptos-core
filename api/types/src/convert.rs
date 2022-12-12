@@ -15,6 +15,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
@@ -41,7 +42,6 @@ use std::{
     rc::Rc,
     sync::Arc,
 };
-use storage_interface::DbReader;
 
 /// The Move converter for converting Move types to JSON
 ///

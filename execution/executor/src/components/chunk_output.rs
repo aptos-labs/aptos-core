@@ -7,16 +7,16 @@ use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_executor_types::ExecutedChunk;
 use aptos_logger::{trace, warn};
+use aptos_storage_interface::{
+    cached_state_view::{CachedStateView, StateCache},
+    ExecutedTrees,
+};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
-use storage_interface::{
-    cached_state_view::{CachedStateView, StateCache},
-    ExecutedTrees,
-};
 
 pub struct ChunkOutput {
     /// Input transactions.

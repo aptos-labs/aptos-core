@@ -43,6 +43,7 @@ fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
 pub fn generate_feature_upgrade_proposal(
     features: &Features,
     is_testnet: bool,
+    next_execution_hash: String,
 ) -> Result<Vec<(String, String)>> {
     let mut result = vec![];
 
@@ -62,20 +63,26 @@ pub fn generate_feature_upgrade_proposal(
 
     let writer = CodeWriter::new(Loc::default());
 
-    let proposal = generate_governance_proposal(&writer, is_testnet, "std::features", |writer| {
-        emit!(writer, "let enabled_blob: vector<u64> = ");
-        generate_features_blob(writer, &enabled);
-        emitln!(writer, ";\n");
+    let proposal = generate_governance_proposal(
+        &writer,
+        is_testnet,
+        &next_execution_hash,
+        "std::features",
+        |writer| {
+            emit!(writer, "let enabled_blob: vector<u64> = ");
+            generate_features_blob(writer, &enabled);
+            emitln!(writer, ";\n");
 
-        emit!(writer, "let disabled_blob: vector<u64> = ");
-        generate_features_blob(writer, &disabled);
-        emitln!(writer, ";\n");
+            emit!(writer, "let disabled_blob: vector<u64> = ");
+            generate_features_blob(writer, &disabled);
+            emitln!(writer, ";\n");
 
-        emitln!(
-            writer,
-            "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
-        );
-    });
+            emitln!(
+                writer,
+                "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
+            );
+        },
+    );
 
     result.push(("features".to_string(), proposal));
     Ok(result)

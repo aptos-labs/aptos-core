@@ -22,10 +22,10 @@ aptos-global-constants = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
+aptos-testcases = { workspace = true }
 async-trait = { workspace = true }
 serde_yaml = { workspace = true }
 structopt = { workspace = true }
-testcases = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 

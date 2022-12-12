@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_memsocket::MemorySocket;
 use futures::{
     executor::block_on,
     io::{AsyncReadExt, AsyncWriteExt},
 };
-use memsocket::MemorySocket;
 use std::io::Result;
 
 #[test]

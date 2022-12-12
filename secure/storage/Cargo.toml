@@ -18,6 +18,7 @@ aptos-crypto = { workspace = true }
 aptos-github-client = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-schemadb = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-vault-client = { workspace = true }
@@ -26,7 +27,6 @@ bcs = { workspace = true }
 chrono = { workspace = true }
 enum_dispatch = { workspace = true }
 rand = { workspace = true }
-schemadb = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -34,8 +34,8 @@ thiserror = { workspace = true }
 [dev-dependencies]
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-crypto-derive = { workspace = true }
+aptos-schemadb = { workspace = true, features = ["fuzzing"] }
 rand = { workspace = true }
-schemadb = { workspace = true, features = ["fuzzing"] }
 
 [features]
 fuzzing = ["aptos-crypto/fuzzing"]

@@ -11,6 +11,7 @@ use aptos_types::ledger_info::generate_ledger_info_with_sig;
 use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
 use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_temppath::TempPath;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -20,7 +21,6 @@ use aptos_types::{
 };
 use proptest::sample::Index;
 use proptest::{collection::vec, prelude::*};
-use scratchpad::SparseMerkleTree;
 
 prop_compose! {
     pub fn arb_state_kv_sets(
@@ -50,7 +50,7 @@ pub(crate) fn update_store(
     input: impl Iterator<Item = (StateKey, Option<StateValue>)>,
     first_version: Version,
 ) -> HashValue {
-    use storage_interface::{jmt_update_refs, jmt_updates};
+    use aptos_storage_interface::{jmt_update_refs, jmt_updates};
     let mut root_hash = *aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
     for (i, (key, value)) in input.enumerate() {
         let value_state_set = vec![(key, value)].into_iter().collect();
