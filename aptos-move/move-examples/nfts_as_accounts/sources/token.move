@@ -23,6 +23,7 @@
 /// * consider tracking ownership if the token is inserted into a TokenStore
 /// * create_token should probably have another function that returns the signer for descendants
 module nfts_as_accounts::token {
+    use std::option::{Option, Self};
     use std::signer;
     use std::string::{Self, String};
     use std::vector;
@@ -30,9 +31,10 @@ module nfts_as_accounts::token {
     use aptos_framework::account;
 
     const ENOT_THE_CREATOR: u64 = 1;
+    const EINVALID_REF_CONVERSION: u64 = 2;
 
     /// Represents the common fields to all tokens.
-    struct Token has key {
+    struct Token<Data> has key {
         /// An optional categorization of similar token, there are no constraints on collections.
         collection: String,
         /// The original creator of this token.
@@ -50,6 +52,8 @@ module nfts_as_accounts::token {
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
+        /// Inner data
+        data: Option<Data>,
     }
 
     /// This config specifies which fields in the TokenData are mutable
@@ -68,11 +72,13 @@ module nfts_as_accounts::token {
         payee_address: address,
     }
 
-    struct TokenRef has store {
+    struct TokenRef<phantom Data> has store {
         inner: account::SignerCapability,
     }
 
-    public fun create_token(
+    struct BaseToken has store { }
+
+    public fun create_token<Data: store>(
         creator: &signer, 
         collection: String,
         description: String,
@@ -80,7 +86,8 @@ module nfts_as_accounts::token {
         name: String,
         royalty: Royalty,
         uri: String,
-    ): TokenRef {
+        data: Data,
+    ): TokenRef<Data> {
         let seed = *string::bytes(&collection);
         vector::append(&mut seed, b"::");
         vector::append(&mut seed, *string::bytes(&name));
@@ -94,10 +101,11 @@ module nfts_as_accounts::token {
             name,
             royalty,
             uri,
+            data: option::some(data),
         };
 
         move_to(&token_account, token);
-        TokenRef { inner }
+        TokenRef<Data> { inner }
     }
 
     public fun create_mutability_config(description: bool, name: bool, uri: bool): MutabilityConfig {
@@ -116,10 +124,6 @@ module nfts_as_accounts::token {
         }
     }
 
-    public fun exists_at(token_addr: address): bool {
-        exists<Token>(token_addr)
-    }
-
     public fun generate_token_address(creator: address, collection: &String, name: &String): address {
         let seed = *string::bytes(collection);
         vector::append(&mut seed, b"::");
@@ -127,14 +131,39 @@ module nfts_as_accounts::token {
         account::create_resource_address(&creator, seed)
     }
 
-    public fun token_addr_from_ref(token_ref: &TokenRef): address {
+    public fun to_base_token<Data>(ref: TokenRef<Data>): TokenRef<BaseToken> {
+        let TokenRef<Data>{ inner: inner } = ref;
+        TokenRef<BaseToken> { inner }
+    }
+
+    public fun from_base_token<Data: store>(ref: TokenRef<BaseToken>): TokenRef<Data> {
+        let addr = token_addr_from_ref(&ref);
+        assert!(exists<Token<Data>>(addr), EINVALID_REF_CONVERSION);
+        let TokenRef<BaseToken>{ inner: inner } = ref;
+        TokenRef<Data> { inner }
+    }
+
+    public fun token_addr_from_ref<Data>(token_ref: &TokenRef<Data>): address {
         account::get_signer_capability_address(&token_ref.inner)
     }
 
-    public fun token_signer(creator: &signer, token_ref: &TokenRef): signer acquires Token {
-        let token = borrow_global<Token>(token_addr_from_ref(token_ref));
+    public fun token_signer<Data: store>(
+        creator: &signer,
+        token_ref: &TokenRef<Data>,
+    ): signer acquires Token {
+        let token = borrow_global<Token<Data>>(token_addr_from_ref(token_ref));
         assert!(token.creator == signer::address_of(creator), ENOT_THE_CREATOR);
         account::create_signer_with_capability(&token_ref.inner)
+    }
+
+    public fun set_data<Data: store>(ref: &TokenRef<Data>, data: Data) acquires Token {
+        let token = borrow_global_mut<Token<Data>>(token_addr_from_ref(ref));
+        option::fill(&mut token.data, data)
+    }
+
+    public fun take_data<Data: store>(ref: &TokenRef<Data>): Data acquires Token {
+        let token = borrow_global_mut<Token<Data>>(token_addr_from_ref(ref));
+        option::extract(&mut token.data)
     }
 
     #[test(account = @0x3)]
@@ -156,11 +185,12 @@ module nfts_as_accounts::token {
             name,
             royalty,
             string::utf8(b"Uri"),
+            BaseToken { },
         );
 
         assert!(token_addr == account::get_signer_capability_address(&token_ref.inner), 1);
 
-        let TokenRef { inner: _inner } = token_ref;
+        let TokenRef<BaseToken> { inner: _inner } = token_ref;
     }
 
     // The same token cannot be created twice, there are no duplicates.
@@ -182,6 +212,7 @@ module nfts_as_accounts::token {
             *&name,
             *&royalty,
             string::utf8(b"Uri"),
+            BaseToken { },
         );
 
         let token_ref_two = create_token(
@@ -192,6 +223,7 @@ module nfts_as_accounts::token {
             name,
             royalty,
             string::utf8(b"Uri"),
+            BaseToken { },
         );
 
         let TokenRef { inner: _inner } = token_ref_one;

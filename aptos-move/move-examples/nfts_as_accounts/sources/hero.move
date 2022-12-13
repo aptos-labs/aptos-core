@@ -14,7 +14,7 @@ module nfts_as_accounts::composable_example {
     use std::signer;
     use std::string::{Self, String};
 
-    use nfts_as_accounts::token;
+    use nfts_as_accounts::token::{Self, TokenRef};
 
     const ENOT_A_HERO: u64 = 1;
     const ENOT_A_WEAPON: u64 = 2;
@@ -26,57 +26,37 @@ module nfts_as_accounts::composable_example {
         royalty: token::Royalty,
     }
 
-    struct Hero has key {
-        armor: Option<ArmorRef>,
+    struct Hero has store {
+        armor: Option<TokenRef<Armor>>,
         gender: String,
         race: String,
-        shield: Option<ShieldRef>,
-        weapon: Option<WeaponRef>,
+        shield: Option<TokenRef<Shield>>,
+        weapon: Option<TokenRef<Weapon>>,
     }
 
-    struct HeroRef has store {
-        inner: token::TokenRef,
-    }
-
-    struct Armor has key {
+    struct Armor has store {
         defense: u64,
-        gem: Option<GemRef>,
+        gem: Option<TokenRef<Gem>>,
         weight: u64,
     }
 
-    struct ArmorRef has store {
-        inner: token::TokenRef,
-    }
-
-    struct Gem has key {
+    struct Gem has store {
         attack_modifier: u64,
         defense_modifier: u64,
         magic_attribute: String,
     }
 
-    struct GemRef has store {
-        inner: token::TokenRef,
-    }
-
-    struct Shield has key {
+    struct Shield has store {
         defense: u64,
-        gem: Option<GemRef>,
+        gem: Option<TokenRef<Gem>>,
         weight: u64,
     }
 
-    struct ShieldRef has store {
-        inner: token::TokenRef,
-    }
-
-    struct Weapon has key {
+    struct Weapon has store {
         attack: u64,
-        gem: Option<GemRef>,
+        gem: Option<TokenRef<Gem>>,
         weapon_type: String,
         weight: u64,
-    }
-
-    struct WeaponRef has store {
-        inner: token::TokenRef,
     }
 
     fun init_module(account: &signer) {
@@ -88,12 +68,13 @@ module nfts_as_accounts::composable_example {
         move_to(account, on_chain_config);
     }
 
-    fun create_token(
+    fun create_token<Data: store>(
         creator: &signer,
         description: String,
         name: String,
         uri: String,
-    ): token::TokenRef acquires OnChainConfig {
+        data: Data,
+    ): TokenRef<Data> acquires OnChainConfig {
         let on_chain_config = borrow_global<OnChainConfig>(signer::address_of(creator));
         token::create_token(
             creator, 
@@ -103,6 +84,7 @@ module nfts_as_accounts::composable_example {
             name,
             *&on_chain_config.royalty,
             uri,
+            data,
         )
     }
 
@@ -113,9 +95,7 @@ module nfts_as_accounts::composable_example {
         name: String,
         race: String,
         uri: String,
-    ): HeroRef acquires OnChainConfig {
-        let token_ref = create_token(creator, description, name, uri);
-
+    ): TokenRef<Hero> acquires OnChainConfig {
         let hero = Hero {
             armor: option::none(),
             gender,
@@ -123,31 +103,13 @@ module nfts_as_accounts::composable_example {
             shield: option::none(),
             weapon: option::none(),
         };
-
-        let token_account = token::token_signer(creator, &token_ref);
-        move_to(&token_account, hero);
-        HeroRef { inner: token_ref }
+        create_token(creator, description, name, uri, hero)
     }
 
-    public fun hero_ref_to_token_ref(hero_ref: HeroRef): token::TokenRef {
-        let HeroRef { inner } = hero_ref;
-        inner
-    }
-
-    public fun hero_ref_from_token_ref(token_ref: token::TokenRef): HeroRef {
-        let token_addr = token::token_addr_from_ref(&token_ref);
-        assert!(exists<Hero>(token_addr), ENOT_A_HERO);
-        HeroRef { inner: token_ref }
-    }
-
-    public fun hero_addr(hero_ref: &HeroRef): address {
-        token::token_addr_from_ref(&hero_ref.inner)
-    }
-
-    public fun hero_equip_weapon(hero_ref: &HeroRef, weapon_ref: WeaponRef) acquires Hero {
-        let hero_addr = hero_addr(hero_ref);
-        let hero = borrow_global_mut<Hero>(hero_addr);
-        option::fill(&mut hero.weapon, weapon_ref);
+    public fun hero_equip_weapon(hero: &TokenRef<Hero>, weapon: TokenRef<Weapon>) {
+        let hero_data = token::take_data(hero);
+        option::fill(&mut hero_data.weapon, weapon);
+        token::set_data(hero, hero_data);
     }
 
     public fun create_weapon(
@@ -158,9 +120,7 @@ module nfts_as_accounts::composable_example {
         uri: String,
         weapon_type: String,
         weight: u64,
-    ): WeaponRef acquires OnChainConfig {
-        let token_ref = create_token(creator, description, name, uri);
-
+    ): TokenRef<Weapon> acquires OnChainConfig {
         let weapon = Weapon {
             attack,
             gem: option::none(),
@@ -168,30 +128,13 @@ module nfts_as_accounts::composable_example {
             weight,
         };
 
-        let token_account = token::token_signer(creator, &token_ref);
-        move_to(&token_account, weapon);
-        WeaponRef { inner: token_ref }
+        create_token(creator, description, name, uri, weapon)
     }
 
-    public fun weapon_addr(weapon_ref: &WeaponRef): address {
-        token::token_addr_from_ref(&weapon_ref.inner)
-    }
-
-    public fun weapon_ref_to_token_ref(weapon_ref: WeaponRef): token::TokenRef {
-        let WeaponRef { inner } = weapon_ref;
-        inner
-    }
-
-    public fun weapon_ref_from_token_ref(token_ref: token::TokenRef): WeaponRef {
-        let token_addr = token::token_addr_from_ref(&token_ref);
-        assert!(exists<Weapon>(token_addr), ENOT_A_WEAPON);
-        WeaponRef { inner: token_ref }
-    }
-
-    public fun weapon_equip_gem(weapon_ref: &WeaponRef, gem_ref: GemRef) acquires Weapon {
-        let weapon_addr = weapon_addr(weapon_ref);
-        let weapon = borrow_global_mut<Weapon>(weapon_addr);
-        option::fill(&mut weapon.gem, gem_ref);
+    public fun weapon_equip_gem(weapon: &TokenRef<Weapon>, gem: TokenRef<Gem>) {
+        let weapon_data = token::take_data(weapon);
+        option::fill(&mut weapon_data.gem, gem);
+        token::set_data(weapon, weapon_data);
     }
 
     public fun create_gem(
@@ -202,42 +145,23 @@ module nfts_as_accounts::composable_example {
         magic_attribute: String,
         name: String,
         uri: String,
-    ): GemRef acquires OnChainConfig {
-        let token_ref = create_token(creator, description, name, uri);
-
+    ): TokenRef<Gem> acquires OnChainConfig {
         let gem = Gem {
             attack_modifier,
             defense_modifier,
             magic_attribute,
         };
 
-        let token_account = token::token_signer(creator, &token_ref);
-        move_to(&token_account, gem);
-        GemRef { inner: token_ref }
-    }
-
-    public fun gem_addr(gem_ref: &GemRef): address {
-        token::token_addr_from_ref(&gem_ref.inner)
-    }
-
-    public fun gem_ref_to_token_ref(gem_ref: GemRef): token::TokenRef {
-        let GemRef { inner } = gem_ref;
-        inner
-    }
-
-    public fun gem_ref_from_token_ref(token_ref: token::TokenRef): GemRef {
-        let token_addr = token::token_addr_from_ref(&token_ref);
-        assert!(exists<Gem>(token_addr), ENOT_A_GEM);
-        GemRef { inner: token_ref }
+        create_token(creator, description, name, uri, gem)
     }
 
     #[test_only]
-
     use nfts_as_accounts::token_store;
+
     #[test(account = @0x3)]
-    fun test_hero_with_gem_weapon(account: &signer) acquires Hero, OnChainConfig, Weapon {
+    fun test_hero_with_gem_weapon(account: &signer) acquires OnChainConfig {
         init_module(account);
-        let hero_ref = create_hero(
+        let hero = create_hero(
             account,
             string::utf8(b"The best hero ever!"),
             string::utf8(b"Male"),
@@ -246,7 +170,7 @@ module nfts_as_accounts::composable_example {
             string::utf8(b""),
         );
 
-        let weapon_ref = create_weapon(
+        let weapon = create_weapon(
             account,
             32,
             string::utf8(b"A magical staff!"),
@@ -256,7 +180,7 @@ module nfts_as_accounts::composable_example {
             15,
         );
 
-        let gem_ref = create_gem(
+        let gem = create_gem(
             account,
             32,
             32,
@@ -266,22 +190,22 @@ module nfts_as_accounts::composable_example {
             string::utf8(b""),
         );
 
-        let weapon_addr = weapon_addr(&weapon_ref);
-        let gem_addr = gem_addr(&gem_ref);
+        let weapon_addr = token::token_addr_from_ref(&weapon);
+        let gem_addr = token::token_addr_from_ref(&gem);
 
         token_store::init(account);        
-        token_store::store(account, weapon_ref_to_token_ref(weapon_ref));
-        token_store::store(account, gem_ref_to_token_ref(gem_ref));
+        token_store::store(account, weapon);
+        token_store::store(account, gem);
 
-        let weapon_ref = weapon_ref_from_token_ref(token_store::take(account, weapon_addr));
-        let gem_ref = gem_ref_from_token_ref(token_store::take(account, gem_addr));
+        let weapon = token_store::take(account, weapon_addr);
+        let gem = token_store::take(account, gem_addr);
 
-        weapon_equip_gem(&weapon_ref, gem_ref);
-        token_store::store(account, weapon_ref_to_token_ref(weapon_ref));
+        weapon_equip_gem(&weapon, gem);
+        token_store::store(account, weapon);
 
-        let weapon_ref = weapon_ref_from_token_ref(token_store::take(account, weapon_addr));
-        hero_equip_weapon(&hero_ref, weapon_ref);
+        let weapon = token_store::take(account, weapon_addr);
+        hero_equip_weapon(&hero, weapon);
 
-        token_store::store(account, hero_ref_to_token_ref(hero_ref));
+        token_store::store(account, hero);
     }
 }
