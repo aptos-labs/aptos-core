@@ -1000,6 +1000,17 @@ impl Client {
         Ok(response.map(|inner| inner.to_vec()))
     }
 
+    pub async fn get_account_resource_bytes(
+        &self,
+        address: AccountAddress,
+        resource_type: &str,
+    ) -> AptosResult<Response<Vec<u8>>> {
+        let url = self.build_path(&format!("accounts/{}/resource/{}", address, resource_type))?;
+
+        let response = self.get_bcs(url).await?;
+        Ok(response.map(|inner| inner.to_vec()))
+    }
+
     pub async fn get_account_resource_at_version(
         &self,
         address: AccountAddress,
