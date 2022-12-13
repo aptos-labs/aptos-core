@@ -134,6 +134,7 @@ const sidebars = {
         "concepts/base-gas",
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",
+        "guides/move-guides/mint-nft-cli",
         "guides/move-guides/upgrading-move-code",
       ],
     },
