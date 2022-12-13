@@ -6,6 +6,8 @@ module aptos_framework::coin {
     use std::signer;
 
     use aptos_framework::account;
+    use aptos_framework::aggregator_factory;
+    use aptos_framework::aggregator::{Self, Aggregator};
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
     use aptos_framework::system_addresses;
@@ -14,6 +16,7 @@ module aptos_framework::coin {
 
     friend aptos_framework::aptos_coin;
     friend aptos_framework::genesis;
+    friend aptos_framework::transaction_fee;
 
     //
     // Errors.
@@ -55,6 +58,9 @@ module aptos_framework::coin {
     /// Symbol of the coin is too long
     const ECOIN_SYMBOL_TOO_LONG: u64 = 13;
 
+    /// The value of aggregatable coin used for transaction fees redistribution does not fit in u64.
+    const EAGGREGATABLE_COIN_VALUE_TOO_LARGE: u64 = 14;
+
     //
     // Constants
     //
@@ -69,6 +75,17 @@ module aptos_framework::coin {
         /// Amount of coin this address has.
         value: u64,
     }
+
+    /// Represents a coin with aggregator as its value. This allows to update
+    /// the coin in every transaction avoiding read-modify-write conflicts. Only
+    /// used for gas fees distribution by Aptos Framework (0x1).
+    struct AggregatableCoin<phantom CoinType> has store {
+        /// Amount of aggregatable coin this address has.
+        value: Aggregator,
+    }
+
+    /// Maximum possible aggregatable coin value.
+    const MAX_U64: u128 = 18446744073709551615;
 
     /// A holder of a specific coin types and associated event handles.
     /// These are kept in a single resource to ensure locality of data.
@@ -137,6 +154,59 @@ module aptos_framework::coin {
         system_addresses::assert_aptos_framework(aptos_framework);
         let allow_upgrades = &mut borrow_global_mut<SupplyConfig>(@aptos_framework).allow_upgrades;
         *allow_upgrades = allowed;
+    }
+
+    //
+    //  Aggregatable coin functions
+    //
+
+    /// Creates a new aggregatable coin with value overflowing on `limit`. Note that this function can
+    /// only be called by Aptos Framework (0x1) account for now becuase of `create_aggregator`.
+    public(friend) fun initialize_aggregatable_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
+        let aggregator = aggregator_factory::create_aggregator(aptos_framework, MAX_U64);
+        AggregatableCoin<CoinType> {
+            value: aggregator,
+        }
+    }
+
+    /// Returns true if the value of aggregatable coin is zero.
+    public(friend) fun is_aggregatable_coin_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
+        let amount = aggregator::read(&coin.value);
+        amount == 0
+    }
+
+    /// Drains the aggregatable coin, setting it to zero and returning a standard coin.
+    public(friend) fun drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
+        let amount = aggregator::read(&coin.value);
+        assert!(amount <= MAX_U64, error::out_of_range(EAGGREGATABLE_COIN_VALUE_TOO_LARGE));
+
+        aggregator::sub(&mut coin.value, amount);
+        Coin<CoinType> {
+            value: (amount as u64),
+        }
+    }
+
+    /// Merges `coin` into aggregatable coin (`dst_coin`).
+    public(friend) fun merge_aggregatable_coin<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
+        let Coin { value } = coin;
+        let amount = (value as u128);
+        aggregator::add(&mut dst_coin.value, amount);
+    }
+
+    /// Collects a specified amount of coin form an account into aggregatable coin.
+    public(friend) fun collect_into_aggregatable_coin<CoinType>(
+        account_addr: address,
+        amount: u64,
+        dst_coin: &mut AggregatableCoin<CoinType>,
+    ) acquires CoinStore {
+        // Skip collecting if amount is zero.
+        if (amount == 0) {
+            return
+        };
+
+        let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+        let coin = extract(&mut coin_store.coin, amount);
+        merge_aggregatable_coin(dst_coin, coin);
     }
 
     //
@@ -491,9 +561,6 @@ module aptos_framework::coin {
     public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
         let BurnCapability<CoinType> {} = burn_cap;
     }
-
-    #[test_only]
-    use aptos_framework::aggregator_factory;
 
     #[test_only]
     struct FakeMoney {}
@@ -959,5 +1026,45 @@ module aptos_framework::coin {
         let supply = option::borrow_mut(maybe_supply);
         assert!(optional_aggregator::is_parallelizable(supply), 0);
         assert!(optional_aggregator::read(supply) == 100, 0);
+    }
+
+    #[test_only]
+    fun destroy_aggregatable_coin_for_test<CoinType>(aggregatable_coin: AggregatableCoin<CoinType>) {
+        let AggregatableCoin { value } = aggregatable_coin;
+        aggregator::destroy(value);
+    }
+
+    #[test(framework = @aptos_framework)]
+    public entry fun test_collect_from_and_drain(
+        framework: signer,
+    ) acquires CoinInfo, CoinStore {
+        let framework_addr = signer::address_of(&framework);
+        account::create_account_for_test(framework_addr);
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&framework, 1, true);
+
+        let coins_minted = mint<FakeMoney>(100, &mint_cap);
+        deposit(framework_addr, coins_minted);
+        assert!(balance<FakeMoney>(framework_addr) == 100, 0);
+        assert!(*option::borrow(&supply<FakeMoney>()) == 100, 0);
+
+        let aggregatable_coin = initialize_aggregatable_coin<FakeMoney>(&framework);
+        collect_into_aggregatable_coin<FakeMoney>(framework_addr, 10, &mut aggregatable_coin);
+
+        // Check that aggregatable coin has the right amount.
+        let collected_coin = drain_aggregatable_coin(&mut aggregatable_coin);
+        assert!(is_aggregatable_coin_zero(&aggregatable_coin), 0);
+        assert!(value(&collected_coin) == 10, 0);
+
+        // Supply of coins should be unchanged, but the balance on the account should decrease.
+        assert!(balance<FakeMoney>(framework_addr) == 90, 0);
+        assert!(*option::borrow(&supply<FakeMoney>()) == 100, 0);
+
+        burn(collected_coin, &burn_cap);
+        destroy_aggregatable_coin_for_test(aggregatable_coin);
+        move_to(&framework, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
     }
 }

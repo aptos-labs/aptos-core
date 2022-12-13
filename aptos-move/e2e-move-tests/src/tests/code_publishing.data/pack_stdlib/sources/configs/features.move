@@ -79,6 +79,16 @@ module std::features {
         is_enabled(VM_BINARY_FORMAT_V6)
     }
 
+    /// Whether gas fees are collected and distributed to the block proposers.
+    /// Lifetime: transient
+    const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
+
+    public fun get_collect_and_distribute_gas_fees_feature(): u64 { COLLECT_AND_DISTRIBUTE_GAS_FEES }
+
+    public fun collect_and_distribute_gas_fees(): bool acquires Features {
+        is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

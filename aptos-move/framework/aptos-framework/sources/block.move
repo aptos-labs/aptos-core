@@ -1,6 +1,7 @@
 /// This module defines a struct storing the metadata of the block and new block events.
 module aptos_framework::block {
     use std::error;
+    use std::features;
     use std::vector;
     use std::option;
 
@@ -11,6 +12,7 @@ module aptos_framework::block {
     use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
+    use aptos_framework::transaction_fee;
 
     friend aptos_framework::genesis;
 
@@ -133,6 +135,15 @@ module aptos_framework::block {
             time_microseconds: timestamp,
         };
         emit_new_block_event(&vm, &mut block_metadata_ref.new_block_events, new_block_event);
+
+        if (features::collect_and_distribute_gas_fees()) {
+            // Assign the fees collected from the previous block to the previous block proposer.
+            // If for any reason the fees cannot be assigned, this function burns the collected coins.
+            transaction_fee::process_collected_fees();
+            // Set the proposer of this block as the receiver of the fees, so that the fees for this
+            // block are assigned to the right account.
+            transaction_fee::register_proposer_for_fee_collection(proposer);
+        };
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
