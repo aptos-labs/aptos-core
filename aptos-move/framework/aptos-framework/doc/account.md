@@ -15,6 +15,7 @@
 -  [Struct `RotationProofChallenge`](#0x1_account_RotationProofChallenge)
 -  [Struct `RotationCapabilityOfferProofChallenge`](#0x1_account_RotationCapabilityOfferProofChallenge)
 -  [Struct `SignerCapabilityOfferProofChallenge`](#0x1_account_SignerCapabilityOfferProofChallenge)
+-  [Struct `RotationCapabilityOfferProofChallengeV2`](#0x1_account_RotationCapabilityOfferProofChallengeV2)
 -  [Struct `SignerCapabilityOfferProofChallengeV2`](#0x1_account_SignerCapabilityOfferProofChallengeV2)
 -  [Constants](#@Constants_0)
 -  [Function `create_signer`](#0x1_account_create_signer)
@@ -29,6 +30,9 @@
 -  [Function `rotate_authentication_key_internal`](#0x1_account_rotate_authentication_key_internal)
 -  [Function `assert_valid_signature_and_get_auth_key`](#0x1_account_assert_valid_signature_and_get_auth_key)
 -  [Function `rotate_authentication_key`](#0x1_account_rotate_authentication_key)
+-  [Function `rotate_authentication_key_with_rotation_capability`](#0x1_account_rotate_authentication_key_with_rotation_capability)
+-  [Function `offer_rotation_capability`](#0x1_account_offer_rotation_capability)
+-  [Function `revoke_rotation_capability`](#0x1_account_revoke_rotation_capability)
 -  [Function `offer_signer_capability`](#0x1_account_offer_signer_capability)
 -  [Function `revoke_signer_capability`](#0x1_account_revoke_signer_capability)
 -  [Function `create_authorized_signer`](#0x1_account_create_authorized_signer)
@@ -65,6 +69,7 @@
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519">0x1::ed25519</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
@@ -368,6 +373,7 @@ context because they include the TXN's unique sequence number.
 
 ## Struct `RotationCapabilityOfferProofChallenge`
 
+Deprecated struct - newest version is <code><a href="account.md#0x1_account_RotationCapabilityOfferProofChallengeV2">RotationCapabilityOfferProofChallengeV2</a></code>
 
 
 <pre><code><b>struct</b> <a href="account.md#0x1_account_RotationCapabilityOfferProofChallenge">RotationCapabilityOfferProofChallenge</a> <b>has</b> drop
@@ -415,6 +421,53 @@ context because they include the TXN's unique sequence number.
 <dl>
 <dt>
 <code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>recipient_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_account_RotationCapabilityOfferProofChallengeV2"></a>
+
+## Struct `RotationCapabilityOfferProofChallengeV2`
+
+This struct stores the challenge message that should be signed by the source account, when the source account
+is delegating its rotation capability to the <code>recipient_address</code>.
+
+
+<pre><code><b>struct</b> <a href="account.md#0x1_account_RotationCapabilityOfferProofChallengeV2">RotationCapabilityOfferProofChallengeV2</a> <b>has</b> drop
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="chain_id.md#0x1_chain_id">chain_id</a>: u8</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>source_address: <b>address</b></code>
 </dt>
 <dd>
 
@@ -607,12 +660,32 @@ The caller does not have a digital-signature-based capability to call this funct
 
 
 
-<a name="0x1_account_ENO_SUCH_SIGNER_CAPABILITY"></a>
+<a name="0x1_account_ENO_NO_SUCH_ROTATION_CAPABILITY_OFFER"></a>
 
-The signer capability doesn't exist at the given address
+The specified rotation capablity offer does not exist at the specified offerer address
 
 
-<pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY">ENO_SUCH_SIGNER_CAPABILITY</a>: u64 = 14;
+<pre><code><b>const</b> <a href="account.md#0x1_account_ENO_NO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_NO_SUCH_ROTATION_CAPABILITY_OFFER</a>: u64 = 18;
+</code></pre>
+
+
+
+<a name="0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER"></a>
+
+The rotation capability offer doesn't exist at the given address
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_SUCH_ROTATION_CAPABILITY_OFFER</a>: u64 = 19;
+</code></pre>
+
+
+
+<a name="0x1_account_ENO_SUCH_SIGNER_CAPABILITY_OFFER"></a>
+
+The signer capability offer doesn't exist at the given address
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY_OFFER">ENO_SUCH_SIGNER_CAPABILITY_OFFER</a>: u64 = 14;
 </code></pre>
 
 
@@ -623,6 +696,16 @@ Address to create is not a valid reserved address for Aptos framework
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_ENO_VALID_FRAMEWORK_RESERVED_ADDRESS">ENO_VALID_FRAMEWORK_RESERVED_ADDRESS</a>: u64 = 11;
+</code></pre>
+
+
+
+<a name="0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST"></a>
+
+Offerer address doesn't exist
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST">EOFFERER_ADDRESS_DOES_NOT_EXIST</a>: u64 = 17;
 </code></pre>
 
 
@@ -1072,6 +1155,7 @@ A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519
 
     // Construct a valid `<a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a>` that `cap_rotate_key` and `cap_update_table` will validate against.
     <b>let</b> curr_auth_key_as_address = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(account_resource.authentication_key);
+
     <b>let</b> challenge = <a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a> {
         sequence_number: account_resource.sequence_number,
         originator: addr,
@@ -1109,6 +1193,173 @@ A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519
     );
 
     account_resource.authentication_key = new_auth_key;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_account_rotate_authentication_key_with_rotation_capability"></a>
+
+## Function `rotate_authentication_key_with_rotation_capability`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_with_rotation_capability">rotate_authentication_key_with_rotation_capability</a>(delegate_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, rotation_cap_offerer_address: <b>address</b>, new_scheme: u8, new_public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, cap_update_table: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_with_rotation_capability">rotate_authentication_key_with_rotation_capability</a>(
+    delegate_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    rotation_cap_offerer_address: <b>address</b>,
+    new_scheme: u8,
+    new_public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    cap_update_table: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a>, <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
+    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(rotation_cap_offerer_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST">EOFFERER_ADDRESS_DOES_NOT_EXIST</a>));
+
+    // check that there <b>exists</b> a rotation capability offer at the offerer's <a href="account.md#0x1_account">account</a> resource for the delegate
+    <b>let</b> offerer_account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(rotation_cap_offerer_address);
+    <b>let</b> delegate_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegate_signer);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&offerer_account_resource.rotation_capability_offer.for, &delegate_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_NO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_NO_SUCH_ROTATION_CAPABILITY_OFFER</a>));
+
+    <b>let</b> delegate_account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(delegate_address);
+    <b>let</b> curr_auth_key = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(offerer_account_resource.authentication_key);
+    <b>let</b> challenge = <a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a> {
+        sequence_number: delegate_account_resource.sequence_number,
+        originator: rotation_cap_offerer_address,
+        current_auth_key: curr_auth_key,
+        new_public_key: new_public_key_bytes,
+    };
+
+    // verify that `cap_update_table` <b>has</b> the correct `<a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a>` and is signed by the new private key
+    <b>let</b> new_auth_key = <a href="account.md#0x1_account_assert_valid_signature_and_get_auth_key">assert_valid_signature_and_get_auth_key</a>(new_scheme, new_public_key_bytes, cap_update_table, &challenge);
+
+    // <b>update</b> the `<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>` <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, so we can find the originating <b>address</b> using the new <b>address</b>
+    <b>let</b> new_address = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(new_auth_key);
+    <b>let</b> address_map = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework).address_map;
+    <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(address_map, curr_auth_key)) {
+        <b>assert</b>!(rotation_cap_offerer_address == <a href="../../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(address_map, curr_auth_key), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EINVALID_ORIGINATING_ADDRESS">EINVALID_ORIGINATING_ADDRESS</a>));
+    };
+    <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(address_map, new_address, rotation_cap_offerer_address);
+
+    // <b>update</b> the authentication key of the offerer's <a href="account.md#0x1_account">account</a>
+    <b>let</b> offerer_account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(rotation_cap_offerer_address);
+    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="account.md#0x1_account_KeyRotationEvent">KeyRotationEvent</a>&gt;(
+        &<b>mut</b> offerer_account_resource.key_rotation_events,
+        <a href="account.md#0x1_account_KeyRotationEvent">KeyRotationEvent</a> {
+            old_authentication_key: offerer_account_resource.authentication_key,
+            new_authentication_key: new_auth_key,
+        }
+    );
+
+    offerer_account_resource.authentication_key = new_auth_key;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_account_offer_rotation_capability"></a>
+
+## Function `offer_rotation_capability`
+
+Offers rotation capability on behalf of <code><a href="account.md#0x1_account">account</a></code> to the account at address <code>recipient_address</code>.
+An account can delegate its rotation capability to only one other address at one time.
+<code>rotation_capability_sig_bytes</code> is the <code><a href="account.md#0x1_account_RotationCapabilityOfferProofChallengeV2">RotationCapabilityOfferProofChallengeV2</a></code> signed by the account owner's key.
+<code>account_scheme</code> is the scheme of the account (ed25519 or multi_ed25519).
+<code>account_public_key_bytes</code> is the public key of the account owner.
+<code>recipient_address</code> is the address of the recipient of the rotation capability - note that if there's an existing
+<code>recipient_address</code> in the account owner's <code>RotationCapabilityOffer</code>, this will replace the
+previous <code>recipient_address</code> upon successful verification (the previous recipient will no longer have access
+to the account owner's rotation capability).
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_offer_rotation_capability">offer_rotation_capability</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, rotation_capability_sig_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, account_scheme: u8, account_public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, recipient_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_offer_rotation_capability">offer_rotation_capability</a>(
+    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    rotation_capability_sig_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    account_scheme: u8,
+    account_public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    recipient_address: <b>address</b>,
+) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(recipient_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
+
+    // proof that this <a href="account.md#0x1_account">account</a> intends <b>to</b> delegate its rotation capability <b>to</b> another <a href="account.md#0x1_account">account</a>
+    <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+    <b>let</b> proof_challenge = <a href="account.md#0x1_account_RotationCapabilityOfferProofChallengeV2">RotationCapabilityOfferProofChallengeV2</a> {
+        <a href="chain_id.md#0x1_chain_id">chain_id</a>: <a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>(),
+        sequence_number: account_resource.sequence_number,
+        source_address: addr,
+        recipient_address,
+    };
+
+    // verify the signature on `<a href="account.md#0x1_account_RotationCapabilityOfferProofChallengeV2">RotationCapabilityOfferProofChallengeV2</a>` by the <a href="account.md#0x1_account">account</a> owner
+    <b>if</b> (account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a>) {
+        <b>let</b> pubkey = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_new_unvalidated_public_key_from_bytes">ed25519::new_unvalidated_public_key_from_bytes</a>(account_public_key_bytes);
+        <b>let</b> expected_auth_key = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_unvalidated_public_key_to_authentication_key">ed25519::unvalidated_public_key_to_authentication_key</a>(&pubkey);
+        <b>assert</b>!(account_resource.authentication_key == expected_auth_key, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EWRONG_CURRENT_PUBLIC_KEY">EWRONG_CURRENT_PUBLIC_KEY</a>));
+
+        <b>let</b> rotation_capability_sig = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_new_signature_from_bytes">ed25519::new_signature_from_bytes</a>(rotation_capability_sig_bytes);
+        <b>assert</b>!(<a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict_t">ed25519::signature_verify_strict_t</a>(&rotation_capability_sig, &pubkey, proof_challenge), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EINVALID_PROOF_OF_KNOWLEDGE">EINVALID_PROOF_OF_KNOWLEDGE</a>));
+    } <b>else</b> <b>if</b> (account_scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>) {
+        <b>let</b> pubkey = <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_new_unvalidated_public_key_from_bytes">multi_ed25519::new_unvalidated_public_key_from_bytes</a>(account_public_key_bytes);
+        <b>let</b> expected_auth_key = <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_unvalidated_public_key_to_authentication_key">multi_ed25519::unvalidated_public_key_to_authentication_key</a>(&pubkey);
+        <b>assert</b>!(account_resource.authentication_key == expected_auth_key, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EWRONG_CURRENT_PUBLIC_KEY">EWRONG_CURRENT_PUBLIC_KEY</a>));
+
+        <b>let</b> rotation_capability_sig = <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_new_signature_from_bytes">multi_ed25519::new_signature_from_bytes</a>(rotation_capability_sig_bytes);
+        <b>assert</b>!(<a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_signature_verify_strict_t">multi_ed25519::signature_verify_strict_t</a>(&rotation_capability_sig, &pubkey, proof_challenge), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EINVALID_PROOF_OF_KNOWLEDGE">EINVALID_PROOF_OF_KNOWLEDGE</a>));
+    } <b>else</b> {
+        <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EINVALID_SCHEME">EINVALID_SCHEME</a>)
+    };
+
+    // <b>update</b> the existing rotation capability offer or put in a new rotation capability offer for the current <a href="account.md#0x1_account">account</a>
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_swap_or_fill">option::swap_or_fill</a>(&<b>mut</b> account_resource.rotation_capability_offer.for, recipient_address);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_account_revoke_rotation_capability"></a>
+
+## Function `revoke_rotation_capability`
+
+Revoke the rotation capability offer given to <code>to_be_revoked_recipient_address</code> from <code><a href="account.md#0x1_account">account</a></code>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_revoke_rotation_capability">revoke_rotation_capability</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, to_be_revoked_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_revoke_rotation_capability">revoke_rotation_capability</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, to_be_revoked_address: <b>address</b>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(to_be_revoked_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&account_resource.rotation_capability_offer.for, &to_be_revoked_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_SUCH_ROTATION_CAPABILITY_OFFER</a>));
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> account_resource.rotation_capability_offer.for);
 }
 </code></pre>
 
@@ -1208,7 +1459,7 @@ has a signer capability offer from <code><a href="account.md#0x1_account">accoun
     <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(to_be_revoked_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&account_resource.signer_capability_offer.for, &to_be_revoked_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY">ENO_SUCH_SIGNER_CAPABILITY</a>));
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&account_resource.signer_capability_offer.for, &to_be_revoked_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY_OFFER">ENO_SUCH_SIGNER_CAPABILITY_OFFER</a>));
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> account_resource.signer_capability_offer.for);
 }
 </code></pre>
@@ -1235,12 +1486,12 @@ at the offerer's address.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_authorized_signer">create_authorized_signer</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, offerer_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(offerer_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
+    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(offerer_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST">EOFFERER_ADDRESS_DOES_NOT_EXIST</a>));
 
     // Check <b>if</b> there's an existing <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> capability offer from the offerer.
     <b>let</b> account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(offerer_address);
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&account_resource.signer_capability_offer.for, &addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY">ENO_SUCH_SIGNER_CAPABILITY</a>));
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&account_resource.signer_capability_offer.for, &addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY_OFFER">ENO_SUCH_SIGNER_CAPABILITY_OFFER</a>));
 
     <a href="account.md#0x1_account_create_signer">create_signer</a>(offerer_address)
 }
