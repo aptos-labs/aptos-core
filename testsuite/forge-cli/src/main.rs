@@ -903,7 +903,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             SuccessCriteria::new(if duration.as_secs() > 1200 {
                 5000
             } else {
-                6000
+                5500
             })
             .add_no_restarts()
             .add_wait_for_catchup_s(

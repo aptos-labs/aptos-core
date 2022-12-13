@@ -744,6 +744,9 @@ pub struct GenerateUpgradeProposal {
     #[clap(long)]
     pub(crate) testnet: bool,
 
+    #[clap(long, default_value = "")]
+    pub(crate) next_execution_hash: String,
+
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
 }
@@ -761,6 +764,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             included_artifacts,
             output,
             testnet,
+            next_execution_hash,
         } = self;
         let package_path = move_options.get_package_path()?;
         let options = included_artifacts.build_options(
@@ -769,11 +773,17 @@ impl CliCommand<()> for GenerateUpgradeProposal {
         );
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
-        if testnet {
+
+        // If we're generating a single-step proposal on testnet
+        if testnet && next_execution_hash.is_empty() {
             release.generate_script_proposal_testnet(account, output)?;
-        } else {
+            // If we're generating a single-step proposal on mainnet
+        } else if next_execution_hash.is_empty() {
             release.generate_script_proposal(account, output)?;
-        }
+            // If we're generating a multi-step proposal
+        } else {
+            release.generate_script_proposal_multi_step(account, output, next_execution_hash)?;
+        };
         Ok(())
     }
 }
