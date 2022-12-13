@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 12 December 2022
+
+- Released [Node Health Checker](nodes/node-health-checker/index.md) web interface for evaluating fullnodes at: https://nodetools.aptosfoundation.org/#/node_checker
+
 ## 09 December 2022
 
 - Added an [Aptos Wallet Adapter overview](concepts/wallet-adapter-concept.md) and instructions for both [dApp](guides/wallet-adapter-for-dapp.md) and [wallet](guides/wallet-adapter-for-wallets.md) builders.
