@@ -30,6 +30,32 @@ async fn test_simple_view() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_simple_view_invalid() {
+    let mut context = new_test_context(current_function_name!());
+    let creator = &mut context.gen_account();
+    let owner = &mut context.gen_account();
+    let txn1 = context.mint_user_account(creator);
+    let txn2 = context.account_transfer(creator, owner, 100_000);
+
+    context.commit_block(&vec![txn1, txn2]).await;
+
+    // is_account_registered does not have #[view] attribute
+    let resp = context
+        .expect_status_code(400)
+        .post(
+            "/view",
+            json!({
+                "function":"0x1::coin::is_account_registered",
+                "arguments": vec![owner.address().to_string()],
+                "type_arguments": vec!["0x1::aptos_coin::AptosCoin"],
+            }),
+        )
+        .await;
+
+    context.check_golden_output_no_prune(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_versioned_simple_view() {
     let mut context = new_test_context(current_function_name!());
     let creator = &mut context.gen_account();
@@ -54,6 +80,7 @@ async fn test_versioned_simple_view() {
     context.check_golden_output_no_prune(resp);
 }
 
+#[ignore] // TODO: reactivate with real source
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_view_tuple() {
     aptos_vm::aptos_vm::allow_module_bundle_for_test();

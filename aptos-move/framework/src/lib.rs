@@ -14,11 +14,11 @@ pub use built_package::*;
 mod module_metadata;
 pub use module_metadata::*;
 
-mod error_map;
 pub mod natives;
 mod release_builder;
 pub use release_builder::*;
 pub mod docgen;
+mod extended_checks;
 pub mod prover;
 mod release_bundle;
 mod released_framework;

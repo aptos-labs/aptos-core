@@ -34,7 +34,6 @@ use aptos_framework::natives::code::UpgradePolicy;
 use aptos_framework::prover::ProverOptions;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
-use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::account_address::{create_resource_address, AccountAddress};
@@ -312,12 +311,11 @@ impl CliCommand<Vec<String>> for CompilePackage {
         if self.save_metadata {
             pack.extract_metadata_and_save()?;
         }
-        let mut ids = Vec::new();
-        for module in pack.modules() {
-            verify_module_init_function(module)
-                .map_err(|e| CliError::MoveCompilationError(e.to_string()))?;
-            ids.push(module.self_id().to_string());
-        }
+        let ids = pack
+            .modules()
+            .into_iter()
+            .map(|m| m.self_id().to_string())
+            .collect::<Vec<_>>();
         Ok(ids)
     }
 }

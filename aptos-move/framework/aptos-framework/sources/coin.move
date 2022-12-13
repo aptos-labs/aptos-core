@@ -219,6 +219,7 @@ module aptos_framework::coin {
         type_info::account_address(&type_info)
     }
 
+    #[view]
     /// Returns the balance of `owner` for provided `CoinType`.
     public fun balance<CoinType>(owner: address): u64 acquires CoinStore {
         assert!(
@@ -348,6 +349,7 @@ module aptos_framework::coin {
         Coin { value: total_value }
     }
 
+    #[legacy_entry_fun]
     /// Freeze a CoinStore to prevent transfers
     public entry fun freeze_coin_store<CoinType>(
         account_addr: address,
@@ -357,6 +359,7 @@ module aptos_framework::coin {
         coin_store.frozen = true;
     }
 
+    #[legacy_entry_fun]
     /// Unfreeze a CoinStore to allow transfers
     public entry fun unfreeze_coin_store<CoinType>(
         account_addr: address,

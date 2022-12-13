@@ -139,7 +139,6 @@ dependencies = [
  "aptos-global-constants",
  "aptos-keygen",
  "aptos-logger",
- "aptos-module-verifier",
  "aptos-node",
  "aptos-rest-client",
  "aptos-sdk",
@@ -1124,7 +1123,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-gas",
  "aptos-gas-algebra-ext",
- "aptos-module-verifier",
  "aptos-sdk-builder",
  "aptos-state-view",
  "aptos-types",
@@ -1533,14 +1531,6 @@ dependencies = [
  "anyhow",
  "claims",
  "prometheus",
-]
-
-[[package]]
-name = "aptos-module-verifier"
-version = "0.1.0"
-dependencies = [
- "move-binary-format",
- "move-core-types",
 ]
 
 [[package]]
@@ -2645,7 +2635,6 @@ dependencies = [
  "aptos-gas",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-module-verifier",
  "aptos-mvhashmap",
  "aptos-state-view",
  "aptos-types",
