@@ -1937,15 +1937,19 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-gas",
+ "aptos-rest-client",
  "aptos-temppath",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "clap 3.2.17",
+ "futures",
  "move-core-types",
  "move-model",
  "serde 1.0.149",
  "serde_yaml 0.8.26",
  "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]
