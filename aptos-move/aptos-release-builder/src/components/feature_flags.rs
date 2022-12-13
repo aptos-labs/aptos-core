@@ -43,7 +43,7 @@ fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
 pub fn generate_feature_upgrade_proposal(
     features: &Features,
     is_testnet: bool,
-    next_execution_hash: String,
+    next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
     let mut result = vec![];
 
@@ -66,7 +66,7 @@ pub fn generate_feature_upgrade_proposal(
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
-        &next_execution_hash,
+        next_execution_hash,
         "std::features",
         |writer| {
             emit!(writer, "let enabled_blob: vector<u64> = ");

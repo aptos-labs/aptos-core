@@ -14,13 +14,16 @@ use crate::{
         types::{
             account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
             EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-            MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
-            PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, TransactionOptions,
-            TransactionSummary,
+            MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs, PrivateKeyInputOptions,
+            PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs, SaveFile,
+            TransactionOptions, TransactionSummary,
         },
         utils::write_to_file,
     },
-    governance::CompileScriptFunction,
+    governance::{
+        CompileScriptFunction, ProposalSubmissionSummary, SubmitProposal, SubmitVote,
+        VerifyProposal, VerifyProposalResponse,
+    },
     move_tool::{
         ArgWithType, CompilePackage, DownloadPackage, FrameworkPackageArgs, IncludedArtifacts,
         IncludedArtifactsArgs, InitPackage, MemberId, PublishPackage, RunFunction, RunScript,
@@ -935,6 +938,32 @@ impl CliTestFramework {
         .await
     }
 
+    pub async fn run_script_with_script_path(
+        &self,
+        index: usize,
+        script_path: &str,
+        args: Vec<ArgWithType>,
+        type_args: Vec<MoveType>,
+    ) -> CliTypedResult<TransactionSummary> {
+        RunScript {
+            txn_options: self.transaction_options(index, None),
+            compile_proposal_args: CompileScriptFunction {
+                script_path: Some(script_path.parse().unwrap()),
+                compiled_script_path: None,
+                framework_package_args: FrameworkPackageArgs {
+                    framework_git_rev: None,
+                    framework_local_dir: Some(Self::aptos_framework_dir()),
+                    skip_fetch_latest_git_deps: false,
+                },
+                bytecode_version: None,
+            },
+            args,
+            type_args,
+        }
+        .execute()
+        .await
+    }
+
     fn aptos_framework_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
@@ -1029,6 +1058,79 @@ impl CliTestFramework {
 
     pub fn account_id(&self, index: usize) -> AccountAddress {
         *self.account_addresses.get(index).unwrap()
+    }
+
+    pub async fn create_proposal(
+        &mut self,
+        index: usize,
+        metadata_url: &str,
+        script_path: PathBuf,
+        pool_address: AccountAddress,
+        is_multi_step: bool,
+    ) -> CliTypedResult<ProposalSubmissionSummary> {
+        SubmitProposal {
+            metadata_url: Url::parse(metadata_url).unwrap(),
+            pool_address_args: PoolAddressArgs { pool_address },
+            txn_options: self.transaction_options(index, None),
+            is_multi_step,
+            compile_proposal_args: CompileScriptFunction {
+                script_path: Some(script_path),
+                compiled_script_path: None,
+                framework_package_args: FrameworkPackageArgs {
+                    framework_git_rev: None,
+                    framework_local_dir: Some(Self::aptos_framework_dir()),
+                    skip_fetch_latest_git_deps: false,
+                },
+                bytecode_version: None,
+            },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn vote(
+        &self,
+        index: usize,
+        proposal_id: u64,
+        yes: bool,
+        no: bool,
+        pool_addresses: Vec<AccountAddress>,
+    ) {
+        SubmitVote {
+            proposal_id,
+            yes,
+            no,
+            pool_addresses,
+            txn_options: self.transaction_options(index, None),
+        }
+        .execute()
+        .await
+        .expect("Successfully voted.");
+    }
+
+    pub async fn verify_proposal(
+        &self,
+        proposal_id: u64,
+        script_path: &str,
+    ) -> CliTypedResult<VerifyProposalResponse> {
+        VerifyProposal {
+            proposal_id,
+            compile_proposal_args: CompileScriptFunction {
+                script_path: Some(script_path.parse().unwrap()),
+                compiled_script_path: None,
+                framework_package_args: FrameworkPackageArgs {
+                    framework_git_rev: None,
+                    framework_local_dir: Some(Self::aptos_framework_dir()),
+                    skip_fetch_latest_git_deps: false,
+                },
+                bytecode_version: None,
+            },
+            rest_options: self.rest_options(),
+            profile: Default::default(),
+            prompt_options: PromptOptions::yes(),
+        }
+        .execute()
+        .await
     }
 }
 
