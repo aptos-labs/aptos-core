@@ -13,16 +13,17 @@ use crate::quorum_store::{
     utils::{BatchBuilder, MempoolProxy, RoundExpirations},
 };
 use crate::round_manager::VerifiedEvent;
+use aptos_consensus_types::common::ProofWithData;
+use aptos_consensus_types::{
+    common::{Payload, PayloadFilter, Round, TransactionSummary},
+    proof_of_store::{LogicalTime, ProofOfStore},
+    request_response::{ConsensusResponse, PayloadRequest},
+};
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::PeerId;
 use channel::aptos_channel;
-use consensus_types::{
-    common::{Payload, PayloadFilter, Round, TransactionSummary},
-    proof_of_store::{LogicalTime, ProofOfStore},
-    request_response::{ConsensusResponse, WrapperCommand},
-};
 use futures::{
     channel::{
         mpsc::{Receiver, Sender},
@@ -325,10 +326,10 @@ impl QuorumStoreWrapper {
         }
     }
 
-    pub(crate) fn handle_consensus_request(&mut self, msg: WrapperCommand) {
+    pub(crate) fn handle_consensus_request(&mut self, msg: PayloadRequest) {
         match msg {
             // TODO: check what max_txns consensus is using
-            WrapperCommand::GetBlockRequest(round, max_txns, max_bytes, filter, callback) => {
+            PayloadRequest::GetBlockRequest(round, max_txns, max_bytes, filter, callback) => {
                 // TODO: Pass along to batch_store
                 let excluded_proofs: HashSet<HashValue> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
@@ -347,21 +348,21 @@ impl QuorumStoreWrapper {
                 self.remaining_proof_num = remaining_proof_num;
 
                 let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
-                    Payload::empty()
+                    Payload::empty(true)
                 } else {
                     debug!(
                         "QS: GetBlockRequest excluded len {}, block len {}",
                         excluded_proofs.len(),
                         proof_block.len()
                     );
-                    Payload::InQuorumStore(proof_block)
+                    Payload::InQuorumStore(ProofWithData::new(proof_block))
                 });
                 match callback.send(Ok(res)) {
                     Ok(_) => (),
                     Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),
                 }
             }
-            WrapperCommand::CleanRequest(logical_time, digests) => {
+            PayloadRequest::CleanRequest(logical_time, digests) => {
                 debug!("QS: got clean request from execution");
                 assert_eq!(
                     self.latest_logical_time.epoch(),
@@ -392,7 +393,7 @@ impl QuorumStoreWrapper {
     pub async fn start(
         mut self,
         mut network_sender: NetworkSender,
-        mut consensus_receiver: Receiver<WrapperCommand>,
+        mut consensus_receiver: Receiver<PayloadRequest>,
         mut shutdown_rx: Receiver<oneshot::Sender<()>>,
         mut network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         mut interval: Interval,

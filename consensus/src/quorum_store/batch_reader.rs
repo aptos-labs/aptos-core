@@ -10,18 +10,18 @@ use crate::quorum_store::{
     utils::RoundExpirations,
 };
 use anyhow::bail;
-use aptos_crypto::HashValue;
-use aptos_logger::debug;
-use aptos_types::{transaction::SignedTransaction, validator_verifier::ValidatorVerifier, PeerId};
-use consensus_types::{
+use aptos_consensus_types::{
     common::Round,
     proof_of_store::{LogicalTime, ProofOfStore},
 };
+use aptos_crypto::HashValue;
+use aptos_executor_types::Error;
+use aptos_logger::debug;
+use aptos_types::{transaction::SignedTransaction, validator_verifier::ValidatorVerifier, PeerId};
 use dashmap::{
     mapref::entry::Entry::{Occupied, Vacant},
     DashMap,
 };
-use executor_types::Error;
 use once_cell::sync::OnceCell;
 use std::{
     collections::HashMap,

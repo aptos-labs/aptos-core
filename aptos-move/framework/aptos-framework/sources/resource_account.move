@@ -18,12 +18,11 @@
 ///
 /// Code snippets to help:
 /// ```
-/// fun init_module(source: &signer) {
+/// fun init_module(resource: &signer) {
 ///   let dev_address = @DEV_ADDR;
-///   let signer_cap = retrieve_resource_account_cap(&source, dev_address);
-///   let lp_signer = create_signer_with_capability(&signer_cap);
+///   let signer_cap = retrieve_resource_account_cap(resource, dev_address);
 ///   let lp = LiquidityPoolInfo { signer_cap: signer_cap, ... };
-///   move_to(&lp_signer, lp);
+///   move_to(resource, lp);
 /// }
 /// ```
 ///
@@ -182,8 +181,7 @@ module aptos_framework::resource_account {
             simple_map::destroy_empty(store);
         };
 
-        let resource = account::create_signer_with_capability(&resource_signer_cap);
-        account::rotate_authentication_key_internal(&resource, ZERO_AUTH_KEY);
+        account::rotate_authentication_key_internal(resource, ZERO_AUTH_KEY);
         resource_signer_cap
     }
 
@@ -205,7 +203,7 @@ module aptos_framework::resource_account {
     }
 
     #[test(user = @0x1111)]
-    #[expected_failure(abort_code = 0x10002)]
+    #[expected_failure(abort_code = 0x10002, location = aptos_std::simple_map)]
     public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
         account::create_account(user_addr);
@@ -243,7 +241,7 @@ module aptos_framework::resource_account {
     }
 
     #[test(framework = @0x1, user = @0x2345)]
-    #[expected_failure(abort_code = 0x60005)]
+    #[expected_failure(abort_code = 0x60005, location = aptos_framework::coin)]
     public entry fun without_coin(framework: signer, user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
         aptos_framework::aptos_account::create_account(user_addr);

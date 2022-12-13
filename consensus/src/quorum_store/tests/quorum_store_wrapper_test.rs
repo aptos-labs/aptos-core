@@ -12,15 +12,15 @@ use crate::quorum_store::{
 };
 use crate::test_utils::build_empty_tree;
 use aptos_config::config::QuorumStoreConfig;
+use aptos_consensus_types::{
+    common::{Payload, PayloadFilter, TransactionSummary},
+    proof_of_store::{LogicalTime, ProofOfStore, SignedDigestInfo},
+    request_response::{ConsensusResponse, PayloadRequest},
+};
 use aptos_crypto::HashValue;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::transaction::SignedTransaction;
-use consensus_types::{
-    common::{Payload, PayloadFilter, TransactionSummary},
-    proof_of_store::{LogicalTime, ProofOfStore, SignedDigestInfo},
-    request_response::{ConsensusResponse, WrapperCommand},
-};
 use futures::{
     channel::{
         mpsc::{channel, Receiver},
@@ -235,7 +235,7 @@ async fn test_block_request() {
     wrapper.insert_proof(proof.clone());
 
     let (callback_tx, callback_rx) = oneshot::channel();
-    let req = WrapperCommand::GetBlockRequest(
+    let req = PayloadRequest::GetBlockRequest(
         1,
         100,
         1000000,

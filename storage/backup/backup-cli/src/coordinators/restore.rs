@@ -170,6 +170,7 @@ impl RestoreCoordinator {
             StateSnapshotRestoreOpt {
                 manifest_handle: state_snapshot_backup.manifest,
                 version,
+                validate_modules: false,
             },
             self.global_opt.clone(),
             Arc::clone(&self.storage),
@@ -185,6 +186,7 @@ impl RestoreCoordinator {
             txn_manifests,
             Some(version + 1),
             epoch_history,
+            vec![],
         )
         .run()
         .await?;

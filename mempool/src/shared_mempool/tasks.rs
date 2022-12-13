@@ -16,6 +16,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_config::network_id::PeerNetworkId;
+use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
@@ -26,7 +27,6 @@ use aptos_types::{
     transaction::SignedTransaction,
     vm_status::DiscardedVMStatus,
 };
-use consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use network::application::interface::NetworkInterface;
 use rayon::prelude::*;

@@ -11,7 +11,8 @@ module aptos_token::token {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
     use aptos_std::table::{Self, Table};
-    use aptos_token::property_map::{Self, PropertyMap};
+    use aptos_token::property_map::{Self, PropertyMap, PropertyValue};
+    use aptos_token::token_event_store;
 
     //
     // Constants
@@ -141,56 +142,63 @@ module aptos_token::token {
     /// Collection or tokendata maximum must be larger than supply
     const EINVALID_MAXIMUM: u64 = 36;
 
+    /// Token Properties count doesn't match
+    const ETOKEN_PROPERTIES_COUNT_NOT_MATCH: u64 = 37;
+
+
+    /// Withdraw capability doesn't have sufficient amount
+    const EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT: u64 = 38;
+
     //
     // Core data structures for holding tokens
     //
     struct Token has store {
         id: TokenId,
-        // the amount of tokens. Only property_version = 0 can have a value bigger than 1.
+        /// the amount of tokens. Only property_version = 0 can have a value bigger than 1.
         amount: u64,
-        // The properties with this token.
-        // when property_version = 0, the token_properties are the same as default_properties in TokenData, we don't store it.
-        // when the property_map mutates, a new property_version is assigned to the token.
+        /// The properties with this token.
+        /// when property_version = 0, the token_properties are the same as default_properties in TokenData, we don't store it.
+        /// when the property_map mutates, a new property_version is assigned to the token.
         token_properties: PropertyMap,
     }
 
     /// global unique identifier of a token
     struct TokenId has store, copy, drop {
-        // the id to the common token data shared by token with different property_version
+        /// the id to the common token data shared by token with different property_version
         token_data_id: TokenDataId,
-        // The version of the property map; when a fungible token is mutated, a new property version is created and assigned to the token to make it an NFT
+        /// The version of the property map; when a fungible token is mutated, a new property version is created and assigned to the token to make it an NFT
         property_version: u64,
     }
 
     /// globally unique identifier of tokendata
     struct TokenDataId has copy, drop, store {
-        // The address of the creator, eg: 0xcafe
+        /// The address of the creator, eg: 0xcafe
         creator: address,
-        // The name of collection; this is unique under the same account, eg: "Aptos Animal Collection"
+        /// The name of collection; this is unique under the same account, eg: "Aptos Animal Collection"
         collection: String,
-        // The name of the token; this is the same as the name field of TokenData
+        /// The name of the token; this is the same as the name field of TokenData
         name: String,
     }
 
     /// The shared TokenData by tokens with different property_version
     struct TokenData has store {
-        // The maximal number of tokens that can be minted under this TokenData; if the maximum is 0, there is no limit
+        /// The maximal number of tokens that can be minted under this TokenData; if the maximum is 0, there is no limit
         maximum: u64,
-        // The current largest property version of all tokens with this TokenData
+        /// The current largest property version of all tokens with this TokenData
         largest_property_version: u64,
-        // The number of tokens with this TokenData. Supply is only tracked for the limited token whose maximum is not 0
+        /// The number of tokens with this TokenData. Supply is only tracked for the limited token whose maximum is not 0
         supply: u64,
-        // The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain storage; the URL length should be less than 512 characters, eg: https://arweave.net/Fmmn4ul-7Mv6vzm7JwE69O-I-vd6Bz2QriJO1niwCh4
+        /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain storage; the URL length should be less than 512 characters, eg: https://arweave.net/Fmmn4ul-7Mv6vzm7JwE69O-I-vd6Bz2QriJO1niwCh4
         uri: String,
-        // The denominator and numerator for calculating the royalty fee; it also contains payee account address for depositing the Royalty
+        /// The denominator and numerator for calculating the royalty fee; it also contains payee account address for depositing the Royalty
         royalty: Royalty,
-        // The name of the token, which should be unique within the collection; the length of name should be smaller than 128, characters, eg: "Aptos Animal #1234"
+        /// The name of the token, which should be unique within the collection; the length of name should be smaller than 128, characters, eg: "Aptos Animal #1234"
         name: String,
-        // Describes this Token
+        /// Describes this Token
         description: String,
-        // The properties are stored in the TokenData that are shared by all tokens
+        /// The properties are stored in the TokenData that are shared by all tokens
         default_properties: PropertyMap,
-        // Control the TokenData field mutability
+        /// Control the TokenData field mutability
         mutability_config: TokenMutabilityConfig,
     }
 
@@ -198,28 +206,28 @@ module aptos_token::token {
     struct Royalty has copy, drop, store {
         royalty_points_numerator: u64,
         royalty_points_denominator: u64,
-        // if the token is jointly owned by multiple creators, the group of creators should create a shared account.
-        // the payee_address will be the shared account address.
+        /// if the token is jointly owned by multiple creators, the group of creators should create a shared account.
+        /// the payee_address will be the shared account address.
         payee_address: address,
     }
 
     /// This config specifies which fields in the TokenData are mutable
     struct TokenMutabilityConfig has copy, store, drop {
-        // control if the token maximum is mutable
+        /// control if the token maximum is mutable
         maximum: bool,
-        // control if the token uri is mutable
+        /// control if the token uri is mutable
         uri: bool,
-        // control if the token royalty is mutable
+        /// control if the token royalty is mutable
         royalty: bool,
-        // control if the token description is mutable
+        /// control if the token description is mutable
         description: bool,
-        // control if the property map is mutable
+        /// control if the property map is mutable
         properties: bool,
     }
 
     /// Represents token resources owned by token owner
     struct TokenStore has key {
-        // the tokens owned by a token owner
+        /// the tokens owned by a token owner
         tokens: Table<TokenId, Token>,
         direct_transfer: bool,
         deposit_events: EventHandle<DepositEvent>,
@@ -230,11 +238,11 @@ module aptos_token::token {
 
     /// This config specifies which fields in the Collection are mutable
     struct CollectionMutabilityConfig has copy, store, drop {
-        // control if description is mutable
+        /// control if description is mutable
         description: bool,
-        // control if uri is mutable
+        /// control if uri is mutable
         uri: bool,
-        // control if collection maxium is mutable
+        /// control if collection maxium is mutable
         maximum: bool,
     }
 
@@ -249,18 +257,18 @@ module aptos_token::token {
 
     /// Represent the collection metadata
     struct CollectionData has store {
-        // A description for the token collection Eg: "Aptos Toad Overload"
+        /// A description for the token collection Eg: "Aptos Toad Overload"
         description: String,
-        // The collection name, which should be unique among all collections by the creator; the name should also be smaller than 128 characters, eg: "Animal Collection"
+        /// The collection name, which should be unique among all collections by the creator; the name should also be smaller than 128 characters, eg: "Animal Collection"
         name: String,
-        // The URI for the collection; its length should be smaller than 512 characters
+        /// The URI for the collection; its length should be smaller than 512 characters
         uri: String,
-        // The number of different TokenData entries in this collection
+        /// The number of different TokenData entries in this collection
         supply: u64,
-        // If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum
-        // If maximal is 0, Aptos doesn't track the supply of this collection, and there is no limit
+        /// If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum
+        /// If maximal is 0, Aptos doesn't track the supply of this collection, and there is no limit
         maximum: u64,
-        // control which collectionData field is mutable
+        /// control which collectionData field is mutable
         mutability_config: CollectionMutabilityConfig,
     }
 
@@ -371,7 +379,6 @@ module aptos_token::token {
         property_types: vector<String>
     ) acquires Collections, TokenStore {
         let token_mut_config = create_token_mutability_config(&mutate_setting);
-
         let tokendata_id = create_tokendata(
             account,
             collection,
@@ -469,6 +476,7 @@ module aptos_token::token {
         initialize_token_store(account);
         let opt_in_flag = &mut borrow_global_mut<TokenStore>(addr).direct_transfer;
         *opt_in_flag = opt_in;
+        token_event_store::emit_token_opt_in_event(account, opt_in);
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
@@ -642,6 +650,7 @@ module aptos_token::token {
         assert_collection_exists(creator_address, collection_name);
         let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
         assert!(collection_data.mutability_config.description, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_collection_description_mutate_event(creator, collection_name, collection_data.description, description);
         collection_data.description = description;
     }
 
@@ -651,6 +660,7 @@ module aptos_token::token {
         assert_collection_exists(creator_address, collection_name);
         let collection_data = table::borrow_mut(&mut borrow_global_mut<Collections>(creator_address).collection_data, collection_name);
         assert!(collection_data.mutability_config.uri, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_collection_uri_mutate_event(creator, collection_name, collection_data.uri , uri);
         collection_data.uri = uri;
     }
 
@@ -662,6 +672,7 @@ module aptos_token::token {
         assert!(collection_data.maximum != 0 && maximum != 0, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(maximum >= collection_data.supply, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(collection_data.mutability_config.maximum, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_collection_maximum_mutate_event(creator, collection_name, collection_data.maximum, maximum);
         collection_data.maximum = maximum;
     }
 
@@ -674,6 +685,7 @@ module aptos_token::token {
         assert!(token_data.maximum != 0 && maximum != 0, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(maximum >= token_data.supply, error::invalid_argument(EINVALID_MAXIMUM));
         assert!(token_data.mutability_config.maximum, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_token_maximum_mutate_event(creator, token_data_id.collection, token_data_id.name, token_data.maximum, maximum);
         token_data.maximum = maximum;
     }
 
@@ -688,6 +700,7 @@ module aptos_token::token {
         let all_token_data = &mut borrow_global_mut<Collections>(token_data_id.creator).token_data;
         let token_data = table::borrow_mut(all_token_data, token_data_id);
         assert!(token_data.mutability_config.uri, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_token_uri_mutate_event(creator, token_data_id.collection, token_data_id.name, token_data.uri ,uri);
         token_data.uri = uri;
     }
 
@@ -697,6 +710,18 @@ module aptos_token::token {
         let all_token_data = &mut borrow_global_mut<Collections>(token_data_id.creator).token_data;
         let token_data = table::borrow_mut(all_token_data, token_data_id);
         assert!(token_data.mutability_config.royalty, error::permission_denied(EFIELD_NOT_MUTABLE));
+
+        token_event_store::emit_token_royalty_mutate_event(
+            creator,
+            token_data_id.collection,
+            token_data_id.name,
+            token_data.royalty.royalty_points_numerator,
+            token_data.royalty.royalty_points_denominator,
+            token_data.royalty.payee_address,
+            royalty.royalty_points_numerator,
+            royalty.royalty_points_denominator,
+            royalty.payee_address
+        );
         token_data.royalty = royalty;
     }
 
@@ -706,6 +731,7 @@ module aptos_token::token {
         let all_token_data = &mut borrow_global_mut<Collections>(token_data_id.creator).token_data;
         let token_data = table::borrow_mut(all_token_data, token_data_id);
         assert!(token_data.mutability_config.description, error::permission_denied(EFIELD_NOT_MUTABLE));
+        token_event_store::emit_token_descrition_mutate_event(creator, token_data_id.collection, token_data_id.name, token_data.description, description);
         token_data.description = description;
     }
 
@@ -718,11 +744,36 @@ module aptos_token::token {
         types: vector<String>,
     ) acquires Collections {
         assert_tokendata_exists(creator, token_data_id);
+        let key_len = vector::length(&keys);
+        let val_len = vector::length(&values);
+        let typ_len = vector::length(&types);
+        assert!(key_len == val_len, error::invalid_state(ETOKEN_PROPERTIES_COUNT_NOT_MATCH));
+        assert!(key_len == typ_len, error::invalid_state(ETOKEN_PROPERTIES_COUNT_NOT_MATCH));
 
         let all_token_data = &mut borrow_global_mut<Collections>(token_data_id.creator).token_data;
         let token_data = table::borrow_mut(all_token_data, token_data_id);
         assert!(token_data.mutability_config.properties, error::permission_denied(EFIELD_NOT_MUTABLE));
-        property_map::update_property_map(&mut token_data.default_properties, keys, values, types);
+        let i: u64 = 0;
+        let old_values: vector<Option<PropertyValue>> = vector::empty();
+        let new_values: vector<PropertyValue> = vector::empty();
+        while (i < vector::length(&keys)){
+            let key = vector::borrow(&keys, i);
+            let old_pv = if (property_map::contains_key(&token_data.default_properties, key)) {
+                option::some(*property_map::borrow(&token_data.default_properties, key))
+            } else {
+                option::none<PropertyValue>()
+            };
+            vector::push_back(&mut old_values, old_pv);
+            let new_pv = property_map::create_property_value_raw(*vector::borrow(&values, i), *vector::borrow(&types, i));
+            vector::push_back(&mut new_values, new_pv);
+            if (option::is_some(&old_pv)) {
+                property_map::update_property_value(&mut token_data.default_properties, key, new_pv);
+            } else {
+                property_map::add(&mut token_data.default_properties, *key, new_pv);
+            };
+            i = i + 1;
+        };
+        token_event_store::emit_default_property_mutate_event(creator, token_data_id.collection, token_data_id.name, keys, old_values, new_values);
     }
 
     public fun mutate_one_token(
@@ -802,7 +853,6 @@ module aptos_token::token {
     }
 
     public fun create_royalty(royalty_points_numerator: u64, royalty_points_denominator: u64, payee_address: address): Royalty {
-        assert!(royalty_points_denominator > 0, error::invalid_argument(EINVALID_ROYALTY_NUMERATOR_DENOMINATOR));
         assert!(royalty_points_numerator <= royalty_points_denominator, error::invalid_argument(EINVALID_ROYALTY_NUMERATOR_DENOMINATOR));
         assert!(account::exists_at(payee_address), error::invalid_argument(EROYALTY_PAYEE_ACCOUNT_DOES_NOT_EXIST));
         Royalty {
@@ -917,6 +967,40 @@ module aptos_token::token {
         )
     }
 
+    /// Withdraw the token with a capability.
+    public fun partial_withdraw_with_capability(
+        withdraw_proof: WithdrawCapability,
+        withdraw_amount: u64,
+    ): (Token, Option<WithdrawCapability>) acquires TokenStore {
+        // verify the delegation hasn't expired yet
+        assert!(timestamp::now_seconds() <= *&withdraw_proof.expiration_sec, error::invalid_argument(EWITHDRAW_PROOF_EXPIRES));
+
+        assert!(withdraw_amount <= withdraw_proof.amount, error::invalid_argument(EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT));
+
+        let res: Option<WithdrawCapability> = if (withdraw_amount == withdraw_proof.amount) {
+            option::none<WithdrawCapability>()
+        } else {
+            option::some(
+                WithdrawCapability {
+                    token_owner: withdraw_proof.token_owner,
+                    token_id: withdraw_proof.token_id,
+                    amount: withdraw_proof.amount - withdraw_amount,
+                    expiration_sec: withdraw_proof.expiration_sec,
+                }
+            )
+        };
+
+        (
+            withdraw_with_event_internal(
+                withdraw_proof.token_owner,
+                withdraw_proof.token_id,
+                withdraw_amount,
+            ),
+            res
+        )
+
+    }
+
     public fun withdraw_token(
         account: &signer,
         id: TokenId,
@@ -1021,6 +1105,8 @@ module aptos_token::token {
         assert!(string::length(&name) <= MAX_NFT_NAME_LENGTH, error::invalid_argument(ENFT_NAME_TOO_LONG));
         assert!(string::length(&collection) <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
         assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
+        assert!(royalty_points_numerator <= royalty_points_denominator, error::invalid_argument(EINVALID_ROYALTY_NUMERATOR_DENOMINATOR));
+
         let account_addr = signer::address_of(account);
         assert!(
             exists<Collections>(account_addr),
@@ -1056,11 +1142,7 @@ module aptos_token::token {
             largest_property_version: 0,
             supply: 0,
             uri,
-            royalty: Royalty {
-                royalty_points_denominator,
-                royalty_points_numerator,
-                payee_address: royalty_payee_address,
-            },
+            royalty: create_royalty(royalty_points_numerator, royalty_points_denominator, royalty_payee_address),
             name,
             description,
             default_properties: property_map::new(property_keys, property_values, property_types),
@@ -1919,7 +2001,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe, owner = @0xafe)]
-    #[expected_failure(abort_code = 327696)]
+    #[expected_failure(abort_code = 327696, location = Self)]
     fun test_opt_in_direct_transfer_fail(
         creator: &signer,
         owner: &signer,
@@ -1944,7 +2026,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe, owner = @0xafe)]
-    #[expected_failure(abort_code = 327696)]
+    #[expected_failure(abort_code = 327696, location = Self)]
     fun test_opt_in_direct_deposit_fail(
         creator: &signer,
         owner: &signer,
@@ -1986,7 +2068,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe, owner = @0x456)]
-    #[expected_failure(abort_code = 327710)]
+    #[expected_failure(abort_code = 327710, location = Self)]
     fun test_burn_token_by_owner_without_burnable_config(
         creator: &signer,
         owner: &signer,
@@ -2181,7 +2263,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 65572)]
+    #[expected_failure(abort_code = 65572, location = Self)]
     fun test_mutate_tokendata_maximum_from_zero(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2347,7 +2429,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 65569)]
+    #[expected_failure(abort_code = 65569, location = Self)]
     fun test_no_zero_balance_token_deposit(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2367,7 +2449,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 65548)]
+    #[expected_failure(abort_code = 65548, location = Self)]
     fun test_split_out_zero_token(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2396,6 +2478,46 @@ module aptos_token::token {
             amount: _,
             token_properties: _,
         } = token;
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 65570, location = Self)]
+    public fun test_enter_illegal_royalty(){
+        create_royalty(101, 100, @0xcafe);
+    }
+
+    #[test(framework = @0x1, creator = @0xcafe)]
+    fun test_partial_withdraw_with_proof(creator: &signer, framework: &signer): Token acquires TokenStore, Collections {
+        timestamp::set_time_has_started_for_testing(framework);
+        account::create_account_for_test(signer::address_of(creator));
+        let token_id = create_collection_and_token(
+            creator,
+            4,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, false],
+        );
+
+        timestamp::update_global_time_for_test(1000000);
+
+        // provide the proof to the account
+        let cap = create_withdraw_capability(
+            creator, // ask user to provide address to avoid ambiguity from rotated keys
+            token_id,
+            3,
+            2000000,
+        );
+
+        let (token, capability) = partial_withdraw_with_capability(cap, 1);
+        assert!(option::borrow<WithdrawCapability>(&capability).amount == 2, 1);
+        let (token_1, cap) = partial_withdraw_with_capability(option::extract(&mut capability), 2);
+        assert!(option::is_none(&cap), 1);
+        merge(&mut token, token_1);
+        token
     }
 
     //

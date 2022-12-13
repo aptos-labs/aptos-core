@@ -12,12 +12,12 @@ use crate::quorum_store::{
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 // use aptos_logger::spawn_named;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
-use consensus_types::{
+use aptos_consensus_types::{
     common::Round,
     proof_of_store::{LogicalTime, SignedDigest},
 };
+use aptos_types::validator_verifier::ValidatorVerifier;
+use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::{
@@ -52,7 +52,7 @@ pub(crate) enum BatchStoreCommand {
     BatchRequest(
         HashValue,
         PeerId,
-        Option<oneshot::Sender<Result<Vec<SignedTransaction>, executor_types::Error>>>,
+        Option<oneshot::Sender<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>>,
     ),
     Clean(Vec<HashValue>),
     Shutdown(oneshot::Sender<()>),

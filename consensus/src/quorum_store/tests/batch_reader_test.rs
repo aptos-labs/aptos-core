@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{batch_reader::BatchReader, types::PersistedValue};
+use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::HashValue;
 use aptos_types::account_address::AccountAddress;
-use consensus_types::proof_of_store::LogicalTime;
 use futures::executor::block_on;
 use std::{
     collections::HashMap,

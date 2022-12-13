@@ -13,6 +13,9 @@ pub enum Error {
     #[error("Cannot find speculation result for block id {0}")]
     BlockNotFound(HashValue),
 
+    #[error("Cannot get data for batch id {0}")]
+    DataNotFound(HashValue),
+
     #[error(
         "Bad num_txns_to_commit. first version {}, num to commit: {}, target version: {}",
         first_version,

@@ -12,8 +12,10 @@ spec aptos_framework::genesis {
         pragma verify = true;
     }
 
-    spec create_signer {
-        // TODO: temporary mockup.
+    spec create_signer(addr: address): signer {
+        use std::signer;
         pragma opaque;
+        aborts_if false;
+        ensures signer::address_of(result) == addr;
     }
 }

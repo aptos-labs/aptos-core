@@ -6,10 +6,10 @@ use crate::quorum_store::{
     quorum_store::QuorumStoreError,
     tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
 };
+use aptos_consensus_types::proof_of_store::{LogicalTime, SignedDigest, SignedDigestInfo};
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
-use consensus_types::proof_of_store::{LogicalTime, SignedDigest, SignedDigestInfo};
 use futures::channel::oneshot;
 use std::sync::Arc;
 use tokio::sync::mpsc::channel;

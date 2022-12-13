@@ -1,5 +1,5 @@
 [package]
-name = "consensus-notifications"
+name = "aptos-consensus-notifications"
 description = "The notification interface between state sync and consensus"
 version = "0.1.0"
 

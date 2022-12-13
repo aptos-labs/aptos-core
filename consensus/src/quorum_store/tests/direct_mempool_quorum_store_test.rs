@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
-use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-use consensus_types::{
-    common::{Payload, PayloadFilter},
-    request_response::{ConsensusResponse, WrapperCommand},
+use aptos_consensus_types::{
+    common::PayloadFilter,
+    request_response::{ConsensusResponse, PayloadRequest},
 };
+use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use futures::{
     channel::{mpsc, oneshot},
     StreamExt,
@@ -20,12 +20,16 @@ async fn test_block_request_no_txns() {
         mpsc::channel(1_024);
     let (mut consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =
         mpsc::channel(1_024);
-    let quorum_store = DirectMempoolQuorumStore::new(quorum_store_to_mempool_sender, 10_000);
-    let join_handle = tokio::spawn(quorum_store.start(consensus_to_quorum_store_receiver));
+    let quorum_store = DirectMempoolQuorumStore::new(
+        consensus_to_quorum_store_receiver,
+        quorum_store_to_mempool_sender,
+        10_000,
+    );
+    let join_handle = tokio::spawn(quorum_store.start());
 
     let (consensus_callback, consensus_callback_rcv) = oneshot::channel();
     consensus_to_quorum_store_sender
-        .try_send(WrapperCommand::GetBlockRequest(
+        .try_send(PayloadRequest::GetBlockRequest(
             1,
             100,
             1000,
@@ -61,10 +65,6 @@ async fn test_block_request_no_txns() {
     {
         ConsensusResponse::GetBlockResponse(payload) => {
             assert!(payload.is_empty());
-            match payload {
-                Payload::DirectMempool(txns) => assert!(txns.is_empty()),
-                _ => {}
-            }
         }
     }
 

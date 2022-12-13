@@ -21,6 +21,7 @@ use crate::{
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
+use aptos_framework::ReleaseBundle;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
@@ -43,12 +44,11 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
+    block_executor::BlockAptosVM,
     data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
-    parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
-use framework::ReleaseBundle;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -211,7 +211,9 @@ impl FakeExecutor {
     /// initialization done.
     pub fn stdlib_only_genesis() -> Self {
         let mut genesis = Self::no_genesis();
-        for (bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules() {
+        for (bytes, module) in
+            aptos_cached_packages::head_release_bundle().code_and_compiled_modules()
+        {
             let id = module.self_id();
             genesis.add_module(&id, bytes.to_vec());
         }
@@ -354,21 +356,6 @@ impl FakeExecutor {
         )
     }
 
-    /// Alternate form of 'execute_block' that keeps the vm_status before it goes into the
-    /// `TransactionOutput`
-    pub fn execute_block_and_keep_vm_status(
-        &self,
-        txn_block: Vec<SignedTransaction>,
-    ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
-        AptosVM::execute_block_and_keep_vm_status(
-            txn_block
-                .into_iter()
-                .map(Transaction::UserTransaction)
-                .collect(),
-            &self.data_store,
-        )
-    }
-
     /// Executes the transaction as a singleton block and applies the resulting write set to the
     /// data store. Panics if execution fails
     pub fn execute_and_apply(&mut self, transaction: SignedTransaction) -> TransactionOutput {
@@ -395,13 +382,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let (result, _) = ParallelAptosVM::execute_block(
-            txn_block,
-            &self.data_store,
-            usize::min(4, num_cpus::get()),
-        )?;
-
-        Ok(result)
+        BlockAptosVM::execute_block(txn_block, &self.data_store, usize::min(4, num_cpus::get()))
     }
 
     pub fn execute_transaction_block(
@@ -578,6 +559,7 @@ impl FakeExecutor {
                 LATEST_GAS_FEATURE_VERSION,
                 self.features
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
                 self.chain_id,
             )
             .unwrap();
@@ -625,6 +607,7 @@ impl FakeExecutor {
             LATEST_GAS_FEATURE_VERSION,
             self.features
                 .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+            self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             self.chain_id,
         )
         .unwrap();

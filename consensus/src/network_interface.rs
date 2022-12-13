@@ -7,19 +7,19 @@ use crate::counters;
 use crate::quorum_store::types::{Batch, Fragment};
 use anyhow::anyhow;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_logger::prelude::*;
-use aptos_types::{epoch_change::EpochChangeProof, PeerId};
-use async_trait::async_trait;
-use channel::{aptos_channel, message_queues::QueueStyle};
-use consensus_types::proof_of_store::{ProofOfStore, SignedDigest};
-use consensus_types::{
+use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
+use aptos_logger::prelude::*;
+use aptos_types::{epoch_change::EpochChangeProof, PeerId};
+use async_trait::async_trait;
+use channel::{aptos_channel, message_queues::QueueStyle};
 use network::{
     application::storage::PeerMetadataStorage,
     constants::NETWORK_CHANNEL_SIZE,

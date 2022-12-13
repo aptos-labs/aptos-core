@@ -2,27 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::monitor;
+use crate::payload_manager::PayloadManager;
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    data_manager::DataManager,
     error::StateSyncError,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
+use aptos_consensus_notifications::ConsensusNotificationSender;
+use aptos_consensus_types::{
+    block::Block,
+    common::{Payload, Round},
+    executed_block::ExecutedBlock,
+    proof_of_store::LogicalTime,
+};
 use aptos_crypto::HashValue;
+use aptos_executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
-use consensus_notifications::ConsensusNotificationSender;
-use consensus_types::common::Payload;
-use consensus_types::proof_of_store::LogicalTime;
-use consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
-use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
 use std::{boxed::Box, cmp::max, sync::Arc};
@@ -43,10 +46,9 @@ pub struct ExecutionProxy {
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: channel::Sender<NotificationType>,
-    async_commit_notifier: channel::Sender<CommitType>,
     validators: Mutex<Vec<AccountAddress>>,
     write_mutex: AsyncMutex<()>,
-    data_manager: Arc<DataManager>,
+    payload_manager: Mutex<Option<Arc<PayloadManager>>>,
 }
 
 impl ExecutionProxy {
@@ -54,7 +56,6 @@ impl ExecutionProxy {
         executor: Arc<dyn BlockExecutorTrait>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-        data_manager: Arc<DataManager>,
         handle: &tokio::runtime::Handle,
     ) -> Self {
         let (tx, mut rx) =
@@ -72,26 +73,14 @@ impl ExecutionProxy {
                 callback();
             }
         });
-        let (commit_tx, mut commit_rx) =
-            channel::new::<CommitType>(10, &counters::PENDING_QUORUM_STORE_COMMIT_NOTIFICATION);
-        let data_manager_clone = data_manager.clone();
-        handle.spawn(async move {
-            while let Some((epoch, round, payloads)) = commit_rx.next().await {
-                debug!("notifying commit for round: {}", round);
-                data_manager_clone
-                    .notify_commit(LogicalTime::new(epoch, round), payloads)
-                    .await;
-            }
-        });
         Self {
             executor,
             txn_notifier,
             state_sync_notifier,
             async_state_sync_notifier: tx,
-            async_commit_notifier: commit_tx,
             validators: Mutex::new(vec![]),
             write_mutex: AsyncMutex::new(()),
-            data_manager,
+            payload_manager: Mutex::new(None),
         }
     }
 }
@@ -118,17 +107,15 @@ impl StateComputer for ExecutionProxy {
             "Executing block",
         );
 
-        debug!(
-            "QSE: trying to get data., round {}, epoch: {} ",
-            block.round(),
-            block.epoch()
-        );
-        let txns = self.data_manager.get_data(block).await?;
+        let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
+        let txns = payload_manager.get_transactions(block).await?;
 
         // TODO: figure out error handling for the prologue txn
         let executor = self.executor.clone();
+
         let transactions_to_execute =
             block.transactions_to_execute(&self.validators.lock(), txns.clone());
+
         let compute_result = monitor!(
             "execute_block",
             tokio::task::spawn_blocking(move || {
@@ -170,13 +157,15 @@ impl StateComputer for ExecutionProxy {
         let mut latest_round: u64 = 0;
         let mut payloads = Vec::new();
 
+        let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
         for block in blocks {
             block_ids.push(block.id());
-            if block.block().payload().is_some() {
-                payloads.push(block.block().payload().unwrap().clone());
+
+            if let Some(payload) = block.block().payload() {
+                payloads.push(payload.clone());
             }
-            debug!("QSE: getting data in commit, round {}", block.round());
-            let signed_txns = self.data_manager.get_data(block.block()).await?;
+
+            let signed_txns = payload_manager.get_transactions(block.block()).await?;
 
             txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
             reconfig_events.extend(block.reconfig_event());
@@ -213,13 +202,9 @@ impl StateComputer for ExecutionProxy {
         if skip_clean {
             return Ok(());
         }
-        debug!("QS: commit epoch {} round {}", latest_epoch, latest_round);
-
-        self.async_commit_notifier
-            .clone()
-            .send((latest_epoch, latest_round, payloads))
-            .await
-            .expect("Failed to send async commit notification");
+        payload_manager
+            .notify_commit(LogicalTime::new(latest_epoch, latest_round), payloads)
+            .await;
         Ok(())
     }
 
@@ -231,20 +216,18 @@ impl StateComputer for ExecutionProxy {
         // held by BlockExecutor to prevent memory leak.
         self.executor.finish();
 
-        debug!(
-            "QS: sync_to epoch {} round {}",
-            target.ledger_info().epoch(),
-            target.ledger_info().round()
-        );
-        self.async_commit_notifier
-            .clone()
-            .send((
-                target.ledger_info().epoch(),
-                target.ledger_info().round(),
-                Vec::new(),
-            ))
-            .await
-            .expect("Failed to send async commit notification in fast_sync_forward");
+        // This is to update QuorumStore with the latest known commit in the system,
+        // so it can set batches expiration accordingly.
+        //Might be none if called in the recovery path.
+        let maybe_payload_manager = self.payload_manager.lock().as_ref().cloned();
+        if let Some(payload_manager) = maybe_payload_manager {
+            payload_manager
+                .notify_commit(
+                    LogicalTime::new(target.ledger_info().epoch(), target.ledger_info().round()),
+                    Vec::new(),
+                )
+                .await;
+        }
 
         fail_point!("consensus::sync_to", |_| {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
@@ -269,10 +252,11 @@ impl StateComputer for ExecutionProxy {
         })
     }
 
-    fn new_epoch(&self, epoch_state: &EpochState) {
+    fn new_epoch(&self, epoch_state: &EpochState, payload_manager: Arc<PayloadManager>) {
         *self.validators.lock() = epoch_state
             .verifier
             .get_ordered_account_addresses_iter()
             .collect();
+        self.payload_manager.lock().replace(payload_manager);
     }
 }

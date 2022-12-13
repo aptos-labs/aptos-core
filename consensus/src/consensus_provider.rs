@@ -3,7 +3,6 @@
 
 use crate::{
     counters,
-    data_manager::DataManager,
     epoch_manager::EpochManager,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
@@ -13,12 +12,12 @@ use crate::{
     util::time_service::ClockTimeService,
 };
 use aptos_config::config::NodeConfig;
+use aptos_consensus_notifications::ConsensusNotificationSender;
+use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_executor::block_executor::BlockExecutor;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_vm::AptosVM;
-use consensus_notifications::ConsensusNotificationSender;
-use event_notifications::ReconfigNotificationListener;
-use executor::block_executor::BlockExecutor;
 use futures::channel::mpsc;
 use network::application::storage::PeerMetadataStorage;
 use std::sync::{
@@ -66,17 +65,10 @@ pub fn start_consensus(
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
 
-    // LANDING QS TODO: smoke test and forge test to test on-chain config
-
-    // LANDING QS TODO: combine data manager with dummy data manager
-    // LANDING QS TODO: Make sure check type (QS vd direct mempool) before voting
-    let data_manager: Arc<DataManager> = Arc::new(DataManager::new());
-
     let state_computer = Arc::new(ExecutionProxy::new(
         Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),
         txn_notifier,
         state_sync_notifier,
-        data_manager.clone(),
         runtime.handle(),
     ));
 
@@ -96,7 +88,6 @@ pub fn start_consensus(
         state_computer,
         storage,
         reconfig_events,
-        data_manager,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);

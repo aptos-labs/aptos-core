@@ -25,18 +25,11 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context, Result};
 use aptos_config::config::ConsensusConfig;
-use aptos_infallible::{checked, Mutex};
-use aptos_logger::prelude::*;
-use aptos_types::{
-    epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
-    validator_verifier::ValidatorVerifier, PeerId,
-};
-use channel::aptos_channel;
-use consensus_types::proof_of_store::{ProofOfStore, SignedDigest};
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
@@ -44,6 +37,13 @@ use consensus_types::{
     vote::Vote,
     vote_msg::VoteMsg,
 };
+use aptos_infallible::{checked, Mutex};
+use aptos_logger::prelude::*;
+use aptos_types::{
+    epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
+    validator_verifier::ValidatorVerifier, PeerId,
+};
+use channel::aptos_channel;
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 #[cfg(test)]
@@ -78,11 +78,12 @@ impl UnverifiedEvent {
         self,
         peer_id: PeerId,
         validator: &ValidatorVerifier,
+        quorum_store_enabled: bool,
     ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
-                p.verify(validator)?;
+                p.verify(validator, quorum_store_enabled)?;
                 VerifiedEvent::ProposalMsg(p)
             }
             UnverifiedEvent::VoteMsg(v) => {

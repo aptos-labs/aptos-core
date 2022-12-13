@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import httpx
 
+from . import ed25519
 from .account import Account
 from .account_address import AccountAddress
 from .authenticator import (Authenticator, Ed25519Authenticator,
@@ -19,16 +20,27 @@ from .type_tag import StructTag, TypeTag
 U64_MAX = 18446744073709551615
 
 
+class ClientConfig:
+    """Common configuration for clients, particularly for submitting transactions"""
+
+    expiration_ttl: int = 600
+    gas_unit_price: int = 100
+    max_gas_amount: int = 100_000
+    transaction_wait_in_seconds: int = 20
+
+
 class RestClient:
     """A wrapper around the Aptos-core Rest API"""
 
     chain_id: int
     client: httpx.Client
+    client_config: ClientConfig
     base_url: str
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, client_config: ClientConfig = ClientConfig()):
         self.base_url = base_url
         self.client = httpx.Client()
+        self.client_config = client_config
         self.chain_id = int(self.info()["chain_id"])
 
     def close(self):
@@ -48,9 +60,10 @@ class RestClient:
 
     def account_balance(self, account_address: AccountAddress) -> int:
         """Returns the test coin balance associated with the account"""
-        return self.account_resource(
+        resource = self.account_resource(
             account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
-        )["data"]["coin"]["value"]
+        )
+        return resource["data"]["coin"]["value"]
 
     def account_sequence_number(self, account_address: AccountAddress) -> int:
         account_res = self.account(account_address)
@@ -58,7 +71,7 @@ class RestClient:
 
     def account_resource(
         self, account_address: AccountAddress, resource_type: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         response = self.client.get(
             f"{self.base_url}/accounts/{account_address}/resource/{resource_type}"
         )
@@ -97,6 +110,31 @@ class RestClient:
     # Transactions
     #
 
+    def simulate_transaction(
+        self,
+        transaction: RawTransaction,
+        sender: Account,
+    ) -> Dict[str, Any]:
+        # Note that simulated transactions are not signed and have all 0 signatures!
+        authenticator = Authenticator(
+            Ed25519Authenticator(
+                sender.public_key(),
+                ed25519.Signature(b"\x00" * 64),
+            )
+        )
+        signed_transaction = SignedTransaction(transaction, authenticator)
+
+        headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
+        response = self.client.post(
+            f"{self.base_url}/transactions/simulate",
+            headers=headers,
+            content=signed_transaction.bytes(),
+        )
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+
+        return response.json()
+
     def submit_bcs_transaction(self, signed_transaction: SignedTransaction) -> str:
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
         response = self.client.post(
@@ -119,9 +157,11 @@ class RestClient:
         txn_request = {
             "sender": f"{sender.address()}",
             "sequence_number": str(self.account_sequence_number(sender.address())),
-            "max_gas_amount": "10000",
-            "gas_unit_price": "100",
-            "expiration_timestamp_secs": str(int(time.time()) + 600),
+            "max_gas_amount": str(self.client_config.max_gas_amount),
+            "gas_unit_price": str(self.client_config.gas_unit_price),
+            "expiration_timestamp_secs": str(
+                int(time.time()) + self.client_config.expiration_ttl
+            ),
             "payload": payload,
         }
 
@@ -149,6 +189,7 @@ class RestClient:
 
     def transaction_pending(self, txn_hash: str) -> bool:
         response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
+        # TODO(@davidiw): consider raising a different error here, since this is an ambiguous state
         if response.status_code == 404:
             return True
         if response.status_code >= 400:
@@ -156,11 +197,14 @@ class RestClient:
         return response.json()["type"] == "pending_transaction"
 
     def wait_for_transaction(self, txn_hash: str) -> None:
-        """Waits up to 20 seconds for a transaction to move past pending state."""
+        """
+        Waits up to the duration specified in client_config for a transaction to move past pending
+        state.
+        """
 
         count = 0
         while self.transaction_pending(txn_hash):
-            assert count < 20, f"transaction {txn_hash} timed out"
+            assert count < self.client_config.transaction_wait_in_seconds, f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
         response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
@@ -183,9 +227,9 @@ class RestClient:
                 sender.address(),
                 self.account_sequence_number(sender.address()),
                 payload,
-                100_000,
-                100,
-                int(time.time()) + 600,
+                self.client_config.max_gas_amount,
+                self.client_config.gas_unit_price,
+                int(time.time()) + self.client_config.expiration_ttl,
                 self.chain_id,
             ),
             [x.address() for x in secondary_accounts],
@@ -212,19 +256,23 @@ class RestClient:
 
         return SignedTransaction(raw_transaction.inner(), authenticator)
 
-    def create_single_signer_bcs_transaction(
+    def create_bcs_transaction(
         self, sender: Account, payload: TransactionPayload
-    ) -> SignedTransaction:
-        raw_transaction = RawTransaction(
+    ) -> RawTransaction:
+        return RawTransaction(
             sender.address(),
             self.account_sequence_number(sender.address()),
             payload,
-            100_000,
-            100,
-            int(time.time()) + 600,
+            self.client_config.max_gas_amount,
+            self.client_config.gas_unit_price,
+            int(time.time()) + self.client_config.expiration_ttl,
             self.chain_id,
         )
 
+    def create_bcs_signed_transaction(
+        self, sender: Account, payload: TransactionPayload
+    ) -> SignedTransaction:
+        raw_transaction = self.create_bcs_transaction(sender, payload)
         signature = sender.sign(raw_transaction.keyed())
         authenticator = Authenticator(
             Ed25519Authenticator(sender.public_key(), signature)
@@ -250,7 +298,7 @@ class RestClient:
         }
         return self.submit_transaction(sender, payload)
 
-    #:!:>bcs_transfer
+    # :!:>bcs_transfer
     def bcs_transfer(
         self, sender: Account, recipient: AccountAddress, amount: int
     ) -> str:
@@ -266,7 +314,7 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -277,7 +325,7 @@ class RestClient:
     # Token transaction wrappers
     #
 
-    #:!:>create_collection
+    # :!:>create_collection
     def create_collection(
         self, account: Account, name: str, description: str, uri: str
     ) -> str:  # <:!:create_collection
@@ -300,12 +348,12 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
 
-    #:!:>create_token
+    # :!:>create_token
     def create_token(
         self,
         account: Account,
@@ -344,7 +392,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -374,7 +422,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -402,7 +450,7 @@ class RestClient:
             [],
             transaction_arguments,
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             account, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -451,9 +499,8 @@ class RestClient:
         token_name: str,
         property_version: int,
     ) -> Any:
-        token_store_handle = self.account_resource(owner, "0x3::token::TokenStore")[
-            "data"
-        ]["tokens"]["handle"]
+        resource = self.account_resource(owner, "0x3::token::TokenStore")
+        token_store_handle = resource["data"]["tokens"]["handle"]
 
         token_id = {
             "token_data_id": {
@@ -491,7 +538,7 @@ class RestClient:
             owner, creator, collection_name, token_name, property_version
         )["amount"]
 
-    #:!:>read_token_data_table
+    # :!:>read_token_data_table
     def get_token_data(
         self,
         creator: AccountAddress,
@@ -499,9 +546,8 @@ class RestClient:
         token_name: str,
         property_version: int,
     ) -> Any:
-        token_data_handle = self.account_resource(creator, "0x3::token::Collections")[
-            "data"
-        ]["token_data"]["handle"]
+        resource = self.account_resource(creator, "0x3::token::Collections")
+        token_data_handle = resource["data"]["token_data"]["handle"]
 
         token_data_id = {
             "creator": creator.hex(),
@@ -517,9 +563,8 @@ class RestClient:
         )  # <:!:read_token_data_table
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
-        token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
-            "collection_data"
-        ]["handle"]
+        resource = self.account_resource(creator, "0x3::token::Collections")
+        token_data = resource["data"]["collection_data"]["handle"]
 
         return self.get_table_item(
             token_data,
@@ -549,7 +594,7 @@ class RestClient:
             transaction_arguments,
         )
 
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)

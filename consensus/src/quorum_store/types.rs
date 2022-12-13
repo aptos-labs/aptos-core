@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
+use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use bcs::to_bytes;
-use consensus_types::proof_of_store::LogicalTime;
 use serde::{Deserialize, Serialize};
 use std::mem;
 

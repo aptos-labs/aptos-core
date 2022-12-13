@@ -602,8 +602,11 @@ func encode_{}_argument(arg {}) []byte {{
         let (constructor, stmt) = match type_tag {
             Bool => ("Bool", default_stmt),
             U8 => ("U8", default_stmt),
+            U16 => ("U16", default_stmt),
+            U32 => ("U32", default_stmt),
             U64 => ("U64", default_stmt),
             U128 => ("U128", default_stmt),
+            U256 => ("U256", default_stmt),
             Address => ("Address", "value = arg.Value".into()),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => ("U8Vector", default_stmt),
@@ -717,8 +720,11 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
         match type_tag {
             Bool => "bool".into(),
             U8 => "uint8".into(),
+            U16 => "uint16".into(),
+            U32 => "uint32".into(),
             U64 => "uint64".into(),
             U128 => "serde.Uint128".into(),
+            U256 => unimplemented!(),
             Address => "aptostypes.AccountAddress".into(),
             Vector(type_tag) => {
                 format!("[]{}", Self::quote_type(type_tag))
@@ -744,8 +750,11 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
         match type_tag {
             Bool => format!("(*aptostypes.TransactionArgument__Bool)(&{})", name),
             U8 => format!("(*aptostypes.TransactionArgument__U8)(&{})", name),
+            U16 => format!("(*aptostypes.TransactionArgument__U16)(&{})", name),
+            U32 => format!("(*aptostypes.TransactionArgument__U32)(&{})", name),
             U64 => format!("(*aptostypes.TransactionArgument__U64)(&{})", name),
             U128 => format!("(*aptostypes.TransactionArgument__U128)(&{})", name),
+            U256 => format!("(*aptostypes.TransactionArgument__U256)(&{})", name),
             Address => format!("&aptostypes.TransactionArgument__Address{{{}}}", name),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => format!("(*aptostypes.TransactionArgument__U8Vector)(&{})", name),
@@ -766,8 +775,11 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
         match type_tag {
             Bool => Some("Bool"),
             U8 => Some("U8"),
+            U16 => Some("U16"),
+            U32 => Some("U32"),
             U64 => Some("U64"),
             U128 => Some("U128"),
+            U256 => None,
             Address => None,
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => Some("Bytes"),

@@ -1,15 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::counters;
-use crate::quorum_store::utils::MempoolProxy;
+use crate::{monitor, quorum_store::counters};
 use anyhow::Result;
-use aptos_logger::prelude::*;
-use aptos_mempool::QuorumStoreRequest;
-use consensus_types::{
-    common::{Payload, PayloadFilter},
-    request_response::{ConsensusResponse, WrapperCommand},
+use aptos_consensus_types::{
+    common::{Payload, PayloadFilter, TransactionSummary},
+    request_response::{ConsensusResponse, PayloadRequest},
 };
+use aptos_logger::prelude::*;
+use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
+use aptos_types::transaction::SignedTransaction;
 use futures::{
     channel::{
         mpsc::{Receiver, Sender},
@@ -17,16 +17,58 @@ use futures::{
     },
     StreamExt,
 };
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use tokio::time::timeout;
 
 pub struct DirectMempoolQuorumStore {
-    mempool_proxy: MempoolProxy,
+    consensus_receiver: Receiver<PayloadRequest>,
+    mempool_sender: Sender<QuorumStoreRequest>,
+    mempool_txn_pull_timeout_ms: u64,
 }
 
 impl DirectMempoolQuorumStore {
-    pub fn new(mempool_tx: Sender<QuorumStoreRequest>, mempool_txn_pull_timeout_ms: u64) -> Self {
+    pub fn new(
+        consensus_receiver: Receiver<PayloadRequest>,
+        mempool_sender: Sender<QuorumStoreRequest>,
+        mempool_txn_pull_timeout_ms: u64,
+    ) -> Self {
         Self {
-            mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
+            consensus_receiver,
+            mempool_sender,
+            mempool_txn_pull_timeout_ms,
+        }
+    }
+
+    async fn pull_internal(
+        &self,
+        max_items: u64,
+        max_bytes: u64,
+        exclude_txns: Vec<TransactionSummary>,
+    ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
+        let (callback, callback_rcv) = oneshot::channel();
+        let msg = QuorumStoreRequest::GetBatchRequest(max_items, max_bytes, exclude_txns, callback);
+        self.mempool_sender
+            .clone()
+            .try_send(msg)
+            .map_err(anyhow::Error::from)?;
+        // wait for response
+        match monitor!(
+            "pull_txn",
+            timeout(
+                Duration::from_millis(self.mempool_txn_pull_timeout_ms),
+                callback_rcv
+            )
+            .await
+        ) {
+            Err(_) => Err(anyhow::anyhow!(
+                "[direct_mempool_quorum_store] did not receive GetBatchResponse on time"
+            )),
+            Ok(resp) => match resp.map_err(anyhow::Error::from)?? {
+                QuorumStoreResponse::GetBatchResponse(txns) => Ok(txns),
+                _ => Err(anyhow::anyhow!(
+                    "[direct_mempool_quorum_store] did not receive expected GetBatchResponse"
+                )),
+            },
         }
     }
 
@@ -46,11 +88,7 @@ impl DirectMempoolQuorumStore {
             PayloadFilter::Empty => Vec::new(),
         };
 
-        let (txns, result) = match self
-            .mempool_proxy
-            .pull_internal(max_txns, max_bytes, exclude_txns)
-            .await
-        {
+        let (txns, result) = match self.pull_internal(max_txns, max_bytes, exclude_txns).await {
             Err(_) => {
                 error!("GetBatch failed");
                 (vec![], counters::REQUEST_FAIL_LABEL)
@@ -79,9 +117,9 @@ impl DirectMempoolQuorumStore {
         );
     }
 
-    async fn handle_consensus_request(&self, req: WrapperCommand) {
+    async fn handle_consensus_request(&self, req: PayloadRequest) {
         match req {
-            WrapperCommand::GetBlockRequest(
+            PayloadRequest::GetBlockRequest(
                 _round,
                 max_txns,
                 max_bytes,
@@ -91,15 +129,21 @@ impl DirectMempoolQuorumStore {
                 self.handle_block_request(max_txns, max_bytes, payload_filter, callback)
                     .await;
             }
-            WrapperCommand::CleanRequest(..) => {
+            PayloadRequest::CleanRequest(..) => {
                 unreachable!()
             }
         }
     }
 
-    pub async fn start(self, mut consensus_rx: Receiver<WrapperCommand>) {
-        while let Some(cmd) = consensus_rx.next().await {
-            self.handle_consensus_request(cmd).await;
+    pub async fn start(mut self) {
+        loop {
+            let _timer = counters::MAIN_LOOP.start_timer();
+            ::futures::select! {
+                msg = self.consensus_receiver.select_next_some() => {
+                    self.handle_consensus_request(msg).await;
+                },
+                complete => break,
+            }
         }
     }
 }

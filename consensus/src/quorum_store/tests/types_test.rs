@@ -3,10 +3,10 @@
 
 use crate::quorum_store::tests::utils::create_vec_signed_transactions;
 use crate::quorum_store::types::{Batch, Fragment, SerializedTransaction};
+use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::hash::DefaultHasher;
 use aptos_types::account_address::AccountAddress;
 use bcs::{from_bytes, to_bytes};
-use consensus_types::proof_of_store::LogicalTime;
 
 #[test]
 fn test_batch() {

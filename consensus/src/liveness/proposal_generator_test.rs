@@ -4,17 +4,18 @@
 use crate::{
     block_storage::BlockReader,
     liveness::{
-        proposal_generator::ProposalGenerator, rotating_proposer_election::RotatingProposer,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
+        rotating_proposer_election::RotatingProposer,
         unequivocal_proposer_election::UnequivocalProposerElection,
     },
     test_utils::{build_empty_tree, MockPayloadManager, TreeInserter},
     util::mock_time_service::SimulatedTimeService,
 };
-use aptos_types::validator_signer::ValidatorSigner;
-use consensus_types::{
+use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
 };
+use aptos_types::validator_signer::ValidatorSigner;
 use futures::{future::BoxFuture, FutureExt};
 use std::sync::Arc;
 
@@ -34,6 +35,8 @@ async fn test_proposal_generation_empty_tree() {
         1,
         10,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
     let mut proposer_election =
         UnequivocalProposerElection::new(Box::new(RotatingProposer::new(vec![signer.author()], 1)));
@@ -70,6 +73,8 @@ async fn test_proposal_generation_parent() {
         1,
         1000,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -138,6 +143,8 @@ async fn test_old_proposal_generation() {
         1,
         1000,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -171,6 +178,8 @@ async fn test_correct_failed_authors() {
         1,
         1000,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
         vec![author, peer1, peer2],

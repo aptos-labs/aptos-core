@@ -7,8 +7,8 @@ use aptos_config::{
     config::{DiscoveryMethod, NodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
     network_id::NetworkId,
 };
+use aptos_forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_types::network_address::{NetworkAddress, Protocol};
-use forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::{
     collections::HashSet,
     net::Ipv4Addr,

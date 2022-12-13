@@ -13,10 +13,10 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-aptos-api = { path = "../", package = "aptos-api" }
-aptos-config = { path = "../../config" }
-aptos-mempool = { path = "../../mempool", features = ["fuzzing"] }
-aptos-types = { path = "../../types" }
-clap = { version = "3.1.17", features = ["derive"] }
-storage-interface = { path = "../../storage/storage-interface", features = ["fuzzing"] }
+anyhow = { workspace = true }
+aptos-api = { workspace = true }
+aptos-config = { workspace = true }
+aptos-mempool = { workspace = true, features = ["fuzzing"] }
+aptos-types = { workspace = true }
+clap = { workspace = true }
+storage-interface = { workspace = true, features = ["fuzzing"] }

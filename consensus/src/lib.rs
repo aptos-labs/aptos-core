@@ -16,7 +16,6 @@ extern crate core;
 
 mod block_storage;
 mod consensusdb;
-mod data_manager;
 mod epoch_manager;
 mod error;
 mod experimental;
@@ -26,7 +25,7 @@ mod metrics_safety_rules;
 mod network;
 #[cfg(test)]
 mod network_tests;
-mod payload_manager;
+mod payload_client;
 mod pending_votes;
 mod persistent_liveness_storage;
 mod quorum_store;
@@ -47,9 +46,12 @@ pub mod consensus_provider;
 pub mod counters;
 /// AptosNet interface.
 pub mod network_interface;
+mod payload_manager;
 
 /// Required by the smoke tests
 pub use consensusdb::CONSENSUS_DB_NAME;
+
+pub use consensusdb::create_checkpoint;
 
 #[cfg(feature = "fuzzing")]
 pub use round_manager::round_manager_fuzzing;

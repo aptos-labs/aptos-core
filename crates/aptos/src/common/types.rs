@@ -19,7 +19,7 @@ use aptos_crypto::{
 };
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{ExplainVMStatus, HashValue, UserTransaction};
+use aptos_rest_client::aptos_api_types::HashValue;
 use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
@@ -45,7 +45,6 @@ use std::{
 };
 use thiserror::Error;
 
-const MAX_POSSIBLE_GAS_UNITS: u64 = 1_000_000;
 pub const DEFAULT_PROFILE: &str = "default";
 
 /// A common result to be returned to users
@@ -566,7 +565,7 @@ impl FromStr for EncodingType {
 }
 
 /// An insertable option for use with prompts.
-#[derive(Clone, Copy, Debug, Default, Parser)]
+#[derive(Clone, Copy, Debug, Default, Parser, PartialEq, Eq)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
     #[clap(long, group = "prompt_options")]
@@ -912,6 +911,18 @@ pub struct MovePackageDir {
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
+
+    /// Skip pulling the latest git dependencies
+    ///
+    /// If you don't have a network connection, the compiler may fail due
+    /// to no ability to pull git dependencies.  This will allow overriding
+    /// this for local development.
+    #[clap(long)]
+    pub(crate) skip_fetch_latest_git_deps: bool,
+
+    /// Specify the version of the bytecode the compiler is going to emit.
+    #[clap(long)]
+    pub bytecode_version: Option<u32>,
 }
 
 impl MovePackageDir {
@@ -920,6 +931,8 @@ impl MovePackageDir {
             package_dir: Some(package_dir),
             output_dir: None,
             named_addresses: Default::default(),
+            skip_fetch_latest_git_deps: true,
+            bytecode_version: None,
         }
     }
 
@@ -1332,33 +1345,28 @@ impl TransactionOptions {
                 sender_key.public_key(),
                 Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
             );
-            // TODO: Cleanup to use the gas price estimation here
-            let simulated_txn = client
-                .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
+
+            let txns = client
+                .simulate_with_gas_estimation(&signed_transaction, true, false)
                 .await?
                 .into_inner();
+            let simulated_txn = txns.first().unwrap();
 
             // Check if the transaction will pass, if it doesn't then fail
-            // TODO: Add move resolver so we can explain the VM status with a proper error map
-            let status = simulated_txn.info.status();
-            if !status.is_success() {
-                let status = client.explain_vm_status(status);
-                return Err(CliError::SimulationError(status));
+            if !simulated_txn.info.success {
+                return Err(CliError::SimulationError(
+                    simulated_txn.info.vm_status.clone(),
+                ));
             }
 
             // Take the gas used and use a headroom factor on it
-            let adjusted_max_gas = adjust_gas_headroom(
-                simulated_txn.info.gas_used(),
-                simulated_txn
-                    .transaction
-                    .as_signed_user_txn()
-                    .expect("Should be signed user transaction")
-                    .max_gas_amount(),
-            );
+            let gas_used = simulated_txn.info.gas_used.0;
+            let adjusted_max_gas =
+                adjust_gas_headroom(gas_used, simulated_txn.request.max_gas_amount.0);
 
             // Ask if you want to accept the estimate amount
             let upper_cost_bound = adjusted_max_gas * gas_unit_price;
-            let lower_cost_bound = simulated_txn.info.gas_used() * gas_unit_price;
+            let lower_cost_bound = gas_used * gas_unit_price;
             let message = format!(
                     "Do you want to submit a transaction for a range of [{} - {}] Octas at a gas unit price of {} Octas?",
                     lower_cost_bound,
@@ -1381,69 +1389,6 @@ impl TransactionOptions {
             .map_err(|err| CliError::ApiError(err.to_string()))?;
 
         Ok(response.into_inner())
-    }
-
-    pub async fn simulate_transaction(
-        &self,
-        payload: TransactionPayload,
-        gas_price: Option<u64>,
-        amount_transfer: Option<u64>,
-    ) -> CliTypedResult<UserTransaction> {
-        let client = self.rest_client()?;
-        let (sender_key, sender_address) = self.get_key_and_address()?;
-
-        // Get sequence number for account
-        let sequence_number = get_sequence_number(&client, sender_address).await?;
-
-        // Estimate gas price if necessary
-        let gas_price = if let Some(gas_price) = gas_price {
-            gas_price
-        } else {
-            self.estimate_gas_price().await?
-        };
-        // Simulate transaction
-        // To get my known possible max gas, I need to get my current balance
-        let account_balance = client
-            .get_account_balance(sender_address)
-            .await?
-            .into_inner()
-            .coin
-            .value
-            .0;
-
-        let max_possible_gas = if gas_price == 0 {
-            MAX_POSSIBLE_GAS_UNITS
-        } else if let Some(amount) = amount_transfer {
-            std::cmp::min(
-                account_balance
-                    .saturating_sub(amount)
-                    .saturating_div(gas_price),
-                MAX_POSSIBLE_GAS_UNITS,
-            )
-        } else {
-            std::cmp::min(
-                account_balance.saturating_div(gas_price),
-                MAX_POSSIBLE_GAS_UNITS,
-            )
-        };
-
-        let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
-            .with_gas_unit_price(gas_price)
-            .with_max_gas_amount(max_possible_gas);
-
-        let unsigned_transaction = transaction_factory
-            .payload(payload)
-            .sender(sender_address)
-            .sequence_number(sequence_number)
-            .build();
-
-        let signed_transaction = SignedTransaction::new(
-            unsigned_transaction,
-            sender_key.public_key(),
-            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
-        );
-        let txns = client.simulate(&signed_transaction).await?.into_inner();
-        Ok(txns.first().unwrap().clone())
     }
 
     pub async fn estimate_gas_price(&self) -> CliTypedResult<u64> {

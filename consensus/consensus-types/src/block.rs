@@ -9,13 +9,13 @@ use crate::{
 use anyhow::{bail, ensure, format_err};
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
-use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
+    transaction::SignedTransaction,
     transaction::{Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -106,8 +106,7 @@ impl Block {
         match self.block_data.payload() {
             None => 0,
             Some(payload) => match payload {
-                Payload::Empty => 0,
-                Payload::InQuorumStore(pos) => pos.len(),
+                Payload::InQuorumStore(pos) => pos.proofs.len(),
                 Payload::DirectMempool(_) => unreachable!(),
             },
         }

@@ -3,6 +3,8 @@
 
 use crate::proof_of_store::ProofOfStore;
 use aptos_crypto::HashValue;
+use aptos_executor_types::Error;
+use aptos_infallible::Mutex;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use rayon::prelude::*;
@@ -10,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt;
 use std::fmt::Write;
+use std::sync::Arc;
+use tokio::sync::oneshot;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
 /// monotonically. It is used for the protocol safety and liveness (please see the detailed
@@ -37,41 +41,77 @@ pub struct RejectedTransactionSummary {
     pub hash: HashValue,
 }
 
+#[derive(Debug)]
+pub enum DataStatus {
+    Cached(Vec<SignedTransaction>),
+    Requested(
+        Vec<(
+            HashValue,
+            oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>,
+        )>,
+    ),
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct ProofWithData {
+    pub proofs: Vec<ProofOfStore>,
+    #[serde(skip)]
+    pub status: Arc<Mutex<Option<DataStatus>>>,
+}
+
+impl PartialEq for ProofWithData {
+    fn eq(&self, other: &Self) -> bool {
+        self.proofs == other.proofs && Arc::as_ptr(&self.status) == Arc::as_ptr(&other.status)
+    }
+}
+
+impl Eq for ProofWithData {}
+
+impl ProofWithData {
+    pub fn new(proofs: Vec<ProofOfStore>) -> Self {
+        Self {
+            proofs,
+            status: Arc::new(Mutex::new(None)),
+        }
+    }
+}
+
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
-    Empty,
     DirectMempool(Vec<SignedTransaction>),
-    InQuorumStore(Vec<ProofOfStore>),
+    InQuorumStore(ProofWithData),
 }
 
 impl Payload {
-    pub fn empty() -> Self {
-        Payload::Empty
+    pub fn empty(quorum_store_enabled: bool) -> Self {
+        if quorum_store_enabled {
+            Payload::InQuorumStore(ProofWithData::new(Vec::new()))
+        } else {
+            Payload::DirectMempool(Vec::new())
+        }
     }
 
     pub fn len(&self) -> usize {
         match self {
             Payload::DirectMempool(txns) => txns.len(),
-            Payload::InQuorumStore(pos) => pos.len(), // quorum store TODO
-            Payload::Empty => 0,
+            Payload::InQuorumStore(proof_with_status) => proof_with_status
+                .proofs
+                .iter()
+                .map(|proof| proof.info().num_txns as usize)
+                .sum(),
         }
     }
 
     pub fn is_empty(&self) -> bool {
         match self {
             Payload::DirectMempool(txns) => txns.is_empty(),
-            Payload::InQuorumStore(proofs) => proofs.is_empty(),
-            Payload::Empty => true,
+            Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs.is_empty(),
         }
     }
 
     pub fn is_direct(&self) -> bool {
-        match self {
-            Payload::DirectMempool(_) => true,
-            Payload::InQuorumStore(_) => false,
-            Payload::Empty => false,
-        }
+        matches!(self, Payload::DirectMempool(_))
     }
 
     /// This is computationally expensive on the first call
@@ -82,21 +122,32 @@ impl Payload {
                 .with_min_len(100)
                 .map(|txn| txn.raw_txn_bytes_len())
                 .sum(),
-            Payload::InQuorumStore(_) => 0, // quorum store TODO
-            Payload::Empty => 0,
+            Payload::InQuorumStore(proof_with_status) => proof_with_status
+                .proofs
+                .iter()
+                .map(|proof| proof.info().num_bytes as usize)
+                .sum(),
         }
     }
 
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        match self {
-            Payload::Empty => Ok(()),
-            Payload::DirectMempool(_) => Ok(()),
-            Payload::InQuorumStore(proofs) => {
-                for proof in proofs.iter() {
+    pub fn verify(
+        &self,
+        validator: &ValidatorVerifier,
+        quorum_store_enabled: bool,
+    ) -> anyhow::Result<()> {
+        match (quorum_store_enabled, self) {
+            (false, Payload::DirectMempool(_)) => Ok(()),
+            (true, Payload::InQuorumStore(proof_with_status)) => {
+                for proof in proof_with_status.proofs.iter() {
                     proof.verify(validator)?;
                 }
                 Ok(())
             }
+            (_, _) => Err(anyhow::anyhow!(
+                "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
+                quorum_store_enabled,
+                self
+            )),
         }
     }
 }
@@ -107,10 +158,9 @@ impl fmt::Display for Payload {
             Payload::DirectMempool(txns) => {
                 write!(f, "InMemory txns: {}", txns.len())
             }
-            Payload::InQuorumStore(proofs) => {
-                write!(f, "InMemory poavs: {}", proofs.len())
+            Payload::InQuorumStore(proof_with_status) => {
+                write!(f, "InMemory proofs: {}", proof_with_status.proofs.len())
             }
-            Payload::Empty => write!(f, "Empty payload"),
         }
     }
 }
@@ -120,7 +170,6 @@ impl fmt::Display for Payload {
 pub enum PayloadFilter {
     DirectMempool(Vec<TransactionSummary>),
     InQuorumStore(HashSet<HashValue>),
-    //
     Empty,
 }
 
@@ -147,8 +196,8 @@ impl From<&Vec<&Payload>> for PayloadFilter {
         } else {
             let mut exclude_proofs = HashSet::new();
             for payload in exclude_payloads {
-                if let Payload::InQuorumStore(proofs) = payload {
-                    for proof in proofs {
+                if let Payload::InQuorumStore(proof_with_status) = payload {
+                    for proof in &proof_with_status.proofs {
                         exclude_proofs.insert(*proof.digest());
                     }
                 }
@@ -169,11 +218,11 @@ impl fmt::Display for PayloadFilter {
                 write!(f, "{}", txns_str)
             }
             PayloadFilter::InQuorumStore(excluded_proofs) => {
-                let mut txns_str = "".to_string();
+                let mut proofs_str = "".to_string();
                 for proof in excluded_proofs.iter() {
-                    write!(txns_str, "{} ", proof)?;
+                    write!(proofs_str, "{} ", proof)?;
                 }
-                write!(f, "{}", txns_str)
+                write!(f, "{}", proofs_str)
             }
             PayloadFilter::Empty => {
                 write!(f, "Empty filter")

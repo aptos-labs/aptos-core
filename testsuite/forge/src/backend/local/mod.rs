@@ -4,9 +4,9 @@
 use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version};
 use anyhow::{bail, Context};
 use aptos_config::config::NodeConfig;
+use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
-use framework::ReleaseBundle;
 use rand::rngs::StdRng;
 use std::time::Duration;
 use std::{

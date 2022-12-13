@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_backup_service::start_backup_service;
 use aptos_config::utils::get_available_port;
 use aptos_proptest_helpers::ValueGenerator;
 use aptos_temppath::TempPath;
@@ -12,7 +13,6 @@ use aptosdb::{
     test_helper::{arb_blocks_to_commit, update_in_memory_state},
     AptosDB,
 };
-use backup_service::start_backup_service;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,

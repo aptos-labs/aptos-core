@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_logger::{prelude::*, Level, Logger};
-use aptos_push_metrics::MetricsPusher;
-use backup_cli::{
+use aptos_backup_cli::{
     coordinators::verify::VerifyCoordinator,
     metadata::cache::MetadataCacheOpt,
     storage::StorageOpt,
     utils::{ConcurrentDownloadsOpt, TrustedWaypointOpt},
 };
+use aptos_logger::{prelude::*, Level, Logger};
+use aptos_push_metrics::MetricsPusher;
 use clap::Parser;
 
 #[derive(Parser)]
@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
 }
 
 async fn main_impl() -> Result<()> {
-    Logger::new().level(Level::Info).read_env().init();
+    Logger::new().level(Level::Info).init();
 
     #[allow(deprecated)]
     let _mp = MetricsPusher::start();

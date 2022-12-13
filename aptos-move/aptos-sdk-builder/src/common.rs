@@ -31,8 +31,11 @@ fn quote_type_as_format(type_tag: &TypeTag) -> Format {
     match type_tag {
         Bool => Format::Bool,
         U8 => Format::U8,
+        U16 => Format::U16,
+        U32 => Format::U32,
         U64 => Format::U64,
         U128 => Format::U128,
+        U256 => Format::TypeName("U256".into()),
         Address => Format::TypeName("AccountAddress".into()),
         Vector(type_tag) => Format::Seq(Box::new(quote_type_as_format(type_tag))),
         Struct(tag) => match tag {
@@ -98,8 +101,11 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
     match type_tag {
         Bool => "bool".into(),
         U8 => "u8".into(),
+        U16 => "u16".into(),
+        U32 => "u32".into(),
         U64 => "u64".into(),
         U128 => "u128".into(),
+        U256 => "u256".into(),
         Address => "address".into(),
         Vector(type_tag) => match type_tag.as_ref() {
             U8 => "u8vector".into(),

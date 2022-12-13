@@ -17,11 +17,16 @@ use aptos_config::config::{
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_framework::ReleaseBundle;
 use aptos_temppath::TempPath;
-use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
+use aptos_types::{
+    chain_id::ChainId,
+    on_chain_config::{GasScheduleV2, OnChainConsensusConfig},
+    transaction::Transaction,
+    waypoint::Waypoint,
+};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use framework::ReleaseBundle;
 use std::convert::TryInto;
 use storage_interface::DbReaderWriter;
 use vm_genesis::Validator;
@@ -61,6 +66,9 @@ pub struct GenesisInfo {
     pub voting_duration_secs: u64,
     /// Percent of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
+
+    pub consensus_config: OnChainConsensusConfig,
+    pub gas_schedule: GasScheduleV2,
 }
 
 impl GenesisInfo {
@@ -94,6 +102,8 @@ impl GenesisInfo {
             rewards_apy_percentage: genesis_config.rewards_apy_percentage,
             voting_duration_secs: genesis_config.voting_duration_secs,
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
+            consensus_config: genesis_config.consensus_config.clone(),
+            gas_schedule: genesis_config.gas_schedule.clone(),
         })
     }
 
@@ -112,7 +122,7 @@ impl GenesisInfo {
             &self.validators,
             &self.framework,
             self.chain_id,
-            vm_genesis::GenesisConfiguration {
+            &vm_genesis::GenesisConfiguration {
                 allow_new_validators: self.allow_new_validators,
                 epoch_duration_secs: self.epoch_duration_secs,
                 is_test: true,
@@ -127,6 +137,8 @@ impl GenesisInfo {
                 employee_vesting_start: 1663456089,
                 employee_vesting_period_duration: 5 * 60, // 5 minutes
             },
+            &self.consensus_config,
+            &self.gas_schedule,
         )
     }
 
@@ -143,6 +155,6 @@ impl GenesisInfo {
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);
-        executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
+        aptos_executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
     }
 }

@@ -27,6 +27,10 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V5
+//   - u16, u32, u256
+// - V4
+//   - Consider memory leaked for event natives
 // - V3
 //   - Add memory quota
 //   - Storage charges:
@@ -39,7 +43,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 4;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 5;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
@@ -69,7 +73,7 @@ pub trait InitialGasSchedule: Sized {
 #[derive(Debug, Clone)]
 pub struct NativeGasParameters {
     pub move_stdlib: move_stdlib::natives::GasParameters,
-    pub aptos_framework: framework::natives::GasParameters,
+    pub aptos_framework: aptos_framework::natives::GasParameters,
     pub table: move_table_extension::GasParameters,
 }
 
@@ -96,7 +100,7 @@ impl NativeGasParameters {
     pub fn zeros() -> Self {
         Self {
             move_stdlib: move_stdlib::natives::GasParameters::zeros(),
-            aptos_framework: framework::natives::GasParameters::zeros(),
+            aptos_framework: aptos_framework::natives::GasParameters::zeros(),
             table: move_table_extension::GasParameters::zeros(),
         }
     }
@@ -175,7 +179,7 @@ pub struct AptosGasMeter {
     balance: InternalGas,
     memory_quota: AbstractValueSize,
 
-    is_call_table: bool,
+    should_leak_memory_for_native: bool,
 }
 
 impl AptosGasMeter {
@@ -200,7 +204,7 @@ impl AptosGasMeter {
             storage_gas_params,
             balance,
             memory_quota,
-            is_call_table: false,
+            should_leak_memory_for_native: false,
         }
     }
 
@@ -266,13 +270,8 @@ impl GasMeter for AptosGasMeter {
         _ty_args: impl ExactSizeIterator<Item = impl TypeView>,
         args: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
-        // TODO(Gas): The table extension maintains its own memory space and currently it's hard
-        //            for us to track when values are created or dropped there.
-        //            Therefore as a temporary hack, we do not consider the memory released when
-        //            values enter the table module, "leaking them" conceptually.
-        //            This special handling should be removed once we build proper memory tracking
-        //            into the table extension itself.
-        if self.is_call_table {
+        // TODO(Gas): https://github.com/aptos-labs/aptos-core/issues/5485
+        if self.should_leak_memory_for_native {
             return Ok(());
         }
 
@@ -385,8 +384,11 @@ impl GasMeter for AptosGasMeter {
         num_locals: NumArgs,
     ) -> PartialVMResult<()> {
         // Save the info for charge_native_function_before_execution.
-        self.is_call_table =
-            *module_id.address() == CORE_CODE_ADDRESS && module_id.name().as_str() == "table";
+        self.should_leak_memory_for_native = (*module_id.address() == CORE_CODE_ADDRESS
+            && module_id.name().as_str() == "table")
+            || (self.feature_version >= 4
+                && *module_id.address() == CORE_CODE_ADDRESS
+                && module_id.name().as_str() == "event");
 
         let params = &self.gas_params.instr;
 

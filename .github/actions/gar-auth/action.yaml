@@ -5,6 +5,9 @@ inputs:
     required: true
   GCP_SERVICE_ACCOUNT_EMAIL:
     required: true
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git"
+    required: false
 
 runs:
   using: composite
@@ -24,3 +27,10 @@ runs:
         registry: us-west1-docker.pkg.dev
         username: oauth2accesstoken
         password: ${{ steps.auth.outputs.access_token }}
+
+    - name: Setup git credentials
+      if: inputs.GIT_CREDENTIALS != ''
+      shell: bash
+      run: |
+        git config --global credential.helper store
+        echo "${{ inputs.GIT_CREDENTIALS }}" > ~/.git-credentials

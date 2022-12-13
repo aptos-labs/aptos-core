@@ -1,5 +1,5 @@
 [package]
-name = "crash-handler"
+name = "aptos-crash-handler"
 description = "Aptos crash handler"
 version = "0.1.0"
 
@@ -13,9 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-backtrace = "0.3.58"
-serde = { version = "1.0.137", features = ["derive"] }
-toml = "0.5.9"
-
-aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-logger = { workspace = true }
+backtrace = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
 

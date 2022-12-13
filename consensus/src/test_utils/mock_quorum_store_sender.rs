@@ -4,8 +4,8 @@
 use crate::network::QuorumStoreSender;
 use crate::network_interface::ConsensusMsg;
 use crate::quorum_store::types::Batch;
-use consensus_types::common::Author;
-use consensus_types::proof_of_store::SignedDigest;
+use aptos_consensus_types::common::Author;
+use aptos_consensus_types::proof_of_store::SignedDigest;
 use tokio::sync::mpsc::Sender;
 
 pub struct MockQuorumStoreSender {

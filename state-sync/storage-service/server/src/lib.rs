@@ -10,6 +10,7 @@ use crate::{
     network::{ResponseSender, StorageServiceNetworkEvents},
 };
 use ::network::ProtocolId;
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::StorageServiceConfig;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
@@ -21,7 +22,6 @@ use aptos_types::{
     state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
-use bounded_executor::BoundedExecutor;
 use futures::stream::StreamExt;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
@@ -34,11 +34,12 @@ use std::{
 use storage_interface::DbReader;
 use storage_service_types::requests::{
     DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest, StorageServiceRequest,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+    TransactionsWithProofRequest,
 };
 use storage_service_types::responses::{
     CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, ServerProtocolVersion,
-    StorageServerSummary, StorageServiceResponse,
+    StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof,
 };
 use storage_service_types::{Result, StorageServiceError};
 use thiserror::Error;
@@ -107,8 +108,8 @@ impl DataSubscriptionRequest {
         }
     }
 
-    /// Creates a new storage service request to satisfy the transaction
-    /// subscription using the new data at the specified `target_ledger_info`.
+    /// Creates a new storage service request to satisfy the subscription
+    /// using the new data at the specified `target_ledger_info`.
     fn get_storage_request_for_missing_data(
         &self,
         config: StorageServiceConfig,
@@ -157,6 +158,17 @@ impl DataSubscriptionRequest {
                     include_events: request.include_events,
                 })
             }
+            DataRequest::GetNewTransactionsOrOutputsWithProof(request) => {
+                DataRequest::GetTransactionsOrOutputsWithProof(
+                    TransactionsOrOutputsWithProofRequest {
+                        proof_version: target_version,
+                        start_version,
+                        end_version,
+                        include_events: request.include_events,
+                        max_num_output_reductions: request.max_num_output_reductions,
+                    },
+                )
+            }
             request => unreachable!("Unexpected subscription request: {:?}", request),
         };
         let storage_request =
@@ -169,6 +181,7 @@ impl DataSubscriptionRequest {
         match &self.request.data_request {
             DataRequest::GetNewTransactionOutputsWithProof(request) => request.known_version,
             DataRequest::GetNewTransactionsWithProof(request) => request.known_version,
+            DataRequest::GetNewTransactionsOrOutputsWithProof(request) => request.known_version,
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -178,6 +191,7 @@ impl DataSubscriptionRequest {
         match &self.request.data_request {
             DataRequest::GetNewTransactionOutputsWithProof(request) => request.known_epoch,
             DataRequest::GetNewTransactionsWithProof(request) => request.known_epoch,
+            DataRequest::GetNewTransactionsOrOutputsWithProof(request) => request.known_epoch,
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -190,6 +204,9 @@ impl DataSubscriptionRequest {
                 config.max_transaction_output_chunk_size
             }
             DataRequest::GetNewTransactionsWithProof(_) => config.max_transaction_chunk_size,
+            DataRequest::GetNewTransactionsOrOutputsWithProof(_) => {
+                config.max_transaction_output_chunk_size
+            }
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -541,6 +558,26 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                             target_ledger_info.clone(),
                         ))
                     }
+                    Ok(DataResponse::TransactionsOrOutputsWithProof((
+                        transactions_with_proof,
+                        outputs_with_proof,
+                    ))) => {
+                        if let Some(transactions_with_proof) = transactions_with_proof {
+                            DataResponse::NewTransactionsOrOutputsWithProof((
+                                (Some(transactions_with_proof), None),
+                                target_ledger_info.clone(),
+                            ))
+                        } else if let Some(outputs_with_proof) = outputs_with_proof {
+                            DataResponse::NewTransactionsOrOutputsWithProof((
+                                (None, Some(outputs_with_proof)),
+                                target_ledger_info.clone(),
+                            ))
+                        } else {
+                            return Err(Error::UnexpectedErrorEncountered(
+                                "Failed to get a transaction or output response for peer!".into(),
+                            ));
+                        }
+                    }
                     data_response => {
                         return Err(Error::UnexpectedErrorEncountered(format!(
                             "Failed to get appropriate data response for peer! Got: {:?}",
@@ -813,7 +850,13 @@ impl<T: StorageReaderInterface> Handler<T> {
             DataRequest::GetTransactionsWithProof(request) => {
                 self.get_transactions_with_proof(request)
             }
-            _ => unreachable!("Received an unexpected request: {:?}", request),
+            DataRequest::GetTransactionsOrOutputsWithProof(request) => {
+                self.get_transactions_or_outputs_with_proof(request)
+            }
+            _ => Err(Error::UnexpectedErrorEncountered(format!(
+                "Received an unexpected request: {:?}",
+                request
+            ))),
         }?;
         let storage_response = StorageServiceResponse::new(data_response, request.use_compression)?;
 
@@ -898,6 +941,25 @@ impl<T: StorageReaderInterface> Handler<T> {
 
         Ok(DataResponse::TransactionsWithProof(transactions_with_proof))
     }
+
+    fn get_transactions_or_outputs_with_proof(
+        &self,
+        request: &TransactionsOrOutputsWithProofRequest,
+    ) -> Result<DataResponse, Error> {
+        let (transactions_with_proof, outputs_with_proof) =
+            self.storage.get_transactions_or_outputs_with_proof(
+                request.proof_version,
+                request.start_version,
+                request.end_version,
+                request.include_events,
+                request.max_num_output_reductions,
+            )?;
+
+        Ok(DataResponse::TransactionsOrOutputsWithProof((
+            transactions_with_proof,
+            outputs_with_proof,
+        )))
+    }
 }
 
 /// The interface into local storage (e.g., the Aptos DB) used by the storage
@@ -942,6 +1004,21 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         start_version: u64,
         end_version: u64,
     ) -> Result<TransactionOutputListWithProof, Error>;
+
+    /// Returns a list of transaction or outputs with a proof relative to the
+    /// `proof_version`. The data list is expected to start at `start_version`
+    /// and end at `end_version` (inclusive). In some cases, less data may be
+    /// returned (e.g., due to network or chunk limits). If `include_events`
+    /// is true, events are also returned. `max_num_output_reductions` specifies
+    /// how many output reductions can occur before transactions are returned.
+    fn get_transactions_or_outputs_with_proof(
+        &self,
+        proof_version: u64,
+        start_version: u64,
+        end_version: u64,
+        include_events: bool,
+        max_num_output_reductions: u64,
+    ) -> Result<TransactionOrOutputListWithProof, Error>;
 
     /// Returns the number of states in the state tree at the specified version.
     fn get_number_of_states(&self, version: u64) -> Result<u64, Error>;
@@ -1100,7 +1177,7 @@ impl StorageReaderInterface for StorageReader {
         end_version: u64,
         include_events: bool,
     ) -> Result<TransactionListWithProof, Error> {
-        // Calculate the number of transaction outputs to fetch
+        // Calculate the number of transactions to fetch
         let expected_num_transactions = inclusive_range_len(start_version, end_version)?;
         let max_num_transactions = self.config.max_transaction_chunk_size;
         let mut num_transactions_to_fetch = min(expected_num_transactions, max_num_transactions);
@@ -1242,6 +1319,63 @@ impl StorageReaderInterface for StorageReader {
             start version: {:?}, end version: {:?}. The data cannot fit into a single network frame!",
             proof_version, start_version, end_version
         )))
+    }
+
+    fn get_transactions_or_outputs_with_proof(
+        &self,
+        proof_version: u64,
+        start_version: u64,
+        end_version: u64,
+        include_events: bool,
+        max_num_output_reductions: u64,
+    ) -> Result<TransactionOrOutputListWithProof, Error> {
+        // Calculate the number of transaction outputs to fetch
+        let expected_num_outputs = inclusive_range_len(start_version, end_version)?;
+        let max_num_outputs = self.config.max_transaction_output_chunk_size;
+        let mut num_outputs_to_fetch = min(expected_num_outputs, max_num_outputs);
+
+        // Attempt to serve the outputs. Halve the data only as many
+        // times as the fallback count allows. If the data still
+        // doesn't fit, return a transaction chunk instead.
+        let mut num_output_reductions = 0;
+        while num_output_reductions <= max_num_output_reductions {
+            let output_list_with_proof = self
+                .storage
+                .get_transaction_outputs(start_version, num_outputs_to_fetch, proof_version)
+                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            let (overflow_frame, num_bytes) = check_overflow_network_frame(
+                &output_list_with_proof,
+                self.config.max_network_chunk_bytes,
+            )?;
+
+            if !overflow_frame {
+                return Ok((None, Some(output_list_with_proof)));
+            } else if num_outputs_to_fetch == 1 {
+                break; // We cannot return less than a single item. Fallback to transactions
+            } else {
+                increment_network_frame_overflow(
+                    DataResponse::TransactionsOrOutputsWithProof((
+                        None,
+                        Some(output_list_with_proof),
+                    ))
+                    .get_label(),
+                );
+                let new_num_outputs_to_fetch = num_outputs_to_fetch / 2;
+                debug!("The request for {:?} outputs was too large (num bytes: {:?}). Current number of data reductions: {:?}",
+                    num_outputs_to_fetch, num_bytes, num_output_reductions);
+                num_outputs_to_fetch = new_num_outputs_to_fetch; // Try again with half the amount of data
+                num_output_reductions += 1;
+            }
+        }
+
+        // Return transactions only
+        let transactions_with_proof = self.get_transactions_with_proof(
+            proof_version,
+            start_version,
+            end_version,
+            include_events,
+        )?;
+        Ok((Some(transactions_with_proof), None))
     }
 
     fn get_number_of_states(&self, version: u64) -> Result<u64, Error> {

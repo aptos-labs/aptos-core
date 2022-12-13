@@ -10,14 +10,7 @@ use crate::{
     quorum_store::types::Batch,
 };
 use anyhow::{anyhow, ensure};
-use aptos_logger::prelude::*;
-use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof,
-    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
-};
-use bytes::Bytes;
-use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::{
+use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
@@ -26,6 +19,13 @@ use consensus_types::{
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
+use aptos_logger::prelude::*;
+use aptos_types::{
+    account_address::AccountAddress, epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
+};
+use bytes::Bytes;
+use channel::{self, aptos_channel, message_queues::QueueStyle};
 use fail::fail_point;
 use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
 use network::{

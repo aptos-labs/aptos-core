@@ -15,3 +15,5 @@ pub const X_APTOS_BLOCK_HEIGHT: &str = "X-Aptos-Block-Height";
 pub const X_APTOS_OLDEST_BLOCK_HEIGHT: &str = "X-Aptos-Oldest-Block-Height";
 /// Current timestamp of the chain
 pub const X_APTOS_LEDGER_TIMESTAMP: &str = "X-Aptos-Ledger-TimestampUsec";
+/// Cursor used for pagination.
+pub const X_APTOS_CURSOR: &str = "X-Aptos-Cursor";

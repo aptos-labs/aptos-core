@@ -3,11 +3,11 @@
 
 use crate::{LoadDestination, NetworkLoadTest};
 use anyhow::{anyhow, bail, Context};
-use aptos_logger::{info, warn};
-use forge::test_utils::consensus_utils::{
+use aptos_forge::test_utils::consensus_utils::{
     test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
 };
-use forge::{NetworkContext, NetworkTest, Result, Swarm, SwarmExt, Test};
+use aptos_forge::{NetworkContext, NetworkTest, Result, Swarm, SwarmExt, Test};
+use aptos_logger::{info, warn};
 use rand::Rng;
 use std::collections::HashSet;
 use std::time::Duration;
@@ -19,6 +19,9 @@ pub struct ChangingWorkingQuorumTest {
     pub max_down_nodes: usize,
     pub num_large_validators: usize,
     pub add_execution_delay: bool,
+    /// Check that every given number of seconds all nodes make progress, without any failures.
+    /// It is good to make epoch length and this duration not be multiples of one another,
+    /// to test different timings
     pub check_period_s: usize,
 }
 

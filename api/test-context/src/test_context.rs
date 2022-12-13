@@ -12,6 +12,8 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::{hash::HashValue, SigningKey};
+use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
+use aptos_executor_types::BlockExecutorTrait;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
@@ -32,8 +34,6 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use bytes::Bytes;
-use executor::{block_executor::BlockExecutor, db_bootstrapper};
-use executor_types::BlockExecutorTrait;
 use hyper::{HeaderMap, Response};
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
@@ -91,7 +91,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let builder = aptos_genesis::builder::Builder::new(
         tmp_dir.path(),
-        cached_packages::head_release_bundle().clone(),
+        aptos_cached_packages::head_release_bundle().clone(),
     )
     .unwrap()
     .with_init_genesis_config(Some(Arc::new(|genesis_config| {

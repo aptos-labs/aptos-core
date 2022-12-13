@@ -6,9 +6,9 @@ use crate::quorum_store::tests::utils::{
     compute_digest_from_signed_transaction, create_vec_signed_transactions,
 };
 use crate::quorum_store::types::PersistedValue;
+use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
-use consensus_types::proof_of_store::LogicalTime;
 
 #[test]
 fn test_db_for_data() {

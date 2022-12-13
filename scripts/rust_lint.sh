@@ -32,3 +32,12 @@ cargo fmt $CHECK_ARG
 # we can move to cleaner workspace dependency notation.
 # See: https://github.com/DevinR528/cargo-sort/issues/47
 cargo sort --grouped --workspace $CHECK_ARG
+
+# Ensure that aptos-cached-packages have been built correctly.
+cargo build -p aptos-cached-packages
+if [ -n "$CHECK_ARG" ]; then
+    if [ -n "$(git status --porcelain -uno)" ]; then
+      echo "There are unstaged changes after running 'cargo build -p aptos-cached-packages'! Are you sure aptos-cached-packages is up-to-date?"
+      exit 1
+    fi
+fi

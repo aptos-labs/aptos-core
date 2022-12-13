@@ -15,12 +15,12 @@ use futures::{
 };
 use tokio::time::{Duration, Instant};
 
+use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock};
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, ledger_info::LedgerInfoWithSignatures,
     validator_verifier::ValidatorVerifier,
 };
-use consensus_types::{common::Author, executed_block::ExecutedBlock};
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},

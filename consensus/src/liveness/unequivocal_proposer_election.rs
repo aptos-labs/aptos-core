@@ -3,13 +3,13 @@
 
 use std::cmp::Ordering;
 
-use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
-use aptos_logger::{error, SecurityEvent};
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
 };
+use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
+use aptos_logger::{error, SecurityEvent};
 
 use super::proposer_election::ProposerElection;
 
@@ -25,6 +25,11 @@ pub struct UnequivocalProposerElection {
 impl ProposerElection for UnequivocalProposerElection {
     fn get_valid_proposer(&self, round: Round) -> Author {
         self.proposer_election.get_valid_proposer(round)
+    }
+
+    fn get_voting_power_participation_ratio(&self, round: Round) -> f64 {
+        self.proposer_election
+            .get_voting_power_participation_ratio(round)
     }
 }
 

@@ -4,13 +4,13 @@
 use crate::quorum_store::{
     counters, quorum_store::QuorumStoreError, types::BatchId, utils::DigestTimeouts,
 };
+use aptos_consensus_types::proof_of_store::{
+    ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
+};
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::{debug, info};
 use aptos_types::{
     aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
-};
-use consensus_types::proof_of_store::{
-    ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
 };
 use futures::channel::oneshot;
 use std::{

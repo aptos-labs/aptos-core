@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::HashValue;
-pub use block_store::{sync_manager::BlockRetriever, BlockStore};
-use consensus_types::{
+use aptos_consensus_types::{
     executed_block::ExecutedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
 };
+use aptos_crypto::HashValue;
+pub use block_store::{sync_manager::BlockRetriever, BlockStore};
 use std::sync::Arc;
 
 mod block_store;

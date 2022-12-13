@@ -15,8 +15,11 @@
 -  [Function `get_state_storage_usage_only_at_epoch_beginning`](#0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning)
 -  [Function `on_reconfig`](#0x1_state_storage_on_reconfig)
 -  [Specification](#@Specification_1)
+    -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `on_new_block`](#@Specification_1_on_new_block)
+    -  [Function `current_items_and_bytes`](#@Specification_1_current_items_and_bytes)
     -  [Function `get_state_storage_usage_only_at_epoch_beginning`](#@Specification_1_get_state_storage_usage_only_at_epoch_beginning)
+    -  [Function `on_reconfig`](#@Specification_1_on_reconfig)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -286,8 +289,30 @@ guarantees a fresh state view then.
 
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_strict;
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_GasParameter">GasParameter</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+ensure caller is admin.
+aborts if StateStorageUsage already exists.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -309,6 +334,22 @@ guarantees a fresh state view then.
 
 
 
+<a name="@Specification_1_current_items_and_bytes"></a>
+
+### Function `current_items_and_bytes`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_current_items_and_bytes">current_items_and_bytes</a>(): (u64, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
 <a name="@Specification_1_get_state_storage_usage_only_at_epoch_beginning"></a>
 
 ### Function `get_state_storage_usage_only_at_epoch_beginning`
@@ -321,7 +362,22 @@ guarantees a fresh state view then.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_on_reconfig"></a>
+
+### Function `on_reconfig`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_reconfig">on_reconfig</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>true</b>;
 </code></pre>
 
 

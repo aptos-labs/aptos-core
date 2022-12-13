@@ -67,15 +67,17 @@ fn collect_core_metrics(core_metrics: &mut BTreeMap<String, String>, node_config
 fn collect_consensus_metrics(core_metrics: &mut BTreeMap<String, String>) {
     core_metrics.insert(
         CONSENSUS_PROPOSALS_COUNT.into(),
-        consensus::counters::PROPOSALS_COUNT.get().to_string(),
+        aptos_consensus::counters::PROPOSALS_COUNT.get().to_string(),
     );
     core_metrics.insert(
         CONSENSUS_LAST_COMMITTED_ROUND.into(),
-        consensus::counters::LAST_COMMITTED_ROUND.get().to_string(),
+        aptos_consensus::counters::LAST_COMMITTED_ROUND
+            .get()
+            .to_string(),
     );
     core_metrics.insert(
         CONSENSUS_TIMEOUT_COUNT.into(),
-        consensus::counters::TIMEOUT_COUNT.get().to_string(),
+        aptos_consensus::counters::TIMEOUT_COUNT.get().to_string(),
     );
     //TODO(joshlind): add block tracing and back pressure!
 }

@@ -3,12 +3,12 @@
 
 use crate::{
     counters,
-    data_manager::QuorumStoreDataManager,
     epoch_manager::EpochManager,
     experimental::buffer_manager::OrderedBlocks,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
     network_tests::{NetworkPlayground, TwinId},
+    payload_manager::PayloadManager,
     test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,
 };
@@ -17,6 +17,8 @@ use aptos_config::{
     generator::{self, ValidatorSwarm},
     network_id::NetworkId,
 };
+use aptos_consensus_types::common::{Author, Round};
+use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -30,8 +32,6 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::common::{Author, Round};
-use event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use network::{
@@ -95,7 +95,7 @@ impl SMRNode {
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
         };
-        let commit_notifier = Arc::new(QuorumStoreDataManager::new());
+        let _commit_notifier = Arc::from(PayloadManager::DirectMempool);
         let mut configs = HashMap::new();
         configs.insert(
             ValidatorSet::CONFIG_ID,
@@ -145,7 +145,6 @@ impl SMRNode {
             state_computer.clone(),
             storage.clone(),
             reconfig_listener,
-            commit_notifier,
         );
         let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
 

@@ -5,17 +5,17 @@ use crate::network::QuorumStoreSender;
 use crate::quorum_store::{counters, types::Batch, utils::DigestTimeouts};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_crypto::HashValue;
+use aptos_executor_types::*;
 use aptos_logger::debug;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use bcs::to_bytes;
-use executor_types::*;
 use std::collections::HashMap;
 use tokio::sync::oneshot;
 
 struct BatchRequesterState {
     signers: Vec<PeerId>,
     next_index: usize,
-    ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, executor_types::Error>>,
+    ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
     num_retries: usize,
     max_num_retry: usize,
 }
@@ -23,7 +23,7 @@ struct BatchRequesterState {
 impl BatchRequesterState {
     fn new(
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, executor_types::Error>>,
+        ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
     ) -> Self {
         Self {
             signers,
@@ -112,7 +112,7 @@ impl<T: QuorumStoreSender> BatchRequester<T> {
         &mut self,
         digest: HashValue,
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, executor_types::Error>>,
+        ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
     ) {
         let mut request_state = BatchRequesterState::new(signers, ret_tx);
         let request_peers = request_state

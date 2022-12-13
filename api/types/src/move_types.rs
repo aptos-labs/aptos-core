@@ -51,129 +51,81 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
     }
 }
 
-/// A string encoded U64
-///
-/// Encoded as a string to encode into JSON
-#[derive(Clone, Debug, Default, Eq, PartialEq, Copy)]
-pub struct U64(pub u64);
+macro_rules! define_integer_type {
+    ($n: ident, $t: ty, $d: literal) => {
+        #[doc = $d]
+        #[doc = "Encoded as a string to encode into JSON."]
+        #[derive(Clone, Debug, Default, Eq, PartialEq, Copy)]
+        pub struct $n(pub $t);
 
-impl U64 {
-    pub fn inner(&self) -> &u64 {
-        &self.0
-    }
+        impl $n {
+            pub fn inner(&self) -> &$t {
+                &self.0
+            }
+        }
+
+        impl From<$t> for $n {
+            fn from(d: $t) -> Self {
+                Self(d)
+            }
+        }
+
+        impl From<$n> for $t {
+            fn from(d: $n) -> Self {
+                d.0
+            }
+        }
+
+        impl From<$n> for move_core_types::value::MoveValue {
+            fn from(d: $n) -> Self {
+                move_core_types::value::MoveValue::$n(d.0)
+            }
+        }
+
+        impl fmt::Display for $n {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "{}", &self.0)
+            }
+        }
+
+        impl Serialize for $n {
+            fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                self.0.to_string().serialize(serializer)
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $n {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                let s = <String>::deserialize(deserializer)?;
+                s.parse().map_err(D::Error::custom)
+            }
+        }
+
+        impl FromStr for $n {
+            type Err = anyhow::Error;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                let data = s.parse::<$t>().map_err(|e| {
+                    format_err!(
+                        "Parsing {} string {:?} failed, caused by error: {}",
+                        stringify!($t),
+                        s,
+                        e
+                    )
+                })?;
+
+                Ok($n(data))
+            }
+        }
+    };
 }
 
-impl From<u64> for U64 {
-    fn from(d: u64) -> Self {
-        Self(d)
-    }
-}
-
-impl From<U64> for u64 {
-    fn from(d: U64) -> Self {
-        d.0
-    }
-}
-
-impl From<U64> for move_core_types::value::MoveValue {
-    fn from(d: U64) -> Self {
-        move_core_types::value::MoveValue::U64(d.0)
-    }
-}
-
-impl fmt::Display for U64 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", &self.0)
-    }
-}
-
-impl Serialize for U64 {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.to_string().serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for U64 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = <String>::deserialize(deserializer)?;
-        s.parse().map_err(D::Error::custom)
-    }
-}
-
-impl FromStr for U64 {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let data = s.parse::<u64>().map_err(|e| {
-            format_err!("Parsing u64 string {:?} failed, caused by error: {}", s, e)
-        })?;
-
-        Ok(U64(data))
-    }
-}
-
-/// A string encoded U128
-///
-/// Encoded as a string to encode into JSON
-#[derive(Clone, Debug, Default, PartialEq, Eq, Copy)]
-pub struct U128(pub u128);
-
-impl U128 {
-    pub fn inner(&self) -> &u128 {
-        &self.0
-    }
-}
-
-impl From<u128> for U128 {
-    fn from(d: u128) -> Self {
-        Self(d)
-    }
-}
-
-impl From<U128> for u128 {
-    fn from(d: U128) -> Self {
-        d.0
-    }
-}
-
-impl From<U128> for move_core_types::value::MoveValue {
-    fn from(d: U128) -> Self {
-        move_core_types::value::MoveValue::U128(d.0)
-    }
-}
-
-impl Serialize for U128 {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.to_string().serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for U128 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = <String>::deserialize(deserializer)?;
-        let data = s.parse::<u128>().map_err(D::Error::custom)?;
-
-        Ok(U128(data))
-    }
-}
-
-impl FromStr for U128 {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let data = s.parse::<u128>().map_err(|e| {
-            format_err!("Parsing u128 string {:?} failed, caused by error: {}", s, e)
-        })?;
-
-        Ok(U128(data))
-    }
-}
+define_integer_type!(U64, u64, "A string encoded U64.");
+define_integer_type!(U128, u128, "A string encoded U128.");
+define_integer_type!(U256, move_core_types::u256::U256, "A string encoded U256.");
 
 /// Hex encoded bytes to allow for having bytes represented in JSON
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -282,8 +234,11 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
 pub enum MoveValue {
     /// A u8 Move type
     U8(u8),
+    U16(u16),
+    U32(u32),
     U64(U64),
     U128(U128),
+    U256(U256),
     /// A bool Move type
     Bool(bool),
     Address(Address),
@@ -330,8 +285,11 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
     fn try_from(val: AnnotatedMoveValue) -> anyhow::Result<Self> {
         Ok(match val {
             AnnotatedMoveValue::U8(v) => MoveValue::U8(v),
+            AnnotatedMoveValue::U16(v) => MoveValue::U16(v),
+            AnnotatedMoveValue::U32(v) => MoveValue::U32(v),
             AnnotatedMoveValue::U64(v) => MoveValue::U64(U64(v)),
             AnnotatedMoveValue::U128(v) => MoveValue::U128(U128(v)),
+            AnnotatedMoveValue::U256(v) => MoveValue::U256(U256(v)),
             AnnotatedMoveValue::Bool(v) => MoveValue::Bool(v),
             AnnotatedMoveValue::Address(v) => MoveValue::Address(v.into()),
             AnnotatedMoveValue::Vector(_, vals) => MoveValue::Vector(
@@ -355,8 +313,11 @@ impl From<TransactionArgument> for MoveValue {
     fn from(val: TransactionArgument) -> Self {
         match val {
             TransactionArgument::U8(v) => MoveValue::U8(v),
+            TransactionArgument::U16(v) => MoveValue::U16(v),
+            TransactionArgument::U32(v) => MoveValue::U32(v),
             TransactionArgument::U64(v) => MoveValue::U64(U64(v)),
             TransactionArgument::U128(v) => MoveValue::U128(U128(v)),
+            TransactionArgument::U256(v) => MoveValue::U256(U256(v)),
             TransactionArgument::Bool(v) => MoveValue::Bool(v),
             TransactionArgument::Address(v) => MoveValue::Address(v.into()),
             TransactionArgument::U8Vector(bytes) => MoveValue::Bytes(HexEncodedBytes(bytes)),
@@ -368,8 +329,11 @@ impl Serialize for MoveValue {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match &self {
             MoveValue::U8(v) => v.serialize(serializer),
+            MoveValue::U16(v) => v.serialize(serializer),
+            MoveValue::U32(v) => v.serialize(serializer),
             MoveValue::U64(v) => v.serialize(serializer),
             MoveValue::U128(v) => v.serialize(serializer),
+            MoveValue::U256(v) => v.serialize(serializer),
             MoveValue::Bool(v) => v.serialize(serializer),
             MoveValue::Address(v) => v.serialize(serializer),
             MoveValue::Vector(v) => v.serialize(serializer),
@@ -517,10 +481,16 @@ pub enum MoveType {
     Bool,
     /// An 8-bit unsigned int
     U8,
+    /// A 16-bit unsigned int
+    U16,
+    /// A 32-bit unsigned int
+    U32,
     /// A 64-bit unsigned int
     U64,
     /// A 128-bit unsigned int
     U128,
+    /// A 256-bit unsigned int
+    U256,
     /// A 32-byte account address
     Address,
     /// An account signer
@@ -571,8 +541,11 @@ impl MoveType {
     pub fn json_type_name(&self) -> String {
         match self {
             MoveType::U8 => "integer".to_owned(),
+            MoveType::U16 => "string<u16>".to_owned(),
+            MoveType::U32 => "string<u32>".to_owned(),
             MoveType::U64 => "string<u64>".to_owned(),
             MoveType::U128 => "string<u128>".to_owned(),
+            MoveType::U256 => "string<u256>".to_owned(),
             MoveType::Signer | MoveType::Address => "string<address>".to_owned(),
             MoveType::Bool => "boolean".to_owned(),
             MoveType::Vector { items } => {
@@ -595,8 +568,11 @@ impl fmt::Display for MoveType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MoveType::U8 => write!(f, "u8"),
+            MoveType::U16 => write!(f, "u16"),
+            MoveType::U32 => write!(f, "u32"),
             MoveType::U64 => write!(f, "u64"),
             MoveType::U128 => write!(f, "u128"),
+            MoveType::U256 => write!(f, "u256"),
             MoveType::Address => write!(f, "address"),
             MoveType::Signer => write!(f, "signer"),
             MoveType::Bool => write!(f, "bool"),
@@ -686,7 +662,10 @@ impl From<TypeTag> for MoveType {
         match tag {
             TypeTag::Bool => MoveType::Bool,
             TypeTag::U8 => MoveType::U8,
+            TypeTag::U16 => MoveType::U16,
+            TypeTag::U32 => MoveType::U32,
             TypeTag::U64 => MoveType::U64,
+            TypeTag::U256 => MoveType::U256,
             TypeTag::U128 => MoveType::U128,
             TypeTag::Address => MoveType::Address,
             TypeTag::Signer => MoveType::Signer,
@@ -703,8 +682,11 @@ impl From<&TypeTag> for MoveType {
         match tag {
             TypeTag::Bool => MoveType::Bool,
             TypeTag::U8 => MoveType::U8,
+            TypeTag::U16 => MoveType::U16,
+            TypeTag::U32 => MoveType::U32,
             TypeTag::U64 => MoveType::U64,
             TypeTag::U128 => MoveType::U128,
+            TypeTag::U256 => MoveType::U256,
             TypeTag::Address => MoveType::Address,
             TypeTag::Signer => MoveType::Signer,
             TypeTag::Vector(v) => MoveType::Vector {

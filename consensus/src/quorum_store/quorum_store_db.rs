@@ -5,9 +5,9 @@ use crate::error::DbError;
 use crate::quorum_store::schema::{BatchIdSchema, BatchSchema, BATCH_CF_NAME, BATCH_ID_CF_NAME};
 use crate::quorum_store::types::{BatchId, PersistedValue};
 use anyhow::Result;
+use aptos_consensus_types::common::Round;
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info};
-use consensus_types::common::Round;
 use schemadb::{Options, ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, path::Path, time::Instant};
 

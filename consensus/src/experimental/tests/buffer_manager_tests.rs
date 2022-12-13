@@ -23,6 +23,10 @@ use crate::{
         RandomComputeResultStateComputer,
     },
 };
+use aptos_consensus_types::{
+    block::block_test_utils::certificate_for_genesis, executed_block::ExecutedBlock,
+    vote_proposal::VoteProposal,
+};
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
@@ -34,10 +38,6 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use channel::{aptos_channel, message_queues::QueueStyle};
-use consensus_types::{
-    block::block_test_utils::certificate_for_genesis, executed_block::ExecutedBlock,
-    vote_proposal::VoteProposal,
-};
 use futures::{channel::oneshot, FutureExt, SinkExt, StreamExt};
 use itertools::enumerate;
 use network::{
@@ -206,7 +206,7 @@ async fn loopback_commit_vote(
                 let event: UnverifiedEvent = msg.into();
                 // verify the message and send the message into self loop
                 msg_tx
-                    .push(author, event.verify(author, verifier).unwrap())
+                    .push(author, event.verify(author, verifier, false).unwrap())
                     .ok();
             }
         }

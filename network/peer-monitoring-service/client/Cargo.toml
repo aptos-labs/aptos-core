@@ -13,12 +13,10 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-async-trait = "0.1.42"
-thiserror = "1.0.24"
-
-aptos-config = { path = "../../../config" }
-aptos-types = { path = "../../../types" }
-
-channel = { path = "../../../crates/channel" }
-network = { path = "../../../network" }
-peer-monitoring-service-types = { path = "../types" }
+aptos-config = { workspace = true }
+aptos-types = { workspace = true }
+async-trait = { workspace = true }
+channel = { workspace = true }
+network = { workspace = true }
+peer-monitoring-service-types = { workspace = true }
+thiserror = { workspace = true }

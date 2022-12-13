@@ -8,20 +8,20 @@ use crate::{
     persistent_liveness_storage::PersistentLivenessStorage,
 };
 use anyhow::bail;
-use aptos_crypto::HashValue;
-use aptos_logger::prelude::*;
-use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
-use consensus_types::{
+use aptos_consensus_types::{
     executed_block::ExecutedBlock, quorum_cert::QuorumCert,
     timeout_2chain::TwoChainTimeoutCertificate,
 };
+use aptos_crypto::HashValue;
+use aptos_logger::prelude::*;
+use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
 use mirai_annotations::{checked_verify_eq, precondition};
 use std::{
     collections::{vec_deque::VecDeque, HashMap, HashSet},
     sync::Arc,
 };
 
-/// This structure is a wrapper of [`ExecutedBlock`](crate::consensus_types::block::ExecutedBlock)
+/// This structure is a wrapper of [`ExecutedBlock`](aptos_consensus_types::executed_block::ExecutedBlock)
 /// that adds `children` field to know the parent-child relationship between blocks.
 struct LinkableBlock {
     /// Executed block that has raw block data and execution output.

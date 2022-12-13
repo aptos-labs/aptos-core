@@ -138,7 +138,7 @@ impl FaucetArgs {
                 .await
         };
 
-        println!("Faucet is running.  Faucet endpoint: {}", address);
+        println!("Faucet is running. Faucet endpoint: {}", address);
 
         info!(
             "[faucet]: running on: {}. Minting from {}",

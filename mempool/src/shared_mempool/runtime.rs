@@ -13,8 +13,8 @@ use crate::{
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_infallible::{Mutex, RwLock};
 
+use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_logger::Level;
-use event_notifications::ReconfigNotificationListener;
 use futures::channel::mpsc::{self, Receiver, UnboundedSender};
 use mempool_notifications::MempoolNotificationListener;
 use network::application::storage::PeerMetadataStorage;

@@ -4,9 +4,9 @@
 use crate::{counters::DISCOVERY_COUNTS, file::FileStream, validator_set::ValidatorSetStream};
 use aptos_config::{config::PeerSet, network_id::NetworkContext};
 use aptos_crypto::x25519;
+use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_logger::prelude::*;
 use aptos_time_service::TimeService;
-use event_notifications::ReconfigNotificationListener;
 use futures::{Stream, StreamExt};
 use network::{
     connectivity_manager::{ConnectivityRequest, DiscoverySource},

@@ -548,21 +548,23 @@ impl OutboundRpcs {
                     latency,
                 );
             }
-            Err(err) => {
-                if let RpcError::UnexpectedResponseChannelCancel = err {
+            Err(error) => {
+                if let RpcError::UnexpectedResponseChannelCancel = error {
+                    // We don't log when the application has dropped the RPC
+                    // response channel because this is often expected (e.g.,
+                    // on state sync subscription requests that timeout).
                     counters::rpc_messages(network_context, REQUEST_LABEL, CANCELED_LABEL).inc();
                 } else {
                     counters::rpc_messages(network_context, REQUEST_LABEL, FAILED_LABEL).inc();
+                    warn!(
+                        NetworkSchema::new(network_context).remote_peer(peer_id),
+                        "{} Error making outbound RPC request to {} (request_id {}). Error: {}",
+                        network_context,
+                        peer_id.short_str(),
+                        request_id,
+                        error
+                    );
                 }
-
-                warn!(
-                    NetworkSchema::new(network_context).remote_peer(peer_id),
-                    "{} Error making outbound rpc request with request_id {} to {}: {}",
-                    network_context,
-                    request_id,
-                    peer_id.short_str(),
-                    err
-                );
             }
         }
     }

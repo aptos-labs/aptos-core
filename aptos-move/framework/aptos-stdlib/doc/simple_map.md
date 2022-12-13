@@ -455,8 +455,9 @@ Map key is not found
     map_borrow = borrow,
     map_borrow_mut = borrow_mut,
     map_spec_get = spec_get,
-    map_spec_set = spec_add,
+    map_spec_set = spec_set,
     map_spec_del = spec_remove,
+    map_spec_len = spec_len,
     map_spec_has_key = spec_contains_key;
 </code></pre>
 
@@ -607,6 +608,15 @@ Map key is not found
 
 
 
+<a name="0x1_simple_map_spec_len"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_spec_len">spec_len</a>&lt;K, V&gt;(t: <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;K, V&gt;): num;
+</code></pre>
+
+
+
+
 <a name="0x1_simple_map_spec_contains_key"></a>
 
 
@@ -616,10 +626,10 @@ Map key is not found
 
 
 
-<a name="0x1_simple_map_spec_add"></a>
+<a name="0x1_simple_map_spec_set"></a>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_spec_add">spec_add</a>&lt;K, V&gt;(t: <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;K, V&gt;, k: K, v: V): <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;K, V&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_spec_set">spec_set</a>&lt;K, V&gt;(t: <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;K, V&gt;, k: K, v: V): <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;K, V&gt;;
 </code></pre>
 
 

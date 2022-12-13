@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_manager::DummyDataManager;
 use crate::{
     block_storage::{BlockReader, BlockStore},
     experimental::buffer_manager::OrderedBlocks,
     liveness::{
-        proposal_generator::ProposalGenerator,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
         proposer_election::ProposerElection,
         rotating_proposer_election::RotatingProposer,
         round_state::{ExponentialTimeInterval, RoundState},
@@ -15,6 +14,7 @@ use crate::{
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
     network_tests::{NetworkPlayground, TwinId},
+    payload_manager::PayloadManager,
     persistent_liveness_storage::RecoveryData,
     round_manager::RoundManager,
     test_utils::{
@@ -24,6 +24,19 @@ use crate::{
     util::time_service::{ClockTimeService, TimeService},
 };
 use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
+use aptos_consensus_types::{
+    block::{
+        block_test_utils::{certificate_for_genesis, gen_test_certificate},
+        Block,
+    },
+    block_retrieval::{BlockRetrievalRequest, BlockRetrievalStatus},
+    common::{Author, Payload, Round},
+    experimental::commit_decision::CommitDecision,
+    proposal_msg::ProposalMsg,
+    sync_info::SyncInfo,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
+    vote_msg::VoteMsg,
+};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::info;
@@ -38,19 +51,6 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::{
-    block::{
-        block_test_utils::{certificate_for_genesis, gen_test_certificate},
-        Block,
-    },
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalStatus},
-    common::{Author, Payload, Round},
-    experimental::commit_decision::CommitDecision,
-    proposal_msg::ProposalMsg,
-    sync_info::SyncInfo,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
-    vote_msg::VoteMsg,
-};
 use futures::{
     channel::{mpsc, oneshot},
     executor::block_on,
@@ -217,7 +217,7 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
-            Arc::new(DummyDataManager::new()),
+            Arc::from(PayloadManager::DirectMempool),
         ));
 
         let proposer_election = Self::create_proposer_election(proposers.clone());
@@ -229,6 +229,8 @@ impl NodeSetup {
             10,
             1000,
             10,
+            ChainHealthBackoffConfig::new_no_backoff(),
+            false,
         );
 
         let round_state = Self::create_round_state(time_service);
@@ -610,7 +612,7 @@ fn vote_on_successful_proposal() {
         node.next_proposal().await;
 
         let proposal = Block::new_proposal(
-            Payload::empty(),
+            Payload::empty(false),
             1,
             1,
             genesis_qc.clone(),
@@ -651,7 +653,7 @@ fn delay_proposal_processing_in_sync_only() {
             .block_store
             .set_back_pressure_for_test(true);
         let proposal = Block::new_proposal(
-            Payload::empty(),
+            Payload::empty(false),
             1,
             1,
             genesis_qc.clone(),
@@ -703,7 +705,7 @@ fn no_vote_on_old_proposal() {
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
     let new_block = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -712,8 +714,15 @@ fn no_vote_on_old_proposal() {
     )
     .unwrap();
     let new_block_id = new_block.id();
-    let old_block =
-        Block::new_proposal(Payload::empty(), 1, 2, genesis_qc, &node.signer, Vec::new()).unwrap();
+    let old_block = Block::new_proposal(
+        Payload::empty(false),
+        1,
+        2,
+        genesis_qc,
+        &node.signer,
+        Vec::new(),
+    )
+    .unwrap();
     timed_block_on(&runtime, async {
         // clear the message queue
         node.next_proposal().await;
@@ -746,7 +755,7 @@ fn no_vote_on_mismatch_round() {
         .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -755,7 +764,7 @@ fn no_vote_on_mismatch_round() {
     )
     .unwrap();
     let block_skip_round = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         2,
         2,
         genesis_qc.clone(),
@@ -850,7 +859,7 @@ fn no_vote_on_invalid_proposer() {
     let mut node = nodes.pop().unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -859,7 +868,7 @@ fn no_vote_on_invalid_proposer() {
     )
     .unwrap();
     let block_incorrect_proposer = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -901,7 +910,7 @@ fn new_round_on_timeout_certificate() {
         .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -910,7 +919,7 @@ fn new_round_on_timeout_certificate() {
     )
     .unwrap();
     let block_skip_round = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         2,
         2,
         genesis_qc.clone(),
@@ -973,7 +982,7 @@ fn reject_invalid_failed_authors() {
 
     let create_proposal = |round: Round, failed_authors: Vec<(Round, Author)>| {
         let block = Block::new_proposal(
-            Payload::empty(),
+            Payload::empty(false),
             round,
             2,
             genesis_qc.clone(),
@@ -1048,7 +1057,7 @@ fn response_on_block_retrieval() {
 
     let genesis_qc = certificate_for_genesis();
     let block = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         genesis_qc.clone(),
@@ -1160,7 +1169,7 @@ fn recover_on_restart() {
             genesis_qc.clone(),
             i,
             i,
-            Payload::empty(),
+            Payload::empty(false),
             (std::cmp::max(1, i.saturating_sub(10))..i)
                 .map(|i| (i, inserter.signer().author()))
                 .collect(),

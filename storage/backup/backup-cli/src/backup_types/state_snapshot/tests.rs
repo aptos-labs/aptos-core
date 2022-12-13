@@ -76,6 +76,7 @@ fn end_to_end() {
             StateSnapshotRestoreOpt {
                 manifest_handle,
                 version,
+                validate_modules: false,
             },
             GlobalRestoreOpt {
                 dry_run: false,

@@ -3,11 +3,11 @@
 
 use std::collections::HashMap;
 
-use aptos_types::validator_signer::ValidatorSigner;
-use consensus_types::{
+use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::{Author, Payload, Round},
 };
+use aptos_types::validator_signer::ValidatorSigner;
 
 use crate::liveness::unequivocal_proposer_election::UnequivocalProposerElection;
 
@@ -40,7 +40,7 @@ fn test_is_valid_proposal() {
     let quorum_cert = certificate_for_genesis();
 
     let good_proposal = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         quorum_cert.clone(),
@@ -49,7 +49,7 @@ fn test_is_valid_proposal() {
     )
     .unwrap();
     let bad_author_proposal = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         1,
         quorum_cert.clone(),
@@ -58,7 +58,7 @@ fn test_is_valid_proposal() {
     )
     .unwrap();
     let bad_duplicate_proposal = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         1,
         2,
         quorum_cert.clone(),
@@ -67,7 +67,7 @@ fn test_is_valid_proposal() {
     )
     .unwrap();
     let next_good_proposal = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         2,
         3,
         quorum_cert.clone(),
@@ -76,7 +76,7 @@ fn test_is_valid_proposal() {
     )
     .unwrap();
     let next_bad_duplicate_proposal = Block::new_proposal(
-        Payload::empty(),
+        Payload::empty(false),
         2,
         4,
         quorum_cert,
