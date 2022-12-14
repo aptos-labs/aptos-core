@@ -5,6 +5,7 @@ use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 
+use aptos_framework::natives::cryptography::groth16::BellmanContext;
 #[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
 #[cfg(feature = "testing")]
@@ -92,4 +93,5 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeTransactionContext::new(vec![1], ChainId::test().id())); // We use the testing environment chain ID here
     exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
+    exts.add(BellmanContext::new());
 }
