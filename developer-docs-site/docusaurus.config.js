@@ -115,6 +115,11 @@ const config = {
                 type: "doc",
                 docId: "guides/getting-started",
               },
+              {
+                label: "Integrate Aptos",
+                type: "doc",
+                docId: "guides/system-integrators-guide",
+              },
             ],
           },
           {
@@ -122,6 +127,11 @@ const config = {
             label: "Build Apps",
             position: "left",
             items: [
+              {
+                type: "doc",
+                label: "Follow Standards",
+                docId: "concepts/coin-and-token/index",
+              },
               {
                 type: "doc",
                 label: "Develop by Tutorial",
@@ -207,6 +217,11 @@ const config = {
                 label: "REST API",
                 type: "doc",
                 docId: "nodes/aptos-api-spec",
+              },
+              {
+                label: "Move References",
+                type: "doc",
+                docId: "reference/move",
               },
               {
                 href: "https://aptos-labs.github.io/ts-sdk-doc/",

@@ -114,6 +114,7 @@ const sidebars = {
     {
       type: "category",
       label: "Develop Locally",
+      link: { type: "doc", id: "nodes/local-testnet/local-testnet-index" },
       collapsible: true,
       collapsed: true,
       items: [
@@ -141,9 +142,10 @@ const sidebars = {
     {
       type: "category",
       label: "Aptos Wallet Adapter",
+      link: { type: "doc", id: "concepts/wallet-adapter-concept" },
       collapsible: true,
       collapsed: true,
-      items: ["concepts/wallet-adapter-concept", "guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
+      items: ["guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
     },
     {
       type: "html",
@@ -278,6 +280,7 @@ const sidebars = {
     },
     "reference/index",
     "nodes/aptos-api-spec",
+    "reference/move",
     {
       type: "category",
       label: "Aptos SDKs",
@@ -298,7 +301,6 @@ const sidebars = {
       ],
     },
     "reference/glossary",
-    "reference/move",
     "issues-and-workarounds",
   ],
 };
