@@ -63,12 +63,12 @@ fn test_account_recovery_valid() {
 
     let owner_account = h.new_account_with_key_pair();
     let delegated_account = h.new_account_with_key_pair();
-    // register_account_recovery(
-    //     &mut h,
-    //     &resource_address,
-    //     &owner_account,
-    //     &delegated_account,
-    // )
+    register_account_recovery(
+        &mut h,
+        &resource_address,
+        &owner_account,
+        &delegated_account,
+    )
 }
 
 pub fn register_account_recovery(

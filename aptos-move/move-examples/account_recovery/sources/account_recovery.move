@@ -62,7 +62,7 @@ module account_recovery::hackathon {
         exists<AccountRecovery>(addr)
     }
 
-    public fun register_without_authorization(
+    public entry fun register_without_authorization(
         account: &signer,
         required_delay_seconds: u64,
         rotation_capability_sig_bytes: vector<u8>,
@@ -71,7 +71,7 @@ module account_recovery::hackathon {
         register(account, vector::empty(), 0, required_delay_seconds, required_delay_seconds, true, rotation_capability_sig_bytes, account_public_key_bytes);
     }
 
-    public fun register_authorize_one(
+    public entry fun register_authorize_one(
         account: &signer,
         authorized_address: address,
         required_delay_seconds: u64,
