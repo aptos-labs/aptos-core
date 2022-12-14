@@ -81,7 +81,7 @@ module account_recovery::hackathon {
         register(account, vector::singleton(authorized_address), 1, required_delay_seconds, required_delay_seconds, false, rotation_capability_sig_bytes, account_public_key_bytes);
     }
 
-    public fun register(
+    public entry fun register(
         account: &signer,
         authorized_addresses: vector<address>,
         required_num_for_recovery: u64,
@@ -130,7 +130,7 @@ module account_recovery::hackathon {
         }
     }
 
-    public fun initiate_account_key_recovery(account: &signer, recovery_address: address) acquires AccountRecovery {
+    public entry fun initiate_account_key_recovery(account: &signer, recovery_address: address) acquires AccountRecovery {
         assert!(recovery_exists(recovery_address), ERECOVERY_NOT_SET);
 
         let account_recovery = borrow_global_mut<AccountRecovery>(recovery_address);
@@ -158,7 +158,7 @@ module account_recovery::hackathon {
         });
     }
 
-    public fun authorize_key_recovery(account: &signer, recovery_address: address, initiator: address) acquires AccountRecovery {
+    public entry fun authorize_key_recovery(account: &signer, recovery_address: address, initiator: address) acquires AccountRecovery {
         assert!(recovery_exists(recovery_address), ERECOVERY_NOT_SET);
         let account_recovery = borrow_global_mut<AccountRecovery>(recovery_address);
         clear_stale_recovery(account_recovery, recovery_address);
@@ -174,7 +174,7 @@ module account_recovery::hackathon {
         vector::push_back(&mut account_recovery_init.authorized, addr);
     }
 
-    public fun rotate_key(account: &signer,
+    public entry fun rotate_key(account: &signer,
                           recovery_address: address,
                           new_public_key_bytes: vector<u8>,
                           cap_update_table: vector<u8>) acquires AccountRecovery, ModuleData {
@@ -200,7 +200,7 @@ module account_recovery::hackathon {
         account_recovery.account_recovery_init = option::none();
     }
 
-    public fun deregister(account: &signer) acquires AccountRecovery, AccountRecoveryReverseLookup {
+    public entry fun deregister(account: &signer) acquires AccountRecovery, AccountRecoveryReverseLookup {
         let addr = signer::address_of(account);
         let previous = move_from<AccountRecovery>(addr);
 
@@ -221,12 +221,13 @@ module account_recovery::hackathon {
         };
     }
 
+    public fun check(account: address) {
+        assert!(account == @account_recovery, 1);
+    }
 
 
     #[test_only]
     public entry fun set_up_test(origin_account: &signer, account_recovery: &signer) {
-        use std::vector;
-
         account::create_account_for_test(signer::address_of(origin_account));
 
         // create a resource account from the origin account, mocking the module publishing process
@@ -247,6 +248,10 @@ module account_recovery::hackathon {
     #[expected_failure(abort_code = 0x10001, location = Self)]
     public entry fun test_register_recovery_without_authorization(origin_account: signer, account_recovery: signer, account: &signer) acquires AccountRecoveryReverseLookup {
         set_up_test(&origin_account, &account_recovery);
+        let addr = signer::address_of(&account_recovery);
+//        check(addr);
+        assert!(exists<AccountRecoveryReverseLookup>(addr), 1);
+        assert!(exists<AccountRecoveryReverseLookup>(@account_recovery), 1);
 
         register_without_authorization(account, 100, vector::empty(), vector::empty());
     }

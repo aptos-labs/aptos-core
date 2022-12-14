@@ -58,7 +58,7 @@ impl Ed25519PrivateKey {
 
     /// Private function aimed at minimizing code duplication between sign
     /// methods of the SigningKey implementation. This should remain private.
-    fn sign_arbitrary_message(&self, message: &[u8]) -> Ed25519Signature {
+    pub fn sign_arbitrary_message(&self, message: &[u8]) -> Ed25519Signature {
         let secret_key: &ed25519_dalek::SecretKey = &self.0;
         let public_key: Ed25519PublicKey = self.into();
         let expanded_secret_key: ed25519_dalek::ExpandedSecretKey =
