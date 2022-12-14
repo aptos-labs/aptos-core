@@ -419,6 +419,7 @@
 /// Domain separation tag (DST) for hashing a message before signing it.
 pub const DST_BLS_SIG_IN_G2_WITH_POP: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
 
+pub mod arithmetics;
 pub mod bls12381_keys;
 pub mod bls12381_pop;
 pub mod bls12381_sigs;

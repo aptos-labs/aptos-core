@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::util::{make_native_from_func, make_test_only_native_from_func};
+use aptos_crypto::bls12381::PrivateKey;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
@@ -23,7 +24,22 @@ fn scalar_one_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let bytes = vec![0_u8, 1_u8];
+    // let bytes = aptos_crypto::bls12381::arithmetics::scalar_one();
+    let bytes: Vec<u8> = vec![3, 4, 5];
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::struct_(Struct::pack(vec![Value::vector_u8(bytes),]))],
+    ))
+}
+
+fn point_identity_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    // let bytes = aptos_crypto::bls12381::arithmetics::point_one();
+    let bytes: Vec<u8> = vec![3, 4, 5];
     Ok(NativeResult::ok(
         gas_params.base,
         smallvec![Value::struct_(Struct::pack(vec![Value::vector_u8(bytes),]))],
