@@ -7,13 +7,14 @@
 
 -  [Struct `VerifyingKey`](#0x1_groth16_VerifyingKey)
 -  [Struct `Proof`](#0x1_groth16_Proof)
+-  [Struct `Scalar`](#0x1_groth16_Scalar)
 -  [Function `verify_proof`](#0x1_groth16_verify_proof)
 -  [Function `new_verifying_key_from_bytes`](#0x1_groth16_new_verifying_key_from_bytes)
 -  [Function `new_proof_from_bytes`](#0x1_groth16_new_proof_from_bytes)
+-  [Function `new_scalar_from_bytes`](#0x1_groth16_new_scalar_from_bytes)
 
 
-<pre><code><b>use</b> <a href="curves.md#0x1_curves">0x1::curves</a>;
-</code></pre>
+<pre><code></code></pre>
 
 
 
@@ -23,7 +24,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>&lt;G1, G2, Gt&gt; <b>has</b> drop
+<pre><code><b>struct</b> <a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a> <b>has</b> drop
 </code></pre>
 
 
@@ -50,7 +51,34 @@
 
 
 
-<pre><code><b>struct</b> <a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1, G2, Gt&gt; <b>has</b> drop
+<pre><code><b>struct</b> <a href="groth16.md#0x1_groth16_Proof">Proof</a> <b>has</b> drop
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>handle: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_groth16_Scalar"></a>
+
+## Struct `Scalar`
+
+
+
+<pre><code><b>struct</b> <a href="groth16.md#0x1_groth16_Scalar">Scalar</a> <b>has</b> drop
 </code></pre>
 
 
@@ -77,7 +105,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof">verify_proof</a>&lt;G1, G2, Gt&gt;(_verifying_key: &<a href="groth16.md#0x1_groth16_VerifyingKey">groth16::VerifyingKey</a>&lt;G1, G2, Gt&gt;, _public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G1&gt;&gt;, _proof: &<a href="groth16.md#0x1_groth16_Proof">groth16::Proof</a>&lt;G1, G2, Gt&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof">verify_proof</a>(_verifying_key: &<a href="groth16.md#0x1_groth16_VerifyingKey">groth16::VerifyingKey</a>, _public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groth16.md#0x1_groth16_Scalar">groth16::Scalar</a>&gt;, _proof: &<a href="groth16.md#0x1_groth16_Proof">groth16::Proof</a>): bool
 </code></pre>
 
 
@@ -86,10 +114,10 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof">verify_proof</a>&lt;G1,G2,Gt&gt;(
-    _verifying_key: &<a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>&lt;G1,G2,Gt&gt;,
-    _public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G1&gt;&gt;,
-    _proof: &<a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1,G2,Gt&gt;,
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof">verify_proof</a>(
+    _verifying_key: &<a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>,
+    _public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groth16.md#0x1_groth16_Scalar">Scalar</a>&gt;,
+    _proof: &<a href="groth16.md#0x1_groth16_Proof">Proof</a>,
 ): bool;
 </code></pre>
 
@@ -103,7 +131,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_verifying_key_from_bytes">new_verifying_key_from_bytes</a>&lt;G1, G2, Gt&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groth16.md#0x1_groth16_VerifyingKey">groth16::VerifyingKey</a>&lt;G1, G2, Gt&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_verifying_key_from_bytes">new_verifying_key_from_bytes</a>(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groth16.md#0x1_groth16_VerifyingKey">groth16::VerifyingKey</a>
 </code></pre>
 
 
@@ -112,7 +140,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_verifying_key_from_bytes">new_verifying_key_from_bytes</a>&lt;G1,G2,Gt&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>&lt;G1,G2,Gt&gt;;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_verifying_key_from_bytes">new_verifying_key_from_bytes</a>(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>;
 </code></pre>
 
 
@@ -125,7 +153,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_proof_from_bytes">new_proof_from_bytes</a>&lt;G1, G2, Gt&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groth16.md#0x1_groth16_Proof">groth16::Proof</a>&lt;G1, G2, Gt&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_proof_from_bytes">new_proof_from_bytes</a>(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groth16.md#0x1_groth16_Proof">groth16::Proof</a>
 </code></pre>
 
 
@@ -134,7 +162,29 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_proof_from_bytes">new_proof_from_bytes</a>&lt;G1,G2,Gt&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1,G2,Gt&gt;;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_proof_from_bytes">new_proof_from_bytes</a>(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groth16.md#0x1_groth16_Proof">Proof</a>;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_groth16_new_scalar_from_bytes"></a>
+
+## Function `new_scalar_from_bytes`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_scalar_from_bytes">new_scalar_from_bytes</a>(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groth16.md#0x1_groth16_Scalar">groth16::Scalar</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_scalar_from_bytes">new_scalar_from_bytes</a>(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groth16.md#0x1_groth16_Scalar">Scalar</a>;
 </code></pre>
 
 
