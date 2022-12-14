@@ -3,7 +3,7 @@ title: "Mint an NFT with Aptos CLI"
 slug: "mint-nft-cli"
 ---
 
-# Mint an NFT
+# Mint an NFT with Aptos CLI
 
 This tutorial lets you use the Aptos CLI to mint NFTs in Aptos testnet so you can see how the process works and employ related functions in your code.
 
@@ -15,15 +15,29 @@ This tutorial assumes you have:
 * the GitHub CLI
 * the Aptos CLI (installed below, or you can run from source via `cargo run`)
 
-## Understand the minting workflow
+## Role of accounts
 
-In short, when you are minting an NFT, Aptos ensures no one else can alter your collection. This is why a private key is required to obtain signer capabilities. When you submit a transaction, you sign the transaction. Creating a [resource account](../resource-accounts.md) grants the signer capability that can be stored in a new resource on the same account. And that capability is protected as no one has access to the private key for the resource account. Resource accounts allow the delegation of signing transactions.
+When you are minting an NFT, this NFT is tied to your [account](../../concepts/accounts.md). Aptos ensures no one else can alter your collection. This is why a private key is required to obtain signer capabilities. When you submit a transaction, you sign the transaction.
 
-Check out and review the [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutorial) source code.
+Resource accounts allow the delegation of signing transactions. You create a [resource account](../resource-accounts.md) grants the signer capability that can be stored in a new resource on the same account and can sign transaction autonomously. The signer capability is protected as no one has access to the private key for the resource account.
+
+## Understand minting
+
+Review the [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutorial) source code and accompanying READMEs.
 
 Explore the `mint_nft` function in [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move).
 
-Note the `mint_nft` function gets a collection and creates a token.
+### Initialization
+
+The `init_module` of [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move) always gets called and run when the module is published:
+
+```shell
+    fun init_module(resource_account: &signer) {
+        let resource_signer_cap = resource_account::retrieve_resource_account_cap(resource_account, @source_addr);
+        let resource_signer = account::create_signer_with_capability(&resource_signer_cap);
+```
+
+The `mint_nft` function of [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move) gets a collection and creates a token.
 
 With the resulting TokenData ID, the function uses the resource signer of the module to mint the token to the `nft-receiver`.
 
@@ -33,19 +47,13 @@ For example:
         let receiver_addr = signer::address_of(receiver);
 ```
 
-The only argument taken is `receiver`. Any `entry fun` will take as the first parameter the type `&signer`. In both Move and Aptos, whenever you submit a transaction, whatever private key you sign the transaction with, the associated account automatically becomes the first parameter of the signer.
+### Signing
 
-You can go from the signer to an address but normally not the reverse. So when claiming an NFT, both the private keys of the minter and receiver are needed, as shown below.
+The only argument taken by `mint_nft` is `receiver`. Any `entry fun` will take as the first parameter the type `&signer`. In both Move and Aptos, whenever you submit a transaction, the private key you sign the transaction with, automatically makes the associated account the first parameter of the signer.
 
-Also in [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move), see this `init_module`:
+You can go from the signer to an address but normally not the reverse. So when claiming an NFT, both the private keys of the minter and receiver are needed, as shown in the instructions below.
 
-```shell
-    fun init_module(resource_account: &signer) {
-        let resource_signer_cap = resource_account::retrieve_resource_account_cap(resource_account, @source_addr);
-        let resource_signer = account::create_signer_with_capability(&resource_signer_cap);
-```
-
-This `init_module` always gets called and run when the module is published. Here, the signer is always the account uploading the contract. This gets combined with:
+In the `init_module`, the signer is always the account uploading the contract. This gets combined with:
 
 ```shell
         token::create_collection(&resource_signer, collection, description, collection_uri, maximum_supply, mutate_setting);
@@ -57,7 +65,11 @@ Where the `&resource_signer` is the first parameter, defined previously as a new
         signer_cap: account::SignerCapability,
 ```
 
-The signer capability prevents anyone from getting the private key from the resource acount. The [resource account](../resource-accounts.md) is entirely controlled by the contract. So later in the same file:
+The signer capability prevents anyone from getting the private key from the resource acount. The [resource account](../resource-accounts.md) is entirely controlled by the contract.
+
+### Module data
+
+So later in [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move), we see:
 
 ```shell
         move_to(resource_account, ModuleData {
@@ -86,41 +98,44 @@ Now that you are starting to write smart contracts with Move, let's create our f
 1. [Install the Aptos CLI](../../cli-tools/aptos-cli-tool/install-aptos-cli.md) and note its [many uses](../../cli-tools/aptos-cli-tool/use-aptos-cli.md) for later if you haven't experienced its goodness already.
 
 1. Create an account on Aptos testnet to receive the NFT by running the following command and selecting `testnet`:
-```shell
-aptos init --profile nft-receiver
-```
+
+  ```shell
+  aptos init --profile nft-receiver
+  ```
 
 1. When prompted, select `testnet` by entering it:
 
-```shell
-Configuring for profile nft-receiver
-Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]
-testnet
-```
+  ```shell
+  Configuring for profile nft-receiver
+  Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]
+  testnet
+  ```
 
 1. When prompted for your private key, hit enter to generate a new key:
-```shell
-Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
-```
+
+  ```shell
+  Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
+  ```
 
 1. Receive output resembling:
-```shell
-No key given, generating key...
-Account blah does not exist, you will need to create and fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account
 
----
-Aptos CLI is now set up for account blah as profile nft-receiver!  Run `aptos --help` for more information about commands
-{
-  "Result": "Success"
-}
-➜  devel
-```
+  ```shell
+  No key given, generating key...
+  Account X does not exist, you will need to create and fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account
+  
+  ---
+  Aptos CLI is now set up for account X as profile nft-receiver!  Run `aptos --help` for more information about commands
+  {
+    "Result": "Success"
+  }
+  ➜  devel
+  ```
 
 1. Note your configuration information can be found in ~/.aptos/config.yaml`. Read that file to see your private and public keys, account address, and REST API URL per network.
 
 ### Install wallet and import account
 
-1. Run `more ~/.aptos/config.yaml` to see the `nft-receiver` private key and then copy it.
+1. Run `more ~/.aptos/config.yaml` to see and copy the `nft-receiver` private key.
 
 1. Install the wallet of your choice. We use the [Petra Wallet](../../guides/install-petra-wallet.md) Chrome extension.
 
@@ -138,19 +153,27 @@ Aptos CLI is now set up for account blah as profile nft-receiver!  Run `aptos --
 
 1. Go to *Petra > Settings > Network > Testnet*.
 
-1. Open the extension and connect your wallet to the Aptos faucet at: https://aptoslabs.com/testnet-faucet
+1. Open the extension and connect your wallet to the Aptos faucet at https://aptoslabs.com/testnet-faucet:
 
-1. Approve the connection request.
+  ![Faucet connect](../../../static/img/connect-wallet-faucet.png "Connect faucet to wallet")
 
-1. Now when you load your wallet, you will see a **Faucet** button next to **Send**. Click **Faucet** to receive one APT to use when minting.
+1. Select your wallet type:
+
+  ![Wallet select](../../../static/img/select-wallet-faucet.png "Select your wallet for faucet")
+
+1. Approve the connection request:
+
+  ![Faucet approval](../../../static/img/approve-wallet-faucet.png "Approve connecting faucet to wallet")
+
+1. Now when you load your wallet, you will see a **Faucet** button next to **Send**. Click **Faucet** to receive one APT per click to use when minting.
 
 ### Mint the NFT
 
 1. Mint the NFT by calling the `mint_nft` function and an existing contract using the Aptos CLI:
 
-```shell
-aptos move run --function-id 8cdf69c8c93fee36ed83f8882908060c1335ed39a827c08dbb506b46237e88fb::minting::mint_nft --profile nft-receiver
-```
+  ```shell
+  aptos move run --function-id 8cdf69c8c93fee36ed83f8882908060c1335ed39a827c08dbb506b46237e88fb::minting::mint_nft --profile nft-receiver
+  ```
 
 1. When asked, `Do you want to submit a transaction for a range of...?`, enter: `yes`
 
@@ -181,7 +204,9 @@ aptos move run --function-id 8cdf69c8c93fee36ed83f8882908060c1335ed39a827c08dbb5
 
 1. Click **Library** at bottom.
 
-1. See the NFT in your wallet.
+1. See the NFT in your wallet:
+
+  ![Wallet library NFT](../../../static/img/petra-nft-library.png "See the wallet library with NFT")
 
 ## Deploy the NFT contract
 
