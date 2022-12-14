@@ -660,32 +660,22 @@ The caller does not have a digital-signature-based capability to call this funct
 
 
 
-<a name="0x1_account_ENO_NO_SUCH_ROTATION_CAPABILITY_OFFER"></a>
+<a name="0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER"></a>
 
 The specified rotation capablity offer does not exist at the specified offerer address
 
 
-<pre><code><b>const</b> <a href="account.md#0x1_account_ENO_NO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_NO_SUCH_ROTATION_CAPABILITY_OFFER</a>: u64 = 18;
+<pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_SUCH_ROTATION_CAPABILITY_OFFER</a>: u64 = 18;
 </code></pre>
 
 
 
-<a name="0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER"></a>
-
-The rotation capability offer doesn't exist at the given address
-
-
-<pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_SUCH_ROTATION_CAPABILITY_OFFER</a>: u64 = 19;
-</code></pre>
-
-
-
-<a name="0x1_account_ENO_SUCH_SIGNER_CAPABILITY_OFFER"></a>
+<a name="0x1_account_ENO_SUCH_SIGNER_CAPABILITY"></a>
 
 The signer capability offer doesn't exist at the given address
 
 
-<pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY_OFFER">ENO_SUCH_SIGNER_CAPABILITY_OFFER</a>: u64 = 14;
+<pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY">ENO_SUCH_SIGNER_CAPABILITY</a>: u64 = 14;
 </code></pre>
 
 
@@ -1155,7 +1145,6 @@ A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519
 
     // Construct a valid `<a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a>` that `cap_rotate_key` and `cap_update_table` will validate against.
     <b>let</b> curr_auth_key_as_address = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(account_resource.authentication_key);
-
     <b>let</b> challenge = <a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a> {
         sequence_number: account_resource.sequence_number,
         originator: addr,
@@ -1227,7 +1216,7 @@ A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519
     // check that there <b>exists</b> a rotation capability offer at the offerer's <a href="account.md#0x1_account">account</a> resource for the delegate
     <b>let</b> offerer_account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(rotation_cap_offerer_address);
     <b>let</b> delegate_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegate_signer);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&offerer_account_resource.rotation_capability_offer.for, &delegate_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_NO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_NO_SUCH_ROTATION_CAPABILITY_OFFER</a>));
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&offerer_account_resource.rotation_capability_offer.for, &delegate_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_SUCH_ROTATION_CAPABILITY_OFFER</a>));
 
     <b>let</b> delegate_account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(delegate_address);
     <b>let</b> curr_auth_key = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(offerer_account_resource.authentication_key);
@@ -1459,7 +1448,7 @@ has a signer capability offer from <code><a href="account.md#0x1_account">accoun
     <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(to_be_revoked_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&account_resource.signer_capability_offer.for, &to_be_revoked_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY_OFFER">ENO_SUCH_SIGNER_CAPABILITY_OFFER</a>));
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&account_resource.signer_capability_offer.for, &to_be_revoked_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY">ENO_SUCH_SIGNER_CAPABILITY</a>));
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> account_resource.signer_capability_offer.for);
 }
 </code></pre>
@@ -1491,7 +1480,7 @@ at the offerer's address.
     // Check <b>if</b> there's an existing <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> capability offer from the offerer.
     <b>let</b> account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(offerer_address);
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&account_resource.signer_capability_offer.for, &addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY_OFFER">ENO_SUCH_SIGNER_CAPABILITY_OFFER</a>));
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&account_resource.signer_capability_offer.for, &addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY">ENO_SUCH_SIGNER_CAPABILITY</a>));
 
     <a href="account.md#0x1_account_create_signer">create_signer</a>(offerer_address)
 }
