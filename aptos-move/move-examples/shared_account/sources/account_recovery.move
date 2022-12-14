@@ -39,16 +39,13 @@ module aptos_framework::account_recovery {
         signer_cap: SignerCapability,
     }
 
-
-    fun initialize(signer: &signer) acquires AccountRecoveryReverseLookup {
+    fun init_module(signer: &signer) {
         move_to(signer, AccountRecoveryReverseLookup {
             authorized_to_recovery: table::new(),
         });
 
         let resource_signer_cap = resource_account::retrieve_resource_account_cap(signer, @source_addr);
 
-        // Store the token data id and the resource account's signer capability within the module, so we can programmatically
-        // sign for transactions in the `mint_event_ticket()` function.
         move_to(signer, ModuleData {
             signer_cap: resource_signer_cap,
         });
@@ -63,18 +60,18 @@ module aptos_framework::account_recovery {
                         required_delay_seconds: u64,
                         rotation_capability_sig_bytes: vector<u8>,
                         account_public_key_bytes: vector<u8>,
-    ) acquires AccountRecovery, AccountRecoveryReverseLookup {
+    ) acquires AccountRecoveryReverseLookup {
         let addr = signer::address_of(account);
 
         assert!(!recovery_exists(addr), ERECOVERY_ALREADY_SET);
-        assert!(!exists<AccountRecoveryReverseLookup>(@source_addr));
+        assert!(exists<AccountRecoveryReverseLookup>(@source_addr));
 
         let reverse_lookup = borrow_global_mut<AccountRecoveryReverseLookup>(@source_addr);
 
         move_to(account, AccountRecovery {
             authorized_addresses,
             required_delay_seconds,
-            account_recovery_init: option::none<>(),
+            account_recovery_init: option::none<AccountRecoveryInitData>(),
         });
 
         let i = 0;
@@ -87,7 +84,7 @@ module aptos_framework::account_recovery {
         account::offer_rotation_capability(signer, rotation_capability_sig_bytes, 0, account_public_key_bytes, @source_addr)
     }
 
-    public fun initiate_account_key_recovery(account: &signer, recovery_address: address) acquires AccountRecovery, AddressToAccountRecovery {
+    public fun initiate_account_key_recovery(account: &signer, recovery_address: address) acquires AccountRecovery {
         assert!(recovery_exists(recovery_address), ERECOVERY_NOT_SET);
 
         let account_recovery = borrow_global_mut<AccountRecovery>(recovery_address);
@@ -127,6 +124,8 @@ module aptos_framework::account_recovery {
         let previous = move_from<AccountRecovery>(addr);
 
         assert!(!exists<AccountRecoveryReverseLookup>(@source_addr));
+        account::revoke_rotation_capability(account, @source_addr);
+
         let reverse_lookup = borrow_global_mut<AccountRecoveryReverseLookup>(@source_addr);
 
         let i = 0;
@@ -138,11 +137,6 @@ module aptos_framework::account_recovery {
             if (found) {
                 vector::swap_remove(list, index);
             }
-        }
+        };
     }
-
-    public fun update_recovery() {
-
-    }
-
 }
