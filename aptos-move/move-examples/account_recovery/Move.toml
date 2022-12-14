@@ -8,4 +8,4 @@ AptosFramework = { local = "../../framework/aptos-framework" }
 
 [addresses]
 # change it to `source_addr = "_" when calling `create-resource-account-and-publish-package` from the cli
-source_addr = "0xcafe"
+source_addr = "0x8e1e84375397ddcece025a5733904736389c5080320c956a08ec8b49a107e560"

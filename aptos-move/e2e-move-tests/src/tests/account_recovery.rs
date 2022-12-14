@@ -92,15 +92,13 @@ pub fn register_account_recovery(
         .privkey
         .sign_arbitrary_message(&rotation_capability_proof_msg.unwrap());
 
+    let authorized_address = vec![delegate_account.address().clone()];
+
     assert_success!(harness.run_entry_function(
         &offerer_account,
-        str::parse(&format!(
-            "0x{}::account_recovery::register",
-            resource_address
-        ))
-        .unwrap(),
+        str::parse(&format!("0x{}::hackathon::register", resource_address)).unwrap(),
         vec![],
-        vec![],
+        vec![bcs::to_bytes(&authorized_address).unwrap(),],
     ));
 
     // let account_resource = parse_struct_tag("0x1::account::Account").unwrap();

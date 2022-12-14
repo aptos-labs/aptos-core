@@ -113,6 +113,7 @@ module account_recovery::hackathon {
             let authorized_address = *vector::borrow(&authorized_addresses, i);
             let list = table::borrow_mut_with_default(&mut reverse_lookup.authorized_to_recovery, authorized_address, vector::empty<address>());
             vector::push_back(list, addr);
+            i = i + 1;
         };
         account::offer_rotation_capability(account, rotation_capability_sig_bytes, 0, account_public_key_bytes, @account_recovery)
     }
@@ -244,16 +245,19 @@ module account_recovery::hackathon {
         initiate_account_key_recovery(authorized, signer::address_of(account));
     }
 
-    #[test(origin_account = @0xcafe, account_recovery = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, account = @0x123)]
+    #[test(origin_account = @0xcafe, account_recovery = @0xf00d, account = @0x123)]
     #[expected_failure(abort_code = 0x10001, location = Self)]
-    public entry fun test_register_recovery_without_authorization(origin_account: signer, account_recovery: signer, account: &signer) acquires AccountRecoveryReverseLookup {
+    public entry fun test_register_recovery_without_authorization(origin_account: signer, account_recovery: signer, account: &signer) {
         set_up_test(&origin_account, &account_recovery);
         let addr = signer::address_of(&account_recovery);
-//        check(addr);
+////        check(addr);
         assert!(exists<AccountRecoveryReverseLookup>(addr), 1);
-        assert!(exists<AccountRecoveryReverseLookup>(@account_recovery), 1);
+//        assert!(exists<AccountRecoveryReverseLookup>(@account_recovery), 1);
+//
+//        register_without_authorization(account, 100, vector::empty(), vector::empty());
+        let addr2 = signer::address_of(account);
+        assert!(exists<AccountRecoveryReverseLookup>(addr2), 1);
 
-        register_without_authorization(account, 100, vector::empty(), vector::empty());
     }
 
 }
