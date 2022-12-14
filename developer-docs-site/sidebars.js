@@ -114,7 +114,7 @@ const sidebars = {
     {
       type: "category",
       label: "Develop Locally",
-      link: { type: "doc", id: "nodes/local-testnet/local-testnet-index" },
+      link: { type: "doc", id: "nodes/local-testnet/index" },
       collapsible: true,
       collapsed: true,
       items: [
@@ -280,7 +280,6 @@ const sidebars = {
     },
     "reference/index",
     "nodes/aptos-api-spec",
-    "reference/move",
     {
       type: "category",
       label: "Aptos SDKs",
@@ -301,6 +300,7 @@ const sidebars = {
       ],
     },
     "reference/glossary",
+    "reference/move",
     "issues-and-workarounds",
   ],
 };
