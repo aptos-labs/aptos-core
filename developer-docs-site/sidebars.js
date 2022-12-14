@@ -114,6 +114,7 @@ const sidebars = {
     {
       type: "category",
       label: "Develop Locally",
+      link: { type: "doc", id: "nodes/local-testnet/index" },
       collapsible: true,
       collapsed: true,
       items: [
@@ -141,9 +142,10 @@ const sidebars = {
     {
       type: "category",
       label: "Aptos Wallet Adapter",
+      link: { type: "doc", id: "concepts/wallet-adapter-concept" },
       collapsible: true,
       collapsed: true,
-      items: ["concepts/wallet-adapter-concept", "guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
+      items: ["guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
     },
     {
       type: "html",

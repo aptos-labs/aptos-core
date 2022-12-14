@@ -115,6 +115,11 @@ const config = {
                 type: "doc",
                 docId: "guides/getting-started",
               },
+              {
+                label: "Integrate Aptos",
+                type: "doc",
+                docId: "guides/system-integrators-guide",
+              },
             ],
           },
           {
@@ -122,6 +127,11 @@ const config = {
             label: "Build Apps",
             position: "left",
             items: [
+              {
+                type: "doc",
+                label: "Follow Standards",
+                docId: "concepts/coin-and-token/index",
+              },
               {
                 type: "doc",
                 label: "Develop by Tutorial",
@@ -168,6 +178,11 @@ const config = {
                 label: "Upgrade Move Code",
                 type: "doc",
                 docId: "guides/move-guides/upgrading-move-code",
+              },
+              {
+                label: "Move References",
+                type: "doc",
+                docId: "reference/move",
               },
             ],
           },
@@ -220,6 +235,11 @@ const config = {
                 label: "Rust SDK",
                 type: "doc",
                 docId: "sdks/rust-sdk",
+              },
+              {
+                label: "Move References",
+                type: "doc",
+                docId: "reference/move",
               },
               {
                 label: "Aptos Glossary",
