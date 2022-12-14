@@ -34,7 +34,7 @@
 
 <dl>
 <dt>
-<code>bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>handle: u64</code>
 </dt>
 <dd>
 
@@ -61,7 +61,7 @@
 
 <dl>
 <dt>
-<code>bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>handle: u64</code>
 </dt>
 <dd>
 
