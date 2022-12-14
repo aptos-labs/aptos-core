@@ -109,8 +109,8 @@ pub fn register_account_recovery(
         vec![
             bcs::to_bytes(&authorized_address).unwrap(),
             bcs::to_bytes::<u64>(&required_delay_seconds).unwrap(),
-            rotation_proof_signed.to_bytes().to_vec(),
-            offerer_account.pubkey.to_bytes().to_vec(),
+            bcs::to_bytes(&rotation_proof_signed.to_bytes().to_vec()).unwrap(),
+            bcs::to_bytes(&offerer_account.pubkey.to_bytes().to_vec()).unwrap(),
         ],
     ));
 
