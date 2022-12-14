@@ -25,7 +25,7 @@ This page shows the key updates to the developer documentation on this site.
 
   Framework upgrade through governance voting:
   - Testnet upgrade - Nov 30th
-  - Mainnet upgrade - Dec 12th - 19th (7 days voting period)
+  - Mainnet upgrade - Dec 12th - 19th (7 days voting period) required by fullnode operators
 
   New features and enhancements:
   - Move
