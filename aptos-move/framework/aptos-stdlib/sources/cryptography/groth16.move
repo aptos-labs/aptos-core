@@ -4,11 +4,11 @@ module aptos_std::groth16 {
     use aptos_std::curves;
 
     struct VerifyingKey<phantom G1, phantom G2, phantom Gt> has drop {
-        bytes: vector<u8>
+        handle: u64,
     }
 
     struct Proof<phantom G1, phantom G2, phantom Gt> has drop {
-        bytes: vector<u8>
+        handle: u64,
     }
 
     native public fun verify_proof<G1,G2,Gt>(
