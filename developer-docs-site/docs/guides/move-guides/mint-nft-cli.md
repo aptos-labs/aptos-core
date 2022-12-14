@@ -252,8 +252,38 @@ yes
 */
 ```
 
-1. Mint another NFT using the `nft-receiver` account:
-aptos move run --function-id [resource account's address]::minting::mint_nft --profile nft-receiver
+1. Mint another NFT using the `nft-receiver` profile, sustituting in the resource account's address:
+
+```shell
+aptos move run --function-id <resource-account-address>::minting::mint_nft --profile nft-receiver
+```
+
+1. Again answer `yes` when prompted to submit the transaction.
+
+1. Receive output resembling:
+
+```shell
+{
+  "Result": {
+    "transaction_hash": "0x62660973b1a94e620c863899a157b0b46c02dcfdb0c9261a34ed4d2391550fc7",
+    "gas_used": 6691,
+    "gas_unit_price": 100,
+    "sender": "aaf015db7b6dacb1db4637ef017e68e689a40797fe8fd3897cee08808979bb91",
+    "sequence_number": 0,
+    "success": true,
+    "timestamp_us": 1667434233137811,
+    "version": 27685944,
+    "vm_status": "Executed successfully"
+  }
+}
+*/
+```
+
+1. Disable NFT minting in this module using the `admin-account` profile so that random folks cannot mint this NFT from your module:
+
+```shell
+aptos move run --function-id <resource-account-address>::minting::set_minting_enabled --args bool:false --profile admin-account
+```
 
 Now you can include your own artwork once you are ready to customize your NFTs by replacing our defaults in `minting.move`:
 https://slwdaeeko5tz5hx46c6zwqhmh3c6je4sbdbjsdjzbntme5dxarxa.arweave.net/kuwwEIp3Z56e_PC9m0DsPsXkk5IIwpkNOQtmwnR3BG4
