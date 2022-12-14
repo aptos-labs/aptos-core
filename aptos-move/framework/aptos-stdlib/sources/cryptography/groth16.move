@@ -12,24 +12,54 @@ module aptos_std::groth16 {
         handle: u64
     }
 
-    native public fun verify_proof(
+    public fun verify_proof(
         _verifying_key: &VerifyingKey,
         _public_inputs: &vector<Scalar>,
         _proof: &Proof,
-    ): bool;
+    ): bool {
+        let public_input_handles: vector<u8> = vector[];
+        let num_public_inputs = std::vector::length(_public_inputs);
+        let i = 0;
+        while (i < num_public_inputs) {
+            std::vector::push_back(&mut public_input_handles, (std::vector::borrow(_public_inputs, i).handle as u8));
+            i = i + 1;
+        };
 
-    native public fun new_verifying_key_from_bytes(bytes: &vector<u8>): VerifyingKey;
-    native public fun new_proof_from_bytes(bytes: &vector<u8>): Proof;
-    native public fun new_scalar_from_bytes(bytes: &vector<u8>): Scalar;
+        verify_proof_internal(_verifying_key.handle, public_input_handles, _proof.handle)
+    }
+
+    public fun new_verifying_key_from_bytes(bytes: vector<u8>): VerifyingKey {
+        VerifyingKey {
+            handle: new_verifying_key_from_bytes_internal(bytes)
+        }
+    }
+
+    public fun new_proof_from_bytes(bytes: vector<u8>): Proof {
+        Proof {
+            handle: new_proof_from_bytes_internal(bytes)
+        }
+    }
+
+    public fun new_scalar_from_bytes(bytes: vector<u8>): Scalar {
+        Scalar {
+            handle: new_scalar_from_bytes_internal(bytes)
+        }
+    }
+
+    native fun new_verifying_key_from_bytes_internal(bytes: vector<u8>): u64;
+    native fun new_proof_from_bytes_internal(bytes: vector<u8>): u64;
+    native fun new_scalar_from_bytes_internal(bytes: vector<u8>): u64;
+    native fun verify_proof_internal(vk_handle: u64, public_inputs: vector<u8>, proof_handle: u64): bool;
+
     #[test]
-    fun t1() {
-        let vk_bytes = x"09b2284943fa8e7a42b958e56a897507a11616c84be60258db0f470675355a3895e2145d736854f1263c85d60b4a1e4e05f538ee9b08d3254d25f3cfd8ca9526a471d84a49b9d27e65088e7308ae77686b4a1f02a856c2fd164a3361c17f642e030007829f78580e98f00bad92fc5649bc4a869e26ca48c403ccf040ebff656db8612b839241c028a5fc570004b2f15b02c03a0f78852619c9866e308b450394317d90219b072a432a40e2217f1cbd466028d983c0dbbf85c7762fae601e1c9c14fe1cc09c1bfd43e865e37e84f813b6b55fe2566587b8bac801ffe68b8de0a2c55889afc02304c0340e9f7f21bc0a2d0ffdfca9da4a4588e9001e7e4f530df990ea4ce10d7130bd568fefa3e1a01a6b0c4d8448f242a04b358f8e770023cf570f08fce0d37b82d271099befb00e1bb35be508d28da72797e22e732af7ff87f776ff7925aa0d524a2d5317ffef4d89630cf681e4eb278b2c9189fc8a47f4ef77d2ed3582255b5c4b3b1ebe1a8f0b02362ef0aa21dae7d955dea5d94fedc87105055df3f694e0fb5be9e48671c7c35991e1c460113b3862616c5e0cfad00e6918e3f2a153ea61e45ab7098d757832dde80703639a5be43c88f1e5d214b3a25d9fb71bc2f8a1216e91a3ddbe7bcf61b6aeea518760196389bc24341f65651cdb17160a7381b23cbfb5d42d3b22d182a63b33672def955b60130ce52130e6b2f01fc8892c70a74acc18f8c6add388db628f026b1d7385691423559e6cdc18637d81f2be09d7419effe5051341a6329207c80075f83a40caf99cdce6facee0a87f1c093f8464ab22da3e387358cfd7bc5d9d9c9e33e5ab87b52e26a3445d0b52ab1a781f0ac4a34038e7869cb5a4b42439e40c9b757c0c863c5c9cdee5e5d18ecd2716515ea28743d75594bb9f268f1ad877b2064d86b453833bd009ed4954e2846b05317965d3562d58ce22b1d611b85578f7d5af11ef40d0e962b84854a9e2064ce56e950fdac597a529870b454d9e585e00fc39745b9dcd2b3087ca397cb8e0672571e0307fb224858609d20524222403bbdff77d62ae764fc43dd62034b92742030265fd97d72cb16de7f5d0d8769d400c1567834c6032df7ef59013dc86246c8dfe8bcd12438d493feaa855ee57062517cdc68c6d0f02a00764d2f2a4351a504a0828c82728eecbf8f95d8178639456da0fbfc4fdb6869d0f8eff0503ec5dab0000000200c6068fc424ca5050d39b423903653eb3b5ff1db4d57fa33745933a4aca2bc0f6370d134874ecbe2c82c7465509a04511a91f5a0fee7b072f4b42ff7e3caee691b1d1ead64a79ab1644f33f5bab7e2a39c1334e7e6d64e668ffb0cfd09705f2087194b171173e33b6b638b84d3feb809d2374a7458a935669f4e3176fc11bd74853cf1a78b2f3f6669ace6fa319013e0ba1f6203018df324dcaad36e3fa261baf6ac04cc4db6d7cc532ac52fa04aae42dc57b7f0094524e087eeb7715ae2895";
-        let vk = new_verifying_key_from_bytes(&vk_bytes);
-        let public_bytes = x"6bf5eddf1a2bed5f168a1e5404e63535f7e660597646f18ac89b7234cd626e40";
-        let public_1 = new_scalar_from_bytes(&public_bytes);
+    fun bellman_basic() {
+        let vk_bytes = x"09b9da0a00f798fceb5f2e31138c49182665c077dbfaead1b4cc71957b72a83511dbdd8b3a4631c1698877508bb0bbf30cab949482993c098f76225a622a015f490cc84ee9b4a46c258398dbdcd1d51ed944b85ae4336d7faae1c4fb9d17efc21348fcef658887712a39743b6e8b6060ddd34474696d9ad345e1c5c4822c826c590c296b1cd8223c57beb8da433c53760300747169e376dd8d1e493e3482a9d41f88c9734157b633fc24358a2b62b76fcf7162a7469ccef8842f70af5d5b3ab917d65b72fb3136d477ea1ad98d37244e59d488fca4a4d3539bf55eb26443502107e75114cf8c68687d08f2268941fe14098f1de415969acd4594d57b04db76397dcb42ff2eaa6bbb34e53eaf84b538924e0b9958a46210d5f8fdcacb1385ffc7008273101376bea162aef59dec1dd41a6a565032f3978492db85c7673b387505de467c3fe1d7e32321159151f14ef58713371db273a23ac6cca4782ebc6a1b5eb16e33f9b8cd7d3bd72c64f1d4ae270c9febc36830081d927d15bea53177418102c8928d29b2e6f3f48e95c81c6f2763f6c22b3edbb269b5bcbaceb85b2411550fd13eb215c8e844257ab29079d98bc504d34d13be087d2eed586e3b69a8ac45547558b37cb456b00db7aee29a6f574be8c9539b7e66b5afbe18c2b0bfa3c5c813c5d36d7a66c46642e9254d690f5a69b07ccb8d5794b8e9c510f69a86ccab81a6c620d91e49a7ef164a6dd0dcde29fd17a27cb0c05fba57699a5b0685f0ef077fa7cb3872ea5c2f87fd1db68dfca7fdccd8480d64e922a184fa4c047780cba81424c1737ae80142df892a6d5c2d62e1105d39fd9e50c2c20b11480629ed484b4b35e7c918ee2da5a8bc42ccb7c30427154c695e24cd07a0ff1dd0efabc39d11685ea21f5518cd4487f377bb27cd847544cd4f5ae33f4ede54338190f8f8932811259d7fd5a0186d97ce93a666d22b9471c4ba8f1145b9fad882b7e8a60fe2d27d03da796aec5303912a1d18d84f188f010790dea53dcfa92322d127c2e83b2d690354db790db33619ad493f53126b188bd551860852af662210e26ce26a96720afce7463641760a4406f85a01f5af388a0971f5c344f9517d41a076b98d22d738764bd2213f3c52897c736cdae3da2a15c4e0a94e0fbdaf38e75331b828b5a23785df6467e67d2e106ada4cdf6e8c39e3bc342eaf2ae44337040e64c747da8e0000000212181cd223ddfca240e6d882836ef3ba8daccd7f69a82a9af633b106e6ccdf54032f46cad59172e8e0069061215637170707c2f059e3c9bedbfff87bc7055463736a91a5fcce53759a126ded510b5a414528ef054592bd9ff98bf705ec53ff680686f5ad27540f72b50947dc625fdf48912163a9e7270d69c6fd2aa9c64efddeb0155c37c80c1ee84688742609f9fd82013486bfe130f43c0d0d6afa5921796fad499bc0723d2c29af56c43bea3899ff10b700d34d7c40321260de33e630eefa";
+        let vk = new_verifying_key_from_bytes(vk_bytes);
+        let public_bytes = x"555330d89b0762b4bef49da37cc7289e731b1b34fd652f6aeefa1b1eadb23434";
+        let public_1 = new_scalar_from_bytes(public_bytes);
         let public_inputs = vector[public_1];
-        let bytes = x"a1db77f5ccdc073523811fb48553e040137184bc571f06b43be02d510537e7dfe623c46faa7c6a7d0f36aed2ae3feb9eb8c74fa8e43960d031ed92f8930c105b45f80499d48dc85c586705fe564a45e7b8f0c5fb4400993dc5bc5d36cd5ecc770c4fa7f413c5acbd0e9215b3d6199d7392c8b8d02f80052ee88d6ddc9e8e5ebc5a0623906c3ce7c5c3537eae50b6b438a55b174c15887a1bde90082eabd8d944ba71ecfc3916a01a52e1cbee819c82e2f5bede228e21eff8c721dce7abc720ca";
-        let proof = new_proof_from_bytes(&bytes);
+        let bytes = x"8ae17f6100bc0ce469b6c25b533ba8bce5a05ddc223344b390d0d135afaad09fcc9596b0204842228177a2a3a32a9466b2dba57ad279de822b97bea69e637288ab116f772f2338079b03a7ee09c329ad9f628f4c1c34f4b5f78dd419429a891e0509f34ce25b0b9a7524f2c7716e1605490d86f9b1478208238c2a7e208726d74b9039dfadabeb06e6bb8f3d53aa2cdfaab40bc03eb218367ab6fe74e5c767a4ed217464523898939f830733ee8f063b3dee922c8a6e7f8bb252327d86e2e5d8";
+        let proof = new_proof_from_bytes(bytes);
         assert!(verify_proof(&vk, &public_inputs, &proof), 1);
     }
 }
