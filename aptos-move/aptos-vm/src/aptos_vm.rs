@@ -19,7 +19,7 @@ use crate::{
     transaction_metadata::TransactionMetadata,
     VMExecutor, VMValidator,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_aggregator::{
     delta_change_set::DeltaChangeSet,
     transaction::{ChangeSetExt, TransactionOutputExt},
@@ -53,7 +53,8 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
-    language_storage::ModuleId,
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
@@ -940,6 +941,38 @@ impl AptosVM {
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         simulation_vm.simulate_signed_transaction(&state_view.as_move_resolver(), txn, &log_context)
+    }
+
+    pub fn execute_view_function(
+        state_view: &impl StateView,
+        module_id: ModuleId,
+        func_name: Identifier,
+        type_args: Vec<TypeTag>,
+        arguments: Vec<Vec<u8>>,
+        gas_budget: u64,
+    ) -> Result<Vec<Vec<u8>>> {
+        let vm = AptosVM::new(state_view);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let mut gas_meter = AptosGasMeter::new(
+            vm.0.get_gas_feature_version(),
+            vm.0.get_gas_parameters(&log_context)?.clone(),
+            vm.0.get_storage_gas_parameters(&log_context)?.clone(),
+            gas_budget,
+        );
+        Ok(vm
+            .new_session(&state_view.as_move_resolver(), SessionId::Void)
+            .execute_function_bypass_visibility(
+                &module_id,
+                func_name.as_ident_str(),
+                type_args,
+                arguments,
+                &mut gas_meter,
+            )
+            .map_err(|err| anyhow!("Failed to execute function: {:?}", err))?
+            .return_values
+            .into_iter()
+            .map(|(bytes, _ty)| bytes)
+            .collect::<Vec<_>>())
     }
 
     fn run_prologue_with_payload<S: MoveResolverExt>(

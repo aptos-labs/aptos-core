@@ -7,6 +7,7 @@ use crate::{
     accounts::AccountsApi, basic::BasicApi, blocks::BlocksApi, check_size::PostSizeLimit,
     context::Context, error_converter::convert_error, events::EventsApi, index::IndexApi,
     log::middleware_log, set_failpoints, state::StateApi, transactions::TransactionsApi,
+    view_function::ViewFunctionApi,
 };
 use anyhow::Context as AnyhowContext;
 use aptos_config::config::NodeConfig;
@@ -70,6 +71,7 @@ pub fn get_api_service(
         IndexApi,
         StateApi,
         TransactionsApi,
+        ViewFunctionApi,
     ),
     (),
 > {
@@ -93,7 +95,10 @@ pub fn get_api_service(
         StateApi {
             context: context.clone(),
         },
-        TransactionsApi { context },
+        TransactionsApi {
+            context: context.clone(),
+        },
+        ViewFunctionApi { context },
     );
 
     let version = VERSION.to_string();
