@@ -179,6 +179,11 @@ const config = {
                 type: "doc",
                 docId: "guides/move-guides/upgrading-move-code",
               },
+              {
+                label: "Move References",
+                type: "doc",
+                docId: "reference/move",
+              },
             ],
           },
           {
@@ -219,11 +224,6 @@ const config = {
                 docId: "nodes/aptos-api-spec",
               },
               {
-                label: "Move References",
-                type: "doc",
-                docId: "reference/move",
-              },
-              {
                 href: "https://aptos-labs.github.io/ts-sdk-doc/",
                 label: "TypeScript SDK",
               },
@@ -235,6 +235,11 @@ const config = {
                 label: "Rust SDK",
                 type: "doc",
                 docId: "sdks/rust-sdk",
+              },
+              {
+                label: "Move References",
+                type: "doc",
+                docId: "reference/move",
               },
               {
                 label: "Aptos Glossary",
