@@ -205,7 +205,10 @@ pub fn all_natives(
     add_natives_from_module!("curves", curves::make_all(gas_params.curves.clone()));
     add_natives_from_module!("ed25519", ed25519::make_all(gas_params.ed25519.clone()));
     add_natives_from_module!("genesis", account::make_all(gas_params.account));
-    add_natives_from_module!("groth16", groth16::make_all(gas_params.groth16));
+    add_natives_from_module!(
+        "groth16_bls12381_bellman",
+        groth16::make_all(gas_params.groth16)
+    );
     add_natives_from_module!("multi_ed25519", multi_ed25519::make_all(gas_params.ed25519));
     add_natives_from_module!(
         "bls12381",
