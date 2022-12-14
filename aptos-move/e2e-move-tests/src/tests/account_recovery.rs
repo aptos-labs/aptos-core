@@ -92,7 +92,7 @@ pub fn register_account_recovery(
         .privkey
         .sign_arbitrary_message(&rotation_capability_proof_msg.unwrap());
 
-    let authorized_address = vec![delegate_account.address().clone()];
+    let authorized_address = delegate_account.address().clone();
     let required_num_recovery = 1;
     let required_delay_seconds = 0;
     let rotate_valid_window_seconds = 0;
@@ -100,14 +100,15 @@ pub fn register_account_recovery(
 
     assert_success!(harness.run_entry_function(
         &offerer_account,
-        str::parse(&format!("0x{}::hackathon::register", resource_address)).unwrap(),
+        str::parse(&format!(
+            "0x{}::hackathon::register_authorize_one",
+            resource_address
+        ))
+        .unwrap(),
         vec![],
         vec![
             bcs::to_bytes(&authorized_address).unwrap(),
-            bcs::to_bytes::<u64>(&required_num_recovery).unwrap(),
             bcs::to_bytes::<u64>(&required_delay_seconds).unwrap(),
-            bcs::to_bytes::<u64>(&rotate_valid_window_seconds).unwrap(),
-            bcs::to_bytes(&allow_unauthorized_initiation).unwrap(),
             rotation_proof_signed.to_bytes().to_vec(),
             offerer_account.pubkey.to_bytes().to_vec(),
         ],
