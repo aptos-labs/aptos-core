@@ -63,7 +63,7 @@ fn test_account_recovery_valid() {
 
     let owner_account = h.new_account_with_key_pair();
     let delegated_account = h.new_account_with_key_pair();
-    // offer_rotation_capability_v2(
+    // register_account_recovery(
     //     &mut h,
     //     &resource_address,
     //     &owner_account,
@@ -93,12 +93,24 @@ pub fn register_account_recovery(
         .sign_arbitrary_message(&rotation_capability_proof_msg.unwrap());
 
     let authorized_address = vec![delegate_account.address().clone()];
+    let required_num_recovery = 1;
+    let required_delay_seconds = 0;
+    let rotate_valid_window_seconds = 0;
+    let allow_unauthorized_initiation = false;
 
     assert_success!(harness.run_entry_function(
         &offerer_account,
         str::parse(&format!("0x{}::hackathon::register", resource_address)).unwrap(),
         vec![],
-        vec![bcs::to_bytes(&authorized_address).unwrap(),],
+        vec![
+            bcs::to_bytes(&authorized_address).unwrap(),
+            bcs::to_bytes::<u64>(&required_num_recovery).unwrap(),
+            bcs::to_bytes::<u64>(&required_delay_seconds).unwrap(),
+            bcs::to_bytes::<u64>(&rotate_valid_window_seconds).unwrap(),
+            bcs::to_bytes(&allow_unauthorized_initiation).unwrap(),
+            rotation_proof_signed.to_bytes().to_vec(),
+            offerer_account.pubkey.to_bytes().to_vec(),
+        ],
     ));
 
     // let account_resource = parse_struct_tag("0x1::account::Account").unwrap();
