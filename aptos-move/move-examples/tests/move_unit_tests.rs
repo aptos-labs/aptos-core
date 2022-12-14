@@ -71,6 +71,11 @@ fn test_resource_account_common(pkg: &str) {
 }
 
 #[test]
+fn test_account_recovery() {
+    test_common("account_recovery");
+}
+
+#[test]
 fn test_data_structures() {
     test_common("data_structures");
 }

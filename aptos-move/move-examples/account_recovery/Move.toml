@@ -1,5 +1,5 @@
 [package]
-name = "test_package"
+name = "account_recovery"
 version = "0.0.0"
 upgrade_policy = "compatible"
 
@@ -9,3 +9,4 @@ AptosFramework = { local = "../../framework/aptos-framework" }
 [addresses]
 # change it to `source_addr = "_" when calling `create-resource-account-and-publish-package` from the cli
 source_addr = "0xcafe"
+account_recovery = "0xcffee"

@@ -5,12 +5,14 @@ module account_recovery::hackathon {
     const EUNAUTHORIZED: u64 = 3;
     const ERECOVERY_NOT_IN_PROGRESS: u64 = 4;
     const ERECOVERY_ALREADY_IN_PROGRESS: u64 = 5;
+    const EREVERSE_LOOKUP_NOT_INITIALIZED: u64 = 6;
+    const EINITIATOR_MISMATCH: u64 = 7;
+    const ERECOVERY_DELAY_NOT_MET: u64 = 8;
 
     use std::signer;
-    use aptos_std::table::{Table, add};
+    use aptos_std::table::{Table, Self};
     use aptos_framework::account;
     use aptos_framework::timestamp;
-    use aptos_std::table;
     use std::vector;
     use std::option::Option;
     use std::option;
@@ -32,7 +34,7 @@ module account_recovery::hackathon {
         authorized_to_recovery: Table<address, vector<address>>,
     }
 
-    struct AccountRecoveryInitData has key, store {
+    struct AccountRecoveryInitData has key, store, drop {
         initiator: address,
         authorized: vector<address>,
         recovery_seq_number: u64,
@@ -92,7 +94,7 @@ module account_recovery::hackathon {
         let addr = signer::address_of(account);
 
         assert!(!recovery_exists(addr), ERECOVERY_ALREADY_SET);
-        assert!(exists<AccountRecoveryReverseLookup>(@account_recovery));
+        assert!(exists<AccountRecoveryReverseLookup>(@account_recovery), EREVERSE_LOOKUP_NOT_INITIALIZED);
 
         let reverse_lookup = borrow_global_mut<AccountRecoveryReverseLookup>(@account_recovery);
 
@@ -112,7 +114,7 @@ module account_recovery::hackathon {
             let list = table::borrow_mut_with_default(&mut reverse_lookup.authorized_to_recovery, authorized_address, vector::empty<address>());
             vector::push_back(list, addr);
         };
-        account::offer_rotation_capability(signer, rotation_capability_sig_bytes, 0, account_public_key_bytes, @account_recovery)
+        account::offer_rotation_capability(account, rotation_capability_sig_bytes, 0, account_public_key_bytes, @account_recovery)
     }
 
     fun clear_stale_recovery(account_recovery: &mut AccountRecovery, recovery_address: address) {
@@ -133,7 +135,7 @@ module account_recovery::hackathon {
 
         let account_recovery = borrow_global_mut<AccountRecovery>(recovery_address);
         clear_stale_recovery(account_recovery, recovery_address);
-        assert!(account_recovery.account_recovery_init, ERECOVERY_ALREADY_IN_PROGRESS);
+        assert!(std::option::is_none(&account_recovery.account_recovery_init), ERECOVERY_ALREADY_IN_PROGRESS);
 
         let addr = signer::address_of(account);
 
@@ -162,12 +164,12 @@ module account_recovery::hackathon {
         clear_stale_recovery(account_recovery, recovery_address);
 
         assert!(std::option::is_some(&account_recovery.account_recovery_init), ERECOVERY_NOT_IN_PROGRESS);
-        let account_recovery_init = std::option::borrow(&account_recovery.account_recovery_init);
+        let account_recovery_init = std::option::borrow_mut(&mut account_recovery.account_recovery_init);
 
-        assert!(account_recovery_init.initiator == initiator);
+        assert!(account_recovery_init.initiator == initiator, EINITIATOR_MISMATCH);
 
         let addr = signer::address_of(account);
-        assert!(!vector::contains(&account_recovery_init.authorized, &addr));
+        assert!(!vector::contains(&account_recovery_init.authorized, &addr), EUNAUTHORIZED);
 
         vector::push_back(&mut account_recovery_init.authorized, addr);
     }
@@ -185,10 +187,10 @@ module account_recovery::hackathon {
         let account_recovery_init = std::option::borrow(&account_recovery.account_recovery_init);
 
         let addr = signer::address_of(account);
-        assert!(account_recovery_init.initiator == addr);
-        assert!(vector::length(&account_recovery_init.authorized) >= account_recovery.required_num_for_recovery);
+        assert!(account_recovery_init.initiator == addr, EINITIATOR_MISMATCH);
+        assert!(vector::length(&account_recovery_init.authorized) >= account_recovery.required_num_for_recovery, EUNAUTHORIZED);
 
-        assert!(timestamp::now_seconds() > account_recovery_init.recovery_initiation_ts + account_recovery.required_delay_seconds);
+        assert!(timestamp::now_seconds() > account_recovery_init.recovery_initiation_ts + account_recovery.required_delay_seconds, ERECOVERY_DELAY_NOT_MET);
 
         let module_data = borrow_global_mut<ModuleData>(@account_recovery);
         let resource_signer = account::create_signer_with_capability(&module_data.signer_cap);
@@ -202,7 +204,7 @@ module account_recovery::hackathon {
         let addr = signer::address_of(account);
         let previous = move_from<AccountRecovery>(addr);
 
-        assert!(!exists<AccountRecoveryReverseLookup>(@account_recovery));
+        assert!(!exists<AccountRecoveryReverseLookup>(@account_recovery), EREVERSE_LOOKUP_NOT_INITIALIZED);
         account::revoke_rotation_capability(account, @account_recovery);
 
         let reverse_lookup = borrow_global_mut<AccountRecoveryReverseLookup>(@account_recovery);
@@ -219,16 +221,34 @@ module account_recovery::hackathon {
         };
     }
 
+
+
     #[test_only]
-    public fun dummy() {}
+    public entry fun set_up_test(origin_account: &signer, account_recovery: &signer) {
+        use std::vector;
+
+        account::create_account_for_test(signer::address_of(origin_account));
+
+        // create a resource account from the origin account, mocking the module publishing process
+        resource_account::create_resource_account(origin_account, vector::empty<u8>(), vector::empty<u8>());
+        init_module(account_recovery);
+    }
 
     #[test(account = @0x123, authorized = @0x234)]
-    #[expected_failure(abort_code = 0x10001, location = Self)]
+    #[expected_failure(abort_code = ERECOVERY_NOT_SET, location = Self)]
     public entry fun test_recovery_not_set(
         account: &signer,
         authorized: &signer,
-    ) {
-        initiate_account_key_recovery(authorized, )
+    ) acquires AccountRecovery {
+        initiate_account_key_recovery(authorized, signer::address_of(account));
+    }
+
+    #[test(origin_account = @0xcafe, account_recovery = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, account = @0x123)]
+    #[expected_failure(abort_code = 0x10001, location = Self)]
+    public entry fun test_register_recovery_without_authorization(origin_account: signer, account_recovery: signer, account: &signer) acquires AccountRecoveryReverseLookup {
+        set_up_test(&origin_account, &account_recovery);
+
+        register_without_authorization(account, 100, vector::empty(), vector::empty());
     }
 
 }
