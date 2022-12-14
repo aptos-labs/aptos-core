@@ -1,4 +1,4 @@
-module aptos_framework::account_recovery {
+module account_recovery::hackathon {
 
     const ERECOVERY_NOT_SET: u64 = 1;
     const ERECOVERY_ALREADY_SET: u64 = 2;
@@ -219,5 +219,16 @@ module aptos_framework::account_recovery {
         };
     }
 
-    
+    #[test_only]
+    public fun dummy() {}
+
+    #[test(account = @0x123, authorized = @0x234)]
+    #[expected_failure(abort_code = 0x10001, location = Self)]
+    public entry fun test_recovery_not_set(
+        account: &signer,
+        authorized: &signer,
+    ) {
+        initiate_account_key_recovery(authorized, )
+    }
+
 }
