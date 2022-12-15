@@ -62,7 +62,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; <b>has</b> drop
+<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;Group&gt; <b>has</b> drop
 </code></pre>
 
 
@@ -89,7 +89,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Point">Point</a>&lt;T&gt; <b>has</b> drop
+<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Point">Point</a>&lt;Group&gt; <b>has</b> drop
 </code></pre>
 
 

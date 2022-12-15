@@ -1,10 +1,10 @@
 module aptos_std::curves {
     use aptos_std::type_info::type_of;
 
-    struct Scalar<phantom T> has drop {
+    struct Scalar<phantom Group> has drop {
         handle: u64
     }
-    struct Point<phantom T> has drop {
+    struct Point<phantom Group> has drop {
         handle: u64
     }
 
