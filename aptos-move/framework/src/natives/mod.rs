@@ -13,6 +13,7 @@ pub mod state_storage;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
+pub mod wasm;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
@@ -46,6 +47,7 @@ pub struct GasParameters {
     pub state_storage: state_storage::GasParameters,
     pub aggregator: aggregator::GasParameters,
     pub aggregator_factory: aggregator_factory::GasParameters,
+    pub wasm: wasm::GasParameters,
 }
 
 impl GasParameters {
@@ -177,6 +179,10 @@ impl GasParameters {
             aggregator_factory: aggregator_factory::GasParameters {
                 new_aggregator: aggregator_factory::NewAggregatorGasParameters { base: 0.into() },
             },
+            wasm: wasm::GasParameters {
+                execute: wasm::ExecuteWASMGasParameters {},
+                validate_wasm: wasm::ValidateWASMGasParameters {},
+            },
         }
     }
 }
@@ -234,6 +240,7 @@ pub fn all_natives(
         "aggregator_factory",
         aggregator_factory::make_all(gas_params.aggregator_factory)
     );
+    add_natives_from_module!("wasm", wasm::make_all(gas_params.wasm));
 
     make_table_from_iter(framework_addr, natives)
 }

@@ -60,6 +60,7 @@ siphasher = { workspace = true }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
 tiny-keccak = { workspace = true }
+wasmtime = "3.0.1"
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }
