@@ -11,14 +11,15 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
 use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
 use aptos_storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     account_view::AccountView,
     epoch_state::EpochState,
     event::EventKey,
     on_chain_config,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::{Transaction, Version},
     write_set::{WriteOp, WriteSet},
 };
@@ -102,8 +103,9 @@ impl InMemoryStateCalculator {
         StateDelta,
         Option<EpochState>,
     )> {
-        let mut state_updates_vec = Vec::new();
-        let mut state_checkpoint_hashes = Vec::new();
+        let num_txns = to_keep.len();
+        let mut state_updates_vec = Vec::with_capacity(num_txns);
+        let mut state_checkpoint_hashes = Vec::with_capacity(num_txns);
 
         for (txn, txn_output) in to_keep {
             let (state_updates, state_checkpoint_hash) = self.add_transaction(txn, txn_output)?;
