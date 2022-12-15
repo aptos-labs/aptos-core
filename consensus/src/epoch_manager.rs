@@ -811,16 +811,16 @@ impl EpochManager {
         // Start QuorumStore
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
+        // TODO: grab config.
+        // TODO: think about these numbers
+        // LANDING QS TODO: move to config file
+        let config = QuorumStoreConfig::default();
+
         // TODO: clean this up
         let (wrapper_quorum_store_tx, wrapper_quorum_store_rx) =
             tokio::sync::mpsc::channel(config.channel_size);
 
         let payload_manager = if self.config.use_quorum_store {
-            // TODO: grab config.
-            // TODO: think about these numbers
-            // LANDING QS TODO: move to config file
-            let config = QuorumStoreConfig::default();
-
             // update the number of network_listener workers when start a new round_manager
             self.num_network_workers_for_fragment = usize::max(
                 1,
