@@ -27,9 +27,9 @@ pub struct GasParameters {
 #[derive(Tid)]
 pub struct Bls12381Context {
     scalar_store: Vec<bls12_381::Scalar>,
-    g1_point_store: Vec<bls12_381::G1Projective>,
-    g2_point_store: Vec<bls12_381::G2Projective>,
-    gt_point_store: Vec<bls12_381::Gt>,
+    g1_point_store: Vec<G1Projective>,
+    g2_point_store: Vec<G2Projective>,
+    gt_point_store: Vec<Gt>,
 }
 
 impl Bls12381Context {
@@ -109,7 +109,7 @@ fn scalar_from_u64_internal(
     let gid = pop_arg!(args, u64);
     let v = pop_arg!(args, u64);
     let handle = match gid {
-        BLS12_381_G1 | BLS12_381_G2 | BLS12_381_Gt => {
+        GID_BLS12_381_G1 | GID_BLS12_381_G2 | GID_BLS12_381_Gt => {
             let handle = context
                 .extensions_mut()
                 .get_mut::<Bls12381Context>()
@@ -169,9 +169,12 @@ fn point_identity_internal(
         smallvec![Value::u64(handle as u64)],
     ))
 }
-const BLS12_381_G1: u64 = 1;
-const BLS12_381_G2: u64 = 2;
-const BLS12_381_Gt: u64 = 3;
+
+const GID_BLS12_381_G1: u64 = 1;
+const GID_BLS12_381_G2: u64 = 2;
+const GID_BLS12_381_Gt: u64 = 3;
+
+const PID_BLS12_381: u64 = 1;
 
 fn point_generator_internal(
     gas_params: &GasParameters,
@@ -184,24 +187,24 @@ fn point_generator_internal(
 
     let group_id = pop_arg!(args, u64);
     let handle = match group_id {
-        BLS12_381_G1 => {
-            let point = bls12_381::G1Projective::generator();
+        GID_BLS12_381_G1 => {
+            let point = G1Projective::generator();
             let handle = context
                 .extensions_mut()
                 .get_mut::<Bls12381Context>()
                 .add_g1_point(point);
             handle
         }
-        BLS12_381_G2 => {
-            let point = bls12_381::G2Projective::generator();
+        GID_BLS12_381_G2 => {
+            let point = G2Projective::generator();
             let handle = context
                 .extensions_mut()
                 .get_mut::<Bls12381Context>()
                 .add_g2_point(point);
             handle
         }
-        BLS12_381_Gt => {
-            let point = bls12_381::Gt::generator();
+        GID_BLS12_381_Gt => {
+            let point = Gt::generator();
             let handle = context
                 .extensions_mut()
                 .get_mut::<Bls12381Context>()
@@ -280,7 +283,7 @@ fn point_mul_internal(
     let point_handle = pop_arg!(args, u64) as usize;
     let scalar_handle = pop_arg!(args, u64) as usize;
     let handle = match gid {
-        BLS12_381_G1 => {
+        GID_BLS12_381_G1 => {
             let point = context
                 .extensions()
                 .get::<Bls12381Context>()
@@ -296,7 +299,7 @@ fn point_mul_internal(
                 .add_g1_point(result);
             handle
         }
-        BLS12_381_G2 => {
+        GID_BLS12_381_G2 => {
             let point = context
                 .extensions()
                 .get::<Bls12381Context>()
@@ -312,7 +315,7 @@ fn point_mul_internal(
                 .add_g2_point(result);
             handle
         }
-        BLS12_381_Gt => {
+        GID_BLS12_381_Gt => {
             let point = context
                 .extensions()
                 .get::<Bls12381Context>()
