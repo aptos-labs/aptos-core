@@ -30,6 +30,7 @@ clap = { workspace = true }
 codespan-reporting = { workspace = true }
 curve25519-dalek = { workspace = true }
 flate2 = { workspace = true }
+group = "0.12.1"
 hex.workspace = true
 include_dir = { workspace = true }
 itertools = { workspace = true }

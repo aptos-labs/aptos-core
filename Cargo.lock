@@ -1004,6 +1004,7 @@ dependencies = [
  "codespan-reporting",
  "curve25519-dalek",
  "flate2",
+ "group",
  "hex",
  "include_dir 0.7.2",
  "itertools",
