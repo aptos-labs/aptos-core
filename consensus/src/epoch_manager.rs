@@ -640,8 +640,7 @@ impl EpochManager {
             payload_manager,
         ));
 
-        // Start QuorumStore
-        self.quorum_store_enabled = onchain_config.quorum_store_enabled();
+        info!(epoch = epoch, "Start DirectMempoolQuorumStore");
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
         self.spawn_direct_mempool_quorum_store(consensus_to_quorum_store_rx);
@@ -724,12 +723,10 @@ impl EpochManager {
 
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
-                self.start_round_manager(
-                    initial_data,
-                    epoch_state,
-                    onchain_config.unwrap_or_default(),
-                )
-                .await
+                let onchain_config = onchain_config.unwrap_or_default();
+                self.quorum_store_enabled = onchain_config.quorum_store_enabled();
+                self.start_round_manager(initial_data, epoch_state, onchain_config)
+                    .await
             }
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.start_recovery_manager(ledger_data, epoch_state).await
