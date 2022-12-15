@@ -11,15 +11,15 @@ This tutorial lets you use the Aptos CLI to mint NFTs in Aptos testnet so you ca
 
 This tutorial assumes you have:
 
-* a GitHub account
-* the GitHub CLI
-* the Aptos CLI (installed below, or you can run from source via `cargo run`)
+* a [GitHub account](https://docs.github.com/en/get-started/signing-up-for-github/signing-up-for-a-new-github-account)
+* the [GitHub CLI](https://cli.github.com/)
+* the [Aptos CLI](../../cli-tools/aptos-cli-tool/install-aptos-cli.md) (or you can run from [aptos-core](https://github.com/aptos-labs/aptos-core) source via `cargo run`)
 
 ## Role of accounts
 
-When you are minting an NFT, this NFT is tied to your [account](../../concepts/accounts.md). Aptos ensures no one else can alter your collection. This is why a private key is required to obtain signer capabilities. When you submit a transaction, you sign the transaction.
+When you are minting an NFT, the NFT is tied to your [account](../../concepts/accounts.md). Aptos ensures no one else can alter your collection of NFTs. This is why a private key is required to obtain signer capabilities. When you submit a transaction, you sign the transaction.
 
-Resource accounts allow the delegation of signing transactions. You create a [resource account](../resource-accounts.md) grants the signer capability that can be stored in a new resource on the same account and can sign transaction autonomously. The signer capability is protected as no one has access to the private key for the resource account.
+[Resource accounts](../resource-accounts.md) allow the delegation of signing transactions. You create a resource account to grant a signer capability that can be stored in a new resource on the same account and can sign transaction autonomously. The signer capability is protected as no one has access to the private key for the resource account.
 
 ## Understand minting
 
@@ -91,20 +91,18 @@ In this manner, you can later use the signer capability already stored in module
 
 ## Mint with the Aptos CLI
 
-Now that you are starting to write smart contracts with Move, let's create our first testnet NFT with the Aptos CLI.
+Now that you have an understanding of the Aptos minting process and are starting to write smart contracts with Move, you are ready to create your first testnet NFT with the Aptos CLI.
 
 ### Install Aptos CLI and create an account
 
 1. [Install the Aptos CLI](../../cli-tools/aptos-cli-tool/install-aptos-cli.md) and note its [many uses](../../cli-tools/aptos-cli-tool/use-aptos-cli.md) for later if you haven't experienced its goodness already.
 
 1. Create an account on Aptos testnet to receive the NFT by running the following command and selecting `testnet`:
-
   ```shell
   aptos init --profile nft-receiver
   ```
 
-1. When prompted, select `testnet` by entering it:
-
+1. When prompted for a network, select `testnet` by entering it and hitting return:
   ```shell
   Configuring for profile nft-receiver
   Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]
@@ -112,30 +110,27 @@ Now that you are starting to write smart contracts with Move, let's create our f
   ```
 
 1. When prompted for your private key, hit enter to generate a new key:
-
   ```shell
   Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
   ```
 
 1. Receive output resembling:
-
   ```shell
   No key given, generating key...
-  Account X does not exist, you will need to create and fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account
+  Account a233bf7be2b93f1e532f8ea88c49e0c70a873d082890b6d9685f89b5e40d50c2 does not exist, you will need to create and fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account
   
   ---
-  Aptos CLI is now set up for account X as profile nft-receiver!  Run `aptos --help` for more information about commands
+  Aptos CLI is now set up for account a233bf7be2b93f1e532f8ea88c49e0c70a873d082890b6d9685f89b5e40d50c2 as profile nft-receiver!  Run `aptos --help` for more information about commands
   {
     "Result": "Success"
   }
-  ➜  devel
   ```
 
-1. Note your configuration information can be found in ~/.aptos/config.yaml`. Read that file to see your private and public keys, account address, and REST API URL per network.
+1. Note your configuration information can be found in `.aptos/config.yaml` relative to where you ran `aptos init`. Read that file to see each profile's private and public keys, account address, and REST API URL.
 
 ### Install wallet and import account
 
-1. Run `more ~/.aptos/config.yaml` to see and copy the `nft-receiver` private key.
+1. Read `.aptos/config.yaml` to see and copy the `nft-receiver` private key.
 
 1. Install the wallet of your choice. We use the [Petra Wallet](../../guides/install-petra-wallet.md) Chrome extension.
 
@@ -151,9 +146,9 @@ Now that you are starting to write smart contracts with Move, let's create our f
 
 ### Get coins from faucet
 
-1. Go to *Petra > Settings > Network > Testnet*.
+1. Go to the *Petra > Settings > Network > Testnet* network if not there already.
 
-1. Open the extension and connect your wallet to the Aptos faucet at https://aptoslabs.com/testnet-faucet:
+1. Connect your wallet to the Aptos faucet at https://aptoslabs.com/testnet-faucet:
 
   ![Faucet connect](../../../static/img/connect-wallet-faucet.png "Connect faucet to wallet")
 
@@ -175,7 +170,7 @@ Now that you are starting to write smart contracts with Move, let's create our f
   aptos move run --function-id 8cdf69c8c93fee36ed83f8882908060c1335ed39a827c08dbb506b46237e88fb::minting::mint_nft --profile nft-receiver
   ```
 
-1. When asked, `Do you want to submit a transaction for a range of...?`, enter: `yes`
+1. When asked, `Do you want to submit a transaction for a range of...?`, enter `yes` and hit return.
 
 1. Receive results resembling:
 
@@ -219,14 +214,13 @@ Create two accounts on testnet for deploying and managing this contract:
   * The admin account is in charge of updating the config of the module (e.g. whether or not we enable minting for this collection).
 
 1. Run these commands to create the accounts, selecting `testnet` when prompted:
-
-```shell
-aptos init --profile source-account
-```
-```shell
-aptos init --profile admin-account
-```
-1. Open `~/.aptos/config.yaml` to find the private keys for the `admin-account` and `source-account` profiles and copy them.
+  ```shell
+  aptos init --profile source-account
+  ```
+  ```shell
+  aptos init --profile admin-account
+  ```
+1. Open `.aptos/config.yaml` to find the private keys for the `admin-account` and `source-account` profiles and copy them.
 
 1. Fund these accounts by adding them to your wallet via importing their private keys into testnet and using the **Faucet** function as you did for the `nft-receiver` profile.
 
@@ -237,45 +231,44 @@ In this section, we will create a [resource account](../resource-accounts.md) fr
 In the [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutorial) smart contract, we store the resource account’s signer capability in the `ModuleData` resource so that it can automatically sign for transactions in the contract. If we don’t store the signer capability within the module, we’d need to provide the resource account’s signer; but we no longer have access to the resource account’s signer because the resource account is meant to be autonomous, and the contracts published under a resource account are immutable. Once the contract is published, the resource account no longer has access to the signer.
 
 1. Clone the NFT Tutorial:
-```shell
-git clone https://github.com/aptos-labs/nft-tutorial
-```
+  ```shell
+  git clone https://github.com/aptos-labs/nft-tutorial
+  ```
 
 1. Navigate into the tutorial directory:
-```shell
-cd nft-tutorial/tutorial
-```
+  ```shell
+  cd nft-tutorial
+  ```
 
 1. Open `Move.toml` in that directory for editing.
 
-1. Update the `source_addr` and `admin_addr` with the `account` values for the `source-account` and `admin-account` profiles you just created (found in `~/.aptos/config.yaml`).
+1. Update the `source_addr` and `admin_addr` with the `account` values for the `source-account` and `admin-account` profiles you just created (found in `.aptos/config.yaml`). Note, the order is flipped in those files, so copy carefully.
 
 1. Run the following command to create the resource account and publish the package all at once. The seed is just an example - feel free to provide a different seed if the resource account created by the specified seed already exists:
+  ```shell
+  aptos move create-resource-account-and-publish-package --seed hex_array:1234 --address-name mint_nft --profile source-account
+  ```
 
-```shell
-aptos move create-resource-account-and-publish-package --seed hex_array:1234 --address-name mint_nft --profile source-account
-```
+1. Receive compilation output like:
+  ```shell
+  Compiling, may take a little while to download git dependencies...
+  INCLUDING DEPENDENCY AptosFramework
+  INCLUDING DEPENDENCY AptosStdlib
+  INCLUDING DEPENDENCY AptosToken
+  INCLUDING DEPENDENCY MoveStdlib
+  BUILDING NFT-tutorial
+  ```
 
-1. Receive output indicating success and resembling:
+1. When prompted to publish this package under the resource account's address, enter `yes` and hit return.
 
-```shell
-/* expected output
-Compiling, may take a little while to download git dependencies...
-INCLUDING DEPENDENCY AptosFramework
-INCLUDING DEPENDENCY AptosStdlib
-INCLUDING DEPENDENCY AptosToken
-INCLUDING DEPENDENCY MoveStdlib
-BUILDING NFT-tutorial
-Do you want to publish this package under the resource account's address 8cdf69c8c93fee36ed83f8882908060c1335ed39a827c08dbb506b46237e88fb? [yes/no] >
-yes
-package size 4550 bytes
-Do you want to submit a transaction for a range of [513300 - 769900] Octas at a gas unit price of 100 Octas? [yes/no] >
-yes
-{
-  "Result": "Success"
-}
-*/
-```
+1. When asked, `Do you want to submit a transaction for a range of...?`, enter `yes` and hit return.
+
+1. Receive output indicating success resembling:
+  ```shell
+  {
+    "Result": "Success"
+  }
+  ```
 
 1. Mint another NFT using the `nft-receiver` profile, sustituting in the resource account's address:
 
