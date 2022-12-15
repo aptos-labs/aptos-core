@@ -3,11 +3,13 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
+use aptos_types::account_config::AccountResource;
 use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
     account_address::create_resource_address, account_address::AccountAddress, event::EventHandle,
 };
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
+use move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -63,19 +65,14 @@ fn test_account_recovery_valid() {
 
     let owner_account = h.new_account_with_key_pair();
     let delegated_account = h.new_account_with_key_pair();
-    register_account_recovery(
-        &mut h,
-        &resource_address,
-        &owner_account,
-        &delegated_account,
-    )
+    register_account_recovery(&mut h, &resource_address, &owner_account, &resource_address)
 }
 
 pub fn register_account_recovery(
     harness: &mut MoveHarness,
     resource_address: &AccountAddress,
     offerer_account: &Account,
-    delegate_account: &Account,
+    delegate_address: &AccountAddress,
 ) {
     let rotation_capability_proof = RotationCapabilityOfferProofChallengeV2 {
         account_address: CORE_CODE_ADDRESS,
@@ -84,7 +81,7 @@ pub fn register_account_recovery(
         chain_id: 4,
         sequence_number: 0,
         source_address: *offerer_account.address(),
-        recipient_address: *delegate_account.address(),
+        recipient_address: *delegate_address,
     };
 
     let rotation_capability_proof_msg = bcs::to_bytes(&rotation_capability_proof);
@@ -92,7 +89,7 @@ pub fn register_account_recovery(
         .privkey
         .sign_arbitrary_message(&rotation_capability_proof_msg.unwrap());
 
-    let authorized_address = delegate_account.address().clone();
+    let authorized_address = delegate_address.clone();
     let required_num_recovery = 1;
     let required_delay_seconds = 0;
     let rotate_valid_window_seconds = 0;
@@ -114,13 +111,13 @@ pub fn register_account_recovery(
         ],
     ));
 
-    // let account_resource = parse_struct_tag("0x1::account::Account").unwrap();
-    // assert_eq!(
-    //     harness
-    //         .read_resource::<AccountResource>(offerer_account.address(), account_resource)
-    //         .unwrap()
-    //         .rotation_capability_offer()
-    //         .unwrap(),
-    //     *delegate_account.address()
-    // );
+    let account_resource = parse_struct_tag("0x1::account::Account").unwrap();
+    assert_eq!(
+        harness
+            .read_resource::<AccountResource>(offerer_account.address(), account_resource)
+            .unwrap()
+            .rotation_capability_offer()
+            .unwrap(),
+        *delegate_address
+    );
 }
