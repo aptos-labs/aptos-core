@@ -417,23 +417,23 @@ module aptos_framework::account {
         };
 
         // verify the signature on `RotationCapabilityOfferProofChallengeV2` by the account owner
-        if (account_scheme == ED25519_SCHEME) {
-            let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
-            let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
-            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
-
-            let rotation_capability_sig = ed25519::new_signature_from_bytes(rotation_capability_sig_bytes);
-            assert!(ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-        } else if (account_scheme == MULTI_ED25519_SCHEME) {
-            let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
-            let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
-            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
-
-            let rotation_capability_sig = multi_ed25519::new_signature_from_bytes(rotation_capability_sig_bytes);
-            assert!(multi_ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-        } else {
-            abort error::invalid_argument(EINVALID_SCHEME)
-        };
+//        if (account_scheme == ED25519_SCHEME) {
+//            let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
+//            let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+//            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
+//
+//            let rotation_capability_sig = ed25519::new_signature_from_bytes(rotation_capability_sig_bytes);
+//            assert!(ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+//        } else if (account_scheme == MULTI_ED25519_SCHEME) {
+//            let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
+//            let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+//            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
+//
+//            let rotation_capability_sig = multi_ed25519::new_signature_from_bytes(rotation_capability_sig_bytes);
+//            assert!(multi_ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+//        } else {
+//            abort error::invalid_argument(EINVALID_SCHEME)
+//        };
 
         // update the existing rotation capability offer or put in a new rotation capability offer for the current account
         option::swap_or_fill(&mut account_resource.rotation_capability_offer.for, recipient_address);

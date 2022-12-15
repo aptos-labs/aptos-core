@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::account_config::AccountResource;
 use aptos_types::state_store::table::TableHandle;
@@ -156,6 +157,30 @@ pub fn initiate_account_key_recovery(
         vec![],
         vec![bcs::to_bytes(&owner_address).unwrap(),],
     ));
+}
+
+pub fn test_rotational_offer_proof() {
+    let rotation_capability_proof = RotationCapabilityOfferProofChallengeV2 {
+        account_address: CORE_CODE_ADDRESS,
+        module_name: String::from("account"),
+        struct_name: String::from("RotationCapabilityOfferProofChallengeV2"),
+        chain_id: 4,
+        sequence_number: 0,
+        source_address: AccountAddress::from_hex_literal(
+            "0x1e0d8d669ed25385af285812700fc996f9d306e1bfb2f6b4b60a2806fe422877",
+        )
+        .unwrap(),
+        recipient_address: AccountAddress::from_hex_literal(
+            "0xd42f9391fdb0868f75db8324a9366b623951455072c74e4b9fbe4c4c94f92e71",
+        )
+        .unwrap(),
+    };
+    let rotation_capability_proof_msg = bcs::to_bytes(&rotation_capability_proof);
+    let priv_key = Ed25519PrivateKey::try_from(
+        hex::encode("3eea62b1807a229eb9909043f01e5d8c4517646cc8cc937915f151032e4b40e1").as_bytes(),
+    )
+    .unwrap();
+    priv_key.sign_arbitrary_message(&rotation_capability_proof_msg.unwrap());
 }
 
 pub fn register_account_recovery(
