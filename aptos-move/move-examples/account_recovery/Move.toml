@@ -8,5 +8,5 @@ AptosFramework = { local = "../../framework/aptos-framework" }
 
 [addresses]
 # change it to `source_addr = "_" when calling `create-resource-account-and-publish-package` from the cli
-# source_addr = "0x8e1e84375397ddcece025a5733904736389c5080320c956a08ec8b49a107e560"
+ source_addr = "0x8f510ba30d81bf57ff85c075e711a510f9641ad8bc54b3e3559b229a9835ed90"
 # account_recovery = "0xcffee"

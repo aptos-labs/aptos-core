@@ -75,10 +75,11 @@ module account_recovery::hackathon {
         account: &signer,
         authorized_address: address,
         required_delay_seconds: u64,
+        rotate_valid_window_seconds: u64,
         rotation_capability_sig_bytes: vector<u8>,
         account_public_key_bytes: vector<u8>,
     ) acquires AccountRecoveryReverseLookup {
-        register(account, vector::singleton(authorized_address), 1, required_delay_seconds, required_delay_seconds, false, rotation_capability_sig_bytes, account_public_key_bytes);
+        register(account, vector::singleton(authorized_address), 1, required_delay_seconds, rotate_valid_window_seconds, false, rotation_capability_sig_bytes, account_public_key_bytes);
     }
 
     public entry fun register(
