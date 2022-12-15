@@ -463,7 +463,7 @@ impl EpochManager {
             self.quorum_store_to_mempool_sender.clone(),
             self.config.mempool_txn_pull_timeout_ms,
         );
-        spawn_named!("Quorum Store", quorum_store.start());
+        spawn_named!("Quorum Store", quorum_store.start()).unwrap();
     }
 
     fn spawn_quorum_store(
