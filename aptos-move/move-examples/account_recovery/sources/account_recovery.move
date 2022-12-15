@@ -191,7 +191,7 @@ module account_recovery::hackathon {
         assert!(account_recovery_init.initiator == addr, EINITIATOR_MISMATCH);
         assert!(vector::length(&account_recovery_init.authorized) >= account_recovery.required_num_for_recovery, EUNAUTHORIZED);
 
-        assert!(timestamp::now_seconds() > account_recovery_init.recovery_initiation_ts + account_recovery.required_delay_seconds, ERECOVERY_DELAY_NOT_MET);
+        assert!(timestamp::now_seconds() >= account_recovery_init.recovery_initiation_ts + account_recovery.required_delay_seconds, ERECOVERY_DELAY_NOT_MET);
 
         let module_data = borrow_global_mut<ModuleData>(@account_recovery);
         let resource_signer = account::create_signer_with_capability(&module_data.signer_cap);

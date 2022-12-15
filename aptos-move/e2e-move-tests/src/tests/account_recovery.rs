@@ -22,6 +22,24 @@ struct RotationCapabilityOfferProofChallengeV2 {
     source_address: AccountAddress,
     recipient_address: AccountAddress,
 }
+// This struct includes TypeInfo (account_address, module_name, and struct_name)
+// and RotationProofChallenge-specific information (sequence_number, originator, current_auth_key, and new_public_key)
+// Since the struct RotationProofChallenge is defined in "0x1::account::RotationProofChallenge",
+// we will be passing in "0x1" to `account_address`, "account" to `module_name`, and "RotationProofChallenge" to `struct_name`
+// Originator refers to the user's address
+#[derive(Serialize, Deserialize)]
+pub struct RotationProofChallenge {
+    // Should be `CORE_CODE_ADDRESS`
+    pub account_address: AccountAddress,
+    // Should be `account`
+    pub module_name: String,
+    // Should be `RotationProofChallenge`
+    pub struct_name: String,
+    pub sequence_number: u64,
+    pub originator: AccountAddress,
+    pub current_auth_key: AccountAddress,
+    pub new_public_key: Vec<u8>,
+}
 
 #[test]
 fn test_account_recovery_valid() {
@@ -65,7 +83,79 @@ fn test_account_recovery_valid() {
 
     let owner_account = h.new_account_with_key_pair();
     let delegated_account = h.new_account_with_key_pair();
-    register_account_recovery(&mut h, &resource_address, &owner_account, &resource_address)
+    register_account_recovery(
+        &mut h,
+        &resource_address,
+        &owner_account,
+        delegated_account.address(),
+    );
+    initiate_account_key_recovery(
+        &mut h,
+        &resource_address,
+        &delegated_account,
+        owner_account.address(),
+    );
+    let new_account = h.new_account_with_key_pair();
+
+    rotate_key(
+        &mut h,
+        &resource_address,
+        &delegated_account,
+        &owner_account,
+        &new_account,
+    );
+}
+
+pub fn rotate_key(
+    harness: &mut MoveHarness,
+    resource_address: &AccountAddress,
+    delegated_account: &Account,
+    owner_account: &Account,
+    new_account: &Account,
+) {
+    let rotation_proof = RotationProofChallenge {
+        account_address: CORE_CODE_ADDRESS,
+        module_name: String::from("account"),
+        struct_name: String::from("RotationProofChallenge"),
+        sequence_number: 0,
+        originator: *owner_account.address(),
+        current_auth_key: AccountAddress::from_bytes(&owner_account.auth_key()).unwrap(),
+        new_public_key: new_account.pubkey.to_bytes().to_vec(),
+    };
+
+    let rotation_msg = bcs::to_bytes(&rotation_proof).unwrap();
+
+    // sign the rotation message by the new private key
+    let signature_by_new_privkey = new_account.privkey.sign_arbitrary_message(&rotation_msg);
+
+    assert_success!(harness.run_entry_function(
+        &delegated_account,
+        str::parse(&format!("0x{}::hackathon::rotate_key", resource_address)).unwrap(),
+        vec![],
+        vec![
+            bcs::to_bytes(&owner_account.address()).unwrap(),
+            bcs::to_bytes(&new_account.pubkey.to_bytes().to_vec()).unwrap(),
+            bcs::to_bytes(&signature_by_new_privkey.to_bytes().to_vec()).unwrap(),
+        ],
+    ));
+}
+
+pub fn initiate_account_key_recovery(
+    harness: &mut MoveHarness,
+    resource_address: &AccountAddress,
+    delegated_account: &Account,
+    owner_address: &AccountAddress,
+) {
+    assert_success!(harness.run_entry_function(
+        &delegated_account,
+        str::parse(&format!(
+            "0x{}::hackathon::initiate_account_key_recovery",
+            resource_address
+        ))
+        .unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&owner_address).unwrap(),],
+    ));
 }
 
 pub fn register_account_recovery(
@@ -81,7 +171,7 @@ pub fn register_account_recovery(
         chain_id: 4,
         sequence_number: 0,
         source_address: *offerer_account.address(),
-        recipient_address: *delegate_address,
+        recipient_address: *resource_address,
     };
 
     let rotation_capability_proof_msg = bcs::to_bytes(&rotation_capability_proof);
@@ -90,10 +180,7 @@ pub fn register_account_recovery(
         .sign_arbitrary_message(&rotation_capability_proof_msg.unwrap());
 
     let authorized_address = delegate_address.clone();
-    let required_num_recovery = 1;
     let required_delay_seconds = 0;
-    let rotate_valid_window_seconds = 0;
-    let allow_unauthorized_initiation = false;
 
     assert_success!(harness.run_entry_function(
         &offerer_account,
@@ -118,6 +205,6 @@ pub fn register_account_recovery(
             .unwrap()
             .rotation_capability_offer()
             .unwrap(),
-        *delegate_address
+        *resource_address
     );
 }
