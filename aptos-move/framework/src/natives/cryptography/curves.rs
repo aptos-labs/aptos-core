@@ -230,7 +230,6 @@ fn point_eq_internal(
     let gid = pop_arg!(args, u64);
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
-    println!("gid={gid}, handle_2={handle_2}, handle_1={handle_1}");
     let result = match gid {
         GID_BLS12_381_G1 => {
             let point_1 = context
