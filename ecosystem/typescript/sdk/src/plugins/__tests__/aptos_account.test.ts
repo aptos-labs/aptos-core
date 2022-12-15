@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount, AptosAccountObject, getAddressFromAccountOrAddress } from "./aptos_account";
-import { HexString } from "./hex_string";
+import { AptosAccount, AptosAccountObject, getAddressFromAccountOrAddress } from "../aptos_account";
+import { HexString } from "../../utils/hex_string";
 
 const aptosAccountObject: AptosAccountObject = {
   address: "0x978c213990c4833df71548df7ce49d54c759d6b6d932de22b24d56060b7af2aa",

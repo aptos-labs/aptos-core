@@ -4,10 +4,10 @@
 /* eslint-disable max-len */
 import nacl from "tweetnacl";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
-import { bcsSerializeUint64, bcsToBytes, Bytes } from "../bcs";
-import { HexString } from "../hex_string";
+import { bcsSerializeUint64, bcsToBytes, Bytes } from "../../bcs";
+import { HexString } from "../../utils/hex_string";
 
-import { TransactionBuilderEd25519, TransactionBuilder } from "./index";
+import { TransactionBuilderEd25519, TransactionBuilder } from "../index";
 import {
   AccountAddress,
   ChainId,
@@ -25,7 +25,7 @@ import {
   TransactionArgumentU16,
   TransactionArgumentU32,
   TransactionArgumentU256,
-} from "../aptos_types";
+} from "../../aptos_types";
 
 const ADDRESS_1 = "0x1222";
 const ADDRESS_2 = "0xdd";

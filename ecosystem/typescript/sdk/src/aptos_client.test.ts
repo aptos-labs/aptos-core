@@ -3,11 +3,11 @@
 
 import { AptosClient } from "./aptos_client";
 import * as Gen from "./generated/index";
-import { AptosAccount } from "./aptos_account";
+import { AptosAccount } from "./plugins";
 import { TxnBuilderTypes, TransactionBuilderMultiEd25519, TransactionBuilderRemoteABI } from "./transaction_builder";
-import { TokenClient } from "./token_client";
-import { HexString } from "./hex_string";
-import { getFaucetClient, longTestTimeout, NODE_URL } from "./utils/test_helper.test";
+import { TokenClient } from "./plugins/token_client";
+import { HexString } from "./utils/hex_string";
+import { getFaucetClient, longTestTimeout, NODE_URL } from "./utils/__tests__/test_helper.test";
 import { bcsSerializeUint64, bcsToBytes } from "./bcs";
 import { Ed25519PublicKey } from "./aptos_types";
 

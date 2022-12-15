@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable max-classes-per-file */
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
-import { HexString } from "../hex_string";
+import { HexString } from "../utils/hex_string";
 import {
   Deserializer,
   Serializer,

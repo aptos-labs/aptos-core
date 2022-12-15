@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /** Faucet creates and funds accounts. This is a thin wrapper around that. */
-import { AptosClient } from "./aptos_client";
-import { OpenAPIConfig } from "./generated";
-import { AxiosHttpRequest } from "./generated/core/AxiosHttpRequest";
-import { HexString, MaybeHexString } from "./hex_string";
-import { DEFAULT_TXN_TIMEOUT_SEC } from "./utils";
+import { AptosClient } from "../aptos_client";
+import { OpenAPIConfig } from "../generated";
+import { AxiosHttpRequest } from "../generated/core/AxiosHttpRequest";
+import { HexString, MaybeHexString } from "../utils/hex_string";
+import { DEFAULT_TXN_TIMEOUT_SEC } from "../utils";
 
 /**
  * Class for requsting tokens from faucet

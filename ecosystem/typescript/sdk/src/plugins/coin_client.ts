@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosAccount, getAddressFromAccountOrAddress } from "./aptos_account";
-import { AptosClient, OptionalTransactionArgs } from "./aptos_client";
-import { HexString, MaybeHexString } from "./hex_string";
-import { TransactionBuilderABI } from "./transaction_builder";
-import { COIN_ABIS } from "./abis";
-import { APTOS_COIN } from "./utils";
+import { AptosClient, OptionalTransactionArgs } from "../aptos_client";
+import { HexString, MaybeHexString } from "../utils/hex_string";
+import { TransactionBuilderABI } from "../transaction_builder";
+import { COIN_ABIS } from "../helpers/abis";
+import { APTOS_COIN } from "../utils";
 
 /**
  * Class for working with the coin module, such as transferring coins and
