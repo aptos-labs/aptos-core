@@ -19,7 +19,7 @@ This tutorial assumes you have:
 
 When you are minting an NFT, the NFT is tied to your [account](../../concepts/accounts.md). Aptos ensures no one else can alter your collection of NFTs. This is why a private key is required to obtain signer capabilities. When you submit a transaction, you sign the transaction.
 
-[Resource accounts](../resource-accounts.md) allow the delegation of signing transactions. You create a resource account to grant a signer capability that can be stored in a new resource on the same account and can sign transaction autonomously. The signer capability is protected as no one has access to the private key for the resource account.
+[Resource accounts](../resource-accounts.md) allow the delegation of signing transactions. You create a resource account to grant a signer capability that can be stored in a new resource on the same account and can sign transactions autonomously. The signer capability is protected as no one has access to the private key for the resource account.
 
 ## Understand minting
 
@@ -49,7 +49,7 @@ For example:
 
 ### Signing
 
-The only argument taken by `mint_nft` is `receiver`. Any `entry fun` will take as the first parameter the type `&signer`. In both Move and Aptos, whenever you submit a transaction, the private key you sign the transaction with, automatically makes the associated account the first parameter of the signer.
+The only argument taken by `mint_nft` is `receiver`. Any `entry fun` will take as the first parameter the type `&signer`. In both Move and Aptos, whenever you submit a transaction, the private key you sign the transaction with automatically makes the associated account the first parameter of the signer.
 
 You can go from the signer to an address but normally not the reverse. So when claiming an NFT, both the private keys of the minter and receiver are needed, as shown in the instructions below.
 
@@ -69,19 +69,19 @@ The signer capability prevents anyone from getting the private key from the reso
 
 ### Module data
 
-So later in [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move), we see:
+The `ModuleData` is then initialized and *moved* to the resource account, which has the signer capability:
 
 ```shell
         move_to(resource_account, ModuleData {
 ```
 
-The `ModuleData` is initialized and *moved* to the resource account, which has the signer capability. So in the `mint_nft` function, you see the first step is borrowing the `ModuleData` struct:
+In the `mint_nft` function, the first step is borrowing the `ModuleData` struct:
 
 ```shell
         let module_data = borrow_global_mut<ModuleData>(@mint_nft);
 ```
 
-And then uses the reference to the signer capability in the  `ModuleData` struct to create the `resource_signer`:
+And then use the reference to the signer capability in the  `ModuleData` struct to create the `resource_signer`:
 
 ```shell
         let resource_signer = account::create_signer_with_capability(&module_data.signer_cap);
@@ -242,7 +242,7 @@ In the [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutor
 
 3. Open `Move.toml` in that directory for editing.
 
-4. Update the `source_addr` and `admin_addr` with the `account` values for the `source-account` and `admin-account` profiles you just created (found in `.aptos/config.yaml`). Note, the order is flipped in those files, so copy carefully.
+4. Update the `source_addr` and `admin_addr` with the `account` values for the `source-account` and `admin-account` profiles you just created (found in `.aptos/config.yaml`), respectively. Note, the order of addresses and accounts is flipped in those files, so copy carefully.
 
 ### Create resource account and publish package
 
@@ -301,12 +301,12 @@ aptos move run --function-id <resource-account-address>::minting::mint_nft --pro
 */
 ```
 
-4. Disable NFT minting in this module using the `admin-account` profile so that random folks cannot mint this NFT from your module:
+4. Disable NFT minting in this module by applying `set_minting_enabled --args bool:false` to the `admin-account` profile so that random folks cannot mint this NFT from your module:
 
 ```shell
 aptos move run --function-id <resource-account-address>::minting::set_minting_enabled --args bool:false --profile admin-account
 ```
 
 Now you can include your own artwork once you are ready to customize your NFTs by replacing our defaults in `minting.move`:
-https://slwdaeeko5tz5hx46c6zwqhmh3c6je4sbdbjsdjzbntme5dxarxa.arweave.net/kuwwEIp3Z56e_PC9m0DsPsXkk5IIwpkNOQtmwnR3BG4
-https://lty5vdw4cl6yczbpz2rnm2732rbtnk3jeiutyqd644wojmkyt2hq.arweave.net/XPHajtwS_YFkL86i1mv71EM2q2kiKTxAfucs5LFYno8
+* https://slwdaeeko5tz5hx46c6zwqhmh3c6je4sbdbjsdjzbntme5dxarxa.arweave.net/kuwwEIp3Z56e_PC9m0DsPsXkk5IIwpkNOQtmwnR3BG4
+* https://lty5vdw4cl6yczbpz2rnm2732rbtnk3jeiutyqd644wojmkyt2hq.arweave.net/XPHajtwS_YFkL86i1mv71EM2q2kiKTxAfucs5LFYno8
