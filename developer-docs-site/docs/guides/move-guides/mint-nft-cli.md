@@ -65,7 +65,7 @@ Where the `&resource_signer` is the first parameter, defined previously as a new
         signer_cap: account::SignerCapability,
 ```
 
-The signer capability prevents anyone from getting the private key from the resource acount. The [resource account](../resource-accounts.md) is entirely controlled by the contract.
+The signer capability prevents anyone from getting the private key from the resource account. The [resource account](../resource-accounts.md) is entirely controlled by the contract.
 
 ### Module data
 
