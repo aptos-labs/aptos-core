@@ -872,9 +872,6 @@ impl EpochManager {
 
         // TODO: cleanup
         if quorum_store_enabled {
-            let (wrapper_quorum_store_tx, wrapper_quorum_store_rx) =
-                tokio::sync::mpsc::channel(config.channel_size);
-
             self.spawn_quorum_store_wrapper(
                 network_sender.clone(),
                 consensus_to_quorum_store_rx,
