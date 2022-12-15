@@ -25,7 +25,7 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 08 December 2022
 
-- Released a new version to Mainnet:
+- Released [aptos-node-v1.1.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.1.0) to Mainnet:
 
   Framework upgrade through governance voting:
   - Testnet upgrade - Nov 30th
