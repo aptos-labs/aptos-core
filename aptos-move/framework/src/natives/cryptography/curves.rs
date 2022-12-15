@@ -73,7 +73,7 @@ impl Bls12381Context {
     }
 
     pub fn add_gt_point(&mut self, point: Gt) -> usize {
-        let ret = self.g2_point_store.len();
+        let ret = self.gt_point_store.len();
         self.gt_point_store.push(point);
         ret
     }
@@ -230,15 +230,47 @@ fn point_eq_internal(
     let gid = pop_arg!(args, u64);
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
-    let point_1 = context
-        .extensions()
-        .get::<Bls12381Context>()
-        .get_g1_point(handle_1);
-    let point_2 = context
-        .extensions()
-        .get::<Bls12381Context>()
-        .get_g1_point(handle_2);
-    let result = point_1.eq(point_2);
+    println!("gid={gid}, handle_2={handle_2}, handle_1={handle_1}");
+    let result = match gid {
+        GID_BLS12_381_G1 => {
+            let point_1 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_g1_point(handle_1);
+            let point_2 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_g1_point(handle_2);
+            let result = point_1.eq(point_2);
+            result
+        }
+        GID_BLS12_381_G2 => {
+            let point_1 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_g2_point(handle_1);
+            let point_2 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_g2_point(handle_2);
+            let result = point_1.eq(point_2);
+            result
+        }
+        GID_BLS12_381_Gt => {
+            let point_1 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_gt_point(handle_1);
+            let point_2 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_gt_point(handle_2);
+            let result = point_1.eq(point_2);
+            result
+        }
+        _ => todo!(),
+    };
+
     Ok(NativeResult::ok(
         gas_params.base,
         smallvec![Value::bool(result)],
@@ -254,19 +286,57 @@ fn point_add_internal(
     let gid = pop_arg!(args, u64);
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
-    let point_1 = context
-        .extensions()
-        .get::<Bls12381Context>()
-        .get_g1_point(handle_1);
-    let point_2 = context
-        .extensions()
-        .get::<Bls12381Context>()
-        .get_g1_point(handle_2);
-    let result = point_1.add(point_2);
-    let handle = context
-        .extensions_mut()
-        .get_mut::<Bls12381Context>()
-        .add_g1_point(result);
+    let handle = match gid {
+        GID_BLS12_381_G1 => {
+            let point_1 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_g1_point(handle_1);
+            let point_2 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_g1_point(handle_2);
+            let result = point_1.add(point_2);
+            let handle = context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_g1_point(result);
+            handle
+        }
+        GID_BLS12_381_G2 => {
+            let point_1 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_g2_point(handle_1);
+            let point_2 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_g2_point(handle_2);
+            let result = point_1.add(point_2);
+            let handle = context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_g2_point(result);
+            handle
+        }
+        GID_BLS12_381_Gt => {
+            let point_1 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_gt_point(handle_1);
+            let point_2 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_gt_point(handle_2);
+            let result = point_1.clone() + point_2.clone();
+            let handle = context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_gt_point(result);
+            handle
+        }
+        _ => todo!(),
+    };
     Ok(NativeResult::ok(
         gas_params.base,
         smallvec![Value::u64(handle as u64)],

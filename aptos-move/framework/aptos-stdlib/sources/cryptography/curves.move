@@ -56,14 +56,14 @@ module aptos_std::curves {
         }
     }
 
-    public fun scalar_inv<T>(_scalar: &Scalar<T>): Scalar<T> {
+    public fun scalar_inv<T>(scalar: &Scalar<T>): Scalar<T> {
         Scalar<T> {
-            handle: scalar_inv_internal(_scalar.handle, get_group_id<T>())
+            handle: scalar_inv_internal(scalar.handle, get_group_id<T>())
         }
     }
 
-    public fun scalar_eq<T>(_scalar_1: &Scalar<T>, _scalar_2: &Scalar<T>): bool {
-        scalar_eq_internal(_scalar_1.handle, _scalar_2.handle, get_group_id<T>())
+    public fun scalar_eq<T>(scalar_1: &Scalar<T>, scalar_2: &Scalar<T>): bool {
+        scalar_eq_internal(scalar_1.handle, scalar_2.handle, get_group_id<T>())
     }
 
     public fun bytes_into_scalar<T>(bytes: vector<u8>): Scalar<T> {
@@ -112,7 +112,7 @@ module aptos_std::curves {
     }
 
     public fun point_eq<T>(point_1: &Point<T>, point_2: &Point<T>): bool {
-        point_eq_internal(get_group_id<T>(), point_1.handle, point_2.handle)
+        point_eq_internal(point_1.handle, point_2.handle, get_group_id<T>())
     }
 
     const GID_UNKNOWN: u64 = 0;
@@ -165,9 +165,9 @@ module aptos_std::curves {
 
     #[test]
     fun test_scalar_point_arithmatics() {
-        let one = scalar_one<BLS12_381_G1>();
+        let one = scalar_one<BLS12_381_G2>();
         let two = scalar_add(&one, &one);
-        let point_p1 = point_generator<BLS12_381_G1>();
+        let point_p1 = point_generator<BLS12_381_G2>();
         let point_p2 = point_add(&point_p1, &point_p1);
         let point_q = point_mul(&two, &point_p1);
         assert!(point_eq(&point_q, &point_p2), 1);

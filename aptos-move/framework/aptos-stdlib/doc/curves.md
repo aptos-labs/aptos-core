@@ -439,7 +439,7 @@ Scalar basics.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv">scalar_inv</a>&lt;T&gt;(_scalar: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv">scalar_inv</a>&lt;T&gt;(scalar: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;
 </code></pre>
 
 
@@ -448,9 +448,9 @@ Scalar basics.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv">scalar_inv</a>&lt;T&gt;(_scalar: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv">scalar_inv</a>&lt;T&gt;(scalar: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; {
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; {
-        handle: <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(_scalar.handle, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;())
+        handle: <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(scalar.handle, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;())
     }
 }
 </code></pre>
@@ -465,7 +465,7 @@ Scalar basics.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_eq">scalar_eq</a>&lt;T&gt;(_scalar_1: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;, _scalar_2: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_eq">scalar_eq</a>&lt;T&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;, scalar_2: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -474,8 +474,8 @@ Scalar basics.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_eq">scalar_eq</a>&lt;T&gt;(_scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt;, _scalar_2: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt;): bool {
-    <a href="curves.md#0x1_curves_scalar_eq_internal">scalar_eq_internal</a>(_scalar_1.handle, _scalar_2.handle, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;())
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_eq">scalar_eq</a>&lt;T&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt;, scalar_2: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt;): bool {
+    <a href="curves.md#0x1_curves_scalar_eq_internal">scalar_eq_internal</a>(scalar_1.handle, scalar_2.handle, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;())
 }
 </code></pre>
 
@@ -703,7 +703,7 @@ Scalar basics.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_point_eq">point_eq</a>&lt;T&gt;(point_1: &<a href="curves.md#0x1_curves_Point">Point</a>&lt;T&gt;, point_2: &<a href="curves.md#0x1_curves_Point">Point</a>&lt;T&gt;): bool {
-    <a href="curves.md#0x1_curves_point_eq_internal">point_eq_internal</a>(<a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;(), point_1.handle, point_2.handle)
+    <a href="curves.md#0x1_curves_point_eq_internal">point_eq_internal</a>(point_1.handle, point_2.handle, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;())
 }
 </code></pre>
 
