@@ -8,6 +8,15 @@ module aptos_std::curves {
         handle: u64
     }
 
+    public fun get_scalar_handle<G>(s: &Scalar<G>): u64 {
+        s.handle
+    }
+    public fun get_point_handle<G>(p: &Point<G>): u64 {
+        p.handle
+    }
+
+
+
     struct BLS12_381_G1 {}
     struct BLS12_381_G2 {}
     struct BLS12_381_Gt {}
@@ -136,7 +145,7 @@ module aptos_std::curves {
     const PID_UNKNOWN: u64 = 0;
     const PID_BLS12_381: u64 = 1;
 
-    fun get_pairing_id<G1,G2,Gt>(): u64 {
+    public fun get_pairing_id<G1,G2,Gt>(): u64 {
         if (get_group_id<G1>() == GID_BLS12_381_G1 && get_group_id<G2>() == GID_BLS12_381_G2 && get_group_id<Gt>() == GID_BLS12_381_Gt) {
             PID_BLS12_381
         } else {

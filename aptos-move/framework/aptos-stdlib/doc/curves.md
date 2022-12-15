@@ -11,6 +11,8 @@
 -  [Struct `BLS12_381_G2`](#0x1_curves_BLS12_381_G2)
 -  [Struct `BLS12_381_Gt`](#0x1_curves_BLS12_381_Gt)
 -  [Constants](#@Constants_0)
+-  [Function `get_scalar_handle`](#0x1_curves_get_scalar_handle)
+-  [Function `get_point_handle`](#0x1_curves_get_point_handle)
 -  [Function `pairing`](#0x1_curves_pairing)
 -  [Function `scalar_zero`](#0x1_curves_scalar_zero)
 -  [Function `scalar_one`](#0x1_curves_scalar_one)
@@ -249,6 +251,54 @@
 </code></pre>
 
 
+
+<a name="0x1_curves_get_scalar_handle"></a>
+
+## Function `get_scalar_handle`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_scalar_handle">get_scalar_handle</a>&lt;G&gt;(s: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_scalar_handle">get_scalar_handle</a>&lt;G&gt;(s: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): u64 {
+    s.handle
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_get_point_handle"></a>
+
+## Function `get_point_handle`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_point_handle">get_point_handle</a>&lt;G&gt;(p: &<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_point_handle">get_point_handle</a>&lt;G&gt;(p: &<a href="curves.md#0x1_curves_Point">Point</a>&lt;G&gt;): u64 {
+    p.handle
+}
+</code></pre>
+
+
+
+</details>
 
 <a name="0x1_curves_pairing"></a>
 
@@ -750,7 +800,7 @@ Scalar basics.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_get_pairing_id">get_pairing_id</a>&lt;G1, G2, Gt&gt;(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_pairing_id">get_pairing_id</a>&lt;G1, G2, Gt&gt;(): u64
 </code></pre>
 
 
@@ -759,7 +809,7 @@ Scalar basics.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_get_pairing_id">get_pairing_id</a>&lt;G1,G2,Gt&gt;(): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_pairing_id">get_pairing_id</a>&lt;G1,G2,Gt&gt;(): u64 {
     <b>if</b> (<a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;G1&gt;() == <a href="curves.md#0x1_curves_GID_BLS12_381_G1">GID_BLS12_381_G1</a> && <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;G2&gt;() == <a href="curves.md#0x1_curves_GID_BLS12_381_G2">GID_BLS12_381_G2</a> && <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;Gt&gt;() == <a href="curves.md#0x1_curves_GID_BLS12_381_Gt">GID_BLS12_381_Gt</a>) {
         <a href="curves.md#0x1_curves_PID_BLS12_381">PID_BLS12_381</a>
     } <b>else</b> {

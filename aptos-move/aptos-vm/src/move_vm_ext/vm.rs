@@ -6,7 +6,7 @@ use crate::{
     natives::aptos_natives,
 };
 use aptos_framework::natives::cryptography::curves::Bls12381Context;
-use aptos_framework::natives::cryptography::groth16::BellmanContext;
+use aptos_framework::natives::cryptography::groth16_bls12381_bellman::BellmanContext;
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     cryptography::ristretto255_point::NativeRistrettoPointContext,

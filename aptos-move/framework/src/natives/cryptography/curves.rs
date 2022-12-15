@@ -1,12 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::cryptography::groth16::BellmanContext;
+use crate::natives::cryptography::groth16_bls12381_bellman::BellmanContext;
 use crate::natives::util::{make_native_from_func, make_test_only_native_from_func};
+use crate::pop_vec_arg;
+use aptos_crypto::bls12381::arithmetics::Scalar;
 use aptos_crypto::bls12381::PrivateKey;
 use better_any::{Tid, TidAble};
 use bls12_381::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt};
-use group::Group;
+use group::{Group, GroupEncoding};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
@@ -81,6 +83,68 @@ impl Bls12381Context {
     pub fn get_gt_point(&self, handle: usize) -> &Gt {
         self.gt_point_store.get(handle).unwrap()
     }
+}
+
+fn bytes_into_point_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    let gid = pop_arg!(args, u64);
+    let bytes = pop_arg!(args, Vec<u8>);
+    let handle = match gid {
+        GID_BLS12_381_G1 => {
+            let bytes_2 = <[u8; 48]>::try_from(bytes).unwrap();
+            let point = bls12_381::G1Affine::from_compressed(&bytes_2)
+                .unwrap()
+                .mul(bls12_381::Scalar::one());
+            context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_g1_point(point)
+        }
+        GID_BLS12_381_G2 => {
+            let bytes_2 = <[u8; 96]>::try_from(bytes.as_slice()).unwrap();
+            let point = bls12_381::G2Affine::from_compressed(&bytes_2)
+                .unwrap()
+                .mul(bls12_381::Scalar::one());
+            context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_g2_point(point)
+        }
+        _ => todo!(),
+    };
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::u64(handle as u64)],
+    ))
+}
+
+fn bytes_into_scalar_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    let gid = pop_arg!(args, u64);
+    let bytes = pop_arg!(args, Vec<u8>);
+    let handle = match gid {
+        GID_BLS12_381_G1 | GID_BLS12_381_G2 => {
+            let scalar =
+                bls12_381::Scalar::from_bytes(&<[u8; 32]>::try_from(bytes).unwrap()).unwrap();
+            context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_scalar(scalar)
+        }
+        _ => todo!(),
+    };
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::u64(handle as u64)],
+    ))
 }
 
 fn scalar_one_internal(
@@ -170,11 +234,11 @@ fn point_identity_internal(
     ))
 }
 
-const GID_BLS12_381_G1: u64 = 1;
-const GID_BLS12_381_G2: u64 = 2;
-const GID_BLS12_381_Gt: u64 = 3;
+pub const GID_BLS12_381_G1: u64 = 1;
+pub const GID_BLS12_381_G2: u64 = 2;
+pub const GID_BLS12_381_Gt: u64 = 3;
 
-const PID_BLS12_381: u64 = 1;
+pub const PID_BLS12_381: u64 = 1;
 
 fn point_generator_internal(
     gas_params: &GasParameters,
@@ -448,6 +512,14 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
 
     // Always-on natives.
     natives.append(&mut vec![
+        (
+            "bytes_into_point_internal",
+            make_native_from_func(gas_params.clone(), bytes_into_point_internal),
+        ),
+        (
+            "bytes_into_scalar_internal",
+            make_native_from_func(gas_params.clone(), bytes_into_scalar_internal),
+        ),
         (
             "scalar_one_internal",
             make_native_from_func(gas_params.clone(), scalar_one_internal),
