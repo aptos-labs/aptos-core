@@ -97,24 +97,24 @@ Now that you have an understanding of the Aptos minting process and are starting
 
 1. [Install the Aptos CLI](../../cli-tools/aptos-cli-tool/install-aptos-cli.md) and note its [many uses](../../cli-tools/aptos-cli-tool/use-aptos-cli.md) for later if you haven't experienced its goodness already.
 
-1. Create an account on Aptos testnet to receive the NFT by running the following command and selecting `testnet`:
+2. Create an account on Aptos testnet to receive the NFT by running the following command and selecting `testnet`:
   ```shell
   aptos init --profile nft-receiver
   ```
 
-1. When prompted for a network, select `testnet` by entering it and hitting return:
+3. When prompted for a network, select `testnet` by entering it and hitting return:
   ```shell
   Configuring for profile nft-receiver
   Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]
   testnet
   ```
 
-1. When prompted for your private key, hit enter to generate a new key:
+4. When prompted for your private key, hit enter to generate a new key:
   ```shell
   Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
   ```
 
-1. Receive output resembling:
+5. Receive output resembling:
   ```shell
   No key given, generating key...
   Account a233bf7be2b93f1e532f8ea88c49e0c70a873d082890b6d9685f89b5e40d50c2 does not exist, you will need to create and fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account
@@ -126,41 +126,41 @@ Now that you have an understanding of the Aptos minting process and are starting
   }
   ```
 
-1. Note your configuration information can be found in `.aptos/config.yaml` relative to where you ran `aptos init`. Read that file to see each profile's private and public keys, account address, and REST API URL.
+6. Note your configuration information can be found in `.aptos/config.yaml` relative to where you ran `aptos init`. Read that file to see each profile's private and public keys, account address, and REST API URL.
 
 ### Install wallet and import account
 
 1. Read `.aptos/config.yaml` to see and copy the `nft-receiver` private key.
 
-1. Install the wallet of your choice. We use the [Petra Wallet](../../guides/install-petra-wallet.md) Chrome extension.
+2. Install the wallet of your choice. We use the [Petra Wallet](../../guides/install-petra-wallet.md) Chrome extension.
 
-1. Open the wallet and select the [Testnet network](https://petra.app/docs/use) in the wallet via *Petra settings > Network > Testnet*.
+3. Open the wallet and select the [Testnet network](https://petra.app/docs/use) in the wallet via *Petra settings > Network > Testnet*.
 
-1. Go to *Petra > Settings > Switch account > Add Account > Import private key*.
+4. Go to *Petra > Settings > Switch account > Add Account > Import private key*.
 
-1. Paste the `nft-receiver` private key there.
+5. Paste the `nft-receiver` private key there.
 
-1. Click **Submit** to add the previously created account to the wallet.
+6. Click **Submit** to add the previously created account to the wallet.
 
-1. You are switched into that account automatically.
+7. You are switched into that account automatically.
 
 ### Get coins from faucet
 
 1. Go to the *Petra > Settings > Network > Testnet* network if not there already.
 
-1. Connect your wallet to the Aptos faucet at https://aptoslabs.com/testnet-faucet:
+2. Connect your wallet to the Aptos faucet at https://aptoslabs.com/testnet-faucet:
 
   ![Faucet connect](../../../static/img/connect-wallet-faucet.png "Connect faucet to wallet")
 
-1. Select your wallet type:
+3. Select your wallet type:
 
   ![Wallet select](../../../static/img/select-wallet-faucet.png "Select your wallet for faucet")
 
-1. Approve the connection request:
+4. Approve the connection request:
 
   ![Faucet approval](../../../static/img/approve-wallet-faucet.png "Approve connecting faucet to wallet")
 
-1. Now when you load your wallet, you will see a **Faucet** button next to **Send**. Click **Faucet** to receive one APT per click to use when minting.
+5. Now when you load your wallet, you will see a **Faucet** button next to **Send**. Click **Faucet** to receive one APT per click to use when minting.
 
 ### Mint the NFT
 
@@ -170,9 +170,9 @@ Now that you have an understanding of the Aptos minting process and are starting
   aptos move run --function-id 8cdf69c8c93fee36ed83f8882908060c1335ed39a827c08dbb506b46237e88fb::minting::mint_nft --profile nft-receiver
   ```
 
-1. When asked, `Do you want to submit a transaction for a range of...?`, enter `yes` and hit return.
+2. When asked, `Do you want to submit a transaction for a range of...?`, enter `yes` and hit return.
 
-1. Receive results resembling:
+3. Receive results resembling:
 
 ```shell
 {
@@ -195,11 +195,11 @@ Now that you have an understanding of the Aptos minting process and are starting
 
 1. Open the Petra Wallet Chrome extension.
 
-1. Go to *Petra > Settings > Network > Testnet*.
+2. Go to *Petra > Settings > Network > Testnet*.
 
-1. Click **Library** at bottom.
+3. Click **Library** at bottom.
 
-1. See the NFT in your wallet:
+4. See the NFT in your wallet:
 
   ![Wallet library NFT](../../../static/img/petra-nft-library.png "See the wallet library with NFT")
 
@@ -220,13 +220,13 @@ Create two accounts on testnet for deploying and managing this contract:
   ```shell
   aptos init --profile admin-account
   ```
-1. Open `.aptos/config.yaml` to find the private keys for the `admin-account` and `source-account` profiles and copy them.
+2. Open `.aptos/config.yaml` to find the private keys for the `admin-account` and `source-account` profiles and copy them.
 
-1. Fund these accounts by adding them to your wallet via importing their private keys into testnet and using the **Faucet** function as you did for the `nft-receiver` profile.
+3. Fund these accounts by adding them to your wallet via importing their private keys into testnet and using the **Faucet** function as you did for the `nft-receiver` profile.
 
-### Create a resource account from source account
+### Prepare resource account from source account
 
-In this section, we will create a [resource account](../resource-accounts.md) from the source-account and publish the module on testnet under the resource account’s address. A resource account is used here to programmatically signed for transactions and avoids the need for multiple signatures.
+In this section, we will create a [resource account](../resource-accounts.md) from the `source-account` and publish the module on testnet under the resource account’s address. A resource account is used here to programmatically signed for transactions and avoids the need for multiple signatures.
 
 In the [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutorial) smart contract, we store the resource account’s signer capability in the `ModuleData` resource so that it can automatically sign for transactions in the contract. If we don’t store the signer capability within the module, we’d need to provide the resource account’s signer; but we no longer have access to the resource account’s signer because the resource account is meant to be autonomous, and the contracts published under a resource account are immutable. Once the contract is published, the resource account no longer has access to the signer.
 
@@ -235,21 +235,23 @@ In the [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutor
   git clone https://github.com/aptos-labs/nft-tutorial
   ```
 
-1. Navigate into the tutorial directory:
+2. Navigate into the tutorial directory:
   ```shell
   cd nft-tutorial
   ```
 
-1. Open `Move.toml` in that directory for editing.
+3. Open `Move.toml` in that directory for editing.
 
-1. Update the `source_addr` and `admin_addr` with the `account` values for the `source-account` and `admin-account` profiles you just created (found in `.aptos/config.yaml`). Note, the order is flipped in those files, so copy carefully.
+4. Update the `source_addr` and `admin_addr` with the `account` values for the `source-account` and `admin-account` profiles you just created (found in `.aptos/config.yaml`). Note, the order is flipped in those files, so copy carefully.
+
+### Create resource account and publish package
 
 1. Run the following command to create the resource account and publish the package all at once. The seed is just an example - feel free to provide a different seed if the resource account created by the specified seed already exists:
   ```shell
   aptos move create-resource-account-and-publish-package --seed hex_array:1234 --address-name mint_nft --profile source-account
   ```
 
-1. Receive compilation output like:
+2. Receive compilation output like:
   ```shell
   Compiling, may take a little while to download git dependencies...
   INCLUDING DEPENDENCY AptosFramework
@@ -259,16 +261,18 @@ In the [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutor
   BUILDING NFT-tutorial
   ```
 
-1. When prompted to publish this package under the resource account's address, enter `yes` and hit return.
+3. When prompted to publish this package under the resource account's address, enter `yes` and hit return.
 
-1. When asked, `Do you want to submit a transaction for a range of...?`, enter `yes` and hit return.
+4. When asked, `Do you want to submit a transaction for a range of...?`, enter `yes` and hit return.
 
-1. Receive output indicating success resembling:
+5. Receive output indicating success resembling:
   ```shell
   {
     "Result": "Success"
   }
   ```
+
+### Mint more NFTs and disable minting from admin account
 
 1. Mint another NFT using the `nft-receiver` profile, sustituting in the resource account's address:
 
@@ -276,9 +280,9 @@ In the [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutor
 aptos move run --function-id <resource-account-address>::minting::mint_nft --profile nft-receiver
 ```
 
-1. Again answer `yes` when prompted to submit the transaction.
+2. Again answer `yes` when prompted to submit the transaction.
 
-1. Receive output resembling:
+3. Receive output resembling:
 
 ```shell
 {
@@ -297,7 +301,7 @@ aptos move run --function-id <resource-account-address>::minting::mint_nft --pro
 */
 ```
 
-1. Disable NFT minting in this module using the `admin-account` profile so that random folks cannot mint this NFT from your module:
+4. Disable NFT minting in this module using the `admin-account` profile so that random folks cannot mint this NFT from your module:
 
 ```shell
 aptos move run --function-id <resource-account-address>::minting::set_minting_enabled --args bool:false --profile admin-account
