@@ -10,13 +10,22 @@ use serde::{Deserialize, Serialize};
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
     TREAT_FRIEND_AS_PRIVATE = 2,
+    VM_BINARY_FORMAT_V6 = 5,
 }
 
 /// Representation of features on chain as a bitset.
-#[derive(Default, Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Features {
     #[serde(with = "serde_bytes")]
     pub features: Vec<u8>,
+}
+
+impl Default for Features {
+    fn default() -> Self {
+        Features {
+            features: vec![0b00100000],
+        }
+    }
 }
 
 impl OnChainConfig for Features {

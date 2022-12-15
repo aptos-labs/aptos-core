@@ -37,6 +37,8 @@ pub trait Bytecode {
 
     fn find_entry_function(&self, name: &IdentStr) -> Option<MoveFunction>;
 
+    fn find_function(&self, name: &IdentStr) -> Option<MoveFunction>;
+
     fn new_move_struct_field(&self, def: &FieldDefinition) -> MoveStructField {
         MoveStructField {
             name: self.identifier_at(def.name).to_owned().into(),
@@ -63,8 +65,11 @@ pub trait Bytecode {
         match token {
             SignatureToken::Bool => MoveType::Bool,
             SignatureToken::U8 => MoveType::U8,
+            SignatureToken::U16 => MoveType::U16,
+            SignatureToken::U32 => MoveType::U32,
             SignatureToken::U64 => MoveType::U64,
             SignatureToken::U128 => MoveType::U128,
+            SignatureToken::U256 => MoveType::U256,
             SignatureToken::Address => MoveType::Address,
             SignatureToken::Signer => MoveType::Signer,
             SignatureToken::Vector(t) => MoveType::Vector {
@@ -181,6 +186,16 @@ impl Bytecode for CompiledModule {
             })
             .map(|def| self.new_move_function(def))
     }
+
+    fn find_function(&self, name: &IdentStr) -> Option<MoveFunction> {
+        self.function_defs
+            .iter()
+            .find(|def| {
+                let fhandle = ModuleAccess::function_handle_at(self, def.function);
+                ModuleAccess::identifier_at(self, fhandle.name) == name
+            })
+            .map(|def| self.new_move_function(def))
+    }
 }
 
 impl Bytecode for CompiledScript {
@@ -209,6 +224,14 @@ impl Bytecode for CompiledScript {
     }
 
     fn find_entry_function(&self, name: &IdentStr) -> Option<MoveFunction> {
+        if name.as_str() == "main" {
+            Some(MoveFunction::from(self))
+        } else {
+            None
+        }
+    }
+
+    fn find_function(&self, name: &IdentStr) -> Option<MoveFunction> {
         if name.as_str() == "main" {
             Some(MoveFunction::from(self))
         } else {

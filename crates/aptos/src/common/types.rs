@@ -919,6 +919,10 @@ pub struct MovePackageDir {
     /// this for local development.
     #[clap(long)]
     pub(crate) skip_fetch_latest_git_deps: bool,
+
+    /// Specify the version of the bytecode the compiler is going to emit.
+    #[clap(long)]
+    pub bytecode_version: Option<u32>,
 }
 
 impl MovePackageDir {
@@ -928,6 +932,7 @@ impl MovePackageDir {
             output_dir: None,
             named_addresses: Default::default(),
             skip_fetch_latest_git_deps: true,
+            bytecode_version: None,
         }
     }
 

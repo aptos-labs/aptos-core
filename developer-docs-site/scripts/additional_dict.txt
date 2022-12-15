@@ -17,6 +17,8 @@ AptosBFT
 AptosCoin
 AptosLabs
 AptosNet
+AptosWalletAdapterProvider
+autoConnect
 BCS
 BFT
 BIP
@@ -36,8 +38,11 @@ CoinType
 Ctrl
 DAO
 DApps
+Dapps
+dapps
 DDoS
 DECL
+doesnt
 DM
 DNS
 Dev
@@ -120,6 +125,8 @@ Mainnnet
 ManagedCoin
 Merkle
 MiB
+Modularity
+monorepo
 Monterey
 MoonCoin
 MoveVM
@@ -132,6 +139,7 @@ NFTs
 NHC
 NetworkAddress
 NoAvailablePeers
+NPM
 ORM
 Octa
 Octas
@@ -278,6 +286,7 @@ io
 ip
 ips
 isConnected
+jsx
 kickstart
 korean
 leaderboard
@@ -331,6 +340,7 @@ quickstart
 quickstarts
 repo
 repos
+requiers
 ruleset
 runtime
 scalability
@@ -369,6 +379,7 @@ uint
 unexportable
 unixtime
 unmount
+unscoped
 untracked
 upgradeability
 upgradeable
@@ -377,6 +388,7 @@ upvote
 url
 useBaseUrl
 usecase
+useWallet
 utc
 validator
 validator's

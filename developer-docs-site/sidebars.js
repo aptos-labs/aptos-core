@@ -114,6 +114,7 @@ const sidebars = {
     {
       type: "category",
       label: "Develop Locally",
+      link: { type: "doc", id: "nodes/local-testnet/index" },
       collapsible: true,
       collapsed: true,
       items: [
@@ -134,8 +135,17 @@ const sidebars = {
         "concepts/base-gas",
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",
+        "guides/move-guides/mint-nft-cli",
         "guides/move-guides/upgrading-move-code",
       ],
+    },
+    {
+      type: "category",
+      label: "Aptos Wallet Adapter",
+      link: { type: "doc", id: "concepts/wallet-adapter-concept" },
+      collapsible: true,
+      collapsed: true,
+      items: ["guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
     },
     {
       type: "html",

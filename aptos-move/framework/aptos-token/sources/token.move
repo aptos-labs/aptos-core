@@ -117,9 +117,6 @@ module aptos_token::token {
     /// Cannot burn 0 Token
     const ENO_BURN_TOKEN_WITH_ZERO_AMOUNT: u64 = 29;
 
-    /// Withdraw proof expires
-    const EWITHDRAW_PROOF_EXPIRES: u64 = 29;
-
     /// Token is not burnable by owner
     const EOWNER_CANNOT_BURN_TOKEN: u64 = 30;
 
@@ -148,6 +145,9 @@ module aptos_token::token {
 
     /// Withdraw capability doesn't have sufficient amount
     const EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT: u64 = 38;
+
+    /// Withdraw proof expires
+    const EWITHDRAW_PROOF_EXPIRES: u64 = 39;
 
     //
     // Core data structures for holding tokens
@@ -776,6 +776,7 @@ module aptos_token::token {
         token_event_store::emit_default_property_mutate_event(creator, token_data_id.collection, token_data_id.name, keys, old_values, new_values);
     }
 
+    /// Mutate the token_properties of one token.
     public fun mutate_one_token(
         account: &signer,
         token_owner: address,
@@ -1226,6 +1227,14 @@ module aptos_token::token {
     /// return the TokenId for a given Token
     public fun get_token_id(token: &Token): TokenId {
         token.id
+    }
+
+    public fun get_direct_transfer(receiver: address): bool acquires TokenStore {
+        if (!exists<TokenStore>(receiver)) {
+            return false
+        };
+
+        borrow_global<TokenStore>(receiver).direct_transfer
     }
 
     public fun create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig {
@@ -2001,7 +2010,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe, owner = @0xafe)]
-    #[expected_failure(abort_code = 327696)]
+    #[expected_failure(abort_code = 327696, location = Self)]
     fun test_opt_in_direct_transfer_fail(
         creator: &signer,
         owner: &signer,
@@ -2026,7 +2035,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe, owner = @0xafe)]
-    #[expected_failure(abort_code = 327696)]
+    #[expected_failure(abort_code = 327696, location = Self)]
     fun test_opt_in_direct_deposit_fail(
         creator: &signer,
         owner: &signer,
@@ -2068,7 +2077,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe, owner = @0x456)]
-    #[expected_failure(abort_code = 327710)]
+    #[expected_failure(abort_code = 327710, location = Self)]
     fun test_burn_token_by_owner_without_burnable_config(
         creator: &signer,
         owner: &signer,
@@ -2263,7 +2272,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 65572)]
+    #[expected_failure(abort_code = 65572, location = Self)]
     fun test_mutate_tokendata_maximum_from_zero(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2429,7 +2438,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 65569)]
+    #[expected_failure(abort_code = 65569, location = Self)]
     fun test_no_zero_balance_token_deposit(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2449,7 +2458,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 65548)]
+    #[expected_failure(abort_code = 65548, location = Self)]
     fun test_split_out_zero_token(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2481,7 +2490,7 @@ module aptos_token::token {
     }
 
     #[test]
-    #[expected_failure(abort_code = 65570)]
+    #[expected_failure(abort_code = 65570, location = Self)]
     public fun test_enter_illegal_royalty(){
         create_royalty(101, 100, @0xcafe);
     }

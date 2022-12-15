@@ -17,7 +17,7 @@ pub type ConnectivityManagerService = ConnectivityManager<ExponentialBackoff>;
 
 pub struct ConnectivityManagerBuilder {
     connectivity_manager: Option<ConnectivityManagerService>,
-    conn_mgr_reqs_tx: channel::Sender<ConnectivityRequest>,
+    conn_mgr_reqs_tx: aptos_channels::Sender<ConnectivityRequest>,
 }
 
 impl ConnectivityManagerBuilder {
@@ -35,7 +35,7 @@ impl ConnectivityManagerBuilder {
         outbound_connection_limit: Option<usize>,
         mutual_authentication: bool,
     ) -> Self {
-        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new(
+        let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new(
             channel_size,
             &counters::PENDING_CONNECTIVITY_MANAGER_REQUESTS,
         );
@@ -59,7 +59,7 @@ impl ConnectivityManagerBuilder {
         }
     }
 
-    pub fn conn_mgr_reqs_tx(&self) -> channel::Sender<ConnectivityRequest> {
+    pub fn conn_mgr_reqs_tx(&self) -> aptos_channels::Sender<ConnectivityRequest> {
         self.conn_mgr_reqs_tx.clone()
     }
 

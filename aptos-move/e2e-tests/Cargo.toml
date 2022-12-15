@@ -1,5 +1,5 @@
 [package]
-name = "language-e2e-tests"
+name = "aptos-language-e2e-tests"
 description = "Move language e2e testing framework"
 version = "0.1.0"
 
@@ -24,6 +24,7 @@ aptos-proptest-helpers = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-genesis = { workspace = true }
 bcs = { workspace = true }
 goldenfile = { workspace = true }
 hex = { workspace = true }
@@ -38,4 +39,3 @@ proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
-vm-genesis = { workspace = true }

@@ -1,5 +1,5 @@
 [package]
-name = "netcore"
+name = "aptos-netcore"
 description = "Aptos netcore"
 version = "0.1.0"
 
@@ -13,22 +13,22 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-memsocket = { workspace = true }
+aptos-proxy = { workspace = true }
 aptos-types = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
-memsocket = { workspace = true }
 pin-project = { workspace = true }
-proxy = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
+aptos-memsocket = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
-memsocket = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["memsocket/fuzzing", "aptos-types/fuzzing"]
-testing = ["memsocket/testing"]
+fuzzing = ["aptos-memsocket/fuzzing", "aptos-types/fuzzing"]
+testing = ["aptos-memsocket/testing"]

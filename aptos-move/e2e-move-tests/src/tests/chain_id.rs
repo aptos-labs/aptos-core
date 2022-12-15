@@ -3,7 +3,7 @@
 
 use crate::tests::common;
 use crate::{assert_success, MoveHarness};
-use language_e2e_tests::account::Account;
+use aptos_language_e2e_tests::account::Account;
 use move_core_types::account_address::AccountAddress;
 use move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};

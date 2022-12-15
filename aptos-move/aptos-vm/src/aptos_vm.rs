@@ -15,26 +15,24 @@ use crate::{
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     system_module_names::*,
-    transaction_arg_validation,
     transaction_metadata::TransactionMetadata,
-    VMExecutor, VMValidator,
+    verifier, VMExecutor, VMValidator,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_aggregator::{
     delta_change_set::DeltaChangeSet,
     transaction::{ChangeSetExt, TransactionOutputExt},
 };
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
-use aptos_gas::AptosGasMeter;
+use aptos_gas::{AptosGasMeter, ChangeSetConfigs};
 use aptos_logger::prelude::*;
-use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
     block_metadata::BlockMetadata,
-    on_chain_config::new_epoch_event_key,
+    on_chain_config::{new_epoch_event_key, FeatureFlag},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -46,17 +44,18 @@ use aptos_types::{
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
+    compatibility::Compatibility,
     errors::{verification_error, Location, PartialVMError, VMError, VMResult},
     CompiledModule, IndexKind,
 };
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
-    language_storage::ModuleId,
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::move_vm::RuntimeConfig;
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::OnceCell;
@@ -72,7 +71,7 @@ use std::{
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
-static RUNTIME_CHECKS: OnceCell<RuntimeConfig> = OnceCell::new();
+static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 
 /// Remove this once the bundle is removed from the code.
@@ -116,25 +115,16 @@ impl AptosVM {
     }
 
     /// Sets runtime config when invoked the first time.
-    pub fn set_runtime_config(paranoid_type_checks: bool, paranoid_hot_potato_checks: bool) {
+    pub fn set_paranoid_type_checks(enable: bool) {
         // Only the first call succeeds, due to OnceCell semantics.
-        RUNTIME_CHECKS
-            .set(RuntimeConfig {
-                paranoid_type_checks,
-                paranoid_hot_potato_checks,
-            })
-            .ok();
+        PARANOID_TYPE_CHECKS.set(enable).ok();
     }
 
-    /// Get the concurrency level if already set, otherwise return default true
-    /// (paranoid execution mode).
-    pub fn get_runtime_config() -> RuntimeConfig {
-        match RUNTIME_CHECKS.get() {
-            Some(config) => *config,
-            None => RuntimeConfig {
-                paranoid_type_checks: true,
-                paranoid_hot_potato_checks: true,
-            },
+    /// Get the paranoid type check flag if already set, otherwise return default true
+    pub fn get_paranoid_checks() -> bool {
+        match PARANOID_TYPE_CHECKS.get() {
+            Some(enable) => *enable,
+            None => true,
         }
     }
 
@@ -250,7 +240,7 @@ impl AptosVM {
                     gas_meter.balance(),
                     txn_data,
                     status,
-                    gas_meter.feature_version(),
+                    gas_meter.change_set_configs(),
                 )
                 .unwrap_or_else(|e| discard_error_vm_status(e).1);
                 (error_code, txn_output)
@@ -301,7 +291,7 @@ impl AptosVM {
         let epilogue_change_set_ext = session
             .finish()
             .map_err(|e| e.into_vm_status())?
-            .into_change_set(&mut (), gas_meter.feature_version())?;
+            .into_change_set(&mut (), gas_meter.change_set_configs())?;
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
@@ -354,12 +344,13 @@ impl AptosVM {
                     senders.extend(txn_data.secondary_signers());
                     let loaded_func =
                         session.load_script(script.code(), script.ty_args().to_vec())?;
-                    let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
-                        &session,
-                        senders,
-                        convert_txn_args(script.args()),
-                        &loaded_func,
-                    )?;
+                    let args =
+                        verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+                            &session,
+                            senders,
+                            convert_txn_args(script.args()),
+                            &loaded_func,
+                        )?;
                     session.execute_script(
                         script.code(),
                         script.ty_args().to_vec(),
@@ -377,12 +368,13 @@ impl AptosVM {
                         script_fn.function(),
                         script_fn.ty_args(),
                     )?;
-                    let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
-                        &session,
-                        senders,
-                        script_fn.args().to_vec(),
-                        &function,
-                    )?;
+                    let args =
+                        verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+                            &session,
+                            senders,
+                            script_fn.args().to_vec(),
+                            &function,
+                        )?;
                     session.execute_entry_function(
                         script_fn.module(),
                         script_fn.function(),
@@ -401,7 +393,7 @@ impl AptosVM {
 
             let session_output = session.finish().map_err(|e| e.into_vm_status())?;
             let change_set_ext =
-                session_output.into_change_set(&mut (), gas_meter.feature_version())?;
+                session_output.into_change_set(&mut (), gas_meter.change_set_configs())?;
 
             // Charge gas for write set
             gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -462,8 +454,11 @@ impl AptosVM {
             let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
+            // Note that for historic reasons, verification here is treated
+            // as StatusCode::CONSTRAINT_NOT_SATISFIED, there this cannot be unified
+            // with the general verify_module above.
             if init_function.is_ok() {
-                if verify_module_init_function(module).is_ok() {
+                if verifier::module_init::verify_module_init_function(module).is_ok() {
                     let args: Vec<Vec<u8>> = senders
                         .iter()
                         .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
@@ -528,7 +523,19 @@ impl AptosVM {
 
         Self::verify_module_bundle(&mut session, modules)?;
         session
-            .publish_module_bundle(modules.clone().into_inner(), txn_data.sender(), gas_meter)
+            .publish_module_bundle_with_compat_config(
+                modules.clone().into_inner(),
+                txn_data.sender(),
+                gas_meter,
+                Compatibility::new(
+                    true,
+                    true,
+                    !self
+                        .0
+                        .get_features()
+                        .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                ),
+            )
             .map_err(|e| e.into_vm_status())?;
 
         // call init function of the each module
@@ -542,7 +549,7 @@ impl AptosVM {
 
         let session_output = session.finish().map_err(|e| e.into_vm_status())?;
         let change_set_ext =
-            session_output.into_change_set(&mut (), gas_meter.feature_version())?;
+            session_output.into_change_set(&mut (), gas_meter.change_set_configs())?;
 
         // Charge gas for write set
         gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -585,7 +592,19 @@ impl AptosVM {
 
             // Publish the bundle and execute initializers
             session
-                .publish_module_bundle(bundle.into_inner(), destination, gas_meter)
+                .publish_module_bundle_with_compat_config(
+                    bundle.into_inner(),
+                    destination,
+                    gas_meter,
+                    Compatibility::new(
+                        true,
+                        true,
+                        !self
+                            .0
+                            .get_features()
+                            .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                    ),
+                )
                 .and_then(|_| {
                     self.execute_module_initialization(
                         session,
@@ -695,7 +714,7 @@ impl AptosVM {
         let mut gas_meter = AptosGasMeter::new(
             self.0.get_gas_feature_version(),
             gas_params.clone(),
-            storage_gas_params.cloned(),
+            storage_gas_params.clone(),
             txn_data.max_gas_amount(),
         );
 
@@ -748,12 +767,14 @@ impl AptosVM {
         session_id: SessionId,
     ) -> Result<ChangeSetExt, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
         let mut gas_meter = UnmeteredGasMeter;
+        let change_set_configs =
+            ChangeSetConfigs::unlimited_at_gas_feature_version(self.0.get_gas_feature_version());
 
         Ok(match writeset_payload {
             WriteSetPayload::Direct(change_set) => ChangeSetExt::new(
                 DeltaChangeSet::empty(),
                 change_set.clone(),
-                self.0.get_gas_feature_version(),
+                Arc::new(change_set_configs),
             ),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage, session_id);
@@ -765,13 +786,14 @@ impl AptosVM {
                 let loaded_func = tmp_session
                     .load_script(script.code(), script.ty_args().to_vec())
                     .map_err(|e| Err(e.into_vm_status()))?;
-                let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
-                    &tmp_session,
-                    senders,
-                    convert_txn_args(script.args()),
-                    &loaded_func,
-                )
-                .map_err(Err)?;
+                let args =
+                    verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+                        &tmp_session,
+                        senders,
+                        convert_txn_args(script.args()),
+                        &loaded_func,
+                    )
+                    .map_err(Err)?;
 
                 let execution_result = tmp_session
                     .execute_script(
@@ -785,7 +807,7 @@ impl AptosVM {
 
                 match execution_result {
                     Ok(session_out) => session_out
-                        .into_change_set(&mut (), self.0.get_gas_feature_version())
+                        .into_change_set(&mut (), &change_set_configs)
                         .map_err(Err)?,
                     Err(e) => {
                         return Err(Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET))));
@@ -907,7 +929,10 @@ impl AptosVM {
             0.into(),
             &txn_data,
             ExecutionStatus::Success,
-            self.0.get_gas_feature_version(),
+            &self
+                .0
+                .get_storage_gas_parameters(log_context)?
+                .change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
     }
@@ -920,6 +945,50 @@ impl AptosVM {
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         simulation_vm.simulate_signed_transaction(&state_view.as_move_resolver(), txn, &log_context)
+    }
+
+    pub fn execute_view_function(
+        state_view: &impl StateView,
+        module_id: ModuleId,
+        func_name: Identifier,
+        type_args: Vec<TypeTag>,
+        arguments: Vec<Vec<u8>>,
+        gas_budget: u64,
+    ) -> Result<Vec<Vec<u8>>> {
+        let vm = AptosVM::new(state_view);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let mut gas_meter = AptosGasMeter::new(
+            vm.0.get_gas_feature_version(),
+            vm.0.get_gas_parameters(&log_context)?.clone(),
+            vm.0.get_storage_gas_parameters(&log_context)?.clone(),
+            gas_budget,
+        );
+        let resolver = &state_view.as_move_resolver();
+        let mut session = vm.new_session(resolver, SessionId::Void);
+
+        let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
+        let metadata = vm.0.extract_module_metadata(&module_id);
+        let arguments = verifier::view_function::validate_view_function(
+            &session,
+            arguments,
+            func_name.as_ident_str(),
+            &func_inst,
+            metadata.as_ref(),
+        )?;
+
+        Ok(session
+            .execute_function_bypass_visibility(
+                &module_id,
+                func_name.as_ident_str(),
+                type_args,
+                arguments,
+                &mut gas_meter,
+            )
+            .map_err(|err| anyhow!("Failed to execute function: {:?}", err))?
+            .return_values
+            .into_iter()
+            .map(|(bytes, _ty)| bytes)
+            .collect::<Vec<_>>())
     }
 
     fn run_prologue_with_payload<S: MoveResolverExt>(
@@ -1198,7 +1267,7 @@ impl AptosSimulationVM {
         let mut gas_meter = AptosGasMeter::new(
             self.0 .0.get_gas_feature_version(),
             gas_params.clone(),
-            storage_gas_params.cloned(),
+            storage_gas_params.clone(),
             txn_data.max_gas_amount(),
         );
 

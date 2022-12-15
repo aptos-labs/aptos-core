@@ -553,12 +553,12 @@ mod test {
     };
     use aptos_config::network_id::NetworkContext;
     use aptos_crypto::{test_utils::TEST_SEED, traits::Uniform as _, x25519};
+    use aptos_memsocket::MemorySocket;
     use futures::{
         executor::block_on,
         future::join,
         io::{AsyncReadExt, AsyncWriteExt},
     };
-    use memsocket::MemorySocket;
     use rand::SeedableRng as _;
     use std::io;
 

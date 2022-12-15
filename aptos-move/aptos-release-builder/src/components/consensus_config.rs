@@ -9,6 +9,7 @@ use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 pub fn generate_consensus_upgrade_proposal(
     consensus_config: &OnChainConsensusConfig,
     is_testnet: bool,
+    next_execution_hash: String,
 ) -> Result<Vec<(String, String)>> {
     let mut result = vec![];
 
@@ -19,6 +20,7 @@ pub fn generate_consensus_upgrade_proposal(
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
+        &next_execution_hash,
         "aptos_framework::consensus_config",
         |writer| {
             let consensus_config_blob = bcs::to_bytes(consensus_config).unwrap();

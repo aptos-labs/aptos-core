@@ -102,11 +102,14 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
 
 // Return whether the argument is valid/allowed and whether it needs validation.
 // Validation is only needed for String arguments at the moment and vectors of them.
-fn is_valid_txn_arg<S: MoveResolverExt>(session: &SessionExt<S>, typ: &Type) -> (bool, bool) {
+pub(crate) fn is_valid_txn_arg<S: MoveResolverExt>(
+    session: &SessionExt<S>,
+    typ: &Type,
+) -> (bool, bool) {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
     match typ {
-        Bool | U8 | U64 | U128 | Address => (true, false),
+        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => (true, false),
         Vector(inner) => is_valid_txn_arg(session, inner),
         Struct(idx) | StructInstantiation(idx, _) => {
             if let Some(st) = session.get_struct_type(*idx) {
@@ -129,7 +132,7 @@ fn is_valid_txn_arg<S: MoveResolverExt>(session: &SessionExt<S>, typ: &Type) -> 
 // Validation at the moment is only for Strings and Vector of them, so we
 // manually walk the serialized args until we find a string.
 // This is obviously brittle and something to change at some point soon.
-fn validate_args<S: MoveResolverExt>(
+pub(crate) fn validate_args<S: MoveResolverExt>(
     session: &SessionExt<S>,
     idxs: &[usize],
     args: &[Vec<u8>],
@@ -201,8 +204,10 @@ fn validate_arg<S: MoveResolverExt>(
         // this is unreachable given the check in `is_valid_txn_arg` and the
         // fact we collect all arguments that involve strings and we validate
         // them and them only
-        Bool | U8 | U64 | U128 | Address | Signer | Reference(_) | MutableReference(_)
-        | TyParam(_) => unreachable!("Validation is only for arguments with String"),
+        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Reference(_)
+        | MutableReference(_) | TyParam(_) => {
+            unreachable!("Validation is only for arguments with String")
+        }
     })
 }
 

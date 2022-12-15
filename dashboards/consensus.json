@@ -116,9 +116,18 @@
           "expr": "quantile(0.5, rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}[$interval]))",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "legendFormat": "committed",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "sum(rate(aptos_chain_health_backoff_triggered{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=\"validator\"}[$interval]))",
+          "hide": false,
+          "legendFormat": "blocks with backoff",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "Committed blocks per sec",
@@ -4906,6 +4915,6 @@
   "timezone": "browser",
   "title": "Consensus",
   "uid": "consensus",
-  "version": 76,
+  "version": 78,
   "weekStart": ""
 }
