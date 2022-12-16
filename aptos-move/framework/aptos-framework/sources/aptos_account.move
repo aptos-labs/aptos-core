@@ -1,10 +1,11 @@
 module aptos_framework::aptos_account {
     use aptos_framework::account::{Self, new_event_handle};
     use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::coin;
+    use aptos_framework::coin::{Self, Coin};
     use aptos_framework::event::{EventHandle, emit_event};
     use std::error;
     use std::signer;
+    use std::vector;
 
     friend aptos_framework::genesis;
     friend aptos_framework::resource_account;
@@ -17,6 +18,8 @@ module aptos_framework::aptos_account {
     const EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS: u64 = 3;
     /// Account opted out of directly receiving NFT tokens.
     const EACCOUNT_DOES_NOT_ACCEPT_DIRECT_TOKEN_TRANSFERS: u64 = 4;
+    /// The lengths of the recipients and amounts lists don't match.
+    const EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH: u64 = 5;
 
     /// Configuration for whether an account can receive direct transfers of coins that they have not registered.
     ///
@@ -40,6 +43,23 @@ module aptos_framework::aptos_account {
         coin::register<AptosCoin>(&signer);
     }
 
+    /// Batch version of APT transfer.
+    public entry fun batch_transfer(source: &signer, recipients: vector<address>, amounts: vector<u64>) {
+        let recipients_len = vector::length(&recipients);
+        assert!(
+            recipients_len == vector::length(&amounts),
+            error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH),
+        );
+
+        let i = 0;
+        while (i < recipients_len) {
+            let to = *vector::borrow(&recipients, i);
+            let amount = *vector::borrow(&amounts, i);
+            transfer(source, to, amount);
+            i = i + 1;
+        };
+    }
+
     /// Convenient function to transfer APT to a recipient account that might not exist.
     /// This would create the recipient account first, which also registers it to receive APT, before transferring.
     public entry fun transfer(source: &signer, to: address, amount: u64) {
@@ -47,6 +67,24 @@ module aptos_framework::aptos_account {
             create_account(to)
         };
         coin::transfer<AptosCoin>(source, to, amount)
+    }
+
+    /// Batch version of transfer_coins.
+    public entry fun batch_transfer_coins<CoinType>(
+        from: &signer, recipients: vector<address>, amounts: vector<u64>) acquires DirectTransferConfig {
+        let recipients_len = vector::length(&recipients);
+        assert!(
+            recipients_len == vector::length(&amounts),
+            error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH),
+        );
+
+        let i = 0;
+        while (i < recipients_len) {
+            let to = *vector::borrow(&recipients, i);
+            let amount = *vector::borrow(&amounts, i);
+            transfer_coins<CoinType>(from, to, amount);
+            i = i + 1;
+        };
     }
 
     /// Convenient function to transfer a custom CoinType to a recipient account that might not exist.
@@ -119,7 +157,6 @@ module aptos_framework::aptos_account {
     use aptos_std::from_bcs;
     #[test_only]
     use std::string::utf8;
-    use aptos_framework::coin::Coin;
     #[test_only]
     use aptos_framework::account::create_account_for_test;
 
@@ -145,6 +182,26 @@ module aptos_framework::aptos_account {
         coin::destroy_mint_cap(mint_cap);
     }
 
+    #[test(from = @0x123, core = @0x1, recipient_1 = @0x124, recipient_2 = @0x125)]
+    public fun test_batch_transfer(from: &signer, core: &signer, recipient_1: &signer, recipient_2: &signer) {
+        let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
+        create_account(signer::address_of(from));
+        let recipient_1_addr = signer::address_of(recipient_1);
+        let recipient_2_addr = signer::address_of(recipient_2);
+        create_account(recipient_1_addr);
+        create_account(recipient_2_addr);
+        coin::deposit(signer::address_of(from), coin::mint(10000, &mint_cap));
+        batch_transfer(
+            from,
+            vector[recipient_1_addr, recipient_2_addr],
+            vector[100, 500],
+        );
+        assert!(coin::balance<AptosCoin>(recipient_1_addr) == 100, 0);
+        assert!(coin::balance<AptosCoin>(recipient_2_addr) == 500, 1);
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
+    }
+
     #[test(from = @0x1, to = @0x12)]
     public fun test_direct_coin_transfers(from: &signer, to: &signer) acquires DirectTransferConfig {
         let (burn_cap, freeze_cap, mint_cap) = coin::initialize<FakeCoin>(
@@ -161,6 +218,35 @@ module aptos_framework::aptos_account {
         let to_addr = signer::address_of(to);
         transfer_coins<FakeCoin>(from, to_addr, 500);
         assert!(coin::balance<FakeCoin>(to_addr) == 500, 0);
+
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
+        coin::destroy_freeze_cap(freeze_cap);
+    }
+
+    #[test(from = @0x1, recipient_1 = @0x124, recipient_2 = @0x125)]
+    public fun test_batch_transfer_coins(
+        from: &signer, recipient_1: &signer, recipient_2: &signer) acquires DirectTransferConfig {
+        let (burn_cap, freeze_cap, mint_cap) = coin::initialize<FakeCoin>(
+            from,
+            utf8(b"FC"),
+            utf8(b"FC"),
+            10,
+            true,
+        );
+        create_account_for_test(signer::address_of(from));
+        let recipient_1_addr = signer::address_of(recipient_1);
+        let recipient_2_addr = signer::address_of(recipient_2);
+        create_account_for_test(recipient_1_addr);
+        create_account_for_test(recipient_2_addr);
+        deposit_coins(signer::address_of(from), coin::mint(1000, &mint_cap));
+        batch_transfer_coins<FakeCoin>(
+            from,
+            vector[recipient_1_addr, recipient_2_addr],
+            vector[100, 500],
+        );
+        assert!(coin::balance<FakeCoin>(recipient_1_addr) == 100, 0);
+        assert!(coin::balance<FakeCoin>(recipient_2_addr) == 500, 1);
 
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
