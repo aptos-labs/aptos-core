@@ -5,11 +5,11 @@
 
 
 
--  [Struct `Scalar`](#0x1_curves_Scalar)
--  [Struct `Point`](#0x1_curves_Point)
 -  [Struct `BLS12_381_G1`](#0x1_curves_BLS12_381_G1)
 -  [Struct `BLS12_381_G2`](#0x1_curves_BLS12_381_G2)
 -  [Struct `BLS12_381_Gt`](#0x1_curves_BLS12_381_Gt)
+-  [Struct `Scalar`](#0x1_curves_Scalar)
+-  [Struct `Point`](#0x1_curves_Point)
 -  [Constants](#@Constants_0)
 -  [Function `get_scalar_handle`](#0x1_curves_get_scalar_handle)
 -  [Function `get_point_handle`](#0x1_curves_get_point_handle)
@@ -57,60 +57,6 @@
 </code></pre>
 
 
-
-<a name="0x1_curves_Scalar"></a>
-
-## Struct `Scalar`
-
-
-
-<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;Group&gt; <b>has</b> drop
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>handle: u64</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a name="0x1_curves_Point"></a>
-
-## Struct `Point`
-
-
-
-<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Point">Point</a>&lt;Group&gt; <b>has</b> drop
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>handle: u64</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
 
 <a name="0x1_curves_BLS12_381_G1"></a>
 
@@ -193,6 +139,60 @@
 
 </details>
 
+<a name="0x1_curves_Scalar"></a>
+
+## Struct `Scalar`
+
+
+
+<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;Group&gt; <b>has</b> drop
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>handle: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_curves_Point"></a>
+
+## Struct `Point`
+
+
+
+<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Point">Point</a>&lt;Group&gt; <b>has</b> drop
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>handle: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="@Constants_0"></a>
 
 ## Constants
@@ -227,6 +227,9 @@
 
 <a name="0x1_curves_GID_UNKNOWN"></a>
 
+Group/bilinear mapping ID assignments.
+Move side and rust side share the same ID assignments.
+NOTE: If it is possible to retrieve move type info on rust end, we do not need ID assignments at all.
 
 
 <pre><code><b>const</b> <a href="curves.md#0x1_curves_GID_UNKNOWN">GID_UNKNOWN</a>: u64 = 0;
@@ -256,9 +259,10 @@
 
 ## Function `get_scalar_handle`
 
+Get internal handle. May not be needed.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_scalar_handle">get_scalar_handle</a>&lt;G&gt;(s: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_scalar_handle">get_scalar_handle</a>&lt;Group&gt;(s: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;Group&gt;): u64
 </code></pre>
 
 
@@ -267,7 +271,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_scalar_handle">get_scalar_handle</a>&lt;G&gt;(s: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_scalar_handle">get_scalar_handle</a>&lt;Group&gt;(s: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;Group&gt;): u64 {
     s.handle
 }
 </code></pre>
@@ -282,7 +286,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_point_handle">get_point_handle</a>&lt;G&gt;(p: &<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_point_handle">get_point_handle</a>&lt;Group&gt;(p: &<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;Group&gt;): u64
 </code></pre>
 
 
@@ -291,7 +295,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_point_handle">get_point_handle</a>&lt;G&gt;(p: &<a href="curves.md#0x1_curves_Point">Point</a>&lt;G&gt;): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_point_handle">get_point_handle</a>&lt;Group&gt;(p: &<a href="curves.md#0x1_curves_Point">Point</a>&lt;Group&gt;): u64 {
     p.handle
 }
 </code></pre>
@@ -304,6 +308,8 @@
 
 ## Function `pairing`
 
+Perform a bilinear mapping.
+TODO: is it possible to have 2+ mappings between same (G1,G2,Gt)? If so we need a parameter for <code>mapping_id</code>?
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing">pairing</a>&lt;G1, G2, Gt&gt;(point_1: &<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;, point_2: &<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;): <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;Gt&gt;
@@ -765,6 +771,7 @@ Scalar basics.
 
 ## Function `get_group_id`
 
+Map a group to its group ID.
 
 
 <pre><code><b>fun</b> <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;G&gt;(): u64
@@ -798,6 +805,7 @@ Scalar basics.
 
 ## Function `get_pairing_id`
 
+Map a pairing group set to its bilinear mapping ID.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_pairing_id">get_pairing_id</a>&lt;G1, G2, Gt&gt;(): u64

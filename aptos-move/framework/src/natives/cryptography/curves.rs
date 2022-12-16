@@ -248,7 +248,6 @@ fn point_generator_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(0, _ty_args.len());
     assert_eq!(1, args.len());
-
     let group_id = pop_arg!(args, u64);
     let handle = match group_id {
         GID_BLS12_381_G1 => {

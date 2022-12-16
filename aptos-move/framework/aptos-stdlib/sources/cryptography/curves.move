@@ -1,27 +1,32 @@
 module aptos_std::curves {
     use aptos_std::type_info::type_of;
 
-    struct Scalar<phantom Group> has drop {
-        handle: u64
-    }
-    struct Point<phantom Group> has drop {
-        handle: u64
-    }
+    // Structs and consts.
 
-    public fun get_scalar_handle<G>(s: &Scalar<G>): u64 {
-        s.handle
-    }
-    public fun get_point_handle<G>(p: &Point<G>): u64 {
-        p.handle
-    }
-
-
-
+    // Fake structs representing group type.
     struct BLS12_381_G1 {}
     struct BLS12_381_G2 {}
     struct BLS12_381_Gt {}
 
-    //...
+    struct Scalar<phantom Group> has drop {
+        handle: u64
+    }
+
+    struct Point<phantom Group> has drop {
+        handle: u64
+    }
+
+    /// Get internal handle. May not be needed.
+    public fun get_scalar_handle<Group>(s: &Scalar<Group>): u64 {
+        s.handle
+    }
+
+    public fun get_point_handle<Group>(p: &Point<Group>): u64 {
+        p.handle
+    }
+
+    /// Perform a bilinear mapping.
+    /// TODO: is it possible to have 2+ mappings between same (G1,G2,Gt)? If so we need a parameter for `mapping_id`?
     public fun pairing<G1,G2,Gt>(point_1: &Point<G1>, point_2: &Point<G2>): Point<Gt> {
         Point<Gt> {
             handle: pairing_internal(point_1.handle, point_2.handle, get_pairing_id<G1,G2,Gt>())
@@ -124,11 +129,17 @@ module aptos_std::curves {
         point_eq_internal(point_1.handle, point_2.handle, get_group_id<T>())
     }
 
+    /// Group/bilinear mapping ID assignments.
+    /// Move side and rust side share the same ID assignments.
+    /// NOTE: If it is possible to retrieve move type info on rust end, we do not need ID assignments at all.
     const GID_UNKNOWN: u64 = 0;
     const GID_BLS12_381_G1: u64 = 1;
     const GID_BLS12_381_G2: u64 = 2;
     const GID_BLS12_381_Gt: u64 = 3;
+    const PID_UNKNOWN: u64 = 0;
+    const PID_BLS12_381: u64 = 1;
 
+    /// Map a group to its group ID.
     fun get_group_id<G>(): u64 {
         let typ = type_of<G>();
         if (typ == type_of<BLS12_381_G1>()) {
@@ -142,9 +153,7 @@ module aptos_std::curves {
         }
     }
 
-    const PID_UNKNOWN: u64 = 0;
-    const PID_BLS12_381: u64 = 1;
-
+    /// Map a pairing group set to its bilinear mapping ID.
     public fun get_pairing_id<G1,G2,Gt>(): u64 {
         if (get_group_id<G1>() == GID_BLS12_381_G1 && get_group_id<G2>() == GID_BLS12_381_G2 && get_group_id<Gt>() == GID_BLS12_381_Gt) {
             PID_BLS12_381
@@ -152,6 +161,8 @@ module aptos_std::curves {
             PID_UNKNOWN
         }
     }
+
+    // Native functions.
 
     native fun bytes_into_point_internal(bytes: vector<u8>, gid: u64): u64;
     native fun bytes_into_scalar_internal(bytes: vector<u8>, gid: u64): u64;

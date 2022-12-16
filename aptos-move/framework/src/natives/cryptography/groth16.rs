@@ -42,7 +42,10 @@ fn verify_proof_internal(
     let vk_gamma_g2_handle = pop_arg!(args, u64);
     let vk_delta_g2_handle = pop_arg!(args, u64);
     let accepted: bool = match pid {
-        curves::PID_BLS12_381 => true,
+        curves::PID_BLS12_381 => {
+            //todo
+            true
+        }
         _ => todo!(),
     };
 
