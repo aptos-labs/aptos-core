@@ -64,7 +64,7 @@ impl FragmentInfo {
         }
     }
 
-    pub fn take_transactions(self) -> Vec<SerializedTransaction> {
+    pub fn into_transactions(self) -> Vec<SerializedTransaction> {
         self.payload
     }
 
@@ -134,8 +134,8 @@ impl Fragment {
         self.fragment_info.epoch
     }
 
-    pub fn take_transactions(self) -> Vec<SerializedTransaction> {
-        self.fragment_info.take_transactions()
+    pub fn into_transactions(self) -> Vec<SerializedTransaction> {
+        self.fragment_info.into_transactions()
     }
 
     pub fn source(&self) -> PeerId {
