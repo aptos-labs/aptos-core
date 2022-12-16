@@ -370,6 +370,22 @@ impl NetworkTask {
         )
     }
 
+    fn push_msg(
+        peer_id: AccountAddress,
+        msg: ConsensusMsg,
+        tx: &aptos_channel::Sender<
+            (AccountAddress, Discriminant<ConsensusMsg>),
+            (AccountAddress, ConsensusMsg),
+        >,
+    ) {
+        if let Err(e) = tx.push((peer_id, discriminant(&msg)), (peer_id, msg)) {
+            warn!(
+                remote_peer = peer_id,
+                error = ?e, "Error pushing consensus msg",
+            );
+        }
+    }
+
     pub async fn start(mut self) {
         while let Some(message) = self.all_events.next().await {
             match message {
@@ -383,15 +399,11 @@ impl NetworkTask {
                         | ConsensusMsg::BatchRequestMsg(_)
                         | ConsensusMsg::BatchMsg(_)
                         | ConsensusMsg::ProofOfStoreMsg(_)) => {
-                            if let Err(e) = self.quorum_store_messages_tx.push(
-                                (peer_id, discriminant(&quorum_store_msg)),
-                                (peer_id, quorum_store_msg),
-                            ) {
-                                warn!(
-                                    remote_peer = peer_id,
-                                    error = ?e, "Error pushing consensus quorum store msg",
-                                );
-                            }
+                            Self::push_msg(
+                                peer_id,
+                                quorum_store_msg,
+                                &self.quorum_store_messages_tx,
+                            );
                         }
                         consensus_msg => {
                             if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
@@ -400,15 +412,7 @@ impl NetworkTask {
                                     BlockStage::NETWORK_RECEIVED,
                                 );
                             }
-                            if let Err(e) = self.consensus_messages_tx.push(
-                                (peer_id, discriminant(&consensus_msg)),
-                                (peer_id, consensus_msg),
-                            ) {
-                                warn!(
-                                    remote_peer = peer_id,
-                                    error = ?e, "Error pushing consensus msg",
-                                );
-                            }
+                            Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
                         }
                     }
                 }
