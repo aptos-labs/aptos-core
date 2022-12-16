@@ -353,6 +353,6 @@ By monitoring the events, you will find all balance changes in the `0x1::coin::C
 
 :::
 
-To create some sample data to explore, conduct ["Your first transaction"](../tutorials/your-first-transaction.md).
+To create some sample data to explore, conduct ["Your first transaction"](../tutorials/first-transaction.md).
 
-To learn more about coin creation, make ["Your First Coin"](../tutorials/your-first-coin.md).
+To learn more about coin creation, make ["Your First Coin"](../tutorials/first-coin.md).

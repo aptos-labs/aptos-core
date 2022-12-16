@@ -10,6 +10,7 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
 };
 use anyhow::{anyhow, ensure};
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
@@ -20,21 +21,20 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
 };
 use aptos_logger::prelude::*;
-use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof,
-    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
-};
-use bytes::Bytes;
-use channel::{self, aptos_channel, message_queues::QueueStyle};
-use fail::fail_point;
-use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
-use network::{
+use aptos_network::{
     protocols::{
         network::{ApplicationNetworkSender, Event},
         rpc::error::RpcError,
     },
     ProtocolId,
 };
+use aptos_types::{
+    account_address::AccountAddress, epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
+};
+use bytes::Bytes;
+use fail::fail_point;
+use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
 use std::{
     mem::{discriminant, Discriminant},
     time::Duration,
@@ -84,7 +84,7 @@ pub struct NetworkSender {
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
     // Note that we do not support self rpc requests as it might cause infinite recursive calls.
-    self_sender: channel::Sender<Event<ConsensusMsg>>,
+    self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
     validators: ValidatorVerifier,
 }
 
@@ -92,7 +92,7 @@ impl NetworkSender {
     pub fn new(
         author: Author,
         network_sender: ConsensusNetworkSender,
-        self_sender: channel::Sender<Event<ConsensusMsg>>,
+        self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
         validators: ValidatorVerifier,
     ) -> Self {
         NetworkSender {
@@ -340,7 +340,7 @@ impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
         network_events: ConsensusNetworkEvents,
-        self_receiver: channel::Receiver<Event<ConsensusMsg>>,
+        self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) =
             aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));

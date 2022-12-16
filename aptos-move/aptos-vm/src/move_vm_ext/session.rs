@@ -16,6 +16,7 @@ use aptos_framework::natives::{
     aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
 };
+use aptos_gas::ChangeSetConfigs;
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
@@ -34,6 +35,7 @@ use move_table_extension::{NativeTableContext, TableChange, TableChangeSet};
 use move_vm_runtime::session::Session;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -170,7 +172,7 @@ impl SessionOutput {
     pub fn into_change_set<C: AccessPathCache>(
         self,
         ap_cache: &mut C,
-        gas_feature_version: u64,
+        configs: &ChangeSetConfigs,
     ) -> Result<ChangeSetExt, VMStatus> {
         use MoveStorageOp::*;
         let Self {
@@ -190,7 +192,7 @@ impl SessionOutput {
                 let op = match blob_op {
                     Delete => WriteOp::Deletion,
                     New(blob) => {
-                        if gas_feature_version < 3 {
+                        if configs.creation_as_modification() {
                             WriteOp::Modification(blob)
                         } else {
                             WriteOp::Creation(blob)
@@ -257,11 +259,11 @@ impl SessionOutput {
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
-        let change_set = ChangeSet::new(write_set, events, gas_feature_version)?;
+        let change_set = ChangeSet::new(write_set, events, configs)?;
         Ok(ChangeSetExt::new(
             delta_change_set,
             change_set,
-            gas_feature_version,
+            Arc::new(configs.clone()),
         ))
     }
 

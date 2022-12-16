@@ -16,6 +16,12 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
+use aptos_db::state_restore::StateSnapshotProgress;
+use aptos_db::{
+    backup::restore_handler::RestoreHandler,
+    state_restore::{StateSnapshotRestore, StateValueBatch, StateValueWriter},
+    AptosDB, GetRestoreHandler,
+};
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{NodeBatch, TreeWriter};
 use aptos_logger::info;
@@ -24,12 +30,6 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
     waypoint::Waypoint,
-};
-use aptosdb::state_restore::StateSnapshotProgress;
-use aptosdb::{
-    backup::restore_handler::RestoreHandler,
-    state_restore::{StateSnapshotRestore, StateValueBatch, StateValueWriter},
-    AptosDB, GetRestoreHandler,
 };
 use clap::Parser;
 use std::{

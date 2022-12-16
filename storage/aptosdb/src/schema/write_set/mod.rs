@@ -15,12 +15,12 @@
 
 use crate::schema::{ensure_slice_len_eq, WRITE_SET_CF_NAME};
 use anyhow::Result;
-use aptos_types::{transaction::Version, write_set::WriteSet};
-use byteorder::{BigEndian, ReadBytesExt};
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
+use aptos_types::{transaction::Version, write_set::WriteSet};
+use byteorder::{BigEndian, ReadBytesExt};
 use std::mem::size_of;
 
 define_schema!(WriteSetSchema, Version, WriteSet, WRITE_SET_CF_NAME);

@@ -3,8 +3,8 @@
 
 use crate::assert_success;
 use crate::harness::MoveHarness;
+use aptos_language_e2e_tests::account::Account;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
-use language_e2e_tests::account::Account;
 use std::path::PathBuf;
 
 pub fn initialize(path: PathBuf) -> (MoveHarness, Account) {

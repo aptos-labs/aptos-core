@@ -31,12 +31,12 @@ use aptos_keygen::KeyGen;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
+use aptos_vm_genesis::{AccountBalance, TestValidator};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     str::FromStr,
 };
-use vm_genesis::{AccountBalance, TestValidator};
 
 const INITIAL_BALANCE: u64 = 100_000_000_000_000;
 

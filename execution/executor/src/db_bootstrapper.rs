@@ -9,6 +9,10 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutedChunk;
 use aptos_logger::prelude::*;
 use aptos_state_view::{StateView, StateViewId};
+use aptos_storage_interface::{
+    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
+    DbWriter, ExecutedTrees,
+};
 use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     access_path::AccessPath,
@@ -24,10 +28,6 @@ use aptos_types::{
 use aptos_vm::VMExecutor;
 use move_core_types::move_resource::MoveResource;
 use std::sync::Arc;
-use storage_interface::{
-    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
-    DbWriter, ExecutedTrees,
-};
 
 pub fn generate_waypoint<V: VMExecutor>(
     db: &DbReaderWriter,

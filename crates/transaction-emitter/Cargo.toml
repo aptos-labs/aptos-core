@@ -1,5 +1,5 @@
 [package]
-name = "transaction-emitter"
+name = "aptos-transaction-emitter"
 description = "Aptos transaction emitter for testing"
 version = "0.0.0"
 
@@ -17,10 +17,10 @@ anyhow = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-sdk = { workspace = true }
+aptos-transaction-emitter-lib = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
 rand = { workspace = true }
 rand_core = { workspace = true }
 tokio = { workspace = true }
-transaction-emitter-lib = { workspace = true }

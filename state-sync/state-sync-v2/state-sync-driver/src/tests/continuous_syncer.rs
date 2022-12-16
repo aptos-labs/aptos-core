@@ -24,12 +24,12 @@ use aptos_data_streaming_service::{
     streaming_client::{NotificationAndFeedback, NotificationFeedback},
 };
 use aptos_infallible::Mutex;
+use aptos_storage_service_types::Epoch;
 use aptos_types::transaction::{TransactionOutputListWithProof, Version};
 use claims::assert_matches;
 use futures::SinkExt;
 use mockall::{predicate::eq, Sequence};
 use std::sync::Arc;
-use storage_service_types::Epoch;
 
 #[tokio::test]
 async fn test_critical_timeout() {

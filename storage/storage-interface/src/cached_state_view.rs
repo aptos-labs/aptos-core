@@ -4,6 +4,7 @@
 use crate::{proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
@@ -14,7 +15,6 @@ use aptos_types::{
 };
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,

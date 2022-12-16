@@ -182,7 +182,10 @@ async fn test_onchain_config_change() {
             conf.api.failpoints_enabled = true;
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
-            let OnChainConsensusConfig::V1(inner) = genesis_config.consensus_config.clone();
+            let inner = match genesis_config.consensus_config.clone() {
+                OnChainConsensusConfig::V1(inner) => inner,
+                OnChainConsensusConfig::V2(inner) => inner,
+            };
 
             let leader_reputation_type =
                 if let ProposerElectionType::LeaderReputation(leader_reputation_type) =
@@ -236,7 +239,10 @@ async fn test_onchain_config_change() {
     )
     .unwrap();
 
-    let OnChainConsensusConfig::V1(inner) = current_consensus_config;
+    let inner = match current_consensus_config {
+        OnChainConsensusConfig::V1(inner) => inner,
+        OnChainConsensusConfig::V2(inner) => inner,
+    };
     let leader_reputation_type =
         if let ProposerElectionType::LeaderReputation(leader_reputation_type) =
             inner.proposer_election_type

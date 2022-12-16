@@ -4,6 +4,10 @@
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
+use aptos_language_e2e_tests::{
+    assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
+    compile::compile_module, current_function_name, executor::FakeExecutor, transaction_status_eq,
+};
 use aptos_types::{
     account_address::AccountAddress,
     account_config,
@@ -11,10 +15,6 @@ use aptos_types::{
     test_helpers::transaction_test_helpers,
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     vm_status::StatusCode,
-};
-use language_e2e_tests::{
-    assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
-    compile::compile_module, current_function_name, executor::FakeExecutor, transaction_status_eq,
 };
 use move_binary_format::file_format::CompiledModule;
 use move_core_types::{

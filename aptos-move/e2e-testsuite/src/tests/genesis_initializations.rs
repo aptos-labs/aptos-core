@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
-use language_e2e_tests::executor::FakeExecutor;
 use move_core_types::vm_status::StatusCode;
 use move_core_types::{
     account_address::AccountAddress,

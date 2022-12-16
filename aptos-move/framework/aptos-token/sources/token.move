@@ -117,9 +117,6 @@ module aptos_token::token {
     /// Cannot burn 0 Token
     const ENO_BURN_TOKEN_WITH_ZERO_AMOUNT: u64 = 29;
 
-    /// Withdraw proof expires
-    const EWITHDRAW_PROOF_EXPIRES: u64 = 29;
-
     /// Token is not burnable by owner
     const EOWNER_CANNOT_BURN_TOKEN: u64 = 30;
 
@@ -148,6 +145,9 @@ module aptos_token::token {
 
     /// Withdraw capability doesn't have sufficient amount
     const EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT: u64 = 38;
+
+    /// Withdraw proof expires
+    const EWITHDRAW_PROOF_EXPIRES: u64 = 39;
 
     //
     // Core data structures for holding tokens
@@ -776,6 +776,7 @@ module aptos_token::token {
         token_event_store::emit_default_property_mutate_event(creator, token_data_id.collection, token_data_id.name, keys, old_values, new_values);
     }
 
+    /// Mutate the token_properties of one token.
     public fun mutate_one_token(
         account: &signer,
         token_owner: address,
@@ -1226,6 +1227,14 @@ module aptos_token::token {
     /// return the TokenId for a given Token
     public fun get_token_id(token: &Token): TokenId {
         token.id
+    }
+
+    public fun get_direct_transfer(receiver: address): bool acquires TokenStore {
+        if (!exists<TokenStore>(receiver)) {
+            return false
+        };
+
+        borrow_global<TokenStore>(receiver).direct_transfer
     }
 
     public fun create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig {

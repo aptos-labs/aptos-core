@@ -34,13 +34,13 @@ use aptos_genesis::{
 use aptos_logger::info;
 use aptos_types::account_address::{AccountAddress, AccountAddressWithChecks};
 use aptos_types::on_chain_config::OnChainConsensusConfig;
+use aptos_vm_genesis::{default_gas_schedule, AccountBalance, EmployeePool};
 use async_trait::async_trait;
 use clap::Parser;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
-use vm_genesis::{default_gas_schedule, AccountBalance, EmployeePool};
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
