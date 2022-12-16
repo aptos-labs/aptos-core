@@ -26,7 +26,7 @@ sources={{
   }}
 />
 
-- The  Aptos community can suggest an Aptos Improvement Proposal (AIP) in [GitHub](https://github.com/aptos-foundation/aip).
+- The  Aptos community can suggest an Aptos Improvement Proposal (AIP) in the [Aptos Foundation AIP GitHub](https://github.com/aptos-foundation/AIPs).
 - When appropriate, an on-chain proposal can be created for the AIP via the `aptos_governance` module. 
 - Voters can then vote on this proposal on-chain via the `aptos_governance` module. If there is sufficient support for a proposal, then it can be resolved.
 - Governance requires a minimal number of votes to be cast by an expiration threshold. However, if sufficient votes, more than 50% of the total supply, are accumulated prior to that threshold, the proposal can be executed **without waiting for the full voting period**.
@@ -52,7 +52,7 @@ Each stake pool can be used to vote on each proposal exactly only one time.
 ## Aptos Improvement Proposals (AIPs)
 
 AIPs are proposals created by the Aptos community or the Aptos Labs team to improve the operations and development of the Aptos chain. 
-To submit an AIP, create an issue in [`Aptos Foundation's github repository`](https://github.com/aptos-foundation/AIPs/issues) using the [template](https://github.com/aptos-foundation/AIPs/blob/main/TEMPLATE.md)
+To submit an AIP, create an issue in [`Aptos Foundation's GitHub repository`](https://github.com/aptos-foundation/AIPs/issues) using the [template](https://github.com/aptos-foundation/AIPs/blob/main/TEMPLATE.md)
 To keep up with new AIPs, check the `#aip-announcements` channel on [Aptos' discord channel](https://discord.gg/aptoslabs). 
 To view and vote on on-chain proposals, go to [`Aptos' Governance website`](https://governance.aptosfoundation.org/). 
 
