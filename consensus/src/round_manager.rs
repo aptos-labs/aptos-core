@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::types::{Batch, Fragment};
+use crate::quorum_store::types::{Batch, BatchRequest, Fragment};
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -65,6 +65,7 @@ pub enum UnverifiedEvent {
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
     FragmentMsg(Box<Fragment>),
+    BatchRequestMsg(Box<BatchRequest>),
     BatchMsg(Box<Batch>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
@@ -102,6 +103,10 @@ impl UnverifiedEvent {
                 f.verify(peer_id)?;
                 VerifiedEvent::FragmentMsg(f)
             }
+            UnverifiedEvent::BatchRequestMsg(br) => {
+                br.verify(peer_id)?;
+                VerifiedEvent::BatchRequestMsg(br)
+            }
             // Only sender is verified. Remaining verification is on-demand (when it's used).
             UnverifiedEvent::BatchMsg(b) => {
                 b.verify(peer_id)?;
@@ -126,6 +131,7 @@ impl UnverifiedEvent {
             UnverifiedEvent::CommitVote(cv) => cv.epoch(),
             UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
             UnverifiedEvent::FragmentMsg(f) => f.epoch(),
+            UnverifiedEvent::BatchRequestMsg(br) => br.epoch(),
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedDigestMsg(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
@@ -142,6 +148,7 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
             ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
             ConsensusMsg::FragmentMsg(m) => UnverifiedEvent::FragmentMsg(m),
+            ConsensusMsg::BatchRequestMsg(m) => UnverifiedEvent::BatchRequestMsg(m),
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedDigestMsg(m) => UnverifiedEvent::SignedDigestMsg(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
@@ -160,6 +167,7 @@ pub enum VerifiedEvent {
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
     FragmentMsg(Box<Fragment>),
+    BatchRequestMsg(Box<BatchRequest>),
     UnverifiedBatchMsg(Box<Batch>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),

@@ -380,6 +380,7 @@ impl NetworkTask {
                     match msg {
                         quorum_store_msg @ (ConsensusMsg::SignedDigestMsg(_)
                         | ConsensusMsg::FragmentMsg(_)
+                        | ConsensusMsg::BatchRequestMsg(_)
                         | ConsensusMsg::BatchMsg(_)
                         | ConsensusMsg::ProofOfStoreMsg(_)) => {
                             if let Err(e) = self.quorum_store_messages_tx.push(

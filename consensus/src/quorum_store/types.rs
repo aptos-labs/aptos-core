@@ -158,6 +158,35 @@ pub struct BatchInfo {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct BatchRequest {
+    pub(crate) source: PeerId,
+    pub(crate) batch_info: BatchInfo,
+}
+
+impl BatchRequest {
+    pub fn new(source: PeerId, epoch: u64, digest: HashValue) -> Self {
+        let batch_info = BatchInfo { epoch, digest };
+        Self { source, batch_info }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.batch_info.epoch
+    }
+
+    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
+        if self.source == peer_id {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "Sender mismatch: peer_id: {}, source: {}",
+                self.source,
+                peer_id
+            ))
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Batch {
     pub(crate) source: PeerId,
     // None is a request, Some(payload) is a response.
@@ -170,13 +199,10 @@ impl Batch {
     pub fn new(
         epoch: u64,
         source: PeerId,
-        digest_hash: HashValue,
+        digest: HashValue,
         maybe_payload: Option<Vec<SignedTransaction>>,
     ) -> Self {
-        let batch_info = BatchInfo {
-            epoch,
-            digest: digest_hash,
-        };
+        let batch_info = BatchInfo { epoch, digest };
         Self {
             source,
             maybe_payload,

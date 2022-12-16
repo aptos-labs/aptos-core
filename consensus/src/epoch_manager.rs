@@ -798,6 +798,7 @@ impl EpochManager {
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::FragmentMsg(_)
+            | ConsensusMsg::BatchRequestMsg(_)
             | ConsensusMsg::BatchMsg(_)
             | ConsensusMsg::SignedDigestMsg(_)
             | ConsensusMsg::ProofOfStoreMsg(_) => {

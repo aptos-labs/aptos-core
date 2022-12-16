@@ -53,7 +53,6 @@ impl SignedDigestInfo {
     }
 }
 
-// TODO: implement properly (and proper place) w.o. public fields.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignedDigest {
     epoch: u64,
