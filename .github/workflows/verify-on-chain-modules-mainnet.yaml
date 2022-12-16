@@ -1,4 +1,7 @@
-name: "replay-mainnet-transactions-nightly"
+# This defines a workflow to verify all modules that have been published on chain with the latest aptos node software.
+# In order to trigger it go to the Actions Tab of the Repo, click "Verify Modules" and then "Run Workflow".
+
+name: "Verify Modules"
 on:
   # Allow triggering manually
   workflow_dispatch:
@@ -7,26 +10,22 @@ on:
         required: false
         type: string
         description: The git SHA1 to test. If not specified, Forge will check the latest commits on the current branch
-  schedule:
-    - cron: "0 9/12 * * *"
   pull_request:
     paths:
       - ".github/workflows/nightly-replay-verify.yaml"
 
 env:
-  BUCKET: aptos-mainnet-backup-backup-831a69a8
+  BUCKET:  aptos-mainnet-backup-backup-831a69a8
   SUB_DIR: e1
-  HISTORY_START: 0
-  TXNS_TO_SKIP: 12253479 12277499
   CONFIG_TEMPLATE_NAME: s3-public.yaml
 
 jobs:
   replay-transactions:
-    timeout-minutes: 720
-    runs-on: high-perf-docker-with-local-ssd
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/replay-verify
+      - uses: ./.github/actions/verify-modules
