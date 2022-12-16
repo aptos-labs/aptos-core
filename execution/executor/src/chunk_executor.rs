@@ -328,23 +328,15 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
         events: Vec<Vec<ContractEvent>>,
         txns_to_skip: Arc<BTreeSet<Version>>,
     ) -> Result<()> {
-        let current_begin_version = {
-            self.commit_queue
-                .lock()
-                .persisted_and_latest_view()
-                .1
-                .version()
-                .ok_or_else(|| anyhow!("Current version is not available"))?
-        };
-
-        let mut offset = current_begin_version;
+        let (_parent_view, latest_view) = self.commit_queue.lock().persisted_and_latest_view();
+        let first_version = latest_view.num_transactions() as Version;
+        let mut offset = first_version;
         let total_length = transactions.len();
 
-        for version in txns_to_skip
-            .range(current_begin_version + 1..current_begin_version + total_length as u64 + 1)
-        {
-            let remaining = transactions.split_off((version - offset) as usize);
-            let remaining_info = transaction_infos.split_off((version - offset) as usize);
+        for version in txns_to_skip.range(first_version..first_version + total_length as u64) {
+            let version = *version;
+            let remaining = transactions.split_off((version - offset + 1) as usize);
+            let remaining_info = transaction_infos.split_off((version - offset + 1) as usize);
             let txn_to_skip = transactions.pop().unwrap();
             let txn_info = transaction_infos.pop().unwrap();
 
@@ -353,8 +345,8 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
             self.apply_transaction_and_output(
                 txn_to_skip,
                 TransactionOutput::new(
-                    writesets[(version - current_begin_version - 1) as usize].clone(),
-                    events[(version - current_begin_version - 1) as usize].clone(),
+                    writesets[(version - first_version) as usize].clone(),
+                    events[(version - first_version) as usize].clone(),
                     txn_info.gas_used(),
                     TransactionStatus::Keep(txn_info.status().clone()),
                 ),
@@ -363,7 +355,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 
             transactions = remaining;
             transaction_infos = remaining_info;
-            offset = version + 1;
+            offset = version;
         }
         self.replay_impl(transactions, transaction_infos)
     }
