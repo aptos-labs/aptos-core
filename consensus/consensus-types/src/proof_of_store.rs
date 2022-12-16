@@ -56,9 +56,9 @@ impl SignedDigestInfo {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignedDigest {
     epoch: u64,
-    pub peer_id: PeerId,
-    pub info: SignedDigestInfo,
-    pub signature: bls12381::Signature,
+    peer_id: PeerId,
+    info: SignedDigestInfo,
+    signature: bls12381::Signature,
 }
 
 impl SignedDigest {

@@ -9,13 +9,13 @@ use bcs::to_bytes;
 use serde::{Deserialize, Serialize};
 use std::mem;
 
-pub(crate) type BatchId = u64;
+pub type BatchId = u64;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SerializedTransaction {
-    // pub(crate) for testing purposes
+    // pub for testing purposes
     #[serde(with = "serde_bytes")]
-    pub(crate) bytes: Vec<u8>,
+    pub bytes: Vec<u8>,
 }
 
 impl SerializedTransaction {
@@ -64,27 +64,27 @@ impl FragmentInfo {
         }
     }
 
-    pub(crate) fn take_transactions(self) -> Vec<SerializedTransaction> {
+    pub fn take_transactions(self) -> Vec<SerializedTransaction> {
         self.payload
     }
 
-    pub(crate) fn fragment_id(&self) -> usize {
+    pub fn fragment_id(&self) -> usize {
         self.fragment_id
     }
 
-    pub(crate) fn batch_id(&self) -> BatchId {
+    pub fn batch_id(&self) -> BatchId {
         self.batch_id
     }
 
-    pub(crate) fn maybe_expiration(&self) -> Option<LogicalTime> {
+    pub fn maybe_expiration(&self) -> Option<LogicalTime> {
         self.maybe_expiration
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Fragment {
-    pub source: PeerId,
-    pub fragment_info: FragmentInfo,
+    source: PeerId,
+    fragment_info: FragmentInfo,
 }
 
 impl Fragment {
@@ -109,7 +109,7 @@ impl Fragment {
         }
     }
 
-    pub(crate) fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
+    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
         if let Some(expiration) = &self.fragment_info.maybe_expiration {
             if expiration.epoch() != self.fragment_info.epoch {
                 return Err(anyhow::anyhow!(
@@ -130,37 +130,37 @@ impl Fragment {
         }
     }
 
-    pub(crate) fn epoch(&self) -> u64 {
+    pub fn epoch(&self) -> u64 {
         self.fragment_info.epoch
     }
 
-    pub(crate) fn take_transactions(self) -> Vec<SerializedTransaction> {
+    pub fn take_transactions(self) -> Vec<SerializedTransaction> {
         self.fragment_info.take_transactions()
     }
 
-    pub(crate) fn source(&self) -> PeerId {
+    pub fn source(&self) -> PeerId {
         self.source
     }
 
-    pub(crate) fn fragment_id(&self) -> usize {
+    pub fn fragment_id(&self) -> usize {
         self.fragment_info.fragment_id()
     }
 
-    pub(crate) fn batch_id(&self) -> BatchId {
+    pub fn batch_id(&self) -> BatchId {
         self.fragment_info.batch_id()
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct BatchInfo {
-    pub(crate) epoch: u64,
-    pub(crate) digest: HashValue,
+    pub epoch: u64,
+    pub digest: HashValue,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct BatchRequest {
-    pub(crate) source: PeerId,
-    pub(crate) batch_info: BatchInfo,
+    source: PeerId,
+    batch_info: BatchInfo,
 }
 
 impl BatchRequest {
@@ -188,13 +188,11 @@ impl BatchRequest {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Batch {
-    pub(crate) source: PeerId,
-    // None is a request, Some(payload) is a response.
-    pub(crate) maybe_payload: Option<Vec<SignedTransaction>>,
-    pub(crate) batch_info: BatchInfo,
+    source: PeerId,
+    batch_info: BatchInfo,
+    maybe_payload: Option<Vec<SignedTransaction>>,
 }
 
-// TODO: make epoch, source, signature fields treatment consistent across structs.
 impl Batch {
     pub fn new(
         epoch: u64,
