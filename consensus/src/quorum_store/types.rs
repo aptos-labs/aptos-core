@@ -190,21 +190,21 @@ impl BatchRequest {
 pub struct Batch {
     source: PeerId,
     batch_info: BatchInfo,
-    maybe_payload: Option<Vec<SignedTransaction>>,
+    payload: Vec<SignedTransaction>,
 }
 
 impl Batch {
     pub fn new(
         epoch: u64,
-        source: PeerId,
         digest: HashValue,
-        maybe_payload: Option<Vec<SignedTransaction>>,
+        source: PeerId,
+        payload: Vec<SignedTransaction>,
     ) -> Self {
         let batch_info = BatchInfo { epoch, digest };
         Self {
             source,
-            maybe_payload,
             batch_info,
+            payload,
         }
     }
 
@@ -226,6 +226,6 @@ impl Batch {
     }
 
     pub fn get_payload(self) -> Vec<SignedTransaction> {
-        self.maybe_payload.expect("Batch contains no payload")
+        self.payload
     }
 }
