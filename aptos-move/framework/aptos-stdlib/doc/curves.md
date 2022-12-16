@@ -156,7 +156,7 @@
 
 <dl>
 <dt>
-<code>handle: u64</code>
+<code>handle: u8</code>
 </dt>
 <dd>
 
@@ -183,7 +183,7 @@
 
 <dl>
 <dt>
-<code>handle: u64</code>
+<code>handle: u8</code>
 </dt>
 <dd>
 
@@ -202,7 +202,7 @@
 
 
 
-<pre><code><b>const</b> <a href="curves.md#0x1_curves_GID_BLS12_381_G1">GID_BLS12_381_G1</a>: u64 = 1;
+<pre><code><b>const</b> <a href="curves.md#0x1_curves_GID_BLS12_381_G1">GID_BLS12_381_G1</a>: u8 = 1;
 </code></pre>
 
 
@@ -211,7 +211,7 @@
 
 
 
-<pre><code><b>const</b> <a href="curves.md#0x1_curves_GID_BLS12_381_G2">GID_BLS12_381_G2</a>: u64 = 2;
+<pre><code><b>const</b> <a href="curves.md#0x1_curves_GID_BLS12_381_G2">GID_BLS12_381_G2</a>: u8 = 2;
 </code></pre>
 
 
@@ -220,7 +220,7 @@
 
 
 
-<pre><code><b>const</b> <a href="curves.md#0x1_curves_GID_BLS12_381_Gt">GID_BLS12_381_Gt</a>: u64 = 3;
+<pre><code><b>const</b> <a href="curves.md#0x1_curves_GID_BLS12_381_Gt">GID_BLS12_381_Gt</a>: u8 = 3;
 </code></pre>
 
 
@@ -228,11 +228,11 @@
 <a name="0x1_curves_GID_UNKNOWN"></a>
 
 Group/bilinear mapping ID assignments.
-Move side and rust side share the same ID assignments.
-NOTE: If it is possible to retrieve move type info on rust end, we do not need ID assignments at all.
+The assignment here should match what is in <code>/aptos-<b>move</b>/framework/src/natives/cryptography/<a href="curves.md#0x1_curves">curves</a>.rs</code>.
+TODO: it is possible to retrieve move type info on rust end, so we do not need these ID assignments at all?
 
 
-<pre><code><b>const</b> <a href="curves.md#0x1_curves_GID_UNKNOWN">GID_UNKNOWN</a>: u64 = 0;
+<pre><code><b>const</b> <a href="curves.md#0x1_curves_GID_UNKNOWN">GID_UNKNOWN</a>: u8 = 0;
 </code></pre>
 
 
@@ -241,7 +241,7 @@ NOTE: If it is possible to retrieve move type info on rust end, we do not need I
 
 
 
-<pre><code><b>const</b> <a href="curves.md#0x1_curves_PID_BLS12_381">PID_BLS12_381</a>: u64 = 1;
+<pre><code><b>const</b> <a href="curves.md#0x1_curves_PID_BLS12_381">PID_BLS12_381</a>: u8 = 1;
 </code></pre>
 
 
@@ -250,7 +250,7 @@ NOTE: If it is possible to retrieve move type info on rust end, we do not need I
 
 
 
-<pre><code><b>const</b> <a href="curves.md#0x1_curves_PID_UNKNOWN">PID_UNKNOWN</a>: u64 = 0;
+<pre><code><b>const</b> <a href="curves.md#0x1_curves_PID_UNKNOWN">PID_UNKNOWN</a>: u8 = 0;
 </code></pre>
 
 
@@ -259,10 +259,11 @@ NOTE: If it is possible to retrieve move type info on rust end, we do not need I
 
 ## Function `get_scalar_handle`
 
-Get internal handle. May not be needed.
+Get internal handle for a Scalar. Currently needed by groth16 module.
+TODO: can this be avoided?
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_scalar_handle">get_scalar_handle</a>&lt;Group&gt;(s: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;Group&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_scalar_handle">get_scalar_handle</a>&lt;Group&gt;(s: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;Group&gt;): u8
 </code></pre>
 
 
@@ -271,7 +272,7 @@ Get internal handle. May not be needed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_scalar_handle">get_scalar_handle</a>&lt;Group&gt;(s: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;Group&gt;): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_scalar_handle">get_scalar_handle</a>&lt;Group&gt;(s: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;Group&gt;): u8 {
     s.handle
 }
 </code></pre>
@@ -284,9 +285,11 @@ Get internal handle. May not be needed.
 
 ## Function `get_point_handle`
 
+Get internal handle for a point. Currently needed by groth16 module.
+TODO: can this be avoided?
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_point_handle">get_point_handle</a>&lt;Group&gt;(p: &<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;Group&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_point_handle">get_point_handle</a>&lt;Group&gt;(p: &<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;Group&gt;): u8
 </code></pre>
 
 
@@ -295,7 +298,7 @@ Get internal handle. May not be needed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_point_handle">get_point_handle</a>&lt;Group&gt;(p: &<a href="curves.md#0x1_curves_Point">Point</a>&lt;Group&gt;): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_point_handle">get_point_handle</a>&lt;Group&gt;(p: &<a href="curves.md#0x1_curves_Point">Point</a>&lt;Group&gt;): u8 {
     p.handle
 }
 </code></pre>
@@ -774,7 +777,7 @@ Scalar basics.
 Map a group to its group ID.
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;G&gt;(): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;G&gt;(): u8
 </code></pre>
 
 
@@ -783,7 +786,7 @@ Map a group to its group ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;G&gt;(): u64 {
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;G&gt;(): u8 {
     <b>let</b> typ = type_of&lt;G&gt;();
     <b>if</b> (typ == type_of&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;()) {
         <a href="curves.md#0x1_curves_GID_BLS12_381_G1">GID_BLS12_381_G1</a>
@@ -808,7 +811,7 @@ Map a group to its group ID.
 Map a pairing group set to its bilinear mapping ID.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_pairing_id">get_pairing_id</a>&lt;G1, G2, Gt&gt;(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_pairing_id">get_pairing_id</a>&lt;G1, G2, Gt&gt;(): u8
 </code></pre>
 
 
@@ -817,7 +820,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_pairing_id">get_pairing_id</a>&lt;G1,G2,Gt&gt;(): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_get_pairing_id">get_pairing_id</a>&lt;G1,G2,Gt&gt;(): u8 {
     <b>if</b> (<a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;G1&gt;() == <a href="curves.md#0x1_curves_GID_BLS12_381_G1">GID_BLS12_381_G1</a> && <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;G2&gt;() == <a href="curves.md#0x1_curves_GID_BLS12_381_G2">GID_BLS12_381_G2</a> && <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;Gt&gt;() == <a href="curves.md#0x1_curves_GID_BLS12_381_Gt">GID_BLS12_381_Gt</a>) {
         <a href="curves.md#0x1_curves_PID_BLS12_381">PID_BLS12_381</a>
     } <b>else</b> {
@@ -836,7 +839,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_bytes_into_point_internal">bytes_into_point_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_bytes_into_point_internal">bytes_into_point_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): u8
 </code></pre>
 
 
@@ -845,7 +848,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_bytes_into_point_internal">bytes_into_point_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_bytes_into_point_internal">bytes_into_point_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): u8;
 </code></pre>
 
 
@@ -858,7 +861,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_bytes_into_scalar_internal">bytes_into_scalar_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_bytes_into_scalar_internal">bytes_into_scalar_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): u8
 </code></pre>
 
 
@@ -867,7 +870,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_bytes_into_scalar_internal">bytes_into_scalar_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_bytes_into_scalar_internal">bytes_into_scalar_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): u8;
 </code></pre>
 
 
@@ -880,7 +883,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_zero_internal">scalar_zero_internal</a>(gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_zero_internal">scalar_zero_internal</a>(gid: u8): u8
 </code></pre>
 
 
@@ -889,7 +892,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_zero_internal">scalar_zero_internal</a>(gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_zero_internal">scalar_zero_internal</a>(gid: u8): u8;
 </code></pre>
 
 
@@ -902,7 +905,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_one_internal">scalar_one_internal</a>(gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_one_internal">scalar_one_internal</a>(gid: u8): u8
 </code></pre>
 
 
@@ -911,7 +914,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_one_internal">scalar_one_internal</a>(gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_one_internal">scalar_one_internal</a>(gid: u8): u8;
 </code></pre>
 
 
@@ -924,7 +927,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_from_u64_internal">scalar_from_u64_internal</a>(value: u64, gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_from_u64_internal">scalar_from_u64_internal</a>(value: u64, gid: u8): u8
 </code></pre>
 
 
@@ -933,7 +936,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_u64_internal">scalar_from_u64_internal</a>(value: u64, gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_u64_internal">scalar_from_u64_internal</a>(value: u64, gid: u8): u8;
 </code></pre>
 
 
@@ -946,7 +949,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>(gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>(gid: u8): u8
 </code></pre>
 
 
@@ -955,7 +958,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>(gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>(gid: u8): u8;
 </code></pre>
 
 
@@ -968,7 +971,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_add_internal">scalar_add_internal</a>(handle_1: u64, handle_2: u64, gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_add_internal">scalar_add_internal</a>(handle_1: u8, handle_2: u8, gid: u8): u8
 </code></pre>
 
 
@@ -977,7 +980,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_add_internal">scalar_add_internal</a>(handle_1: u64, handle_2: u64, gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_add_internal">scalar_add_internal</a>(handle_1: u8, handle_2: u8, gid: u8): u8;
 </code></pre>
 
 
@@ -990,7 +993,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_mul_internal">scalar_mul_internal</a>(handle_1: u64, handle_2: u64, gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_mul_internal">scalar_mul_internal</a>(handle_1: u8, handle_2: u8, gid: u8): u8
 </code></pre>
 
 
@@ -999,7 +1002,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_mul_internal">scalar_mul_internal</a>(handle_1: u64, handle_2: u64, gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_mul_internal">scalar_mul_internal</a>(handle_1: u8, handle_2: u8, gid: u8): u8;
 </code></pre>
 
 
@@ -1012,7 +1015,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(handle: u64, gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(handle: u8, gid: u8): u8
 </code></pre>
 
 
@@ -1021,7 +1024,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(handle: u64, gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(handle: u8, gid: u8): u8;
 </code></pre>
 
 
@@ -1034,7 +1037,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_eq_internal">scalar_eq_internal</a>(handle_1: u64, handle_2: u64, gid: u64): bool
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_eq_internal">scalar_eq_internal</a>(handle_1: u8, handle_2: u8, gid: u8): bool
 </code></pre>
 
 
@@ -1043,7 +1046,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_eq_internal">scalar_eq_internal</a>(handle_1: u64, handle_2: u64, gid: u64): bool;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_eq_internal">scalar_eq_internal</a>(handle_1: u8, handle_2: u8, gid: u8): bool;
 </code></pre>
 
 
@@ -1056,7 +1059,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_to_bytes_internal">scalar_to_bytes_internal</a>(h: u64, gid: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_to_bytes_internal">scalar_to_bytes_internal</a>(h: u8, gid: u8): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1065,7 +1068,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_to_bytes_internal">scalar_to_bytes_internal</a>(h: u64, gid: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_to_bytes_internal">scalar_to_bytes_internal</a>(h: u8, gid: u8): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -1078,7 +1081,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>(p1_handle: u64, p2_handle: u64, pairing_id: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>(p1_handle: u8, p2_handle: u8, pairing_id: u8): u8
 </code></pre>
 
 
@@ -1087,7 +1090,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>(p1_handle: u64, p2_handle: u64, pairing_id: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>(p1_handle: u8, p2_handle: u8, pairing_id: u8): u8;
 </code></pre>
 
 
@@ -1100,7 +1103,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_add_internal">point_add_internal</a>(handle_1: u64, handle_2: u64, gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_add_internal">point_add_internal</a>(handle_1: u8, handle_2: u8, gid: u8): u8
 </code></pre>
 
 
@@ -1109,7 +1112,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_add_internal">point_add_internal</a>(handle_1: u64, handle_2: u64, gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_add_internal">point_add_internal</a>(handle_1: u8, handle_2: u8, gid: u8): u8;
 </code></pre>
 
 
@@ -1122,7 +1125,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_eq_internal">point_eq_internal</a>(handle_1: u64, handle_2: u64, gid: u64): bool
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_eq_internal">point_eq_internal</a>(handle_1: u8, handle_2: u8, gid: u8): bool
 </code></pre>
 
 
@@ -1131,7 +1134,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_eq_internal">point_eq_internal</a>(handle_1: u64, handle_2: u64, gid: u64): bool;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_eq_internal">point_eq_internal</a>(handle_1: u8, handle_2: u8, gid: u8): bool;
 </code></pre>
 
 
@@ -1144,7 +1147,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_identity_internal">point_identity_internal</a>(gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_identity_internal">point_identity_internal</a>(gid: u8): u8
 </code></pre>
 
 
@@ -1153,7 +1156,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_identity_internal">point_identity_internal</a>(gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_identity_internal">point_identity_internal</a>(gid: u8): u8;
 </code></pre>
 
 
@@ -1166,7 +1169,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_generator_internal">point_generator_internal</a>(gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_generator_internal">point_generator_internal</a>(gid: u8): u8
 </code></pre>
 
 
@@ -1175,7 +1178,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_generator_internal">point_generator_internal</a>(gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_generator_internal">point_generator_internal</a>(gid: u8): u8;
 </code></pre>
 
 
@@ -1188,7 +1191,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_mul_internal">point_mul_internal</a>(scalar_handle: u64, point_handle: u64, gid: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_mul_internal">point_mul_internal</a>(scalar_handle: u8, point_handle: u8, gid: u8): u8
 </code></pre>
 
 
@@ -1197,7 +1200,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_mul_internal">point_mul_internal</a>(scalar_handle: u64, point_handle: u64, gid: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_mul_internal">point_mul_internal</a>(scalar_handle: u8, point_handle: u8, gid: u8): u8;
 </code></pre>
 
 
@@ -1210,7 +1213,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_to_bytes_internal">point_to_bytes_internal</a>(handle: u64, gid: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_to_bytes_internal">point_to_bytes_internal</a>(handle: u8, gid: u8): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1219,7 +1222,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_to_bytes_internal">point_to_bytes_internal</a>(handle: u64, gid: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_to_bytes_internal">point_to_bytes_internal</a>(handle: u8, gid: u8): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 

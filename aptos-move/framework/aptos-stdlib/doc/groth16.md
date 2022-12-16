@@ -223,7 +223,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof_internal">verify_proof_internal</a>(vk_alpha_g1_handle: u64, vk_beta_g_handle: u64, vk_gamma_g2_handle: u64, vk_delta_g2_handle: u64, gamma_abc_g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, proof_a_handle: u64, proof_b_handle: u64, proof_c_handle: u64, public_input_handle: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, pairing_id: u64): bool
+<pre><code><b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof_internal">verify_proof_internal</a>(vk_alpha_g1_handle: u8, vk_beta_g_handle: u8, vk_gamma_g2_handle: u8, vk_delta_g2_handle: u8, gamma_abc_g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, proof_a_handle: u8, proof_b_handle: u8, proof_c_handle: u8, public_input_handle: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, pairing_id: u8): bool
 </code></pre>
 
 
@@ -233,10 +233,10 @@
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof_internal">verify_proof_internal</a>(
-    vk_alpha_g1_handle: u64, vk_beta_g_handle: u64, vk_gamma_g2_handle: u64, vk_delta_g2_handle: u64, gamma_abc_g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    proof_a_handle: u64, proof_b_handle: u64, proof_c_handle: u64,
+    vk_alpha_g1_handle: u8, vk_beta_g_handle: u8, vk_gamma_g2_handle: u8, vk_delta_g2_handle: u8, gamma_abc_g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    proof_a_handle: u8, proof_b_handle: u8, proof_c_handle: u8,
     public_input_handle: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    pairing_id: u64
+    pairing_id: u8
 ): bool;
 </code></pre>
 

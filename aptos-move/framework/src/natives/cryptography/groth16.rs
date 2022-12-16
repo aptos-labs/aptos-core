@@ -31,16 +31,16 @@ fn verify_proof_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let pid = pop_arg!(args, u64);
+    let pid = pop_arg!(args, u8);
     let public_input_handles = pop_arg!(args, Vec<u8>);
-    let proof_c_handle = pop_arg!(args, u64);
-    let proof_b_handle = pop_arg!(args, u64);
-    let proof_a_handle = pop_arg!(args, u64);
+    let proof_c_handle = pop_arg!(args, u8);
+    let proof_b_handle = pop_arg!(args, u8);
+    let proof_a_handle = pop_arg!(args, u8);
     let gamma_abc_g1_handles = pop_arg!(args, Vec<u8>);
-    let vk_alpha_g1_handle = pop_arg!(args, u64);
-    let vk_beta_g2_handle = pop_arg!(args, u64);
-    let vk_gamma_g2_handle = pop_arg!(args, u64);
-    let vk_delta_g2_handle = pop_arg!(args, u64);
+    let vk_alpha_g1_handle = pop_arg!(args, u8);
+    let vk_beta_g2_handle = pop_arg!(args, u8);
+    let vk_gamma_g2_handle = pop_arg!(args, u8);
+    let vk_delta_g2_handle = pop_arg!(args, u8);
     let accepted: bool = match pid {
         curves::PID_BLS12_381 => {
             //todo

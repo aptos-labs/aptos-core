@@ -7,7 +7,7 @@ use crate::pop_vec_arg;
 use aptos_crypto::bls12381::arithmetics::Scalar;
 use aptos_crypto::bls12381::PrivateKey;
 use better_any::{Tid, TidAble};
-use bls12_381::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt};
+use bls12_381;
 use group::{Group, GroupEncoding};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
@@ -29,9 +29,9 @@ pub struct GasParameters {
 #[derive(Tid)]
 pub struct Bls12381Context {
     scalar_store: Vec<bls12_381::Scalar>,
-    g1_point_store: Vec<G1Projective>,
-    g2_point_store: Vec<G2Projective>,
-    gt_point_store: Vec<Gt>,
+    g1_point_store: Vec<bls12_381::G1Projective>,
+    g2_point_store: Vec<bls12_381::G2Projective>,
+    gt_point_store: Vec<bls12_381::Gt>,
 }
 
 impl Bls12381Context {
@@ -54,33 +54,33 @@ impl Bls12381Context {
         self.scalar_store.get(handle).unwrap()
     }
 
-    pub fn add_g1_point(&mut self, p0: G1Projective) -> usize {
+    pub fn add_g1_point(&mut self, p0: bls12_381::G1Projective) -> usize {
         let ret = self.g1_point_store.len();
         self.g1_point_store.push(p0);
         ret
     }
 
-    pub fn get_g1_point(&self, handle: usize) -> &G1Projective {
+    pub fn get_g1_point(&self, handle: usize) -> &bls12_381::G1Projective {
         self.g1_point_store.get(handle).unwrap()
     }
 
-    pub fn add_g2_point(&mut self, p0: G2Projective) -> usize {
+    pub fn add_g2_point(&mut self, p0: bls12_381::G2Projective) -> usize {
         let ret = self.g2_point_store.len();
         self.g2_point_store.push(p0);
         ret
     }
 
-    pub fn get_g2_point(&self, handle: usize) -> &G2Projective {
+    pub fn get_g2_point(&self, handle: usize) -> &bls12_381::G2Projective {
         self.g2_point_store.get(handle).unwrap()
     }
 
-    pub fn add_gt_point(&mut self, point: Gt) -> usize {
+    pub fn add_gt_point(&mut self, point: bls12_381::Gt) -> usize {
         let ret = self.gt_point_store.len();
         self.gt_point_store.push(point);
         ret
     }
 
-    pub fn get_gt_point(&self, handle: usize) -> &Gt {
+    pub fn get_gt_point(&self, handle: usize) -> &bls12_381::Gt {
         self.gt_point_store.get(handle).unwrap()
     }
 }
@@ -91,9 +91,9 @@ fn bytes_into_point_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let gid = pop_arg!(args, u64);
+    let group_id = pop_arg!(args, u8);
     let bytes = pop_arg!(args, Vec<u8>);
-    let handle = match gid {
+    let handle = match group_id {
         GID_BLS12_381_G1 => {
             let bytes_2 = <[u8; 48]>::try_from(bytes).unwrap();
             let point = bls12_381::G1Affine::from_compressed(&bytes_2)
@@ -118,7 +118,7 @@ fn bytes_into_point_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u64(handle as u64)],
+        smallvec![Value::u8(handle as u8)],
     ))
 }
 
@@ -128,9 +128,9 @@ fn bytes_into_scalar_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let gid = pop_arg!(args, u64);
+    let group_id = pop_arg!(args, u8);
     let bytes = pop_arg!(args, Vec<u8>);
-    let handle = match gid {
+    let handle = match group_id {
         GID_BLS12_381_G1 | GID_BLS12_381_G2 => {
             let scalar =
                 bls12_381::Scalar::from_bytes(&<[u8; 32]>::try_from(bytes).unwrap()).unwrap();
@@ -143,7 +143,7 @@ fn bytes_into_scalar_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u64(handle as u64)],
+        smallvec![Value::u8(handle as u8)],
     ))
 }
 
@@ -153,14 +153,21 @@ fn scalar_one_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let gid = pop_arg!(args, u64);
-    let handle = context
-        .extensions_mut()
-        .get_mut::<Bls12381Context>()
-        .add_scalar(bls12_381::Scalar::one());
+    let group_id = pop_arg!(args, u8);
+    let handle = match group_id {
+        GID_BLS12_381_G1 | GID_BLS12_381_G2 | GID_BLS12_381_Gt => {
+            let handle = context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_scalar(bls12_381::Scalar::one());
+            handle
+        }
+        _ => todo!(),
+    };
+
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u64(handle as u64)],
+        smallvec![Value::u8(handle as u8)],
     ))
 }
 
@@ -170,9 +177,9 @@ fn scalar_from_u64_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let gid = pop_arg!(args, u64);
+    let group_id = pop_arg!(args, u8);
     let v = pop_arg!(args, u64);
-    let handle = match gid {
+    let handle = match group_id {
         GID_BLS12_381_G1 | GID_BLS12_381_G2 | GID_BLS12_381_Gt => {
             let handle = context
                 .extensions_mut()
@@ -184,7 +191,7 @@ fn scalar_from_u64_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u64(handle as u64)],
+        smallvec![Value::u8(handle as u8)],
     ))
 }
 
@@ -194,25 +201,31 @@ fn scalar_add_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let gid = pop_arg!(args, u64);
-    let handle_2 = pop_arg!(args, u64) as usize;
-    let handle_1 = pop_arg!(args, u64) as usize;
-    let scalar_1 = context
-        .extensions()
-        .get::<Bls12381Context>()
-        .get_scalar(handle_1);
-    let scalar_2 = context
-        .extensions()
-        .get::<Bls12381Context>()
-        .get_scalar(handle_2);
-    let result = scalar_1.add(scalar_2);
-    let result_handle = context
-        .extensions_mut()
-        .get_mut::<Bls12381Context>()
-        .add_scalar(result);
+    let group_id = pop_arg!(args, u8);
+    let handle_2 = pop_arg!(args, u8) as usize;
+    let handle_1 = pop_arg!(args, u8) as usize;
+    let handle = match group_id {
+        GID_BLS12_381_G1 | GID_BLS12_381_G2 | GID_BLS12_381_Gt => {
+            let scalar_1 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_scalar(handle_1);
+            let scalar_2 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_scalar(handle_2);
+            let result = scalar_1.add(scalar_2);
+            let result_handle = context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_scalar(result);
+            result_handle
+        }
+        _ => todo!(),
+    };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u64(result_handle as u64)],
+        smallvec![Value::u8(handle as u8)],
     ))
 }
 
@@ -222,23 +235,46 @@ fn point_identity_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let gid = pop_arg!(args, u64);
-    let point = bls12_381::G1Projective::identity();
-    let handle = context
-        .extensions_mut()
-        .get_mut::<Bls12381Context>()
-        .add_g1_point(point);
+    let group_id = pop_arg!(args, u8);
+    let handle = match group_id {
+        GID_BLS12_381_G1 => {
+            let point = bls12_381::G1Projective::identity();
+            let handle = context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_g1_point(point);
+            handle
+        }
+        GID_BLS12_381_G2 => {
+            let point = bls12_381::G2Projective::identity();
+            let handle = context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_g2_point(point);
+            handle
+        }
+        GID_BLS12_381_Gt => {
+            let point = bls12_381::Gt::identity();
+            let handle = context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_gt_point(point);
+            handle
+        }
+        _ => todo!(),
+    };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u64(handle as u64)],
+        smallvec![Value::u8(handle as u8)],
     ))
 }
 
-pub const GID_BLS12_381_G1: u64 = 1;
-pub const GID_BLS12_381_G2: u64 = 2;
-pub const GID_BLS12_381_Gt: u64 = 3;
-
-pub const PID_BLS12_381: u64 = 1;
+/// Group/bilinear mapping ID assignments.
+/// The assignment here should match what is in `/aptos-move/framework/aptos-stdlib/sources/cryptography/curves.move`.
+pub const GID_BLS12_381_G1: u8 = 1;
+pub const GID_BLS12_381_G2: u8 = 2;
+pub const GID_BLS12_381_Gt: u8 = 3;
+pub const PID_BLS12_381: u8 = 1;
 
 fn point_generator_internal(
     gas_params: &GasParameters,
@@ -248,10 +284,10 @@ fn point_generator_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(0, _ty_args.len());
     assert_eq!(1, args.len());
-    let group_id = pop_arg!(args, u64);
+    let group_id = pop_arg!(args, u8);
     let handle = match group_id {
         GID_BLS12_381_G1 => {
-            let point = G1Projective::generator();
+            let point = bls12_381::G1Projective::generator();
             let handle = context
                 .extensions_mut()
                 .get_mut::<Bls12381Context>()
@@ -259,7 +295,7 @@ fn point_generator_internal(
             handle
         }
         GID_BLS12_381_G2 => {
-            let point = G2Projective::generator();
+            let point = bls12_381::G2Projective::generator();
             let handle = context
                 .extensions_mut()
                 .get_mut::<Bls12381Context>()
@@ -267,20 +303,18 @@ fn point_generator_internal(
             handle
         }
         GID_BLS12_381_Gt => {
-            let point = Gt::generator();
+            let point = bls12_381::Gt::generator();
             let handle = context
                 .extensions_mut()
                 .get_mut::<Bls12381Context>()
                 .add_gt_point(point);
             handle
         }
-        _ => {
-            todo!()
-        }
+        _ => todo!(),
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u64(handle as u64)],
+        smallvec![Value::u8(handle as u8)],
     ))
 }
 
@@ -290,10 +324,10 @@ fn point_eq_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let gid = pop_arg!(args, u64);
-    let handle_2 = pop_arg!(args, u64) as usize;
-    let handle_1 = pop_arg!(args, u64) as usize;
-    let result = match gid {
+    let group_id = pop_arg!(args, u8);
+    let handle_2 = pop_arg!(args, u8) as usize;
+    let handle_1 = pop_arg!(args, u8) as usize;
+    let result = match group_id {
         GID_BLS12_381_G1 => {
             let point_1 = context
                 .extensions()
@@ -345,10 +379,10 @@ fn point_add_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let gid = pop_arg!(args, u64);
-    let handle_2 = pop_arg!(args, u64) as usize;
-    let handle_1 = pop_arg!(args, u64) as usize;
-    let handle = match gid {
+    let group_id = pop_arg!(args, u8);
+    let handle_2 = pop_arg!(args, u8) as usize;
+    let handle_1 = pop_arg!(args, u8) as usize;
+    let handle = match group_id {
         GID_BLS12_381_G1 => {
             let point_1 = context
                 .extensions()
@@ -401,7 +435,7 @@ fn point_add_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u64(handle as u64)],
+        smallvec![Value::u8(handle as u8)],
     ))
 }
 
@@ -411,10 +445,10 @@ fn point_mul_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let gid = pop_arg!(args, u64);
-    let point_handle = pop_arg!(args, u64) as usize;
-    let scalar_handle = pop_arg!(args, u64) as usize;
-    let handle = match gid {
+    let group_id = pop_arg!(args, u8);
+    let point_handle = pop_arg!(args, u8) as usize;
+    let scalar_handle = pop_arg!(args, u8) as usize;
+    let handle = match group_id {
         GID_BLS12_381_G1 => {
             let point = context
                 .extensions()
@@ -463,13 +497,11 @@ fn point_mul_internal(
                 .add_gt_point(result);
             handle
         }
-        _ => {
-            todo!()
-        }
+        _ => todo!(),
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u64(handle as u64)],
+        smallvec![Value::u8(handle as u8)],
     ))
 }
 
@@ -479,30 +511,36 @@ fn pairing_internal(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let pid = pop_arg!(args, u64);
-    let handle_2 = pop_arg!(args, u64) as usize;
-    let handle_1 = pop_arg!(args, u64) as usize;
-    let point_1 = context
-        .extensions()
-        .get::<Bls12381Context>()
-        .get_g1_point(handle_1);
-    let point_2 = context
-        .extensions()
-        .get::<Bls12381Context>()
-        .get_g2_point(handle_2);
-    let mut point_1_affine = G1Affine::default();
-    G1Projective::batch_normalize(&[*point_1], &mut [point_1_affine]);
-    let mut point_2_affine = G2Affine::default();
-    G2Projective::batch_normalize(&[*point_2], &mut [point_2_affine]);
+    let pid = pop_arg!(args, u8);
+    let handle_2 = pop_arg!(args, u8) as usize;
+    let handle_1 = pop_arg!(args, u8) as usize;
+    let handle = match pid {
+        PID_BLS12_381 => {
+            let point_1 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_g1_point(handle_1);
+            let point_2 = context
+                .extensions()
+                .get::<Bls12381Context>()
+                .get_g2_point(handle_2);
+            let mut point_1_affine = bls12_381::G1Affine::default();
+            bls12_381::G1Projective::batch_normalize(&[*point_1], &mut [point_1_affine]);
+            let mut point_2_affine = bls12_381::G2Affine::default();
+            bls12_381::G2Projective::batch_normalize(&[*point_2], &mut [point_2_affine]);
 
-    let result = pairing(&point_1_affine, &point_2_affine);
-    let handle = context
-        .extensions_mut()
-        .get_mut::<Bls12381Context>()
-        .add_gt_point(result);
+            let result = bls12_381::pairing(&point_1_affine, &point_2_affine);
+            let handle = context
+                .extensions_mut()
+                .get_mut::<Bls12381Context>()
+                .add_gt_point(result);
+            handle
+        }
+        _ => todo!(),
+    };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u64(handle as u64)],
+        smallvec![Value::u8(handle as u8)],
     ))
 }
 

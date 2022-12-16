@@ -8,20 +8,24 @@ module aptos_std::curves {
     struct BLS12_381_G2 {}
     struct BLS12_381_Gt {}
 
+    //TODO: handle as u8 temporarily. Upgrade to u64.
     struct Scalar<phantom Group> has drop {
-        handle: u64
+        handle: u8
     }
 
     struct Point<phantom Group> has drop {
-        handle: u64
+        handle: u8
     }
 
-    /// Get internal handle. May not be needed.
-    public fun get_scalar_handle<Group>(s: &Scalar<Group>): u64 {
+    /// Get internal handle for a Scalar. Currently needed by groth16 module.
+    /// TODO: can this be avoided?
+    public fun get_scalar_handle<Group>(s: &Scalar<Group>): u8 {
         s.handle
     }
 
-    public fun get_point_handle<Group>(p: &Point<Group>): u64 {
+    /// Get internal handle for a point. Currently needed by groth16 module.
+    /// TODO: can this be avoided?
+    public fun get_point_handle<Group>(p: &Point<Group>): u8 {
         p.handle
     }
 
@@ -130,17 +134,17 @@ module aptos_std::curves {
     }
 
     /// Group/bilinear mapping ID assignments.
-    /// Move side and rust side share the same ID assignments.
-    /// NOTE: If it is possible to retrieve move type info on rust end, we do not need ID assignments at all.
-    const GID_UNKNOWN: u64 = 0;
-    const GID_BLS12_381_G1: u64 = 1;
-    const GID_BLS12_381_G2: u64 = 2;
-    const GID_BLS12_381_Gt: u64 = 3;
-    const PID_UNKNOWN: u64 = 0;
-    const PID_BLS12_381: u64 = 1;
+    /// The assignment here should match what is in `/aptos-move/framework/src/natives/cryptography/curves.rs`.
+    /// TODO: it is possible to retrieve move type info on rust end, so we do not need these ID assignments at all?
+    const GID_UNKNOWN: u8 = 0;
+    const GID_BLS12_381_G1: u8 = 1;
+    const GID_BLS12_381_G2: u8 = 2;
+    const GID_BLS12_381_Gt: u8 = 3;
+    const PID_UNKNOWN: u8 = 0;
+    const PID_BLS12_381: u8 = 1;
 
     /// Map a group to its group ID.
-    fun get_group_id<G>(): u64 {
+    fun get_group_id<G>(): u8 {
         let typ = type_of<G>();
         if (typ == type_of<BLS12_381_G1>()) {
             GID_BLS12_381_G1
@@ -154,7 +158,7 @@ module aptos_std::curves {
     }
 
     /// Map a pairing group set to its bilinear mapping ID.
-    public fun get_pairing_id<G1,G2,Gt>(): u64 {
+    public fun get_pairing_id<G1,G2,Gt>(): u8 {
         if (get_group_id<G1>() == GID_BLS12_381_G1 && get_group_id<G2>() == GID_BLS12_381_G2 && get_group_id<Gt>() == GID_BLS12_381_Gt) {
             PID_BLS12_381
         } else {
@@ -164,24 +168,24 @@ module aptos_std::curves {
 
     // Native functions.
 
-    native fun bytes_into_point_internal(bytes: vector<u8>, gid: u64): u64;
-    native fun bytes_into_scalar_internal(bytes: vector<u8>, gid: u64): u64;
-    native fun scalar_zero_internal(gid: u64): u64;
-    native fun scalar_one_internal(gid: u64): u64;
-    native fun scalar_from_u64_internal(value: u64, gid: u64): u64;
-    native fun scalar_neg_internal(gid: u64): u64;
-    native fun scalar_add_internal(handle_1: u64, handle_2: u64, gid: u64): u64;
-    native fun scalar_mul_internal(handle_1: u64, handle_2: u64, gid: u64): u64;
-    native fun scalar_inv_internal(handle: u64, gid: u64): u64;
-    native fun scalar_eq_internal(handle_1: u64, handle_2: u64, gid: u64): bool;
-    native fun scalar_to_bytes_internal(h: u64, gid: u64): vector<u8>;
-    native fun pairing_internal(p1_handle: u64, p2_handle: u64, pairing_id: u64): u64;
-    native fun point_add_internal(handle_1: u64, handle_2: u64, gid: u64): u64;
-    native fun point_eq_internal(handle_1: u64, handle_2: u64, gid: u64): bool;
-    native fun point_identity_internal(gid: u64): u64;
-    native fun point_generator_internal(gid: u64): u64;
-    native fun point_mul_internal(scalar_handle: u64, point_handle: u64, gid: u64): u64;
-    native fun point_to_bytes_internal(handle: u64, gid: u64): vector<u8>;
+    native fun bytes_into_point_internal(bytes: vector<u8>, gid: u8): u8;
+    native fun bytes_into_scalar_internal(bytes: vector<u8>, gid: u8): u8;
+    native fun scalar_zero_internal(gid: u8): u8;
+    native fun scalar_one_internal(gid: u8): u8;
+    native fun scalar_from_u64_internal(value: u64, gid: u8): u8;
+    native fun scalar_neg_internal(gid: u8): u8;
+    native fun scalar_add_internal(handle_1: u8, handle_2: u8, gid: u8): u8;
+    native fun scalar_mul_internal(handle_1: u8, handle_2: u8, gid: u8): u8;
+    native fun scalar_inv_internal(handle: u8, gid: u8): u8;
+    native fun scalar_eq_internal(handle_1: u8, handle_2: u8, gid: u8): bool;
+    native fun scalar_to_bytes_internal(h: u8, gid: u8): vector<u8>;
+    native fun pairing_internal(p1_handle: u8, p2_handle: u8, pairing_id: u8): u8;
+    native fun point_add_internal(handle_1: u8, handle_2: u8, gid: u8): u8;
+    native fun point_eq_internal(handle_1: u8, handle_2: u8, gid: u8): bool;
+    native fun point_identity_internal(gid: u8): u8;
+    native fun point_generator_internal(gid: u8): u8;
+    native fun point_mul_internal(scalar_handle: u8, point_handle: u8, gid: u8): u8;
+    native fun point_to_bytes_internal(handle: u8, gid: u8): vector<u8>;
 
     #[test]
     fun test_scalar_point_arithmatics() {
