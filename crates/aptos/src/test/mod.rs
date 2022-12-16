@@ -928,6 +928,7 @@ impl CliTestFramework {
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
+                bytecode_version: None,
             },
             args: Vec::new(),
             type_args: Vec::new(),
