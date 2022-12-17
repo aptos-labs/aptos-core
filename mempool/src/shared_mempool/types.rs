@@ -49,6 +49,7 @@ where
     pub db: Arc<dyn DbReader>,
     pub validator: Arc<RwLock<V>>,
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
+    pub broadcast_within_validator_network: Arc<RwLock<bool>>,
 }
 
 impl<V: TransactionValidation + 'static> SharedMempool<V> {
@@ -75,11 +76,18 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
             db,
             validator,
             subscribers,
+            broadcast_within_validator_network: Arc::new(RwLock::new(true)),
         }
     }
 
     pub fn broadcast_within_validator_network(&self) -> bool {
-        self.config.shared_mempool_validator_broadcast
+        // This value will be changed true -> false via onchain config when quorum store is enabled.
+        // On the transition from true -> false, all transactions in mempool will be eligible for
+        // at least one of mempool broadcast or quorum store batch.
+        // A transition from false -> true is unexpected -- it would only be triggered if quorum
+        // store needs an emergency rollback. In this case, some transactions may not be propagated,
+        // they will neither go through a mempool broadcast or quorum store batch.
+        *self.broadcast_within_validator_network.read()
     }
 }
 
