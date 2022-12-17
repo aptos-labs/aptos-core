@@ -28,12 +28,6 @@ locals {
   monitoring_helm_chart_path = "${path.module}/../../helm/monitoring"
   logger_helm_chart_path     = "${path.module}/../../helm/logger"
   aptos_node_helm_chart_path = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
-
-  # these values are the most likely to be changed by the user and may be managed by terraform to trigger re-deployment
-  helm_values_managed = {
-    "imageTag"  = var.image_tag
-    "chain.era" = var.era
-  }
 }
 
 resource "helm_release" "validator" {
@@ -41,12 +35,6 @@ resource "helm_release" "validator" {
   chart       = local.aptos_node_helm_chart_path
   max_history = 5
   wait        = false
-
-  lifecycle {
-    ignore_changes = [
-      values,
-    ]
-  }
 
   values = [
     jsonencode({
@@ -89,17 +77,12 @@ resource "helm_release" "validator" {
   ]
 
   dynamic "set" {
-    for_each = var.manage_via_tf ? local.helm_values_managed : {}
+    for_each = var.manage_via_tf ? toset([""]) : toset([])
     content {
-      name  = set.key
-      value = set.value
+      # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+      name  = "chart_sha1"
+      value = sha1(join("", [for f in fileset(local.aptos_node_helm_chart_path, "**") : filesha1("${local.aptos_node_helm_chart_path}/${f}")]))
     }
-  }
-
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
-  set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.aptos_node_helm_chart_path, "**") : filesha1("${local.aptos_node_helm_chart_path}/${f}")]))
   }
 }
 
