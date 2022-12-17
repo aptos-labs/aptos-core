@@ -317,10 +317,17 @@ where
                 versioned_data_cache.mark_estimate(&k, idx_to_validate);
             }
 
-            scheduler.finish_abort(idx_to_validate, incarnation, guard)
-        } else {
-            SchedulerTask::NoTask
+            return scheduler.finish_abort(idx_to_validate, incarnation, guard);
+        } else if valid {
+            // When the validation is successful, check if the transaction can be committed.
+            let txn_gas = match last_input_output.write_set(idx_to_validate).as_ref() {
+                ExecutionStatus::Success(t) => t.gas_used(),
+                ExecutionStatus::SkipRest(t) => t.gas_used(),
+                ExecutionStatus::Abort(_) => 0,
+            };
+            return scheduler.try_commit(idx_to_validate, txn_gas, guard);
         }
+        SchedulerTask::NoTask
     }
 
     fn work_task_with_scope(
@@ -412,7 +419,8 @@ where
         });
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.
-        let num_txns = scheduler.num_txn_to_execute();
+        // Note: use the number of committed transactions, may be smaller than block size.
+        let num_txns = scheduler.num_txn_to_commit();
         let mut final_results = Vec::with_capacity(num_txns);
 
         let maybe_err = if last_input_output.module_publishing_may_race() {

@@ -4,7 +4,6 @@
 use aptos_infallible::Mutex;
 use crossbeam::utils::CachePadded;
 use std::{
-    cmp::min,
     hint,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -32,6 +31,21 @@ pub enum DependencyResult {
     Dependency(DependencyCondvar),
     Resolved,
     ExecutionHalted,
+}
+
+// Next transaction to commit and accumulated gas of committed transactions.
+pub struct CommitAndGas {
+    commit_idx: usize,
+    commit_gas: u64,
+}
+
+impl CommitAndGas {
+    pub fn new(commit_idx: usize, commit_gas: u64) -> Self {
+        Self {
+            commit_idx,
+            commit_gas,
+        }
+    }
 }
 
 // A struct to track the number of active tasks in the scheduler using RAII.
@@ -128,6 +142,10 @@ impl PartialEq for TransactionStatus {
 pub struct Scheduler {
     /// Number of txns to execute, immutable.
     num_txns: usize,
+    /// The total amount of gas the block can use.
+    /// If the sequential execution of txns 0,..,i has gas cost >= max_per_block_gas, the parallel
+    /// executor will halt after committing txns 0,..,i.
+    max_per_block_gas: u64,
 
     /// A shared index that tracks the minimum of all transaction indices that require execution.
     /// The threads increment the index and attempt to create an execution task for the corresponding
@@ -156,6 +174,11 @@ pub struct Scheduler {
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
     /// An index i maps to the most up-to-date status of transaction i.
     txn_status: Vec<CachePadded<Mutex<TransactionStatus>>>,
+
+    /// The next txn to commit and the total accumulated gas of committed transactions.
+    /// Mutex ensures both variables are updated atomically, to avoid the race issue such as
+    /// accumulating the gas non-sequentially.
+    commit_idx_and_gas: Mutex<CommitAndGas>,
 }
 
 /// Public Interfaces for the Scheduler
@@ -163,6 +186,7 @@ impl Scheduler {
     pub fn new(num_txns: usize) -> Self {
         Self {
             num_txns,
+            max_per_block_gas: u64::MAX, // TODO: have a better way to pass in the parameter
             execution_idx: AtomicUsize::new(0),
             validation_idx: AtomicUsize::new(0),
             decrease_cnt: AtomicUsize::new(0),
@@ -174,12 +198,14 @@ impl Scheduler {
             txn_status: (0..num_txns)
                 .map(|_| CachePadded::new(Mutex::new(TransactionStatus::ReadyToExecute(0, None))))
                 .collect(),
+            commit_idx_and_gas: Mutex::new(CommitAndGas::new(0, 0)),
         }
     }
 
-    /// Return the number of transactions to be executed from the block.
-    pub fn num_txn_to_execute(&self) -> usize {
-        self.num_txns
+    /// Return the number of transactions to be committed from the block.
+    /// The number can be smaller than block size due to the per-block gas limit.
+    pub fn num_txn_to_commit(&self) -> usize {
+        self.commit_idx_and_gas.lock().commit_idx
     }
 
     /// Try to abort version = (txn_idx, incarnation), called upon validation failure.
@@ -363,8 +389,8 @@ impl Scheduler {
         SchedulerTask::NoTask
     }
 
-    /// Set the done_marker to be true, return the previous value of the done_marker.
-    /// Should only be called when there is a module r/w intersection.
+    /// Set the done_marker to be true. Should only be called when there is a module r/w intersection,
+    /// or when the per-block gas limit is exceeded, or all transactions have been committed.
     pub fn halt(&self) {
         // The first thread that sets done_marker to be true will be reponsible for
         // resolving the conditional variables, to help other theads that may be pending
@@ -397,6 +423,49 @@ impl Scheduler {
                     cvar.notify_one();
                 }
                 _ => {}
+            }
+        }
+    }
+
+    /// Try to commit the validated transaction. If committed, create and return a validation task of the next
+    /// transaction to ensure liveness of the algorithm.
+    pub fn try_commit<'a>(
+        &self,
+        txn_idx: usize,
+        txn_gas: u64,
+        guard: TaskGuard<'a>,
+    ) -> SchedulerTask<'a> {
+        // Get the next transaction to commit and accumulated gas of committed transactions.
+        let mut commit_idx_and_gas = self.commit_idx_and_gas.lock();
+        {
+            // We will sequentially commit transactions, so the txn_idx needs to match commit_idx.
+            if (*commit_idx_and_gas).commit_idx != txn_idx {
+                return SchedulerTask::NoTask;
+            }
+
+            // Update the commit_idx and commit_gas atomically.
+            (*commit_idx_and_gas).commit_idx += 1;
+            (*commit_idx_and_gas).commit_gas += txn_gas;
+
+            // When the total amount of gas exceeds the per-block gas limit, or all transactions have been committed,
+            // halt the parallel execution.
+            if (*commit_idx_and_gas).commit_gas > self.max_per_block_gas
+                || (*commit_idx_and_gas).commit_idx == self.num_txns
+            {
+                self.halt();
+                return SchedulerTask::NoTask;
+            }
+
+            // Create a validation task of the next transaction if incarnation was last executed. The reason to create
+            // such a validation task is that, the validation of next transaction may already succeed, but the transaction is not
+            // committed due to the commit index is not yet updated. So here a new validation task can guarantee to commit the
+            // next transaction.
+            match self
+                .is_executed(txn_idx + 1)
+                .map(|incarnation| ((txn_idx + 1, incarnation), guard))
+            {
+                Some((version, guard)) => SchedulerTask::ValidationTask(version, guard),
+                None => SchedulerTask::NoTask,
             }
         }
     }
@@ -576,39 +645,19 @@ impl Scheduler {
         *status = TransactionStatus::ReadyToExecute(incarnation + 1, None);
     }
 
-    /// A lazy, check of whether the scheduler execution is completed.
-    /// Updates the 'done_marker' so other threads can know by calling done() function below.
-    ///
-    /// 1. After the STM execution has completed:
-    /// validation_idx >= num_txn, execution_idx >= num_txn, num_active_tasks == 0,
-    /// and decrease_cnt does not change - so it will be successfully detected.
-    /// 2. If done_marker is set, all of these must hold at the same time, implying completion.
-    /// Proof: O.w. one of the indices must decrease from when it is read to be >= num_txns
-    /// to when num_active_tasks is read to be 0, but decreasing thread is performing an active task,
-    /// so it must first perform the next instruction in 'decrease_validation_idx' or
-    /// 'decrease_execution_idx' functions, which is to increment the decrease_cnt++.
-    /// Final check will then detect a change in decrease_cnt and not allow a false positive.
+    /// The function is no longer necessary. Keep it here to pass the unit test.
     fn check_done(&self) -> bool {
         if self.done() {
             return true;
         }
-        let observed_cnt = self.decrease_cnt.load(Ordering::SeqCst);
-
-        let val_idx = self.validation_idx.load(Ordering::SeqCst);
-        let exec_idx = self.execution_idx.load(Ordering::SeqCst);
-        let num_tasks = self.num_active_tasks.load(Ordering::SeqCst);
-        if min(exec_idx, val_idx) < self.num_txns || num_tasks > 0 {
-            // There is work remaining.
-            return false;
+        let commit_idx_and_gas = self.commit_idx_and_gas.lock();
+        if (*commit_idx_and_gas).commit_gas > self.max_per_block_gas
+            || (*commit_idx_and_gas).commit_idx == self.num_txns
+        {
+            self.halt();
+            return true;
         }
-
-        // Re-read and make sure decrease_cnt hasn't changed.
-        if observed_cnt == self.decrease_cnt.load(Ordering::SeqCst) {
-            self.done_marker.store(true, Ordering::Release);
-            true
-        } else {
-            false
-        }
+        false
     }
 
     /// Checks whether the done marker is set. The marker can only be set by 'check_done' and 'halt'.

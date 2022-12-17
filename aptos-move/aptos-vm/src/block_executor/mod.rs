@@ -81,6 +81,11 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             TransactionStatus::Retry,
         )))
     }
+
+    /// Return the amount of gas consumed by the transaction.
+    fn gas_used(&self) -> u64 {
+        self.0.txn_output().gas_used()
+    }
 }
 
 pub struct BlockAptosVM();

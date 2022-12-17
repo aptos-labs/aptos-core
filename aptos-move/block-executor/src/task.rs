@@ -102,4 +102,6 @@ pub trait TransactionOutput: Send + Sync {
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
+
+    fn gas_used(&self) -> u64;
 }
