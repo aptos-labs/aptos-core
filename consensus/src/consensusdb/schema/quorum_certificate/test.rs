@@ -3,7 +3,7 @@
 
 use super::*;
 use aptos_consensus_types::block::block_test_utils::certificate_for_genesis;
-use schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
+use aptos_schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
 
 #[test]
 fn test_encode_decode() {

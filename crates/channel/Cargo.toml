@@ -1,5 +1,5 @@
 [package]
-name = "channel"
+name = "aptos-channels"
 description = "An implementation of a channel with configurable QoS"
 version = "0.1.0"
 

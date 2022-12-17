@@ -62,9 +62,11 @@ use aptos_config::config::{
 };
 
 use aptos_crypto::hash::HashValue;
+use aptos_db_indexer::Indexer;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -92,11 +94,9 @@ use aptos_types::{
     },
 };
 use aptos_vm::data_cache::AsMoveResolver;
-use aptosdb_indexer::Indexer;
 use itertools::zip_eq;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
-use schemadb::{SchemaBatch, DB};
 use std::{
     collections::HashMap,
     iter::Iterator,
@@ -116,7 +116,7 @@ use crate::{
     stale_node_index::StaleNodeIndexSchema,
     stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
 };
-use storage_interface::{
+use aptos_storage_interface::{
     state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };

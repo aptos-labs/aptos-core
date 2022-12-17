@@ -13,12 +13,12 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{Error, ExecutedChunk};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
+use aptos_storage_interface::DbReader;
 use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::{Arc, Weak},
 };
-use storage_interface::DbReader;
 
 pub struct Block {
     pub id: HashValue,

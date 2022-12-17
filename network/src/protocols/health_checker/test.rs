@@ -14,8 +14,8 @@ use crate::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_time_service::{MockTimeService, TimeService};
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{executor::block_on, future};
 
 const PING_INTERVAL: Duration = Duration::from_secs(1);

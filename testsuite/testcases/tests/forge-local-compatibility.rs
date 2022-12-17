@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_forge::{forge_main, ForgeConfig, InitialVersion, LocalFactory, Options, Result};
+use aptos_testcases::compatibility_test::SimpleValidatorUpgrade;
 use std::num::NonZeroUsize;
-use testcases::compatibility_test::SimpleValidatorUpgrade;
 
 fn main() -> Result<()> {
     ::aptos_logger::Logger::init_for_testing();

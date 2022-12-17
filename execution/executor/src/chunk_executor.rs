@@ -22,6 +22,10 @@ use aptos_executor_types::{
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
+use aptos_storage_interface::{
+    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
+    ExecutedTrees,
+};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -34,10 +38,6 @@ use aptos_types::{
 use aptos_vm::VMExecutor;
 use fail::fail_point;
 use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
-use storage_interface::{
-    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
-    ExecutedTrees,
-};
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,

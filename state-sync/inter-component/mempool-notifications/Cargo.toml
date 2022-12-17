@@ -1,5 +1,5 @@
 [package]
-name = "mempool-notifications"
+name = "aptos-mempool-notifications"
 description = "The notification interface between state sync and mempool"
 version = "0.1.0"
 

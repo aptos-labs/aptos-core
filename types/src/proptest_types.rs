@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::transaction::NoOpChangeSetChecker;
 use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
@@ -104,10 +105,7 @@ impl Arbitrary for ChangeSet {
     type Parameters = ();
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         (any::<WriteSet>(), vec(any::<ContractEvent>(), 0..10))
-            .prop_map(|(ws, events)| {
-                // TODO(gas): probably move LATEST_GAS_FEATURE_VERSION to global-constants
-                ChangeSet::new(ws, events, 3).unwrap()
-            })
+            .prop_map(|(ws, events)| ChangeSet::new(ws, events, &NoOpChangeSetChecker).unwrap())
             .boxed()
     }
 

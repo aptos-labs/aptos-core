@@ -7,7 +7,7 @@
 use crate::metadata::{MetadataKey, MetadataValue};
 use crate::schema::INDEXER_METADATA_CF_NAME;
 use anyhow::Result;
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };

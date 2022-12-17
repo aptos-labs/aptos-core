@@ -6,10 +6,10 @@ use crate::{
     AptosDB,
 };
 use anyhow::Result;
+use aptos_storage_interface::DbWriter;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
 use proptest::prelude::*;
-use storage_interface::DbWriter;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]

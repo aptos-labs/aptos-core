@@ -19,11 +19,11 @@ use aptos_types::{
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
+use aptos_vm_genesis::GENESIS_KEYPAIR;
 use move_core_types::{
     language_storage::{ResourceKey, StructTag},
     move_resource::MoveStructType,
 };
-use vm_genesis::GENESIS_KEYPAIR;
 
 // TTL is 86400s. Initial time was set to 0.
 pub const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;

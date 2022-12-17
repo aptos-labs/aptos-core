@@ -11,9 +11,9 @@ use aptos_infallible::Mutex;
 
 use crate::pruner::pruner_manager::PrunerManager;
 use aptos_jellyfish_merkle::StaleNodeIndex;
+use aptos_schemadb::schema::KeyCodec;
+use aptos_schemadb::DB;
 use aptos_types::transaction::Version;
-use schemadb::schema::KeyCodec;
-use schemadb::DB;
 use std::{sync::Arc, thread::JoinHandle};
 
 use crate::pruner::db_pruner::DBPruner;

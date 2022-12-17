@@ -11,8 +11,8 @@ use crate::pruner::ledger_pruner_worker::LedgerPrunerWorker;
 use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
 use crate::pruner::pruner_manager::PrunerManager;
 use crate::{pruner_utils, StateStore};
+use aptos_schemadb::DB;
 use aptos_types::transaction::Version;
-use schemadb::DB;
 use std::{sync::Arc, thread::JoinHandle};
 
 /// The `PrunerManager` for `LedgerPruner`.
