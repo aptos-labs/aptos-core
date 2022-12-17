@@ -189,7 +189,7 @@ async fn test_data_stream_transactions_with_target() {
         .unwrap_err();
     assert_matches!(error, Error::VerificationError(_));
 
-    // Drive progress to initialize the transaction output stream
+    // Drive progress to initialize the transaction output stream.
     drive_progress(&mut continuous_syncer, &sync_request).await;
 }
 
