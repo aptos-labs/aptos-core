@@ -202,7 +202,7 @@ fn main() -> Result<()> {
     let args = Args::from_args();
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
-
+    // let duration = Duration::from_secs(6 * 5 * 60);
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -785,6 +785,65 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     }),
             ),
         "large_db_simple_test" => large_db_test(10, 500, 300, "10-validators".to_string()),
+        "max_tps_test" => config
+            .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+            .with_initial_fullnode_count(20)
+            // .with_network_tests(vec![&PerformanceBenchmarkWithFN])
+            .with_network_tests(vec![&LoadVsPerfBenchmark {
+                test: &PerformanceBenchmarkWithFN,
+                tps: &[8000, 9000, 10000, 11000, 12000, 13000],
+            }])
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                // no epoch change.
+                helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+            }))
+            .with_node_helm_config_fn(Arc::new(move |helm_values| {
+                helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                    5000.into();
+                helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
+                    5000.into();
+                helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+                    (2 * 1024 * 1024).into();
+                helm_values["validator"]["config"]["consensus"]["max_receiving_block_bytes"] =
+                    (2 * 1024 * 1024).into();
+
+                let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
+                // Generally if we are stress testing the consensus, we don't want to slow it down.
+                chain_health_backoff = vec![];
+                helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
+                    serde_yaml::to_value(chain_health_backoff).unwrap();
+
+                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+            }))
+            // .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+            //     mempool_backlog: 70000,
+            // }))
+            .with_success_criteria(
+                SuccessCriteria::new(6000)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(
+                        // Give at least 60s for catchup, give 10% of the run for longer durations.
+                        60,
+                    )
+                    .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                        // Check that we don't use more than 12 CPU cores for 30% of the time.
+                        MetricsThreshold::new(12, 30),
+                        // Check that we don't use more than 10 GB of memory for 30% of the time.
+                        MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                    ))
+                    .add_chain_progress(StateProgressThreshold {
+                        max_no_progress_secs: 10.0,
+                        max_round_gap: 4,
+                    }),
+            ),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -904,12 +963,40 @@ fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<
 
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(15).unwrap())
-        .with_initial_fullnode_count(15)
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(20)
         .with_network_tests(vec![&PerformanceBenchmarkWithFN])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            helm_values["chain"]["epoch_duration_secs"] = 3600.into();
+        }))
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] = 3200.into();
+            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
+                3200.into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+                (2 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["consensus"]["max_receiving_block_bytes"] =
+                (2 * 1024 * 1024).into();
+
+            let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
+            // Generally if we are stress testing the consensus, we don't want to slow it down.
+            chain_health_backoff = vec![];
+            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
+                serde_yaml::to_value(chain_health_backoff).unwrap();
+
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+        }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+            mempool_backlog: 70000,
         }))
         .with_success_criteria(
             SuccessCriteria::new(if duration.as_secs() > 1200 {
