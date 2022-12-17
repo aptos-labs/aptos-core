@@ -25,7 +25,8 @@ pub enum Commands {
     },
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let args = Argument::parse();
 
     // TODO: Being able to parse the release config from a TOML file to generate the proposals.

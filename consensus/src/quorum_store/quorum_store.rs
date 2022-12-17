@@ -14,15 +14,14 @@ use crate::quorum_store::{
     types::{BatchId, Fragment, SerializedTransaction},
 };
 use crate::round_manager::VerifiedEvent;
+use aptos_channels::aptos_channel;
 use aptos_config::config::QuorumStoreConfig;
-use aptos_logger::debug;
-// use aptos_logger::spawn_named;
 use aptos_consensus_types::proof_of_store::SignedDigestInfo;
 use aptos_consensus_types::{common::Round, proof_of_store::LogicalTime};
+use aptos_logger::debug;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
-use channel::aptos_channel;
 use std::sync::Arc;
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},

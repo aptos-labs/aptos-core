@@ -21,8 +21,8 @@ use crate::{
     EventStore, StateStore, TransactionStore,
 };
 use aptos_logger::warn;
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_types::transaction::{AtomicVersion, Version};
-use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::sync::{atomic::Ordering, Arc};
 
 pub const LEDGER_PRUNER_NAME: &str = "ledger_pruner";

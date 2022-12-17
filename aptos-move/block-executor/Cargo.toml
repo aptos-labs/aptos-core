@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-mvhashmap = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 arc-swap = { workspace = true }
@@ -25,7 +26,6 @@ criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 crossbeam-queue = { workspace = true }
 dashmap = { workspace = true }
-mvhashmap = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use schemadb::SchemaBatch;
+use aptos_schemadb::SchemaBatch;
 use std::fmt::Debug;
 
 /// Defines the trait for sub-pruner of a parent DB pruner

@@ -4,7 +4,7 @@
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramTimer, HistogramVec, IntCounterVec,
 };
-use network::ProtocolId;
+use aptos_network::ProtocolId;
 use once_cell::sync::Lazy;
 
 /// Counter for pending network events to the monitoring service (server-side)

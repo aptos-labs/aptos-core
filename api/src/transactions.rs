@@ -248,7 +248,7 @@ impl TransactionsApi {
         accept_type: AcceptType,
         /// Address of account with or without a `0x` prefix
         address: Path<Address>,
-        /// Ledger version to start list of transactions
+        /// Account sequence number to start list of transactions
         ///
         /// If not provided, defaults to showing the latest transactions
         start: Query<Option<U64>>,

@@ -14,9 +14,9 @@ use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_logger::error;
+use aptos_schemadb::schema::KeyCodec;
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_types::transaction::{AtomicVersion, Version};
-use schemadb::schema::KeyCodec;
-use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::sync::{atomic::Ordering, Arc};
 
 pub mod generics;

@@ -4,7 +4,7 @@
 use crate::quorum_store::types::{BatchId, PersistedValue};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use schemadb::{
+use aptos_schemadb::{
     schema::{KeyCodec, Schema, ValueCodec},
     ColumnFamilyName,
 };
@@ -16,7 +16,7 @@ pub(crate) const BATCH_ID_CF_NAME: ColumnFamilyName = "batch_ID";
 pub(crate) struct BatchSchema;
 
 impl Schema for BatchSchema {
-    const COLUMN_FAMILY_NAME: schemadb::ColumnFamilyName = BATCH_CF_NAME;
+    const COLUMN_FAMILY_NAME: aptos_schemadb::ColumnFamilyName = BATCH_CF_NAME;
     type Key = HashValue;
     type Value = PersistedValue;
 }
@@ -45,7 +45,7 @@ impl ValueCodec<BatchSchema> for PersistedValue {
 pub(crate) struct BatchIdSchema;
 
 impl Schema for BatchIdSchema {
-    const COLUMN_FAMILY_NAME: schemadb::ColumnFamilyName = BATCH_ID_CF_NAME;
+    const COLUMN_FAMILY_NAME: aptos_schemadb::ColumnFamilyName = BATCH_ID_CF_NAME;
     type Key = u64;
     type Value = BatchId;
 }

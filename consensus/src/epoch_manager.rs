@@ -46,6 +46,7 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, Context};
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{ConsensusConfig, NodeConfig, QuorumStoreConfig};
 use aptos_consensus_types::{
     common::{Author, Round},
@@ -57,6 +58,8 @@ use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
+use aptos_network::protocols::network::{ApplicationNetworkSender, Event};
+use aptos_safety_rules::SafetyRulesManager;
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
@@ -69,7 +72,6 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
-use channel::{aptos_channel, message_queues::QueueStyle};
 use fail::fail_point;
 use futures::{
     channel::{
@@ -80,8 +82,6 @@ use futures::{
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
-use network::protocols::network::{ApplicationNetworkSender, Event};
-use safety_rules::SafetyRulesManager;
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -110,9 +110,9 @@ pub struct EpochManager {
     author: Author,
     config: ConsensusConfig,
     time_service: Arc<dyn TimeService>,
-    self_sender: channel::Sender<Event<ConsensusMsg>>,
+    self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkSender,
-    timeout_sender: channel::Sender<Round>,
+    timeout_sender: aptos_channels::Sender<Round>,
     quorum_store_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     commit_state_computer: Arc<dyn StateComputer>,
@@ -147,9 +147,9 @@ impl EpochManager {
     pub fn new(
         node_config: &NodeConfig,
         time_service: Arc<dyn TimeService>,
-        self_sender: channel::Sender<Event<ConsensusMsg>>,
+        self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
         network_sender: ConsensusNetworkSender,
-        timeout_sender: channel::Sender<Round>,
+        timeout_sender: aptos_channels::Sender<Round>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
@@ -167,7 +167,8 @@ impl EpochManager {
             self_sender,
             network_sender,
             timeout_sender,
-            quorum_store_enabled: false, // TODO: read form on chain config
+            // This default value is updated at epoch start
+            quorum_store_enabled: false,
             quorum_store_to_mempool_sender,
             commit_state_computer,
             storage,
@@ -199,7 +200,7 @@ impl EpochManager {
     fn create_round_state(
         &self,
         time_service: Arc<dyn TimeService>,
-        timeout_sender: channel::Sender<Round>,
+        timeout_sender: aptos_channels::Sender<Round>,
     ) -> RoundState {
         let time_interval = Box::new(ExponentialTimeInterval::new(
             Duration::from_millis(self.config.round_initial_timeout_ms),
@@ -767,7 +768,6 @@ impl EpochManager {
         recovery_data: RecoveryData,
         epoch_state: EpochState,
         onchain_config: OnChainConsensusConfig,
-        quorum_store_enabled: bool,
     ) {
         let epoch = epoch_state.epoch;
         counters::EPOCH.set(epoch_state.epoch as i64);
@@ -820,7 +820,7 @@ impl EpochManager {
         let (wrapper_quorum_store_tx, wrapper_quorum_store_rx) =
             tokio::sync::mpsc::channel(config.channel_size);
 
-        let payload_manager = if self.config.use_quorum_store {
+        let payload_manager = if self.quorum_store_enabled {
             // update the number of network_listener workers when start a new round_manager
             self.num_network_workers_for_fragment = usize::max(
                 1,
@@ -871,7 +871,7 @@ impl EpochManager {
         ));
 
         // TODO: cleanup
-        if quorum_store_enabled {
+        if self.quorum_store_enabled {
             self.spawn_quorum_store_wrapper(
                 network_sender.clone(),
                 consensus_to_quorum_store_rx,
@@ -881,6 +881,7 @@ impl EpochManager {
                 block_store.clone(),
             );
         } else {
+            info!(epoch = epoch, "Start DirectMempoolQuorumStore");
             self.spawn_direct_mempool_quorum_store(consensus_to_quorum_store_rx);
         }
 
@@ -896,7 +897,7 @@ impl EpochManager {
             self.config.max_sending_block_bytes,
             onchain_config.max_failed_authors_to_store(),
             chain_health_backoff_config,
-            quorum_store_enabled,
+            self.quorum_store_enabled,
         );
 
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
@@ -956,13 +957,10 @@ impl EpochManager {
 
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
-                self.start_round_manager(
-                    initial_data,
-                    epoch_state,
-                    onchain_config.unwrap_or_default(),
-                    self.quorum_store_enabled,
-                )
-                .await
+                let onchain_config = onchain_config.unwrap_or_default();
+                self.quorum_store_enabled = onchain_config.quorum_store_enabled();
+                self.start_round_manager(initial_data, epoch_state, onchain_config)
+                    .await
             }
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.start_recovery_manager(ledger_data, epoch_state).await
@@ -1178,7 +1176,7 @@ impl EpochManager {
 
     pub async fn start(
         mut self,
-        mut round_timeout_sender_rx: channel::Receiver<Round>,
+        mut round_timeout_sender_rx: aptos_channels::Receiver<Round>,
         mut network_receivers: NetworkReceivers,
     ) {
         debug!("QS: Initial start");

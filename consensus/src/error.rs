@@ -73,7 +73,7 @@ pub fn error_kind(e: &anyhow::Error) -> &'static str {
     if e.downcast_ref::<DbError>().is_some() {
         return "ConsensusDb";
     }
-    if e.downcast_ref::<safety_rules::Error>().is_some() {
+    if e.downcast_ref::<aptos_safety_rules::Error>().is_some() {
         return "SafetyRules";
     }
     if e.downcast_ref::<VerifyError>().is_some() {

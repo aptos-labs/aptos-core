@@ -11,6 +11,7 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_types::proof::position::Position;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -18,7 +19,6 @@ use aptos_types::{
     proof::{definition::LeafCount, position::FrozenSubTreeIterator},
     transaction::{Transaction, TransactionInfo, TransactionOutput, Version},
 };
-use schemadb::{SchemaBatch, DB};
 use std::sync::Arc;
 
 /// Saves the given ledger infos to the ledger store. If a change set is provided,

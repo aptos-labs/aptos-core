@@ -16,13 +16,13 @@ use crate::{
 };
 use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_types::{
     account_address::AccountAddress,
     proof::position::Position,
     transaction::{Transaction, Version},
     write_set::WriteSet,
 };
-use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::sync::Arc;
 
 #[cfg(test)]

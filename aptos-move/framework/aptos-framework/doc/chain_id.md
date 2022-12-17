@@ -11,6 +11,9 @@ This code provides a container for storing a chain id and functions to initializ
 -  [Resource `ChainId`](#0x1_chain_id_ChainId)
 -  [Function `initialize`](#0x1_chain_id_initialize)
 -  [Function `get`](#0x1_chain_id_get)
+-  [Specification](#@Specification_0)
+    -  [Function `initialize`](#@Specification_0_initialize)
+    -  [Function `get`](#@Specification_0_get)
 
 
 <pre><code><b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -96,6 +99,50 @@ Return the chain ID of this instance.
 
 
 </details>
+
+<a name="@Specification_0"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_strict;
+</code></pre>
+
+
+
+<a name="@Specification_0_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="chain_id.md#0x1_chain_id_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, id: u8)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_0_get"></a>
+
+### Function `get`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chain_id.md#0x1_chain_id_get">get</a>(): u8
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(@aptos_framework);
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html

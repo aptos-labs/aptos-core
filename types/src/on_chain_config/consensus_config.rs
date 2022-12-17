@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainConsensusConfig {
     V1(ConsensusConfigV1),
+    V2(ConsensusConfigV1),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -19,14 +20,18 @@ impl OnChainConsensusConfig {
     /// The number of recent rounds that don't count into reputations.
     pub fn leader_reputation_exclude_round(&self) -> u64 {
         match &self {
-            OnChainConsensusConfig::V1(config) => config.exclude_round,
+            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
+                config.exclude_round
+            }
         }
     }
 
     /// Decouple execution from consensus or not.
     pub fn decoupled_execution(&self) -> bool {
         match &self {
-            OnChainConsensusConfig::V1(config) => config.decoupled_execution,
+            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
+                config.decoupled_execution
+            }
         }
     }
 
@@ -38,7 +43,9 @@ impl OnChainConsensusConfig {
             return 10;
         }
         match &self {
-            OnChainConsensusConfig::V1(config) => config.back_pressure_limit,
+            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
+                config.back_pressure_limit
+            }
         }
     }
 
@@ -46,14 +53,25 @@ impl OnChainConsensusConfig {
     // to this max size.
     pub fn max_failed_authors_to_store(&self) -> usize {
         match &self {
-            OnChainConsensusConfig::V1(config) => config.max_failed_authors_to_store,
+            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
+                config.max_failed_authors_to_store
+            }
         }
     }
 
     // Type and configuration used for proposer election.
     pub fn proposer_election_type(&self) -> &ProposerElectionType {
         match &self {
-            OnChainConsensusConfig::V1(config) => &config.proposer_election_type,
+            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
+                &config.proposer_election_type
+            }
+        }
+    }
+
+    pub fn quorum_store_enabled(&self) -> bool {
+        match &self {
+            OnChainConsensusConfig::V1(_config) => false,
+            OnChainConsensusConfig::V2(_config) => true,
         }
     }
 }

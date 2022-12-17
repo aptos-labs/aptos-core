@@ -4,6 +4,7 @@
 use aptos_gas::{
     AptosGasMeter, AptosGasParameters, StorageGasParameters, LATEST_GAS_FEATURE_VERSION,
 };
+use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 use aptos_state_view::StateView;
 use aptos_types::{
     transaction::ExecutionStatus,
@@ -15,7 +16,6 @@ use aptos_vm::{
     transaction_metadata::TransactionMetadata,
     AptosVM,
 };
-use language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 use move_core_types::vm_status::StatusCode::TYPE_MISMATCH;
 
 #[test]
@@ -38,11 +38,11 @@ fn failed_transaction_cleanup_test() {
     };
 
     let gas_params = AptosGasParameters::zeros();
-    let storage_gas_params = StorageGasParameters::zeros();
+    let storage_gas_params = StorageGasParameters::free_and_unlimited();
     let mut gas_meter = AptosGasMeter::new(
         LATEST_GAS_FEATURE_VERSION,
         gas_params,
-        Some(storage_gas_params),
+        storage_gas_params,
         10_000,
     );
 

@@ -1,5 +1,5 @@
 [package]
-name = "safety-rules"
+name = "aptos-safety-rules"
 description = "Aptos safety rules"
 version = "0.1.0"
 

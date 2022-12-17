@@ -6,6 +6,8 @@ use crate::ledger_info::LedgerInfoSchema;
 use crate::state_value::StateValueSchema;
 use crate::transaction_by_account::TransactionByAccountSchema;
 use anyhow::{anyhow, ensure, Result};
+use aptos_schemadb::iterator::SchemaIterator;
+use aptos_schemadb::{ReadOptions, DB};
 use aptos_types::account_address::AccountAddress;
 use aptos_types::contract_event::ContractEvent;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
@@ -13,8 +15,6 @@ use aptos_types::state_store::state_key::StateKey;
 use aptos_types::state_store::state_key_prefix::StateKeyPrefix;
 use aptos_types::state_store::state_value::StateValue;
 use aptos_types::transaction::Version;
-use schemadb::iterator::SchemaIterator;
-use schemadb::{ReadOptions, DB};
 use std::iter::Peekable;
 use std::marker::PhantomData;
 

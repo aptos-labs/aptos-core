@@ -12,9 +12,9 @@ use crate::{
     },
     round_manager::VerifiedEvent,
 };
+use aptos_channels::aptos_channel;
 use aptos_logger::debug;
 use aptos_types::PeerId;
-use channel::aptos_channel;
 use futures::StreamExt;
 use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;

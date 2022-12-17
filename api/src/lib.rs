@@ -24,6 +24,7 @@ mod state;
 #[cfg(test)]
 pub mod tests;
 mod transactions;
+mod view_function;
 
 /// API categories for the OpenAPI spec
 #[derive(Tags)]
@@ -44,6 +45,9 @@ pub enum ApiTags {
 
     /// Access to transactions
     Transactions,
+
+    /// View functions,
+    View,
 }
 
 // Note: Many of these exports are just for the test-context crate, which is

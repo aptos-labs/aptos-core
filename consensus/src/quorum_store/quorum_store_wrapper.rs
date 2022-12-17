@@ -13,6 +13,7 @@ use crate::quorum_store::{
     utils::{BatchBuilder, MempoolProxy, RoundExpirations},
 };
 use crate::round_manager::VerifiedEvent;
+use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::ProofWithData;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, Round, TransactionSummary},
@@ -23,7 +24,6 @@ use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::PeerId;
-use channel::aptos_channel;
 use futures::{
     channel::{
         mpsc::{Receiver, Sender},

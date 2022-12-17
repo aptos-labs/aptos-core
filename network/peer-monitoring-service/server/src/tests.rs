@@ -6,16 +6,14 @@
 use crate::{
     PeerMonitoringServiceNetworkEvents, PeerMonitoringServiceServer, PEER_MONITORING_SERVER_VERSION,
 };
+use aptos_channels::aptos_channel;
 use aptos_config::{
     config::{PeerMonitoringServiceConfig, PeerRole},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_logger::Level;
-use aptos_types::{network_address::NetworkAddress, PeerId};
-use channel::aptos_channel;
-use futures::channel::oneshot;
-use netcore::transport::ConnectionOrigin;
-use network::{
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::{
     application::{
         storage::PeerMetadataStorage,
         types::{PeerError, PeerInfo, PeerState},
@@ -28,10 +26,12 @@ use network::{
     },
     transport::{ConnectionId, ConnectionMetadata},
 };
-use peer_monitoring_service_types::{
+use aptos_peer_monitoring_service_types::{
     ConnectedPeersResponse, PeerMonitoringServiceError, PeerMonitoringServiceMessage,
     PeerMonitoringServiceRequest, PeerMonitoringServiceResponse, ServerProtocolVersionResponse,
 };
+use aptos_types::{network_address::NetworkAddress, PeerId};
+use futures::channel::oneshot;
 use std::{
     collections::{hash_map::Entry, HashMap},
     str::FromStr,

@@ -25,8 +25,6 @@ pub struct ConsensusConfig {
     // validators coordinate on the latest version to apply a manual transaction.
     pub sync_only: bool,
     pub channel_size: usize,
-    // When false, use the Direct Mempool Quorum Store
-    pub use_quorum_store: bool,
     pub quorum_store_pull_timeout_ms: u64,
     // Decides how long the leader waits before proposing empty block if there's no txns in mempool
     // the period = (poll_count - 1) * 30ms
@@ -67,7 +65,6 @@ impl Default for ConsensusConfig {
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
             channel_size: 100, // hard-coded
-            use_quorum_store: true,
             quorum_store_pull_timeout_ms: 1000,
             quorum_store_poll_count: 10,
             intra_consensus_channel_buffer_size: 10,

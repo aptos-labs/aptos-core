@@ -6,8 +6,8 @@ use std::time::Duration;
 use super::Test;
 use crate::success_criteria::{SuccessCriteria, SuccessCriteriaChecker};
 use crate::{CoreContext, Result, Swarm, TestReport};
+use aptos_transaction_emitter_lib::{EmitJobRequest, TxnStats};
 use tokio::runtime::Runtime;
-use transaction_emitter_lib::{EmitJobRequest, TxnStats};
 
 /// The testing interface which defines a test written with full control over an existing network.
 /// Tests written against this interface will have access to both the Root account as well as the

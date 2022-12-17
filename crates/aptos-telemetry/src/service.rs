@@ -110,7 +110,7 @@ pub fn start_telemetry_service(
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> Option<Runtime> {
     if enable_prometheus_node_metrics() {
-        node_resource_metrics::register_node_metrics_collector();
+        aptos_node_resource_metrics::register_node_metrics_collector();
     }
 
     // Don't start the service if telemetry has been disabled

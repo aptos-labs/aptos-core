@@ -11,6 +11,10 @@ use aptos_config::{
 };
 use aptos_crypto::{test_utils::TEST_SEED, traits::Uniform, x25519};
 use aptos_infallible::RwLock;
+use aptos_netcore::{
+    framing::{read_u16frame, write_u16frame},
+    transport::{memory, ConnectionOrigin, Transport},
+};
 use aptos_time_service::MockTimeService;
 use aptos_types::{
     chain_id::ChainId,
@@ -19,10 +23,6 @@ use aptos_types::{
 };
 use bytes::{Bytes, BytesMut};
 use futures::{future, io::AsyncWriteExt, stream::StreamExt};
-use netcore::{
-    framing::{read_u16frame, write_u16frame},
-    transport::{memory, ConnectionOrigin, Transport},
-};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{collections::HashMap, io, iter::FromIterator, sync::Arc};
 use tokio::runtime::Runtime;

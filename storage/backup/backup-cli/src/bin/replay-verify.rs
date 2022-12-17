@@ -13,9 +13,9 @@ use aptos_config::config::{
     BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
+use aptos_db::{AptosDB, GetRestoreHandler};
 use aptos_logger::{prelude::*, Level, Logger};
 use aptos_types::transaction::Version;
-use aptosdb::{AptosDB, GetRestoreHandler};
 use clap::Parser;
 use std::{path::PathBuf, sync::Arc};
 

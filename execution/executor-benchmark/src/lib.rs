@@ -16,16 +16,16 @@ use aptos_config::config::{
     NodeConfig, PrunerConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
+use aptos_db::AptosDB;
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
-use aptosdb::AptosDB;
 
 use crate::pipeline::Pipeline;
 use aptos_executor::block_executor::BlockExecutor;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
 use std::{fs, path::Path};
-use storage_interface::DbReaderWriter;
 
 pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<AptosVM>) {
     let db = DbReaderWriter::new(

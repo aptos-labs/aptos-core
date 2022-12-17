@@ -34,23 +34,28 @@ use aptos_types::{
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 
+use aptos_db::AptosDB;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
 use aptos_framework::ReleaseBundle;
+use aptos_mempool_notifications::MempoolNotificationSender;
+use aptos_network::application::storage::PeerMetadataStorage;
+use aptos_network_builder::builder::NetworkBuilder;
+use aptos_state_sync_driver::{
+    driver_factory::{DriverFactory, StateSyncRuntimes},
+    metadata_storage::PersistentMetadataStorage,
+};
+use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
+use aptos_storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
+use aptos_storage_service_server::{
+    network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
+};
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::FromHex;
 use log_build_information::log_build_information;
-use mempool_notifications::MempoolNotificationSender;
-use network::application::storage::PeerMetadataStorage;
-use network_builder::builder::NetworkBuilder;
 use rand::{rngs::StdRng, SeedableRng};
-use state_sync_driver::{
-    driver_factory::{DriverFactory, StateSyncRuntimes},
-    metadata_storage::PersistentMetadataStorage,
-};
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
@@ -63,11 +68,6 @@ use std::{
     },
     thread,
     time::Instant,
-};
-use storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
-use storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
-use storage_service_server::{
-    network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
 };
 use tokio::runtime::{Builder, Runtime};
 
@@ -387,7 +387,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     storage_service_server_network_handles: Vec<StorageServiceNetworkEvents>,
     storage_service_client_network_handles: HashMap<
         NetworkId,
-        storage_service_client::StorageServiceNetworkSender,
+        aptos_storage_service_client::StorageServiceNetworkSender,
     >,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
     mempool_notifier: M,
@@ -478,7 +478,7 @@ fn setup_aptos_data_client(
     storage_service_config: StorageServiceConfig,
     aptos_data_client_config: AptosDataClientConfig,
     base_config: BaseConfig,
-    network_handles: HashMap<NetworkId, storage_service_client::StorageServiceNetworkSender>,
+    network_handles: HashMap<NetworkId, aptos_storage_service_client::StorageServiceNetworkSender>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> anyhow::Result<(AptosNetDataClient, Runtime)> {
     // Combine all storage service client handles
@@ -600,7 +600,7 @@ fn create_checkpoint_and_change_working_dir(
     aptos_consensus::create_checkpoint(&source_dir, &checkpoint_dir)
         .expect("ConsensusDB checkpoint creation failed.");
     let state_sync_db =
-        state_sync_driver::metadata_storage::PersistentMetadataStorage::new(&source_dir);
+        aptos_state_sync_driver::metadata_storage::PersistentMetadataStorage::new(&source_dir);
     state_sync_db
         .create_checkpoint(&checkpoint_dir)
         .expect("StateSyncDB checkpoint creation failed.");
@@ -614,7 +614,7 @@ pub fn setup_environment(
     // Start the node inspection service
     let node_config_clone = node_config.clone();
     thread::spawn(move || {
-        inspection_service::inspection_service::start_inspection_service(node_config_clone)
+        aptos_inspection_service::inspection_service::start_inspection_service(node_config_clone)
     });
 
     // If working_dir is provided, we will make RocksDb checkpoint for consensus_db,
@@ -773,15 +773,16 @@ pub fn setup_environment(
         // storage service at all.
 
         // Register the network-facing storage service with Network.
-        let storage_service_events =
-            network_builder.add_service(&storage_service_server::network::network_endpoint_config(
+        let storage_service_events = network_builder.add_service(
+            &aptos_storage_service_server::network::network_endpoint_config(
                 node_config.state_sync.storage_service,
-            ));
+            ),
+        );
         storage_service_server_network_handles.push(storage_service_events);
 
         // Register the storage-service clients with Network
         let storage_service_sender =
-            network_builder.add_client(&storage_service_client::network_endpoint_config());
+            network_builder.add_client(&aptos_storage_service_client::network_endpoint_config());
         storage_service_client_network_handles.insert(network_id, storage_service_sender);
 
         // Create the endpoints to connect the Network to mempool.
@@ -816,7 +817,7 @@ pub fn setup_environment(
 
     // For state sync to send notifications to mempool and receive notifications from consensus.
     let (mempool_notifier, mempool_listener) =
-        mempool_notifications::new_mempool_notifier_listener_pair();
+        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
     let (consensus_notifier, consensus_listener) =
         aptos_consensus_notifications::new_consensus_notifier_listener_pair(
             node_config
@@ -869,12 +870,6 @@ pub fn setup_environment(
         peer_metadata_storage.clone(),
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
-
-    assert_ne!(
-        node_config.consensus.use_quorum_store,
-        node_config.mempool.shared_mempool_validator_broadcast,
-        "Shared mempool validator broadcast must be turned off when QuorumStore is on, and vice versa"
-    );
 
     // StateSync should be instantiated and started before Consensus to avoid a cyclic dependency:
     // network provider -> consensus -> state synchronizer -> network provider.  This has resulted

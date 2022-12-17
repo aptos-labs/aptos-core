@@ -8,7 +8,7 @@ use anyhow::Result;
 use aptos_consensus_types::common::Round;
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info};
-use schemadb::{Options, ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, path::Path, time::Instant};
 
 pub trait BatchIdDB: Send + Sync {

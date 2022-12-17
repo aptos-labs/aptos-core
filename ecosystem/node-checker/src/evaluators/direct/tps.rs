@@ -7,13 +7,13 @@ use crate::{
     evaluators::EvaluatorType,
 };
 use anyhow::{Context, Result};
+use aptos_transaction_emitter_lib::{
+    emit_transactions_with_cluster, Cluster, ClusterArgs, CoinSourceArgs, EmitArgs,
+};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use thiserror::Error as ThisError;
-use transaction_emitter_lib::{
-    emit_transactions_with_cluster, Cluster, ClusterArgs, CoinSourceArgs, EmitArgs,
-};
 
 use super::types::DirectEvaluatorInput;
 

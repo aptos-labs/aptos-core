@@ -47,7 +47,7 @@ async fn test_upgrade_flow() {
         entries: gas_parameters.to_on_chain_gas_schedule(),
     };
 
-    let (_, update_gas_script) = generate_gas_upgrade_proposal(&gas_schedule, true)
+    let (_, update_gas_script) = generate_gas_upgrade_proposal(&gas_schedule, true, "".to_owned())
         .unwrap()
         .pop()
         .unwrap();

@@ -16,6 +16,7 @@ pub mod mime_types;
 mod move_types;
 mod table;
 mod transaction;
+mod view;
 mod wrappers;
 
 pub use account::AccountData;
@@ -49,6 +50,7 @@ pub use transaction::{
     UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
     WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
 };
+pub use view::ViewRequest;
 pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};
 
 pub fn deserialize_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>
