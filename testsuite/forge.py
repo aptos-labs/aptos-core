@@ -813,6 +813,8 @@ async def write_cluster_config(
                 "update-kubeconfig",
                 "--name",
                 forge_cluster_name,
+                "--region",
+                "us-east-1",
                 "--kubeconfig",
                 temp,
             ]
@@ -1185,6 +1187,9 @@ def test(
     test_args: Optional[List[str]],
     test_suites: Tuple[str],
 ) -> None:
+    forge_enable_performance = "true"
+    forge_test_suite = "land_blocking" # "max_tps_test"
+    
     """Run a forge test"""
     shell = LocalShell(verbose == "true")
     git = Git(shell)
@@ -1253,6 +1258,8 @@ def test(
         cluster_names = config.get("enabled_clusters")
         forge_cluster_name = random.choice(cluster_names)
 
+    forge_cluster_name = "aptos-forge-big-east-0"
+
     assert forge_cluster_name, "Forge cluster name is required"
 
     # These features and profile flags are set as strings
@@ -1294,6 +1301,7 @@ def test(
                 enable_performance_profile=enable_performance_profile,
             )
         )
+        # default_latest_image = "performance_c8c8032917b907375a48d16d04cb4e080a7b8d30"
         image_tag = image_tag or default_latest_image
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
