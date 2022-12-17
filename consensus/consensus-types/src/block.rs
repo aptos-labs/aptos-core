@@ -107,7 +107,7 @@ impl Block {
             None => 0,
             Some(payload) => match payload {
                 Payload::InQuorumStore(pos) => pos.proofs.len(),
-                Payload::DirectMempool(_) => unreachable!(),
+                Payload::DirectMempool(txns) => txns.len(),
             },
         }
     }
