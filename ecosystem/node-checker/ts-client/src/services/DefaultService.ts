@@ -1,9 +1,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { ConfigurationKey } from '../models/ConfigurationKey';
-import type { EvaluationSummary } from '../models/EvaluationSummary';
-import type { NodeConfiguration } from '../models/NodeConfiguration';
+import type { CheckSummary } from '../models/CheckSummary';
+import type { ConfigurationDescriptor } from '../models/ConfigurationDescriptor';
 
 import type { CancelablePromise } from '../core/CancelablePromise';
 import type { BaseHttpRequest } from '../core/BaseHttpRequest';
@@ -13,44 +12,54 @@ export class DefaultService {
     constructor(public readonly httpRequest: BaseHttpRequest) {}
 
     /**
-     * Check the health of a given target node. You may specify a baseline
-     * node configuration to use for the evaluation. If you don't specify
-     * a baseline node configuration, we will attempt to determine the
-     * appropriate baseline based on your target node.
-     * @returns EvaluationSummary
+     * Check the health of a given target node. You must specify a baseline
+     * node configuration to use for the evaluation and the URL of your node,
+     * without including any port or endpoints. All other parameters are optional.
+     * For example, if your node's API port is open but the rest are closed, only
+     * set the `api_port`.
+     * @returns CheckSummary
      * @throws ApiError
      */
-    public getCheckNode({
+    public getCheck({
+        baselineConfigurationId,
         nodeUrl,
-        baselineConfigurationName,
-        metricsPort = 9101,
-        apiPort = 8080,
-        noisePort = 6180,
+        metricsPort,
+        apiPort,
+        noisePort,
         publicKey,
     }: {
         /**
-         * The URL of the node to check. e.g. http://44.238.19.217 or http://fullnode.mysite.com
+         * The ID of the baseline node configuration to use for the evaluation, e.g. devnet_fullnode
+         */
+        baselineConfigurationId: string,
+        /**
+         * The URL of the node to check, e.g. http://44.238.19.217 or http://fullnode.mysite.com
          */
         nodeUrl: string,
         /**
-         * The name of the baseline node configuration to use for the evaluation, e.g. devnet_fullnode
+         * If given, we will assume the metrics service is available at the given port.
          */
-        baselineConfigurationName?: string,
         metricsPort?: number,
+        /**
+         * If given, we will assume the API is available at the given port.
+         */
         apiPort?: number,
+        /**
+         * If given, we will assume that clients can communicate with your node via noise at the given port.
+         */
         noisePort?: number,
         /**
          * A public key for the node, e.g. 0x44fd1324c66371b4788af0b901c9eb8088781acb29e6b8b9c791d5d9838fbe1f.
-         * This is only necessary for certain evaluators, e.g. HandshakeEvaluator.
+         * This is only necessary for certain checkers, e.g. HandshakeChecker.
          */
         publicKey?: string,
-    }): CancelablePromise<EvaluationSummary> {
+    }): CancelablePromise<CheckSummary> {
         return this.httpRequest.request({
             method: 'GET',
-            url: '/check_node',
+            url: '/check',
             query: {
+                'baseline_configuration_id': baselineConfigurationId,
                 'node_url': nodeUrl,
-                'baseline_configuration_name': baselineConfigurationName,
                 'metrics_port': metricsPort,
                 'api_port': apiPort,
                 'noise_port': noisePort,
@@ -60,53 +69,16 @@ export class DefaultService {
     }
 
     /**
-     * Check the health of the preconfigured node. If none was specified when
-     * this instance of the node checker was started, this will return an error.
-     * You may specify a baseline node configuration to use for the evaluation.
-     * If you don't specify a baseline node configuration, we will attempt to
-     * determine the appropriate baseline based on your target node.
-     * @returns EvaluationSummary
+     * Get the IDs and pretty names for the configurations. For example,
+     * devnet_fullnode as the ID and "Devnet Fullnode Checker" as the
+     * pretty name.
+     * @returns ConfigurationDescriptor
      * @throws ApiError
      */
-    public getCheckPreconfiguredNode({
-        baselineConfigurationName,
-    }: {
-        baselineConfigurationName?: string,
-    }): CancelablePromise<EvaluationSummary> {
+    public getConfigurations(): CancelablePromise<Array<ConfigurationDescriptor>> {
         return this.httpRequest.request({
             method: 'GET',
-            url: '/check_preconfigured_node',
-            query: {
-                'baseline_configuration_name': baselineConfigurationName,
-            },
-        });
-    }
-
-    /**
-     * Get the different baseline configurations the instance of NHC is
-     * configured with. This method is best effort, it is infeasible to
-     * derive (or even represent) some fields of the spec via OpenAPI,
-     * so note that some fields will be missing from the response.
-     * @returns NodeConfiguration
-     * @throws ApiError
-     */
-    public getGetConfigurations(): CancelablePromise<Array<NodeConfiguration>> {
-        return this.httpRequest.request({
-            method: 'GET',
-            url: '/get_configurations',
-        });
-    }
-
-    /**
-     * Get just the keys and pretty names for the configurations, meaning
-     * the configuration_name and configuration_name_pretty fields.
-     * @returns ConfigurationKey
-     * @throws ApiError
-     */
-    public getGetConfigurationKeys(): CancelablePromise<Array<ConfigurationKey>> {
-        return this.httpRequest.request({
-            method: 'GET',
-            url: '/get_configuration_keys',
+            url: '/configurations',
         });
     }
 

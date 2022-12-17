@@ -1027,13 +1027,13 @@ name = "aptos-fn-check-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-logger",
  "aptos-node-checker",
  "aptos-sdk",
  "clap 3.2.17",
  "env_logger 0.9.0",
  "futures",
  "gcp-bigquery-client",
- "log",
  "reqwest",
  "serde 1.0.149",
  "serde_json",
@@ -1763,7 +1763,6 @@ dependencies = [
  "const_format",
  "env_logger 0.9.0",
  "futures",
- "log",
  "once_cell",
  "poem",
  "poem-openapi",
@@ -7915,8 +7914,7 @@ dependencies = [
 [[package]]
 name = "prometheus-parse"
 version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef7a8ed15bcffc55fe0328931ef20d393bb89ad704756a37bd20cffb4804f306"
+source = "git+https://github.com/banool/prometheus-parse-rs?rev=b65a1f20c5c604a9d2d1e545f70ca51ea8da2354#b65a1f20c5c604a9d2d1e545f70ca51ea8da2354"
 dependencies = [
  "chrono",
  "itertools",
