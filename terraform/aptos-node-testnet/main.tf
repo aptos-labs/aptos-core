@@ -46,7 +46,7 @@ module "validator" {
   chain_id       = local.chain_id
   era            = var.era
   chain_name     = local.chain_name
-  image_tag      = var.image_tag
+  image_tag      = var.validator_image_tag != "" ? var.validator_image_tag : var.image_tag
   validator_name = "aptos-node"
 
   validator_storage_class = var.validator_storage_class
