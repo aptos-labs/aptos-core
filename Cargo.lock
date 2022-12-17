@@ -122,7 +122,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "aptos-backup-cli",
@@ -139,7 +139,6 @@ dependencies = [
  "aptos-global-constants",
  "aptos-keygen",
  "aptos-logger",
- "aptos-module-verifier",
  "aptos-node",
  "aptos-rest-client",
  "aptos-sdk",
@@ -1124,7 +1123,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-gas",
  "aptos-gas-algebra-ext",
- "aptos-module-verifier",
  "aptos-sdk-builder",
  "aptos-state-view",
  "aptos-types",
@@ -1536,14 +1534,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-module-verifier"
-version = "0.1.0"
-dependencies = [
- "move-binary-format",
- "move-core-types",
-]
-
-[[package]]
 name = "aptos-move-examples"
 version = "0.1.0"
 dependencies = [
@@ -1935,16 +1925,21 @@ name = "aptos-release-builder"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
  "aptos-gas",
+ "aptos-rest-client",
  "aptos-temppath",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "clap 3.2.17",
+ "futures",
  "move-core-types",
  "move-model",
  "serde 1.0.149",
  "serde_yaml 0.8.26",
  "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -2640,7 +2635,6 @@ dependencies = [
  "aptos-gas",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-module-verifier",
  "aptos-mvhashmap",
  "aptos-state-view",
  "aptos-types",

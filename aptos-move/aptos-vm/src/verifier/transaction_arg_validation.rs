@@ -102,7 +102,10 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
 
 // Return whether the argument is valid/allowed and whether it needs validation.
 // Validation is only needed for String arguments at the moment and vectors of them.
-fn is_valid_txn_arg<S: MoveResolverExt>(session: &SessionExt<S>, typ: &Type) -> (bool, bool) {
+pub(crate) fn is_valid_txn_arg<S: MoveResolverExt>(
+    session: &SessionExt<S>,
+    typ: &Type,
+) -> (bool, bool) {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
     match typ {
@@ -129,7 +132,7 @@ fn is_valid_txn_arg<S: MoveResolverExt>(session: &SessionExt<S>, typ: &Type) -> 
 // Validation at the moment is only for Strings and Vector of them, so we
 // manually walk the serialized args until we find a string.
 // This is obviously brittle and something to change at some point soon.
-fn validate_args<S: MoveResolverExt>(
+pub(crate) fn validate_args<S: MoveResolverExt>(
     session: &SessionExt<S>,
     idxs: &[usize],
     args: &[Vec<u8>],

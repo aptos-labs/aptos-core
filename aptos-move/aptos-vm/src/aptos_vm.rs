@@ -15,11 +15,10 @@ use crate::{
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     system_module_names::*,
-    transaction_arg_validation,
     transaction_metadata::TransactionMetadata,
-    VMExecutor, VMValidator,
+    verifier, VMExecutor, VMValidator,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_aggregator::{
     delta_change_set::DeltaChangeSet,
     transaction::{ChangeSetExt, TransactionOutputExt},
@@ -28,7 +27,6 @@ use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas::{AptosGasMeter, ChangeSetConfigs};
 use aptos_logger::prelude::*;
-use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
@@ -53,7 +51,8 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
-    language_storage::ModuleId,
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
@@ -345,12 +344,13 @@ impl AptosVM {
                     senders.extend(txn_data.secondary_signers());
                     let loaded_func =
                         session.load_script(script.code(), script.ty_args().to_vec())?;
-                    let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
-                        &session,
-                        senders,
-                        convert_txn_args(script.args()),
-                        &loaded_func,
-                    )?;
+                    let args =
+                        verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+                            &session,
+                            senders,
+                            convert_txn_args(script.args()),
+                            &loaded_func,
+                        )?;
                     session.execute_script(
                         script.code(),
                         script.ty_args().to_vec(),
@@ -368,12 +368,13 @@ impl AptosVM {
                         script_fn.function(),
                         script_fn.ty_args(),
                     )?;
-                    let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
-                        &session,
-                        senders,
-                        script_fn.args().to_vec(),
-                        &function,
-                    )?;
+                    let args =
+                        verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+                            &session,
+                            senders,
+                            script_fn.args().to_vec(),
+                            &function,
+                        )?;
                     session.execute_entry_function(
                         script_fn.module(),
                         script_fn.function(),
@@ -453,8 +454,11 @@ impl AptosVM {
             let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
+            // Note that for historic reasons, verification here is treated
+            // as StatusCode::CONSTRAINT_NOT_SATISFIED, there this cannot be unified
+            // with the general verify_module above.
             if init_function.is_ok() {
-                if verify_module_init_function(module).is_ok() {
+                if verifier::module_init::verify_module_init_function(module).is_ok() {
                     let args: Vec<Vec<u8>> = senders
                         .iter()
                         .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
@@ -782,13 +786,14 @@ impl AptosVM {
                 let loaded_func = tmp_session
                     .load_script(script.code(), script.ty_args().to_vec())
                     .map_err(|e| Err(e.into_vm_status()))?;
-                let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
-                    &tmp_session,
-                    senders,
-                    convert_txn_args(script.args()),
-                    &loaded_func,
-                )
-                .map_err(Err)?;
+                let args =
+                    verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+                        &tmp_session,
+                        senders,
+                        convert_txn_args(script.args()),
+                        &loaded_func,
+                    )
+                    .map_err(Err)?;
 
                 let execution_result = tmp_session
                     .execute_script(
@@ -940,6 +945,50 @@ impl AptosVM {
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         simulation_vm.simulate_signed_transaction(&state_view.as_move_resolver(), txn, &log_context)
+    }
+
+    pub fn execute_view_function(
+        state_view: &impl StateView,
+        module_id: ModuleId,
+        func_name: Identifier,
+        type_args: Vec<TypeTag>,
+        arguments: Vec<Vec<u8>>,
+        gas_budget: u64,
+    ) -> Result<Vec<Vec<u8>>> {
+        let vm = AptosVM::new(state_view);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let mut gas_meter = AptosGasMeter::new(
+            vm.0.get_gas_feature_version(),
+            vm.0.get_gas_parameters(&log_context)?.clone(),
+            vm.0.get_storage_gas_parameters(&log_context)?.clone(),
+            gas_budget,
+        );
+        let resolver = &state_view.as_move_resolver();
+        let mut session = vm.new_session(resolver, SessionId::Void);
+
+        let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
+        let metadata = vm.0.extract_module_metadata(&module_id);
+        let arguments = verifier::view_function::validate_view_function(
+            &session,
+            arguments,
+            func_name.as_ident_str(),
+            &func_inst,
+            metadata.as_ref(),
+        )?;
+
+        Ok(session
+            .execute_function_bypass_visibility(
+                &module_id,
+                func_name.as_ident_str(),
+                type_args,
+                arguments,
+                &mut gas_meter,
+            )
+            .map_err(|err| anyhow!("Failed to execute function: {:?}", err))?
+            .return_values
+            .into_iter()
+            .map(|(bytes, _ty)| bytes)
+            .collect::<Vec<_>>())
     }
 
     fn run_prologue_with_payload<S: MoveResolverExt>(

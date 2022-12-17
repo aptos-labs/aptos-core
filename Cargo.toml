@@ -219,7 +219,6 @@ aptos-mempool = { path = "mempool" }
 aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
-aptos-module-verifier = { path = "aptos-move/aptos-module-verifier" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-netcore = { path = "network/netcore" }
