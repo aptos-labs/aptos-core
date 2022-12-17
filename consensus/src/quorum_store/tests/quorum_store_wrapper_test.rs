@@ -245,8 +245,8 @@ async fn test_block_request() {
     wrapper.handle_consensus_request(req);
     let ConsensusResponse::GetBlockResponse(payload) = callback_rx.await.unwrap().unwrap();
     if let Payload::InQuorumStore(proofs) = payload {
-        assert_eq!(proofs.len(), 1);
-        assert_eq!(proofs[0], proof);
+        assert_eq!(proofs.proofs.len(), 1);
+        assert_eq!(proofs.proofs[0], proof);
     } else {
         panic!("Unexpected variant")
     }
