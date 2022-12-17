@@ -23,6 +23,7 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::HistogramTimer;
 use aptos_network::application::interface::NetworkInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
+use aptos_types::on_chain_config::OnChainConsensusConfig;
 use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::OnChainConfigPayload,
@@ -109,7 +110,7 @@ pub(crate) async fn process_client_transaction_submission<V>(
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer_client();
     let ineligible_for_broadcast =
-        !smp.broadcast_within_validator_network() && smp.network_interface.is_validator();
+        smp.network_interface.is_validator() && !smp.broadcast_within_validator_network();
     let timeline_state = if ineligible_for_broadcast {
         TimelineState::NonQualified
     } else {
@@ -501,6 +502,7 @@ pub(crate) fn process_rejected_transactions(
 pub(crate) async fn process_config_update<V>(
     config_update: OnChainConfigPayload,
     validator: Arc<RwLock<V>>,
+    broadcast_within_validator_network: Arc<RwLock<bool>>,
 ) where
     V: TransactionValidation,
 {
@@ -509,8 +511,22 @@ pub(crate) async fn process_config_update<V>(
             .reconfig_update(config_update.clone())
     );
 
-    if let Err(e) = validator.write().restart(config_update) {
+    if let Err(e) = validator.write().restart(config_update.clone()) {
         counters::VM_RECONFIG_UPDATE_FAIL_COUNT.inc();
         error!(LogSchema::event_log(LogEntry::ReconfigUpdate, LogEvent::VMUpdateFail).error(&e));
+    }
+
+    let consensus_config: anyhow::Result<OnChainConsensusConfig> = config_update.get();
+    match consensus_config {
+        Ok(consensus_config) => {
+            *broadcast_within_validator_network.write() = !consensus_config.quorum_store_enabled();
+        }
+        Err(e) => {
+            error!(
+                "Failed to read on-chain consensus config, keeping value broadcast_within_validator_network={}: {}",
+                *broadcast_within_validator_network.read(),
+                e
+            );
+        }
     }
 }

@@ -776,6 +776,7 @@ module aptos_token::token {
         token_event_store::emit_default_property_mutate_event(creator, token_data_id.collection, token_data_id.name, keys, old_values, new_values);
     }
 
+    /// Mutate the token_properties of one token.
     public fun mutate_one_token(
         account: &signer,
         token_owner: address,

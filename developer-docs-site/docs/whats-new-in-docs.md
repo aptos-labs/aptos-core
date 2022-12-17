@@ -7,17 +7,29 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 14 December 2022
+
+- Noted you may employ the [Aptos Name Service](https://www.aptosnames.com/) to secure .apt domains for key [accounts](concepts/accounts.md).
+
+## 12 December 2022
+
+- Released [Node Health Checker](nodes/node-health-checker/index.md) web interface for evaluating fullnodes at: https://nodetools.aptosfoundation.org/#/node_checker
+
+## 11 December 2022
+
+- [Renamed](https://github.com/aptos-labs/aptos-core/pull/5778) `AptosGovernance::create_proposal` to `aptos_governance::create_proposal` and added information on [Aptos Improvement Proposals (AIPs)](concepts/governance.md#aptos-improvement-proposals-aips) and the [Technical Implementation of Aptos Governance](concepts/governance.md#technical-implementation-of-aptos-governance).
+
 ## 09 December 2022
 
 - Added an [Aptos Wallet Adapter overview](concepts/wallet-adapter-concept.md) and instructions for both [dApp](guides/wallet-adapter-for-dapp.md) and [wallet](guides/wallet-adapter-for-wallets.md) builders.
 
 ## 08 December 2022
 
-- Released a new version to Mainnet:
+- Released [aptos-node-v1.1.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.1.0) to Mainnet:
 
   Framework upgrade through governance voting:
   - Testnet upgrade - Nov 30th
-  - Mainnet upgrade - Dec 12th - 19th (7 days voting period)
+  - Mainnet upgrade - Dec 12th - 19th (7 days voting period) required by fullnode operators
 
   New features and enhancements:
   - Move

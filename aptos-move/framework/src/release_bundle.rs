@@ -29,7 +29,7 @@ pub struct ReleaseBundle {
     pub source_dirs: Vec<String>,
 }
 
-/// A release package consists of package metdata and the code.
+/// A release package consists of package metadata and the code.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ReleasePackage {
     pub metadata: PackageMetadata,
@@ -193,7 +193,7 @@ impl ReleasePackage {
         for_address: AccountAddress,
         out: PathBuf,
     ) -> anyhow::Result<()> {
-        self.generate_script_proposal_impl(for_address, out, false)
+        self.generate_script_proposal_impl(for_address, out, false, false, "".to_owned())
     }
 
     pub fn generate_script_proposal_testnet(
@@ -201,7 +201,16 @@ impl ReleasePackage {
         for_address: AccountAddress,
         out: PathBuf,
     ) -> anyhow::Result<()> {
-        self.generate_script_proposal_impl(for_address, out, true)
+        self.generate_script_proposal_impl(for_address, out, true, false, "".to_owned())
+    }
+
+    pub fn generate_script_proposal_multi_step(
+        &self,
+        for_address: AccountAddress,
+        out: PathBuf,
+        next_execution_hash: String,
+    ) -> anyhow::Result<()> {
+        self.generate_script_proposal_impl(for_address, out, true, true, next_execution_hash)
     }
 
     fn generate_script_proposal_impl(
@@ -209,6 +218,8 @@ impl ReleasePackage {
         for_address: AccountAddress,
         out: PathBuf,
         is_testnet: bool,
+        is_multi_step: bool,
+        next_execution_hash: String,
     ) -> anyhow::Result<()> {
         let writer = CodeWriter::new(Loc::default());
         emitln!(
@@ -223,7 +234,7 @@ impl ReleasePackage {
         emitln!(writer, "use aptos_framework::aptos_governance;");
         emitln!(writer, "use aptos_framework::code;\n");
 
-        if is_testnet {
+        if is_testnet && !is_multi_step {
             emitln!(writer, "fun main(core_resources: &signer){");
             writer.indent();
             emitln!(
@@ -231,7 +242,7 @@ impl ReleasePackage {
                 "let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @{});",
                 for_address
             );
-        } else {
+        } else if !is_multi_step {
             emitln!(writer, "fun main(proposal_id: u64){");
             writer.indent();
             emitln!(
@@ -239,6 +250,10 @@ impl ReleasePackage {
                 "let framework_signer = aptos_governance::resolve(proposal_id, @{});",
                 for_address
             );
+        } else {
+            emitln!(writer, "fun main(proposal_id: u64){");
+            writer.indent();
+            Self::generate_next_execution_hash_blob(&writer, for_address, next_execution_hash);
         }
 
         emitln!(writer, "let code = vector::empty();");
@@ -298,5 +313,39 @@ impl ReleasePackage {
         emitln!(writer);
         writer.unindent();
         emit!(writer, "]")
+    }
+
+    fn generate_next_execution_hash_blob(
+        writer: &CodeWriter,
+        for_address: AccountAddress,
+        next_execution_hash: String,
+    ) {
+        if next_execution_hash == "vector::empty<u8>()" {
+            emitln!(
+                writer,
+                "let framework_signer = aptos_governance::resolve_multi_step_proposal(proposal_id, @{}, {});\n",
+                for_address,
+                next_execution_hash,
+            );
+        } else {
+            let next_execution_hash_bytes = next_execution_hash.as_bytes();
+            emitln!(
+                writer,
+                "let framework_signer = aptos_governance::resolve_multi_step_proposal("
+            );
+            writer.indent();
+            emitln!(writer, "proposal_id,");
+            emitln!(writer, "@{},", for_address);
+            emit!(writer, "vector[");
+            for (i, b) in next_execution_hash_bytes.iter().enumerate() {
+                if (i + 1) % 20 == 0 {
+                    emitln!(writer);
+                }
+                emit!(writer, "{}u8,", b);
+            }
+            emitln!(writer, "],");
+            writer.unindent();
+            emitln!(writer, "};");
+        }
     }
 }

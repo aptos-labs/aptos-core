@@ -11,7 +11,7 @@ use crate::{
     transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::transaction::TransactionOutputExt;
-use aptos_framework::{RuntimeModuleMetadata, APTOS_METADATA_KEY};
+use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, FromOnChainGasSchedule,
     Gas, NativeGasParameters, StorageGasParameters,
@@ -30,7 +30,6 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
-use dashmap::DashMap;
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
@@ -54,7 +53,6 @@ pub struct AptosVMImpl {
     storage_gas_params: Option<StorageGasParameters>,
     version: Option<Version>,
     transaction_validation: Option<TransactionValidation>,
-    metadata_cache: DashMap<ModuleId, Option<RuntimeModuleMetadata>>,
     features: Features,
 }
 
@@ -138,7 +136,6 @@ impl AptosVMImpl {
             storage_gas_params,
             version: None,
             transaction_validation: None,
-            metadata_cache: Default::default(),
             features,
         };
         vm.version = Version::fetch_config(&storage);
@@ -511,24 +508,18 @@ impl AptosVMImpl {
         module: &ModuleId,
         abort_code: u64,
     ) -> Option<AbortInfo> {
-        let entry = self
-            .metadata_cache
-            .entry(module.clone())
-            .or_insert_with(|| {
-                if let Some(m) = self
-                    .move_vm
-                    .get_module_metadata(module.clone(), &APTOS_METADATA_KEY)
-                {
-                    bcs::from_bytes::<RuntimeModuleMetadata>(&m.value).ok()
-                } else {
-                    None
-                }
-            });
-        if let Some(m) = entry.value() {
+        if let Some(m) = self.extract_module_metadata(module) {
             m.extract_abort_info(abort_code)
         } else {
             None
         }
+    }
+
+    pub(crate) fn extract_module_metadata(
+        &self,
+        module: &ModuleId,
+    ) -> Option<RuntimeModuleMetadataV1> {
+        aptos_framework::get_vm_metadata(&self.move_vm, module.clone())
     }
 
     pub fn new_session<'r, R: MoveResolverExt>(
@@ -536,7 +527,6 @@ impl AptosVMImpl {
         r: &'r R,
         session_id: SessionId,
     ) -> SessionExt<'r, '_, R> {
-        self.metadata_cache.clear();
         self.move_vm.new_session(r, session_id)
     }
 

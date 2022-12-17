@@ -145,7 +145,8 @@ impl EpochManager {
             self_sender,
             network_sender,
             timeout_sender,
-            quorum_store_enabled: false, // TODO: read form on chain config
+            // This default value is updated at epoch start
+            quorum_store_enabled: false,
             quorum_store_to_mempool_sender,
             commit_state_computer,
             storage,
@@ -575,7 +576,6 @@ impl EpochManager {
         recovery_data: RecoveryData,
         epoch_state: EpochState,
         onchain_config: OnChainConsensusConfig,
-        quorum_store_enabled: bool,
     ) {
         let epoch = epoch_state.epoch;
         counters::EPOCH.set(epoch_state.epoch as i64);
@@ -640,7 +640,7 @@ impl EpochManager {
             payload_manager,
         ));
 
-        // Start QuorumStore
+        info!(epoch = epoch, "Start DirectMempoolQuorumStore");
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
         self.spawn_direct_mempool_quorum_store(consensus_to_quorum_store_rx);
@@ -663,7 +663,7 @@ impl EpochManager {
             self.config.max_sending_block_bytes,
             onchain_config.max_failed_authors_to_store(),
             chain_health_backoff_config,
-            quorum_store_enabled,
+            self.quorum_store_enabled,
         );
 
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
@@ -723,13 +723,10 @@ impl EpochManager {
 
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
-                self.start_round_manager(
-                    initial_data,
-                    epoch_state,
-                    onchain_config.unwrap_or_default(),
-                    self.quorum_store_enabled,
-                )
-                .await
+                let onchain_config = onchain_config.unwrap_or_default();
+                self.quorum_store_enabled = onchain_config.quorum_store_enabled();
+                self.start_round_manager(initial_data, epoch_state, onchain_config)
+                    .await
             }
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.start_recovery_manager(ledger_data, epoch_state).await

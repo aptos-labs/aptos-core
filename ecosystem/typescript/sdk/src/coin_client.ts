@@ -97,8 +97,7 @@ export class CoinClient {
     const coinType = extraArgs?.coinType ?? APTOS_COIN;
     const typeTag = `0x1::coin::CoinStore<${coinType}>`;
     const address = getAddressFromAccountOrAddress(account);
-    const resources = await this.aptosClient.getAccountResources(address);
-    const accountResource = resources.find((r) => r.type === typeTag);
-    return BigInt((accountResource!.data as any).coin.value);
+    const accountResource = await this.aptosClient.getAccountResource(address, typeTag);
+    return BigInt((accountResource.data as any).coin.value);
   } // <:!:checkBalance
 }
