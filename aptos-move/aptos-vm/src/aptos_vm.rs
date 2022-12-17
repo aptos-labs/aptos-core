@@ -481,9 +481,18 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
+        let max_version = if self
+            .0
+            .get_features()
+            .is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6)
+        {
+            6
+        } else {
+            5
+        };
         let mut result = vec![];
         for module_blob in modules.iter() {
-            match CompiledModule::deserialize(module_blob.code()) {
+            match CompiledModule::deserialize_with_max_version(module_blob.code(), max_version) {
                 Ok(module) => {
                     result.push(module);
                 }
