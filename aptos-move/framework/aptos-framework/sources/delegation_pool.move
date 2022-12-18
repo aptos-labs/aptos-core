@@ -117,10 +117,17 @@ module aptos_framework::delegation_pool {
             return false
         };
         let pool = borrow_global_mut<DelegationPool>(pool_address);
+        // if no pending_inactive stake on lockup epoch to end, reuse the shares pool
+        if (pool_u64::total_coins(table::borrow(&pool.inactive_shares, pool.lockup_epoch)) == 0) {
+            return true
+        };
+
+        // advance lookup epoch
         spec {
             assume pool.lockup_epoch + 1 <= MAX_U64;
         };
         pool.lockup_epoch = pool.lockup_epoch + 1;
+        // start this new lockup epoch with a fresh shares pool
         table::add(&mut pool.inactive_shares, pool.lockup_epoch, pool_u64::create(DELEGATORS_LIMIT));
         true
     }
