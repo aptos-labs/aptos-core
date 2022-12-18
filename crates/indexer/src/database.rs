@@ -61,18 +61,13 @@ pub fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
     PgPool::builder().build(manager).map(Arc::new)
 }
 
-pub fn execute_with_better_error<
-    T: diesel::Table + diesel::QuerySource + diesel::query_builder::QueryId + 'static,
-    U: diesel::query_builder::QueryFragment<diesel::pg::Pg>
-        + diesel::query_builder::QueryId
-        + diesel::insertable::CanInsertInSingleQuery<diesel::pg::Pg>,
->(
+pub fn execute_with_better_error<U>(
     conn: &mut PgConnection,
-    query: diesel::query_builder::InsertStatement<T, U>,
+    query: U,
     mut additional_where_clause: Option<&'static str>,
-) -> diesel::QueryResult<usize>
+) -> QueryResult<usize>
 where
-    <T as diesel::QuerySource>::FromClause: diesel::query_builder::QueryFragment<diesel::pg::Pg>,
+    U: QueryFragment<Pg> + diesel::query_builder::QueryId,
 {
     let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
     // This is needed because if we don't insert any row, then diesel makes a call like this
