@@ -753,12 +753,17 @@ impl EpochManager {
         let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
 
         if let Some(unverified_event) = maybe_unverified_event {
+            // filter out quorum store messages if quorum store has not been enabled
+            self.filter_quorum_store_events(peer_id, &unverified_event)?;
+
             // same epoch -> run well-formedness + signature check
             let verified_event = monitor!(
                 "verify_message",
-                unverified_event
-                    .clone()
-                    .verify(&self.epoch_state().verifier, self.quorum_store_enabled)
+                unverified_event.clone().verify(
+                    peer_id,
+                    &self.epoch_state().verifier,
+                    self.quorum_store_enabled
+                )
             )
             .context("[EpochManager] Verify event")
             .map_err(|err| {
@@ -787,7 +792,12 @@ impl EpochManager {
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
-            | ConsensusMsg::CommitDecisionMsg(_) => {
+            | ConsensusMsg::CommitDecisionMsg(_)
+            | ConsensusMsg::FragmentMsg(_)
+            | ConsensusMsg::BatchRequestMsg(_)
+            | ConsensusMsg::BatchMsg(_)
+            | ConsensusMsg::SignedDigestMsg(_)
+            | ConsensusMsg::ProofOfStoreMsg(_) => {
                 let event: UnverifiedEvent = msg.into();
                 if event.epoch() == self.epoch() {
                     return Ok(Some(event));
@@ -831,6 +841,30 @@ impl EpochManager {
             }
         }
         Ok(None)
+    }
+
+    fn filter_quorum_store_events(
+        &mut self,
+        peer_id: AccountAddress,
+        event: &UnverifiedEvent,
+    ) -> anyhow::Result<()> {
+        match event {
+            UnverifiedEvent::FragmentMsg(_)
+            | UnverifiedEvent::BatchRequestMsg(_)
+            | UnverifiedEvent::BatchMsg(_)
+            | UnverifiedEvent::SignedDigestMsg(_)
+            | UnverifiedEvent::ProofOfStoreMsg(_) => {
+                if self.quorum_store_enabled {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Quorum store is not enabled locally, but received msg from sender: {}",
+                        peer_id,
+                    ))
+                }
+            }
+            _ => Ok(()),
+        }
     }
 
     fn process_event(

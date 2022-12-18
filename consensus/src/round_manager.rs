@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::quorum_store::types::{Batch, BatchRequest, Fragment};
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -29,6 +30,7 @@ use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
@@ -43,7 +45,7 @@ use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
-    validator_verifier::ValidatorVerifier,
+    validator_verifier::ValidatorVerifier, PeerId,
 };
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
@@ -62,6 +64,11 @@ pub enum UnverifiedEvent {
     SyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
+    FragmentMsg(Box<Fragment>),
+    BatchRequestMsg(Box<BatchRequest>),
+    BatchMsg(Box<Batch>),
+    SignedDigestMsg(Box<SignedDigest>),
+    ProofOfStoreMsg(Box<ProofOfStore>),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -69,6 +76,7 @@ pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
 impl UnverifiedEvent {
     pub fn verify(
         self,
+        peer_id: PeerId,
         validator: &ValidatorVerifier,
         quorum_store_enabled: bool,
     ) -> Result<VerifiedEvent, VerifyError> {
@@ -91,6 +99,27 @@ impl UnverifiedEvent {
                 cd.verify(validator)?;
                 VerifiedEvent::CommitDecision(cd)
             }
+            UnverifiedEvent::FragmentMsg(f) => {
+                f.verify(peer_id)?;
+                VerifiedEvent::FragmentMsg(f)
+            }
+            UnverifiedEvent::BatchRequestMsg(br) => {
+                br.verify(peer_id)?;
+                VerifiedEvent::BatchRequestMsg(br)
+            }
+            // Only sender is verified. Remaining verification is on-demand (when it's used).
+            UnverifiedEvent::BatchMsg(b) => {
+                b.verify(peer_id)?;
+                VerifiedEvent::UnverifiedBatchMsg(b)
+            }
+            UnverifiedEvent::SignedDigestMsg(sd) => {
+                sd.verify(validator)?;
+                VerifiedEvent::SignedDigestMsg(sd)
+            }
+            UnverifiedEvent::ProofOfStoreMsg(p) => {
+                p.verify(validator)?;
+                VerifiedEvent::ProofOfStoreMsg(p)
+            }
         })
     }
 
@@ -101,6 +130,11 @@ impl UnverifiedEvent {
             UnverifiedEvent::SyncInfo(s) => s.epoch(),
             UnverifiedEvent::CommitVote(cv) => cv.epoch(),
             UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
+            UnverifiedEvent::FragmentMsg(f) => f.epoch(),
+            UnverifiedEvent::BatchRequestMsg(br) => br.epoch(),
+            UnverifiedEvent::BatchMsg(b) => b.epoch(),
+            UnverifiedEvent::SignedDigestMsg(sd) => sd.epoch(),
+            UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
         }
     }
 }
@@ -113,6 +147,11 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
             ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
+            ConsensusMsg::FragmentMsg(m) => UnverifiedEvent::FragmentMsg(m),
+            ConsensusMsg::BatchRequestMsg(m) => UnverifiedEvent::BatchRequestMsg(m),
+            ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
+            ConsensusMsg::SignedDigestMsg(m) => UnverifiedEvent::SignedDigestMsg(m),
+            ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
             _ => unreachable!("Unexpected conversion"),
         }
     }
@@ -127,6 +166,11 @@ pub enum VerifiedEvent {
     UnverifiedSyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
+    FragmentMsg(Box<Fragment>),
+    BatchRequestMsg(Box<BatchRequest>),
+    UnverifiedBatchMsg(Box<Batch>),
+    SignedDigestMsg(Box<SignedDigest>),
+    ProofOfStoreMsg(Box<ProofOfStore>),
     // local messages
     LocalTimeout(Round),
 }

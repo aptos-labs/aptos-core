@@ -491,6 +491,16 @@ pub static ROUND_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counters(queued,dequeued,dropped) related to quorum store channel
+pub static QUORUM_STORE_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_quorum_store_channel_msgs_count",
+        "Counters(queued,dequeued,dropped) related to quorum store channel",
+        &["state"]
+    )
+    .unwrap()
+});
+
 /// Counters(queued,dequeued,dropped) related to block retrieval channel
 pub static BLOCK_RETRIEVAL_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(

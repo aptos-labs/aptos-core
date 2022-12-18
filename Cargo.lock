@@ -562,6 +562,7 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "serde 1.0.149",
+ "serde_bytes",
  "serde_json",
  "tempfile",
  "thiserror",
