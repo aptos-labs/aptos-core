@@ -78,6 +78,8 @@ module std::features {
 
     public fun blake2b_256_enabled(): bool acquires Features {
         is_enabled(BLAKE2B_256_NATIVE)
+    }
+
     /// Whether to allow the use of binary format version v6.
     /// Lifetime: transient
     const VM_BINARY_FORMAT_V6: u64 = 5;
