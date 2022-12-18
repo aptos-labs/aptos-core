@@ -29,6 +29,7 @@ module aptos_framework::stake {
     use aptos_std::table::{Self, Table};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::account;
+    use aptos_framework::delegation_pool;
     use aptos_framework::coin::{Self, Coin, MintCapability};
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
@@ -1183,6 +1184,8 @@ module aptos_framework::stake {
         // Pending active stake can now be active.
         coin::merge(&mut stake_pool.active, coin::extract_all(&mut stake_pool.pending_active));
 
+        delegation_pool::commit_epoch_rewards(pool_address, rewards_active, rewards_pending_inactive);
+
         // Pending inactive stake is only fully unlocked and moved into inactive if the current lockup cycle has expired
         let current_lockup_expiration = stake_pool.locked_until_secs;
         if (timestamp::now_seconds() >= current_lockup_expiration) {
@@ -1190,6 +1193,7 @@ module aptos_framework::stake {
                 &mut stake_pool.inactive,
                 coin::extract_all(&mut stake_pool.pending_inactive),
             );
+            delegation_pool::end_lockup_epoch(pool_address);
         };
 
         event::emit_event(
