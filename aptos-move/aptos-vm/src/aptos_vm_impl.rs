@@ -68,14 +68,14 @@ impl AptosVMImpl {
                     let feature_version = gas_schedule.feature_version;
                     let map = gas_schedule.to_btree_map();
                     (
-                        AptosGasParameters::from_on_chain_gas_schedule(&map),
+                        AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
                         feature_version,
                     )
                 }
                 None => match GasSchedule::fetch_config(&storage) {
                     Some(gas_schedule) => {
                         let map = gas_schedule.to_btree_map();
-                        (AptosGasParameters::from_on_chain_gas_schedule(&map), 0)
+                        (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
                     }
                     None => (None, 0),
                 },

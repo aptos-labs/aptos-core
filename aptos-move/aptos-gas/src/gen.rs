@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 pub fn current_gas_schedule() -> GasScheduleV2 {
     GasScheduleV2 {
         feature_version: LATEST_GAS_FEATURE_VERSION,
-        entries: AptosGasParameters::initial().to_on_chain_gas_schedule(),
+        entries: AptosGasParameters::initial().to_on_chain_gas_schedule(LATEST_GAS_FEATURE_VERSION),
     }
 }
 
