@@ -3,6 +3,7 @@
 
 use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
+    config::GlobalConfig,
     CliResult,
 };
 use aptos_build_info::build_information;
@@ -154,10 +155,22 @@ pub fn check_if_file_exists(file: &Path, prompt_options: PromptOptions) -> CliTy
 }
 
 pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> CliTypedResult<()> {
-    if prompt_options.assume_no || (!prompt_options.assume_yes && !prompt_yes(prompt)) {
-        Err(CliError::AbortedError)
+    if prompt_options.assume_no {
+        return Err(CliError::AbortedError);
+    } else if prompt_options.assume_yes {
+        return Ok(());
+    }
+
+    let is_yes = if let Some(response) = GlobalConfig::load()?.get_default_prompt_response() {
+        response
     } else {
+        prompt_yes(prompt)
+    };
+
+    if is_yes {
         Ok(())
+    } else {
+        Err(CliError::AbortedError)
     }
 }
 

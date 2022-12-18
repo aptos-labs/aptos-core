@@ -14,27 +14,27 @@ use crate::{
     },
     MempoolEventsReceiver, QuorumStoreRequest,
 };
-use ::network::protocols::network::Event;
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_consensus_types::common::TransactionSummary;
+use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
+use aptos_network::protocols::network::Event;
 use aptos_types::on_chain_config::OnChainConfigPayload;
-use bounded_executor::BoundedExecutor;
-use consensus_types::common::TransactionSummary;
-use event_notifications::ReconfigNotificationListener;
+use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
     channel::mpsc,
     stream::{select_all, FuturesUnordered},
     StreamExt,
 };
-use mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
 use std::{
     sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
 use tokio::{runtime::Handle, time::interval};
 use tokio_stream::wrappers::IntervalStream;
-use vm_validator::vm_validator::TransactionValidation;
 
 use super::types::MempoolClientRequest;
 
@@ -227,6 +227,7 @@ async fn handle_mempool_reconfig_event<V>(
         .spawn(tasks::process_config_update(
             config_update,
             smp.validator.clone(),
+            smp.broadcast_within_validator_network.clone(),
         ))
         .await;
 }
@@ -284,8 +285,8 @@ async fn handle_network_event<V>(
                 } => {
                     let smp_clone = smp.clone();
                     let peer = PeerNetworkId::new(network_id, peer_id);
-                    let ineligible_for_broadcast = (!smp.broadcast_within_validator_network()
-                        && smp.network_interface.is_validator())
+                    let ineligible_for_broadcast = (smp.network_interface.is_validator()
+                        && !smp.broadcast_within_validator_network())
                         || smp.network_interface.is_upstream_peer(&peer, None);
                     let timeline_state = if ineligible_for_broadcast {
                         TimelineState::NonQualified

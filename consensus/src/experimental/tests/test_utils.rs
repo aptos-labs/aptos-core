@@ -2,26 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::MockStorage};
-use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_infallible::Mutex;
-use aptos_secure_storage::Storage;
-use aptos_types::{
-    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
-    validator_signer::ValidatorSigner,
-    validator_verifier::random_validator_verifier,
-    waypoint::Waypoint,
-};
-use consensus_types::{
+use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis,
     common::{Payload, Round},
     executed_block::ExecutedBlock,
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
-use executor_types::StateComputeResult;
-use safety_rules::{
+use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
+use aptos_executor_types::StateComputeResult;
+use aptos_infallible::Mutex;
+use aptos_safety_rules::{
     test_utils::{make_proposal_with_parent, make_proposal_with_qc},
     PersistentSafetyStorage, SafetyRulesManager,
+};
+use aptos_secure_storage::Storage;
+use aptos_types::{
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
+    validator_signer::ValidatorSigner,
+    validator_verifier::random_validator_verifier,
+    waypoint::Waypoint,
 };
 use std::sync::Arc;
 
@@ -69,7 +69,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
     assert!(num_blocks > 0);
 
     let p1 = if let Some(parent) = some_parent {
-        make_proposal_with_parent(Payload::empty(), init_round, &parent, None, signer)
+        make_proposal_with_parent(Payload::empty(false), init_round, &parent, None, signer)
     } else {
         make_proposal_with_qc(init_round, init_qc.unwrap(), signer)
     };
@@ -80,7 +80,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
         println!("Generating {}", i);
         let parent = proposals.last().unwrap();
         let proposal =
-            make_proposal_with_parent(Payload::empty(), init_round + i, parent, None, signer);
+            make_proposal_with_parent(Payload::empty(false), init_round + i, parent, None, signer);
         proposals.push(proposal);
     }
 

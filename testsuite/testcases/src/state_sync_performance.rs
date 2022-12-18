@@ -3,12 +3,12 @@
 
 use crate::generate_traffic;
 use anyhow::bail;
-use aptos_logger::info;
-use aptos_sdk::move_types::account_address::AccountAddress;
-use forge::{
+use aptos_forge::{
     get_highest_synced_epoch, get_highest_synced_version, NetworkContext, NetworkTest, Result,
     SwarmExt, Test,
 };
+use aptos_logger::info;
+use aptos_sdk::move_types::account_address::AccountAddress;
 use std::time::Instant;
 use tokio::{runtime::Runtime, time::Duration};
 
@@ -215,12 +215,7 @@ fn emit_traffic_and_ensure_bounded_sync(
         "Generating the initial traffic for {:?} seconds.",
         emit_txn_duration.as_secs()
     );
-    let _txn_stat = generate_traffic(
-        ctx,
-        nodes_to_send_traffic,
-        emit_txn_duration,
-        aptos_global_constants::GAS_UNIT_PRICE,
-    )?;
+    let _txn_stat = generate_traffic(ctx, nodes_to_send_traffic, emit_txn_duration)?;
 
     // Wait for all nodes to synchronize. We time bound this to ensure
     // nodes don't fall too far behind.

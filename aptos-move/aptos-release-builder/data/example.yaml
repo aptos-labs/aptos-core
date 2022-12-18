@@ -1,5 +1,6 @@
 ---
 testnet: true
+is_multi_step: false
 framework_release: true
 gas_schedule:
   feature_version: 4

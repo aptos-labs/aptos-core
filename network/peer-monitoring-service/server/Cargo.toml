@@ -1,5 +1,5 @@
 [package]
-name = "peer-monitoring-service-server"
+name = "aptos-peer-monitoring-service-server"
 description = "The peer monitoring service (server-side)"
 version = "0.1.0"
 
@@ -13,19 +13,19 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-bounded-executor = { workspace = true }
+aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-netcore = { workspace = true }
+aptos-network = { workspace = true }
+aptos-peer-monitoring-service-types = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
-bounded-executor = { workspace = true }
 bytes = { workspace = true }
-channel = { workspace = true }
 futures = { workspace = true }
-netcore = { workspace = true }
-network = { workspace = true }
 once_cell = { workspace = true }
-peer-monitoring-service-types = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

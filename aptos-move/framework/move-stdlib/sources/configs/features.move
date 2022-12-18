@@ -78,6 +78,24 @@ module std::features {
 
     public fun blake2b_256_enabled(): bool acquires Features {
         is_enabled(BLAKE2B_256_NATIVE)
+    /// Whether to allow the use of binary format version v6.
+    /// Lifetime: transient
+    const VM_BINARY_FORMAT_V6: u64 = 5;
+
+    public fun get_vm_binary_format_v6(): u64 { VM_BINARY_FORMAT_V6 }
+
+    public fun allow_vm_binary_format_v6(): bool acquires Features {
+        is_enabled(VM_BINARY_FORMAT_V6)
+    }
+
+    /// Whether gas fees are collected and distributed to the block proposers.
+    /// Lifetime: transient
+    const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
+
+    public fun get_collect_and_distribute_gas_fees_feature(): u64 { COLLECT_AND_DISTRIBUTE_GAS_FEES }
+
+    public fun collect_and_distribute_gas_fees(): bool acquires Features {
+        is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
     }
 
     // ============================================================================================

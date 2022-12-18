@@ -8,19 +8,19 @@ use crate::{
     },
 };
 use anyhow::Result;
+use aptos_consensus_types::{
+    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
 };
-use consensus_types::{
-    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
-};
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::DbReader;
 
 pub struct MockSharedStorage {
     // Safety state

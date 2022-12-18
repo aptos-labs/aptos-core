@@ -69,6 +69,7 @@ const sidebars = {
         "cli-tools/install-move-prover",
       ],
     },
+    "guides/system-integrators-guide",
     {
       type: "html",
       value: "Build Apps",
@@ -80,14 +81,14 @@ const sidebars = {
       link: { type: "doc", id: "concepts/coin-and-token/index" },
       collapsible: true,
       collapsed: true,
-      items: ["concepts/coin-and-token/aptos-coin", "concepts/coin-and-token/aptos-token"],
+      items: ["concepts/coin-and-token/aptos-coin", "concepts/coin-and-token/aptos-token", "guides/wallet-standard"],
     },
     {
       type: "category",
       label: "Read Blockchain Data",
       collapsible: true,
       collapsed: true,
-      items: ["guides/system-integrators-guide", "guides/indexing"],
+      items: ["guides/aptos-apis", "guides/indexing"],
     },
     {
       type: "category",
@@ -95,12 +96,7 @@ const sidebars = {
       link: { type: "doc", id: "guides/index" },
       collapsible: true,
       collapsed: true,
-      items: [
-        "guides/sign-a-transaction",
-        "guides/resource-accounts",
-        "guides/wallet-standard",
-        "guides/handle-aptos-errors",
-      ],
+      items: ["guides/sign-a-transaction", "guides/resource-accounts", "guides/handle-aptos-errors"],
     },
     {
       type: "category",
@@ -118,6 +114,7 @@ const sidebars = {
     {
       type: "category",
       label: "Develop Locally",
+      link: { type: "doc", id: "nodes/local-testnet/index" },
       collapsible: true,
       collapsed: true,
       items: [
@@ -138,8 +135,17 @@ const sidebars = {
         "concepts/base-gas",
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",
+        "guides/move-guides/mint-nft-cli",
         "guides/move-guides/upgrading-move-code",
       ],
+    },
+    {
+      type: "category",
+      label: "Aptos Wallet Adapter",
+      link: { type: "doc", id: "concepts/wallet-adapter-concept" },
+      collapsible: true,
+      collapsed: true,
+      items: ["guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
     },
     {
       type: "html",
@@ -237,7 +243,6 @@ const sidebars = {
       items: [
         "concepts/fullnodes",
         "nodes/full-node/fullnode-source-code-or-docker",
-        "nodes/full-node/bootstrap-fullnode",
         "nodes/full-node/update-fullnode-with-new-releases",
         "nodes/full-node/network-identity-fullnode",
         "nodes/full-node/fullnode-network-connections",
@@ -273,13 +278,8 @@ const sidebars = {
       value: "Reference",
       className: "sidebar-title",
     },
-    {
-      type: "category",
-      label: "Aptos API",
-      collapsible: true,
-      collapsed: true,
-      items: ["nodes/aptos-api-spec", "reference/index"],
-    },
+    "reference/index",
+    "nodes/aptos-api-spec",
     {
       type: "category",
       label: "Aptos SDKs",

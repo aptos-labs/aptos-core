@@ -9,18 +9,18 @@ use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
 };
+use aptos_executor_types::{
+    in_memory_state_calculator::InMemoryStateCalculator, ExecutedChunk, ParsedTransactionOutput,
+    TransactionData,
+};
 use aptos_logger::error;
+use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     proof::accumulator::InMemoryAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, TransactionOutput, TransactionStatus},
 };
-use executor_types::{
-    in_memory_state_calculator::InMemoryStateCalculator, ExecutedChunk, ParsedTransactionOutput,
-    TransactionData,
-};
 use std::{collections::HashMap, iter::repeat, sync::Arc};
-use storage_interface::ExecutedTrees;
 
 pub struct ApplyChunkOutput;
 

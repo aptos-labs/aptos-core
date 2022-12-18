@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Context, Result};
+use aptos_logger::info;
 use aptos_sdk::types::account_address::AccountAddress;
 use clap::Parser;
 use gcp_bigquery_client::{
@@ -12,7 +13,6 @@ use gcp_bigquery_client::{
     },
     Client as BigQueryClient,
 };
-use log::info;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::convert::TryFrom;

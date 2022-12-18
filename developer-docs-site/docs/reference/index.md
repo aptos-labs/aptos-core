@@ -17,7 +17,7 @@ You can try out APIs for different networks here:
 - ### [Testnet](https://fullnode.testnet.aptoslabs.com/v1/spec#/)
 - ### [Mainnet](https://fullnode.mainnet.aptoslabs.com/v1/spec#/)
 
-Read [Use Aptos API](../guides/system-integrators-guide.md) to integrate Aptos into your platform.
+Read [System Integrators Guide](../guides/system-integrators-guide.md) to integrate Aptos into your platform.
 
 ## Aptos SDKs
 

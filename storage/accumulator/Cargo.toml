@@ -1,5 +1,5 @@
 [package]
-name = "accumulator"
+name = "aptos-accumulator"
 description = "Aptos merkle tree accumulator"
 version = "0.1.0"
 

@@ -9,6 +9,7 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_logger::info;
+use aptos_storage_interface::state_delta::StateDelta;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
@@ -23,7 +24,6 @@ use std::{
     },
     thread::JoinHandle,
 };
-use storage_interface::state_delta::StateDelta;
 
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
 pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 20_000;

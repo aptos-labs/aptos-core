@@ -3,9 +3,17 @@
 
 use crate::{assert_success, AptosPackageHooks};
 use aptos::move_tool::MemberId;
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, Uniform};
+use aptos_framework::natives::code::PackageMetadata;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
+use aptos_language_e2e_tests::{
+    account::{Account, AccountData},
+    executor::FakeExecutor,
+};
+use aptos_types::contract_event::ContractEvent;
 use aptos_types::on_chain_config::{FeatureFlag, GasScheduleV2};
 use aptos_types::transaction::TransactionOutput;
 use aptos_types::{
@@ -14,13 +22,6 @@ use aptos_types::{
     account_config::AccountResource,
     state_store::state_key::StateKey,
     transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
-};
-use cached_packages::aptos_stdlib;
-use framework::natives::code::PackageMetadata;
-use framework::{BuildOptions, BuiltPackage};
-use language_e2e_tests::{
-    account::{Account, AccountData},
-    executor::FakeExecutor,
 };
 use move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
 use move_core_types::move_resource::MoveStructType;
@@ -158,6 +159,18 @@ impl MoveHarness {
     /// Runs a signed transaction. On success, applies the write set.
     pub fn run(&mut self, txn: SignedTransaction) -> TransactionStatus {
         self.run_raw(txn).status().to_owned()
+    }
+
+    /// Runs a signed transaction. On success, applies the write set and return events
+    pub fn run_with_events(
+        &mut self,
+        txn: SignedTransaction,
+    ) -> (TransactionStatus, Vec<ContractEvent>) {
+        let output = self.executor.execute_transaction(txn);
+        if matches!(output.status(), TransactionStatus::Keep(_)) {
+            self.executor.apply_write_set(output.write_set());
+        }
+        (output.status().to_owned(), output.events().to_owned())
     }
 
     /// Runs a block of signed transactions. On success, applies the write set.
@@ -447,7 +460,10 @@ impl MoveHarness {
 #[macro_export]
 macro_rules! enable_golden {
     ($h:expr) => {
-        $h.internal_set_golden(std::file!(), language_e2e_tests::current_function_name!())
+        $h.internal_set_golden(
+            std::file!(),
+            aptos_language_e2e_tests::current_function_name!(),
+        )
     };
 }
 

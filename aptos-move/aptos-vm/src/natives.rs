@@ -9,7 +9,7 @@ use move_vm_runtime::native_functions::NativeFunctionTable;
 use aptos_types::chain_id::ChainId;
 #[cfg(feature = "testing")]
 use {
-    framework::natives::{
+    aptos_framework::natives::{
         aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
         cryptography::ristretto255_point::NativeRistrettoPointContext,
         transaction_context::NativeTransactionContext,
@@ -30,7 +30,7 @@ pub fn aptos_natives(
     move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
         .into_iter()
         .filter(|(_, name, _, _)| name.as_str() != "vector")
-        .chain(framework::natives::all_natives(
+        .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
             gas_params.aptos_framework,
             move |val| abs_val_size_gas_params.abstract_value_size(val, feature_version),

@@ -1,5 +1,5 @@
 [package]
-name = "event-notifications"
+name = "aptos-event-notifications"
 description = "The notification service offered by state sync for on-chain events"
 version = "0.1.0"
 
@@ -13,25 +13,25 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-channels = { workspace = true }
 aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-state-view = { workspace = true }
+aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
-channel = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true }
-storage-interface = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
+aptos-executor-test-helpers = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-vm = { workspace = true }
-aptosdb = { workspace = true }
+aptos-vm-genesis = { workspace = true }
 bcs = { workspace = true }
 claims = { workspace = true }
-executor-test-helpers = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
-vm-genesis = { workspace = true }

@@ -11,9 +11,10 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue, PrivateKey, Uniform,
 };
+use aptos_framework::{ReleaseBundle, ReleasePackage};
 use aptos_gas::{
-    AbstractValueSizeGasParameters, AptosGasParameters, InitialGasSchedule, NativeGasParameters,
-    ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
+    AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, InitialGasSchedule,
+    NativeGasParameters, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::account_config::aptos_test_root_address;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
@@ -25,10 +26,9 @@ use aptos_types::{
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
-    data_cache::{IntoMoveResolver, StateViewCache},
+    data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use framework::{ReleaseBundle, ReleasePackage};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -101,12 +101,13 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+    let data_cache = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         ChainId::test().id(),
     )
     .unwrap();
@@ -138,7 +139,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let state_view = GenesisStateView::new();
-    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+    let data_cache = state_view.as_move_resolver();
 
     let mut id2_arr = [0u8; 32];
     id2_arr[31] = 1;
@@ -150,7 +151,10 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     session1_out.squash(session2_out).unwrap();
 
     let change_set_ext = session1_out
-        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+        .into_change_set(
+            &mut (),
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+        )
         .unwrap();
     let (delta_change_set, change_set) = change_set_ext.into_inner();
 
@@ -206,12 +210,13 @@ pub fn encode_genesis_change_set(
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+    let data_cache = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         ChainId::test().id(),
     )
     .unwrap();
@@ -245,7 +250,7 @@ pub fn encode_genesis_change_set(
     let mut session1_out = session.finish().unwrap();
 
     let state_view = GenesisStateView::new();
-    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+    let data_cache = state_view.as_move_resolver();
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let mut id2_arr = [0u8; 32];
@@ -258,7 +263,10 @@ pub fn encode_genesis_change_set(
     session1_out.squash(session2_out).unwrap();
 
     let change_set_ext = session1_out
-        .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+        .into_change_set(
+            &mut (),
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+        )
         .unwrap();
     let (delta_change_set, change_set) = change_set_ext.into_inner();
 
@@ -391,7 +399,7 @@ fn initialize(
 }
 
 fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
-    let features: Vec<u64> = vec![1, 2];
+    let features: Vec<u64> = vec![1, 2, 5];
 
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(bcs::to_bytes(&features).unwrap());
@@ -641,11 +649,11 @@ pub fn generate_genesis_change_set_for_testing_with_count(
     count: u64,
 ) -> ChangeSet {
     let framework = match genesis_options {
-        GenesisOptions::Head => cached_packages::head_release_bundle(),
-        GenesisOptions::Testnet => framework::testnet_release_bundle(),
+        GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
+        GenesisOptions::Testnet => aptos_framework::testnet_release_bundle(),
         GenesisOptions::Mainnet => {
             // We don't yet have mainnet, so returning testnet here
-            framework::testnet_release_bundle()
+            aptos_framework::testnet_release_bundle()
         }
     };
 
@@ -655,10 +663,10 @@ pub fn generate_genesis_change_set_for_testing_with_count(
 /// Generate a genesis `ChangeSet` for mainnet
 pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
     let framework = match genesis_options {
-        GenesisOptions::Head => cached_packages::head_release_bundle(),
-        GenesisOptions::Testnet => framework::testnet_release_bundle(),
+        GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
+        GenesisOptions::Testnet => aptos_framework::testnet_release_bundle(),
         // We don't yet have mainnet, so returning testnet here
-        GenesisOptions::Mainnet => framework::testnet_release_bundle(),
+        GenesisOptions::Mainnet => aptos_framework::testnet_release_bundle(),
     };
 
     generate_mainnet_genesis(framework, Some(1)).0
@@ -672,7 +680,7 @@ pub fn test_genesis_transaction() -> Transaction {
 pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    generate_test_genesis(cached_packages::head_release_bundle(), count)
+    generate_test_genesis(aptos_cached_packages::head_release_bundle(), count)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -850,23 +858,25 @@ pub struct ValidatorWithCommissionRate {
 pub fn test_genesis_module_publishing() {
     // create a state view for move_vm
     let mut state_view = GenesisStateView::new();
-    for (module_bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules()
+    for (module_bytes, module) in
+        aptos_cached_packages::head_release_bundle().code_and_compiled_modules()
     {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+    let data_cache = state_view.as_move_resolver();
 
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         false,
+        true,
         ChainId::test().id(),
     )
     .unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
-    publish_framework(&mut session, cached_packages::head_release_bundle());
+    publish_framework(&mut session, aptos_cached_packages::head_release_bundle());
 }
 
 #[test]
@@ -1059,7 +1069,7 @@ pub fn test_mainnet_end_to_end() {
         &accounts,
         &employees,
         &validators,
-        cached_packages::head_release_bundle(),
+        aptos_cached_packages::head_release_bundle(),
         ChainId::mainnet(),
         &mainnet_genesis_config(),
     );

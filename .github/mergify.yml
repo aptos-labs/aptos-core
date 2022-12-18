@@ -1,7 +1,7 @@
 # This defines the rules used by https://mergify.com/
 
 pull_request_rules:
-  - name: required status checks
+  - name: required checks
     conditions:
       - base=main
       - or:
@@ -11,8 +11,8 @@ pull_request_rules:
               - check-success=ecosystem-lint
               - check-success=permission-check
               - check-success=scripts-lint
-              - check-success=python-lint-test
-              - check-success=helm-lint
+              - check-success=python-lint-test / python-unit-test
+              - check-success=helm-lint / helm-lint
               - check-success=terraform-lint
               - check-success=rust-unit-test
               - check-success=rust-doc-test
@@ -32,7 +32,9 @@ pull_request_rules:
         title: |
           {% if not check_succeed %}
           {% if check_pending|length > 0 %}
-          Some checks are still pending...
+          Ignore the red X, it just means some checks are still pending, please wait...
+          {% elif check_skipped|length > 0 %}
+          Some checks were skipped (try rebasing, toggling automerge, or applying the corresponding labels)...
           {% else %}
           Tests failed
           {% endif %}

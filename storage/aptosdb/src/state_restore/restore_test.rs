@@ -13,6 +13,7 @@ use aptos_jellyfish_merkle::test_helper::{init_mock_db, ValueBlob};
 use aptos_jellyfish_merkle::{
     JellyfishMerkleTree, NodeBatch, TestKey, TestValue, TreeReader, TreeWriter,
 };
+use aptos_storage_interface::StateSnapshotReceiver;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::transaction::Version;
 use proptest::{collection::btree_map, prelude::*};
@@ -20,7 +21,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
 };
-use storage_interface::StateSnapshotReceiver;
 
 #[derive(Default)]
 struct MockSnapshotStore<K: TestKey, V: TestValue> {

@@ -1,15 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_cached_packages::aptos_stdlib;
+use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
-use cached_packages::aptos_stdlib;
-use language_e2e_tests::{account::Account, executor::FakeExecutor};
 
 #[test]
 fn mint_to_new_account() {
     let mut executor = FakeExecutor::from_head_genesis();
     let mut root = Account::new_aptos_root();
-    let (private_key, public_key) = vm_genesis::GENESIS_KEYPAIR.clone();
+    let (private_key, public_key) = aptos_vm_genesis::GENESIS_KEYPAIR.clone();
     root.rotate_key(private_key, public_key);
 
     // Create and publish a sender with TXN_RESERVED coins, also note how

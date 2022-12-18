@@ -6,11 +6,9 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
     test_utils::{self, consensus_runtime, placeholder_ledger_info, timed_block_on},
 };
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkId;
-use aptos_infallible::{Mutex, RwLock};
-use aptos_types::{block_info::BlockInfo, PeerId};
-use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::{
+use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
     proposal_msg::ProposalMsg,
@@ -19,8 +17,8 @@ use consensus_types::{
     vote_data::VoteData,
     vote_msg::VoteMsg,
 };
-use futures::{channel::mpsc, SinkExt, StreamExt};
-use network::{
+use aptos_infallible::{Mutex, RwLock};
+use aptos_network::{
     application::storage::PeerMetadataStorage,
     peer_manager::{
         conn_notifs_channel, ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
@@ -33,6 +31,8 @@ use network::{
     },
     ProtocolId,
 };
+use aptos_types::{block_info::BlockInfo, PeerId};
+use futures::{channel::mpsc, SinkExt, StreamExt};
 use std::{
     collections::{HashMap, HashSet},
     iter::FromIterator,
@@ -191,7 +191,7 @@ impl NetworkPlayground {
         // `Sender` side of this queue is usually wrapped in a
         // `ConsensusNetworkSender` adapter.
         network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-        conn_mgr_reqs_rx: channel::Receiver<network::ConnectivityRequest>,
+        conn_mgr_reqs_rx: aptos_channels::Receiver<aptos_network::ConnectivityRequest>,
     ) {
         self.node_consensus_txs.lock().insert(twin_id, consensus_tx);
         self.drop_config.write().add_node(twin_id);
@@ -482,18 +482,18 @@ mod tests {
     use super::*;
     use crate::network::NetworkTask;
     use aptos_config::network_id::NetworkId;
-    use aptos_crypto::HashValue;
-    use aptos_types::validator_verifier::random_validator_verifier;
-    use bytes::Bytes;
-    use consensus_types::{
+    use aptos_consensus_types::{
         block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus},
         common::Payload,
     };
-    use futures::{channel::oneshot, future};
-    use network::{
+    use aptos_crypto::HashValue;
+    use aptos_network::{
         application::storage::PeerMetadataStorage, protocols::direct_send::Message,
         transport::ConnectionMetadata,
     };
+    use aptos_types::validator_verifier::random_validator_verifier;
+    use bytes::Bytes;
+    use futures::{channel::oneshot, future};
 
     #[test]
     fn test_split_network_round() {
@@ -568,7 +568,7 @@ mod tests {
             let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-            let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
+            let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
             let (_, conn_status_rx) = conn_notifs_channel::new();
             add_peer_to_storage(
                 &peer_metadata_storage,
@@ -593,7 +593,7 @@ mod tests {
 
             playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
-            let (self_sender, self_receiver) = channel::new_test(8);
+            let (self_sender, self_receiver) = aptos_channels::new_test(8);
             let node = NetworkSender::new(
                 *peer,
                 network_sender,
@@ -618,7 +618,7 @@ mod tests {
         let previous_qc = certificate_for_genesis();
         let proposal = ProposalMsg::new(
             Block::new_proposal(
-                Payload::empty(),
+                Payload::empty(false),
                 1,
                 1,
                 previous_qc.clone(),
@@ -672,7 +672,7 @@ mod tests {
             let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-            let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
+            let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
             let (_, conn_status_rx) = conn_notifs_channel::new();
             let mut network_sender = ConsensusNetworkSender::new(
                 PeerManagerRequestSender::new(network_reqs_tx),
@@ -698,7 +698,7 @@ mod tests {
 
             playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
-            let (self_sender, self_receiver) = channel::new_test(8);
+            let (self_sender, self_receiver) = aptos_channels::new_test(8);
             let node = NetworkSender::new(
                 *peer,
                 network_sender.clone(),
@@ -767,7 +767,7 @@ mod tests {
             aptos_channel::new(QueueStyle::FIFO, 8, None);
         let consensus_network_events =
             ConsensusNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
-        let (self_sender, self_receiver) = channel::new_test(8);
+        let (self_sender, self_receiver) = aptos_channels::new_test(8);
 
         let (network_task, mut network_receivers) =
             NetworkTask::new(consensus_network_events, self_receiver);

@@ -16,17 +16,16 @@ members = [
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
+    "aptos-move/block-executor",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
-    "aptos-move/framework/artifacts-test",
     "aptos-move/framework/cached-packages",
     "aptos-move/gas-algebra-ext",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
-    "aptos-move/parallel-executor",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
     "aptos-node",
@@ -77,7 +76,6 @@ members = [
     "crates/transaction-emitter-lib",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
-    "ecosystem/sf-indexer/firehose-stream",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
@@ -167,45 +165,77 @@ rust-version = "1.64"
 [workspace.dependencies]
 # Internal crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
-accumulator = { path = "storage/accumulator" }
 aptos = { path = "crates/aptos" }
+aptos-accumulator = { path = "storage/accumulator" }
 aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
 aptos-api = { path = "api" }
 aptos-api-test-context = { path = "api/test-context" }
 aptos-api-types = { path = "api/types" }
+aptos-backup-cli = { path = "storage/backup/backup-cli" }
+aptos-backup-service = { path = "storage/backup/backup-service" }
+aptos-bounded-executor = { path = "crates/bounded-executor" }
+aptos-block-executor = { path = "aptos-move/block-executor" }
 aptos-bitvec = { path = "crates/aptos-bitvec" }
 aptos-build-info = { path = "crates/aptos-build-info" }
+aptos-cached-packages = { path = "aptos-move/framework/cached-packages" }
+aptos-channels = { path = "crates/channel" }
 aptos-compression = { path = "crates/aptos-compression" }
+aptos-consensus = { path = "consensus" }
+aptos-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
+aptos-consensus-types = { path = "consensus/consensus-types" }
 aptos-config = { path = "config" }
+aptos-crash-handler = { path = "crates/crash-handler" }
 aptos-crypto = { path = "crates/aptos-crypto" }
 aptos-crypto-derive = { path = "crates/aptos-crypto-derive" }
 aptos-data-client = { path = "state-sync/aptos-data-client" }
-aptosdb-indexer = { path = "storage/indexer" }
+aptos-data-streaming-service = { path = "state-sync/state-sync-v2/data-streaming-service" }
+aptos-db = { path = "storage/aptosdb" }
+aptos-db-indexer = { path = "storage/indexer" }
 aptos-debugger = { path = "aptos-move/aptos-debugger" }
-aptos-fh-stream = { path = "ecosystem/sf-indexer/firehose-stream" }
+aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
+aptos-executor = { path = "execution/executor" }
+aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
+aptos-executor-types = { path = "execution/executor-types" }
 aptos-faucet = { path = "crates/aptos-faucet" }
+aptos-fallible = { path = "crates/fallible" }
+aptos-forge = { path = "testsuite/forge" }
+aptos-framework = { path = "aptos-move/framework" }
 aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
 aptos-gas = { path = "aptos-move/aptos-gas" }
+aptos-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
 aptos-genesis = { path = "crates/aptos-genesis" }
 aptos-github-client = { path = "secure/storage/github" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
 aptos-infallible = { path = "crates/aptos-infallible" }
+aptos-inspection-service = { path = "crates/inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
 aptos-keygen = { path = "crates/aptos-keygen" }
+aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-log-derive = { path = "crates/aptos-log-derive" }
 aptos-logger = { path = "crates/aptos-logger" }
 aptos-mempool = { path = "mempool" }
+aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
+aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
-aptos-module-verifier = { path = "aptos-move/aptos-module-verifier" }
+aptos-move-examples = { path = "aptos-move/move-examples" }
+aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
+aptos-netcore = { path = "network/netcore" }
+aptos-network = { path = "network" }
+aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
+aptos-network-discovery = { path = "network/discovery" }
 aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
+aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
+aptos-num-variants = { path = "crates/num-variants" }
 aptos-openapi = { path = "crates/aptos-openapi" }
-aptos-parallel-executor = { path = "aptos-move/parallel-executor" }
+aptos-package-builder = { path = "aptos-move/package-builder" }
+aptos-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }
+aptos-proxy = { path = "crates/proxy" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }
 aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }
 aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
@@ -214,70 +244,35 @@ aptos-rest-client = { path = "crates/aptos-rest-client" }
 aptos-retrier = { path = "crates/aptos-retrier" }
 aptos-rocksdb-options = { path = "storage/rocksdb-options" }
 aptos-rosetta = { path = "crates/aptos-rosetta" }
+aptos-safety-rules = { path = "consensus/safety-rules" }
+aptos-schemadb = { path = "storage/schemadb" }
+aptos-scratchpad = { path = "storage/scratchpad" }
 aptos-sdk = { path = "sdk" }
 aptos-sdk-builder = { path = "aptos-move/aptos-sdk-builder" }
 aptos-secure-net = { path = "secure/net" }
 aptos-secure-storage = { path = "secure/storage" }
+aptos-short-hex-str = { path = "crates/short-hex-str" }
+aptos-state-sync-driver = { path = "state-sync/state-sync-v2/state-sync-driver" }
 aptos-state-view = { path = "storage/state-view" }
+aptos-storage-interface = { path = "storage/storage-interface" }
+aptos-storage-service-client = { path = "state-sync/storage-service/client" }
+aptos-storage-service-types = { path = "state-sync/storage-service/types" }
+aptos-storage-service-server = { path = "state-sync/storage-service/server" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }
+aptos-testcases = { path = "testsuite/testcases" }
 aptos-time-service = { path = "crates/aptos-time-service", features = ["async"] }
+aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
+aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
+aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
-aptosdb = { path = "storage/aptosdb" }
-backup-cli = { path = "storage/backup/backup-cli" }
-backup-service = { path = "storage/backup/backup-service" }
-bounded-executor = { path = "crates/bounded-executor" }
-cached-packages = { path = "aptos-move/framework/cached-packages" }
-channel = { path = "crates/channel" }
-consensus = { path = "consensus" }
-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
-consensus-types = { path = "consensus/consensus-types" }
-crash-handler = { path = "crates/crash-handler" }
-data-streaming-service = { path = "state-sync/state-sync-v2/data-streaming-service" }
-event-notifications = { path = "state-sync/inter-component/event-notifications" }
-executor = { path = "execution/executor" }
-executor-test-helpers = { path = "execution/executor-test-helpers" }
-executor-types = { path = "execution/executor-types" }
-fallible = { path = "crates/fallible" }
-forge = { path = "testsuite/forge" }
-framework = { path = "aptos-move/framework" }
-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
-handlebars = "4.2.2"
-inspection-service = { path = "crates/inspection-service" }
-language-e2e-tests = { path = "aptos-move/e2e-tests" }
-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
-memsocket = { path = "network/memsocket" }
-move-examples = { path = "aptos-move/move-examples" }
-mvhashmap = { path = "aptos-move/mvhashmap" }
-netcore = { path = "network/netcore" }
-network = { path = "network" }
-network-builder = { path = "network/builder" }
-network-discovery = { path = "network/discovery" }
-node-resource-metrics = { path = "crates/node-resource-metrics" }
-num-variants = { path = "crates/num-variants" }
-package-builder = { path = "aptos-move/package-builder" }
-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
-proxy = { path = "crates/proxy" }
-safety-rules = { path = "consensus/safety-rules" }
-schemadb = { path = "storage/schemadb" }
-scratchpad = { path = "storage/scratchpad" }
-short-hex-str = { path = "crates/short-hex-str" }
-state-sync-driver = { path = "state-sync/state-sync-v2/state-sync-driver" }
-storage-interface = { path = "storage/storage-interface" }
-storage-service-client = { path = "state-sync/storage-service/client" }
-storage-service-server = { path = "state-sync/storage-service/server" }
-storage-service-types = { path = "state-sync/storage-service/types" }
-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
-testcases = { path = "testsuite/testcases" }
-vm-genesis = { path = "aptos-move/vm-genesis" }
-vm-validator = { path = "vm-validator" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
@@ -292,7 +287,7 @@ async-trait = "0.1.53"
 axum = "0.5.16"
 base64 = "0.13.0"
 backtrace = "0.3.58"
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
+bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = "0.1.1"
 bigdecimal = { version = "0.3.0", features = ["serde"] }
 bitvec = "0.19.4"
@@ -324,6 +319,7 @@ digest = "0.9.0"
 dir-diff = "0.3.2"
 dirs = "4.0.0"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
+ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
 enum_dispatch = "0.3.8"
 env_logger = "0.9.0"
@@ -339,6 +335,7 @@ futures-util = "0.3.21"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
 goldenfile = "1.1.0"
+handlebars = "4.2.2"
 heck = "0.3.2"
 hex = "0.4.3"
 hkdf = "0.10.0"
@@ -385,10 +382,11 @@ proc-macro2 = "1.0.38"
 project-root = "0.2.2"
 prometheus = { version = "0.13.0", default-features = false }
 prometheus-http-query = "0.5.2"
-prometheus-parse = "0.2.2"
+# Necessary until this lands: https://github.com/ccakes/prometheus-parse-rs/pull/6.
+prometheus-parse = { git = "https://github.com/banool/prometheus-parse-rs", rev = "b65a1f20c5c604a9d2d1e545f70ca51ea8da2354" }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
-prost = "0.10.4"
+prost = "0.11.3"
 prost-types = "0.10.1"
 quanta = "0.10.1"
 quote = "1.0.18"
@@ -429,7 +427,8 @@ sysinfo = "0.24.2"
 tempfile = "3.3.0"
 termcolor = "1.1.2"
 textwrap = "0.15.0"
-thiserror = "1.0.31"
+thiserror = "1.0.37"
+tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.34"
 tracing-subscriber = "0.3.11"
@@ -440,7 +439,7 @@ tokio-stream = "0.1.8"
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.5.9"
-tonic = { version = "0.7.2", features = ["tls-roots", "transport", "prost", "compression", "codegen"] }
+tonic = { version = "0.8.3", features = ["tls-roots", "transport", "prost", "gzip", "codegen"] }
 ureq = { version = "1.5.4", features = ["json", "native-tls"], default_features = false }
 url = { version = "2.2.2", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
@@ -452,34 +451,34 @@ x25519-dalek = "1.2.0"
 
 # Note: the BEGIN and END comments below are required for external tooling. Do not remove.
 # BEGIN MOVE DEPENDENCIES
-move-abigen = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-binary-format = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-cli = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-command-line-common = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-compiler ={ git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743", features = ["address32"] }
-move-docgen = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-ir-compiler = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-model = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-package = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-prover = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-prover-boogie-backend = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-stackless-bytecode = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-prover-test-utils = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-resource-viewer = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-symbol-pool = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-table-extension = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-transactional-test-runner = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-move-unit-test = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743", features = ["table-extension"] }
-move-vm-runtime = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743", features = ["lazy_natives"] }
-move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743", features = ["table-extension"] }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-read-write-set = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
-read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "f22af5038c4edd09ae2f7e9e7ff576a4b1118743" }
+move-abigen = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-cli = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-command-line-common = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-compiler ={ git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0", features = ["address32"] }
+move-docgen = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-ir-compiler = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-model = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-package = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-prover = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-prover-boogie-backend = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-stackless-bytecode = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-prover-test-utils = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-resource-viewer = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-symbol-pool = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-transactional-test-runner = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0", features = ["table-extension"] }
+move-vm-runtime = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0", features = ["lazy_natives"] }
+move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0", features = ["table-extension"] }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+read-write-set = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
 # END MOVE DEPENDENCIES
 
 [profile.release]

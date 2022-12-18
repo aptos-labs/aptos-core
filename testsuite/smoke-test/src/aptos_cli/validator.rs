@@ -10,6 +10,7 @@ use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_bitvec::BitVec;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
+use aptos_forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::{Client, State};
@@ -20,7 +21,6 @@ use aptos_types::on_chain_config::{
     ProposerElectionType, ValidatorSet,
 };
 use aptos_types::PeerId;
-use forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt::Write;
@@ -182,7 +182,10 @@ async fn test_onchain_config_change() {
             conf.api.failpoints_enabled = true;
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
-            let OnChainConsensusConfig::V1(inner) = genesis_config.consensus_config.clone();
+            let inner = match genesis_config.consensus_config.clone() {
+                OnChainConsensusConfig::V1(inner) => inner,
+                OnChainConsensusConfig::V2(inner) => inner,
+            };
 
             let leader_reputation_type =
                 if let ProposerElectionType::LeaderReputation(leader_reputation_type) =
@@ -236,7 +239,10 @@ async fn test_onchain_config_change() {
     )
     .unwrap();
 
-    let OnChainConsensusConfig::V1(inner) = current_consensus_config;
+    let inner = match current_consensus_config {
+        OnChainConsensusConfig::V1(inner) => inner,
+        OnChainConsensusConfig::V2(inner) => inner,
+    };
     let leader_reputation_type =
         if let ProposerElectionType::LeaderReputation(leader_reputation_type) =
             inner.proposer_election_type

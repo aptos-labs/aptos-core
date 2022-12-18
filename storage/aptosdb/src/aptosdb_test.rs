@@ -16,6 +16,7 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
 use aptos_temppath::TempPath;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
@@ -28,7 +29,6 @@ use aptos_types::{
 use proptest::prelude::*;
 use std::collections::HashSet;
 use std::sync::Arc;
-use storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
 proptest! {

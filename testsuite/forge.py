@@ -969,7 +969,7 @@ def create_forge_command(
         forge_args.extend(
             [
                 "-p",
-                "forge-cli",
+                "aptos-forge-cli",
                 "--",
             ]
         )

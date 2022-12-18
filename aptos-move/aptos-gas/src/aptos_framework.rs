@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::gas_meter::EXECUTION_GAS_MULTIPLIER as MUL;
-use framework::natives::GasParameters;
+use aptos_framework::natives::GasParameters;
 
 crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framework", [
     [.account.create_address.base, "account.create_address.base", 300 * MUL],

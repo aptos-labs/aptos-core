@@ -13,15 +13,15 @@ echo "FEATURES: $FEATURES"
 # Build all the rust binaries
 cargo build --locked --profile=$PROFILE \
     -p aptos \
+    -p aptos-backup-cli \
     -p aptos-faucet \
+    -p aptos-forge-cli \
+    -p aptos-fn-check-client \
     -p aptos-node-checker \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
-    -p aptos-fn-check-client \
-    -p backup-cli \
-    -p db-bootstrapper \
-    -p forge-cli \
-    -p transaction-emitter \
+    -p aptos-db-bootstrapper \
+    -p aptos-transaction-emitter \
     "$@"
 
 # Build aptos-node separately
@@ -46,10 +46,10 @@ BINS=(
     aptos-fn-check-client
     db-backup
     db-backup-verify
-    db-bootstrapper
+    aptos-db-bootstrapper
     db-restore
     forge
-    transaction-emitter
+    aptos-transaction-emitter
 )
 
 mkdir dist
@@ -59,4 +59,4 @@ for BIN in "${BINS[@]}"; do
 done
 
 # Build the Aptos Move framework and place it in dist. It can be found afterwards in the current directory.
-(cd dist && cargo run --package framework -- release)
+(cd dist && cargo run --package aptos-framework -- release)

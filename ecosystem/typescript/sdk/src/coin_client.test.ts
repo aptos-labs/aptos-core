@@ -7,7 +7,7 @@ import { AptosAccount } from "./aptos_account";
 import { CoinClient } from "./coin_client";
 
 test(
-  "transferCoins and checkBalance works",
+  "transfer and checkBalance works",
   async () => {
     const client = new AptosClient(NODE_URL);
     const faucetClient = getFaucetClient();
@@ -21,6 +21,15 @@ test(
     await client.waitForTransaction(await coinClient.transfer(alice, bob, 42), { checkSuccess: true });
 
     expect(await coinClient.checkBalance(bob)).toBe(BigInt(42));
+
+    // Test that `createReceiverIfMissing` works.
+    const jemima = new AptosAccount();
+    await client.waitForTransaction(await coinClient.transfer(alice, jemima, 717, { createReceiverIfMissing: true }), {
+      checkSuccess: true,
+    });
+
+    // Check that using a string address instead of an account works with `checkBalance`.
+    expect(await coinClient.checkBalance(jemima.address().hex())).toBe(BigInt(717));
   },
   longTestTimeout,
 );

@@ -15,12 +15,12 @@ use futures::{
 };
 use tokio::time::{Duration, Instant};
 
+use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock};
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, ledger_info::LedgerInfoWithSignatures,
     validator_verifier::ValidatorVerifier,
 };
-use consensus_types::{common::Author, executed_block::ExecutedBlock};
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
@@ -87,7 +87,7 @@ pub struct BufferManager {
     signing_phase_rx: Receiver<SigningResponse>,
 
     commit_msg_tx: NetworkSender,
-    commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
+    commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
 
     // we don't hear back from the persisting phase
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
@@ -118,7 +118,7 @@ impl BufferManager {
         signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
         signing_phase_rx: Receiver<SigningResponse>,
         commit_msg_tx: NetworkSender,
-        commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
+        commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,

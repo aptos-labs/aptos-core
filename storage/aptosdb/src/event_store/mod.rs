@@ -14,12 +14,14 @@ use crate::{
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
     },
 };
-use accumulator::{HashReader, MerkleAccumulator};
 use anyhow::{bail, ensure, format_err, Result};
+use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
 };
+use aptos_schemadb::iterator::SchemaIterator;
+use aptos_schemadb::{schema::ValueCodec, ReadOptions, SchemaBatch, DB};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -28,8 +30,6 @@ use aptos_types::{
     proof::position::Position,
     transaction::Version,
 };
-use schemadb::iterator::SchemaIterator;
-use schemadb::{schema::ValueCodec, ReadOptions, SchemaBatch, DB};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     convert::{TryFrom, TryInto},

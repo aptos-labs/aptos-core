@@ -5,12 +5,9 @@
 
 use crate::counters;
 use anyhow::anyhow;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_logger::prelude::*;
-use aptos_types::{epoch_change::EpochChangeProof, PeerId};
-use async_trait::async_trait;
-use channel::{aptos_channel, message_queues::QueueStyle};
-use consensus_types::{
+use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
@@ -18,7 +15,8 @@ use consensus_types::{
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
-use network::{
+use aptos_logger::prelude::*;
+use aptos_network::{
     application::storage::PeerMetadataStorage,
     constants::NETWORK_CHANNEL_SIZE,
     error::NetworkError,
@@ -32,6 +30,8 @@ use network::{
     },
     ProtocolId,
 };
+use aptos_types::{epoch_change::EpochChangeProof, PeerId};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 

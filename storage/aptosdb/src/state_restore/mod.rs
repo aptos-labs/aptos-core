@@ -9,13 +9,13 @@ use aptos_jellyfish_merkle::{
     restore::JellyfishMerkleRestore,
     IO_POOL, {Key, TreeReader, TreeWriter, Value},
 };
+use aptos_storage_interface::StateSnapshotReceiver;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{proof::SparseMerkleRangeProof, transaction::Version};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::Arc;
-use storage_interface::StateSnapshotReceiver;
 
 #[cfg(test)]
 mod restore_test;

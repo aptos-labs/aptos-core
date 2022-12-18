@@ -100,6 +100,7 @@ impl VerifyCoordinator {
                 StateSnapshotRestoreOpt {
                     manifest_handle: backup.manifest,
                     version: backup.version,
+                    validate_modules: false,
                 },
                 global_opt.clone(),
                 Arc::clone(&self.storage),
@@ -116,6 +117,7 @@ impl VerifyCoordinator {
             txn_manifests,
             None, /* replay_from_version */
             Some(epoch_history),
+            vec![],
         )
         .run()
         .await?;

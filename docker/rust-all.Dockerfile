@@ -37,8 +37,12 @@ ARG PROFILE
 ENV PROFILE ${PROFILE}
 ARG FEATURES
 ENV FEATURES ${FEATURES}
+ARG GIT_CREDENTIALS
+ENV GIT_CREDENTIALS ${GIT_CREDENTIALS}
 
+RUN GIT_CREDENTIALS="$GIT_CREDENTIALS" git config --global credential.helper store && echo "${GIT_CREDENTIALS}" > ~/.git-credentials
 RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target
+RUN rm -rf ~/.git-credentials
 
 ### Validator Image ###
 FROM debian-base AS validator
@@ -65,7 +69,7 @@ RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-
 RUN mkdir -p /opt/aptos/etc
 COPY --link --from=builder /aptos/dist/aptos-node /usr/local/bin/
 COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/
-COPY --link --from=builder /aptos/dist/db-bootstrapper /usr/local/bin/
+COPY --link --from=builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/
 COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/
 
 # Admission control
@@ -143,14 +147,14 @@ COPY --link docker/tools/boto.cfg /etc/boto.cfg
 RUN wget https://storage.googleapis.com/pub/gsutil.tar.gz -O- | tar --gzip --directory /opt --extract && ln -s /opt/gsutil/gsutil /usr/local/bin
 RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl" -O kubectl && chmod +x kubectl
 
-COPY --link --from=builder /aptos/dist/db-bootstrapper /usr/local/bin/db-bootstrapper
+COPY --link --from=builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/aptos-db-bootstrapper
 COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/db-backup
 COPY --link --from=builder /aptos/dist/db-backup-verify /usr/local/bin/db-backup-verify
 COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/db-restore
 COPY --link --from=builder /aptos/dist/aptos /usr/local/bin/aptos
 COPY --link --from=builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
 COPY --link --from=builder /aptos/dist/aptos-fn-check-client /usr/local/bin/aptos-fn-check-client
-COPY --link --from=builder /aptos/dist/transaction-emitter /usr/local/bin/transaction-emitter
+COPY --link --from=builder /aptos/dist/aptos-transaction-emitter /usr/local/bin/aptos-transaction-emitter
 
 ### Get Aptos Move releases for genesis ceremony
 RUN mkdir -p /aptos-framework/move
@@ -279,6 +283,7 @@ FROM validator AS validator-testing
 RUN apt-get update && apt-get install -y \
     # Extra goodies for debugging
     less \
+    git \
     vim \
     nano \
     libjemalloc-dev \
@@ -287,12 +292,30 @@ RUN apt-get update && apt-get install -y \
     ghostscript \
     strace \
     htop \
+    sysstat \
     valgrind \
-    bpfcc-tools \
-    python3-bpfcc \
-    libbpfcc \
-    libbpfcc-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
+
+RUN echo "deb http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+RUN echo "deb-src http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+
+RUN apt-get update && apt-get install -y \
+		arping bison clang-format cmake dh-python \
+		dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
+		libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
+		libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
+		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+RUN git clone https://github.com/aptos-labs/bcc.git
+RUN mkdir bcc/build
+WORKDIR bcc/
+RUN git checkout 5258d14cb35ba08a8757a68386bebc9ea05f00c9
+WORKDIR build/
+RUN cmake ..
+RUN make
+RUN make install
+WORKDIR ..
 
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1

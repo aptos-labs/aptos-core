@@ -354,7 +354,7 @@ impl AccountAuthenticator {
     }
 }
 
-/// A struct that represents an account authentication key. An account's address is the last 16
+/// A struct that represents an account authentication key. An account's address is the last 32
 /// bytes of authentication key used to create it
 #[derive(
     Clone,

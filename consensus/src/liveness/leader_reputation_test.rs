@@ -11,9 +11,11 @@ use crate::liveness::{
     proposer_election::{choose_index, ProposerElection},
 };
 use aptos_bitvec::BitVec;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::{bls12381, HashValue};
 use aptos_infallible::Mutex;
 use aptos_keygen::KeyGen;
+use aptos_storage_interface::{DbReader, Order};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -24,12 +26,10 @@ use aptos_types::{
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use claims::assert_err;
-use consensus_types::common::{Author, Round};
 use itertools::Itertools;
 use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use num_traits::Pow;
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::{DbReader, Order};
 
 /// #### NewBlockEventAggregation tests ####
 

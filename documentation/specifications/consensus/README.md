@@ -258,7 +258,7 @@ Verification
 
 ### SyncInfo
 
-This structure provides verifiable certificates that can allow a validator to catch up to another validator. The max round _r_ of the `highest_quorum_cert` and `highest_timeout_cert` have already completed according to > 2f validators and convince any validator join round _r+1_ immediately if they are currently on a round < _r+1_. A correct implementation ensures that `highest_commit_cert` and `highest_quorum_cert` are on the same chain id. If a validator learns about more recent state upon receiving `SyncInfo`, then it should catch up through [BlockRetrievalRequest](#BlockRetrievalRequest), [EpochRetrievalRequest](#EpochRetrievalRequest) or [state synchronization](../state_sync/README.md).
+This structure provides verifiable certificates that can allow a validator to catch up to another validator. The max round _r_ of the `highest_quorum_cert` and `highest_timeout_cert` have already completed according to > 2f validators and convince any validator join round _r+1_ immediately if they are currently on a round < _r+1_. A correct implementation ensures that `highest_commit_cert` and `highest_quorum_cert` are on the same chain id. If a validator learns about more recent state upon receiving `SyncInfo`, then it should catch up through [BlockRetrievalRequest](#BlockRetrievalRequest), [EpochRetrievalRequest](#EpochRetrievalRequest) or [state synchronization](../../../state-sync/README.md).
 
 ```rust
 pub struct SyncInfo {
@@ -394,7 +394,7 @@ Verification
 
 * ensure `status` == Succeeded
 
-  * TODO: Consider whether `status` == NotEnoughBlocks is also correct behavior. If the number of blocks to catch up exceeds a limit, a validator should rely on [state synchronization](../state_sync/README.md) to catch up.
+  * TODO: Consider whether `status` == NotEnoughBlocks is also correct behavior. If the number of blocks to catch up exceeds a limit, a validator should rely on [state synchronization](../../../state-sync/README.md) to catch up.
 
 * verify each blocks independently
 * verify the blocks form a chain where the first one's id == the `block_id` in BlockRetrievalRequest. `[blocks[i].block_data.quorum_cert.certified_block.id == blocks[i+1].id for i in 0..blocks.len()-1]`
@@ -460,7 +460,7 @@ Verification
 
 Verification
 
-* Same as specified in [SyncInfo](#sync_info_data)
+* Same as specified in [SyncInfo](#syncinfo)
 
 ## Abstracted modules
 

@@ -62,11 +62,11 @@ use aptos_config::config::{
 };
 
 use aptos_crypto::hash::HashValue;
+use aptos_db_indexer::Indexer;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_types::proof::TransactionAccumulatorSummary;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -77,12 +77,13 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
-        TransactionInfoListWithProof,
+        TransactionAccumulatorSummary, TransactionInfoListWithProof,
     },
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
+        state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
     },
@@ -93,11 +94,9 @@ use aptos_types::{
     },
 };
 use aptos_vm::data_cache::AsMoveResolver;
-use aptosdb_indexer::Indexer;
 use itertools::zip_eq;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
-use schemadb::{SchemaBatch, DB};
 use std::{
     collections::HashMap,
     iter::Iterator,
@@ -108,13 +107,16 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::pruner::{
-    ledger_pruner_manager::LedgerPrunerManager, ledger_store::ledger_store_pruner::LedgerPruner,
-    state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
+use crate::{
+    pruner::{
+        ledger_pruner_manager::LedgerPrunerManager,
+        ledger_store::ledger_store_pruner::LedgerPruner, state_pruner_manager::StatePrunerManager,
+        state_store::StateMerklePruner,
+    },
+    stale_node_index::StaleNodeIndexSchema,
+    stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
 };
-use crate::stale_node_index::StaleNodeIndexSchema;
-use crate::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema;
-use storage_interface::{
+use aptos_storage_interface::{
     state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
@@ -655,6 +657,8 @@ impl AptosDB {
         let start = Instant::now();
         let ledger_db_path = path.as_ref().join(LEDGER_DB_NAME);
         let state_merkle_db_path = path.as_ref().join(STATE_MERKLE_DB_NAME);
+        std::fs::remove_dir_all(&ledger_db_path).unwrap_or(());
+        std::fs::remove_dir_all(&state_merkle_db_path).unwrap_or(());
         self.ledger_db.create_checkpoint(&ledger_db_path)?;
         self.state_merkle_db
             .create_checkpoint(&state_merkle_db_path)?;

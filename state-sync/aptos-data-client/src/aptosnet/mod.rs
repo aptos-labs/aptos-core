@@ -20,6 +20,21 @@ use aptos_config::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_network::{
+    application::interface::NetworkInterface,
+    protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
+};
+use aptos_storage_service_client::StorageServiceClient;
+use aptos_storage_service_types::requests::{
+    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+    NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+    StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
+    TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+};
+use aptos_storage_service_types::responses::{
+    StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof,
+};
+use aptos_storage_service_types::Epoch;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     epoch_change::EpochChangeProof,
@@ -29,20 +44,8 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use futures::StreamExt;
-use network::{
-    application::interface::NetworkInterface,
-    protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
-};
 use rand::seq::SliceRandom;
 use std::{convert::TryFrom, fmt, sync::Arc, time::Duration};
-use storage_service_client::StorageServiceClient;
-use storage_service_types::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-    NewTransactionsWithProofRequest, StateValuesWithProofRequest, StorageServiceRequest,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
-};
-use storage_service_types::responses::{StorageServerSummary, StorageServiceResponse};
-use storage_service_types::Epoch;
 use tokio::{runtime::Handle, task::JoinHandle};
 
 mod logging;
@@ -126,6 +129,11 @@ impl AptosNetDataClient {
     /// Returns true iff compression should be requested
     fn use_compression(&self) -> bool {
         self.data_client_config.use_compression
+    }
+
+    /// Returns the max number of output reductions as defined by the config
+    fn get_max_num_output_reductions(&self) -> u64 {
+        self.data_client_config.max_num_output_reductions
     }
 
     /// Generates a new response id
@@ -296,6 +304,7 @@ impl AptosNetDataClient {
     async fn send_request_and_decode<T, E>(
         &self,
         request: StorageServiceRequest,
+        request_timeout_ms: u64,
     ) -> Result<Response<T>>
     where
         T: TryFrom<StorageServiceResponse, Error = E>,
@@ -311,7 +320,8 @@ impl AptosNetDataClient {
             error
         })?;
         let _timer = start_request_timer(&metrics::REQUEST_LATENCIES, &request.get_label(), peer);
-        self.send_request_to_peer_and_decode(peer, request).await
+        self.send_request_to_peer_and_decode(peer, request, request_timeout_ms)
+            .await
     }
 
     /// Sends a request to a specific peer and decodes the response
@@ -319,12 +329,15 @@ impl AptosNetDataClient {
         &self,
         peer: PeerNetworkId,
         request: StorageServiceRequest,
+        request_timeout_ms: u64,
     ) -> Result<Response<T>>
     where
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
     {
-        let response = self.send_request_to_peer(peer, request.clone()).await?;
+        let response = self
+            .send_request_to_peer(peer, request.clone(), request_timeout_ms)
+            .await?;
 
         let (context, storage_response) = response.into_parts();
 
@@ -359,9 +372,9 @@ impl AptosNetDataClient {
         &self,
         peer: PeerNetworkId,
         request: StorageServiceRequest,
+        request_timeout_ms: u64,
     ) -> Result<Response<StorageServiceResponse>, Error> {
         let id = self.next_response_id();
-
         trace!(
             (LogSchema::new(LogEntry::StorageServiceRequest)
                 .event(LogEvent::SendRequest)
@@ -370,18 +383,17 @@ impl AptosNetDataClient {
                 .peer(&peer)
                 .request_data(&request))
         );
-
         increment_request_counter(&metrics::SENT_REQUESTS, &request.get_label(), peer);
 
+        // Send the request and process the result
         let result = self
             .network_client
             .send_request(
                 peer,
                 request.clone(),
-                Duration::from_millis(self.data_client_config.response_timeout_ms),
+                Duration::from_millis(request_timeout_ms),
             )
             .await;
-
         match result {
             Ok(response) => {
                 trace!(
@@ -421,12 +433,12 @@ impl AptosNetDataClient {
                 // data client errors. Also categorize the error type for scoring
                 // purposes.
                 let client_error = match error {
-                    storage_service_client::Error::RpcError(err) => match err {
+                    aptos_storage_service_client::Error::RpcError(err) => match err {
                         RpcError::NotConnected(_) => Error::DataIsUnavailable(err.to_string()),
                         RpcError::TimedOut => Error::TimeoutWaitingForResponse(err.to_string()),
                         _ => Error::UnexpectedErrorEncountered(err.to_string()),
                     },
-                    storage_service_client::Error::StorageServiceError(err) => {
+                    aptos_storage_service_client::Error::StorageServiceError(err) => {
                         Error::UnexpectedErrorEncountered(err.to_string())
                     }
                 };
@@ -464,6 +476,22 @@ impl AptosNetDataClient {
             .write()
             .update_score_error(peer, error_type);
     }
+
+    /// Creates a storage service request using the given data request
+    /// and sends it across the network
+    async fn create_and_send_storage_request<T, E>(
+        &self,
+        request_timeout_ms: u64,
+        data_request: DataRequest,
+    ) -> Result<Response<T>>
+    where
+        T: TryFrom<StorageServiceResponse, Error = E>,
+        E: Into<Error>,
+    {
+        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
+        self.send_request_and_decode(storage_request, request_timeout_ms)
+            .await
+    }
 }
 
 #[async_trait]
@@ -476,14 +504,15 @@ impl AptosDataClient for AptosNetDataClient {
         &self,
         start_epoch: Epoch,
         expected_end_epoch: Epoch,
+        request_timeout_ms: u64,
     ) -> Result<Response<Vec<LedgerInfoWithSignatures>>> {
         let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
             start_epoch,
             expected_end_epoch,
         });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        let response: Response<EpochChangeProof> =
-            self.send_request_and_decode(storage_request).await?;
+        let response: Response<EpochChangeProof> = self
+            .create_and_send_storage_request(request_timeout_ms, data_request)
+            .await?;
         Ok(response.map(|epoch_change| epoch_change.ledger_info_with_sigs))
     }
 
@@ -491,14 +520,15 @@ impl AptosDataClient for AptosNetDataClient {
         &self,
         known_version: Version,
         known_epoch: Epoch,
+        request_timeout_ms: u64,
     ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>> {
         let data_request =
             DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
                 known_version,
                 known_epoch,
             });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request).await
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
     }
 
     async fn get_new_transactions_with_proof(
@@ -506,6 +536,7 @@ impl AptosDataClient for AptosNetDataClient {
         known_version: Version,
         known_epoch: Epoch,
         include_events: bool,
+        request_timeout_ms: u64,
     ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>> {
         let data_request =
             DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
@@ -513,14 +544,37 @@ impl AptosDataClient for AptosNetDataClient {
                 known_epoch,
                 include_events,
             });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request).await
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
     }
 
-    async fn get_number_of_states(&self, version: Version) -> Result<Response<u64>> {
+    async fn get_new_transactions_or_outputs_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>> {
+        let data_request = DataRequest::GetNewTransactionsOrOutputsWithProof(
+            NewTransactionsOrOutputsWithProofRequest {
+                known_version,
+                known_epoch,
+                include_events,
+                max_num_output_reductions: self.get_max_num_output_reductions(),
+            },
+        );
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
+    }
+
+    async fn get_number_of_states(
+        &self,
+        version: Version,
+        request_timeout_ms: u64,
+    ) -> Result<Response<u64>> {
         let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request).await
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
     }
 
     async fn get_state_values_with_proof(
@@ -528,14 +582,15 @@ impl AptosDataClient for AptosNetDataClient {
         version: u64,
         start_index: u64,
         end_index: u64,
+        request_timeout_ms: u64,
     ) -> Result<Response<StateValueChunkWithProof>> {
         let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
             version,
             start_index,
             end_index,
         });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request).await
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
     }
 
     async fn get_transaction_outputs_with_proof(
@@ -543,6 +598,7 @@ impl AptosDataClient for AptosNetDataClient {
         proof_version: Version,
         start_version: Version,
         end_version: Version,
+        request_timeout_ms: u64,
     ) -> Result<Response<TransactionOutputListWithProof>> {
         let data_request =
             DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
@@ -550,8 +606,8 @@ impl AptosDataClient for AptosNetDataClient {
                 start_version,
                 end_version,
             });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request).await
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
     }
 
     async fn get_transactions_with_proof(
@@ -560,6 +616,7 @@ impl AptosDataClient for AptosNetDataClient {
         start_version: Version,
         end_version: Version,
         include_events: bool,
+        request_timeout_ms: u64,
     ) -> Result<Response<TransactionListWithProof>> {
         let data_request = DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
             proof_version,
@@ -567,8 +624,28 @@ impl AptosDataClient for AptosNetDataClient {
             end_version,
             include_events,
         });
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
-        self.send_request_and_decode(storage_request).await
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
+    }
+
+    async fn get_transactions_or_outputs_with_proof(
+        &self,
+        proof_version: Version,
+        start_version: Version,
+        end_version: Version,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> Result<Response<TransactionOrOutputListWithProof>> {
+        let data_request =
+            DataRequest::GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
+                proof_version,
+                start_version,
+                end_version,
+                include_events,
+                max_num_output_reductions: self.get_max_num_output_reductions(),
+            });
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
     }
 }
 
@@ -763,6 +840,7 @@ pub(crate) fn poll_peer(
         let data_request = DataRequest::GetStorageServerSummary;
         let storage_request =
             StorageServiceRequest::new(data_request, data_client.use_compression());
+        let request_timeout = data_client.data_client_config.response_timeout_ms;
 
         // Start the peer polling timer
         let timer = start_request_timer(
@@ -773,7 +851,7 @@ pub(crate) fn poll_peer(
 
         // Fetch the storage summary for the peer and stop the timer
         let result: Result<StorageServerSummary> = data_client
-            .send_request_to_peer_and_decode(peer, storage_request)
+            .send_request_to_peer_and_decode(peer, storage_request, request_timeout)
             .await
             .map(Response::into_payload);
         drop(timer);

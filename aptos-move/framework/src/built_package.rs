@@ -2,20 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::docgen::DocgenOptions;
-use crate::error_map::generate_error_map;
 use crate::natives::code::{
     ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
 };
-use crate::{zip_metadata, zip_metadata_str, RuntimeModuleMetadata, APTOS_METADATA_KEY};
-use aptos_module_verifier::module_init::verify_module_init_function;
+use crate::{
+    extended_checks, zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY_V1,
+};
+use anyhow::bail;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::EntryABI;
 use clap::Parser;
+use codespan_reporting::diagnostic::Severity;
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use itertools::Itertools;
 use move_binary_format::CompiledModule;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_core_types::errmap::ErrorMapping;
+use move_core_types::language_storage::ModuleId;
 use move_core_types::metadata::Metadata;
 use move_model::model::GlobalEnv;
 use move_package::compilation::compiled_package::CompiledPackage;
@@ -26,6 +29,7 @@ use move_package::source_package::manifest_parser::{
 use move_package::{BuildConfig, ModelConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::stderr;
 use std::path::{Path, PathBuf};
 
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
@@ -51,6 +55,8 @@ pub struct BuildOptions {
     pub named_addresses: BTreeMap<String, AccountAddress>,
     #[clap(skip)]
     pub docgen_options: Option<DocgenOptions>,
+    #[clap(long)]
+    pub skip_fetch_latest_git_deps: bool,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -66,6 +72,9 @@ impl Default for BuildOptions {
             install_dir: None,
             named_addresses: Default::default(),
             docgen_options: None,
+            // This is false by default, because it could accidentally pull new dependencies
+            // while in a test (and cause some havoc)
+            skip_fetch_latest_git_deps: false,
         }
     }
 }
@@ -120,58 +129,59 @@ impl BuiltPackage {
             test_mode: false,
             force_recompilation: false,
             fetch_deps_only: false,
-            skip_fetch_latest_git_deps: true,
+            skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
         };
         eprintln!("Compiling, may take a little while to download git dependencies...");
-        let mut package =
-            build_config.compile_package_no_exit(&package_path, &mut std::io::stderr())?;
-        for module in package.root_modules_map().iter_modules().iter() {
-            verify_module_init_function(module)?;
-        }
+        let mut package = build_config.compile_package_no_exit(&package_path, &mut stderr())?;
 
-        let error_map = if options.with_error_map || options.with_docs {
-            let model = build_model(
-                package_path.as_path(),
-                options.named_addresses.clone(),
-                None,
-            )?;
-            if options.with_docs {
-                let docgen = if let Some(opts) = options.docgen_options.clone() {
-                    opts
-                } else {
-                    DocgenOptions::default()
-                };
-                let dep_paths = package
-                    .deps_compiled_units
-                    .iter()
-                    .map(|(_, u)| {
-                        u.source_path
-                            .parent()
-                            .unwrap()
-                            .parent()
-                            .unwrap()
-                            .join("doc")
-                            .display()
-                            .to_string()
-                    })
-                    .unique()
-                    .collect::<Vec<_>>();
-                docgen.run(package_path.display().to_string(), dep_paths, &model)?
+        // Build the Move model for extra processing and run extended checks as well derive
+        // runtime metadata
+        let model = &build_model(
+            package_path.as_path(),
+            options.named_addresses.clone(),
+            None,
+        )?;
+        let runtime_metadata = extended_checks::run_extended_checks(model);
+        if model.diag_count(Severity::Warning) > 0 {
+            let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+            model.report_diag(&mut error_writer, Severity::Warning);
+            if model.has_errors() {
+                bail!("extended checks failed")
             }
-            Some(generate_error_map(&model))
-        } else {
-            None
-        };
-
-        if let Some(map) = &error_map {
-            inject_module_metadata(
-                package_path
-                    .join(CompiledPackageLayout::Root.path())
-                    .join(package.compiled_package_info.package_name.as_str()),
-                &mut package,
-                map,
-            )?
         }
+        inject_runtime_metadata(
+            package_path
+                .join(CompiledPackageLayout::Root.path())
+                .join(package.compiled_package_info.package_name.as_str()),
+            &mut package,
+            runtime_metadata,
+        )?;
+
+        // If enabled generate docs.
+        if options.with_docs {
+            let docgen = if let Some(opts) = options.docgen_options.clone() {
+                opts
+            } else {
+                DocgenOptions::default()
+            };
+            let dep_paths = package
+                .deps_compiled_units
+                .iter()
+                .map(|(_, u)| {
+                    u.source_path
+                        .parent()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .join("doc")
+                        .display()
+                        .to_string()
+                })
+                .unique()
+                .collect::<Vec<_>>();
+            docgen.run(package_path.display().to_string(), dep_paths, model)?
+        }
+
         Ok(Self {
             options,
             package_path,
@@ -320,25 +330,20 @@ fn extract_custom_fields(toml: &str) -> anyhow::Result<BTreeMap<String, String>>
         .collect())
 }
 
-fn inject_module_metadata(
+fn inject_runtime_metadata(
     package_path: PathBuf,
     pack: &mut CompiledPackage,
-    error_map: &ErrorMapping,
+    metadata: BTreeMap<ModuleId, RuntimeModuleMetadataV1>,
 ) -> anyhow::Result<()> {
     for unit_with_source in pack.root_compiled_units.iter_mut() {
         match &mut unit_with_source.unit {
             CompiledUnit::Module(named_module) => {
-                if let Some(module_map) = error_map
-                    .module_error_maps
-                    .get(&named_module.module.self_id())
-                {
-                    if !module_map.is_empty() {
-                        let serialized_metadata = bcs::to_bytes(&RuntimeModuleMetadata {
-                            error_map: module_map.clone(),
-                        })
-                        .expect("BCS for RuntimeModuleMetadata");
+                if let Some(module_metadata) = metadata.get(&named_module.module.self_id()) {
+                    if !module_metadata.is_empty() {
+                        let serialized_metadata =
+                            bcs::to_bytes(&module_metadata).expect("BCS for RuntimeModuleMetadata");
                         named_module.module.metadata.push(Metadata {
-                            key: APTOS_METADATA_KEY.clone(),
+                            key: APTOS_METADATA_KEY_V1.clone(),
                             value: serialized_metadata,
                         });
 

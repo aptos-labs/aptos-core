@@ -28,6 +28,8 @@ spec aptos_framework::storage_gas {
 
     spec module {
         use aptos_std::chain_status;
+        pragma verify = true;
+        pragma aborts_if_is_strict;
         // After genesis, `StateStorageUsage` and `GasParameter` exist.
         invariant [suspendable] chain_status::is_operating() ==> exists<StorageGasConfig>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<StorageGas>(@aptos_framework);
@@ -38,16 +40,61 @@ spec aptos_framework::storage_gas {
     // Function specifications
     // -----------------------
 
-    spec validate_points {
-        pragma opaque;
-        aborts_if [abstract] exists i in 0..len(points) - 1: (
-            points[i].x >= points[i + 1].x || points[i].y > points[i + 1].y
-        );
-        aborts_if [abstract] len(points) > 0 && points[0].x == 0;
-        aborts_if [abstract]  len(points) > 0 && points[len(points) - 1].x == BASIS_POINT_DENOMINATION;
+    spec base_8192_exponential_curve(min_gas: u64, max_gas: u64): GasCurve {
+        include NewGasCurveAbortsIf;
     }
 
-    spec calculate_gas {
+    spec new_point(x: u64, y: u64): Point {
+        aborts_if x > BASIS_POINT_DENOMINATION || y > BASIS_POINT_DENOMINATION;
+
+        ensures result.x == x;
+        ensures result.y == y;
+    }
+
+    /// A non decreasing curve must ensure that next is greater than cur.
+    spec new_gas_curve(min_gas: u64, max_gas: u64, points: vector<Point>): GasCurve {
+        include NewGasCurveAbortsIf;
+        include ValidatePointsAbortsIf;
+    }
+
+    spec new_usage_gas_config(target_usage: u64, read_curve: GasCurve, create_curve: GasCurve, write_curve: GasCurve): UsageGasConfig {
+        aborts_if target_usage == 0;
+        aborts_if target_usage > MAX_U64 / BASIS_POINT_DENOMINATION;
+    }
+
+    spec new_storage_gas_config(item_config: UsageGasConfig, byte_config: UsageGasConfig): StorageGasConfig {
+        aborts_if false;
+
+        ensures result.item_config == item_config;
+        ensures result.byte_config == byte_config;
+    }
+
+    /// Signer address must be @aptos_framework and StorageGasConfig exists.
+    spec set_config(aptos_framework: &signer, config: StorageGasConfig) {
+        include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        aborts_if !exists<StorageGasConfig>(@aptos_framework);
+    }
+
+    /// Signer address must be @aptos_framework.
+    /// Address @aptos_framework does not exist StorageGasConfig and StorageGas before the function call is restricted
+    /// and exists after the function is executed.
+    spec initialize(aptos_framework: &signer) {
+        include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        aborts_if exists<StorageGasConfig>(@aptos_framework);
+        aborts_if exists<StorageGas>(@aptos_framework);
+
+        ensures exists<StorageGasConfig>(@aptos_framework);
+        ensures exists<StorageGas>(@aptos_framework);
+    }
+
+    /// A non decreasing curve must ensure that next is greater than cur.
+    spec validate_points(points: &vector<Point>) {
+        pragma aborts_if_is_strict = false;
+        pragma opaque;
+        include ValidatePointsAbortsIf;
+    }
+
+    spec calculate_gas(max_usage: u64, current_usage: u64, curve: &GasCurve): u64 {
         pragma opaque;
         requires max_usage > 0;
         requires max_usage <= MAX_U64 / BASIS_POINT_DENOMINATION;
@@ -55,20 +102,20 @@ spec aptos_framework::storage_gas {
         ensures [abstract] result == spec_calculate_gas(max_usage, current_usage, curve);
     }
 
-    spec interpolate {
+    spec interpolate(x0: u64, x1: u64, y0: u64, y1: u64, x: u64): u64 {
         pragma opaque;
-        requires x0 < x1;
-        requires y0 <= y1;
-        requires x0 <= x && x <= x1;
-        requires x1 * y1 <= MAX_U64;
+        pragma intrinsic;
+
         aborts_if false;
-        ensures y0 <= result && result <= y1;
     }
 
+    /// Address @aptos_framework must exist StorageGasConfig and StorageGas and StateStorageUsage.
     spec on_reconfig {
         use aptos_std::chain_status;
         requires chain_status::is_operating();
-        aborts_if false;
+        aborts_if !exists<StorageGasConfig>(@aptos_framework);
+        aborts_if !exists<StorageGas>(@aptos_framework);
+        aborts_if !exists<state_storage::StateStorageUsage>(@aptos_framework);
     }
 
 
@@ -77,4 +124,23 @@ spec aptos_framework::storage_gas {
     // ---------------------------------
 
     spec fun spec_calculate_gas(max_usage: u64, current_usage: u64, curve: GasCurve): u64;
+
+    spec schema NewGasCurveAbortsIf {
+        min_gas: u64;
+        max_gas: u64;
+
+        aborts_if max_gas < min_gas;
+        aborts_if max_gas > MAX_U64 / BASIS_POINT_DENOMINATION;
+    }
+
+    /// A non decreasing curve must ensure that next is greater than cur.
+    spec schema ValidatePointsAbortsIf {
+        points: vector<Point>;
+
+        aborts_if exists i in 0..len(points) - 1: (
+            points[i].x >= points[i + 1].x || points[i].y > points[i + 1].y
+        );
+        aborts_if len(points) > 0 && points[0].x == 0;
+        aborts_if len(points) > 0 && points[len(points) - 1].x == BASIS_POINT_DENOMINATION;
+    }
 }

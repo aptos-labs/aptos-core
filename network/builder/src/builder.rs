@@ -19,12 +19,10 @@ use aptos_config::{
     network_id::NetworkContext,
 };
 use aptos_crypto::x25519::PublicKey;
+use aptos_event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, network_address::NetworkAddress};
-use event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
-use network::{
+use aptos_network::{
     application::storage::PeerMetadataStorage,
     connectivity_manager::{builder::ConnectivityManagerBuilder, ConnectivityRequest},
     constants::MAX_MESSAGE_SIZE,
@@ -38,9 +36,11 @@ use network::{
         network::{AppConfig, NewNetworkEvents, NewNetworkSender},
     },
 };
+use aptos_time_service::TimeService;
+use aptos_types::{chain_id::ChainId, network_address::NetworkAddress};
 
-use netcore::transport::tcp::TCPBufferCfg;
-use network_discovery::DiscoveryChangeListener;
+use aptos_netcore::transport::tcp::TCPBufferCfg;
+use aptos_network_discovery::DiscoveryChangeListener;
 use std::{
     clone::Clone,
     collections::{HashMap, HashSet},
@@ -327,7 +327,7 @@ impl NetworkBuilder {
         self.network_context
     }
 
-    pub fn conn_mgr_reqs_tx(&self) -> Option<channel::Sender<ConnectivityRequest>> {
+    pub fn conn_mgr_reqs_tx(&self) -> Option<aptos_channels::Sender<ConnectivityRequest>> {
         self.connectivity_manager_builder
             .as_ref()
             .map(|conn_mgr_builder| conn_mgr_builder.conn_mgr_reqs_tx())

@@ -13,21 +13,21 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
+use aptos_storage_interface::{DbReader, Order};
 use aptos_types::{
     account_config::{new_block_event_key, NewBlockEvent},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
 };
-use consensus_types::common::{Author, Round};
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
     sync::Arc,
 };
-use storage_interface::{DbReader, Order};
 
 /// Interface to query committed NewBlockEvent.
 pub trait MetadataBackend: Send + Sync {

@@ -3,19 +3,19 @@
 
 use crate::{
     block_storage::BlockReader, counters::CHAIN_HEALTH_BACKOFF_TRIGGERED,
-    state_replication::PayloadManager, util::time_service::TimeService,
+    state_replication::PayloadClient, util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::ChainHealthBackoffValues;
-use aptos_logger::{error, sample, sample::SampleRate, warn};
-use consensus_types::{
+use aptos_consensus_types::{
     block::Block,
     block_data::BlockData,
     common::{Author, Round},
     quorum_cert::QuorumCert,
 };
+use aptos_logger::{error, sample, sample::SampleRate, warn};
 
-use consensus_types::common::{Payload, PayloadFilter};
+use aptos_consensus_types::common::{Payload, PayloadFilter};
 use futures::future::BoxFuture;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
@@ -43,6 +43,7 @@ impl ChainHealthBackoffConfig {
         Self { backoffs }
     }
 
+    #[allow(dead_code)]
     pub fn new_no_backoff() -> Self {
         Self {
             backoffs: BTreeMap::new(),
@@ -101,7 +102,7 @@ pub struct ProposalGenerator {
     // proposed block.
     block_store: Arc<dyn BlockReader + Send + Sync>,
     // ProofOfStore manager is delivering the ProofOfStores.
-    payload_manager: Arc<dyn PayloadManager>,
+    payload_client: Arc<dyn PayloadClient>,
     // Transaction manager is delivering the transactions.
     // Time service to generate block timestamps
     time_service: Arc<dyn TimeService>,
@@ -116,29 +117,32 @@ pub struct ProposalGenerator {
 
     // Last round that a proposal was generated
     last_round_generated: Round,
+    quorum_store_enabled: bool,
 }
 
 impl ProposalGenerator {
     pub fn new(
         author: Author,
         block_store: Arc<dyn BlockReader + Send + Sync>,
-        payload_manager: Arc<dyn PayloadManager>,
+        payload_client: Arc<dyn PayloadClient>,
         time_service: Arc<dyn TimeService>,
         max_block_txns: u64,
         max_block_bytes: u64,
         max_failed_authors_to_store: usize,
         chain_health_backoff_config: ChainHealthBackoffConfig,
+        quorum_store_enabled: bool,
     ) -> Self {
         Self {
             author,
             block_store,
-            payload_manager,
+            payload_client,
             time_service,
             max_block_txns,
             max_block_bytes,
             max_failed_authors_to_store,
             chain_health_backoff_config,
             last_round_generated: 0,
+            quorum_store_enabled,
         }
     }
 
@@ -194,7 +198,10 @@ impl ProposalGenerator {
         let (payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
             // after reconfiguration until it's committed
-            (Payload::empty(), hqc.certified_block().timestamp_usecs())
+            (
+                Payload::empty(self.quorum_store_enabled),
+                hqc.certified_block().timestamp_usecs(),
+            )
         } else {
             // One needs to hold the blocks with the references to the payloads while get_block is
             // being executed: pending blocks vector keeps all the pending ancestors of the extended branch.
@@ -246,8 +253,9 @@ impl ProposalGenerator {
             };
 
             let payload = self
-                .payload_manager
+                .payload_client
                 .pull_payload(
+                    round,
                     max_block_txns,
                     max_block_bytes,
                     payload_filter,

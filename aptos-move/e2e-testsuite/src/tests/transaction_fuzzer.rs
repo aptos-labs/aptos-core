@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use cached_packages::aptos_stdlib::EntryFunctionCall;
-use language_e2e_tests::{account::Account, executor::FakeExecutor};
+use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
+use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use proptest::{collection::vec, prelude::*};
 
 proptest! {

@@ -22,6 +22,9 @@ import {
   TransactionPayloadScript,
   TransactionPayloadEntryFunction,
   TypeTagStruct,
+  TransactionArgumentU16,
+  TransactionArgumentU32,
+  TransactionArgumentU256,
 } from "../aptos_types";
 
 const ADDRESS_1 = "0x1222";
@@ -230,5 +233,33 @@ test("serialize script payload with one type arg and two function args", () => {
 
   expect(hexSignedTxn(signedTxn)).toBe(
     "000000000000000000000000000000000000000000000000000000000a550c1800000000000000000026a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102010700000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e000204080100000000000000030000000000000000000000000000000000000000000000000000000000000001d0070000000000000000000000000000ffffffffffffffff040020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a492004055c7499795ea68d7acfa64a58f19efa2ba3b977fa58ae93ae8c0732c0f6d6dd084d92bbe4edc2a0d687031cae90da117abfac16ebd902e764bdc38a2154a2102",
+  );
+});
+
+test("serialize script payload with new integer types (u16, u32, u256) as args", () => {
+  const argU16 = new TransactionArgumentU16(0xf111);
+  const argU32 = new TransactionArgumentU32(0xf1111111);
+  const argU256 = new TransactionArgumentU256(
+    BigInt("0xf111111111111111111111111111111111111111111111111111111111111111"),
+  );
+
+  const script = hexToBytes("");
+
+  const scriptPayload = new TransactionPayloadScript(new Script(script, [], [argU16, argU32, argU256]));
+
+  const rawTxn = new RawTransaction(
+    AccountAddress.fromHex(ADDRESS_3),
+    BigInt(0),
+    scriptPayload,
+    BigInt(2000),
+    BigInt(0),
+    BigInt(TXN_EXPIRE),
+    new ChainId(4),
+  );
+
+  const signedTxn = sign(rawTxn);
+
+  expect(hexSignedTxn(signedTxn)).toBe(
+    "000000000000000000000000000000000000000000000000000000000a550c180000000000000000000000030611f107111111f10811111111111111111111111111111111111111111111111111111111111111f1d0070000000000000000000000000000ffffffffffffffff040020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200409402b773f66cf5444efe4de38a026cf9b34e0327798ea01f0695db8e8e0888e20387b08f504b620dcffbc382e3ac141c0ec9a820c5f58b5da2eec589a9e86b0b",
   );
 });

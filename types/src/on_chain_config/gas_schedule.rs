@@ -26,6 +26,19 @@ pub struct StorageGasSchedule {
     pub per_byte_write: u64,
 }
 
+impl StorageGasSchedule {
+    pub fn zeros() -> Self {
+        Self {
+            per_item_read: 0,
+            per_item_create: 0,
+            per_item_write: 0,
+            per_byte_read: 0,
+            per_byte_create: 0,
+            per_byte_write: 0,
+        }
+    }
+}
+
 impl GasSchedule {
     pub fn to_btree_map(self) -> BTreeMap<String, u64> {
         // TODO: what if the gas schedule contains duplicated entries?

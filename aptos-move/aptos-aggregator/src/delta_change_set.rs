@@ -352,6 +352,7 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_state_view::TStateView;
     use aptos_types::state_store::state_storage_usage::StateStorageUsage;
     use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};
     use once_cell::sync::Lazy;
@@ -537,7 +538,9 @@ mod tests {
         data: HashMap<StateKey, Vec<u8>>,
     }
 
-    impl StateView for FakeView {
+    impl TStateView for FakeView {
+        type Key = StateKey;
+
         fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
             Ok(self.data.get(state_key).cloned())
         }

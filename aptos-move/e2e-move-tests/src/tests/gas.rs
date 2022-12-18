@@ -3,9 +3,9 @@
 
 use crate::tests::common::test_dir_path;
 use crate::MoveHarness;
+use aptos_cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
-use cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
 
 /// Run with `cargo test test_gas -- --nocapture` to see output.
 #[test]
@@ -167,16 +167,77 @@ fn test_gas() {
             aptos_token_sdk_builder::token_mutate_token_properties(
                 account_1_address,
                 account_1_address,
-                collection_name,
-                token_name,
+                collection_name.clone(),
+                token_name.clone(),
                 0,
                 1,
-                vec![],
-                vec![],
-                vec![],
+                vec!["age".as_bytes().to_vec()],
+                vec!["4".as_bytes().to_vec()],
+                vec!["int".as_bytes().to_vec()],
             ),
         ),
     );
+    print_gas_cost(
+        "MutateToken2ndTime",
+        harness.evaluate_gas(
+            account_1,
+            aptos_token_sdk_builder::token_mutate_token_properties(
+                account_1_address,
+                account_1_address,
+                collection_name.clone(),
+                token_name.clone(),
+                1,
+                1,
+                vec!["age".as_bytes().to_vec()],
+                vec!["5".as_bytes().to_vec()],
+                vec!["int".as_bytes().to_vec()],
+            ),
+        ),
+    );
+
+    let mut keys = vec![];
+    let mut vals = vec![];
+    let mut typs = vec![];
+    for i in 0..10 {
+        keys.push(format!("attr_{}", i).as_bytes().to_vec());
+        vals.push(format!("{}", i).as_bytes().to_vec());
+        typs.push("u64".as_bytes().to_vec());
+    }
+    print_gas_cost(
+        "MutateTokenAdd10NewProperties",
+        harness.evaluate_gas(
+            account_1,
+            aptos_token_sdk_builder::token_mutate_token_properties(
+                account_1_address,
+                account_1_address,
+                collection_name.clone(),
+                token_name.clone(),
+                1,
+                1,
+                keys.clone(),
+                vals.clone(),
+                typs.clone(),
+            ),
+        ),
+    );
+    print_gas_cost(
+        "MutateTokenMutate10ExistingProperties",
+        harness.evaluate_gas(
+            account_1,
+            aptos_token_sdk_builder::token_mutate_token_properties(
+                account_1_address,
+                account_1_address,
+                collection_name,
+                token_name,
+                1,
+                1,
+                keys,
+                vals,
+                typs,
+            ),
+        ),
+    );
+
     let publisher = &harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     print_gas_cost(
         "PublishSmall",

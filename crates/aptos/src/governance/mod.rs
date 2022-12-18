@@ -10,7 +10,9 @@ use crate::common::utils::prompt_yes_with_override;
 use crate::common::utils::read_from_file;
 use crate::move_tool::{FrameworkPackageArgs, IncludedArtifacts};
 use crate::{CliCommand, CliResult};
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::HashValue;
+use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::{Address, HexEncodedBytes, U128, U64};
 use aptos_rest_client::{Client, Transaction};
@@ -24,9 +26,7 @@ use aptos_types::{
     transaction::{Script, TransactionPayload},
 };
 use async_trait::async_trait;
-use cached_packages::aptos_stdlib;
 use clap::Parser;
-use framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use move_core_types::transaction_argument::TransactionArgument;
 use reqwest::Url;
 use serde::Deserialize;
@@ -587,15 +587,22 @@ fn compile_in_temp_dir(
     })?;
 
     // Compile the script
-    compile_script(package_dir)
+    compile_script(
+        framework_package_args.skip_fetch_latest_git_deps,
+        package_dir,
+    )
 }
 
-fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
+fn compile_script(
+    skip_fetch_latest_git_deps: bool,
+    package_dir: &Path,
+) -> CliTypedResult<(Vec<u8>, HashValue)> {
     let build_options = BuildOptions {
         with_srcs: false,
         with_abis: false,
         with_source_maps: false,
         with_error_map: false,
+        skip_fetch_latest_git_deps,
         ..BuildOptions::default()
     };
 
@@ -737,6 +744,9 @@ pub struct GenerateUpgradeProposal {
     #[clap(long)]
     pub(crate) testnet: bool,
 
+    #[clap(long, default_value = "")]
+    pub(crate) next_execution_hash: String,
+
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
 }
@@ -754,16 +764,26 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             included_artifacts,
             output,
             testnet,
+            next_execution_hash,
         } = self;
         let package_path = move_options.get_package_path()?;
-        let options = included_artifacts.build_options(move_options.named_addresses());
+        let options = included_artifacts.build_options(
+            move_options.skip_fetch_latest_git_deps,
+            move_options.named_addresses(),
+        );
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
-        if testnet {
+
+        // If we're generating a single-step proposal on testnet
+        if testnet && next_execution_hash.is_empty() {
             release.generate_script_proposal_testnet(account, output)?;
-        } else {
+            // If we're generating a single-step proposal on mainnet
+        } else if next_execution_hash.is_empty() {
             release.generate_script_proposal(account, output)?;
-        }
+            // If we're generating a multi-step proposal
+        } else {
+            release.generate_script_proposal_multi_step(account, output, next_execution_hash)?;
+        };
         Ok(())
     }
 }

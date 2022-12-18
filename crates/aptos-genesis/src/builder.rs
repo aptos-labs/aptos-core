@@ -22,6 +22,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey,
 };
+use aptos_framework::ReleaseBundle;
 use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -30,7 +31,7 @@ use aptos_types::{
     transaction::Transaction,
     waypoint::Waypoint,
 };
-use framework::ReleaseBundle;
+use aptos_vm_genesis::default_gas_schedule;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -41,7 +42,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use vm_genesis::default_gas_schedule;
 
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
 const VFN_IDENTITY: &str = "vfn-identity.yaml";

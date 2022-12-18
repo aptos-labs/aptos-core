@@ -16,22 +16,24 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-api = { workspace = true }
 aptos-api-types = { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-db = { workspace = true, features = ["fuzzing"] }
+aptos-executor = { workspace = true }
+aptos-executor-types = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
+aptos-mempool-notifications = { workspace = true }
 aptos-sdk = { workspace = true }
+aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-aptosdb = { workspace = true, features = ["fuzzing"] }
+aptos-vm-validator = { workspace = true }
 bytes = { workspace = true }
-cached-packages = { workspace = true }
-executor = { workspace = true }
-executor-types = { workspace = true }
 goldenfile = { workspace = true }
 hyper = { workspace = true }
-mempool-notifications = { workspace = true }
 poem = { workspace = true }
 poem-openapi = { workspace = true }
 proptest = { workspace = true }
@@ -40,9 +42,7 @@ regex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-storage-interface = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
-vm-validator = { workspace = true }
 warp = { workspace = true }
 warp-reverse-proxy = { workspace = true }

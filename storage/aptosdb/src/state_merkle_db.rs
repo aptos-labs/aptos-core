@@ -14,6 +14,7 @@ use aptos_jellyfish_merkle::{
     node_type::{NodeKey, NodeType},
     JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
 };
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -21,7 +22,6 @@ use aptos_types::{
     transaction::Version,
 };
 use rayon::prelude::*;
-use schemadb::{SchemaBatch, DB};
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Instant};
 
 pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
