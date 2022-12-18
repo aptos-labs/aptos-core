@@ -41,7 +41,6 @@ tiny-keccak = { workspace = true }
 x25519-dalek = { workspace = true }
 
 [dev-dependencies]
-
 bitvec = { workspace = true }
 blake2 = { workspace = true }
 blake2-rfc = { workspace = true }
