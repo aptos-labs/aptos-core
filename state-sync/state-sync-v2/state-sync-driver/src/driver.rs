@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::utils::OutputFallbackHandler;
 use crate::{
     bootstrapper::Bootstrapper,
     continuous_syncer::ContinuousSyncer,
@@ -20,9 +21,9 @@ use crate::{
     utils::PENDING_DATA_LOG_FREQ_SECS,
 };
 use aptos_config::config::{RoleType, StateSyncDriverConfig};
-use aptos_consensus_notifications::{
-    ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
-};
+use aptos_consensus_notifications::ConsensusCommitNotification;
+use aptos_consensus_notifications::ConsensusNotification;
+use aptos_consensus_notifications::ConsensusSyncNotification;
 use aptos_data_client::AptosDataClient;
 use aptos_data_streaming_service::streaming_client::{
     DataStreamingClient, NotificationAndFeedback, NotificationFeedback,
@@ -32,9 +33,12 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReader;
+use aptos_time_service::TimeService;
+use aptos_time_service::TimeServiceTrait;
 use aptos_types::waypoint::Waypoint;
 use futures::StreamExt;
-use std::{sync::Arc, time::SystemTime};
+use std::sync::Arc;
+use std::time::Instant;
 use tokio::task::yield_now;
 use tokio::time::{interval, Duration};
 use tokio_stream::wrappers::IntervalStream;
@@ -104,13 +108,16 @@ pub struct StateSyncDriver<
     mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
 
     // The timestamp at which the driver started executing
-    start_time: Option<SystemTime>,
+    start_time: Option<Instant>,
 
     // The interface to read from storage
     storage: Arc<dyn DbReader>,
 
     // The storage synchronizer used to update local storage
     storage_synchronizer: StorageSyncer,
+
+    // The time service
+    time_service: TimeService,
 }
 
 impl<
@@ -135,10 +142,14 @@ impl<
         aptos_data_client: DataClient,
         streaming_client: StreamingClient,
         storage: Arc<dyn DbReader>,
+        time_service: TimeService,
     ) -> Self {
+        let output_fallback_handler =
+            OutputFallbackHandler::new(driver_configuration.clone(), time_service.clone());
         let bootstrapper = Bootstrapper::new(
             driver_configuration.clone(),
             metadata_storage,
+            output_fallback_handler.clone(),
             streaming_client.clone(),
             storage.clone(),
             storage_synchronizer.clone(),
@@ -146,6 +157,7 @@ impl<
         let continuous_syncer = ContinuousSyncer::new(
             driver_configuration.clone(),
             streaming_client,
+            output_fallback_handler,
             storage.clone(),
             storage_synchronizer.clone(),
         );
@@ -164,6 +176,7 @@ impl<
             start_time: None,
             storage,
             storage_synchronizer,
+            time_service,
         }
     }
 
@@ -176,7 +189,7 @@ impl<
 
         // Start the driver
         info!(LogSchema::new(LogEntry::Driver).message("Started the state sync v2 driver!"));
-        self.start_time = Some(SystemTime::now());
+        self.start_time = Some(self.time_service.now());
         loop {
             ::futures::select! {
                 notification = self.client_notification_listener.select_next_some() => {
@@ -415,10 +428,10 @@ impl<
         if self.bootstrapper.is_bootstrapped() {
             if let Err(error) = self
                 .continuous_syncer
-                .reset_active_stream(Some(NotificationAndFeedback::new(
+                .handle_storage_synchronizer_error(NotificationAndFeedback::new(
                     notification_id,
                     notification_feedback,
-                )))
+                ))
                 .await
             {
                 panic!(
@@ -428,10 +441,10 @@ impl<
             }
         } else if let Err(error) = self
             .bootstrapper
-            .reset_active_stream(Some(NotificationAndFeedback::new(
+            .handle_storage_synchronizer_error(NotificationAndFeedback::new(
                 notification_id,
                 notification_feedback,
-            )))
+            ))
             .await
         {
             panic!(
@@ -518,10 +531,7 @@ impl<
                         .config
                         .max_connection_deadline_secs,
                 )) {
-                    if SystemTime::now()
-                        .duration_since(connection_deadline)
-                        .is_ok()
-                    {
+                    if self.time_service.now() >= connection_deadline {
                         info!(LogSchema::new(LogEntry::AutoBootstrapping).message(
                             "Passed the connection deadline! Auto-bootstrapping the validator!"
                         ));

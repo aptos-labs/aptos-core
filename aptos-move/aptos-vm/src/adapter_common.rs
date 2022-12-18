@@ -1,23 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters::*, data_cache::StateViewCache};
-use anyhow::Result;
-use aptos_aggregator::transaction::TransactionOutputExt;
-use aptos_state_view::StateView;
-use aptos_types::{
-    transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
-    vm_status::{StatusCode, VMStatus},
-};
-
 use crate::{
+    counters::*,
     data_cache::AsMoveResolver,
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
 };
+use anyhow::Result;
+use aptos_aggregator::transaction::TransactionOutputExt;
+use aptos_state_view::StateView;
 use aptos_types::{
     block_metadata::BlockMetadata,
+    transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
     transaction::{Transaction, TransactionOutput, TransactionStatus, WriteSetPayload},
+    vm_status::{StatusCode, VMStatus},
     write_set::WriteSet,
 };
 
@@ -81,8 +78,7 @@ pub fn validate_signed_transaction<A: VMAdapter>(
         }
     };
 
-    let remote_cache = StateViewCache::new(state_view);
-    let resolver = remote_cache.as_move_resolver();
+    let resolver = state_view.as_move_resolver();
     let mut session = adapter.new_session(&resolver, SessionId::txn(&txn));
 
     let validation_result = validate_signature_checked_transaction(

@@ -433,6 +433,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
         event_subscription_service,
         aptos_data_client,
         streaming_service_client,
+        TimeService::real(),
     );
 
     // Create and return the new state sync handle
@@ -870,16 +871,6 @@ pub fn setup_environment(
         peer_metadata_storage.clone(),
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
-
-    assert!(
-        !node_config.consensus.use_quorum_store,
-        "QuorumStore is not yet implemented"
-    );
-    assert_ne!(
-        node_config.consensus.use_quorum_store,
-        node_config.mempool.shared_mempool_validator_broadcast,
-        "Shared mempool validator broadcast must be turned off when QuorumStore is on, and vice versa"
-    );
 
     // StateSync should be instantiated and started before Consensus to avoid a cyclic dependency:
     // network provider -> consensus -> state synchronizer -> network provider.  This has resulted

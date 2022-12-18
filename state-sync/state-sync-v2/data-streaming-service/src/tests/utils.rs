@@ -12,8 +12,9 @@ use aptos_infallible::Mutex;
 use aptos_logger::Level;
 use aptos_storage_service_types::requests::{
     DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-    NewTransactionsWithProofRequest, StateValuesWithProofRequest,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+    StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
+    TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 use aptos_storage_service_types::responses::{CompleteDataRange, TransactionOrOutputListWithProof};
 use aptos_storage_service_types::Epoch;
@@ -437,14 +438,55 @@ impl AptosDataClient for MockAptosDataClient {
 
     async fn get_new_transactions_or_outputs_with_proof(
         &self,
-        _known_version: Version,
-        _known_epoch: Epoch,
-        _include_events: bool,
-        _request_timeout_ms: u64,
+        known_version: Version,
+        known_epoch: Epoch,
+        include_events: bool,
+        request_timeout_ms: u64,
     ) -> aptos_data_client::Result<
         Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>,
     > {
-        todo!() // Implement when we have a client side implementation
+        self.verify_request_timeout(
+            request_timeout_ms,
+            true,
+            DataRequest::GetNewTransactionsOrOutputsWithProof(
+                NewTransactionsOrOutputsWithProofRequest {
+                    known_version,
+                    known_epoch,
+                    include_events,
+                    max_num_output_reductions: 3,
+                },
+            ),
+        );
+        self.emulate_network_latencies();
+
+        // Create a mock data client without timeout verification (to handle the internal requests)
+        let mut aptos_data_client = self.clone();
+        aptos_data_client.skip_timeout_verification = true;
+
+        // Get the new transactions or outputs response
+        let response = if return_transactions_instead_of_outputs() {
+            let (transactions, ledger_info) = aptos_data_client
+                .get_new_transactions_with_proof(
+                    known_version,
+                    known_epoch,
+                    include_events,
+                    request_timeout_ms,
+                )
+                .await?
+                .payload;
+            ((Some(transactions), None), ledger_info)
+        } else {
+            let (outputs, ledger_info) = aptos_data_client
+                .get_new_transaction_outputs_with_proof(
+                    known_version,
+                    known_epoch,
+                    request_timeout_ms,
+                )
+                .await?
+                .payload;
+            ((None, Some(outputs)), ledger_info)
+        };
+        Ok(create_data_client_response(response))
     }
 
     async fn get_number_of_states(
@@ -483,16 +525,8 @@ impl AptosDataClient for MockAptosDataClient {
         // Calculate the last version based on if we should limit the chunk size
         let end_version = self.calculate_last_index(start_version, end_version);
 
-        // Create the requested transactions and transaction outputs
-        let mut transactions_and_outputs = vec![];
-        for _ in start_version..=end_version {
-            transactions_and_outputs.push((create_transaction(), create_transaction_output()));
-        }
+        let output_list_with_proof = create_output_list_with_proof(start_version, end_version);
 
-        // Create a transaction output list with an empty proof
-        let mut output_list_with_proof = TransactionOutputListWithProof::new_empty();
-        output_list_with_proof.first_transaction_output_version = Some(start_version);
-        output_list_with_proof.transactions_and_outputs = transactions_and_outputs;
         Ok(create_data_client_response(output_list_with_proof))
     }
 
@@ -528,13 +562,53 @@ impl AptosDataClient for MockAptosDataClient {
 
     async fn get_transactions_or_outputs_with_proof(
         &self,
-        _proof_version: Version,
-        _start_version: Version,
-        _end_version: Version,
-        _include_events: bool,
-        _request_timeout_ms: u64,
+        proof_version: Version,
+        start_version: Version,
+        end_version: Version,
+        include_events: bool,
+        request_timeout_ms: u64,
     ) -> aptos_data_client::Result<Response<TransactionOrOutputListWithProof>> {
-        todo!() // Implement when we have a client side implementation
+        self.verify_request_timeout(
+            request_timeout_ms,
+            false,
+            DataRequest::GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
+                proof_version,
+                start_version,
+                end_version,
+                include_events,
+                max_num_output_reductions: 3,
+            }),
+        );
+        self.emulate_network_latencies();
+
+        // Create a mock data client without timeout verification (to handle the internal requests)
+        let mut aptos_data_client = self.clone();
+        aptos_data_client.skip_timeout_verification = true;
+
+        // Get the transactions or outputs response
+        let transactions_or_outputs = if return_transactions_instead_of_outputs() {
+            let transactions_with_proof = aptos_data_client
+                .get_transactions_with_proof(
+                    proof_version,
+                    start_version,
+                    end_version,
+                    include_events,
+                    request_timeout_ms,
+                )
+                .await?;
+            (Some(transactions_with_proof.payload), None)
+        } else {
+            let outputs_with_proof = aptos_data_client
+                .get_transaction_outputs_with_proof(
+                    proof_version,
+                    start_version,
+                    end_version,
+                    request_timeout_ms,
+                )
+                .await?;
+            (None, Some(outputs_with_proof.payload))
+        };
+        Ok(create_data_client_response(transactions_or_outputs))
     }
 }
 
@@ -771,4 +845,12 @@ pub fn create_output_list_with_proof(
         Some(start_version),
         transaction_list_with_proof.proof,
     )
+}
+
+/// Returns true iff the server should return transactions
+/// instead of outputs.
+///
+/// Note: there's a 50-50 chance of this occurring.
+fn return_transactions_instead_of_outputs() -> bool {
+    (create_random_u64(u64::MAX) % 2) == 0
 }

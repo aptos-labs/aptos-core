@@ -16,25 +16,24 @@ use aptos_crypto::HashValue;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::error;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
-use aptos_state_view::StateView;
+use aptos_state_view::TStateView;
 use aptos_storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order, MAX_REQUEST_LIMIT,
 };
-use aptos_types::access_path::{AccessPath, Path};
-use aptos_types::account_config::NewBlockEvent;
-use aptos_types::account_view::AccountView;
-use aptos_types::on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig};
-use aptos_types::transaction::Transaction;
 use aptos_types::{
+    access_path::{AccessPath, Path},
     account_address::AccountAddress,
+    account_config::NewBlockEvent,
     account_state::AccountState,
+    account_view::AccountView,
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig},
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
-    transaction::{SignedTransaction, TransactionWithProof, Version},
+    transaction::{SignedTransaction, Transaction, TransactionWithProof, Version},
 };
 use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned};
 use futures::{channel::oneshot, SinkExt};

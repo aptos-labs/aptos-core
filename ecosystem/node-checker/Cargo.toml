@@ -27,7 +27,6 @@ clap = { workspace = true }
 const_format = { workspace = true }
 env_logger = { workspace = true }
 futures = { workspace = true }
-log = { workspace = true }
 once_cell = { workspace = true }
 poem = { workspace = true }
 poem-openapi = { workspace = true }

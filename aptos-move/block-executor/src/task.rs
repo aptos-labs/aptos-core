@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::executor::MVHashMapView;
 use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath, state_store::state_key::StateKey, write_set::TransactionWrite,
 };
-use std::{collections::btree_map::BTreeMap, fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -53,10 +53,10 @@ pub struct Accesses<K> {
 // TODO: Sync should not be required. Sync is only introduced because this trait occurs as a phantom type of executor struct.
 pub trait ExecutorTask: Sync {
     /// Type of transaction and its associated key and value.
-    type T: Transaction;
+    type Txn: Transaction;
 
     /// The output of a transaction. This should contain the side effect of this transaction.
-    type Output: TransactionOutput<T = Self::T> + 'static;
+    type Output: TransactionOutput<Txn = Self::Txn> + 'static;
 
     /// Type of error when the executor failed to process a transaction and needs to abort.
     type Error: Clone + Send + Sync + 'static;
@@ -68,37 +68,31 @@ pub trait ExecutorTask: Sync {
     /// Create an instance of the transaction executor.
     fn init(args: Self::Argument) -> Self;
 
-    /// Execute one single transaction given the view of the current state as a BTreeMap,
-    fn execute_transaction_btree_view(
+    /// Execute a single transaction given the view of the current state.
+    fn execute_transaction(
         &self,
-        view: &BTreeMap<<Self::T as Transaction>::Key, <Self::T as Transaction>::Value>,
-        txn: &Self::T,
+        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        txn: &Self::Txn,
         txn_idx: usize,
-    ) -> ExecutionStatus<Self::Output, Self::Error>;
-
-    /// Execute one single transaction given the view of the current state.
-    fn execute_transaction_mvhashmap_view(
-        &self,
-        view: &MVHashMapView<<Self::T as Transaction>::Key, <Self::T as Transaction>::Value>,
-        txn: &Self::T,
+        materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 }
 
 /// Trait for execution result of a transaction.
 pub trait TransactionOutput: Send + Sync {
     /// Type of transaction and its associated key and value.
-    type T: Transaction;
+    type Txn: Transaction;
 
     /// Get the writes of a transaction from its output.
     fn get_writes(
         &self,
     ) -> Vec<(
-        <Self::T as Transaction>::Key,
-        <Self::T as Transaction>::Value,
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
     )>;
 
     /// Get the deltas of a transaction from its output.
-    fn get_deltas(&self) -> Vec<(<Self::T as Transaction>::Key, DeltaOp)>;
+    fn get_deltas(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
