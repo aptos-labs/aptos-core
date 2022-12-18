@@ -7,31 +7,30 @@ Defines feature flags for Aptos. Those are used in Aptos specific implementation
 the Move stdlib, the Aptos stdlib, and the Aptos framework.
 
 
-- [Module `0x1::features`](#module-0x1features)
-  - [Resource `Features`](#resource-features)
-  - [Constants](#constants)
-  - [Function `code_dependency_check_enabled`](#function-code_dependency_check_enabled)
-  - [Function `treat_friend_as_private`](#function-treat_friend_as_private)
-  - [Function `get_sha_512_and_ripemd_160_feature`](#function-get_sha_512_and_ripemd_160_feature)
-  - [Function `sha_512_and_ripemd_160_enabled`](#function-sha_512_and_ripemd_160_enabled)
-  - [Function `get_aptos_stdlib_chain_id_feature`](#function-get_aptos_stdlib_chain_id_feature)
-  - [Function `aptos_stdlib_chain_id_enabled`](#function-aptos_stdlib_chain_id_enabled)
-  - [Function `get_blake2b_256_feature`](#function-get_blake2b_256_feature)
-  - [Function `get_vm_binary_format_v6`](#function-get_vm_binary_format_v6)
-  - [Function `blake2b_256_enabled`](#function-blake2b_256_enabled)
-  - [Function `allow_vm_binary_format_v6`](#function-allow_vm_binary_format_v6)
-  - [Function `get_collect_and_distribute_gas_fees_feature`](#function-get_collect_and_distribute_gas_fees_feature)
-  - [Function `collect_and_distribute_gas_fees`](#function-collect_and_distribute_gas_fees)
-  - [Function `change_feature_flags`](#function-change_feature_flags)
-  - [Function `is_enabled`](#function-is_enabled)
-  - [Function `set`](#function-set)
-  - [Function `contains`](#function-contains)
-  - [Specification](#specification)
-    - [Function `code_dependency_check_enabled`](#function-code_dependency_check_enabled-1)
-    - [Function `change_feature_flags`](#function-change_feature_flags-1)
-    - [Function `is_enabled`](#function-is_enabled-1)
-    - [Function `set`](#function-set-1)
-    - [Function `contains`](#function-contains-1)
+-  [Resource `Features`](#0x1_features_Features)
+-  [Constants](#@Constants_0)
+-  [Function `code_dependency_check_enabled`](#0x1_features_code_dependency_check_enabled)
+-  [Function `treat_friend_as_private`](#0x1_features_treat_friend_as_private)
+-  [Function `get_sha_512_and_ripemd_160_feature`](#0x1_features_get_sha_512_and_ripemd_160_feature)
+-  [Function `sha_512_and_ripemd_160_enabled`](#0x1_features_sha_512_and_ripemd_160_enabled)
+-  [Function `get_aptos_stdlib_chain_id_feature`](#0x1_features_get_aptos_stdlib_chain_id_feature)
+-  [Function `aptos_stdlib_chain_id_enabled`](#0x1_features_aptos_stdlib_chain_id_enabled)
+-  [Function `get_blake2b_256_feature`](#0x1_features_get_blake2b_256_feature)
+-  [Function `blake2b_256_enabled`](#0x1_features_blake2b_256_enabled)
+-  [Function `get_vm_binary_format_v6`](#0x1_features_get_vm_binary_format_v6)
+-  [Function `allow_vm_binary_format_v6`](#0x1_features_allow_vm_binary_format_v6)
+-  [Function `get_collect_and_distribute_gas_fees_feature`](#0x1_features_get_collect_and_distribute_gas_fees_feature)
+-  [Function `collect_and_distribute_gas_fees`](#0x1_features_collect_and_distribute_gas_fees)
+-  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
+-  [Function `is_enabled`](#0x1_features_is_enabled)
+-  [Function `set`](#0x1_features_set)
+-  [Function `contains`](#0x1_features_contains)
+-  [Specification](#@Specification_1)
+    -  [Function `code_dependency_check_enabled`](#@Specification_1_code_dependency_check_enabled)
+    -  [Function `change_feature_flags`](#@Specification_1_change_feature_flags)
+    -  [Function `is_enabled`](#@Specification_1_is_enabled)
+    -  [Function `set`](#@Specification_1_set)
+    -  [Function `contains`](#@Specification_1_contains)
 
 
 <pre><code><b>use</b> <a href="error.md#0x1_error">0x1::error</a>;
@@ -312,6 +311,45 @@ Lifetime: transient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_blake2b_256_feature">get_blake2b_256_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_blake2b_256_feature">get_blake2b_256_feature</a>(): u64 { <a href="features.md#0x1_features_BLAKE2B_256_NATIVE">BLAKE2B_256_NATIVE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_blake2b_256_enabled"></a>
+
+## Function `blake2b_256_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_blake2b_256_enabled">blake2b_256_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_blake2b_256_enabled">blake2b_256_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLAKE2B_256_NATIVE">BLAKE2B_256_NATIVE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_features_get_vm_binary_format_v6"></a>
 
 ## Function `get_vm_binary_format_v6`
@@ -327,7 +365,6 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_blake2b_256_feature">get_blake2b_256_feature</a>(): u64 { <a href="features.md#0x1_features_BLAKE2B_256_NATIVE">BLAKE2B_256_NATIVE</a> }
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_vm_binary_format_v6">get_vm_binary_format_v6</a>(): u64 { <a href="features.md#0x1_features_VM_BINARY_FORMAT_V6">VM_BINARY_FORMAT_V6</a> }
 </code></pre>
 
@@ -335,13 +372,6 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_blake2b_256_enabled"></a>
-
-## Function `blake2b_256_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_blake2b_256_enabled">blake2b_256_enabled</a>(): bool
 <a name="0x1_features_allow_vm_binary_format_v6"></a>
 
 ## Function `allow_vm_binary_format_v6`
@@ -357,8 +387,6 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_blake2b_256_enabled">blake2b_256_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLAKE2B_256_NATIVE">BLAKE2B_256_NATIVE</a>)
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_allow_vm_binary_format_v6">allow_vm_binary_format_v6</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_VM_BINARY_FORMAT_V6">VM_BINARY_FORMAT_V6</a>)
 }
