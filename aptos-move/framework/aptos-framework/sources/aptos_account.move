@@ -124,7 +124,7 @@ module aptos_framework::aptos_account {
         if (exists<DirectTransferConfig>(addr)) {
             let direct_transfer_config = borrow_global_mut<DirectTransferConfig>(addr);
             // Short-circuit to avoid emitting an event if direct transfer config is not changing.
-            if (direct_transfer_config.allow_arbitrary_coin_transfers != allow) {
+            if (direct_transfer_config.allow_arbitrary_coin_transfers == allow) {
                 return
             };
 
@@ -251,6 +251,18 @@ module aptos_framework::aptos_account {
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
         coin::destroy_freeze_cap(freeze_cap);
+    }
+
+    #[test(user = @0x123)]
+    public fun test_set_allow_direct_coin_transfers(user: &signer) acquires DirectTransferConfig {
+        let addr = signer::address_of(user);
+        create_account_for_test(addr);
+        set_allow_direct_coin_transfers(user, true);
+        assert!(can_receive_direct_coin_transfers(addr), 0);
+        set_allow_direct_coin_transfers(user, false);
+        assert!(!can_receive_direct_coin_transfers(addr), 1);
+        set_allow_direct_coin_transfers(user, true);
+        assert!(can_receive_direct_coin_transfers(addr), 2);
     }
 
     #[test(from = @0x1, to = @0x12)]

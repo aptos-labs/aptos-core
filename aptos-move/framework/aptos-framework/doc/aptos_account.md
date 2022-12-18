@@ -416,7 +416,7 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
     <b>if</b> (<b>exists</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr)) {
         <b>let</b> direct_transfer_config = <b>borrow_global_mut</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr);
         // Short-circuit <b>to</b> avoid emitting an <a href="event.md#0x1_event">event</a> <b>if</b> direct transfer config is not changing.
-        <b>if</b> (direct_transfer_config.allow_arbitrary_coin_transfers != allow) {
+        <b>if</b> (direct_transfer_config.allow_arbitrary_coin_transfers == allow) {
             <b>return</b>
         };
 
