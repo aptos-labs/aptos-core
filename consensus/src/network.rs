@@ -346,7 +346,8 @@ impl NetworkTask {
             aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
         let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
             QueueStyle::FIFO,
-            1000,
+            // TODO: tune this value based on quorum store messages with backpressure
+            50,
             Some(&counters::QUORUM_STORE_CHANNEL_MSGS),
         );
         let (block_retrieval_tx, block_retrieval) = aptos_channel::new(
