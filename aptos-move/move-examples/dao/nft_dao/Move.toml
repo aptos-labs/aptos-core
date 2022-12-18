@@ -1,0 +1,11 @@
+[package]
+name = "NFTDAO"
+version = "0.0.0"
+
+[addresses]
+dao_platform = "_"
+aptos_std = "0x1"
+
+[dependencies]
+AptosToken = { local = "../../../framework/aptos-token" }
+DataStructure = { local = "../../data_structures" }
