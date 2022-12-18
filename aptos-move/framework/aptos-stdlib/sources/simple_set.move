@@ -6,20 +6,24 @@ module aptos_std::simple_set {
     use std::option;
     use std::vector;
 
+    /// A simple implementation of set backed by an underlying vector, suitable for small sets.
     struct SimpleSet<Key> has copy, drop, store {
         data: vector<Key>,
     }
 
+    /// Return the number of keys in the set.
     public fun length<Key>(set: &SimpleSet<Key>): u64 {
         vector::length(&set.data)
     }
 
-    public fun create<Key: store + copy>(): SimpleSet<Key> {
+    /// Create an empty set.
+    public fun empty<Key: store + copy + drop>(): SimpleSet<Key> {
         SimpleSet {
             data: vector::empty<Key>(),
         }
     }
 
+    /// Return true if the set contains `key`, or false vice versa.
     public fun contains<Key>(
         set: &SimpleSet<Key>,
         key: &Key,
@@ -28,12 +32,15 @@ module aptos_std::simple_set {
         option::is_some(&maybe_idx)
     }
 
+    /// Destroy the set. Aborts if set is not empty.
     public fun destroy_empty<Key>(set: SimpleSet<Key>) {
         let SimpleSet { data } = set;
         vector::destroy_empty(data);
     }
 
-    public fun insert<Key>(
+    /// Insert `key` into the set.
+    /// Return `true` if `key` did not already exist in the set and `false` vice versa.
+    public fun insert<Key: drop>(
         set: &mut SimpleSet<Key>,
         key: Key,
     ): bool {
@@ -46,7 +53,9 @@ module aptos_std::simple_set {
         }
     }
 
-    public fun remove<Key>(
+    /// Remove `key` into the set.
+    /// Return `true` if `key` already existed in the set and `false` vice versa.
+    public fun remove<Key: drop>(
         set: &mut SimpleSet<Key>,
         key: &Key,
     ): bool {
@@ -59,6 +68,7 @@ module aptos_std::simple_set {
         }
     }
 
+    /// Find the potential index of `key` in the underlying data vector.
     fun find<Key>(
         set: &SimpleSet<Key>,
         key: &Key,
@@ -77,7 +87,7 @@ module aptos_std::simple_set {
 
     #[test]
     public fun insert_remove_many() {
-        let set = create<u64>();
+        let set = empty<u64>();
 
         assert!(length(&set) == 0, 0);
         assert!(!contains(&set, &3), 0);
@@ -100,7 +110,7 @@ module aptos_std::simple_set {
 
     #[test]
     public fun insert_twice() {
-        let set = create<u64>();
+        let set = empty<u64>();
         assert!(insert(&mut set, 3) == true, 0);
         assert!(insert(&mut set, 3) == false, 0);
 
@@ -110,7 +120,7 @@ module aptos_std::simple_set {
 
     #[test]
     public fun remove_twice() {
-        let set = create<u64>();
+        let set = empty<u64>();
         insert(&mut set, 3);
         assert!(remove(&mut set, &3) == true, 0);
         assert!(remove(&mut set, &3) == false, 0);

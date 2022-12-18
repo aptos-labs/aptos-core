@@ -28,6 +28,7 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::ristretto255`](ristretto255.md#0x1_ristretto255)
 -  [`0x1::secp256k1`](secp256k1.md#0x1_secp256k1)
 -  [`0x1::simple_map`](simple_map.md#0x1_simple_map)
+-  [`0x1::simple_set`](simple_set.md#0x1_simple_set)
 -  [`0x1::table`](table.md#0x1_table)
 -  [`0x1::table_with_length`](table_with_length.md#0x1_table_with_length)
 -  [`0x1::type_info`](type_info.md#0x1_type_info)
