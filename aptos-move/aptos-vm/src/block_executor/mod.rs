@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-mod storage_wrapper;
 pub(crate) mod vm_wrapper;
 
 use crate::{
@@ -13,11 +12,12 @@ use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutput
 use aptos_block_executor::{
     errors::Error,
     executor::{BlockExecutor, RAYON_EXEC_POOL},
-    output_delta_resolver::{OutputDeltaResolver, ResolvedData},
+    output_delta_resolver::OutputDeltaResolver,
     task::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
+    view::ResolvedData,
 };
 use aptos_logger::debug;
 use aptos_state_view::StateView;
@@ -53,7 +53,7 @@ impl AptosTransactionOutput {
 }
 
 impl BlockExecutorTransactionOutput for AptosTransactionOutput {
-    type T = PreprocessedTransaction;
+    type Txn = PreprocessedTransaction;
 
     fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
         self.0
@@ -144,18 +144,19 @@ impl BlockAptosVM {
                     .collect()
             });
 
-        let executor =
-            BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>>::new(concurrency_level);
+        let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
+            concurrency_level,
+        );
 
         let mut ret = if concurrency_level > 1 {
             executor
-                .execute_transactions_parallel(state_view, &signature_verified_block)
+                .execute_transactions_parallel(state_view, &signature_verified_block, state_view)
                 .map(|(results, delta_resolver)| {
                     Self::process_parallel_block_output(results, delta_resolver, state_view)
                 })
         } else {
             executor
-                .execute_transactions_sequential(state_view, &signature_verified_block)
+                .execute_transactions_sequential(state_view, &signature_verified_block, state_view)
                 .map(Self::process_sequential_block_output)
         };
 
@@ -163,7 +164,7 @@ impl BlockAptosVM {
             debug!("[Execution]: Module read & written, sequential fallback");
 
             ret = executor
-                .execute_transactions_sequential(state_view, &signature_verified_block)
+                .execute_transactions_sequential(state_view, &signature_verified_block, state_view)
                 .map(Self::process_sequential_block_output);
         }
 
