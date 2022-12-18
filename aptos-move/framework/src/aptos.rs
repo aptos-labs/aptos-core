@@ -115,6 +115,7 @@ impl ReleaseTarget {
                     references_file: Some("doc_template/references.md".to_string()),
                 }),
                 skip_fetch_latest_git_deps: false,
+                bytecode_version: None,
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
             rust_bindings: packages
