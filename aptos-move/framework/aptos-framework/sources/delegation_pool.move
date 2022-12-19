@@ -1,9 +1,9 @@
 module aptos_framework::delegation_pool {
     use std::error;
+    use std::vector;
 
     use aptos_std::math64::min;
     use aptos_std::pool_u64;
-    use aptos_std::table::{Self, Table};
 
     use aptos_framework::account;
     use aptos_framework::event::{Self, EventHandle};
@@ -19,8 +19,7 @@ module aptos_framework::delegation_pool {
 
     struct DelegationPool has key {
         active_shares: pool_u64::Pool,
-        inactive_shares: Table<u64, pool_u64::Pool>,
-        lockup_epoch: u64,
+        inactive_shares: vector<pool_u64::Pool>,
         stake_pool_signer_cap: account::SignerCapability,
 
         // The events emitted for delegation operations on the pool
@@ -55,13 +54,9 @@ module aptos_framework::delegation_pool {
     }
 
     public(friend) fun initialize(stake_pool_signer: &signer, stake_pool_signer_cap: account::SignerCapability) {
-        let inactive_shares = table::new<u64, pool_u64::Pool>();
-        table::add(&mut inactive_shares, 1, pool_u64::create(DELEGATORS_LIMIT));
-
         move_to(stake_pool_signer, DelegationPool {
-            lockup_epoch: 1,
             active_shares: pool_u64::create(DELEGATORS_LIMIT),
-            inactive_shares,
+            inactive_shares: vector::singleton(pool_u64::create(DELEGATORS_LIMIT)),
             stake_pool_signer_cap,
             add_stake_events: account::new_event_handle<AddStakeEvent>(stake_pool_signer),
             reactivate_stake_events: account::new_event_handle<ReactivateStakeEvent>(stake_pool_signer),
@@ -84,7 +79,17 @@ module aptos_framework::delegation_pool {
     }
 
     public fun current_lockup_epoch(pool_address: address): u64 acquires DelegationPool {
-        borrow_global<DelegationPool>(pool_address).lockup_epoch
+        assert_delegation_pool_exists(pool_address);
+        current_lockup_epoch_internal(borrow_global<DelegationPool>(pool_address))
+    }
+
+    fun current_lockup_epoch_internal(pool: &DelegationPool): u64 {
+        vector::length(&pool.inactive_shares) - 1
+    }
+
+    fun latest_inactive_shares_pool(pool: &mut DelegationPool): &mut pool_u64::Pool {
+        let current_lockup_epoch = current_lockup_epoch_internal(pool);
+        vector::borrow_mut(&mut pool.inactive_shares, current_lockup_epoch)
     }
 
     public(friend) fun emit_add_stake_event(
@@ -170,8 +175,8 @@ module aptos_framework::delegation_pool {
         assert_delegation_pool_exists(pool_address);
         let pool = borrow_global_mut<DelegationPool>(pool_address);
 
-        // cannot buy inactive shares, only pending inactive of current lockup epoch's pool
-        pool_u64::buy_in(table::borrow_mut(&mut pool.inactive_shares, pool.lockup_epoch), shareholder, coins_amount)
+        // cannot buy inactive shares, only pending_inactive in current lockup epoch
+        pool_u64::buy_in(latest_inactive_shares_pool(pool), shareholder, coins_amount)
     }
 
     public(friend) fun redeem_active_shares(
@@ -196,7 +201,8 @@ module aptos_framework::delegation_pool {
     ): u64 acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         let pool = borrow_global_mut<DelegationPool>(pool_address);
-        let inactive_shares = table::borrow_mut(&mut pool.inactive_shares, lockup_epoch);
+        let current_lockup_epoch = current_lockup_epoch_internal(pool);
+        let inactive_shares = vector::borrow_mut(&mut pool.inactive_shares, lockup_epoch);
 
         coins_amount = min(coins_amount, pool_u64::balance(inactive_shares, shareholder));
 
@@ -204,8 +210,8 @@ module aptos_framework::delegation_pool {
         let redeemed_coins = pool_u64::redeem_shares(inactive_shares, shareholder, shares_to_redeem);
 
         // if withdrawn the last shares from past pending_inactive shares pool, delete it
-        if (lockup_epoch < pool.lockup_epoch && pool_u64::total_coins(inactive_shares) == 0) {
-            let inactive_shares = table::remove<u64, pool_u64::Pool>(&mut pool.inactive_shares, lockup_epoch);
+        if (lockup_epoch < current_lockup_epoch && pool_u64::total_coins(inactive_shares) == 0) {
+            let inactive_shares = vector::remove<pool_u64::Pool>(&mut pool.inactive_shares, lockup_epoch);
             pool_u64::destroy_empty(inactive_shares);
         };
         redeemed_coins
@@ -216,18 +222,11 @@ module aptos_framework::delegation_pool {
             return false
         };
         let pool = borrow_global_mut<DelegationPool>(pool_address);
-        // if no pending_inactive stake on lockup epoch to end, reuse the shares pool
-        if (pool_u64::total_coins(table::borrow(&pool.inactive_shares, pool.lockup_epoch)) == 0) {
-            return true
+        // if no pending_inactive stake on the lockup epoch to be ended, reuse its shares pool
+        if (pool_u64::total_coins(latest_inactive_shares_pool(pool)) > 0) {
+            // start this new lockup epoch with a fresh shares pool
+            vector::push_back(&mut pool.inactive_shares, pool_u64::create(DELEGATORS_LIMIT));
         };
-
-        // advance lookup epoch
-        spec {
-            assume pool.lockup_epoch + 1 <= MAX_U64;
-        };
-        pool.lockup_epoch = pool.lockup_epoch + 1;
-        // start this new lockup epoch with a fresh shares pool
-        table::add(&mut pool.inactive_shares, pool.lockup_epoch, pool_u64::create(DELEGATORS_LIMIT));
         true
     }
 
@@ -246,7 +245,7 @@ module aptos_framework::delegation_pool {
         pool_u64::update_total_coins(&mut pool.active_shares, total_coins_active + rewards_active);
 
         // update total coins accumulated by pending_inactive shares
-        let inactive_shares = table::borrow_mut(&mut pool.inactive_shares, pool.lockup_epoch);
+        let inactive_shares = latest_inactive_shares_pool(pool);
         let total_coins_pending_inactive = pool_u64::total_coins(inactive_shares);
         pool_u64::update_total_coins(inactive_shares, total_coins_pending_inactive + rewards_pending_inactive);
         true
