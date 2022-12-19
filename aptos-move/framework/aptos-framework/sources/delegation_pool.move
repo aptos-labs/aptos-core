@@ -6,6 +6,7 @@ module aptos_framework::delegation_pool {
     use aptos_std::table::{Self, Table};
 
     use aptos_framework::account;
+    use aptos_framework::event::{Self, EventHandle};
 
     friend aptos_framework::stake;
     friend aptos_framework::delegate;
@@ -21,6 +22,36 @@ module aptos_framework::delegation_pool {
         inactive_shares: Table<u64, pool_u64::Pool>,
         lockup_epoch: u64,
         stake_pool_signer_cap: account::SignerCapability,
+
+        // The events emitted for delegation operations on the pool
+        add_stake_events: EventHandle<AddStakeEvent>,
+        reactivate_stake_events: EventHandle<ReactivateStakeEvent>,
+        unlock_stake_events: EventHandle<UnlockStakeEvent>,
+        withdraw_stake_events: EventHandle<WithdrawStakeEvent>,
+    }
+
+    struct AddStakeEvent has drop, store {
+        pool_address: address,
+        delegator_address: address,
+        amount_added: u64,
+    }
+
+    struct ReactivateStakeEvent has drop, store {
+        pool_address: address,
+        delegator_address: address,
+        amount: u64,
+    }
+
+    struct UnlockStakeEvent has drop, store {
+        pool_address: address,
+        delegator_address: address,
+        amount_unlocked: u64,
+    }
+
+    struct WithdrawStakeEvent has drop, store {
+        pool_address: address,
+        delegator_address: address,
+        amount_withdrawn: u64,
     }
 
     public(friend) fun initialize(stake_pool_signer: &signer, stake_pool_signer_cap: account::SignerCapability) {
@@ -32,6 +63,10 @@ module aptos_framework::delegation_pool {
             active_shares: pool_u64::create(DELEGATORS_LIMIT),
             inactive_shares,
             stake_pool_signer_cap,
+            add_stake_events: account::new_event_handle<AddStakeEvent>(stake_pool_signer),
+            reactivate_stake_events: account::new_event_handle<ReactivateStakeEvent>(stake_pool_signer),
+            unlock_stake_events: account::new_event_handle<UnlockStakeEvent>(stake_pool_signer),
+            withdraw_stake_events: account::new_event_handle<WithdrawStakeEvent>(stake_pool_signer),
         });
     }
 
@@ -50,6 +85,70 @@ module aptos_framework::delegation_pool {
 
     public fun current_lockup_epoch(pool_address: address): u64 acquires DelegationPool {
         borrow_global<DelegationPool>(pool_address).lockup_epoch
+    }
+
+    public(friend) fun emit_add_stake_event(
+        pool_address: address,
+        delegator_address: address,
+        amount_added: u64,
+    ) acquires DelegationPool {
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
+        event::emit_event(
+            &mut pool.add_stake_events,
+            AddStakeEvent {
+                pool_address,
+                delegator_address,
+                amount_added,
+            },
+        );
+    }
+
+    public(friend) fun emit_reactivate_stake_event(
+        pool_address: address,
+        delegator_address: address,
+        amount: u64,
+    ) acquires DelegationPool {
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
+        event::emit_event(
+            &mut pool.reactivate_stake_events,
+            ReactivateStakeEvent {
+                pool_address,
+                delegator_address,
+                amount,
+            },
+        );
+    }
+
+    public(friend) fun emit_unlock_stake_event(
+        pool_address: address,
+        delegator_address: address,
+        amount_unlocked: u64,
+    ) acquires DelegationPool {
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
+        event::emit_event(
+            &mut pool.unlock_stake_events,
+            UnlockStakeEvent {
+                pool_address,
+                delegator_address,
+                amount_unlocked,
+            },
+        );
+    }
+
+    public(friend) fun emit_withdraw_stake_event(
+        pool_address: address,
+        delegator_address: address,
+        amount_withdrawn: u64,
+    ) acquires DelegationPool {
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
+        event::emit_event(
+            &mut pool.withdraw_stake_events,
+            WithdrawStakeEvent {
+                pool_address,
+                delegator_address,
+                amount_withdrawn,
+            },
+        );
     }
 
     public(friend) fun buy_in_active_shares(

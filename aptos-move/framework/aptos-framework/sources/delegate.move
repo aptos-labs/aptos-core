@@ -94,6 +94,8 @@ module aptos_framework::delegate {
         stake::add_stake(&stake_pool_signer, amount);
 
         buy_in_active_shares(pool_address, delegator_address, amount);
+
+        delegation_pool::emit_add_stake_event(pool_address, delegator_address, amount);
     }
 
     public entry fun unlock(delegator: &signer, pool_address: address, amount: u64) {
@@ -107,6 +109,8 @@ module aptos_framework::delegate {
         amount = redeem_active_shares(pool_address, delegator_address, amount);
         stake::unlock(&stake_pool_signer, amount);
         buy_in_inactive_shares(pool_address, delegator_address, amount);
+
+        delegation_pool::emit_unlock_stake_event(pool_address, delegator_address, amount);
     }
 
     public entry fun reactivate_stake(delegator: &signer, pool_address: address, amount: u64) {
@@ -116,6 +120,8 @@ module aptos_framework::delegate {
         let amount = redeem_inactive_shares(pool_address, delegator_address, amount, current_lockup_epoch(pool_address));
         stake::reactivate_stake(&stake_pool_signer, amount);
         buy_in_active_shares(pool_address, delegator_address, amount);
+
+        delegation_pool::emit_reactivate_stake_event(pool_address, delegator_address, amount);
     }
 
     public entry fun withdraw(delegator: &signer, pool_address: address, amount: u64, lockup_epoch: u64) {
@@ -130,5 +136,7 @@ module aptos_framework::delegate {
         let amount = redeem_inactive_shares(pool_address, delegator_address, amount, lockup_epoch);
         stake::withdraw(&stake_pool_signer, amount);
         coin::transfer<AptosCoin>(&stake_pool_signer, delegator_address, amount);
+
+        delegation_pool::emit_add_stake_event(pool_address, delegator_address, amount);
     }
 }
