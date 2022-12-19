@@ -43,8 +43,28 @@ pub struct RuntimeModuleMetadataV1 {
 
 /// Enumeration of known attributes
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum KnownAttribute {
+pub struct KnownAttribute {
+    kind: KnownAttributeKind,
+    args: Vec<String>,
+}
+
+/// Enumeration of known attributes
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum KnownAttributeKind {
     ViewFunction = 1,
+}
+
+impl KnownAttribute {
+    pub fn view_function() -> Self {
+        Self {
+            kind: KnownAttributeKind::ViewFunction,
+            args: vec![],
+        }
+    }
+
+    pub fn is_view_function(&self) -> bool {
+        self.kind == KnownAttributeKind::ViewFunction
+    }
 }
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
