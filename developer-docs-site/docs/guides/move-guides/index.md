@@ -25,6 +25,7 @@ Start here to learn how the Move language works on the Aptos blockchain.
 - ### [Mint NFT with Aptos CLI](./mint-nft-cli.md)
 - ### [Upgrading Move Code](upgrading-move-code.md)
 - ### [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
+- ### [End-to-End Aptos Move Tests](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/e2e-move-tests/src/tests)
 
 ## Aptos Move reference
 
