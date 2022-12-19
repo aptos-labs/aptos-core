@@ -112,11 +112,14 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
     let maybe_maximum_amount = service.maximum_amount.unwrap_or(params.amount);
     let amount = std::cmp::min(params.amount, maybe_maximum_amount);
 
-    let receiver_address = params.receiver().ok_or_else(|| {
-        anyhow::format_err!("You must provide 'address' (preferred), 'pub_key', or 'auth_key'")
-    })?;
+    let receiver_address = params
+        .receiver()
+        .ok_or_else(|| {
+            anyhow::format_err!("You must provide 'address' (preferred), 'pub_key', or 'auth_key'")
+        })
+        .unwrap();
 
-    let (mut faucet_seq, mut receiver_seq) = sequences(service, receiver_address).await?;
+    let (mut faucet_seq, mut receiver_seq) = sequences(service, receiver_address).await.unwrap();
     if receiver_seq.is_some() && amount == 0 {
         anyhow::bail!("Account is already created and amount asked for is 0");
     }
@@ -163,7 +166,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
         );
 
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-        let (lhs, rhs) = sequences(service, receiver_address).await?;
+        let (lhs, rhs) = sequences(service, receiver_address).await.unwrap();
         faucet_seq = lhs;
         receiver_seq = rhs;
 
@@ -204,7 +207,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
     // to what was on chain
     if response.is_err() {
         *service.faucet_account.lock().await.sequence_number_mut() = faucet_seq;
-        response?;
+        response.unwrap();
     }
 
     if params.return_txns.unwrap_or(false) {

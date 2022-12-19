@@ -33,6 +33,12 @@ pub enum AuthenticationError {
     MaxSignaturesExceeded,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct FeePayerAuthenticator {
+    pub address: AccountAddress,
+    pub authenticator: TransactionAuthenticator,
+}
+
 /// Each transaction submitted to the Aptos blockchain contains a `TransactionAuthenticator`. During
 /// transaction execution, the executor will check if every `AccountAuthenticator`'s signature on
 /// the transaction hash is well-formed and whether the sha3 hash of the

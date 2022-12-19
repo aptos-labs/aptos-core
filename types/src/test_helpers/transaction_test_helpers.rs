@@ -46,7 +46,7 @@ pub fn get_test_signed_module_publishing_transaction(
 
     let signature = private_key.sign(&raw_txn).unwrap();
 
-    SignedTransaction::new(raw_txn, public_key, signature)
+    SignedTransaction::new(raw_txn, public_key, signature, None)
 }
 
 // Test helper for transaction creation
@@ -74,7 +74,7 @@ pub fn get_test_signed_transaction(
 
     let signature = private_key.sign(&raw_txn).unwrap();
 
-    SignedTransaction::new(raw_txn, public_key, signature)
+    SignedTransaction::new(raw_txn, public_key, signature, None)
 }
 
 // Test helper for creating transactions for which the signature hasn't been checked.
@@ -125,7 +125,7 @@ fn get_test_unchecked_transaction_(
 
     let signature = private_key.sign(&raw_txn).unwrap();
 
-    SignedTransaction::new(raw_txn, public_key, signature)
+    SignedTransaction::new(raw_txn, public_key, signature, None)
 }
 
 // Test helper for transaction creation. Short version for get_test_signed_transaction
@@ -235,7 +235,7 @@ pub fn get_test_txn_with_chain_id(
 
     let signature = private_key.sign(&raw_txn).unwrap();
 
-    SignedTransaction::new(raw_txn, public_key, signature)
+    SignedTransaction::new(raw_txn, public_key, signature, None)
 }
 
 pub fn block(mut user_txns: Vec<Transaction>) -> Vec<Transaction> {

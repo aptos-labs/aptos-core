@@ -292,6 +292,8 @@ impl_poem_type!(
     )
 );
 
+// impl_poem_type!(MyType, "object", ());
+
 impl_poem_parameter!(
     Address,
     HashValue,

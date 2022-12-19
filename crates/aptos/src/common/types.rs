@@ -1348,6 +1348,7 @@ impl TransactionOptions {
                 unsigned_transaction,
                 sender_key.public_key(),
                 Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+                None,
             );
 
             let txns = client

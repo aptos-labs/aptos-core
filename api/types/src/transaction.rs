@@ -13,7 +13,7 @@ use aptos_crypto::{
     ed25519::{self, Ed25519PublicKey},
     multi_ed25519::{self, MultiEd25519PublicKey},
 };
-use aptos_types::transaction::authenticator::MAX_NUM_OF_SIGS;
+use aptos_types::transaction::authenticator::{FeePayerAuthenticator, MAX_NUM_OF_SIGS};
 use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
@@ -306,6 +306,7 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
             expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
             signature: Some(txn.authenticator().into()),
             payload,
+            fee_payer_signature: None,
         }
     }
 }
@@ -449,6 +450,8 @@ pub struct UserTransactionRequest {
     pub payload: TransactionPayload,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<TransactionSignature>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_payer_signature: Option<FeePayerSignature>,
 }
 
 /// Request to create signing messages
@@ -801,6 +804,23 @@ impl WriteSetChange {
             WriteSetChange::WriteResource { .. } => "write_resource",
             WriteSetChange::WriteTableItem { .. } => "write_table_item",
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct FeePayerSignature {
+    pub address: Address,
+    pub signature: TransactionSignature,
+}
+
+impl TryFrom<FeePayerSignature> for FeePayerAuthenticator {
+    type Error = anyhow::Error;
+    fn try_from(fps: FeePayerSignature) -> anyhow::Result<Self> {
+        let FeePayerSignature { address, signature } = fps;
+        Ok(FeePayerAuthenticator {
+            address: AccountAddress::try_from(address)?,
+            authenticator: signature.try_into()?,
+        })
     }
 }
 

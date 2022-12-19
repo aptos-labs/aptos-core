@@ -388,9 +388,14 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             .signature
             .clone()
             .ok_or_else(|| format_err!("missing signature"))?;
+        let mut fee_payer_authenticator = None;
+        if let Some(fee_payer_signature) = txn.fee_payer_signature.clone() {
+            fee_payer_authenticator = Some(fee_payer_signature.try_into()?);
+        }
         Ok(SignedTransaction::new_with_authenticator(
             self.try_into_raw_transaction(txn, chain_id)?,
             signature.try_into()?,
+            fee_payer_authenticator,
         ))
     }
 
@@ -399,13 +404,10 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         submit_transaction_request: SubmitTransactionRequest,
         chain_id: ChainId,
     ) -> Result<SignedTransaction> {
-        Ok(SignedTransaction::new_with_authenticator(
-            self.try_into_raw_transaction_poem(
-                submit_transaction_request.user_transaction_request,
-                chain_id,
-            )?,
-            submit_transaction_request.signature.try_into().context("Failed to parse transaction when building SignedTransaction from SubmitTransactionRequest")?,
-        ))
+        Ok(SignedTransaction::new_with_authenticator(self.try_into_raw_transaction_poem(
+            submit_transaction_request.user_transaction_request,
+            chain_id,
+        )?, submit_transaction_request.signature.try_into().context("Failed to parse transaction when building SignedTransaction from SubmitTransactionRequest")?, None))
     }
 
     pub fn try_into_raw_transaction(
@@ -421,6 +423,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             expiration_timestamp_secs,
             payload,
             signature: _,
+            fee_payer_signature: _,
         } = txn;
         Ok(RawTransaction::new(
             sender.into(),

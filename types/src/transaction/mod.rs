@@ -50,6 +50,7 @@ pub use script::{
 };
 
 use crate::state_store::{state_key::StateKey, state_value::StateValue};
+use crate::transaction::authenticator::FeePayerAuthenticator;
 use move_core_types::vm_status::AbortLocation;
 use once_cell::sync::OnceCell;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
@@ -220,7 +221,7 @@ impl RawTransaction {
     ) -> Result<SignatureCheckedTransaction> {
         let signature = private_key.sign(&self)?;
         Ok(SignatureCheckedTransaction(SignedTransaction::new(
-            self, public_key, signature,
+            self, public_key, signature, None,
         )))
     }
 
@@ -420,6 +421,10 @@ pub struct SignedTransaction {
     /// Prevents serializing the same transaction multiple times to determine size.
     #[serde(skip)]
     size: OnceCell<usize>,
+
+    /// Address and signature of the fee payer
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fee_payer_authenticator: Option<FeePayerAuthenticator>,
 }
 
 /// PartialEq ignores the "bytes" field as this is a OnceCell that may or
@@ -474,12 +479,14 @@ impl SignedTransaction {
         raw_txn: RawTransaction,
         public_key: Ed25519PublicKey,
         signature: Ed25519Signature,
+        fee_payer_authenticator: Option<FeePayerAuthenticator>,
     ) -> SignedTransaction {
         let authenticator = TransactionAuthenticator::ed25519(public_key, signature);
         SignedTransaction {
             raw_txn,
             authenticator,
             size: OnceCell::new(),
+            fee_payer_authenticator,
         }
     }
 
@@ -493,6 +500,7 @@ impl SignedTransaction {
             raw_txn,
             authenticator,
             size: OnceCell::new(),
+            fee_payer_authenticator: None,
         }
     }
 
@@ -510,17 +518,20 @@ impl SignedTransaction {
                 secondary_signers,
             ),
             size: OnceCell::new(),
+            fee_payer_authenticator: None,
         }
     }
 
     pub fn new_with_authenticator(
         raw_txn: RawTransaction,
         authenticator: TransactionAuthenticator,
+        fee_payer_authenticator: Option<FeePayerAuthenticator>,
     ) -> Self {
         Self {
             raw_txn,
             authenticator,
             size: OnceCell::new(),
+            fee_payer_authenticator,
         }
     }
 
