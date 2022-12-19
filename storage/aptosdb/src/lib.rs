@@ -9,14 +9,14 @@
 //! It relays read/write operations on the physical storage via [`schemadb`] to the underlying
 //! Key-Value storage system, and implements aptos data structures on top of it.
 
+#[cfg(feature = "consensus-only-perf-test")]
+pub mod fake_aptosdb;
 // Used in this and other crates for testing.
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helper;
 
 pub mod backup;
 pub mod errors;
-#[cfg(feature = "fake-persist")]
-pub mod fake_aptosdb;
 pub mod metrics;
 pub mod schema;
 pub mod state_restore;
@@ -1807,7 +1807,7 @@ impl GetRestoreHandler for Arc<AptosDB> {
     }
 }
 
-pub(crate) fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
+pub fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
 where
     F: FnOnce() -> Result<T>,
 {

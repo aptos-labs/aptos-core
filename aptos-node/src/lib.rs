@@ -387,59 +387,6 @@ fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
         .chain_id())
 }
 
-fn create_no_state_sync_runtime(
-    mut consensus_listener: ConsensusNotificationListener,
-    mut event_subscription_service: EventSubscriptionService,
-    db_rw: DbReaderWriter,
-) -> anyhow::Result<Runtime> {
-    let runtime = Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("state-sync-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .map_err(|err| anyhow!("Failed to create data streaming service {}", err))?;
-
-    runtime.spawn(async move {
-        // Notify subscribers of the initial on-chain config values
-        match (&*db_rw.reader).fetch_latest_state_checkpoint_version() {
-            Ok(synced_version) => {
-                if let Err(error) =
-                    event_subscription_service.notify_initial_configs(synced_version)
-                {
-                    panic!(
-                        "Failed to notify subscribers of initial on-chain configs: {:?}",
-                        error
-                    )
-                }
-            }
-            Err(error) => panic!("Failed to fetch the initial synced version: {:?}", error),
-        }
-
-        while let Some(notification) = consensus_listener.next().await {
-            match notification {
-                aptos_consensus_notifications::ConsensusNotification::NotifyCommit(
-                    consensus_commit_notification,
-                ) => {
-                    consensus_listener
-                        .respond_to_commit_notification(
-                            consensus_commit_notification,
-                            Result::Ok(()),
-                        )
-                        .await
-                        .unwrap();
-                }
-                aptos_consensus_notifications::ConsensusNotification::SyncToTarget(_) => {}
-            }
-        }
-    });
-
-    Ok(runtime)
-}
-
 fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     node_config: &NodeConfig,
     storage_service_server_network_handles: Vec<StorageServiceNetworkEvents>,

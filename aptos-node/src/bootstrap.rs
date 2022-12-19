@@ -7,7 +7,7 @@ use aptos_db::AptosDB;
 use aptos_storage_interface::DbReaderWriter;
 use tokio::runtime::Runtime;
 
-#[cfg(not(feature = "consensus-only"))]
+#[cfg(not(feature = "consensus-only-perf-test"))]
 pub(crate) fn bootstrap_db(
     node_config: &NodeConfig,
 ) -> Result<(Arc<AptosDB>, DbReaderWriter, Option<Runtime>)> {
@@ -26,11 +26,11 @@ pub(crate) fn bootstrap_db(
         .map_err(|err| anyhow!("DB failed to open {}", err))?,
     );
     let db_backup_service =
-        start_backup_service(node_config.storage.backup_service_address, aptos_db);
+        start_backup_service(node_config.storage.backup_service_address, aptos_db.clone());
     Ok((aptos_db, db_rw, Some(db_backup_service)))
 }
 
-#[cfg(feature = "consensus-only")]
+#[cfg(feature = "consensus-only-perf-test")]
 pub(crate) fn bootstrap_db(
     node_config: &NodeConfig,
 ) -> Result<(

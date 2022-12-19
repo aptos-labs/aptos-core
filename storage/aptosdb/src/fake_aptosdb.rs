@@ -1,17 +1,17 @@
-use crate::{error_if_too_many_requested, AccountAddress};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_storage_interface::{DbReader, DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT};
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{aptos_test_root_address, AccountResource, NewBlockEvent},
+    account_address::AccountAddress,
+    account_config::{AccountResource, NewBlockEvent},
     contract_event::EventWithVersion,
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
     ledger_info::LedgerInfoWithSignatures,
     proof::{
-        AccumulatorConsistencyProof, SparseMerkleProofExt, TransactionAccumulatorProof,
-        TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
-        TransactionInfoListWithProof, TransactionInfoWithProof,
+        AccumulatorConsistencyProof, AccumulatorRangeProof, SparseMerkleProofExt,
+        TransactionAccumulatorProof, TransactionAccumulatorRangeProof,
+        TransactionAccumulatorSummary, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
     state_proof::StateProof,
     state_store::{
@@ -27,14 +27,16 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
+use arc_swap::ArcSwap;
 use move_core_types::move_resource::MoveStructType;
 
 use anyhow::{format_err, Result};
 use dashmap::DashMap;
 use itertools::zip_eq;
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use crate::{
+    errors::AptosDbError,
     gauged_api,
     metrics::{LEDGER_VERSION, NEXT_BLOCK_EPOCH},
     AptosDB,
@@ -42,11 +44,16 @@ use crate::{
 
 pub struct FakeAptosDB {
     inner: AptosDB,
+    // A map of transaction hash to transaction version
     txn_version_by_hash: Arc<DashMap<HashValue, Version>>,
+    // A map of transaction version to Transaction
     txn_by_version: Arc<DashMap<Version, Transaction>>,
+    // A map of transaction to TransactionInfo
     txn_info_by_version: Arc<DashMap<Version, TransactionInfo>>,
+    // A map of account address to the highest executed sequence number
     account_seq_num: Arc<DashMap<AccountAddress, u64>>,
     ledger_commit_lock: std::sync::Mutex<()>,
+    latest_ledger_info: ArcSwap<Option<LedgerInfoWithSignatures>>,
 }
 
 impl FakeAptosDB {
@@ -58,6 +65,7 @@ impl FakeAptosDB {
             txn_info_by_version: Arc::new(DashMap::new()),
             account_seq_num: Arc::new(DashMap::new()),
             ledger_commit_lock: std::sync::Mutex::new(()),
+            latest_ledger_info: ArcSwap::from(Arc::new(None)),
         }
     }
 }
@@ -81,6 +89,9 @@ impl DbWriter for FakeAptosDB {
                 .try_lock()
                 .expect("Concurrent committing detected.");
 
+            // Persist the writeset of the genesis transaction executed on the VM. The framework
+            // code in genesis is necessary for benchmark execution. Note that only the genesis
+            // transaction is executed on the VM when consensus-only-perf-test feature is enabled.
             if first_version == 0 {
                 self.inner.save_transactions(
                     txns_to_commit,
@@ -90,37 +101,13 @@ impl DbWriter for FakeAptosDB {
                     sync_commit,
                     latest_in_memory_state,
                 )?;
-
-                // let last_version = first_version + txns_to_commit.len() as u64 - 1;
-
-                // zip_eq(first_version..=last_version, txns_to_commit).for_each(
-                //     |(_, txn_to_commit)| {
-                //         if let Transaction::GenesisTransaction(write_set) =
-                //             txn_to_commit.transaction()
-                //         {
-                //             if let aptos_types::transaction::WriteSetPayload::Direct(change_set) =
-                //                 write_set
-                //             {
-                //                 change_set.write_set().iter().for_each(|(key, _)| {
-                //                     if let StateKey::AccessPath(path) = key {
-                //                         println!("{{ key: {} }}, ", path);
-                //                     }
-                //                 });
-                //                 println!("==============");
-                //             }
-                //         }
-                //     },
-                // );
             }
-
-            // print!("save_transactions usr : ");
 
             let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
+            // Iterate through the transactions and update the in-memory maps
             zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
                 |(ver, txn_to_commit)| -> Result<(), anyhow::Error> {
-                    // let hash = txn_to_commit.transaction().hash();
-
                     self.txn_by_version
                         .insert(ver, txn_to_commit.transaction().clone());
                     self.txn_info_by_version
@@ -128,6 +115,7 @@ impl DbWriter for FakeAptosDB {
                     self.txn_version_by_hash
                         .insert(txn_to_commit.transaction().hash(), ver);
 
+                    // If it is a user transaction, also update the account sequence number
                     if let Ok(user_txn) = txn_to_commit.transaction().as_signed_user_txn() {
                         self.account_seq_num
                             .entry(user_txn.sender())
@@ -140,11 +128,9 @@ impl DbWriter for FakeAptosDB {
                 },
             )?;
 
-            // println!("");
-
             // Once everything is successfully stored, update the latest in-memory ledger info.
             if let Some(x) = ledger_info_with_sigs {
-                self.inner.ledger_store.set_latest_ledger_info(x.clone());
+                self.latest_ledger_info.store(Arc::new(Some(x.clone())));
 
                 LEDGER_VERSION.set(x.ledger_info().version() as i64);
                 NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
@@ -185,12 +171,49 @@ impl DbReader for FakeAptosDB {
     fn get_transactions(
         &self,
         start_version: Version,
-        batch_size: u64,
+        limit: u64,
         ledger_version: Version,
-        fetch_events: bool,
+        _fetch_events: bool,
     ) -> Result<TransactionListWithProof> {
-        self.inner
-            .get_transactions(start_version, batch_size, ledger_version, fetch_events)
+        gauged_api("get_transactions", || {
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+
+            if start_version > ledger_version || limit == 0 {
+                return Ok(TransactionListWithProof::new_empty());
+            }
+
+            let limit = std::cmp::min(limit, ledger_version - start_version + 1);
+
+            let (txn_info_list, txn_list) = (start_version..start_version + limit)
+                .map(|version| {
+                    let txn_info = self
+                        .txn_info_by_version
+                        .get(&version)
+                        .ok_or_else(|| format_err!("No transaction info at version {}", version,))?
+                        .clone();
+
+                    let txn = self
+                        .txn_by_version
+                        .get(&version)
+                        .ok_or_else(|| format_err!("No transaction at version {}", version))?
+                        .clone();
+
+                    Ok((txn_info, txn))
+                })
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .unzip();
+
+            Ok(TransactionListWithProof::new(
+                txn_list,
+                None,
+                Some(start_version),
+                TransactionInfoListWithProof::new(
+                    AccumulatorRangeProof::new_empty(),
+                    txn_info_list,
+                ),
+            ))
+        })
     }
 
     fn get_gas_prices(
@@ -206,52 +229,49 @@ impl DbReader for FakeAptosDB {
     fn get_transaction_by_hash(
         &self,
         hash: HashValue,
-        _ledger_version: Version,
-        _fetch_events: bool,
+        ledger_version: Version,
+        fetch_events: bool,
     ) -> Result<Option<TransactionWithProof>> {
-        // println!("get_transaction_by_hash {hash:#x}");
-        // println!(
-        //     "txn_version_by_hash({hash:#x}): {:?}",
-        //     self.txn_version_by_hash.contains_key(&hash)
-        // );
-        self.txn_version_by_hash
-            .get(&hash)
-            .as_deref()
-            .map(|version| {
-                let txn_info = self
-                    .txn_info_by_version
-                    .get(version)
-                    .ok_or_else(|| format_err!("No transaction info at version {}", version,))?
-                    .clone();
-                let txn = self
-                    .txn_by_version
-                    .get(version)
-                    .ok_or_else(|| format_err!("No transaction at version {}", version))?
-                    .clone();
-
-                let txn_info_with_proof = TransactionInfoWithProof::new(
-                    TransactionAccumulatorProof::new(vec![]),
-                    txn_info,
-                );
-
-                Ok(TransactionWithProof::new(
-                    version.clone(),
-                    txn,
-                    None,
-                    txn_info_with_proof,
-                ))
-            })
-            .transpose()
+        gauged_api("get_transaction_by_hash", || {
+            self.txn_version_by_hash
+                .get(&hash)
+                .as_deref()
+                .map(|version| {
+                    self.get_transaction_by_version(*version, ledger_version, fetch_events)
+                })
+                .transpose()
+        })
     }
 
     fn get_transaction_by_version(
         &self,
         version: Version,
-        ledger_version: Version,
-        fetch_events: bool,
+        _ledger_version: Version,
+        _fetch_events: bool,
     ) -> Result<TransactionWithProof> {
-        self.inner
-            .get_transaction_by_version(version, ledger_version, fetch_events)
+        gauged_api("get_transaction_by_version", || {
+            let txn_info = self
+                .txn_info_by_version
+                .get(&version)
+                .ok_or_else(|| format_err!("No transaction info at version {}", version,))?
+                .clone();
+
+            let txn = self
+                .txn_by_version
+                .get(&version)
+                .ok_or_else(|| format_err!("No transaction at version {}", version))?
+                .clone();
+
+            let txn_info_with_proof =
+                TransactionInfoWithProof::new(TransactionAccumulatorProof::new(vec![]), txn_info);
+
+            Ok(TransactionWithProof::new(
+                version.clone(),
+                txn,
+                None,
+                txn_info_with_proof,
+            ))
+        })
     }
 
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
@@ -374,11 +394,13 @@ impl DbReader for FakeAptosDB {
     }
 
     fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
-        self.inner.get_latest_ledger_info_option()
+        let ledger_info_ptr = self.latest_ledger_info.load();
+        let ledger_info: &Option<_> = ledger_info_ptr.deref();
+        Ok(ledger_info.clone())
     }
 
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
-        self.inner.get_latest_state_checkpoint_version()
+        Ok(Some(self.get_latest_ledger_info()?.ledger_info().version()))
     }
 
     fn get_state_snapshot_before(
@@ -433,7 +455,7 @@ impl DbReader for FakeAptosDB {
         let account_address = access_path.address;
         let struct_tag = access_path.get_struct_tag();
 
-        if (account_address != aptos_test_root_address() && account_address != AccountAddress::ONE)
+        if (account_address != AccountAddress::ONE)
             && struct_tag.is_some()
             && struct_tag.unwrap() == AccountResource::struct_tag()
         {
@@ -441,8 +463,10 @@ impl DbReader for FakeAptosDB {
             let seq_num = match self.account_seq_num.get(&account_address).as_deref() {
                 Some(seq_num) => *seq_num,
                 None => {
-                    self.account_seq_num.insert(account_address, 1);
-                    1
+                    let initial_seq_num = 0;
+                    self.account_seq_num
+                        .insert(account_address, initial_seq_num);
+                    initial_seq_num
                 }
             };
             let account = AccountResource::new(
@@ -454,7 +478,6 @@ impl DbReader for FakeAptosDB {
             let bytes = bcs::to_bytes(&account)?;
             Ok(Some(StateValue::new(bytes)))
         } else {
-            // println!("getting root account from db");
             self.inner.get_state_value_by_version(state_key, version)
         }
     }
@@ -551,5 +574,302 @@ impl DbReader for FakeAptosDB {
 
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         self.inner.get_state_storage_usage(version)
+    }
+}
+
+fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {
+    if num_requested > max_allowed {
+        Err(AptosDbError::TooManyRequested(num_requested, max_allowed).into())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::test_helper::{arb_blocks_to_commit, update_in_memory_state};
+    use crate::AptosDB;
+    use anyhow::{ensure, Result};
+    use aptos_crypto::{hash::CryptoHash, HashValue};
+    use aptos_storage_interface::{DbReader, DbWriter};
+    use aptos_temppath::TempPath;
+    use aptos_types::account_address::AccountAddress;
+    use aptos_types::transaction::{
+        TransactionListWithProof, TransactionOutputListWithProof, TransactionStatus,
+    };
+    use aptos_types::{
+        ledger_info::LedgerInfoWithSignatures,
+        transaction::{TransactionToCommit, TransactionWithProof, Version},
+    };
+
+    use crate::fake_aptosdb::FakeAptosDB;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+
+        #[test]
+        fn test_save_transactions(input in arb_blocks_to_commit()) {
+            let tmp_dir = TempPath::new();
+            let db = FakeAptosDB::new(AptosDB::new_for_test(&tmp_dir));
+
+            let mut in_memory_state = db
+                .inner
+                .buffered_state()
+                .lock()
+                .current_state()
+                .clone();
+
+            let mut cur_ver: Version = 0;
+            for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
+                update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
+                db.save_transactions(
+                    txns_to_commit,
+                    cur_ver,                /* first_version */
+                    cur_ver.checked_sub(1), /* base_state_version */
+                    Some(ledger_info_with_sigs),
+                    false, /* sync_commit */
+                    in_memory_state.clone(),
+                )
+                .unwrap();
+
+                assert_eq!(
+                    db.get_latest_ledger_info().unwrap(),
+                    *ledger_info_with_sigs
+                );
+                verify_committed_transactions(
+                    &db,
+                    txns_to_commit,
+                    cur_ver,
+                    ledger_info_with_sigs,
+                );
+
+                cur_ver += txns_to_commit.len() as u64;
+            }
+        }
+    }
+
+    fn verify_committed_transactions(
+        db: &FakeAptosDB,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: Version,
+        ledger_info_with_sigs: &LedgerInfoWithSignatures,
+    ) {
+        let ledger_info = ledger_info_with_sigs.ledger_info();
+        let ledger_version = ledger_info.version();
+        assert_eq!(
+            db.get_accumulator_root_hash(ledger_version).unwrap(),
+            HashValue::zero(),
+        );
+
+        let mut cur_ver = first_version;
+        for txn_to_commit in txns_to_commit {
+            let txn_info = &*db.txn_info_by_version.get(&cur_ver).unwrap();
+
+            // Verify transaction hash.
+            assert_eq!(
+                txn_info.transaction_hash(),
+                txn_to_commit.transaction().hash()
+            );
+
+            if !txn_to_commit.is_state_checkpoint() {
+                // Fetch and verify transaction itself.
+                let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
+                let txn_with_proof = db
+                    .get_transaction_by_hash(
+                        txn_to_commit.transaction().hash(),
+                        ledger_version,
+                        true,
+                    )
+                    .unwrap()
+                    .unwrap();
+
+                assert_eq!(
+                    txn_with_proof.transaction.hash(),
+                    txn_to_commit.transaction().hash()
+                );
+
+                verify_user_txn(
+                    &txn_with_proof,
+                    cur_ver,
+                    txn.sender(),
+                    txn.sequence_number(),
+                )
+                .unwrap();
+
+                let txn_with_proof = db
+                    .get_transaction_by_version(cur_ver, ledger_version, true)
+                    .unwrap();
+                verify_user_txn(
+                    &txn_with_proof,
+                    cur_ver,
+                    txn.sender(),
+                    txn.sequence_number(),
+                )
+                .unwrap();
+
+                let txn_list_with_proof = db
+                    .get_transactions(cur_ver, 1, ledger_version, true /* fetch_events */)
+                    .unwrap();
+                verify_txn_list(&txn_list_with_proof, Some(cur_ver)).unwrap();
+                assert_eq!(txn_list_with_proof.transactions.len(), 1);
+
+                let txn_output_list_with_proof = db
+                    .get_transaction_outputs(cur_ver, 1, ledger_version)
+                    .unwrap();
+                verify_txn_outputs(&txn_output_list_with_proof, Some(cur_ver)).unwrap();
+                assert_eq!(txn_output_list_with_proof.transactions_and_outputs.len(), 1);
+            }
+            cur_ver += 1;
+        }
+    }
+
+    fn verify_user_txn(
+        transaction_with_proof: &TransactionWithProof,
+        version: Version,
+        sender: AccountAddress,
+        sequence_number: u64,
+    ) -> Result<()> {
+        let signed_transaction = transaction_with_proof.transaction.as_signed_user_txn()?;
+
+        ensure!(
+            transaction_with_proof.version == version,
+            "Version ({}) is not expected ({}).",
+            transaction_with_proof.version,
+            version,
+        );
+        ensure!(
+            signed_transaction.sender() == sender,
+            "Sender ({}) not expected ({}).",
+            signed_transaction.sender(),
+            sender,
+        );
+        ensure!(
+            signed_transaction.sequence_number() == sequence_number,
+            "Sequence number ({}) not expected ({}).",
+            signed_transaction.sequence_number(),
+            sequence_number,
+        );
+
+        let txn_hash = transaction_with_proof.transaction.hash();
+        ensure!(
+            txn_hash
+                == transaction_with_proof
+                    .proof
+                    .transaction_info()
+                    .transaction_hash(),
+            "Transaction hash ({}) not expected ({}).",
+            txn_hash,
+            transaction_with_proof
+                .proof
+                .transaction_info()
+                .transaction_hash(),
+        );
+
+        Ok(())
+    }
+
+    fn verify_txn_outputs(
+        txn_outputs_with_proof: &TransactionOutputListWithProof,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        // Verify the first transaction/output versions match
+        ensure!(
+            txn_outputs_with_proof.first_transaction_output_version
+                == first_transaction_output_version,
+            "First transaction and output version ({:?}) doesn't match given version ({:?}).",
+            txn_outputs_with_proof.first_transaction_output_version,
+            first_transaction_output_version,
+        );
+
+        // Verify the lengths of the transaction(output)s and transaction infos match
+        ensure!(
+            txn_outputs_with_proof.proof.transaction_infos.len()
+                == txn_outputs_with_proof.transactions_and_outputs.len(),
+            "The number of TransactionInfo objects ({}) does not match the number of \
+             transactions and outputs ({}).",
+            txn_outputs_with_proof.proof.transaction_infos.len(),
+            txn_outputs_with_proof.transactions_and_outputs.len(),
+        );
+
+        // Verify the events, status, gas used and transaction hashes.
+        itertools::zip_eq(
+            &txn_outputs_with_proof.transactions_and_outputs,
+            &txn_outputs_with_proof.proof.transaction_infos,
+        )
+        .map(|((txn, txn_output), txn_info)| {
+            // Verify the gas matches for both the transaction info and output
+            ensure!(
+                txn_output.gas_used() == txn_info.gas_used(),
+                "The gas used in transaction output does not match the transaction info \
+                     in proof. Gas used in transaction output: {}. Gas used in txn_info: {}.",
+                txn_output.gas_used(),
+                txn_info.gas_used(),
+            );
+
+            // Verify the execution status matches for both the transaction info and output.
+            ensure!(
+                *txn_output.status() == TransactionStatus::Keep(txn_info.status().clone()),
+                "The execution status of transaction output does not match the transaction \
+                     info in proof. Status in transaction output: {:?}. Status in txn_info: {:?}.",
+                txn_output.status(),
+                txn_info.status(),
+            );
+
+            // Verify the transaction hashes match those of the transaction infos
+            let txn_hash = txn.hash();
+            ensure!(
+                txn_hash == txn_info.transaction_hash(),
+                "The transaction hash does not match the hash in transaction info. \
+                     Transaction hash: {:x}. Transaction hash in txn_info: {:x}.",
+                txn_hash,
+                txn_info.transaction_hash(),
+            );
+            Ok(())
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+        Ok(())
+    }
+
+    fn verify_txn_list(
+        txn_list: &TransactionListWithProof,
+        first_transaction_version: Option<Version>,
+    ) -> Result<()> {
+        // Verify the first transaction versions match
+        ensure!(
+            txn_list.first_transaction_version == first_transaction_version,
+            "First transaction version ({:?}) doesn't match given version ({:?}).",
+            txn_list.first_transaction_version,
+            first_transaction_version,
+        );
+
+        // Verify the lengths of the transactions and transaction infos match
+        ensure!(
+            txn_list.proof.transaction_infos.len() == txn_list.transactions.len(),
+            "The number of TransactionInfo objects ({}) does not match the number of \
+             transactions ({}).",
+            txn_list.proof.transaction_infos.len(),
+            txn_list.transactions.len(),
+        );
+
+        // Verify the transaction hashes match those of the transaction infos
+        let transaction_hashes: Vec<_> =
+            txn_list.transactions.iter().map(CryptoHash::hash).collect();
+        itertools::zip_eq(transaction_hashes, &txn_list.proof.transaction_infos)
+            .map(|(txn_hash, txn_info)| {
+                ensure!(
+                    txn_hash == txn_info.transaction_hash(),
+                    "The hash of transaction does not match the transaction info in proof. \
+                     Transaction hash: {:x}. Transaction hash in txn_info: {:x}.",
+                    txn_hash,
+                    txn_info.transaction_hash(),
+                );
+                Ok(())
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(())
     }
 }

@@ -7,7 +7,6 @@ use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_executor_types::ExecutedChunk;
 use aptos_logger::{trace, warn};
-use aptos_state_view::{StateView, StateViewId};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     ExecutedTrees,
@@ -15,7 +14,6 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
-    write_set::WriteSet,
 };
 use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
@@ -98,7 +96,7 @@ impl ChunkOutput {
         }
     }
 
-    #[cfg(not(feature = "fake-execute"))]
+    #[cfg(not(feature = "consensus-only-perf-test"))]
     fn execute_block<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
@@ -106,11 +104,14 @@ impl ChunkOutput {
         Ok(V::execute_block(transactions, &state_view)?)
     }
 
-    #[cfg(feature = "fake-execute")]
+    #[cfg(feature = "consensus-only-perf-test")]
     fn execute_block<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
     ) -> Result<Vec<TransactionOutput>> {
+        use aptos_state_view::{StateViewId, TStateView};
+        use aptos_types::write_set::WriteSet;
+
         let transaction_outputs = match state_view.id() {
             StateViewId::Miscellaneous => V::execute_block(transactions, &state_view)?,
             _ => transactions

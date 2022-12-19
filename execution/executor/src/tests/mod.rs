@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeSet, iter::once, sync::Arc};
+use std::{iter::once, sync::Arc};
 
 use proptest::prelude::*;
 
@@ -18,7 +18,6 @@ use aptos_types::{
     block_info::BlockInfo,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    proof::definition::LeafCount,
     state_store::{state_key::StateKey, state_value::StateValue},
     test_helpers::transaction_test_helpers::block,
     transaction::{
@@ -135,6 +134,7 @@ fn gen_ledger_info(
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_executor_status() {
     let executor = TestExecutor::new();
     let parent_block_id = executor.committed_block_id();
@@ -148,15 +148,31 @@ fn test_executor_status() {
         .execute_block((block_id, block(vec![txn0, txn1, txn2])), parent_block_id)
         .unwrap();
 
-    assert_eq!(
-        &vec![
-            KEEP_STATUS.clone(),
-            KEEP_STATUS.clone(),
-            DISCARD_STATUS.clone(),
-            KEEP_STATUS.clone(),
-        ],
-        output.compute_status()
-    );
+    #[cfg(not(feature = "consensus-only-perf-test"))]
+    {
+        assert_eq!(
+            &vec![
+                KEEP_STATUS.clone(),
+                KEEP_STATUS.clone(),
+                DISCARD_STATUS.clone(),
+                KEEP_STATUS.clone(),
+            ],
+            output.compute_status()
+        );
+    }
+    // Since execution is disabled, all the transactions should be kept.
+    #[cfg(feature = "consensus-only-perf-test")]
+    {
+        assert_eq!(
+            &vec![
+                KEEP_STATUS.clone(),
+                KEEP_STATUS.clone(),
+                KEEP_STATUS.clone(),
+                KEEP_STATUS.clone(),
+            ],
+            output.compute_status()
+        );
+    }
 }
 
 #[test]
@@ -216,7 +232,21 @@ fn test_executor_two_blocks_with_failed_txns() {
     let output2 = executor
         .execute_block((block2_id, block(block2_txns)), block1_id)
         .unwrap();
-    let ledger_info = gen_ledger_info(77, output2.root_hash(), block2_id, 1);
+
+    #[cfg(not(feature = "consensus-only-perf-test"))]
+    let expected_ledger_info_version: u64 = 77;
+
+    // Trasnsaction do not fail in consensus-only-perf-test mode since
+    // they are not executed
+    #[cfg(feature = "consensus-only-perf-test")]
+    let expected_ledger_info_version: u64 = 102;
+
+    let ledger_info = gen_ledger_info(
+        expected_ledger_info_version,
+        output2.root_hash(),
+        block2_id,
+        1,
+    );
     executor
         .commit_blocks(vec![block1_id, block2_id], ledger_info)
         .unwrap();
@@ -320,6 +350,7 @@ fn create_transaction_chunks(
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_noop_block_after_reconfiguration() {
     let executor = TestExecutor::new();
     let mut parent_block_id = executor.committed_block_id();
@@ -528,12 +559,19 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
     let db = &executor.db;
     let mut ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
+    #[cfg(not(feature = "consensus-only-perf-test"))]
+    let state_view_id = StateViewId::Miscellaneous;
+    #[cfg(feature = "consensus-only-perf-test")]
+    let state_view_id = StateViewId::BlockExecution {
+        block_id: HashValue::zero(),
+    };
+
     for txn in transactions {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
             vec![txn],
             ledger_view
                 .verified_state_view(
-                    StateViewId::Miscellaneous,
+                    state_view_id,
                     Arc::clone(&db.reader),
                     Arc::new(SyncProofFetcher::new(db.reader.clone())),
                 )
@@ -611,6 +649,7 @@ proptest! {
     }
 
     #[test]
+    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
     fn test_reconfiguration_with_retry_transaction_status(
         (num_user_txns, reconfig_txn_index) in (10..100u64).prop_flat_map(|num_user_txns| {
             (
@@ -620,7 +659,7 @@ proptest! {
         })) {
             let block_id = gen_block_id(1);
             let mut block = TestBlock::new(num_user_txns, 10, block_id);
-            let num_txns = block.txns.len() as LeafCount;
+            let num_txns = block.txns.len() as aptos_types::proof::definition::LeafCount;
             block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction();
             let executor = TestExecutor::new();
 
@@ -663,7 +702,7 @@ proptest! {
             // replay txns in one batch across epoch boundary,
             // and the replayer should deal with `Retry`s automatically
             let replayer = chunk_executor_tests::TestExecutor::new();
-            replayer.executor.replay(block.txns, txn_infos, vec![], vec![], Arc::new(BTreeSet::new())).unwrap();
+            replayer.executor.replay(block.txns, txn_infos, vec![], vec![], Arc::new(std::collections::BTreeSet::new())).unwrap();
             replayer.executor.commit().unwrap();
             let replayed_db = replayer.db.reader.clone();
             prop_assert_eq!(

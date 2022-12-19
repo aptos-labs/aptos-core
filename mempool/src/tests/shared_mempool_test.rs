@@ -54,6 +54,7 @@ fn test_consensus_events_rejected_txns() {
 }
 
 #[test]
+#[cfg(not(feature = "consensus-only-perf-test"))]
 fn test_mempool_notify_committed_txns() {
     // Create runtime for the mempool notifier and listener
     let runtime = Builder::new_multi_thread()
@@ -98,4 +99,54 @@ fn test_mempool_notify_committed_txns() {
     let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10);
     assert_eq!(timeline.len(), 1);
     assert_eq!(timeline.first().unwrap(), &kept_txn);
+}
+
+#[test]
+#[cfg(feature = "consensus-only-perf-test")]
+/// Since commit notifications are ignored, no transactions are
+/// evicted from the mempool nor they should be garbage collected.
+fn test_mempool_notify_committed_txns_is_noop() {
+    // Create runtime for the mempool notifier and listener
+    let runtime = Builder::new_multi_thread()
+        .disable_lifo_slot()
+        .enable_all()
+        .build()
+        .unwrap();
+    let _enter = runtime.enter();
+
+    // Create a new mempool notifier, listener and shared mempool
+    let smp = MockSharedMempool::new();
+
+    // Add txns 1, 2, 3
+    // Txn 1: committed successfully
+    // Txn 2: not committed but older than gc block timestamp
+    // Txn 3: not committed and newer than block timestamp
+    let committed_txn =
+        TestTransaction::new(0, 0, 1).make_signed_transaction_with_expiration_time(0);
+    let kept_txn = TestTransaction::new(1, 0, 1).make_signed_transaction(); // not committed or cleaned out by block timestamp gc
+    let txns = vec![
+        committed_txn.clone(),
+        TestTransaction::new(0, 1, 1).make_signed_transaction_with_expiration_time(0),
+        kept_txn.clone(),
+    ];
+    // Add txns to mempool
+    {
+        let mut pool = smp.mempool.lock();
+        assert!(batch_add_signed_txn(&mut pool, txns).is_ok());
+    }
+
+    let committed_txns = vec![Transaction::UserTransaction(committed_txn.clone())];
+    block_on(async {
+        assert!(smp
+            .mempool_notifier
+            .notify_new_commit(committed_txns, 1, 1000)
+            .await
+            .is_ok());
+    });
+
+    let pool = smp.mempool.lock();
+    // TODO: make less brittle to broadcast buckets changes
+    let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10);
+    assert_eq!(timeline.len(), 3);
+    assert_eq!(timeline.first().unwrap(), &committed_txn);
 }

@@ -11,6 +11,7 @@ use crate::{
         notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
         SharedMempoolNotification, SubmissionStatusBundle,
     },
+    thread_pool::IO_POOL,
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
@@ -22,12 +23,15 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::HistogramTimer;
 use aptos_network::application::interface::NetworkInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
-use aptos_types::on_chain_config::OnChainConsensusConfig;
+use aptos_types::{
+    mempool_status::MempoolStatus, on_chain_config::OnChainConsensusConfig,
+    vm_status::DiscardedVMStatus,
+};
 use aptos_types::{
     mempool_status::MempoolStatusCode, on_chain_config::OnChainConfigPayload,
     transaction::SignedTransaction,
 };
-use aptos_vm_validator::vm_validator::{self, get_account_sequence_number, TransactionValidation};
+use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
 
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use rayon::prelude::*;
@@ -233,9 +237,9 @@ pub(crate) fn update_ack_counter(
     }
 }
 
-#[cfg(feature = "no-validation")]
 /// Submits a list of SignedTransaction to the local mempool
-/// and returns a vector containing AdmissionControlStatus.
+/// and returns a vector containing SubmissionStatusBundle.
+#[cfg(not(feature = "consensus-only-perf-test"))]
 pub(crate) fn process_incoming_transactions<V>(
     smp: &SharedMempool<V>,
     transactions: Vec<SignedTransaction>,
@@ -244,39 +248,6 @@ pub(crate) fn process_incoming_transactions<V>(
 where
     V: TransactionValidation,
 {
-    use aptos_types::account_config::AccountSequenceInfo;
-
-    let mut statuses = vec![];
-    let mut mempool = smp.mempool.lock();
-    for transaction in transactions.into_iter() {
-        let mempool_status = mempool.add_txn(
-            transaction.clone(),
-            0,
-            AccountSequenceInfo::Sequential(0),
-            timeline_state,
-        );
-        statuses.push((transaction, (mempool_status, None)));
-    }
-    return statuses;
-}
-
-#[cfg(not(feature = "no-validation"))]
-/// Submits a list of SignedTransaction to the local mempool
-/// and returns a vector containing AdmissionControlStatus.
-pub(crate) fn process_incoming_transactions<V>(
-    smp: &SharedMempool<V>,
-    transactions: Vec<SignedTransaction>,
-    timeline_state: TimelineState,
-) -> Vec<SubmissionStatusBundle>
-where
-    V: TransactionValidation,
-{
-    use crate::thread_pool::IO_POOL;
-    use aptos_types::{mempool_status::MempoolStatus, vm_status::DiscardedVMStatus};
-    use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
-    use storage_interface::state_view::LatestDbStateCheckpointView;
-    use vm_validator::vm_validator::get_account_sequence_number;
-
     let mut statuses = vec![];
 
     let start_storage_read = Instant::now();
@@ -377,6 +348,87 @@ where
                     ),
                 ));
             }
+        }
+    }
+    notify_subscribers(SharedMempoolNotification::NewTransactions, &smp.subscribers);
+    statuses
+}
+
+/// Submits a list of SignedTransaction to the local mempool
+/// and returns a vector containing SubmissionStatusBundle.
+#[cfg(feature = "consensus-only-perf-test")]
+pub(crate) fn process_incoming_transactions<V>(
+    smp: &SharedMempool<V>,
+    transactions: Vec<SignedTransaction>,
+    timeline_state: TimelineState,
+) -> Vec<SubmissionStatusBundle>
+where
+    V: TransactionValidation,
+{
+    let mut statuses = vec![];
+
+    let start_storage_read = Instant::now();
+    let state_view = smp
+        .db
+        .latest_state_checkpoint_view()
+        .expect("Failed to get latest state checkpoint view.");
+
+    // Track latency: fetching seq number
+    let seq_numbers = IO_POOL.install(|| {
+        transactions
+            .par_iter()
+            .map(|t| {
+                get_account_sequence_number(&state_view, t.sender()).map_err(|e| {
+                    error!(LogSchema::new(LogEntry::DBError).error(&e));
+                    counters::DB_ERROR.inc();
+                    e
+                })
+            })
+            .collect::<Vec<_>>()
+    });
+
+    // Track latency for storage read fetching sequence number
+    let storage_read_latency = start_storage_read.elapsed();
+    counters::PROCESS_TXN_BREAKDOWN_LATENCY
+        .with_label_values(&[counters::FETCH_SEQ_NUM_LABEL])
+        .observe(storage_read_latency.as_secs_f64() / transactions.len() as f64);
+
+    let transactions: Vec<_> = transactions
+        .into_iter()
+        .enumerate()
+        .filter_map(|(idx, t)| {
+            if let Ok(sequence_info) = seq_numbers[idx] {
+                if t.sequence_number() >= sequence_info.min_seq() {
+                    return Some((t, sequence_info));
+                } else {
+                    statuses.push((
+                        t,
+                        (
+                            MempoolStatus::new(MempoolStatusCode::VmError),
+                            Some(DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD),
+                        ),
+                    ));
+                }
+            } else {
+                // Failed to get transaction
+                statuses.push((
+                    t,
+                    (
+                        MempoolStatus::new(MempoolStatusCode::VmError),
+                        Some(DiscardedVMStatus::RESOURCE_DOES_NOT_EXIST),
+                    ),
+                ));
+            }
+            None
+        })
+        .collect();
+
+    {
+        let mut mempool = smp.mempool.lock();
+        for (transaction, sequence_info) in transactions.into_iter() {
+            let mempool_status =
+                mempool.add_txn(transaction.clone(), 0, sequence_info, timeline_state);
+            statuses.push((transaction, (mempool_status, None)));
         }
     }
     notify_subscribers(SharedMempoolNotification::NewTransactions, &smp.subscribers);
@@ -499,6 +551,17 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
 }
 
 /// Remove transactions that are committed (or rejected) so that we can stop broadcasting them.
+#[cfg(feature = "consensus-only-perf-test")]
+pub(crate) fn process_committed_transactions(
+    _mempool: &Mutex<CoreMempool>,
+    _transactions: Vec<TransactionSummary>,
+    _block_timestamp_usecs: u64,
+) {
+    // no-op
+}
+
+/// Remove transactions that are committed (or rejected) so that we can stop broadcasting them.
+#[cfg(not(feature = "consensus-only-perf-test"))]
 pub(crate) fn process_committed_transactions(
     mempool: &Mutex<CoreMempool>,
     transactions: Vec<TransactionSummary>,

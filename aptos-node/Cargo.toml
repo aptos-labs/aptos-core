@@ -64,9 +64,9 @@ tokio-stream = { workspace = true }
 jemallocator = { workspace = true }
 
 [features]
-default = [ "consensus-only" ]
+default = ["consensus-only-perf-test"]
 assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-cloneable"]
 failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
 indexer = ["aptos-indexer"]
 check-vm-features = []
-consensus-only = ["aptos-consensus/consensus-only", "aptos-executor/fake-execute", "aptos-mempool/no-validation", "aptos-db/fake-persist"]
+consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-mempool/consensus-only-perf-test", "aptos-db/consensus-only-perf-test"]

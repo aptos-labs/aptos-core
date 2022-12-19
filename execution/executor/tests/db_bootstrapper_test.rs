@@ -186,6 +186,7 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_new_genesis() {
     let genesis = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_key = &aptos_vm_genesis::GENESIS_KEYPAIR.0;

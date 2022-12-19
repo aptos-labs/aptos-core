@@ -41,7 +41,7 @@ impl Default for MempoolConfig {
             mempool_snapshot_interval_secs: 180,
             capacity: 2_000_000,
             capacity_bytes: 2 * 1024 * 1024 * 1024,
-            capacity_per_user: 100_000,
+            capacity_per_user: 100,
             default_failovers: 3,
             system_transaction_timeout_secs: 5 * 60 * 60,
             system_transaction_gc_interval_ms: 5 * 60 * 60_000,
