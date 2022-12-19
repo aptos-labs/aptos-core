@@ -24,6 +24,7 @@ impl QuorumStoreDB {
     pub(crate) fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
         let column_families = vec![BATCH_CF_NAME, BATCH_ID_CF_NAME];
 
+        // TODO: this fails twins tests because it assumes a unique path per process
         let path = db_root_path.as_ref().join("quorumstoreDB");
         let instant = Instant::now();
         let mut opts = Options::default();
