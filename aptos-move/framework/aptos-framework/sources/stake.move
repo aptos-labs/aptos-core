@@ -1425,12 +1425,8 @@ module aptos_framework::stake {
 
     #[test_only]
     public fun mint(account: &signer, amount: u64) acquires AptosCoinCapabilities {
-        let account_address = signer::address_of(account);
-        if (!coin::is_account_registered<AptosCoin>(account_address)) {
-            coin::register<AptosCoin>(account);
-        };
-
-        coin::deposit(account_address, mint_coins(amount));
+        coin::register<AptosCoin>(account);
+        coin::deposit(signer::address_of(account), mint_coins(amount));
     }
 
     #[test_only]
