@@ -1188,7 +1188,7 @@ def test(
     test_suites: Tuple[str],
 ) -> None:
     forge_enable_performance = "true"
-    forge_test_suite = "land_blocking" # "max_tps_test"
+    forge_test_suite = "max_tps_test"
     
     """Run a forge test"""
     shell = LocalShell(verbose == "true")
