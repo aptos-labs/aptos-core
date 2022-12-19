@@ -40,12 +40,17 @@ module aptos_framework::delegate {
         pool_address: address,
     }
 
-    public entry fun initialize_delegation_pool(owner: &signer) {
+    public entry fun initialize_delegation_pool(owner: &signer, delegation_pool_creation_seed: vector<u8>) {
         let owner_address = signer::address_of(owner);
         assert!(!owner_cap_exists(owner_address), error::already_exists(EOWNER_CAP_ALREADY_EXISTS));
 
+        // generate a seed to be used to create the resource account hosting the delegation pool
         let seed = bcs::to_bytes(&owner_address);
+        // include a salt to avoid conflicts with any other modules creating resource accounts
         vector::append(&mut seed, SALT);
+        // include an additional salt in case the same resource account has already been created.
+        vector::append(&mut seed, delegation_pool_creation_seed);
+
         let (stake_pool_signer, stake_pool_signer_cap) = account::create_resource_account(owner, seed);
         coin::register<AptosCoin>(&stake_pool_signer);
 
@@ -137,6 +142,6 @@ module aptos_framework::delegate {
         stake::withdraw(&stake_pool_signer, amount);
         coin::transfer<AptosCoin>(&stake_pool_signer, delegator_address, amount);
 
-        delegation_pool::emit_add_stake_event(pool_address, delegator_address, amount);
+        delegation_pool::emit_withdraw_stake_event(pool_address, delegator_address, amount);
     }
 }
