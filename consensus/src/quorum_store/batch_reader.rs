@@ -439,11 +439,11 @@ impl BatchReader {
                     .expect("Failed to send to BatchStore"); // TODO: I think we have a race here. Batch store can stop before batch reader.
                 },
             StorageMode::MemoryAndPersisted => {
-                    let batch = Batch::new(
-                    self.epoch(),
+                let batch = Batch::new(
                     self.my_peer_id,
+                    self.epoch(),
                     digest,
-                    Some(value.maybe_payload.clone().expect("BatchReader payload and storage kind mismatch")),
+                    value.maybe_payload.clone().expect("BatchReader payload and storage kind mismatch"),
                     );
                     network_sender.send_batch(batch, vec![peer_id]).await;
             }

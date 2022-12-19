@@ -28,7 +28,7 @@ fn test_batch() {
     let batch = Batch::new(epoch, source, digest, Some(signed_txns.clone()));
 
     assert!(batch.verify(source).is_ok());
-    assert_eq!(batch.get_payload(), signed_txns);
+    assert_eq!(batch.into_payload(), signed_txns);
 }
 
 #[test]

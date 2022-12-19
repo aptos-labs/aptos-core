@@ -481,21 +481,21 @@ pub static CONSENSUS_SENT_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counters(queued,dequeued,dropped) related to consensus channel
-pub static QUORUM_STORE_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "aptos_quorum_store_channel_msgs_count",
-        "Counters(queued,dequeued,dropped) related to quorum store channel",
-        &["state"]
-    )
-    .unwrap()
-});
-
 /// Counters(queued,dequeued,dropped) related to consensus round manager channel
 pub static ROUND_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_round_manager_msgs_count",
         "Counters(queued,dequeued,dropped) related to consensus round manager channel",
+        &["state"]
+    )
+    .unwrap()
+});
+
+/// Counters(queued,dequeued,dropped) related to quorum store channel
+pub static QUORUM_STORE_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_quorum_store_channel_msgs_count",
+        "Counters(queued,dequeued,dropped) related to quorum store channel",
         &["state"]
     )
     .unwrap()

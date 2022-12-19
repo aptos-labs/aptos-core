@@ -23,7 +23,7 @@ pub(crate) fn validate_view_function<S: MoveResolverExt>(
     let is_view = if let Some(data) = module_metadata {
         data.fun_attributes
             .get(fun_name.as_str())
-            .map(|attrs| attrs.contains(&KnownAttribute::ViewFunction))
+            .map(|attrs| attrs.contains(&KnownAttribute::view_function()))
             .unwrap_or_default()
     } else {
         false

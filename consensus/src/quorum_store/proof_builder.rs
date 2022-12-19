@@ -50,19 +50,19 @@ impl IncrementalProofState {
     }
 
     fn add_signature(&mut self, signed_digest: SignedDigest) -> Result<(), SignedDigestError> {
-        if signed_digest.info != self.info {
+        if signed_digest.info() != &self.info {
             return Err(SignedDigestError::WrongInfo);
         }
 
         if self
             .aggregated_signature
-            .contains_key(&signed_digest.peer_id)
+            .contains_key(&signed_digest.peer_id())
         {
             return Err(SignedDigestError::DuplicatedSignature);
         }
 
         self.aggregated_signature
-            .insert(signed_digest.peer_id, signed_digest.signature);
+            .insert(signed_digest.peer_id(), signed_digest.signature());
         Ok(())
     }
 
@@ -136,24 +136,19 @@ impl ProofBuilder {
         signed_digest: SignedDigest,
         validator_verifier: &ValidatorVerifier,
     ) -> Result<(), SignedDigestError> {
-        if !self
-            .digest_to_proof
-            .contains_key(&signed_digest.info.digest)
-        {
+        if !self.digest_to_proof.contains_key(&signed_digest.digest()) {
             return Err(SignedDigestError::WrongInfo);
         }
         let mut ret = Ok(());
         let mut ready = false;
-        let digest = signed_digest.info.digest.clone();
+        let digest = signed_digest.digest().clone();
         let my_id = self.peer_id;
-        self.digest_to_proof
-            .entry(signed_digest.info.digest)
-            .and_modify(|state| {
-                ret = state.add_signature(signed_digest);
-                if ret.is_ok() {
-                    ready = state.ready(validator_verifier, my_id);
-                }
-            });
+        self.digest_to_proof.entry(digest).and_modify(|state| {
+            ret = state.add_signature(signed_digest);
+            if ret.is_ok() {
+                ready = state.ready(validator_verifier, my_id);
+            }
+        });
         if ready {
             let (proof, batch_id, tx) = self
                 .digest_to_proof
@@ -204,7 +199,7 @@ impl ProofBuilder {
                             .expect("Error initializing proof of store");
                     }
                     ProofBuilderCommand::AppendSignature(signed_digest) => {
-                            let peer_id = signed_digest.peer_id;
+                            let peer_id = signed_digest.peer_id();
                         if let Err(e) = self.add_signature(signed_digest, &validator_verifier) {
                             // Can happen if we already garbage collected
                             if peer_id == self.peer_id {

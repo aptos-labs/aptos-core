@@ -17,26 +17,26 @@ crate::params::define_gas_parameters!(
     [
         // abstract value size
         [u8: AbstractValueSize, "u8", 40],
-        [u16: AbstractValueSize, optional "u16", 40],
-        [u32: AbstractValueSize, optional "u32", 40],
+        [u16: AbstractValueSize, { 5.. => "u16" }, 40],
+        [u32: AbstractValueSize, { 5.. => "u32" }, 40],
         [u64: AbstractValueSize, "u64", 40],
         [u128: AbstractValueSize, "u128", 40],
-        [u256: AbstractValueSize, optional "u256", 40],
+        [u256: AbstractValueSize, { 5.. => "u256" }, 40],
         [bool: AbstractValueSize, "bool", 40],
         [address: AbstractValueSize, "address", 40],
         [struct_: AbstractValueSize, "struct", 40],
         [vector: AbstractValueSize, "vector", 40],
         [reference: AbstractValueSize, "reference", 40],
         [per_u8_packed: AbstractValueSizePerArg, "per_u8_packed", 1],
-        [per_u16_packed: AbstractValueSizePerArg, optional "per_u16_packed", 2],
-        [per_u32_packed: AbstractValueSizePerArg, optional "per_u32_packed", 4],
+        [per_u16_packed: AbstractValueSizePerArg, { 5.. => "per_u16_packed" }, 2],
+        [per_u32_packed: AbstractValueSizePerArg, { 5.. => "per_u32_packed" }, 4],
         [per_u64_packed: AbstractValueSizePerArg, "per_u64_packed", 8],
         [
             per_u128_packed: AbstractValueSizePerArg,
             "per_u128_packed",
             16
         ],
-        [per_u256_packed: AbstractValueSizePerArg, optional "per_u256_packed", 32],
+        [per_u256_packed: AbstractValueSizePerArg, { 5.. => "per_u256_packed" }, 32],
         [
             per_bool_packed: AbstractValueSizePerArg,
             "per_bool_packed",
@@ -579,16 +579,22 @@ pub struct MiscGasParameters {
 }
 
 impl FromOnChainGasSchedule for MiscGasParameters {
-    fn from_on_chain_gas_schedule(gas_schedule: &BTreeMap<String, u64>) -> Option<Self> {
+    fn from_on_chain_gas_schedule(
+        gas_schedule: &BTreeMap<String, u64>,
+        feature_version: u64,
+    ) -> Option<Self> {
         Some(Self {
-            abs_val: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
+            abs_val: FromOnChainGasSchedule::from_on_chain_gas_schedule(
+                gas_schedule,
+                feature_version,
+            )?,
         })
     }
 }
 
 impl ToOnChainGasSchedule for MiscGasParameters {
-    fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)> {
-        self.abs_val.to_on_chain_gas_schedule()
+    fn to_on_chain_gas_schedule(&self, feature_version: u64) -> Vec<(String, u64)> {
+        self.abs_val.to_on_chain_gas_schedule(feature_version)
     }
 }
 

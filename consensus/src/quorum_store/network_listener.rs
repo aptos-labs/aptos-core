@@ -56,20 +56,20 @@ impl NetworkListener {
             .batch_aggregators
             .entry(source)
             .or_insert(BatchAggregator::new(self.max_batch_bytes));
-        if let Some(expiration) = fragment.fragment_info.maybe_expiration() {
+        if let Some(expiration) = fragment.maybe_expiration() {
             counters::DELIVERED_END_BATCH_COUNT.inc();
             // end batch message
             debug!(
                 "QS: got end batch message from {:?} batch_id {}, fragment_id {}",
                 source,
-                fragment.fragment_info.batch_id(),
-                fragment.fragment_info.fragment_id(),
+                fragment.batch_id(),
+                fragment.fragment_id(),
             );
             if expiration.epoch() == self.epoch {
                 match entry.end_batch(
                     fragment.batch_id(),
                     fragment.fragment_id(),
-                    fragment.take_transactions(),
+                    fragment.into_transactions(),
                 ) {
                     Ok((num_bytes, payload, digest)) => {
                         let persist_cmd = BatchStoreCommand::Persist(PersistRequest::new(
@@ -104,7 +104,7 @@ impl NetworkListener {
             if let Err(e) = entry.append_transactions(
                 fragment.batch_id(),
                 fragment.fragment_id(),
-                fragment.take_transactions(),
+                fragment.into_transactions(),
             ) {
                 debug!("Could not append batch from {:?}, error {:?}", source, e);
             }
@@ -126,7 +126,7 @@ impl NetworkListener {
                         .expect("Failed to send shutdown ack to QuorumStore");
                     break;
                 }
-                VerifiedEvent::SignedDigest(signed_digest) => {
+                VerifiedEvent::SignedDigestMsg(signed_digest) => {
                     // debug!("QS: got SignedDigest from network");
                     let cmd = ProofBuilderCommand::AppendSignature(*signed_digest);
                     self.proof_builder_tx
@@ -135,34 +135,35 @@ impl NetworkListener {
                         .expect("Could not send signed_digest to proof_builder");
                 }
 
-                VerifiedEvent::Fragment(fragment) => {
+                VerifiedEvent::FragmentMsg(fragment) => {
                     counters::DELIVERED_FRAGMENTS_COUNT.inc();
                     self.handle_fragment(*fragment).await;
                 }
 
-                VerifiedEvent::Batch(batch) => {
-                    let cmd: BatchReaderCommand;
-                    if batch.maybe_payload.is_some() {
-                        counters::RECEIVED_BATCH_REQUEST_COUNT.inc();
-                        debug!(
-                            "QS: batch response from {:?} digest {}",
-                            batch.source, batch.batch_info.digest
-                        );
-                        cmd = BatchReaderCommand::BatchResponse(
-                            batch.batch_info.digest,
-                            batch.get_payload(),
-                        );
-                    } else {
-                        debug!(
-                            "QS: batch request from {:?} digest {}",
-                            batch.source, batch.batch_info.digest
-                        );
-                        cmd = BatchReaderCommand::GetBatchForPeer(
-                            batch.batch_info.digest,
-                            batch.source,
-                        );
-                    }
+                VerifiedEvent::BatchRequestMsg(request) => {
+                    counters::RECEIVED_BATCH_REQUEST_COUNT.inc();
+                    debug!(
+                        "QS: batch request from {:?} digest {}",
+                        request.source(),
+                        request.digest()
+                    );
+                    let cmd =
+                        BatchReaderCommand::GetBatchForPeer(request.digest(), request.source());
+                    self.batch_reader_tx
+                        .send(cmd)
+                        .await
+                        .expect("could not push Batch batch_reader");
+                }
 
+                VerifiedEvent::UnverifiedBatchMsg(batch) => {
+                    counters::RECEIVED_BATCH_COUNT.inc();
+                    debug!(
+                        "QS: batch response from {:?} digest {}",
+                        batch.source(),
+                        batch.digest()
+                    );
+                    let cmd =
+                        BatchReaderCommand::BatchResponse(batch.digest(), batch.into_payload());
                     self.batch_reader_tx
                         .send(cmd)
                         .await

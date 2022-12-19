@@ -417,7 +417,8 @@ impl MoveHarness {
         // TODO: The AptosGasParameters::zeros() schedule doesn't do what we want, so
         // explicitly manipulating gas entries. Wasn't obvious from the gas code how to
         // do this differently then below, so perhaps improve this...
-        let entries = AptosGasParameters::initial().to_on_chain_gas_schedule();
+        let entries = AptosGasParameters::initial()
+            .to_on_chain_gas_schedule(aptos_gas::LATEST_GAS_FEATURE_VERSION);
         let entries = entries
             .into_iter()
             .map(|(name, val)| {

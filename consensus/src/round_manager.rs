@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::monitor;
-use crate::quorum_store::types::{Batch, Fragment};
+use crate::quorum_store::types::{Batch, BatchRequest, Fragment};
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -65,10 +65,11 @@ pub enum UnverifiedEvent {
     SyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
-    SignedDigest(Box<SignedDigest>),
-    Fragment(Box<Fragment>),
-    Batch(Box<Batch>),
-    ProofOfStoreBroadcast(Box<ProofOfStore>),
+    FragmentMsg(Box<Fragment>),
+    BatchRequestMsg(Box<BatchRequest>),
+    BatchMsg(Box<Batch>),
+    SignedDigestMsg(Box<SignedDigest>),
+    ProofOfStoreMsg(Box<ProofOfStore>),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -100,21 +101,26 @@ impl UnverifiedEvent {
                 cd.verify(validator)?;
                 VerifiedEvent::CommitDecision(cd)
             }
-            UnverifiedEvent::SignedDigest(sd) => {
-                sd.verify(validator)?;
-                VerifiedEvent::SignedDigest(sd)
-            }
-            UnverifiedEvent::Fragment(f) => {
+            UnverifiedEvent::FragmentMsg(f) => {
                 f.verify(peer_id)?;
-                VerifiedEvent::Fragment(f)
+                VerifiedEvent::FragmentMsg(f)
             }
-            UnverifiedEvent::Batch(b) => {
+            UnverifiedEvent::BatchRequestMsg(br) => {
+                br.verify(peer_id)?;
+                VerifiedEvent::BatchRequestMsg(br)
+            }
+            // Only sender is verified. Remaining verification is on-demand (when it's used).
+            UnverifiedEvent::BatchMsg(b) => {
                 b.verify(peer_id)?;
-                VerifiedEvent::Batch(b)
+                VerifiedEvent::UnverifiedBatchMsg(b)
             }
-            UnverifiedEvent::ProofOfStoreBroadcast(p) => {
+            UnverifiedEvent::SignedDigestMsg(sd) => {
+                sd.verify(validator)?;
+                VerifiedEvent::SignedDigestMsg(sd)
+            }
+            UnverifiedEvent::ProofOfStoreMsg(p) => {
                 p.verify(validator)?;
-                VerifiedEvent::ProofOfStoreBroadcast(p)
+                VerifiedEvent::ProofOfStoreMsg(p)
             }
         })
     }
@@ -126,10 +132,11 @@ impl UnverifiedEvent {
             UnverifiedEvent::SyncInfo(s) => s.epoch(),
             UnverifiedEvent::CommitVote(cv) => cv.epoch(),
             UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
-            UnverifiedEvent::SignedDigest(sd) => sd.epoch(),
-            UnverifiedEvent::Fragment(f) => f.epoch(),
-            UnverifiedEvent::Batch(b) => b.epoch(),
-            UnverifiedEvent::ProofOfStoreBroadcast(p) => p.epoch(),
+            UnverifiedEvent::FragmentMsg(f) => f.epoch(),
+            UnverifiedEvent::BatchRequestMsg(br) => br.epoch(),
+            UnverifiedEvent::BatchMsg(b) => b.epoch(),
+            UnverifiedEvent::SignedDigestMsg(sd) => sd.epoch(),
+            UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
         }
     }
 }
@@ -142,10 +149,11 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
             ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
-            ConsensusMsg::SignedDigestMsg(sd) => UnverifiedEvent::SignedDigest(sd),
-            ConsensusMsg::FragmentMsg(f) => UnverifiedEvent::Fragment(f),
-            ConsensusMsg::BatchMsg(b) => UnverifiedEvent::Batch(b),
-            ConsensusMsg::ProofOfStoreBroadcastMsg(p) => UnverifiedEvent::ProofOfStoreBroadcast(p),
+            ConsensusMsg::FragmentMsg(m) => UnverifiedEvent::FragmentMsg(m),
+            ConsensusMsg::BatchRequestMsg(m) => UnverifiedEvent::BatchRequestMsg(m),
+            ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
+            ConsensusMsg::SignedDigestMsg(m) => UnverifiedEvent::SignedDigestMsg(m),
+            ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
             _ => unreachable!("Unexpected conversion"),
         }
     }
@@ -160,10 +168,11 @@ pub enum VerifiedEvent {
     UnverifiedSyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
-    SignedDigest(Box<SignedDigest>),
-    Fragment(Box<Fragment>),
-    Batch(Box<Batch>),
-    ProofOfStoreBroadcast(Box<ProofOfStore>),
+    FragmentMsg(Box<Fragment>),
+    BatchRequestMsg(Box<BatchRequest>),
+    UnverifiedBatchMsg(Box<Batch>),
+    SignedDigestMsg(Box<SignedDigest>),
+    ProofOfStoreMsg(Box<ProofOfStore>),
     // local messages
     LocalTimeout(Round),
     // Shutdown the NetworkListener

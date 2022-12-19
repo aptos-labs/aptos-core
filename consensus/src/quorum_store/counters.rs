@@ -315,6 +315,15 @@ pub static RECEIVED_BATCH_REQUEST_TIMEOUT_COUNT: Lazy<IntCounter> = Lazy::new(||
     .unwrap()
 });
 
+/// Count of the number of batches received from other nodes.
+pub static RECEIVED_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_count",
+        "Count of the number of batches received from other nodes."
+    )
+    .unwrap()
+});
+
 /// Count for the number of expired batches due to smaller epoch when pulling the proofs for consensus.
 pub static BATCH_EXPIRED_SMALLER_EPOCH_WHEN_PULL_PROOFS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::block_storage::BlockReader;
-use crate::network::NetworkSender;
-use crate::network_interface::ConsensusMsg;
+use crate::network::{NetworkSender, QuorumStoreSender};
 use crate::quorum_store::utils::ProofQueue;
 use crate::quorum_store::{
     counters,
@@ -250,11 +249,7 @@ impl QuorumStoreWrapper {
         proof: ProofOfStore,
         network_sender: &mut NetworkSender,
     ) {
-        network_sender
-            .broadcast_without_self(ConsensusMsg::ProofOfStoreBroadcastMsg(Box::new(
-                proof.clone(),
-            )))
-            .await;
+        network_sender.broadcast_proof_of_store(proof).await;
     }
 
     #[cfg(test)]
@@ -459,7 +454,7 @@ impl QuorumStoreWrapper {
                     self.handle_consensus_request(msg)
                 },
                 Some(msg) = network_msg_rx.next() => {
-                   if let VerifiedEvent::ProofOfStoreBroadcast(proof) = msg{
+                   if let VerifiedEvent::ProofOfStoreMsg(proof) = msg{
                         debug!("QS: got proof from peer");
 
                         counters::REMOTE_POS_COUNT.inc();

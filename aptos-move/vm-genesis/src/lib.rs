@@ -26,7 +26,7 @@ use aptos_types::{
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
-    data_cache::{IntoMoveResolver, StateViewCache},
+    data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
 use move_core_types::{
@@ -81,7 +81,7 @@ pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::
 pub fn default_gas_schedule() -> GasScheduleV2 {
     GasScheduleV2 {
         feature_version: aptos_gas::LATEST_GAS_FEATURE_VERSION,
-        entries: AptosGasParameters::initial().to_on_chain_gas_schedule(),
+        entries: AptosGasParameters::initial().to_on_chain_gas_schedule(LATEST_GAS_FEATURE_VERSION),
     }
 }
 
@@ -101,7 +101,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+    let data_cache = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
@@ -139,7 +139,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let state_view = GenesisStateView::new();
-    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+    let data_cache = state_view.as_move_resolver();
 
     let mut id2_arr = [0u8; 32];
     id2_arr[31] = 1;
@@ -210,7 +210,7 @@ pub fn encode_genesis_change_set(
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+    let data_cache = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
@@ -250,7 +250,7 @@ pub fn encode_genesis_change_set(
     let mut session1_out = session.finish().unwrap();
 
     let state_view = GenesisStateView::new();
-    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+    let data_cache = state_view.as_move_resolver();
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let mut id2_arr = [0u8; 32];
@@ -863,7 +863,7 @@ pub fn test_genesis_module_publishing() {
     {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+    let data_cache = state_view.as_move_resolver();
 
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),

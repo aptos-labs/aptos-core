@@ -987,6 +987,9 @@ impl EpochManager {
         let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
 
         if let Some(unverified_event) = maybe_unverified_event {
+            // filter out quorum store messages if quorum store has not been enabled
+            self.filter_quorum_store_events(peer_id, &unverified_event)?;
+
             // same epoch -> run well-formedness + signature check
             let verified_event = monitor!(
                 "verify_message",
@@ -1024,10 +1027,11 @@ impl EpochManager {
             | ConsensusMsg::VoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)
-            | ConsensusMsg::SignedDigestMsg(_)
             | ConsensusMsg::FragmentMsg(_)
+            | ConsensusMsg::BatchRequestMsg(_)
             | ConsensusMsg::BatchMsg(_)
-            | ConsensusMsg::ProofOfStoreBroadcastMsg(_) => {
+            | ConsensusMsg::SignedDigestMsg(_)
+            | ConsensusMsg::ProofOfStoreMsg(_) => {
                 let event: UnverifiedEvent = msg.into();
                 if event.epoch() == self.epoch() {
                     return Ok(Some(event));
@@ -1073,6 +1077,30 @@ impl EpochManager {
         Ok(None)
     }
 
+    fn filter_quorum_store_events(
+        &mut self,
+        peer_id: AccountAddress,
+        event: &UnverifiedEvent,
+    ) -> anyhow::Result<()> {
+        match event {
+            UnverifiedEvent::FragmentMsg(_)
+            | UnverifiedEvent::BatchRequestMsg(_)
+            | UnverifiedEvent::BatchMsg(_)
+            | UnverifiedEvent::SignedDigestMsg(_)
+            | UnverifiedEvent::ProofOfStoreMsg(_) => {
+                if self.quorum_store_enabled {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Quorum store is not enabled locally, but received msg from sender: {}",
+                        peer_id,
+                    ))
+                }
+            }
+            _ => Ok(()),
+        }
+    }
+
     fn process_event(
         &mut self,
         peer_id: AccountAddress,
@@ -1085,7 +1113,7 @@ impl EpochManager {
             );
         }
         match event {
-            wrapper_quorum_store_event @ VerifiedEvent::ProofOfStoreBroadcast(_) => {
+            wrapper_quorum_store_event @ VerifiedEvent::ProofOfStoreMsg(_) => {
                 if let Some((wrapper_net_sender, _)) = &mut self.wrapper_quorum_store_tx {
                     wrapper_net_sender.push(peer_id, wrapper_quorum_store_event)?;
                 } else {
@@ -1103,15 +1131,20 @@ impl EpochManager {
             //     let sender = &mut self.quorum_store_msg_tx_vec[idx];
             //     sender.push(peer_id, quorum_store_event)?;
             // }
-            quorum_store_event @ VerifiedEvent::Batch(_) => {
+            // TODO: make sure requests are handled
+            quorum_store_event @ VerifiedEvent::BatchRequestMsg(_) => {
                 let sender = &mut self.quorum_store_msg_tx_vec[0];
                 sender.push(peer_id, quorum_store_event)?;
             }
-            quorum_store_event @ VerifiedEvent::SignedDigest(_) => {
+            quorum_store_event @ VerifiedEvent::UnverifiedBatchMsg(_) => {
+                let sender = &mut self.quorum_store_msg_tx_vec[0];
+                sender.push(peer_id, quorum_store_event)?;
+            }
+            quorum_store_event @ VerifiedEvent::SignedDigestMsg(_) => {
                 let sender = &mut self.quorum_store_msg_tx_vec[1];
                 sender.push(peer_id, quorum_store_event)?;
             }
-            quorum_store_event @ VerifiedEvent::Fragment(_) => {
+            quorum_store_event @ VerifiedEvent::FragmentMsg(_) => {
                 let idx = peer_id.to_vec()[0] as usize % self.num_network_workers_for_fragment + 2;
                 debug!(
                     "QS: peer_id {:?},  # network_worker {}, hashed to idx {}",

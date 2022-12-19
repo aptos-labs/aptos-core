@@ -4,77 +4,27 @@
 use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
-    block_executor::{storage_wrapper::VersionedView, AptosTransactionOutput},
-    data_cache::{AsMoveResolver, StateViewCache, StorageAdapter},
+    block_executor::AptosTransactionOutput,
+    data_cache::{AsMoveResolver, StorageAdapter},
     logging::AdapterLogSchema,
-    move_vm_ext::MoveResolverExt,
 };
 use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::TransactionOutputExt};
-use aptos_block_executor::{
-    executor::MVHashMapView,
-    task::{ExecutionStatus, ExecutorTask},
-};
+use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::VMStatus,
 };
-use std::collections::btree_map::BTreeMap;
 
 pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
     base_view: &'a S,
 }
 
-// This function is called by the BlockExecutor for each transaction is intends
-// to execute (via the ExecutorTask trait). It can be as a part of sequential
-// execution, or speculatively as a part of a parallel execution.
-fn execute_transaction<S: MoveResolverExt + StateView>(
-    vm: &AptosVM,
-    txn: &PreprocessedTransaction,
-    view: S,
-    log_context: AdapterLogSchema,
-    materialize_deltas: bool,
-) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-    match vm.execute_single_transaction(txn, &view, &log_context) {
-        Ok((vm_status, mut output_ext, sender)) => {
-            if materialize_deltas {
-                // Keep TransactionOutputExt type for wrapper.
-                output_ext = TransactionOutputExt::new(
-                    DeltaChangeSet::empty(),                   // Cleared deltas.
-                    output_ext.into_transaction_output(&view), // Materialize.
-                );
-            }
-
-            if output_ext.txn_output().status().is_discarded() {
-                match sender {
-                    Some(s) => trace!(
-                        log_context,
-                        "Transaction discarded, sender: {}, error: {:?}",
-                        s,
-                        vm_status,
-                    ),
-                    None => {
-                        trace!(log_context, "Transaction malformed, error: {:?}", vm_status,)
-                    }
-                };
-            }
-            if AptosVM::should_restart_execution(output_ext.txn_output()) {
-                info!(log_context, "Reconfiguration occurred: restart required",);
-                ExecutionStatus::SkipRest(AptosTransactionOutput::new(output_ext))
-            } else {
-                ExecutionStatus::Success(AptosTransactionOutput::new(output_ext))
-            }
-        }
-        Err(err) => ExecutionStatus::Abort(err),
-    }
-}
-
 impl<'a, S: 'a + StateView> ExecutorTask for AptosExecutorTask<'a, S> {
-    type T = PreprocessedTransaction;
+    type Txn = PreprocessedTransaction;
     type Output = AptosTransactionOutput;
     type Error = VMStatus;
     type Argument = &'a S;
@@ -101,33 +51,52 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosExecutorTask<'a, S> {
         }
     }
 
-    fn execute_transaction_btree_view(
+    // This function is called by the BlockExecutor for each transaction is intends
+    // to execute (via the ExecutorTask trait). It can be as a part of sequential
+    // execution, or speculatively as a part of a parallel execution.
+    fn execute_transaction(
         &self,
-        view: &BTreeMap<StateKey, WriteOp>,
+        view: &impl StateView,
         txn: &PreprocessedTransaction,
         txn_idx: usize,
+        materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-        let state_cache_view = StateViewCache::from_map_ref(self.base_view, view);
-        execute_transaction(
-            &self.vm,
-            txn,
-            state_cache_view.as_move_resolver(),
-            AdapterLogSchema::new(self.base_view.id(), txn_idx),
-            true,
-        )
-    }
+        let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
 
-    fn execute_transaction_mvhashmap_view(
-        &self,
-        view: &MVHashMapView<StateKey, WriteOp>,
-        txn: &PreprocessedTransaction,
-    ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-        execute_transaction(
-            &self.vm,
-            txn,
-            VersionedView::new_view(self.base_view, view),
-            AdapterLogSchema::new(self.base_view.id(), view.txn_idx()),
-            false,
-        )
+        match self
+            .vm
+            .execute_single_transaction(txn, &view.as_move_resolver(), &log_context)
+        {
+            Ok((vm_status, mut output_ext, sender)) => {
+                if materialize_deltas {
+                    // Keep TransactionOutputExt type for wrapper.
+                    output_ext = TransactionOutputExt::new(
+                        DeltaChangeSet::empty(),                  // Cleared deltas.
+                        output_ext.into_transaction_output(view), // Materialize.
+                    );
+                }
+
+                if output_ext.txn_output().status().is_discarded() {
+                    match sender {
+                        Some(s) => trace!(
+                            log_context,
+                            "Transaction discarded, sender: {}, error: {:?}",
+                            s,
+                            vm_status,
+                        ),
+                        None => {
+                            trace!(log_context, "Transaction malformed, error: {:?}", vm_status,)
+                        }
+                    };
+                }
+                if AptosVM::should_restart_execution(output_ext.txn_output()) {
+                    info!(log_context, "Reconfiguration occurred: restart required",);
+                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(output_ext))
+                } else {
+                    ExecutionStatus::Success(AptosTransactionOutput::new(output_ext))
+                }
+            }
+            Err(err) => ExecutionStatus::Abort(err),
+        }
     }
 }

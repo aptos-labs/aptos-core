@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network::QuorumStoreSender;
-use crate::quorum_store::{counters, types::Batch, utils::DigestTimeouts};
+use crate::quorum_store::{counters, types::BatchRequest, utils::DigestTimeouts};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
@@ -104,8 +104,10 @@ impl<T: QuorumStoreSender> BatchRequester<T> {
     async fn send_requests(&self, digest: HashValue, request_peers: Vec<PeerId>) {
         // Quorum Store measurements
         counters::SENT_BATCH_REQUEST_COUNT.inc();
-        let batch = Batch::new(self.epoch, self.my_peer_id, digest, None);
-        self.network_sender.send_batch(batch, request_peers).await;
+        let request = BatchRequest::new(self.my_peer_id, self.epoch, digest);
+        self.network_sender
+            .send_batch_request(request, request_peers)
+            .await;
     }
 
     pub(crate) async fn add_request(

@@ -270,12 +270,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                                         self.my_peer_id, peer_id,
                                         "Request from self without return channel"
                                     );
-                                    let batch = Batch::new(
-                                        self.epoch,
-                                        self.my_peer_id,
-                                        digest,
-                                        Some(payload),
-                                    );
+                                    let batch =
+                                        Batch::new(self.my_peer_id, self.epoch, digest, payload);
                                     self.network_sender.send_batch(batch, vec![peer_id]).await;
                                 }
                             }

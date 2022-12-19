@@ -72,7 +72,7 @@ pub static BOOTSTRAPPER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counter for state sync continuous syncer errors
+/// Gauge for state sync continuous syncer fallback mode
 pub static CONTINUOUS_SYNCER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_state_sync_continuous_syncer_errors",
@@ -87,6 +87,16 @@ pub static DRIVER_COUNTERS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_state_sync_driver_counters",
         "Counters related to the state sync driver",
+        &["label"]
+    )
+    .unwrap()
+});
+
+/// Gauge for state sync bootstrapper fallback mode
+pub static DRIVER_FALLBACK_MODE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_state_sync_driver_fallback_mode",
+        "Gauges related to the driver fallback mode",
         &["label"]
     )
     .unwrap()

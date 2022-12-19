@@ -228,7 +228,7 @@ module post_mint_reveal_nft::minting {
             token_mutate_config: create_token_mutability_config(&token_mutate_config),
             royalty_points_den,
             royalty_points_num,
-            tokens: big_vector::new<TokenAsset>(128),
+            tokens: big_vector::empty<TokenAsset>(128),
             public_mint_limit,
         });
 
@@ -452,8 +452,7 @@ module post_mint_reveal_nft::minting {
 
         // Randomize which token we're assigning to the user.
         let index = now % big_vector::length(&collection_config.tokens);
-        let bucket_index = big_vector::bucket_index(&collection_config.tokens, index);
-        let token = big_vector::swap_remove(&mut collection_config.tokens, &bucket_index);
+        let token = big_vector::swap_remove(&mut collection_config.tokens, index);
 
         // The name of the destination token will be based on the property version of the source certificate token.
         let token_name = collection_config.token_name_base;

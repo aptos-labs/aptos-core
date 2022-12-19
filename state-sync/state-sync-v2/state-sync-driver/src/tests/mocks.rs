@@ -377,6 +377,14 @@ mock! {
             include_events: bool,
         ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
+        async fn get_all_transactions_or_outputs(
+            &self,
+            start_version: Version,
+            end_version: Version,
+            proof_version: Version,
+            include_events: bool,
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
+
         async fn continuously_stream_transaction_outputs(
             &self,
             start_version: Version,
@@ -385,6 +393,14 @@ mock! {
         ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn continuously_stream_transactions(
+            &self,
+            start_version: Version,
+            start_epoch: Epoch,
+            include_events: bool,
+            target: Option<LedgerInfoWithSignatures>,
+        ) -> Result<DataStreamListener, aptos_data_streaming_service::error::Error>;
+
+        async fn continuously_stream_transactions_or_outputs(
             &self,
             start_version: Version,
             start_epoch: Epoch,

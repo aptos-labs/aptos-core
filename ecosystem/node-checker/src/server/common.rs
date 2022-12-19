@@ -18,8 +18,8 @@ pub struct ServerArgs {
     #[clap(long, default_value_t = DEFAULT_LISTEN_PORT)]
     pub listen_port: u16,
 
-    /// What endpoint to run the API on. e.g. setting this to "api" will result
-    /// in you calling an endpoint like http://nhc.mysite.com:20121/api/check_node
+    /// What endpoint to run the API on. e.g. setting this to "api" for example will
+    /// result in you calling an endpoint like http://nhc.mysite.com:20121/api/check_node
     #[clap(long, default_value = "", parse(from_str = parse_api_path))]
     pub api_path: String,
 }

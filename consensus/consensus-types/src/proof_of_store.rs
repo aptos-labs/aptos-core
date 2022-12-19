@@ -5,10 +5,10 @@ use crate::common::Round;
 use anyhow::Context;
 use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::account_address::AccountAddress as PeerId;
 use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::validator_signer::ValidatorSigner;
 use aptos_types::validator_verifier::ValidatorVerifier;
+use aptos_types::PeerId;
 use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -54,13 +54,12 @@ impl SignedDigestInfo {
     }
 }
 
-// TODO: implement properly (and proper place) w.o. public fields.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignedDigest {
     epoch: u64,
-    pub peer_id: PeerId,
-    pub info: SignedDigestInfo,
-    pub signature: bls12381::Signature,
+    peer_id: PeerId,
+    info: SignedDigestInfo,
+    signature: bls12381::Signature,
 }
 
 impl SignedDigest {
@@ -83,12 +82,28 @@ impl SignedDigest {
         })
     }
 
+    pub fn peer_id(&self) -> PeerId {
+        self.peer_id
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         Ok(validator.verify(self.peer_id, &self.info, &self.signature)?)
+    }
+
+    pub fn info(&self) -> &SignedDigestInfo {
+        &self.info
+    }
+
+    pub fn signature(self) -> bls12381::Signature {
+        self.signature
+    }
+
+    pub fn digest(&self) -> HashValue {
+        self.info.digest
     }
 }
 
@@ -98,15 +113,12 @@ pub enum SignedDigestError {
     DuplicatedSignature,
 }
 
-// TODO: add num txn and num bytes in batch
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct ProofOfStore {
     info: SignedDigestInfo,
     multi_signature: AggregateSignature,
 }
 
-#[allow(dead_code)]
 impl ProofOfStore {
     pub fn new(info: SignedDigestInfo, multi_signature: AggregateSignature) -> Self {
         Self {

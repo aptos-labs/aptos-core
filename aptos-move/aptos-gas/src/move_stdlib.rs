@@ -4,6 +4,12 @@
 use crate::gas_meter::EXECUTION_GAS_MULTIPLIER as MUL;
 use move_stdlib::natives::GasParameters;
 
+#[cfg(all(test, not(feature = "testing")))]
+const UNIT_TEST_ENTRIES: usize = 0;
+
+#[cfg(all(test, feature = "testing"))]
+const UNIT_TEST_ENTRIES: usize = 2;
+
 crate::natives::define_gas_parameters_for_natives!(GasParameters, "move_stdlib", [
     [.bcs.to_bytes.per_byte_serialized, "bcs.to_bytes.per_byte_serialized", 10 * MUL],
     [.bcs.to_bytes.failure, "bcs.to_bytes.failure", 1000 * MUL],
@@ -25,9 +31,4 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "move_stdlib",
     [.string.index_of.base, "string.index_of.base", 400 * MUL],
     [.string.index_of.per_byte_pattern, "string.index_of.per_byte_pattern", 20 * MUL],
     [.string.index_of.per_byte_searched, "string.index_of.per_byte_searched", 10 * MUL],
-
-    // TODO(Gas): these should only be enabled when feature "testing" is present
-    // TODO(Gas): rename these in the move repo
-    [test_only .unit_test.create_signers_for_testing.base_cost, "unit_test.create_signers_for_testing.base", 1],
-    [test_only .unit_test.create_signers_for_testing.unit_cost, "unit_test.create_signers_for_testing.unit", 1]
-], allow_unmapped = 1 /* bcs */ + 2 /* hash */ + 8 /* vector */ + 2 /* type_name */);
+], allow_unmapped = 1 /* bcs */ + 2 /* hash */ + 8 /* vector */ + 2 /* type_name */ + UNIT_TEST_ENTRIES);

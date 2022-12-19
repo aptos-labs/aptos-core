@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::NetworkSender;
-use crate::network_interface::ConsensusMsg;
+use crate::network::{NetworkSender, QuorumStoreSender};
 use crate::quorum_store::{
     batch_aggregator::BatchAggregator,
     batch_reader::BatchReader,
@@ -221,23 +220,20 @@ impl QuorumStore {
         &mut self,
         fragment_payload: Vec<SerializedTransaction>,
         batch_id: BatchId,
-    ) -> ConsensusMsg {
+    ) -> Fragment {
         match self.batch_aggregator.append_transactions(
             batch_id,
             self.fragment_id,
             fragment_payload.clone(),
         ) {
-            Ok(()) => {
-                let fragment = Fragment::new(
-                    self.epoch,
-                    batch_id,
-                    self.fragment_id,
-                    fragment_payload,
-                    None,
-                    self.my_peer_id,
-                );
-                ConsensusMsg::FragmentMsg(Box::new(fragment))
-            }
+            Ok(()) => Fragment::new(
+                self.epoch,
+                batch_id,
+                self.fragment_id,
+                fragment_payload,
+                None,
+                self.my_peer_id,
+            ),
             Err(e) => {
                 unreachable!(
                     "[QuorumStore] Aggregation failed for own fragments with error {:?}",
@@ -353,7 +349,7 @@ impl QuorumStore {
                 QuorumStoreCommand::AppendToBatch(fragment_payload, batch_id) => {
                     debug!("QS: end batch cmd received, batch id {}", batch_id);
                     let msg = self.handle_append_to_batch(fragment_payload, batch_id);
-                    self.network_sender.broadcast_without_self(msg).await;
+                    self.network_sender.broadcast_fragment(msg).await;
 
                     self.fragment_id = self.fragment_id + 1;
                 }
@@ -369,9 +365,7 @@ impl QuorumStore {
                         .handle_end_batch(fragment_payload, batch_id, logical_time, proof_tx)
                         .await;
 
-                    self.network_sender
-                        .broadcast_without_self(ConsensusMsg::FragmentMsg(Box::new(fragment)))
-                        .await;
+                    self.network_sender.broadcast_fragment(fragment).await;
 
                     self.batch_store_tx
                         .send(batch_store_command)
