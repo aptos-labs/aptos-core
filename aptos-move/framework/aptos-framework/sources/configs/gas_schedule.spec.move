@@ -16,6 +16,12 @@ spec aptos_framework::gas_schedule {
     spec set_gas_schedule(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
         use std::signer;
         use aptos_framework::util;
+        use aptos_framework::stake;
+        use aptos_framework::coin::CoinInfo;
+        use aptos_framework::aptos_coin::AptosCoin;
+
+        requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
 
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         aborts_if len(gas_schedule_blob) == 0;
@@ -26,6 +32,13 @@ spec aptos_framework::gas_schedule {
     }
 
     spec set_storage_gas_config(aptos_framework: &signer, config: StorageGasConfig) {
+        use aptos_framework::stake;
+        use aptos_framework::coin::CoinInfo;
+        use aptos_framework::aptos_coin::AptosCoin;
+
+        requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
+
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         aborts_if !exists<StorageGasConfig>(@aptos_framework);
     }
