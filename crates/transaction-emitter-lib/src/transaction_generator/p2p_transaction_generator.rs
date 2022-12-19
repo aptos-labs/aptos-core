@@ -51,9 +51,12 @@ impl P2PTransactionGenerator {
         num_coins: u64,
         txn_factory: &TransactionFactory,
         gas_price: u64,
+        index: usize,
     ) -> SignedTransaction {
         from.sign_with_transaction_builder(
             txn_factory
+                .clone()
+                .with_increased_transaction_expiration_time(index as u64)
                 .payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins))
                 .gas_unit_price(gas_price),
         )
@@ -65,6 +68,7 @@ impl P2PTransactionGenerator {
         sender: &mut LocalAccount,
         receiver: &AccountAddress,
         reqs: &[SignedTransaction],
+        index: usize,
     ) -> SignedTransaction {
         let mut invalid_account = LocalAccount::generate(rng);
         let invalid_address = invalid_account.address();
@@ -77,6 +81,7 @@ impl P2PTransactionGenerator {
                     self.send_amount,
                     txn_factory,
                     self.gas_price,
+                    index,
                 )
             }
             InvalidTransactionType::Sender => self.gen_single_txn(
@@ -85,6 +90,7 @@ impl P2PTransactionGenerator {
                 self.send_amount,
                 &self.txn_factory,
                 self.gas_price,
+                index,
             ),
             InvalidTransactionType::Receiver => self.gen_single_txn(
                 sender,
@@ -92,6 +98,7 @@ impl P2PTransactionGenerator {
                 self.send_amount,
                 &self.txn_factory,
                 self.gas_price,
+                index,
             ),
             InvalidTransactionType::Duplication => {
                 // if this is the first tx, default to generate invalid tx with wrong chain id
@@ -104,6 +111,7 @@ impl P2PTransactionGenerator {
                         self.send_amount,
                         txn_factory,
                         self.gas_price,
+                        index,
                     )
                 } else {
                     let random_index = rng.gen_range(0, reqs.len());
@@ -174,6 +182,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
                         self.send_amount,
                         &self.txn_factory,
                         self.gas_price,
+                        i,
                     )
                 } else {
                     self.generate_invalid_transaction(
@@ -181,6 +190,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
                         sender,
                         receiver,
                         &requests,
+                        i,
                     )
                 };
                 requests.push(request);
