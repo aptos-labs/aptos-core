@@ -17,7 +17,7 @@ locals {
 }
 
 module "validator" {
-  source = "../aptos-node/aws"
+  source = "../../aptos-node/aws"
 
   manage_via_tf = var.manage_via_tf
 
