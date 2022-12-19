@@ -28,7 +28,7 @@ Refer to our [Coding Guidelines](https://github.com/aptos-labs/aptos-core/blob/m
 
 ### Documentation
 
-Aptos Core's developer website is also open source (the code can be found in this [repository](https://github.com/aptos-labs/aptos-core/blob/main/developers-docs-sitee/)).  It is built using [Docusaurus](https://docusaurus.io/):
+Aptos Core's developer website is also open source (the code can be found in this [repository](https://github.com/aptos-labs/aptos-core/tree/main/developers-docs-site/).  It is built using [Docusaurus](https://docusaurus.io/):
 
 If you know Markdown, you can already contribute! How to contribute can be found in the [website repo](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md).
 
