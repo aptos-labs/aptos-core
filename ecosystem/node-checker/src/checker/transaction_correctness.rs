@@ -101,7 +101,7 @@ impl Checker for TransactionCorrectnessChecker {
             Ok(response) => response.oldest_ledger_version.0,
             Err(err) => {
                 return Ok(vec![Self::build_result(
-                    "Failed to determine ledger version of your node".to_string(),
+                    "Failed to determine oldest ledger version of your node".to_string(),
                     0,
                     format!(
                         "There was an error querying your node's API (1st time): {:#}",
@@ -116,13 +116,13 @@ impl Checker for TransactionCorrectnessChecker {
         let latest_baseline_version = baseline_api_index_provider
             .provide()
             .await?
-            .oldest_ledger_version
+            .ledger_version
             .0;
         let latest_target_version = match target_api_index_provider.provide().await {
-            Ok(response) => response.oldest_ledger_version.0,
+            Ok(response) => response.ledger_version.0,
             Err(err) => {
                 return Ok(vec![Self::build_result(
-                    "Failed to determine ledger version of your node".to_string(),
+                    "Failed to determine latest ledger version of your node".to_string(),
                     0,
                     format!(
                         "There was an error querying your node's API (2nd time): {:#}",
