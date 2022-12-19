@@ -210,12 +210,23 @@ module aptos_std::aptos_hash {
         // We need to enable the feature in order for the native call to be allowed.
         features::change_feature_flags(&fx, vector[features::get_blake2b_256_feature()], vector[]);
         let inputs = vector[
+        b"",
         b"testing",
         b"testing again", // empty message doesn't yield an output on the online generator
         ];
 
-        // From https://www.toolkitbay.com/tkb/tool/BLAKE2b_256
+        // From https://www.toolkitbay.com/tkb/tool/BLAKE2b_256.
+        //
+        // For computing the hash of an empty string, we use the following Python3 script:
+        // ```
+        //   #!/usr/bin/python3
+        //
+        //   import hashlib
+        //
+        //   print(hashlib.blake2b(b'', digest_size=32).hexdigest());
+        // ```
         let outputs = vector[
+        x"0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
         x"99397ff32ae348b8b6536d5c213f343d7e9fdeaa10e8a23a9f90ab21a1658565",
         x"1deab5a4eb7481453ca9b29e1f7c4be8ba44de4faeeafdf173b310cbaecfc84c",
         ];

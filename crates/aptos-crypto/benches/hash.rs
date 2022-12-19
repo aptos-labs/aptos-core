@@ -209,7 +209,7 @@ fn blake2_blake2b_256<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
 
     g.throughput(Throughput::Bytes(n as u64));
 
-    g.bench_function(BenchmarkId::new("BLAKE2B-256-blake2-crate", n), move |b| {
+    g.bench_function(BenchmarkId::new("blake2-crate/blake2b-256", n), move |b| {
         b.iter_with_setup(
             || random_bytes(&mut rng, n),
             |bytes| {
@@ -232,11 +232,13 @@ fn blake2_rfc_blake2b_256<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
     g.throughput(Throughput::Bytes(n as u64));
 
     g.bench_function(
-        BenchmarkId::new("BLAKE2B-256-blake2-rfc-crate", n),
+        BenchmarkId::new("blake2-rfc-crate/blake2b-256", n),
         move |b| {
             b.iter_with_setup(
                 || random_bytes(&mut rng, n),
                 |bytes| {
+                    assert_eq!(bytes.len(), n);
+
                     // Using the state context.
                     let mut context = Blake2b::new(32);
                     context.update(&bytes);
