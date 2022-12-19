@@ -4,6 +4,7 @@
 use aptos_infallible::Mutex;
 use crossbeam::utils::CachePadded;
 use std::{
+    cmp::min,
     hint,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -452,7 +453,8 @@ impl Scheduler {
             if (*commit_idx_and_gas).commit_gas > self.max_per_block_gas
                 || (*commit_idx_and_gas).commit_idx == self.num_txns
             {
-                self.halt();
+                self.check_done();
+                // self.halt();
                 return SchedulerTask::NoTask;
             }
 
@@ -645,20 +647,56 @@ impl Scheduler {
         *status = TransactionStatus::ReadyToExecute(incarnation + 1, None);
     }
 
-    /// The function is no longer necessary. Keep it here to pass the unit test.
+    /// A lazy, check of whether the scheduler execution is completed.
+    /// Updates the 'done_marker' so other threads can know by calling done() function below.
+    ///
+    /// 1. After the STM execution has completed:
+    /// validation_idx >= num_txn, execution_idx >= num_txn, num_active_tasks == 0,
+    /// and decrease_cnt does not change - so it will be successfully detected.
+    /// 2. If done_marker is set, all of these must hold at the same time, implying completion.
+    /// Proof: O.w. one of the indices must decrease from when it is read to be >= num_txns
+    /// to when num_active_tasks is read to be 0, but decreasing thread is performing an active task,
+    /// so it must first perform the next instruction in 'decrease_validation_idx' or
+    /// 'decrease_execution_idx' functions, which is to increment the decrease_cnt++.
+    /// Final check will then detect a change in decrease_cnt and not allow a false positive.
     fn check_done(&self) -> bool {
         if self.done() {
             return true;
         }
-        let commit_idx_and_gas = self.commit_idx_and_gas.lock();
-        if (*commit_idx_and_gas).commit_gas > self.max_per_block_gas
-            || (*commit_idx_and_gas).commit_idx == self.num_txns
-        {
-            self.halt();
-            return true;
+        let observed_cnt = self.decrease_cnt.load(Ordering::SeqCst);
+
+        let val_idx = self.validation_idx.load(Ordering::SeqCst);
+        let exec_idx = self.execution_idx.load(Ordering::SeqCst);
+        let num_tasks = self.num_active_tasks.load(Ordering::SeqCst);
+        if min(exec_idx, val_idx) < self.num_txns || num_tasks > 0 {
+            // There is work remaining.
+            return false;
         }
-        false
+
+        // Re-read and make sure decrease_cnt hasn't changed.
+        if observed_cnt == self.decrease_cnt.load(Ordering::SeqCst) {
+            self.halt();
+            // self.done_marker.store(true, Ordering::Release);
+            true
+        } else {
+            false
+        }
     }
+
+    // /// The function is no longer necessary. Keep it here to pass the unit test.
+    // fn check_done(&self) -> bool {
+    //     if self.done() {
+    //         return true;
+    //     }
+    //     let commit_idx_and_gas = self.commit_idx_and_gas.lock();
+    //     if (*commit_idx_and_gas).commit_gas > self.max_per_block_gas
+    //         || (*commit_idx_and_gas).commit_idx == self.num_txns
+    //     {
+    //         self.halt();
+    //         return true;
+    //     }
+    //     false
+    // }
 
     /// Checks whether the done marker is set. The marker can only be set by 'check_done' and 'halt'.
     fn done(&self) -> bool {
