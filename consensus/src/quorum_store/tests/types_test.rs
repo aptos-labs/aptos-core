@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::tests::utils::create_vec_signed_transactions;
-use crate::quorum_store::types::{Batch, Fragment, SerializedTransaction};
+use crate::quorum_store::types::{Batch, BatchRequest, Fragment, SerializedTransaction};
 use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::hash::DefaultHasher;
 use aptos_types::account_address::AccountAddress;
@@ -20,12 +20,12 @@ fn test_batch() {
     }
     let digest = hasher.finish();
 
-    let empty_batch = Batch::new(epoch, source, digest, None);
+    let batch_request = BatchRequest::new(source, epoch, digest);
 
-    assert_eq!(epoch, empty_batch.epoch());
-    assert!(empty_batch.verify(source).is_ok());
+    assert_eq!(epoch, batch_request.epoch());
+    assert!(batch_request.verify(source).is_ok());
 
-    let batch = Batch::new(epoch, source, digest, Some(signed_txns.clone()));
+    let batch = Batch::new(source, epoch, digest, signed_txns.clone());
 
     assert!(batch.verify(source).is_ok());
     assert_eq!(batch.into_payload(), signed_txns);
@@ -106,7 +106,7 @@ fn test_fragment() {
     assert_eq!(fragment.source(), source);
     assert_eq!(fragment.batch_id(), batch_id);
 
-    let serialized_txns = fragment.take_transactions();
+    let serialized_txns = fragment.into_transactions();
     assert_eq!(serialized_txns, data.clone());
 
     let mut returned_signed_transactions = Vec::new();

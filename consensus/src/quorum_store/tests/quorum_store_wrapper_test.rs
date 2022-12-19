@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::BlockStore;
 use crate::error::DbError;
 use crate::quorum_store::{
     quorum_store::QuorumStoreCommand,

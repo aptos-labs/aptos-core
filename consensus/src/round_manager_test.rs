@@ -957,7 +957,7 @@ fn new_round_on_timeout_certificate() {
     });
 }
 
-//#[test]
+#[test]
 /// We allow to 'skip' round if proposal carries timeout certificate for next round
 fn reject_invalid_failed_authors() {
     let runtime = consensus_runtime();
@@ -1284,7 +1284,7 @@ fn vote_resent_on_timeout() {
     });
 }
 
-//#[test]
+#[test]
 fn sync_on_partial_newer_sync_info() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_interface::ConsensusMsg;
+use crate::quorum_store::types::BatchRequest;
 use crate::quorum_store::{
     batch_requester::BatchRequester,
     tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
@@ -39,7 +40,9 @@ async fn test_batch_requester() {
     assert_some!(res.clone());
     let (msg, signers) = res.unwrap();
     match msg {
-        ConsensusMsg::BatchMsg(batch) => assert_eq!(*batch, Batch::new(epoch, id, digest, None)),
+        ConsensusMsg::BatchRequestMsg(request) => {
+            assert_eq!(*request, BatchRequest::new(id, epoch, digest))
+        }
         _ => unreachable!(),
     }
     assert_eq!(signers.len(), 3);
