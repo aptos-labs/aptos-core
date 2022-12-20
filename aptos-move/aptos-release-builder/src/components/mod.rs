@@ -22,6 +22,7 @@ pub mod consensus_config;
 pub mod feature_flags;
 pub mod framework;
 pub mod gas;
+pub mod transaction_fee;
 pub mod version;
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]

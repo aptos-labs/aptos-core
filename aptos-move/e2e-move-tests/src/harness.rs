@@ -342,6 +342,18 @@ impl MoveHarness {
             .new_block_with_metadata(proposer, failed_proposer_indices);
     }
 
+    // Executes the block of transactions inserting metadata at the start of the block. Returns the gas used.
+    pub fn run_block_with_metadata(
+        &mut self,
+        proposer: AccountAddress,
+        failed_proposer_indices: Vec<u32>,
+        txns: Vec<SignedTransaction>,
+    ) -> u64 {
+        self.fast_forward(1);
+        self.executor
+            .run_block_with_metadata(proposer, failed_proposer_indices, txns)
+    }
+
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
         self.executor.read_state_value(state_key).and_then(|bytes| {
             if bytes.is_empty() {

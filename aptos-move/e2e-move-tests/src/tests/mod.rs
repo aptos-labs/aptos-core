@@ -25,5 +25,6 @@ mod simple_defi;
 mod stake;
 mod string_args;
 mod token_event_store;
+mod transaction_fee;
 mod type_too_large;
 mod vector_numeric_address;

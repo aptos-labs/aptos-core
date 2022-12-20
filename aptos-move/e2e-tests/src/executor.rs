@@ -497,14 +497,17 @@ impl FakeExecutor {
         self.new_block_with_metadata(proposer, vec![])
     }
 
-    pub fn new_block_with_metadata(
+    pub fn run_block_with_metadata(
         &mut self,
         proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
-    ) {
+        txns: Vec<SignedTransaction>,
+    ) -> u64 {
+        let mut txn_block: Vec<Transaction> =
+            txns.into_iter().map(Transaction::UserTransaction).collect();
         let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
             .expect("Unable to retrieve the validator set from storage");
-        let new_block = BlockMetadata::new(
+        let new_block_metadata = BlockMetadata::new(
             HashValue::zero(),
             0,
             0,
@@ -513,16 +516,33 @@ impl FakeExecutor {
             failed_proposer_indices,
             self.block_time,
         );
-        let output = self
-            .execute_transaction_block(vec![Transaction::BlockMetadata(new_block)])
-            .expect("Executing block prologue should succeed")
-            .pop()
-            .expect("Failed to get the execution result for Block Prologue");
-        // check if we emit the expected event, there might be more events for transaction fees
-        let event = output.events()[0].clone();
+        txn_block.insert(0, Transaction::BlockMetadata(new_block_metadata));
+
+        let outputs = self
+            .execute_transaction_block(txn_block)
+            .expect("Must execute transactions");
+
+        // Check if we emit the expected event for block metadata, there might be more events for transaction fees.
+        let event = outputs[0].events()[0].clone();
         assert_eq!(event.key(), &new_block_event_key());
         assert!(bcs::from_bytes::<NewBlockEvent>(event.event_data()).is_ok());
-        self.apply_write_set(output.write_set());
+
+        let mut total_gas_used = 0;
+        for output in outputs {
+            if !output.status().is_discarded() {
+                self.apply_write_set(output.write_set());
+            }
+            total_gas_used += output.gas_used();
+        }
+        total_gas_used
+    }
+
+    pub fn new_block_with_metadata(
+        &mut self,
+        proposer: AccountAddress,
+        failed_proposer_indices: Vec<u32>,
+    ) {
+        self.run_block_with_metadata(proposer, failed_proposer_indices, vec![]);
     }
 
     fn module(name: &str) -> ModuleId {

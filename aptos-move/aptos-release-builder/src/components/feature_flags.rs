@@ -18,6 +18,7 @@ pub struct Features {
 #[serde(rename_all = "snake_case")]
 pub enum FeatureFlag {
     CodeDependencyCheck,
+    CollectAndDistributeGasFees,
     TreatFriendAsPrivate,
     VMBinaryFormatV6,
 }
@@ -92,6 +93,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
     fn from(f: FeatureFlag) -> Self {
         match f {
             FeatureFlag::CodeDependencyCheck => AptosFeatureFlag::CODE_DEPENDENCY_CHECK,
+            FeatureFlag::CollectAndDistributeGasFees => {
+                AptosFeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES
+            },
             FeatureFlag::TreatFriendAsPrivate => AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::VMBinaryFormatV6 => AptosFeatureFlag::VM_BINARY_FORMAT_V6,
         }
@@ -103,6 +107,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
     fn from(f: AptosFeatureFlag) -> Self {
         match f {
             AptosFeatureFlag::CODE_DEPENDENCY_CHECK => FeatureFlag::CodeDependencyCheck,
+            AptosFeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES => {
+                FeatureFlag::CollectAndDistributeGasFees
+            },
             AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE => FeatureFlag::TreatFriendAsPrivate,
             AptosFeatureFlag::VM_BINARY_FORMAT_V6 => FeatureFlag::VMBinaryFormatV6,
         }
