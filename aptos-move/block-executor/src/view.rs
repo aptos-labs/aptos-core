@@ -49,6 +49,8 @@ pub enum ReadResult<V> {
     U128(u128),
     // Read failed while resolving a delta.
     Unresolved(DeltaOp),
+    // Halt the current MoveMV execution, to avoid pending thread due to read dependency.
+    HaltVM,
     // Read did not return anything.
     None,
 }
@@ -109,8 +111,12 @@ impl<
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     let _timer = counters::EXECUTOR_DEPENDENCY_WAIT_SECOND.start_timer();
                     match self.scheduler.wait_for_dependency(txn_idx, dep_idx) {
-                        Some(dep_condition) => {
+                        Some(_dep_condition) => {
                             counters::DEPENDENCY_SUSPEND_COUNT.inc();
+
+                            // hacky way to halt MoveVM execution and set the thread free
+                            return ReadResult::HaltVM;
+
                             // Wait on a condition variable corresponding to the encountered
                             // read dependency. Once the dep_idx finishes re-execution, scheduler
                             // will mark the dependency as resolved, and then the txn_idx will be
@@ -125,11 +131,11 @@ impl<
                             // thread that aborted dep_idx was alive, and again, since lower txns
                             // than txn_idx are not blocked, so the execution of dep_idx will
                             // eventually finish and lead to unblocking txn_idx, contradiction.
-                            let (lock, cvar) = &*dep_condition;
-                            let mut dep_resolved = lock.lock();
-                            while !*dep_resolved {
-                                dep_resolved = cvar.wait(dep_resolved).unwrap();
-                            }
+                            // let (lock, cvar) = &*dep_condition;
+                            // let mut dep_resolved = lock.lock();
+                            // while !*dep_resolved {
+                            //     dep_resolved = cvar.wait(dep_resolved).unwrap();
+                            // }
                         }
                         None => continue,
                     }
@@ -214,6 +220,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                         .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
                     Ok(Some(serialize(&result)))
                 }
+                ReadResult::HaltVM => Err(anyhow::Error::new(VMStatus::Error(
+                    StatusCode::STORAGE_ERROR,
+                ))),
                 ReadResult::None => self.base_view.get_state_value(state_key),
             },
             ViewMapKind::BTree(map) => map.get(state_key).map_or_else(

@@ -465,7 +465,7 @@ impl Scheduler {
         if let TransactionStatus::Suspended(incarnation, dep_condvar) = &*status {
             *status = TransactionStatus::ReadyToExecute(*incarnation, Some(dep_condvar.clone()));
         } else {
-            unreachable!();
+            // unreachable!();
         }
     }
 
