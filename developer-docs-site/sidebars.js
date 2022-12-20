@@ -148,6 +148,14 @@ const sidebars = {
       items: ["guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
     },
     {
+      type: "category",
+      label: "Aptos Names Service",
+      link: { type: "doc", id: "concepts/aptos-names-service" },
+      collapsible: true,
+      collapsed: true,
+      items: ["guides/aptos-names-service-faq"],
+    },
+    {
       type: "html",
       value: "Run Nodes",
       className: "sidebar-title",
