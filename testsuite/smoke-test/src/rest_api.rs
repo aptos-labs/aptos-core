@@ -78,8 +78,12 @@ async fn test_gas_estimation() {
         .await
         .unwrap()
         .into_inner();
-    let gas_params =
-        AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map()).unwrap();
+    let feaure_version = gas_schedule.feature_version;
+    let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
+        &gas_schedule.to_btree_map(),
+        feaure_version,
+    )
+    .unwrap();
 
     // No transactions should always return 1 as the estimated gas
     assert_eq!(

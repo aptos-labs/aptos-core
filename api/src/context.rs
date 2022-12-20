@@ -911,14 +911,15 @@ impl Context {
 
             let gas_schedule_params =
                 match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
+                    let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
-                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
                     None => GasSchedule::fetch_config(&storage_adapter)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
-                            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+                            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0)
                         })
                         .ok_or_else(|| {
                             E::internal_with_code(

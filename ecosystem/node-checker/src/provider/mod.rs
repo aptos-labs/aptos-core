@@ -56,7 +56,7 @@ pub struct CommonProviderConfig {
 
 impl CommonProviderConfig {
     fn default_check_delay_secs() -> u64 {
-        5
+        4
     }
 
     fn default_cache_ttl_ms() -> u64 {

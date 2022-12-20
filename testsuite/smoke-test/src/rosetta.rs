@@ -704,8 +704,12 @@ async fn test_block() {
         .await
         .unwrap()
         .into_inner();
-    let gas_params =
-        AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map()).unwrap();
+    let feaure_version = gas_schedule.feature_version;
+    let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
+        &gas_schedule.to_btree_map(),
+        feaure_version,
+    )
+    .unwrap();
     let min_gas_price = u64::from(gas_params.txn.min_price_per_gas_unit);
 
     let private_key_0 = cli.private_key(0);
