@@ -29,12 +29,7 @@ from forge import (
     ForgeJob,
     ForgeResult,
     ForgeState,
-    GetPodsItem,
-    GetPodsItemMetadata,
-    GetPodsItemStatus,
-    GetPodsResult,
     K8sForgeRunner,
-    ListClusterResult,
     LocalForgeRunner,
     RunResult,
     SystemContext,
@@ -50,7 +45,6 @@ from forge import (
     get_humio_forge_link,
     get_humio_logs_link,
     get_testsuite_images,
-    list_eks_clusters,
     main,
     sanitize_forge_resource_name,
     validate_forge_config,
@@ -60,6 +54,14 @@ from click.testing import CliRunner, Result
 from forge_wrapper_core.filesystem import Filesystem
 from forge_wrapper_core.git import Git
 from forge_wrapper_core.process import Process, Processes
+from forge_wrapper_core.cluster import (
+    GetPodsItem,
+    GetPodsItemMetadata,
+    GetPodsItemStatus,
+    GetPodsResult,
+    list_eks_clusters,
+    AwsListClusterResult,
+)
 
 from forge_wrapper_core.shell import Shell
 from forge_wrapper_core.time import Time
@@ -810,7 +812,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
 class TestListClusters(unittest.TestCase):
     def testListClusters(self) -> None:
         fake_clusters = json.dumps(
-            ListClusterResult(
+            AwsListClusterResult(
                 clusters=[
                     "banana-fake-1",
                     "aptos-forge-banana-1",
