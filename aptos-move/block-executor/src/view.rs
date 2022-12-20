@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TxnIndex},
     task::{ModulePath, Transaction},
     txn_last_input_output::ReadDescriptor,
@@ -107,6 +108,7 @@ impl<
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     match self.scheduler.wait_for_dependency(txn_idx, dep_idx) {
                         DependencyResult::Dependency(dep_condition) => {
+                            counters::DEPENDENCY_SUSPEND_COUNT.inc();
                             // Wait on a condition variable corresponding to the encountered
                             // read dependency. Once the dep_idx finishes re-execution, scheduler
                             // will mark the dependency as resolved, and then the txn_idx will be
