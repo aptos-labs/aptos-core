@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics_core::{register_int_counter, IntCounter};
+use aptos_metrics_core::{register_histogram, register_int_counter, Histogram, IntCounter};
 use once_cell::sync::Lazy;
 
 /// Count of times the module publishing fallback was triggered in parallel execution.
@@ -18,6 +18,14 @@ pub static SPECULATIVE_ABORT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_execution_speculative_abort_count",
         "Number of speculative aborts in parallel execution (leading to re-execution)"
+    )
+    .unwrap()
+});
+
+pub static EXECUTOR_DEPENDENCY_WAIT_SECOND: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "executor_dependency_wait",
+        "Number of transactions per block"
     )
     .unwrap()
 });

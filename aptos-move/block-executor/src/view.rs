@@ -10,6 +10,7 @@ use crate::{
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
 use aptos_infallible::Mutex;
+use aptos_metrics_core::{register_histogram, Histogram};
 use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
@@ -18,6 +19,8 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use move_binary_format::errors::Location;
+use once_cell::sync::Lazy;
+use std::fmt::Debug;
 use std::{collections::BTreeMap, hash::Hash, sync::Arc};
 
 /// Resolved and serialized data for WriteOps, None means deletion.
@@ -52,7 +55,7 @@ pub enum ReadResult<V> {
 
 impl<
         'a,
-        K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq,
+        K: Debug + ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq,
         V: TransactionWrite + Send + Sync,
     > MVHashMapView<'a, K, V>
 {
@@ -104,6 +107,7 @@ impl<
                 }
                 Err(Dependency(dep_idx)) => {
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
+                    let _timer = counters::EXECUTOR_DEPENDENCY_WAIT_SECOND.start_timer();
                     match self.scheduler.wait_for_dependency(txn_idx, dep_idx) {
                         Some(dep_condition) => {
                             counters::DEPENDENCY_SUSPEND_COUNT.inc();
@@ -181,10 +185,19 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     }
 }
 
+pub static VERSIONED_VIEW_GET_STATE_VALUE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "versioned_view_get_state_val",
+        "Number of transactions per block"
+    )
+    .unwrap()
+});
+
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<'a, T, S> {
     type Key = T::Key;
 
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        let _timer = VERSIONED_VIEW_GET_STATE_VALUE.start_timer();
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => match map.read(state_key, self.txn_idx) {
                 ReadResult::Value(v) => Ok(v.extract_raw_bytes()),

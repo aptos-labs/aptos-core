@@ -20,6 +20,8 @@ use aptos_block_executor::{
     view::ResolvedData,
 };
 use aptos_logger::debug;
+use aptos_metrics_core::exponential_buckets;
+use aptos_metrics_core::{register_histogram, Histogram};
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
@@ -27,6 +29,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_core_types::vm_status::VMStatus;
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::collections::HashMap;
 
@@ -85,6 +88,28 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
 pub struct BlockAptosVM();
 
+pub static BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "block_executor_execute_block_seconds",
+        // metric description
+        "The time spent in seconds of vm block execution in Aptos executor",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "block_executor_signature_verification_seconds",
+        // metric description
+        "The time spent in seconds of vm block execution in Aptos executor",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
 impl BlockAptosVM {
     fn process_parallel_block_output<S: StateView>(
         results: Vec<AptosTransactionOutput>,
@@ -133,9 +158,13 @@ impl BlockAptosVM {
         state_view: &S,
         concurrency_level: usize,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
+
+        let signature_verification_timer =
+            BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
         let signature_verified_block: Vec<PreprocessedTransaction> =
             RAYON_EXEC_POOL.install(|| {
                 transactions
@@ -143,6 +172,7 @@ impl BlockAptosVM {
                     .map(preprocess_transaction::<AptosVM>)
                     .collect()
             });
+        drop(signature_verification_timer);
 
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
             concurrency_level,

@@ -798,7 +798,6 @@ def get_aws_account_num(shell: Shell) -> str:
     return json.loads(caller_id.unwrap()).get("Account")
 
 
-# NOTE: this is not used anywhere
 def get_current_cluster_name(shell: Shell) -> str:
     result = shell.run(["kubectl", "config", "current-context"])
     current_context = result.unwrap().decode()
@@ -1168,6 +1167,8 @@ def test(
     test_args: Optional[List[str]],
     test_suites: Tuple[str],
 ) -> None:
+    forge_enable_performance = "true"
+    forge_test_suite = "land_blocking"
     """Run a forge test"""
 
     ### XXX: hack these arguments to force Forge to run with overrides
@@ -1250,6 +1251,8 @@ def test(
     if not forge_cluster_name or balance_clusters:
         cluster_names = config.get("enabled_clusters")
         forge_cluster_name = random.choice(cluster_names)
+
+     # forge_cluster_name = "aptos-forge-big-east-0"
 
     assert forge_cluster_name, "Forge cluster name is required"
 

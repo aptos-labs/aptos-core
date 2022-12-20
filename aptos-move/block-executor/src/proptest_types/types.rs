@@ -382,7 +382,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
 impl<K, V> TransactionType for Transaction<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: Debug + PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Key = K;
@@ -403,7 +403,7 @@ impl<K, V> Task<K, V> {
 
 impl<K, V> ExecutorTask for Task<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: Debug + PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Txn = Transaction<K, V>;
@@ -459,7 +459,7 @@ pub struct Output<K, V>(Vec<(K, V)>, Vec<(K, DeltaOp)>, Vec<Option<Vec<u8>>>);
 
 impl<K, V> TransactionOutput for Output<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: Debug + PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Txn = Transaction<K, V>;
