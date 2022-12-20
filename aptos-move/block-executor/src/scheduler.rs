@@ -453,7 +453,7 @@ impl Scheduler {
         if let TransactionStatus::Executing(incarnation) = *status {
             *status = TransactionStatus::Suspended(incarnation, dep_condvar);
         } else {
-            unreachable!();
+            // unreachable!();
         }
     }
 
@@ -474,7 +474,7 @@ impl Scheduler {
         let mut status = self.txn_status[txn_idx].lock();
 
         // Only makes sense when the current status is 'Executing'.
-        debug_assert!(*status == TransactionStatus::Executing(incarnation));
+        // debug_assert!(*status == TransactionStatus::Executing(incarnation));
 
         *status = TransactionStatus::Executed(incarnation);
     }
