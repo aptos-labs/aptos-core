@@ -69,16 +69,6 @@ module std::features {
         is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
     }
 
-    /// Whether the new BLAKE2B-256 hash function natives is enabled.
-    /// This is needed because of the introduction of new native functions.
-    /// Lifetime: transient
-    const BLAKE2B_256_NATIVE: u64 = 5;
-
-    public fun get_blake2b_256_feature(): u64 { BLAKE2B_256_NATIVE }
-
-    public fun blake2b_256_enabled(): bool acquires Features {
-        is_enabled(BLAKE2B_256_NATIVE)
-    }
     /// Whether to allow the use of binary format version v6.
     /// Lifetime: transient
     const VM_BINARY_FORMAT_V6: u64 = 5;
@@ -97,6 +87,17 @@ module std::features {
 
     public fun collect_and_distribute_gas_fees(): bool acquires Features {
         is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
+    }
+
+    /// Whether the new BLAKE2B-256 hash function natives is enabled.
+    /// This is needed because of the introduction of new native functions.
+    /// Lifetime: transient
+    const BLAKE2B_256_NATIVE: u64 = 8;
+
+    public fun get_blake2b_256_feature(): u64 { BLAKE2B_256_NATIVE }
+
+    public fun blake2b_256_enabled(): bool acquires Features {
+        is_enabled(BLAKE2B_256_NATIVE)
     }
 
     // ============================================================================================
