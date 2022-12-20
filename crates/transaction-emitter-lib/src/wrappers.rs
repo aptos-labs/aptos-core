@@ -75,7 +75,7 @@ pub async fn emit_transactions_with_cluster(
         emit_job_request = emit_job_request.expected_gas_per_txn(expected_gas_per_txn);
     }
     if !cluster.coin_source_is_root {
-        emit_job_request = emit_job_request.promt_before_spending();
+        emit_job_request = emit_job_request.prompt_before_spending();
     }
     let stats = emitter
         .emit_txn_for_with_stats(

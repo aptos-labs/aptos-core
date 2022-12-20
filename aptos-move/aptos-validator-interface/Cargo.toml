@@ -13,16 +13,14 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-async-trait = "0.1.53"
-tokio = { version = "1.21.0", features = ["full"] }
-
-aptos-api-types = { path = "../../api/types" }
-aptos-config = { path = "../../config" }
-aptos-rest-client = { path = "../../crates/aptos-rest-client" }
-aptos-state-view = { path = "../../storage/state-view" }
-aptos-types = { path = "../../types" }
-
-aptosdb = { path = "../../storage/aptosdb" }
+anyhow = { workspace = true }
+aptos-api-types = { workspace = true }
+aptos-config = { workspace = true }
+aptos-db = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-state-view = { workspace = true }
+aptos-storage-interface = { workspace = true }
+aptos-types = { workspace = true }
+async-trait = { workspace = true }
 move-binary-format = { workspace = true }
-storage-interface = { path = "../../storage/storage-interface" }
+tokio = { workspace = true }

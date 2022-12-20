@@ -6,7 +6,10 @@
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
 use crate::common::native_coin_tag;
-use crate::construction::{parse_set_operator_operation, parse_set_voter_operation};
+use crate::construction::{
+    parse_create_stake_pool_operation, parse_reset_lockup_operation, parse_set_operator_operation,
+    parse_set_voter_operation,
+};
 use crate::types::move_types::*;
 use crate::{
     common::{is_native_coin, native_coin},
@@ -18,6 +21,7 @@ use crate::{
     ApiError, RosettaContext,
 };
 use anyhow::anyhow;
+use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::TransactionOnChainData;
@@ -29,7 +33,6 @@ use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use aptos_types::write_set::{WriteOp, WriteSet};
 use aptos_types::{account_address::AccountAddress, event::EventKey};
-use cached_packages::aptos_stdlib;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -351,6 +354,22 @@ impl Operation {
             Some(OperationMetadata::set_voter(operator, new_voter)),
         )
     }
+
+    pub fn reset_lockup(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        operator: Option<AccountIdentifier>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::ResetLockup,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::reset_lockup(operator)),
+        )
+    }
 }
 
 impl std::cmp::PartialOrd for Operation {
@@ -437,6 +456,13 @@ impl OperationMetadata {
             new_operator,
             new_voter,
             staked_balance: staked_balance.map(U64::from),
+            ..Default::default()
+        }
+    }
+
+    pub fn reset_lockup(operator: Option<AccountIdentifier>) -> Self {
+        OperationMetadata {
+            operator,
             ..Default::default()
         }
     }
@@ -699,9 +725,9 @@ fn parse_failed_operations_from_txn_payload(
                 if let Ok(mut ops) =
                     parse_set_operator_operation(sender, inner.ty_args(), inner.args())
                 {
-                    let mut operation = ops.remove(0);
-                    operation.status = Some(OperationStatusType::Failure.to_string());
-                    operations.push(operation);
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
                 } else {
                     warn!("Failed to parse set operator {:?}", inner);
                 }
@@ -710,11 +736,33 @@ fn parse_failed_operations_from_txn_payload(
                 if let Ok(mut ops) =
                     parse_set_voter_operation(sender, inner.ty_args(), inner.args())
                 {
-                    let mut operation = ops.remove(0);
-                    operation.status = Some(OperationStatusType::Failure.to_string());
-                    operations.push(operation);
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
                 } else {
                     warn!("Failed to parse set voter {:?}", inner);
+                }
+            }
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, RESET_LOCKUP_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_reset_lockup_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse reset lockup {:?}", inner);
+                }
+            }
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, CREATE_STAKING_CONTRACT_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_create_stake_pool_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse create staking pool {:?}", inner);
                 }
             }
             _ => {
@@ -1313,6 +1361,7 @@ pub enum InternalOperation {
     SetOperator(SetOperator),
     SetVoter(SetVoter),
     InitializeStakePool(InitializeStakePool),
+    ResetLockup(ResetLockup),
 }
 
 impl InternalOperation {
@@ -1415,6 +1464,23 @@ impl InternalOperation {
                                 }));
                             }
                         }
+                        Ok(OperationType::ResetLockup) => {
+                            if let (Some(OperationMetadata { operator, .. }), Some(account)) =
+                                (&operation.metadata, &operation.account)
+                            {
+                                let operator = if let Some(operator) = operator {
+                                    operator.account_address()?
+                                } else {
+                                    return Err(ApiError::InvalidInput(Some(
+                                        "Reset lockup missing operator field".to_string(),
+                                    )));
+                                };
+                                return Ok(Self::ResetLockup(ResetLockup {
+                                    owner: account.account_address()?,
+                                    operator,
+                                }));
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -1441,6 +1507,7 @@ impl InternalOperation {
             Self::SetOperator(inner) => inner.owner,
             Self::SetVoter(inner) => inner.owner,
             Self::InitializeStakePool(inner) => inner.owner,
+            Self::ResetLockup(inner) => inner.owner,
         }
     }
 
@@ -1496,6 +1563,10 @@ impl InternalOperation {
                     init_stake_pool.seed.clone(),
                 ),
                 init_stake_pool.owner,
+            ),
+            InternalOperation::ResetLockup(reset_lockup) => (
+                aptos_stdlib::staking_contract_reset_lockup(reset_lockup.operator),
+                reset_lockup.owner,
             ),
         })
     }
@@ -1648,4 +1719,10 @@ pub struct InitializeStakePool {
     pub amount: u64,
     pub commission_percentage: u64,
     pub seed: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ResetLockup {
+    pub owner: AccountAddress,
+    pub operator: AccountAddress,
 }

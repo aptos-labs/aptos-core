@@ -5,7 +5,7 @@
 
 use crate::account::AccountData;
 use anyhow::Result;
-use aptos_state_view::StateView;
+use aptos_state_view::TStateView;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     access_path::AccessPath,
@@ -14,14 +14,14 @@ use aptos_types::{
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},
 };
+use aptos_vm_genesis::{
+    generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
+    GenesisOptions,
+};
 use move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use vm_genesis::{
-    generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
-    GenesisOptions,
-};
 
 /// Dummy genesis ChangeSet for testing
 pub static GENESIS_CHANGE_SET_HEAD: Lazy<ChangeSet> =
@@ -104,7 +104,9 @@ impl FakeDataStore {
 }
 
 // This is used by the `execute_block` API.
-impl StateView for FakeDataStore {
+impl TStateView for FakeDataStore {
+    type Key = StateKey;
+
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         Ok(self.state_data.get(state_key).cloned())
     }

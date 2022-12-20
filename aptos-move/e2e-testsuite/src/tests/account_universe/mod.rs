@@ -5,7 +5,7 @@ mod bad_transaction;
 mod create_account;
 mod peer_to_peer;
 
-use language_e2e_tests::{
+use aptos_language_e2e_tests::{
     account_universe::{
         all_transactions_strategy, default_num_accounts, default_num_transactions,
         log_balance_strategy, run_and_assert_universe, AccountCurrent, AccountPairGen,

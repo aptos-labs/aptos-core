@@ -1,5 +1,5 @@
 [package]
-name = "storage-service-types"
+name = "aptos-storage-service-types"
 description = "Common types offered by the Aptos storage service"
 version = "0.1.0"
 
@@ -13,16 +13,15 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-num-traits = { version = "0.2.15", default-features = false }
-serde = { version = "1.0.137", default-features = false }
-thiserror = "1.0.31"
-
-aptos-compression = { path = "../../../crates/aptos-compression" }
-aptos-config = { path = "../../../config" }
-aptos-crypto = { path = "../../../crates/aptos-crypto" }
-aptos-types = { path = "../../../types" }
+aptos-compression = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+num-traits = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-claims = "0.7"
-proptest = "1.0.0"
+claims = { workspace = true }
+proptest = { workspace = true }

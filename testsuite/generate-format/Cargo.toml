@@ -13,23 +13,21 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-rand = "0.7.3"
-serde = { version = "1.0.137", features = ["derive"] }
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
-serde_yaml = "0.8.24"
-structopt = "0.3.21"
-
-aptos-api-types = { path = "../../api/types", package = "aptos-api-types" }
-aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
-aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
-aptos-types = { path = "../../types", features = ["fuzzing"] }
-
-consensus = { path = "../../consensus", features = ["fuzzing"] }
-consensus-types = { path = "../../consensus/consensus-types", features = ["fuzzing"] }
+aptos-api-types = { workspace = true }
+aptos-config = { workspace = true }
+aptos-consensus = { workspace = true, features = ["fuzzing"] }
+aptos-consensus-types = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-crypto-derive = { workspace = true }
+aptos-network = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
-network = { path = "../../network" }
+rand = { workspace = true }
+serde = { workspace = true }
+serde-reflection = { workspace = true }
+serde_yaml = { workspace = true }
+structopt = { workspace = true }
 
 [[bin]]
 name = "compute"

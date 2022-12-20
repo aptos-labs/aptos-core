@@ -4,9 +4,9 @@
 use crate::block::Block;
 use anyhow::ensure;
 use aptos_crypto::hash::HashValue;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::fmt;
 
 // this number is recommended to be greater than backpressure limit

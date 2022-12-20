@@ -10,7 +10,7 @@ runs:
         sudo apt-get update -y && sudo apt-get install -y expect
     - name: Build CLI binaries in release mode
       shell: bash
-      run: cargo build --release -p backup-cli --bin replay-verify --bin db-backup
+      run: cargo build --release -p aptos-backup-cli --bin replay-verify --bin db-backup
     - name: query latest version in backup, at the same time, pre-heat metadata cache
       shell: bash
       run: |
@@ -24,7 +24,7 @@ runs:
       shell: bash
       run: |
         set -o nounset -o errexit -o pipefail
-        N=48
+        N=32
         PER_PARTITION=$(( ($LATEST_VERSION - $HISTORY_START) / $N ))
 
         for n in `seq 1 $N`
@@ -39,8 +39,9 @@ runs:
 
           echo [main process] spawning $NAME
           unbuffer target/release/replay-verify \
-          --concurrent-downloads 4 \
-          --replay-concurrency-level 4 \
+          --txns-to-skip $TXNS_TO_SKIP \
+          --concurrent-downloads 2 \
+          --replay-concurrency-level 2 \
           --metadata-cache-dir ./$NAME/metadata-cache \
           --target-db-dir ./$NAME/db \
           --start-version $START \

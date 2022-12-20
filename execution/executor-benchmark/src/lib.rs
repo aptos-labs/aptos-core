@@ -16,20 +16,20 @@ use aptos_config::config::{
     NodeConfig, PrunerConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
+use aptos_db::AptosDB;
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
-use aptosdb::AptosDB;
 
 use crate::pipeline::Pipeline;
+use aptos_executor::block_executor::BlockExecutor;
 use aptos_metrics_core::{
     register_int_counter_vec, register_int_gauge_vec, IntCounterVec, IntGaugeVec,
 };
+use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
-use executor::block_executor::BlockExecutor;
 use once_cell::sync::Lazy;
 use std::{env, fs, path::Path};
-use storage_interface::DbReaderWriter;
 
 pub static EXECUTOR_BENCHMARK_LATENCY: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!("executor_benchmark_latency_ms", "blah", &["foo"]).unwrap()

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use framework::ReleaseBundle;
+use aptos_framework::ReleaseBundle;
 use once_cell::sync::Lazy;
 
 pub mod aptos_framework_sdk_builder;

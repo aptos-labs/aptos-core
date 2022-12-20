@@ -3,9 +3,9 @@
 
 use crate::{block::Block, common::Author, sync_info::SyncInfo};
 use anyhow::{anyhow, ensure, format_err, Context, Result};
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::fmt;
 
 /// ProposalMsg contains the required information for the proposer election protocol to make its
@@ -79,8 +79,12 @@ impl ProposalMsg {
         Ok(())
     }
 
-    pub fn verify(&self, validator: &ValidatorVerifier) -> Result<()> {
-        self.proposal
+    pub fn verify(&self, validator: &ValidatorVerifier, quorum_store_enabled: bool) -> Result<()> {
+        self.proposal()
+            .payload()
+            .map_or(Ok(()), |p| p.verify(validator, quorum_store_enabled))?;
+
+        self.proposal()
             .validate_signature(validator)
             .map_err(|e| format_err!("{:?}", e))?;
         // if there is a timeout certificate, verify its signatures

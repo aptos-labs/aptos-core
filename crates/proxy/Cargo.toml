@@ -1,5 +1,5 @@
 [package]
-name = "proxy"
+name = "aptos-proxy"
 description = "Aptos proxy"
 version = "0.1.0"
 
@@ -13,6 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-ipnet = "2.5.0"
+ipnet = { workspace = true }
 
 

@@ -6,11 +6,11 @@ plugins:
       #- bytes=.
       - file_descriptor_set
 
-  - name: prost-serde
-    out: src/pb
-
   - name: prost-crate
     out: src/pb
     strategy: all
     opt:
       - no_features
+
+  - name: tonic
+    out: src/pb

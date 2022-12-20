@@ -1,5 +1,5 @@
 [package]
-name = "mvhashmap"
+name = "aptos-mvhashmap"
 description = "Move hash map"
 version = "0.1.0"
 
@@ -13,15 +13,14 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-crossbeam = "0.8.1"
-dashmap = "5.2.0"
-
-aptos-aggregator = { path = "../aptos-aggregator" }
-aptos-types = { path = "../../types" }
+anyhow = { workspace = true }
+aptos-aggregator = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+crossbeam = { workspace = true }
+dashmap = { workspace = true }
 
 [dev-dependencies]
-proptest = "1.0.0"
-proptest-derive = "0.3.0"
-rayon = "1.5.2"
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+rayon = { workspace = true }

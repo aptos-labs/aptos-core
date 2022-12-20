@@ -13,53 +13,47 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-dashmap = "5.2.0"
-fail = "0.5.0"
-num_cpus = "1.13.1"
-once_cell = "1.10.0"
-rayon = "1.5.2"
-serde = { version = "1.0.137", default-features = false }
-serde_json = "1.0.81"
-smallvec = "1.8.0"
-tracing = "0.1.34"
-
-aptos-aggregator = { path = "../aptos-aggregator" }
-aptos-gas = { path = "../aptos-gas" }
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
-aptos-module-verifier = { path = "../../aptos-move/aptos-module-verifier" }
-aptos-parallel-executor = { path = "../parallel-executor" }
-aptos-state-view = { path = "../../storage/state-view" }
-aptos-types = { path = "../../types" }
-
-framework =  { path = "../framework" }
+anyhow = { workspace = true }
+aptos-aggregator = { workspace = true }
+aptos-block-executor = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-crypto-derive = { workspace = true }
+aptos-framework =  { workspace = true }
+aptos-gas = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-mvhashmap = { workspace = true }
+aptos-state-view = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+dashmap = { workspace = true }
+fail = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-stdlib = { workspace = true }
-mvhashmap = { path = "../mvhashmap" }
-
 move-table-extension = { workspace = true }
+move-unit-test = { workspace = true, optional = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
+num_cpus = { workspace = true }
+once_cell = { workspace = true }
+rayon = { workspace = true }
 read-write-set-dynamic = { workspace = true }
-
-move-unit-test = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+smallvec = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
-proptest = "1.0.0"
-
-aptos-types = { path = "../../types", features = ["fuzzing"] }
+aptos-types = { workspace = true }
+proptest = { workspace = true }
 
 [features]
 default = []
 mirai-contracts = []
-fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "framework/fuzzing"]
+fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing"]
 failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
-testing = ["move-unit-test", "framework/testing"]
+testing = ["move-unit-test", "aptos-framework/testing"]

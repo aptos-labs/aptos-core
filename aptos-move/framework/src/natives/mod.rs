@@ -16,8 +16,8 @@ pub mod util;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
+use aptos_gas_algebra_ext::AbstractValueSize;
 use cryptography::ed25519;
-use gas_algebra_ext::AbstractValueSize;
 
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
@@ -127,6 +127,10 @@ impl GasParameters {
                     per_byte: 0.into(),
                 },
                 ripemd160: hash::Ripemd160HashGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
+                blake2b_256: hash::Blake2B256HashGasParameters {
                     base: 0.into(),
                     per_byte: 0.into(),
                 },

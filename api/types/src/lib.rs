@@ -16,6 +16,7 @@ pub mod mime_types;
 mod move_types;
 mod table;
 mod transaction;
+mod view;
 mod wrappers;
 
 pub use account::AccountData;
@@ -33,7 +34,7 @@ pub use move_types::{
     HexEncodedBytes, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
     MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
     MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue,
-    MAX_RECURSIVE_TYPES_ALLOWED, U128, U64,
+    MAX_RECURSIVE_TYPES_ALLOWED, U128, U256, U64,
 };
 use serde::{Deserialize, Deserializer};
 use std::str::FromStr;
@@ -49,6 +50,7 @@ pub use transaction::{
     UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
     WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
 };
+pub use view::ViewRequest;
 pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};
 
 pub fn deserialize_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>

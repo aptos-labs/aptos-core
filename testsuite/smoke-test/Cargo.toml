@@ -13,58 +13,51 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-async-trait = "0.1.53"
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-diesel = { version = "2.0.0", features = [
-    "chrono",
-    "postgres",
-    "r2d2",
-    "numeric",
-    "serde_json",
-] }
-hex = "0.4.3"
-proptest = "1.0.0"
-reqwest = { version = "0.11.10", features = ["json"] }
-serde_json = "1.0.81"
-tokio = { version = "1.21.0", features = ["full"] }
-
-aptos = { path = "../../crates/aptos", features = ["fuzzing"] }
-aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-debugger = { path = "../../aptos-move/aptos-debugger" }
-aptos-faucet = { path = "../../crates/aptos-faucet" }
-aptos-gas = { path = "../../aptos-move/aptos-gas", features = ["testing"] }
-aptos-global-constants = { path = "../../config/global-constants", features = ["testing"] }
-aptos-indexer = { path = "../../crates/indexer" }
-aptos-keygen = { path = "../../crates/aptos-keygen" }
-aptos-release-builder = { path = "../../aptos-move/aptos-release-builder" }
-aptos-rest-client = { path = "../../crates/aptos-rest-client" }
-aptos-rosetta = { path = "../../crates/aptos-rosetta" }
-aptos-sdk = { path = "../../sdk" }
-aptos-temppath = { path = "../../crates/aptos-temppath" }
-aptos-types = { path = "../../types" }
-aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["fuzzing"] }
-cached-packages = { path = "../../aptos-move/framework/cached-packages" }
-consensus = { path = "../../consensus" }
-forge = { path = "../forge", features = ["testing"] }
-framework = { path = "../../aptos-move/framework" }
+anyhow = { workspace = true }
+aptos = { workspace = true, features = ["fuzzing"] }
+aptos-bitvec = { path = "../../crates/aptos-bitvec" }
+aptos-cached-packages = { workspace = true }
+aptos-config = { workspace = true }
+aptos-consensus = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-debugger = { workspace = true }
+aptos-faucet = { workspace = true }
+aptos-forge = { workspace = true }
+aptos-framework = { workspace = true }
+aptos-gas = { workspace = true, features = ["testing"] }
+aptos-global-constants = { workspace = true }
+aptos-indexer = { workspace = true }
+aptos-keygen = { workspace = true }
+aptos-release-builder = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-rosetta = { workspace = true }
+aptos-sdk = { workspace = true }
+aptos-temppath = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+async-trait = { workspace = true }
+bcs = { workspace = true }
+diesel = { workspace = true }
+hex = { workspace = true }
 move-core-types = { workspace = true }
+proptest = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
-base64 = "0.13.0"
-futures = "0.3.21"
-num_cpus = "1.13.1"
-once_cell = "1.10.0"
-rand = "0.7.3"
-regex = "1.5.5"
-serde_yaml = "0.8.24"
-
-aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
-aptos-infallible = { path = "../../crates/aptos-infallible" }
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-secure-storage = { path = "../../secure/storage", features = ["testing"] }
-aptos-time-service = { path = "../../crates/aptos-time-service", features = ["testing"] }
-aptos-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
-aptos-writeset-generator = { path = "../../aptos-move/writeset-transaction-generator" }
-backup-cli = { path = "../../storage/backup/backup-cli" }
+aptos-backup-cli = { workspace = true }
+aptos-genesis = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-secure-storage = { workspace = true }
+aptos-time-service = { workspace = true }
+aptos-vault-client = { workspace = true }
+aptos-writeset-generator = { workspace = true }
+base64 = { workspace = true }
+futures = { workspace = true }
+num_cpus = { workspace = true }
+once_cell = { workspace = true }
+rand = { workspace = true }
+regex = { workspace = true }
+serde_yaml = { workspace = true }

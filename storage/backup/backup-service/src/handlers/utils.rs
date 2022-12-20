@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_db::backup::backup_handler::BackupHandler;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
 };
-use aptosdb::backup::backup_handler::BackupHandler;
 use bytes::Bytes;
 use hyper::Body;
 use once_cell::sync::Lazy;

@@ -1,21 +1,20 @@
 ---
-title: "Aptos Concepts"
+title: "Learn Aptos Concepts"
 slug: "aptos-concepts"
 hidden: false
 ---
 
-# Aptos Concepts
+# Learn Aptos Concepts
 
 Start here to get into the core concepts of the Aptos blockchain.
 
-- ### [Transactions and States](basics-txns-states.md)
-- ### [Accounts](basics-accounts.md)
-- ### [Events](basics-events.md)
-- ### [Gas and Transaction Fees](basics-gas-txn-fee.md)
-- ### [How Base Gas Works](base-gas.md)
-- ### [Coin and Token](coin-and-token/index.md)
-- ### [Fullnodes](basics-fullnodes.md)
-- ### [Validator Nodes](basics-validator-nodes.md)
-- ### [Node Networks and Synchronization](basics-node-networks-sync.md)
-- ### [Staking](staking)
-- ### [Governance](governance)
+- ### [Aptos White Paper](../aptos-white-paper/index.md)
+- ### [Accounts](./accounts.md)
+- ### [Resources](./resources.md)
+- ### [Events](./events.md)
+- ### [Transactions and States](./txns-states.md)
+- ### [Gas and Transaction Fees](./gas-txn-fee.md)
+- ### [Blocks](./blocks.md)
+- ### [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn.md)
+- ### [Staking](./staking)
+- ### [Governance](./governance)

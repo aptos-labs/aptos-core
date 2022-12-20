@@ -202,9 +202,7 @@ module marketplace::marketplace_auction_example {
         );
 
         // initialized coin store when listing
-        if (!coin::is_account_registered<CoinType>(signer::address_of(owner))) {
-            coin::register<CoinType>(owner);
-        };
+        coin::register<CoinType>(owner);
 
         let auctions = borrow_global_mut<Auctions<CoinType>>(@marketplace);
         event::emit_event<ListingEvent>(
@@ -463,7 +461,7 @@ module marketplace::marketplace_auction_example {
         *simple_map::borrow(&auction.bids, &highest_price)
     }
 
-    #[test(lister = @0xAF, bidder_a = @0xBB, bidder_b = @0xBA, framework = @0x1, house = @marketplace, fee_account = @0xa)]
+    #[test(lister = @marketplace, bidder_a = @0xBB, bidder_b = @0xBA, framework = @0x1, house = @marketplace, fee_account = @0xa)]
     public fun test_listing_one_and_two_bids(
         lister: signer,
         bidder_a: signer,
@@ -561,7 +559,7 @@ module marketplace::marketplace_auction_example {
         assert!(coin::balance<coin::FakeMoney>(signer::address_of(&lister)) == 297, 1);
     }
 
-    #[test(lister = @0xAF, bidder_a = @0xBB, framework = @0x1, house = @marketplace)]
+    #[test(lister = @marketplace, bidder_a = @0xBB, framework = @0x1, house = @marketplace)]
     public fun test_cancel_bid(
         lister: signer,
         bidder_a: signer,

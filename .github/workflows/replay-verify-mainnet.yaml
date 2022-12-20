@@ -17,6 +17,7 @@ env:
   BUCKET: aptos-mainnet-backup-backup-831a69a8
   SUB_DIR: e1
   HISTORY_START: 0
+  TXNS_TO_SKIP: 12253479 12277499
   CONFIG_TEMPLATE_NAME: s3-public.yaml
 
 jobs:

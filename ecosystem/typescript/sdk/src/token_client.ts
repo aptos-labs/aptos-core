@@ -12,7 +12,7 @@ import { TransactionBuilder, TransactionBuilderABI, TxnBuilderTypes } from "./tr
 import { MAX_U64_BIG_INT } from "./bcs/consts";
 import { TOKEN_ABIS, TOKEN_TRANSFER_OPT_IN } from "./abis";
 import { AnyNumber, bcsToBytes, Bytes } from "./bcs";
-import { getPropertyValueRaw } from "./utils/property_map_serializer";
+import { getPropertyValueRaw, PropertyMap } from "./utils/property_map_serde";
 import {
   Script,
   TransactionArgumentAddress,
@@ -20,6 +20,7 @@ import {
   TransactionArgumentU8Vector,
   TransactionPayloadScript,
 } from "./aptos_types";
+import { Token, TokenData } from "./token_types";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
@@ -349,14 +350,14 @@ export class TokenClient {
    * @param optIn boolean value indicates user want to opt-in or out of direct transfer
    * @returns The hash of the transaction submitted to the API
    */
-  async optInTokenTransfer(sender: AptosAccount, optIn: boolean): Promise<string> {
+  async optInTokenTransfer(sender: AptosAccount, optIn: boolean, extraArgs?: OptionalTransactionArgs): Promise<string> {
     const payload = this.transactionBuilder.buildTransactionPayload("0x3::token::opt_in_direct_transfer", [], [optIn]);
 
-    return this.aptosClient.generateSignSubmitTransaction(sender, payload);
+    return this.aptosClient.generateSignSubmitTransaction(sender, payload, extraArgs);
   }
 
   /**
-   * User opt-in or out direct transfer through a boolean flag
+   * Directly transfer token to a receiver. The receiver should have opted in to direct transfer
    *
    * @param sender AptosAccount where the token will be transferred
    * @param creator  address of the token creator
@@ -374,6 +375,7 @@ export class TokenClient {
     propertyVersion: AnyNumber,
     receiver: MaybeHexString,
     amount: AnyNumber,
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     // compile script to invoke public transfer function
     const payload = new TransactionPayloadScript(
@@ -391,7 +393,7 @@ export class TokenClient {
       ),
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(sender, payload);
+    return this.aptosClient.generateSignSubmitTransaction(sender, payload, extraArgs);
   }
 
   /**
@@ -412,6 +414,7 @@ export class TokenClient {
     name: String,
     PropertyVersion: AnyNumber,
     amount: AnyNumber,
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     const payload = this.transactionBuilder.buildTransactionPayload(
       "0x3::token::burn_by_creator",
@@ -419,7 +422,7 @@ export class TokenClient {
       [ownerAddress, collection, name, PropertyVersion, amount],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(creator, payload);
+    return this.aptosClient.generateSignSubmitTransaction(creator, payload, extraArgs);
   }
 
   /**
@@ -440,6 +443,7 @@ export class TokenClient {
     name: String,
     PropertyVersion: AnyNumber,
     amount: AnyNumber,
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     const payload = this.transactionBuilder.buildTransactionPayload(
       "0x3::token::burn",
@@ -447,7 +451,7 @@ export class TokenClient {
       [creatorAddress, collection, name, PropertyVersion, amount],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(owner, payload);
+    return this.aptosClient.generateSignSubmitTransaction(owner, payload, extraArgs);
   }
 
   /**
@@ -474,6 +478,7 @@ export class TokenClient {
     keys: Array<string>,
     values: Array<Bytes>,
     types: Array<string>,
+    extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     const payload = this.transactionBuilder.buildTransactionPayload(
       "0x3::token::mutate_token_properties",
@@ -481,7 +486,7 @@ export class TokenClient {
       [tokenOwner, creator, collection_name, tokenName, propertyVersion, amount, keys, values, types],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(account, payload);
+    return this.aptosClient.generateSignSubmitTransaction(account, payload, extraArgs);
   }
 
   /**
@@ -570,7 +575,17 @@ export class TokenClient {
 
     // We know the response will be a struct containing TokenData, hence the
     // implicit cast.
-    return this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
+    const rawTokenData = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
+    return new TokenData(
+      rawTokenData.collection,
+      rawTokenData.description,
+      rawTokenData.name,
+      rawTokenData.maximum,
+      rawTokenData.supply,
+      rawTokenData.uri,
+      rawTokenData.default_properties,
+      rawTokenData.mutability_config,
+    );
   } // <:!:getTokenData
 
   /**
@@ -629,13 +644,14 @@ export class TokenClient {
     };
 
     try {
-      return await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
+      const rawToken = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
+      return new Token(rawToken.id, rawToken.amount, rawToken.token_properties);
     } catch (error: any) {
       if (error?.status === 404) {
         return {
           id: tokenId,
           amount: "0",
-          token_properties: {},
+          token_properties: new PropertyMap(),
         };
       }
       return error;

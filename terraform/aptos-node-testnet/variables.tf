@@ -207,3 +207,8 @@ variable "fullnode_storage_class" {
     error_message = "Supported storage classes are gp3, io1, io2"
   }
 }
+
+variable "manage_via_tf" {
+  description = "Whether to manage the aptos-node k8s workload via Terraform"
+  default     = true
+}

@@ -3,24 +3,28 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{components::chunk_output::ChunkOutput, metrics::APTOS_EXECUTOR_ERRORS};
+use crate::{
+    components::chunk_output::ChunkOutput,
+    metrics::{APTOS_EXECUTOR_ERRORS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS},
+};
 use anyhow::{ensure, Result};
 use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
 };
+use aptos_executor_types::{
+    in_memory_state_calculator::InMemoryStateCalculator, ExecutedChunk, ParsedTransactionOutput,
+    TransactionData,
+};
 use aptos_logger::error;
+use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     proof::accumulator::InMemoryAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, TransactionOutput, TransactionStatus},
 };
-use executor_types::{
-    in_memory_state_calculator::InMemoryStateCalculator, ExecutedChunk, ParsedTransactionOutput,
-    TransactionData,
-};
+use rayon::prelude::*;
 use std::{collections::HashMap, iter::repeat, sync::Arc};
-use storage_interface::ExecutedTrees;
 
 pub struct ApplyChunkOutput;
 
@@ -34,16 +38,27 @@ impl ApplyChunkOutput {
             transactions,
             transaction_outputs,
         } = chunk_output;
-        // Separate transactions with different VM statuses.
-        let (new_epoch, status, to_keep, to_discard, to_retry) =
-            Self::sort_transactions(transactions, transaction_outputs)?;
+        let (new_epoch, status, to_keep, to_discard, to_retry) = {
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["sort_transactions"])
+                .start_timer();
+            // Separate transactions with different VM statuses.
+            Self::sort_transactions(transactions, transaction_outputs)?
+        };
 
         // Apply the write set, get the latest state.
-        let (state_updates_vec, state_checkpoint_hashes, result_state, next_epoch_state) =
+        let (state_updates_vec, state_checkpoint_hashes, result_state, next_epoch_state) = {
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["apply_write_set"])
+                .start_timer();
             InMemoryStateCalculator::new(base_view.state(), state_cache)
-                .calculate_for_transaction_chunk(&to_keep, new_epoch)?;
+                .calculate_for_transaction_chunk(&to_keep, new_epoch)?
+        };
 
         // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
+        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            .with_label_values(&["calculate_ledger_diff"])
+            .start_timer();
         let (to_commit, transaction_info_hashes) =
             Self::assemble_ledger_diff(to_keep, state_updates_vec, state_checkpoint_hashes);
         let result_view = ExecutedTrees::new(
@@ -147,23 +162,51 @@ impl ApplyChunkOutput {
         assert_eq!(to_keep.len(), state_updates_vec.len());
         assert_eq!(to_keep.len(), state_checkpoint_hashes.len());
 
-        let mut to_commit = vec![];
-        let mut txn_info_hashes = vec![];
-        for (((txn, txn_output), state_checkpoint_hash), state_updates) in itertools::zip_eq(
-            itertools::zip_eq(to_keep, state_checkpoint_hashes),
+        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            .with_label_values(&["assemble_ledger_diff"])
+            .start_timer();
+        let num_txns = to_keep.len();
+        let mut to_commit = Vec::with_capacity(num_txns);
+        let mut txn_info_hashes = Vec::with_capacity(num_txns);
+        let hashes_vec = {
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["calculate_ledger_diff_hashes"])
+                .start_timer();
+            to_keep
+                .par_iter()
+                .with_min_len(16)
+                .map(|(_, txn_output)| {
+                    (
+                        txn_output
+                            .events()
+                            .iter()
+                            .map(CryptoHash::hash)
+                            .collect::<Vec<_>>(),
+                        CryptoHash::hash(txn_output.write_set()),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+
+        for (
+            (txn, txn_output),
+            state_checkpoint_hash,
+            state_updates,
+            (event_hashes, write_set_hash),
+        ) in itertools::izip!(
+            to_keep,
+            state_checkpoint_hashes,
             state_updates_vec,
+            hashes_vec
         ) {
             let (write_set, events, reconfig_events, gas_used, status) = txn_output.unpack();
-            let event_tree = {
-                let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
-                InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes)
-            };
+            let event_tree =
+                InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes);
 
-            let state_change_hash = CryptoHash::hash(&write_set);
             let txn_info = match &status {
                 TransactionStatus::Keep(status) => TransactionInfo::new(
                     txn.hash(),
-                    state_change_hash,
+                    write_set_hash,
                     event_tree.root_hash(),
                     state_checkpoint_hash,
                     gas_used,

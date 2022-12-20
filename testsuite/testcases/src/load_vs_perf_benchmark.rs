@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::NetworkLoadTest;
+use aptos_forge::{EmitJobMode, NetworkContext, NetworkTest, Result, Test, TxnStats};
 use aptos_logger::info;
-use forge::{EmitJobMode, NetworkContext, NetworkTest, Result, Test, TxnStats};
 use rand::SeedableRng;
 use std::time::Duration;
 use tokio::runtime::Runtime;

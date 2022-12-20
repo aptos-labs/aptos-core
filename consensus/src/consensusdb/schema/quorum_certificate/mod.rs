@@ -11,9 +11,9 @@
 
 use super::QC_CF_NAME;
 use anyhow::Result;
+use aptos_consensus_types::quorum_cert::QuorumCert;
 use aptos_crypto::HashValue;
-use consensus_types::quorum_cert::QuorumCert;
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };

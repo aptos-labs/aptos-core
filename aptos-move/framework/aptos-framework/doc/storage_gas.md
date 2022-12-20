@@ -240,6 +240,13 @@ The below index is automatically generated from source code:
     -  [Struct `Point`](#@Specification_16_Point)
     -  [Struct `UsageGasConfig`](#@Specification_16_UsageGasConfig)
     -  [Struct `GasCurve`](#@Specification_16_GasCurve)
+    -  [Function `base_8192_exponential_curve`](#@Specification_16_base_8192_exponential_curve)
+    -  [Function `new_point`](#@Specification_16_new_point)
+    -  [Function `new_gas_curve`](#@Specification_16_new_gas_curve)
+    -  [Function `new_usage_gas_config`](#@Specification_16_new_usage_gas_config)
+    -  [Function `new_storage_gas_config`](#@Specification_16_new_storage_gas_config)
+    -  [Function `set_config`](#@Specification_16_set_config)
+    -  [Function `initialize`](#@Specification_16_initialize)
     -  [Function `validate_points`](#@Specification_16_validate_points)
     -  [Function `calculate_gas`](#@Specification_16_calculate_gas)
     -  [Function `interpolate`](#@Specification_16_interpolate)
@@ -1244,7 +1251,9 @@ target utilization.
 
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@aptos_framework);
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_strict;
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@aptos_framework);
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGas">StorageGas</a>&gt;(@aptos_framework);
 </code></pre>
 
@@ -1292,6 +1301,134 @@ target utilization.
 
 
 
+<a name="@Specification_16_base_8192_exponential_curve"></a>
+
+### Function `base_8192_exponential_curve`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(min_gas: u64, max_gas: u64): <a href="storage_gas.md#0x1_storage_gas_GasCurve">storage_gas::GasCurve</a>
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a>;
+</code></pre>
+
+
+
+<a name="@Specification_16_new_point"></a>
+
+### Function `new_point`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_gas.md#0x1_storage_gas_new_point">new_point</a>(x: u64, y: u64): <a href="storage_gas.md#0x1_storage_gas_Point">storage_gas::Point</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> x &gt; <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a> || y &gt; <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
+<b>ensures</b> result.x == x;
+<b>ensures</b> result.y == y;
+</code></pre>
+
+
+
+<a name="@Specification_16_new_gas_curve"></a>
+
+### Function `new_gas_curve`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_gas.md#0x1_storage_gas_new_gas_curve">new_gas_curve</a>(min_gas: u64, max_gas: u64, points: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="storage_gas.md#0x1_storage_gas_Point">storage_gas::Point</a>&gt;): <a href="storage_gas.md#0x1_storage_gas_GasCurve">storage_gas::GasCurve</a>
+</code></pre>
+
+
+A non decreasing curve must ensure that next is greater than cur.
+
+
+<pre><code><b>include</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a>;
+<b>include</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a>;
+</code></pre>
+
+
+
+<a name="@Specification_16_new_usage_gas_config"></a>
+
+### Function `new_usage_gas_config`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_gas.md#0x1_storage_gas_new_usage_gas_config">new_usage_gas_config</a>(target_usage: u64, read_curve: <a href="storage_gas.md#0x1_storage_gas_GasCurve">storage_gas::GasCurve</a>, create_curve: <a href="storage_gas.md#0x1_storage_gas_GasCurve">storage_gas::GasCurve</a>, write_curve: <a href="storage_gas.md#0x1_storage_gas_GasCurve">storage_gas::GasCurve</a>): <a href="storage_gas.md#0x1_storage_gas_UsageGasConfig">storage_gas::UsageGasConfig</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> target_usage == 0;
+<b>aborts_if</b> target_usage &gt; <a href="storage_gas.md#0x1_storage_gas_MAX_U64">MAX_U64</a> / <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
+</code></pre>
+
+
+
+<a name="@Specification_16_new_storage_gas_config"></a>
+
+### Function `new_storage_gas_config`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_gas.md#0x1_storage_gas_new_storage_gas_config">new_storage_gas_config</a>(item_config: <a href="storage_gas.md#0x1_storage_gas_UsageGasConfig">storage_gas::UsageGasConfig</a>, byte_config: <a href="storage_gas.md#0x1_storage_gas_UsageGasConfig">storage_gas::UsageGasConfig</a>): <a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">storage_gas::StorageGasConfig</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result.item_config == item_config;
+<b>ensures</b> result.byte_config == byte_config;
+</code></pre>
+
+
+
+<a name="@Specification_16_set_config"></a>
+
+### Function `set_config`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="storage_gas.md#0x1_storage_gas_set_config">set_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">storage_gas::StorageGasConfig</a>)
+</code></pre>
+
+
+Signer address must be @aptos_framework and StorageGasConfig exists.
+
+
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: aptos_framework };
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_16_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_gas.md#0x1_storage_gas_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+Signer address must be @aptos_framework.
+Address @aptos_framework does not exist StorageGasConfig and StorageGas before the function call is restricted
+and exists after the function is executed.
+
+
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: aptos_framework };
+<b>aborts_if</b> <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@aptos_framework);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGas">StorageGas</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGas">StorageGas</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
 <a name="@Specification_16_validate_points"></a>
 
 ### Function `validate_points`
@@ -1301,14 +1438,12 @@ target utilization.
 </code></pre>
 
 
+A non decreasing curve must ensure that next is greater than cur.
 
 
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> [abstract] <b>exists</b> i in 0..len(points) - 1: (
-    points[i].x &gt;= points[i + 1].x || points[i].y &gt; points[i + 1].y
-);
-<b>aborts_if</b> [abstract] len(points) &gt; 0 && points[0].x == 0;
-<b>aborts_if</b> [abstract]  len(points) &gt; 0 && points[len(points) - 1].x == <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
+<pre><code><b>pragma</b> aborts_if_is_strict = <b>false</b>;
+<b>pragma</b> opaque;
+<b>include</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a>;
 </code></pre>
 
 
@@ -1345,12 +1480,8 @@ target utilization.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>requires</b> x0 &lt; x1;
-<b>requires</b> y0 &lt;= y1;
-<b>requires</b> x0 &lt;= x && x &lt;= x1;
-<b>requires</b> x1 * y1 &lt;= <a href="storage_gas.md#0x1_storage_gas_MAX_U64">MAX_U64</a>;
+<b>pragma</b> intrinsic;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> y0 &lt;= result && result &lt;= y1;
 </code></pre>
 
 
@@ -1364,10 +1495,13 @@ target utilization.
 </code></pre>
 
 
+Address @aptos_framework must exist StorageGasConfig and StorageGas and StateStorageUsage.
 
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
-<b>aborts_if</b> <b>false</b>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">StorageGasConfig</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGas">StorageGas</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">state_storage::StateStorageUsage</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -1377,6 +1511,37 @@ target utilization.
 
 
 <pre><code><b>fun</b> <a href="storage_gas.md#0x1_storage_gas_spec_calculate_gas">spec_calculate_gas</a>(max_usage: u64, current_usage: u64, curve: <a href="storage_gas.md#0x1_storage_gas_GasCurve">GasCurve</a>): u64;
+</code></pre>
+
+
+
+
+<a name="0x1_storage_gas_NewGasCurveAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a> {
+    min_gas: u64;
+    max_gas: u64;
+    <b>aborts_if</b> max_gas &lt; min_gas;
+    <b>aborts_if</b> max_gas &gt; <a href="storage_gas.md#0x1_storage_gas_MAX_U64">MAX_U64</a> / <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
+}
+</code></pre>
+
+
+A non decreasing curve must ensure that next is greater than cur.
+
+
+<a name="0x1_storage_gas_ValidatePointsAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a> {
+    points: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="storage_gas.md#0x1_storage_gas_Point">Point</a>&gt;;
+    <b>aborts_if</b> <b>exists</b> i in 0..len(points) - 1: (
+        points[i].x &gt;= points[i + 1].x || points[i].y &gt; points[i + 1].y
+    );
+    <b>aborts_if</b> len(points) &gt; 0 && points[0].x == 0;
+    <b>aborts_if</b> len(points) &gt; 0 && points[len(points) - 1].x == <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
+}
 </code></pre>
 
 

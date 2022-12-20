@@ -4,20 +4,28 @@
 use crate::{
     block_storage::BlockStore,
     liveness::{
-        proposal_generator::ProposalGenerator,
+        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
         rotating_proposer_election::RotatingProposer,
         round_state::{ExponentialTimeInterval, NewRoundEvent, NewRoundReason, RoundState},
     },
     metrics_safety_rules::MetricsSafetyRules,
     network::NetworkSender,
     network_interface::ConsensusNetworkSender,
+    payload_manager::PayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     round_manager::RoundManager,
     test_utils::{EmptyStateComputer, MockPayloadManager, MockStorage},
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::ConsensusConfig;
+use aptos_consensus_types::proposal_msg::ProposalMsg;
 use aptos_infallible::Mutex;
+use aptos_network::{
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
+    protocols::network::NewNetworkSender,
+};
+use aptos_safety_rules::{test_utils, SafetyRules, TSafetyRules};
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     epoch_change::EpochChangeProof,
@@ -28,15 +36,8 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
-use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::proposal_msg::ProposalMsg;
 use futures::{channel::mpsc, executor::block_on};
-use network::{
-    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::NewNetworkSender,
-};
 use once_cell::sync::Lazy;
-use safety_rules::{test_utils, SafetyRules, TSafetyRules};
 use std::{sync::Arc, time::Duration};
 use tokio::runtime::Runtime;
 
@@ -76,6 +77,7 @@ fn build_empty_store(
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
+        Arc::from(PayloadManager::DirectMempool),
     ))
 }
 
@@ -93,7 +95,7 @@ fn make_initial_epoch_change_proof(signer: &ValidatorSigner) -> EpochChangeProof
 fn create_round_state() -> RoundState {
     let base_timeout = std::time::Duration::new(60, 0);
     let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
-    let (round_timeout_sender, _) = channel::new_test(1_024);
+    let (round_timeout_sender, _) = aptos_channels::new_test(1_024);
     let time_service = Arc::new(SimulatedTimeService::new());
     RoundState::new(time_interval, time_service, round_timeout_sender)
 }
@@ -122,7 +124,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
-    let (self_sender, _self_receiver) = channel::new_test(8);
+    let (self_sender, _self_receiver) = aptos_channels::new_test(8);
 
     let epoch_state = EpochState {
         epoch: 1,
@@ -151,6 +153,8 @@ fn create_node_for_fuzzing() -> RoundManager {
         1,
         1024,
         10,
+        ChainHealthBackoffConfig::new_no_backoff(),
+        false,
     );
 
     //

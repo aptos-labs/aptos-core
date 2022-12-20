@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::{
-    X_APTOS_BLOCK_HEIGHT, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_OLDEST_VERSION,
-    X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION, X_APTOS_OLDEST_BLOCK_HEIGHT,
+    X_APTOS_BLOCK_HEIGHT, X_APTOS_CHAIN_ID, X_APTOS_CURSOR, X_APTOS_EPOCH,
+    X_APTOS_LEDGER_OLDEST_VERSION, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
+    X_APTOS_OLDEST_BLOCK_HEIGHT,
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -15,6 +16,7 @@ pub struct State {
     pub oldest_ledger_version: u64,
     pub oldest_block_height: u64,
     pub block_height: u64,
+    pub cursor: Option<String>,
 }
 
 impl State {
@@ -47,6 +49,10 @@ impl State {
             .get(X_APTOS_OLDEST_BLOCK_HEIGHT)
             .and_then(|h| h.to_str().ok())
             .and_then(|s| s.parse().ok());
+        let cursor = headers
+            .get(X_APTOS_CURSOR)
+            .and_then(|h| h.to_str().ok())
+            .map(|s| s.to_string());
 
         let state = if let (
             Some(chain_id),
@@ -56,6 +62,7 @@ impl State {
             Some(oldest_ledger_version),
             Some(block_height),
             Some(oldest_block_height),
+            cursor,
         ) = (
             maybe_chain_id,
             maybe_version,
@@ -64,6 +71,7 @@ impl State {
             maybe_oldest_ledger_version,
             maybe_block_height,
             maybe_oldest_block_height,
+            cursor,
         ) {
             Self {
                 chain_id,
@@ -73,6 +81,7 @@ impl State {
                 oldest_ledger_version,
                 block_height,
                 oldest_block_height,
+                cursor,
             }
         } else {
             anyhow::bail!(

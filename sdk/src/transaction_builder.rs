@@ -8,12 +8,12 @@ use crate::{
         transaction::{authenticator::AuthenticationKey, RawTransaction, TransactionPayload},
     },
 };
+pub use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
 use aptos_types::transaction::{
     authenticator::AuthenticationKeyPreimage, EntryFunction, ModuleBundle, Script,
 };
-pub use cached_packages::aptos_stdlib;
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,

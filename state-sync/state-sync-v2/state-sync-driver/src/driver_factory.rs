@@ -12,20 +12,21 @@ use crate::{
     storage_synchronizer::StorageSynchronizer,
 };
 use aptos_config::config::NodeConfig;
+use aptos_consensus_notifications::ConsensusNotificationListener;
 use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_data_streaming_service::streaming_client::StreamingServiceClient;
+use aptos_event_notifications::{EventNotificationSender, EventSubscriptionService};
+use aptos_executor_types::ChunkExecutorTrait;
 use aptos_infallible::Mutex;
+use aptos_mempool_notifications::MempoolNotificationSender;
+use aptos_storage_interface::DbReaderWriter;
+use aptos_time_service::TimeService;
 use aptos_types::{move_resource::MoveStorage, waypoint::Waypoint};
-use consensus_notifications::ConsensusNotificationListener;
-use data_streaming_service::streaming_client::StreamingServiceClient;
-use event_notifications::{EventNotificationSender, EventSubscriptionService};
-use executor_types::ChunkExecutorTrait;
 use futures::{channel::mpsc, executor::block_on};
-use mempool_notifications::MempoolNotificationSender;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use storage_interface::DbReaderWriter;
 use tokio::runtime::{Builder, Runtime};
 
 /// Creates a new state sync driver and client
@@ -52,6 +53,7 @@ impl DriverFactory {
         mut event_subscription_service: EventSubscriptionService,
         aptos_data_client: AptosNetDataClient,
         streaming_service_client: StreamingServiceClient,
+        time_service: TimeService,
     ) -> Self {
         // Notify subscribers of the initial on-chain config values
         match (&*storage.reader).fetch_latest_state_checkpoint_version() {
@@ -133,6 +135,7 @@ impl DriverFactory {
             aptos_data_client,
             streaming_service_client,
             storage.reader,
+            time_service,
         );
 
         // Spawn the driver

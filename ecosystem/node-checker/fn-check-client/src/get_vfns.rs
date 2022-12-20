@@ -5,6 +5,7 @@
 //! converting it into the format expected by check.rs
 
 use anyhow::{Context, Result};
+use aptos_logger::info;
 use aptos_sdk::{
     rest_client::Client as AptosClient,
     types::{
@@ -13,7 +14,6 @@ use aptos_sdk::{
     },
 };
 use clap::Parser;
-use log::info;
 use reqwest::Url;
 use std::collections::HashMap;
 

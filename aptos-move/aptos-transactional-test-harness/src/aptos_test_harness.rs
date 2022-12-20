@@ -9,7 +9,8 @@ use aptos_crypto::{
     ValidCryptoMaterialStringExt,
 };
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
-use aptos_state_view::StateView;
+use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
+use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
@@ -25,10 +26,10 @@ use aptos_types::{
 };
 use aptos_vm::{
     data_cache::{AsMoveResolver, IntoMoveResolver, StorageAdapterOwned},
-    AptosVM,
+    AptosVM, VMExecutor,
 };
+use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::StructOpt;
-use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -38,7 +39,6 @@ use std::{
     string::String,
     sync::Arc,
 };
-use vm_genesis::GENESIS_KEYPAIR;
 use {
     move_binary_format::file_format::{CompiledModule, CompiledScript},
     move_command_line_common::{
@@ -250,7 +250,7 @@ impl SignerAndKeyPair {
 
 pub struct FakeDbReader {}
 
-impl storage_interface::DbReader for FakeDbReader {
+impl aptos_storage_interface::DbReader for FakeDbReader {
     fn indexer_enabled(&self) -> bool {
         false
     }
@@ -285,8 +285,10 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     let deps = vec![PackagePaths {
         name: None,
-        paths: cached_packages::head_release_bundle().files().unwrap(),
-        named_address_map: framework::named_addresses().clone(),
+        paths: aptos_cached_packages::head_release_bundle()
+            .files()
+            .unwrap(),
+        named_address_map: aptos_framework::named_addresses().clone(),
     }];
     let program_res = move_compiler::construct_pre_compiled_lib(
         deps,
@@ -472,23 +474,26 @@ impl<'a> AptosTestAdapter<'a> {
     /// Should error if the transaction ends up being discarded, or having a status other than
     /// EXECUTED.
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
-        let mut outputs = AptosVM::execute_block_and_keep_vm_status(vec![txn], &self.storage)?;
+        let mut outputs = AptosVM::execute_block(vec![txn], &self.storage)?;
 
         assert_eq!(outputs.len(), 1);
 
-        let (status, output) = outputs.pop().unwrap();
+        let output = outputs.pop().unwrap();
         match output.status() {
             TransactionStatus::Keep(kept_vm_status) => {
                 self.storage.add_write_set(output.write_set());
                 match kept_vm_status {
                     ExecutionStatus::Success => Ok(output),
                     _ => {
-                        bail!("Failed to execute transaction. ExecutionStatus: {}", status)
+                        bail!(
+                            "Failed to execute transaction. ExecutionStatus: {:?}",
+                            kept_vm_status
+                        )
                     }
                 }
             }
-            TransactionStatus::Discard(_) => {
-                bail!("Transaction discarded. VMStatus: {}", status)
+            TransactionStatus::Discard(status_code) => {
+                bail!("Transaction discarded. VM status code: {:?}", status_code)
             }
             TransactionStatus::Retry => panic!(),
         }
@@ -502,7 +507,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_test_root_address(),
             parameters.sequence_number,
-            cached_packages::aptos_stdlib::aptos_account_create_account(account_addr),
+            aptos_cached_packages::aptos_stdlib::aptos_account_create_account(account_addr),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,
@@ -518,7 +523,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_test_root_address(),
             parameters.sequence_number + 1,
-            cached_packages::aptos_stdlib::aptos_coin_mint(account_addr, amount),
+            aptos_cached_packages::aptos_stdlib::aptos_coin_mint(account_addr, amount),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,
@@ -561,7 +566,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             None => BTreeMap::new(),
         };
 
-        let mut named_address_mapping = framework::named_addresses().clone();
+        let mut named_address_mapping = aptos_framework::named_addresses().clone();
 
         for (name, addr) in additional_named_address_mapping.clone() {
             if named_address_mapping.contains_key(&name) {

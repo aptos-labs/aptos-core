@@ -4,8 +4,6 @@ import asyncio
 import difflib
 import json
 import os
-from pprint import pprint
-import pwd
 import random
 import re
 import resource
@@ -15,12 +13,13 @@ import time
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import (
     Any,
     Callable,
-    Dict,
+    Iterator,
+    Mapping,
     Generator,
     List,
     Optional,
@@ -53,10 +52,10 @@ class RunResult:
         return self.exit_code == 0
 
 
-def get_prompt_answer(prompt: str, answer: Optional[str]=None) -> bool:
+def get_prompt_answer(prompt: str, answer: Optional[str] = None) -> bool:
     """Get a yes/no answer from the user, or use the default answer if provided."""
     if not answer and not os.getenv("CI"):
-        answer = input(f"{prompt} (y/n) ").strip().lower() 
+        answer = input(f"{prompt} (y/n) ").strip().lower()
     return answer in ("y", "yes", "yeet", "yessir", "si", "true")
 
 
@@ -82,10 +81,6 @@ try:
 except ImportError:
     install_dependency("psutil")
     import psutil
-
-
-def get_current_user() -> str:
-    return pwd.getpwuid(os.getuid())[0]
 
 
 @click.group()
@@ -325,7 +320,7 @@ def get_dashboard_link(
         raise Exception(f"Invalid refresh argument: {time_filter}")
 
     return (
-        f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}"
+        f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}&var-metrics_source=All"
         f"&var-chain_name={forge_chain_name}{grafana_time_filter}"
     )
 
@@ -357,9 +352,9 @@ def milliseconds(timestamp: datetime) -> int:
 
 
 def apply_humio_time_filter(
-    urlparts: Dict[str, Union[str, bool, int]],
+    urlparts: Mapping[str, Union[str, bool, int]],
     time_filter: Union[bool, Tuple[datetime, datetime]],
-) -> Dict:
+) -> Mapping:
     if time_filter is True:
         urlparts = {
             **urlparts,
@@ -384,6 +379,7 @@ def get_humio_forge_link(
     forge_namespace: str,
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
+    """Get a link to the forge test runner logs in humio for a given test run in a given namespace"""
     columns = [
         {
             "type": "field",
@@ -425,7 +421,8 @@ def get_humio_logs_link(
     forge_namespace: str,
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
-    query = f"$forgeLogs(validator_instance=*) | {forge_namespace}"
+    """Get a link to the node logs in humio for a given test run in a given namespace"""
+    query = f'$forgeLogs(validator_instance=*) | "k8s.namespace" = "{forge_namespace}"'
     columns = [
         {
             "type": "field",
@@ -835,14 +832,14 @@ def get_current_cluster_name(shell: Shell) -> str:
 def assert_provided_image_tags_has_profile_or_features(
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
-    enable_testing_image: bool,
+    enable_failpoints: bool,
     enable_performance_profile: bool,
 ):
     for tag in [image_tag, upgrade_image_tag]:
         if not tag:
             continue
         if (
-            enable_testing_image
+            enable_failpoints
         ):  # testing image requires the tag to be prefixed with failpoints_
             assert tag.startswith(
                 "failpoints"
@@ -857,19 +854,19 @@ def find_recent_images_by_profile_or_features(
     shell: Shell,
     git: Git,
     num_images: int,
-    enable_testing_image: Optional[bool],
+    enable_failpoints: Optional[bool],
     enable_performance_profile: Optional[bool],
 ) -> Generator[str, None, None]:
     image_name = "aptos/validator"
     image_tag_prefix = ""
-    if enable_testing_image and enable_performance_profile:
+    if enable_failpoints and enable_performance_profile:
         raise Exception(
             "Cannot yet set both testing (failpoints) image and performance"
         )
 
     if enable_performance_profile:
         image_tag_prefix = "performance_"
-    if enable_testing_image:
+    if enable_failpoints:
         image_tag_prefix = "failpoints_"
 
     return find_recent_images(
@@ -972,7 +969,7 @@ def create_forge_command(
         forge_args.extend(
             [
                 "-p",
-                "forge-cli",
+                "aptos-forge-cli",
                 "--",
             ]
         )
@@ -1127,7 +1124,7 @@ async def run_multiple(
 @envoption("FORGE_NAMESPACE_KEEP")
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
-@envoption("FORGE_ENABLE_TESTING_IMAGE")
+@envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
 @envoption("FORGE_TEST_SUITE")
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
@@ -1166,7 +1163,7 @@ def test(
     forge_num_validator_fullnodes: Optional[str],
     forge_namespace_keep: Optional[str],
     forge_namespace_reuse: Optional[str],
-    forge_enable_testing_image: Optional[str],
+    forge_enable_failpoints: Optional[str],
     forge_enable_performance: Optional[str],
     forge_enable_haproxy: Optional[str],
     forge_test_suite: str,
@@ -1259,13 +1256,13 @@ def test(
     assert forge_cluster_name, "Forge cluster name is required"
 
     # These features and profile flags are set as strings
-    enable_testing_image = forge_enable_testing_image == "true"
+    enable_failpoints = forge_enable_failpoints == "true"
     enable_performance_profile = forge_enable_performance == "true"
 
     assert_provided_image_tags_has_profile_or_features(
         image_tag,
         upgrade_image_tag,
-        enable_testing_image=enable_testing_image,
+        enable_failpoints=enable_failpoints,
         enable_performance_profile=enable_performance_profile,
     )
 
@@ -1276,7 +1273,7 @@ def test(
                 shell,
                 git,
                 2,
-                enable_testing_image=enable_testing_image,
+                enable_failpoints=enable_failpoints,
                 enable_performance_profile=enable_performance_profile,
             )
         )
@@ -1293,7 +1290,7 @@ def test(
                 shell,
                 git,
                 1,
-                enable_testing_image=enable_testing_image,
+                enable_failpoints=enable_failpoints,
                 enable_performance_profile=enable_performance_profile,
             )
         )
@@ -1304,7 +1301,7 @@ def test(
     assert_provided_image_tags_has_profile_or_features(
         image_tag,
         upgrade_image_tag,
-        enable_testing_image=enable_testing_image,
+        enable_failpoints=enable_failpoints,
         enable_performance_profile=enable_performance_profile,
     )
 
@@ -1615,23 +1612,23 @@ class TestConfig(TypedDict):
 
 class TestSuite(TypedDict):
     name: str
-    all_tests: Dict[str, TestConfig]
-    enabled_tests: Dict[str, TestConfig]
+    all_tests: Mapping[str, TestConfig]
+    enabled_tests: Mapping[str, TestConfig]
 
 
 # All changes to this struct must be backwards compatible
 # i.e. its ok to add a new field, but not to remove one
-
-
 class ForgeConfigValue(TypedDict):
     enabled_clusters: List[str]
     all_clusters: List[str]
-    test_suites: Dict[str, TestSuite]
-    default_helm_values: Dict
+    test_suites: Mapping[str, TestSuite]
+    default_helm_values: Mapping
 
 
 def default_forge_config() -> ForgeConfigValue:
-    return {
+    # Return a default config with not all the fields, as they are not mandatory
+    # This ensures we check for backwards compatibility
+    return {  # type: ignore
         "enabled_clusters": [],
         "all_clusters": [],
     }
@@ -1676,7 +1673,12 @@ def ensure_forge_config(value: Any) -> ForgeConfigValue:
         raise Exception("Type had errors:\n" + "\n".join(errors))
     return value
 
-def get_forge_config_diff(old_config: dict, new_config: dict, full_diff: Optional[bool]=False) -> list:
+
+def get_forge_config_diff(
+    old_config: ForgeConfigValue,
+    new_config: ForgeConfigValue,
+    full_diff: Optional[bool] = False,
+) -> Iterator[str]:
     """Returns a list of diffs between the old and new config"""
     config_string = json.dumps(new_config, indent=2)
     old_config_string = json.dumps(old_config, indent=2)
@@ -1687,6 +1689,7 @@ def get_forge_config_diff(old_config: dict, new_config: dict, full_diff: Optiona
         return diff.compare(old_lines, new_lines)
     else:
         return difflib.unified_diff(old_lines, new_lines)
+
 
 class ForgeConfigBackend:
     def create(self) -> None:
@@ -1893,7 +1896,7 @@ def config_edit(ctx: click.Context) -> None:
     shell = LocalShell(True)
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes, time)
+    context = SystemContext(shell, filesystem, processes, SystemTime())
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
 
@@ -2005,7 +2008,7 @@ def cluster_config_delete(
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
-    context = SystemContext(shell, filesystem, processes, time)
+    context = SystemContext(shell, filesystem, processes, SystemTime())
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
 
     config.init()
@@ -2182,7 +2185,7 @@ def test_config_add(
         raise Exception(f"Test {test_name} already exists")
 
     if test_name:
-        test_suite["all_tests"][test_name]: TestConfig = {
+        test_suite["all_tests"][test_name] = {
             "name": test_name,
         }
 
@@ -2327,6 +2330,7 @@ def test_config_enable(
     else:
         print("Config not updated")
 
+
 @test_config.command("disable")
 @click.argument("suite_name")
 @click.argument("test_name")
@@ -2366,6 +2370,7 @@ def test_config_disable(
         config.flush()
     else:
         print("Config not updated")
+
 
 if __name__ == "__main__":
     main()

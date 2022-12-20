@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_logger::{prelude::*, Level, Logger};
-use aptos_push_metrics::MetricsPusher;
-use backup_cli::{
+use aptos_backup_cli::{
     backup_types::{
         epoch_ending::restore::{EpochEndingRestoreController, EpochEndingRestoreOpt},
         state_snapshot::restore::{StateSnapshotRestoreController, StateSnapshotRestoreOpt},
@@ -14,6 +12,8 @@ use backup_cli::{
     storage::StorageOpt,
     utils::{GlobalRestoreOpt, GlobalRestoreOptions},
 };
+use aptos_logger::{prelude::*, Level, Logger};
+use aptos_push_metrics::MetricsPusher;
 use clap::Parser;
 use std::convert::TryInto;
 
@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
 }
 
 async fn main_impl() -> Result<()> {
-    Logger::new().level(Level::Info).read_env().init();
+    Logger::new().level(Level::Info).init();
     #[allow(deprecated)]
     let _mp = MetricsPusher::start();
 
@@ -92,6 +92,7 @@ async fn main_impl() -> Result<()> {
                 global_opt,
                 storage.init_storage().await?,
                 None, /* epoch_history */
+                vec![],
             )
             .run()
             .await?;

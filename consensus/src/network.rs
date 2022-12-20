@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::block_storage::tracing::{observe_block, BlockStage};
+use crate::quorum_store::types::{Batch, Fragment};
 use crate::{
     counters,
     logging::LogEvent,
@@ -9,30 +10,31 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
 };
 use anyhow::{anyhow, ensure};
-use aptos_logger::prelude::*;
-use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof,
-    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
-};
-use bytes::Bytes;
-use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::{
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
+use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
-use fail::fail_point;
-use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
-use network::{
+use aptos_logger::prelude::*;
+use aptos_network::{
     protocols::{
         network::{ApplicationNetworkSender, Event},
         rpc::error::RpcError,
     },
     ProtocolId,
 };
+use aptos_types::{
+    account_address::AccountAddress, epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
+};
+use bytes::Bytes;
+use fail::fail_point;
+use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
 use std::{
     mem::{discriminant, Discriminant},
     time::Duration,
@@ -55,8 +57,23 @@ pub struct NetworkReceivers {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
+    pub quorum_store_messages: aptos_channel::Receiver<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
     pub block_retrieval:
         aptos_channel::Receiver<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
+}
+
+#[async_trait::async_trait]
+pub(crate) trait QuorumStoreSender {
+    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
+
+    async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>);
+
+    async fn broadcast_fragment(&mut self, fragment: Fragment);
+
+    async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore);
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -67,7 +84,7 @@ pub struct NetworkSender {
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
     // Note that we do not support self rpc requests as it might cause infinite recursive calls.
-    self_sender: channel::Sender<Event<ConsensusMsg>>,
+    self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
     validators: ValidatorVerifier,
 }
 
@@ -75,7 +92,7 @@ impl NetworkSender {
     pub fn new(
         author: Author,
         network_sender: ConsensusNetworkSender,
-        self_sender: channel::Sender<Event<ConsensusMsg>>,
+        self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
         validators: ValidatorVerifier,
     ) -> Self {
         NetworkSender {
@@ -141,6 +158,13 @@ impl NetworkSender {
         if let Err(err) = self.self_sender.send(self_msg).await {
             error!("Error broadcasting to self: {:?}", err);
         }
+
+        self.broadcast_without_self(msg).await;
+    }
+
+    /// Tries to send the given msg to all the participants, excluding self.
+    async fn broadcast_without_self(&mut self, msg: ConsensusMsg) {
+        fail_point!("consensus::send::any", |_| ());
 
         // Get the list of validators excluding our own account address. Note the
         // ordering is not important in this case.
@@ -271,8 +295,39 @@ impl NetworkSender {
     }
 }
 
+#[async_trait::async_trait]
+impl QuorumStoreSender for NetworkSender {
+    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
+        fail_point!("consensus::send_batch", |_| ());
+        let msg = ConsensusMsg::BatchMsg(Box::new(batch));
+        self.send(msg, recipients).await
+    }
+
+    async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>) {
+        fail_point!("consensus::send_signed_digest", |_| ());
+        let msg = ConsensusMsg::SignedDigestMsg(Box::new(signed_digest));
+        self.send(msg, recipients).await
+    }
+
+    async fn broadcast_fragment(&mut self, fragment: Fragment) {
+        fail_point!("consensus::send::broadcast_fragment", |_| ());
+        let msg = ConsensusMsg::FragmentMsg(Box::new(fragment));
+        self.broadcast_without_self(msg).await
+    }
+
+    async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore) {
+        fail_point!("consensus::send::proof_of_store", |_| ());
+        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(proof_of_store));
+        self.broadcast_without_self(msg).await
+    }
+}
+
 pub struct NetworkTask {
     consensus_messages_tx: aptos_channel::Sender<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
+    quorum_store_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
@@ -285,10 +340,16 @@ impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
         network_events: ConsensusNetworkEvents,
-        self_receiver: channel::Receiver<Event<ConsensusMsg>>,
+        self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) =
             aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
+        let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            // TODO: tune this value based on quorum store messages with backpressure
+            50,
+            Some(&counters::QUORUM_STORE_CHANNEL_MSGS),
+        );
         let (block_retrieval_tx, block_retrieval) = aptos_channel::new(
             QueueStyle::LIFO,
             1,
@@ -298,14 +359,32 @@ impl NetworkTask {
         (
             NetworkTask {
                 consensus_messages_tx,
+                quorum_store_messages_tx,
                 block_retrieval_tx,
                 all_events,
             },
             NetworkReceivers {
                 consensus_messages,
+                quorum_store_messages,
                 block_retrieval,
             },
         )
+    }
+
+    fn push_msg(
+        peer_id: AccountAddress,
+        msg: ConsensusMsg,
+        tx: &aptos_channel::Sender<
+            (AccountAddress, Discriminant<ConsensusMsg>),
+            (AccountAddress, ConsensusMsg),
+        >,
+    ) {
+        if let Err(e) = tx.push((peer_id, discriminant(&msg)), (peer_id, msg)) {
+            warn!(
+                remote_peer = peer_id,
+                error = ?e, "Error pushing consensus msg",
+            );
+        }
     }
 
     pub async fn start(mut self) {
@@ -315,20 +394,27 @@ impl NetworkTask {
                     counters::CONSENSUS_RECEIVED_MSGS
                         .with_label_values(&[msg.name()])
                         .inc();
-                    if let ConsensusMsg::ProposalMsg(proposal) = &msg {
-                        observe_block(
-                            proposal.proposal().timestamp_usecs(),
-                            BlockStage::NETWORK_RECEIVED,
-                        );
-                    }
-                    if let Err(e) = self
-                        .consensus_messages_tx
-                        .push((peer_id, discriminant(&msg)), (peer_id, msg))
-                    {
-                        warn!(
-                            remote_peer = peer_id,
-                            error = ?e, "Error pushing consensus msg",
-                        );
+                    match msg {
+                        quorum_store_msg @ (ConsensusMsg::SignedDigestMsg(_)
+                        | ConsensusMsg::FragmentMsg(_)
+                        | ConsensusMsg::BatchRequestMsg(_)
+                        | ConsensusMsg::BatchMsg(_)
+                        | ConsensusMsg::ProofOfStoreMsg(_)) => {
+                            Self::push_msg(
+                                peer_id,
+                                quorum_store_msg,
+                                &self.quorum_store_messages_tx,
+                            );
+                        }
+                        consensus_msg => {
+                            if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
+                                observe_block(
+                                    proposal.proposal().timestamp_usecs(),
+                                    BlockStage::NETWORK_RECEIVED,
+                                );
+                            }
+                            Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
+                        }
                     }
                 }
                 Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {

@@ -144,7 +144,7 @@ export class AptosClient {
     // to limit the number of items per response, or does it limit the total output
     // of this function? We avoid this confusion by not exposing the parameter at all.
     const f = this.client.accounts.getAccountModules.bind({ httpRequest: this.client.request });
-    const out = await paginateWithCursor(f, accountAddress, 100, query);
+    const out = await paginateWithCursor(f, accountAddress, 1000, query);
     return out;
   }
 
@@ -186,7 +186,7 @@ export class AptosClient {
     query?: { ledgerVersion?: AnyNumber },
   ): Promise<Gen.MoveResource[]> {
     const f = this.client.accounts.getAccountResources.bind({ httpRequest: this.client.request });
-    const out = await paginateWithCursor(f, accountAddress, 1000, query);
+    const out = await paginateWithCursor(f, accountAddress, 9999, query);
     return out;
   }
 

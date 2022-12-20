@@ -6,12 +6,17 @@
 use crate::components::chunk_output::ChunkOutput;
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
+use aptos_executor_types::ExecutedChunk;
 use aptos_logger::prelude::*;
-use aptos_state_view::{StateView, StateViewId};
-use aptos_types::aggregate_signature::AggregateSignature;
+use aptos_state_view::{StateViewId, TStateView};
+use aptos_storage_interface::{
+    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
+    DbWriter, ExecutedTrees,
+};
 use aptos_types::{
     access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
+    aggregate_signature::AggregateSignature,
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ConfigurationResource,
@@ -21,13 +26,8 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
-use executor_types::ExecutedChunk;
 use move_core_types::move_resource::MoveResource;
 use std::sync::Arc;
-use storage_interface::{
-    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
-    DbWriter, ExecutedTrees,
-};
 
 pub fn generate_waypoint<V: VMExecutor>(
     db: &DbReaderWriter,

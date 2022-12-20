@@ -114,6 +114,8 @@ impl ReleaseTarget {
                     landing_page_template: Some("doc_template/overview.md".to_string()),
                     references_file: Some("doc_template/references.md".to_string()),
                 }),
+                skip_fetch_latest_git_deps: false,
+                bytecode_version: None,
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
             rust_bindings: packages

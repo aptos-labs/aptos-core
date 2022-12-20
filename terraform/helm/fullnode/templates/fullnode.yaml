@@ -43,14 +43,8 @@ spec:
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
         env:
-        {{- if .Values.logging.address }}
-        - name: STRUCT_LOG_TCP_ADDR
-          value: {{ $.Values.logging.address | quote }}
-        {{- end }}
         - name: RUST_LOG
           value: {{ .Values.rust_log }}
-        - name: RUST_LOG_REMOTE
-          value: {{ .Values.rust_log_remote }}
         - name: KUBERNETES_NAMESPACE
           valueFrom:
             fieldRef:

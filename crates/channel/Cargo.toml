@@ -1,5 +1,5 @@
 [package]
-name = "channel"
+name = "aptos-channels"
 description = "An implementation of a channel with configurable QoS"
 version = "0.1.0"
 
@@ -13,13 +13,11 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-futures = "0.3.21"
-
-aptos-infallible = { path = "../../crates/aptos-infallible" }
-aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
+anyhow = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-metrics-core = { workspace = true }
+futures = { workspace = true }
 
 [dev-dependencies]
-tokio = { version = "1.21.0", features = ["full"] }
-
-aptos-types = { path = "../../types" }
+aptos-types = { workspace = true }
+tokio = { workspace = true }

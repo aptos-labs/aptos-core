@@ -6,7 +6,8 @@
 //! VFN information on chain or PFN information from a file, and has converted
 //! it into a common format that these functions can ingest.
 
-use aptos_node_checker_lib::EvaluationSummary;
+use aptos_logger::{debug, info};
+use aptos_node_checker_lib::CheckSummary;
 use aptos_sdk::{
     crypto::{x25519, ValidCryptoMaterialStringExt},
     types::account_address::AccountAddress,
@@ -14,7 +15,6 @@ use aptos_sdk::{
 use clap::Parser;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use log::{debug, info};
 use reqwest::{Client as ReqwestClient, Url};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -43,7 +43,7 @@ pub struct NodeHealthCheckerArgs {
     pub nhc_baseline_config_name: String,
 
     /// How long to wait when talking to NHC. The check should be quick unless
-    /// we're using the TPS evaluator.
+    /// we're using the TPS checker.
     #[clap(long, default_value_t = 60)]
     pub nhc_timeout_secs: u64,
 
@@ -243,8 +243,8 @@ impl NodeHealthCheckerArgs {
         };
 
         // Confirm the response is valid JSON.
-        let evaluation_summary = match response.json::<EvaluationSummary>().await {
-            Ok(evaluation_summary) => evaluation_summary,
+        let check_summary = match response.json::<CheckSummary>().await {
+            Ok(check_summary) => check_summary,
             Err(e) => {
                 return SingleCheckResult::NodeCheckFailure(NodeCheckFailure::new(
                     format!("{:#}", e),
@@ -254,24 +254,20 @@ impl NodeHealthCheckerArgs {
         };
 
         // Check specifically if the API port is closed.
-        if evaluation_summary
-            .evaluation_results
-            .iter()
-            .any(|evaluation_result| {
-                evaluation_result.evaluator_name == "index_response" && evaluation_result.score == 0
-            })
-        {
+        if check_summary.check_results.iter().any(|check_result| {
+            check_result.checker_name == "NodeIdentityChecker" && check_result.score == 0
+        }) {
             return SingleCheckResult::NodeCheckFailure(NodeCheckFailure::new(
                 format!(
                     "Couldn't talk to API on any of the expected ports {:?}: {:?}",
-                    API_PORTS, evaluation_summary
+                    API_PORTS, check_summary
                 ),
                 NodeCheckFailureCode::ApiPortClosed,
             ));
         }
 
         SingleCheckResult::Success(SingleCheckSuccess::new(
-            evaluation_summary,
+            check_summary,
             address_single_string,
         ))
     }
@@ -341,7 +337,7 @@ pub struct SingleCheckSuccess {
     /// The evaluation summary returned by NHC. This doesn't necessarily imply
     /// that the node passed the evaluation, just that an evaluation was returned
     /// successfully and it passed the API available check.
-    pub evaluation_summary: EvaluationSummary,
+    pub check_summary: CheckSummary,
 
     /// This is the address that we used to get this successful evaluation.
     /// This is presented in a normal URL format, not the NetworkAddress
@@ -354,9 +350,9 @@ pub struct SingleCheckSuccess {
 }
 
 impl SingleCheckSuccess {
-    pub fn new(evaluation_summary: EvaluationSummary, fn_address_url: String) -> Self {
+    pub fn new(check_summary: CheckSummary, fn_address_url: String) -> Self {
         Self {
-            evaluation_summary,
+            check_summary,
             fn_address_url,
         }
     }

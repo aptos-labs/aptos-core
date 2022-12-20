@@ -9,12 +9,9 @@ use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 pub fn generate_gas_upgrade_proposal(
     gas_schedule: &GasScheduleV2,
     is_testnet: bool,
+    next_execution_hash: String,
 ) -> Result<Vec<(String, String)>> {
     let mut result = vec![];
-
-    let gas_schedule_blob = bcs::to_bytes(gas_schedule).unwrap();
-
-    assert!(gas_schedule_blob.len() < 65536);
 
     let writer = CodeWriter::new(Loc::default());
 
@@ -37,21 +34,25 @@ pub fn generate_gas_upgrade_proposal(
     }
     emitln!(writer);
 
-    if is_testnet {
-        generate_testnet_header(&writer, "aptos_framework::gas_schedule");
-    } else {
-        generate_governance_proposal_header(&writer, "aptos_framework::gas_schedule");
-    }
+    let proposal = generate_governance_proposal(
+        &writer,
+        is_testnet,
+        &next_execution_hash,
+        "aptos_framework::gas_schedule",
+        |writer| {
+            let gas_schedule_blob = bcs::to_bytes(gas_schedule).unwrap();
+            assert!(gas_schedule_blob.len() < 65536);
+            emit!(writer, "let gas_schedule_blob: vector<u8> = ");
+            generate_blob(writer, &gas_schedule_blob);
+            emitln!(writer, ";\n");
 
-    emit!(writer, "let gas_schedule_blob: vector<u8> = ");
-    generate_blob(&writer, &gas_schedule_blob);
-    emitln!(writer, ";\n");
-
-    emitln!(
-        writer,
-        "gas_schedule::set_gas_schedule(framework_signer, gas_schedule_blob);"
+            emitln!(
+                writer,
+                "gas_schedule::set_gas_schedule(framework_signer, gas_schedule_blob);"
+            );
+        },
     );
 
-    result.push(("gas-schedule".to_string(), finish_with_footer(&writer)));
+    result.push(("gas-schedule".to_string(), proposal));
     Ok(result)
 }

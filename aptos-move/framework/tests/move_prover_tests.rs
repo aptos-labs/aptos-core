@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use framework::prover::ProverOptions;
+use aptos_framework::prover::ProverOptions;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 

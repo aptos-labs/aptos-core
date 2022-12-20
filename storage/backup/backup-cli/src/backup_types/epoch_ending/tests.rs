@@ -15,7 +15,10 @@ use crate::{
         ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, RocksdbOpt, TrustedWaypointOpt,
     },
 };
+use aptos_backup_service::start_backup_service;
 use aptos_config::utils::get_available_port;
+use aptos_db::AptosDB;
+use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
@@ -23,8 +26,6 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
     waypoint::Waypoint,
 };
-use aptosdb::AptosDB;
-use backup_service::start_backup_service;
 use proptest::{collection::vec, prelude::*};
 use std::{
     convert::TryInto,
@@ -32,7 +33,6 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
 };
-use storage_interface::DbReader;
 use tokio::{runtime::Runtime, time::Duration};
 use warp::Filter;
 

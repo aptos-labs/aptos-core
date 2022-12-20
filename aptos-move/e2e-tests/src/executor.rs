@@ -21,9 +21,13 @@ use crate::{
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_framework::ReleaseBundle;
+use aptos_gas::{
+    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters,
+    LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_keygen::KeyGen;
-use aptos_state_view::StateView;
+use aptos_state_view::TStateView;
 use aptos_types::chain_id::ChainId;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
@@ -43,12 +47,12 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
+    block_executor::BlockAptosVM,
     data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
-    parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
-use framework::ReleaseBundle;
+use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -57,7 +61,6 @@ use move_core_types::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
-use vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -211,7 +214,9 @@ impl FakeExecutor {
     /// initialization done.
     pub fn stdlib_only_genesis() -> Self {
         let mut genesis = Self::no_genesis();
-        for (bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules() {
+        for (bytes, module) in
+            aptos_cached_packages::head_release_bundle().code_and_compiled_modules()
+        {
             let id = module.self_id();
             genesis.add_module(&id, bytes.to_vec());
         }
@@ -220,7 +225,7 @@ impl FakeExecutor {
 
     /// Creates fresh genesis from the framework passed in.
     pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts);
+        let genesis = aptos_vm_genesis::generate_test_genesis(framework, validator_accounts);
         Self::from_genesis(genesis.0.write_set(), ChainId::test())
     }
 
@@ -286,7 +291,7 @@ impl FakeExecutor {
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
         let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()));
-        let data_blob = StateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
+        let data_blob = TStateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
             .expect("account must exist in data store")
             .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
         bcs::from_bytes(data_blob.as_slice()).ok()
@@ -354,21 +359,6 @@ impl FakeExecutor {
         )
     }
 
-    /// Alternate form of 'execute_block' that keeps the vm_status before it goes into the
-    /// `TransactionOutput`
-    pub fn execute_block_and_keep_vm_status(
-        &self,
-        txn_block: Vec<SignedTransaction>,
-    ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
-        AptosVM::execute_block_and_keep_vm_status(
-            txn_block
-                .into_iter()
-                .map(Transaction::UserTransaction)
-                .collect(),
-            &self.data_store,
-        )
-    }
-
     /// Executes the transaction as a singleton block and applies the resulting write set to the
     /// data store. Panics if execution fails
     pub fn execute_and_apply(&mut self, transaction: SignedTransaction) -> TransactionOutput {
@@ -395,13 +385,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let (result, _) = ParallelAptosVM::execute_block(
-            txn_block,
-            &self.data_store,
-            usize::min(4, num_cpus::get()),
-        )?;
-
-        Ok(result)
+        BlockAptosVM::execute_block(txn_block, &self.data_store, usize::min(4, num_cpus::get()))
     }
 
     pub fn execute_transaction_block(
@@ -483,7 +467,7 @@ impl FakeExecutor {
 
     /// Get the blob for the associated AccessPath
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
-        StateView::get_state_value(&self.data_store, state_key).unwrap()
+        TStateView::get_state_value(&self.data_store, state_key).unwrap()
     }
 
     /// Set the blob for the associated AccessPath
@@ -578,6 +562,7 @@ impl FakeExecutor {
                 LATEST_GAS_FEATURE_VERSION,
                 self.features
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
                 self.chain_id,
             )
             .unwrap();
@@ -602,7 +587,10 @@ impl FakeExecutor {
             let session_out = session.finish().expect("Failed to generate txn effects");
             // TODO: Support deltas in fake executor.
             let (_, change_set) = session_out
-                .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+                .into_change_set(
+                    &mut (),
+                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+                )
                 .expect("Failed to generate writeset")
                 .into_inner();
             let (write_set, _events) = change_set.into_inner();
@@ -625,6 +613,7 @@ impl FakeExecutor {
             LATEST_GAS_FEATURE_VERSION,
             self.features
                 .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+            self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             self.chain_id,
         )
         .unwrap();
@@ -642,7 +631,10 @@ impl FakeExecutor {
         let session_out = session.finish().expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
         let (_, change_set) = session_out
-            .into_change_set(&mut (), LATEST_GAS_FEATURE_VERSION)
+            .into_change_set(
+                &mut (),
+                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+            )
             .expect("Failed to generate writeset")
             .into_inner();
         let (writeset, _events) = change_set.into_inner();

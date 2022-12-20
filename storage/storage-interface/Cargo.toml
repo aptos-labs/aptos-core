@@ -1,5 +1,5 @@
 [package]
-name = "storage-interface"
+name = "aptos-storage-interface"
 description = "Aptos storage interface"
 version = "0.1.0"
 
@@ -13,31 +13,27 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-crossbeam-channel = "0.5.4"
-once_cell = "1.10.0"
-parking_lot = "0.12.0"
-rayon = "1.5.2"
-serde = { version = "1.0.137", default-features = false }
-thiserror = "1.0.31"
-
-aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
-aptos-secure-net = { path = "../../secure/net" }
-aptos-state-view = { path = "../state-view" }
-aptos-types = { path = "../../types" }
-aptos-vm = { path = "../../aptos-move/aptos-vm" }
-
-scratchpad = { path = "../scratchpad" }
-
+anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-scratchpad = { workspace = true }
+aptos-secure-net = { workspace = true }
+aptos-state-view = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+bcs = { workspace = true }
+crossbeam-channel = { workspace = true }
 move-core-types = { workspace = true }
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-assert_unordered = "0.1.1"
-
-aptos-types = { path = "../../types", features = ["fuzzing"] }
+aptos-types = { workspace = true, features = ["fuzzing"] }
+assert_unordered = { workspace = true }
 
 [features]
 default = []

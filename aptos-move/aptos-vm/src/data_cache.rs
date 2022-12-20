@@ -2,22 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
-use crate::{counters::CRITICAL_ERRORS, create_access_path, logging::AdapterLogSchema};
+use crate::create_access_path;
 #[allow(unused_imports)]
-use anyhow::format_err;
 use anyhow::Error;
-use aptos_logger::prelude::*;
-use aptos_state_view::{StateView, StateViewId};
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_framework::natives::state_storage::StateStorageUsageResolver;
+use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
     on_chain_config::ConfigStorage,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
     vm_status::StatusCode,
-    write_set::{WriteOp, WriteSet},
 };
-use fail::fail_point;
-use framework::natives::state_storage::StateStorageUsageResolver;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
@@ -25,99 +20,7 @@ use move_core_types::{
     resolver::{ModuleResolver, ResourceResolver},
 };
 use move_table_extension::{TableHandle, TableResolver};
-use std::{
-    collections::btree_map::BTreeMap,
-    ops::{Deref, DerefMut},
-};
-
-/// A local cache for a given a `StateView`. The cache is private to the Aptos layer
-/// but can be used as a one shot cache for systems that need a simple `RemoteCache`
-/// implementation (e.g. tests or benchmarks).
-///
-/// The cache is responsible to track all changes to the `StateView` that are the result
-/// of transaction execution. Those side effects are published at the end of a transaction
-/// execution via `StateViewCache::push_write_set`.
-///
-/// `StateViewCache` is responsible to give an up to date view over the data store,
-/// so that changes executed but not yet committed are visible to subsequent transactions.
-///
-/// If a system wishes to execute a block of transaction on a given view, a cache that keeps
-/// track of incremental changes is vital to the consistency of the data store and the system.
-pub struct StateViewCache<'a, S> {
-    data_view: &'a S,
-    data_map: BTreeMap<StateKey, Option<Vec<u8>>>,
-}
-
-impl<'a, S: StateView> StateViewCache<'a, S> {
-    /// Create a `StateViewCache` give a `StateView`. Hold updates to the data store and
-    /// forward data request to the `StateView` if not in the local cache.
-    pub fn new(data_view: &'a S) -> Self {
-        StateViewCache {
-            data_view,
-            data_map: BTreeMap::new(),
-        }
-    }
-
-    // Publishes a `WriteSet` computed at the end of a transaction.
-    // The effect is to build a layer in front of the `StateView` which keeps
-    // track of the data as if the changes were applied immediately.
-    pub(crate) fn push_write_set(&mut self, write_set: &WriteSet) {
-        for (ap, write_op) in write_set.iter() {
-            match write_op {
-                WriteOp::Modification(blob) | WriteOp::Creation(blob) => {
-                    self.data_map.insert(ap.clone(), Some(blob.clone()));
-                }
-                WriteOp::Deletion => {
-                    self.data_map.remove(ap);
-                    self.data_map.insert(ap.clone(), None);
-                }
-            }
-        }
-    }
-}
-
-impl<'block, S: StateView> StateView for StateViewCache<'block, S> {
-    // Get some data either through the cache or the `StateView` on a cache miss.
-    fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
-        fail_point!("move_adapter::data_cache::get", |_| Err(format_err!(
-            "Injected failure in data_cache::get"
-        )));
-
-        match self.data_map.get(state_key) {
-            Some(opt_data) => Ok(opt_data.clone()),
-            None => match self.data_view.get_state_value(state_key) {
-                Ok(remote_data) => Ok(remote_data),
-                // TODO: should we forward some error info?
-                Err(e) => {
-                    // create an AdapterLogSchema from the `data_view` in scope. This log_context
-                    // does not carry proper information about the specific transaction and
-                    // context, but this error is related to the given `StateView` rather
-                    // than the transaction.
-                    // Also this API does not make it easy to plug in a context
-                    let log_context = AdapterLogSchema::new(self.data_view.id(), 0);
-                    CRITICAL_ERRORS.inc();
-                    error!(
-                        log_context,
-                        "[VM, StateView] Error getting data from storage for {:?}", state_key
-                    );
-                    Err(e)
-                }
-            },
-        }
-    }
-
-    fn is_genesis(&self) -> bool {
-        self.data_view.is_genesis()
-    }
-
-    fn id(&self) -> StateViewId {
-        self.data_view.id()
-    }
-
-    fn get_usage(&self) -> Result<StateStorageUsage, Error> {
-        self.data_view.get_usage()
-    }
-}
+use std::ops::{Deref, DerefMut};
 
 // Adapter to convert a `StateView` into a `RemoteCache`.
 pub struct StorageAdapter<'a, S>(&'a S);

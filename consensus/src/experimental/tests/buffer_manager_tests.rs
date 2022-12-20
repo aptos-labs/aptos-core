@@ -23,8 +23,18 @@ use crate::{
         RandomComputeResultStateComputer,
     },
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_consensus_types::{
+    block::block_test_utils::certificate_for_genesis, executed_block::ExecutedBlock,
+    vote_proposal::VoteProposal,
+};
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
+use aptos_network::{
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
+    protocols::network::{Event, NewNetworkSender},
+};
+use aptos_safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use aptos_secure_storage::Storage;
 use aptos_types::{
     account_address::AccountAddress,
@@ -33,18 +43,8 @@ use aptos_types::{
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
     waypoint::Waypoint,
 };
-use channel::{aptos_channel, message_queues::QueueStyle};
-use consensus_types::{
-    block::block_test_utils::certificate_for_genesis, executed_block::ExecutedBlock,
-    vote_proposal::VoteProposal,
-};
 use futures::{channel::oneshot, FutureExt, SinkExt, StreamExt};
 use itertools::enumerate;
-use network::{
-    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{Event, NewNetworkSender},
-};
-use safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -53,7 +53,7 @@ pub fn prepare_buffer_manager() -> (
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-    channel::Receiver<Event<ConsensusMsg>>,
+    aptos_channels::Receiver<Event<ConsensusMsg>>,
     PipelinePhase<ExecutionPhase>,
     PipelinePhase<SigningPhase>,
     PipelinePhase<PersistingPhase>,
@@ -95,7 +95,7 @@ pub fn prepare_buffer_manager() -> (
         ConnectionRequestSender::new(connection_reqs_tx),
     );
 
-    let (self_loop_tx, self_loop_rx) = channel::new_test(1000);
+    let (self_loop_tx, self_loop_rx) = aptos_channels::new_test(1000);
     let network = NetworkSender::new(author, network_sender, self_loop_tx, validators.clone());
 
     let (msg_tx, msg_rx) =
@@ -153,7 +153,7 @@ pub fn launch_buffer_manager() -> (
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-    channel::Receiver<Event<ConsensusMsg>>,
+    aptos_channels::Receiver<Event<ConsensusMsg>>,
     HashValue,
     Runtime,
     Vec<ValidatorSigner>,
@@ -196,7 +196,7 @@ pub fn launch_buffer_manager() -> (
 }
 
 async fn loopback_commit_vote(
-    self_loop_rx: &mut channel::Receiver<Event<ConsensusMsg>>,
+    self_loop_rx: &mut aptos_channels::Receiver<Event<ConsensusMsg>>,
     msg_tx: &aptos_channel::Sender<AccountAddress, VerifiedEvent>,
     verifier: &ValidatorVerifier,
 ) {
@@ -205,7 +205,9 @@ async fn loopback_commit_vote(
             if matches!(msg, ConsensusMsg::CommitVoteMsg(_)) {
                 let event: UnverifiedEvent = msg.into();
                 // verify the message and send the message into self loop
-                msg_tx.push(author, event.verify(verifier).unwrap()).ok();
+                msg_tx
+                    .push(author, event.verify(author, verifier, false).unwrap())
+                    .ok();
             }
         }
         _ => {

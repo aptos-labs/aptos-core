@@ -34,28 +34,26 @@ pub struct CoinSourceArgs {
 
 impl CoinSourceArgs {
     pub fn get_private_key(&self) -> Result<(Ed25519PrivateKey, bool)> {
-        Ok(
-            match (
-                &self.mint_key,
-                &self.mint_file,
-                &self.coin_source_key,
-                &self.coin_source_file,
-            ) {
-                (Some(ref key), None, None, None) => (key.private_key(), true),
-                (None, Some(path), None, None) => (
-                    EncodingType::BCS
-                        .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,
-                    true,
-                ),
-                (None, None, Some(ref key), None) => (key.private_key(), false),
-                (None, None, None, Some(path)) => (
-                    EncodingType::BCS
-                        .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,
-                    false,
-                ),
-                _ => unreachable!(),
-            },
-        )
+        match (
+            &self.mint_key,
+            &self.mint_file,
+            &self.coin_source_key,
+            &self.coin_source_file,
+        ) {
+            (Some(ref key), None, None, None) => Ok((key.private_key(), true)),
+            (None, Some(path), None, None) => Ok((
+                EncodingType::BCS
+                    .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,
+                true,
+            )),
+            (None, None, Some(ref key), None) => Ok((key.private_key(), false)),
+            (None, None, None, Some(path)) => Ok((
+                EncodingType::BCS
+                    .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,
+                false,
+            )),
+            _ => Err(anyhow::anyhow!("Please provide exactly one of mint-key, mint-file, coin-source-key, or coin-source-file")),
+        }
     }
 }
 

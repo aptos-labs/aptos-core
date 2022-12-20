@@ -47,6 +47,7 @@ jobs:
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
         with:
@@ -111,6 +112,10 @@ jobs:
       - run: npm install -g wait-on
       - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8080/v1
       - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8081/health
+
+      # Confirm the Rust API client examples pass.
+      - uses: ./.github/actions/rust-setup
+      - run: cargo run -p aptos-rest-client --example account -- --api-url http://127.0.01:8080
 
       # Test and build.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2

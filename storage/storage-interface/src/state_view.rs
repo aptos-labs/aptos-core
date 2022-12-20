@@ -3,7 +3,7 @@
 
 use crate::DbReader;
 use anyhow::Result;
-use aptos_state_view::StateView;
+use aptos_state_view::TStateView;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 use std::sync::Arc;
@@ -25,7 +25,9 @@ impl DbStateView {
     }
 }
 
-impl StateView for DbStateView {
+impl TStateView for DbStateView {
+    type Key = StateKey;
+
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         self.get(state_key)
     }

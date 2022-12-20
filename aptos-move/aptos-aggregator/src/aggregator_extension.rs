@@ -364,7 +364,7 @@ pub fn extension_error(message: impl ToString) -> PartialVMError {
 mod test {
     use super::*;
     use crate::delta_change_set::serialize;
-    use aptos_state_view::StateView;
+    use aptos_state_view::TStateView;
     use aptos_types::{
         account_address::AccountAddress,
         state_store::{
@@ -391,7 +391,9 @@ mod test {
         }
     }
 
-    impl StateView for FakeTestStorage {
+    impl TStateView for FakeTestStorage {
+        type Key = StateKey;
+
         fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
             Ok(self.data.get(state_key).cloned())
         }

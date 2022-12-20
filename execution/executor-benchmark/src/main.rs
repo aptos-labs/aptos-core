@@ -163,7 +163,7 @@ fn main() {
             num_accounts,
             init_account_balance,
         } => {
-            executor_benchmark::db_generator::run(
+            aptos_executor_benchmark::db_generator::run(
                 num_accounts,
                 init_account_balance,
                 opt.block_size,
@@ -177,7 +177,7 @@ fn main() {
             data_dir,
             checkpoint_dir,
         } => {
-            executor_benchmark::run_benchmark(
+            aptos_executor_benchmark::run_benchmark(
                 opt.block_size,
                 blocks,
                 data_dir,
@@ -192,7 +192,7 @@ fn main() {
             num_new_accounts,
             init_account_balance,
         } => {
-            executor_benchmark::add_accounts(
+            aptos_executor_benchmark::add_accounts(
                 num_new_accounts,
                 init_account_balance,
                 opt.block_size,

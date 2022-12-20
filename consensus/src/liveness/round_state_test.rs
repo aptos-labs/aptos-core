@@ -8,18 +8,18 @@ use crate::{
     util::mock_time_service::SimulatedTimeService,
 };
 
-use aptos_crypto::HashValue;
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::{
-    block_info::BlockInfo,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-};
-use consensus_types::{
+use aptos_consensus_types::{
     common::Round,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote_data::VoteData,
+};
+use aptos_crypto::HashValue;
+use aptos_types::aggregate_signature::AggregateSignature;
+use aptos_types::{
+    block_info::BlockInfo,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use futures::StreamExt;
 use std::{sync::Arc, time::Duration};
@@ -82,10 +82,10 @@ fn test_round_event_generation() {
     );
 }
 
-fn make_round_state() -> (RoundState, channel::Receiver<Round>) {
+fn make_round_state() -> (RoundState, aptos_channels::Receiver<Round>) {
     let time_interval = Box::new(ExponentialTimeInterval::fixed(Duration::from_millis(2)));
     let simulated_time = SimulatedTimeService::auto_advance_until(Duration::from_millis(4));
-    let (timeout_tx, timeout_rx) = channel::new_test(1_024);
+    let (timeout_tx, timeout_rx) = aptos_channels::new_test(1_024);
     (
         RoundState::new(time_interval, Arc::new(simulated_time), timeout_tx),
         timeout_rx,

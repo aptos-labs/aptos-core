@@ -3,6 +3,7 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable class-methods-use-this */
+/* eslint-disable max-classes-per-file */
 import { Deserializer, Seq, Serializer, deserializeVector, serializeVector } from "../bcs";
 import { AccountAddress } from "./account_address";
 import { Identifier } from "./identifier";
@@ -29,6 +30,12 @@ export abstract class TypeTag {
         return TypeTagVector.load(deserializer);
       case 7:
         return TypeTagStruct.load(deserializer);
+      case 8:
+        return TypeTagU16.load(deserializer);
+      case 9:
+        return TypeTagU32.load(deserializer);
+      case 10:
+        return TypeTagU256.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TypeTag: ${index}`);
     }
@@ -55,6 +62,26 @@ export class TypeTagU8 extends TypeTag {
   }
 }
 
+export class TypeTagU16 extends TypeTag {
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(1);
+  }
+
+  static load(_deserializer: Deserializer): TypeTagU16 {
+    return new TypeTagU16();
+  }
+}
+
+export class TypeTagU32 extends TypeTag {
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(1);
+  }
+
+  static load(_deserializer: Deserializer): TypeTagU32 {
+    return new TypeTagU32();
+  }
+}
+
 export class TypeTagU64 extends TypeTag {
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(2);
@@ -72,6 +99,16 @@ export class TypeTagU128 extends TypeTag {
 
   static load(_deserializer: Deserializer): TypeTagU128 {
     return new TypeTagU128();
+  }
+}
+
+export class TypeTagU256 extends TypeTag {
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(1);
+  }
+
+  static load(_deserializer: Deserializer): TypeTagU256 {
+    return new TypeTagU256();
   }
 }
 
@@ -130,7 +167,7 @@ export class TypeTagStruct extends TypeTag {
     if (
       this.value.module_name.value === "string" &&
       this.value.name.value === "String" &&
-      this.value.address === AccountAddress.fromHex("0x1")
+      this.value.address.toHexString() === AccountAddress.fromHex("0x1").toHexString()
     ) {
       return true;
     }

@@ -1,11 +1,99 @@
 ---
-title: "Whats New in Docs"
+title: "See What's New"
 slug: "whats-new-in-docs"
 ---
 
-# Whats New in Docs
+# See What's New in Aptos
 
 This page shows the key updates to the developer documentation on this site.
+
+## 14 December 2022
+
+- Noted you may employ the [Aptos Name Service](https://www.aptosnames.com/) to secure .apt domains for key [accounts](concepts/accounts.md).
+
+## 12 December 2022
+
+- Released [Node Health Checker](nodes/node-health-checker/index.md) web interface for evaluating fullnodes at: https://nodetools.aptosfoundation.org/#/node_checker
+
+## 11 December 2022
+
+- [Renamed](https://github.com/aptos-labs/aptos-core/pull/5778) `AptosGovernance::create_proposal` to `aptos_governance::create_proposal` and added information on [Aptos Improvement Proposals (AIPs)](concepts/governance.md#aptos-improvement-proposals-aips) and the [Technical Implementation of Aptos Governance](concepts/governance.md#technical-implementation-of-aptos-governance).
+
+## 09 December 2022
+
+- Added an [Aptos Wallet Adapter overview](concepts/wallet-adapter-concept.md) and instructions for both [dApp](guides/wallet-adapter-for-dapp.md) and [wallet](guides/wallet-adapter-for-wallets.md) builders.
+
+## 08 December 2022
+
+- Released [aptos-node-v1.1.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.1.0) to Mainnet:
+
+  Framework upgrade through governance voting:
+  - Testnet upgrade - Nov 30th
+  - Mainnet upgrade - Dec 12th - 19th (7 days voting period) required by fullnode operators
+
+  New features and enhancements:
+  - Move
+    - [New chain_id native function + corresponding new gas schedule entry](https://github.com/aptos-labs/aptos-core/pull/5288).
+  - Blockchain
+    - Added automatic chain-health based back pressure to improve reliability. Automatic slow-down (through max block size reduction) is triggered in some scenarios.
+    - Improved timeouts for state synchronization: (i) lower timeouts for optimistic fetch (to help reduce end-to-end latency); and (ii) exponential back-off for low-bandwidth nodes.
+
+  Resolved issues:
+  - Move
+    - Explicit error codes in resource account.
+    - Improved Leader Election (gated behind feature flag).
+
+  See these resources for more details on the release:
+    - [#mainnet-release](https://discord.com/channels/945856774056083548/1042502400507916349) Discord channel for more detailed descriptions of the above changes.
+    - [Aptos Releases](https://github.com/aptos-labs/aptos-core/releases) list for all releases.
+    - [`testnet`](https://github.com/aptos-labs/aptos-core/commits/testnet) branch commits for the changes landing in mainnet today.
+
+## 05 December 2022
+
+- Moved recently pared down System Integrators Guide to [Use the Aptos REST Read API](guides/aptos-apis.md).
+- Resurrected last full version of the [Aptos System Integrators Guide](guides/system-integrators-guide.md).
+- Renamed System Integrators Guide to [Integrate Aptos with Your Platform](guides/system-integrators-guide.md) and updated it with our latest guidance.
+
+## 02 December 2022
+
+- Distributed a survey asking how we can make the Aptos developer experience better: https://aptos.typeform.com/dev-survey
+
+## 29 November 2022
+
+- Increased rate limits of https://indexer.mainnet.aptoslabs.com and https://fullnode.mainnet.aptoslabs.com to 1000 requests/5-minute interval by IP.
+
+## 21 November 2022
+
+- Added conceptual overviews for [blocks](concepts/blocks.md) and [resources](concepts/resources.md) in Aptos, explaining how transactions are batched and resources relate to objects, respectively.
+
+## 18 November 2022
+
+- Increased [Aptos Indexer](/guides/indexing) rate limits from 300 requests per IP per hour to 400 requests every five minutes.
+
+## 17 November 2022
+
+- Published instructions for [updating validator nodes](/nodes/validator-node/operator/update-validator-node) by configuring and failing over to validator fullnode.
+
+## 16 November 2022
+
+Completely overhauled the navigation of Aptos.dev to better reflect our users and their feedback. Here are the highlights:
+ * Introduced new *Start Aptos* and *Build Apps* sections to contain information related to setup and app development, respectively.
+ * Shifted key concepts up in navigation, included the Aptos White Paper, moved nodes-related materials to the *Run Nodes* section, and gas-related pages to a new *Build Apps > [Write Move Smart Contracts](/guides/move-guides/aptos-move-guides)* section.
+ * Placed instructions for the Aptos CLI and other tools under *Start Aptos > [Set Environment](/guides/getting-started)*.
+ * Recategorized previous *Guides* across several new subsections, including *Build Apps > [Develop Locally](/nodes/local-testnet/local-testnet-index)*, *[Interact with Blockchain](/guides/aptos-guides)*, and *Run Nodes > [Configure Nodes](/nodes/identity-and-configuration)*.
+ * Integrated the [Aptos Node API specification](/nodes/aptos-api-spec#/), [Issues and Workarounds](/issues-and-workarounds) and [Aptos Glossary](/reference/glossary) into a new *Reference* section.
+
+## 12 November 2022
+
+- Recommended performance improvements to [validator source code](/nodes/validator-node/operator/running-validator-node/run-validator-node-using-source) startup instructions by suggesting building the `aptos-node` binary and running it directly instead of using `cargo run`.
+
+## 09 November 2022
+
+- Improved [indexer fullnode](/docs/nodes/indexer-fullnode.md) setup instructions to standardize on one package manager and explain how to restart the database.
+
+## 08 November 2022
+
+- Published links to new auto-generated Move reference files [for all available versions](/guides/move-guides/aptos-move-guides#aptos-move-documentation).
 
 ## 07 November 2022
 
@@ -15,13 +103,17 @@ This page shows the key updates to the developer documentation on this site.
 
 - Added a guide on [Resource Accounts](/docs/guides/resource-accounts.md) used by developers to publish modules and automatically sign transactions.
 
+## 03 November 2022
+
+- Added [Aptos API reference files](https://aptos.dev/nodes/aptos-api-spec/#/) directly to Aptos.dev for easy access and clarified available information at various endpoints.
+
 ## 02 November 2022
 
 - Created a #docs-feedback channel on [Discord](https://discord.com/channels/945856774056083548/1034215378299133974) seeking input on Aptos.dev and taking action with updates to the documentation.
 
 ## 01 November 2022
 
-- Expanded the previous Coin and Token documentation into the [Aptos Token Standard](/docs/concepts/coin-and-token/index.md) with new field descriptions and more and moved it to the [Getting Started](/docs/guides/getting-started.md) section for greater visilibity.
+- Expanded the previous Coin and Token documentation into the [Aptos Token Standard](/docs/concepts/coin-and-token/index.md) with new field descriptions and more and moved it to the [Getting Started](/docs/guides/getting-started.md) section for greater visibility.
 
 ## 25 October 2022
 
@@ -69,11 +161,11 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 25 September 2022
 
-- [Transactions and States](/docs/concepts/basics-txns-states.md) matches the [Aptos Blockchain whitepaper](/docs/aptos-white-paper/index.md) in structure and content.
+- [Transactions and States](/docs/concepts/txns-states.md) matches the [Aptos Blockchain whitepaper](/docs/aptos-white-paper/index.md) in structure and content.
 
 ## 23 September 2022
 
-- [Gas and Transaction Fees](/docs/concepts/basics-gas-txn-fee.md) contains sections on [prioritizing your transaction](/docs/concepts/basics-gas-txn-fee.md#prioritizing-your-transaction), [gas parameters set by governance](/docs/concepts/basics-gas-txn-fee.md#gas-parameters-set-by-governance), and [examples](/docs/concepts/basics-gas-txn-fee.md#examples) for understanding account balances, transaction fees, and transaction amounts.
+- [Gas and Transaction Fees](/docs/concepts/gas-txn-fee.md) contains sections on [prioritizing your transaction](/docs/concepts/gas-txn-fee.md#prioritizing-your-transaction), [gas parameters set by governance](/docs/concepts/gas-txn-fee.md#gas-parameters-set-by-governance), and [examples](/docs/concepts/gas-txn-fee.md#examples) for understanding account balances, transaction fees, and transaction amounts.
 
 ## 22 September 2022
 

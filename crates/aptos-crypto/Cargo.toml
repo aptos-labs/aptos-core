@@ -13,43 +13,44 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = { git = "https://github.com/aptos-labs/bcs", rev = "2cde3e8446c460cb17b0c1d6bac7e27e964ac169" }
-blst = "0.3.7"
-bytes = "1.1.0"
-curve25519-dalek = { version = "3", default-features = false }
-digest = "0.9.0"
-ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
-hex = "0.4.3"
-hkdf = "0.10.0"
-libsecp256k1 = "0.7.0"
-more-asserts = "0.3.0"
-once_cell = "1.10.0"
-proptest = { version = "1.0.0", optional = true }
-proptest-derive = { version = "0.3.0", optional = true }
-rand = "0.7.3"
-rand_core = { version = "0.5.1", default-features = false }
-ring = { version = "0.16.20", features = ["std"] }
-serde = { version = "1.0.137", features = ["derive"] }
-serde-name = "0.1.1"
-serde_bytes = "0.11.6"
-sha2 = "0.9.3"
-static_assertions = "1.1.0"
-thiserror = "1.0.31"
-tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
-x25519-dalek = { version = "1.2.0" }
-
-aptos-crypto-derive = { path = "../aptos-crypto-derive", version = "0.0.3" }
+anyhow = { workspace = true }
+aptos-crypto-derive = { workspace = true }
+bcs = { workspace = true }
+blst = { workspace = true }
+bytes = { workspace = true }
+curve25519-dalek = { workspace = true }
+digest = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+hkdf = { workspace = true }
+libsecp256k1 = { workspace = true }
+more-asserts = { workspace = true }
+once_cell = { workspace = true }
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+ring = { workspace = true }
+serde = { workspace = true }
+serde-name = { workspace = true }
+serde_bytes = { workspace = true }
+sha2 = { workspace = true }
+static_assertions = { workspace = true }
+thiserror = { workspace = true }
+tiny-keccak = { workspace = true }
+x25519-dalek = { workspace = true }
 
 [dev-dependencies]
-bitvec = "0.19.4"
-byteorder = "1.4.3"
-criterion = "0.3.5"
-proptest = "1.0.0"
-proptest-derive = "0.3.0"
-serde_json = "1.0.81"
-sha3 = "0.9.1"
-trybuild = "1.0.41"
+bitvec = { workspace = true }
+blake2 = { workspace = true }
+blake2-rfc = { workspace = true }
+byteorder = { workspace = true }
+criterion = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+serde_json = { workspace = true }
+sha3 = { workspace = true }
+trybuild = { workspace = true }
 
 [features]
 default = []

@@ -1,5 +1,5 @@
 [package]
-name = "transaction-emitter"
+name = "aptos-transaction-emitter"
 description = "Aptos transaction emitter for testing"
 version = "0.0.0"
 
@@ -13,16 +13,14 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { version = "1.0.57", features = ["backtrace"] }
-clap = "3.1.17"
-futures = "0.3.21"
-itertools = "0.10.3"
-rand = "0.7.3"
-rand_core = "0.5.1"
-tokio = { version = "1.21.0", features = ["full"] }
-
-aptos-global-constants = { path = "../../config/global-constants" }
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-sdk = { path = "../../sdk" }
-
-transaction-emitter-lib = { path = "../../crates/transaction-emitter-lib" }
+anyhow = { workspace = true }
+aptos-global-constants = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-sdk = { workspace = true }
+aptos-transaction-emitter-lib = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+itertools = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+tokio = { workspace = true }

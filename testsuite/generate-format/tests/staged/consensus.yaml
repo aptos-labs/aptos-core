@@ -38,6 +38,26 @@ AggregateSignatureWithRounds:
         TYPENAME: AggregateSignature
     - rounds:
         SEQ: U64
+Batch:
+  STRUCT:
+    - source:
+        TYPENAME: AccountAddress
+    - batch_info:
+        TYPENAME: BatchInfo
+    - payload:
+        SEQ:
+          TYPENAME: SignedTransaction
+BatchInfo:
+  STRUCT:
+    - epoch: U64
+    - digest:
+        TYPENAME: HashValue
+BatchRequest:
+  STRUCT:
+    - source:
+        TYPENAME: AccountAddress
+    - batch_info:
+        TYPENAME: BatchInfo
 BitVec:
   STRUCT:
     - inner: BYTES
@@ -190,6 +210,26 @@ ConsensusMsg:
       CommitDecisionMsg:
         NEWTYPE:
           TYPENAME: CommitDecision
+    9:
+      FragmentMsg:
+        NEWTYPE:
+          TYPENAME: Fragment
+    10:
+      BatchRequestMsg:
+        NEWTYPE:
+          TYPENAME: BatchRequest
+    11:
+      BatchMsg:
+        NEWTYPE:
+          TYPENAME: Batch
+    12:
+      SignedDigestMsg:
+        NEWTYPE:
+          TYPENAME: SignedDigest
+    13:
+      ProofOfStoreMsg:
+        NEWTYPE:
+          TYPENAME: ProofOfStore
 ContractEvent:
   ENUM:
     0:
@@ -239,6 +279,23 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
+Fragment:
+  STRUCT:
+    - source:
+        TYPENAME: AccountAddress
+    - fragment_info:
+        TYPENAME: FragmentInfo
+FragmentInfo:
+  STRUCT:
+    - epoch: U64
+    - batch_id: U64
+    - fragment_id: U64
+    - payload:
+        SEQ:
+          TYPENAME: SerializedTransaction
+    - maybe_expiration:
+        OPTION:
+          TYPENAME: LogicalTime
 HashValue:
   STRUCT:
     - hash:
@@ -265,6 +322,10 @@ LedgerInfoWithV0:
         TYPENAME: LedgerInfo
     - signatures:
         TYPENAME: AggregateSignature
+LogicalTime:
+  STRUCT:
+    - epoch: U64
+    - round: U64
 Module:
   STRUCT:
     - code: BYTES
@@ -290,6 +351,21 @@ Payload:
         NEWTYPE:
           SEQ:
             TYPENAME: SignedTransaction
+    1:
+      InQuorumStore:
+        NEWTYPE:
+          TYPENAME: ProofWithData
+ProofOfStore:
+  STRUCT:
+    - info:
+        TYPENAME: SignedDigestInfo
+    - multi_signature:
+        TYPENAME: AggregateSignature
+ProofWithData:
+  STRUCT:
+    - proofs:
+        SEQ:
+          TYPENAME: ProofOfStore
 ProposalMsg:
   STRUCT:
     - proposal:
@@ -325,8 +401,28 @@ Script:
     - args:
         SEQ:
           TYPENAME: TransactionArgument
+SerializedTransaction:
+  STRUCT:
+    - bytes: BYTES
 Signature:
   NEWTYPESTRUCT: BYTES
+SignedDigest:
+  STRUCT:
+    - epoch: U64
+    - peer_id:
+        TYPENAME: AccountAddress
+    - info:
+        TYPENAME: SignedDigestInfo
+    - signature:
+        TYPENAME: Signature
+SignedDigestInfo:
+  STRUCT:
+    - digest:
+        TYPENAME: HashValue
+    - expiration:
+        TYPENAME: LogicalTime
+    - num_txns: U64
+    - num_bytes: U64
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -413,6 +509,18 @@ TransactionArgument:
     5:
       Bool:
         NEWTYPE: BOOL
+    6:
+      U16:
+        NEWTYPE: U16
+    7:
+      U32:
+        NEWTYPE: U32
+    8:
+      U256:
+        NEWTYPE:
+          TUPLEARRAY:
+            CONTENT: U8
+            SIZE: 32
 TransactionAuthenticator:
   ENUM:
     0:
@@ -488,6 +596,12 @@ TypeTag:
       struct:
         NEWTYPE:
           TYPENAME: StructTag
+    8:
+      u16: UNIT
+    9:
+      u32: UNIT
+    10:
+      u256: UNIT
 ValidatorConsensusInfo:
   STRUCT:
     - address:

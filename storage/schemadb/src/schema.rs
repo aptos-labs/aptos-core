@@ -12,7 +12,7 @@ use std::fmt::Debug;
 /// `define_schema!` allows a schema to be defined in the following syntax:
 /// ```
 /// use anyhow::Result;
-/// use schemadb::{
+/// use aptos_schemadb::{
 ///     define_schema,
 ///     schema::{KeyCodec, SeekKeyCodec, ValueCodec},
 /// };
@@ -160,8 +160,8 @@ pub mod fuzzing {
     #[macro_export]
     macro_rules! test_no_panic_decoding {
         ($schema_type: ty) => {
+            use aptos_schemadb::schema::fuzzing::{arb_small_vec_u8, assert_no_panic_decoding};
             use proptest::prelude::*;
-            use schemadb::schema::fuzzing::{arb_small_vec_u8, assert_no_panic_decoding};
 
             proptest! {
                 #[test]

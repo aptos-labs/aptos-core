@@ -1,18 +1,18 @@
 ---
-title: "Getting Started"
+title: "Prepare Aptos Dev Environment"
 slug: "getting-started"
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Getting Started
+# Prepare Aptos Dev Environment
 
 To kickstart your journey in the Aptos ecosystem, set up your environment as needed by your role. To interact with Aptos, you may simply [install the Aptos command line interface (CLI)](#install-the-cli). To develop Aptos itself, you will need to [clone the Aptos-core repository](#clone-the-Aptos-core-repo).
 
 See the [Workflows](#workflows) for use cases associated with each path. See the [Aptos developer resources](#aptos-developer-resources) for quick links to Aptos networks, SDKs, and other tools.
 
-Then review the Aptos source code, found in the [Aptos-core](https://github.com/aptos-labs/aptos-core) repository of GitHub, and continue your journey through this site. The source contains READMEs and code comments invaluable to developing on Aptos.
+Then review the Aptos source code and [documentation](https://github.com/aptos-labs/aptos-core/tree/main/documentation) found in the [Aptos-core](https://github.com/aptos-labs/aptos-core) repository of GitHub and continue your journey through this site. The source contains READMEs and code comments invaluable to developing on Aptos.
 
 ## Use supported operating systems
 
@@ -51,7 +51,7 @@ In addition to installing the CLI, [clone](#clone-the-aptos-core-repo) and [revi
 * [Take the starter tutorials](../tutorials/index.md), many of which rely upon Aptos source code.
 * [Extend and contribute](https://github.com/aptos-labs/aptos-core) to the Aptos blockchain itself; [pull requests](https://github.com/aptos-labs/aptos-core/pulls) welcome!
 
-Although Docker options exist for many of these configurations, you should download the Aptos source to become familiar with the innerworkings of the blockchain once you are conducting this more advanced work.
+Although Docker options exist for many of these configurations, you should download the Aptos source to become familiar with the inner workings of the blockchain once you are conducting this more advanced work.
 
 :::tip Find information in the source
 The [Aptos source files](https://github.com/aptos-labs/aptos-core) themselves also contain a wealth of information in docs comments worth reviewing.
@@ -193,6 +193,6 @@ This section contains links to frequently referred Aptos developer resources.
 
 ### IDE plugins for Move language
 
-- [Syntax hightlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax)
+- [Syntax highlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax)
 - [Move analyzer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer): Supports advanced code navigation and syntax highlighting.
 - [Move language plugin for Jetbrains IDEs](https://plugins.jetbrains.com/plugin/14721-move-language): Supports syntax highlighting, code navigation, renames, formatting, type checks and code generation.

@@ -11,6 +11,7 @@ use aptos_config::{
     keys::ConfigKey,
     network_id::NetworkId,
 };
+use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
@@ -21,7 +22,6 @@ use aptos_sdk::{
         PeerId,
     },
 };
-use framework::ReleaseBundle;
 use prometheus_http_query::response::PromqlResult;
 use std::{
     collections::HashMap,
@@ -128,7 +128,8 @@ impl LocalSwarm {
         let (root_key, genesis, genesis_waypoint, validators) =
             aptos_genesis::builder::Builder::new(
                 &dir_actual,
-                genesis_framework.unwrap_or_else(|| cached_packages::head_release_bundle().clone()),
+                genesis_framework
+                    .unwrap_or_else(|| aptos_cached_packages::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(
