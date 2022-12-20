@@ -17,7 +17,7 @@ This tutorial assumes you have:
 
 ## Role of accounts
 
-When you are minting an NFT, the NFT is tied to your [account](../../concepts/accounts.md). Aptos ensures no one else can alter your collection of NFTs. This is why a private key is required to obtain signer capabilities. When you submit a transaction, you sign the transaction.
+When you are minting an NFT, the NFT is stored under your [account](../../concepts/accounts.md) address. When you submit a transaction, you sign the transaction.
 
 [Resource accounts](../resource-accounts.md) allow the delegation of signing transactions. You create a resource account to grant a signer capability that can be stored in a new resource on the same account and can sign transactions autonomously. The signer capability is protected as no one has access to the private key for the resource account.
 
@@ -65,7 +65,7 @@ Where the `&resource_signer` is the first parameter, defined previously as a new
         signer_cap: account::SignerCapability,
 ```
 
-The signer capability prevents anyone from getting the private key from the resource account. The [resource account](../resource-accounts.md) is entirely controlled by the contract.
+The signer capability allows the module to sign autonomously. The [resource account](../resource-accounts.md) prevents anyone from getting the private key and is entirely controlled by the contract.
 
 ### Module data
 
