@@ -1169,6 +1169,13 @@ def test(
     test_suites: Tuple[str],
 ) -> None:
     """Run a forge test"""
+
+    ### XXX: hack these arguments to force Forge to run with overrides
+    # cloud = "gcp"
+    # forge_cluster_name = "aptos-forge-0"
+    # forge_enable_performance = "true"
+
+    # Initialize all configs
     shell = LocalShell(verbose == "true")
     git = Git(shell)
     filesystem = LocalFilesystem()
@@ -1177,6 +1184,14 @@ def test(
     context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
+
+    # XXX: manual override testing in CI
+    # # for GCP
+    # forge_cluster_name = "aptos-forge-0"
+    # cloud = "gcp"
+
+    # # for performance
+    # forge_enable_performance = "true"
 
     if not forge_namespace:
         forge_namespace = f"forge-{processes.user()}-{time.epoch()}"
@@ -1237,6 +1252,19 @@ def test(
         forge_cluster_name = random.choice(cluster_names)
 
     assert forge_cluster_name, "Forge cluster name is required"
+
+    # cloud
+    if cloud.upper() == "AWS":
+        cloud = Cloud.AWS
+    elif cloud.upper() == "GCP":
+        cloud = Cloud.GCP
+    else:
+        raise Exception(f"Unknown cloud: {cloud}")
+
+    print(f"Using cluster: {forge_cluster_name} in cloud: {cloud.value}")
+    temp = context.filesystem.mkstemp()
+    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud)
+    asyncio.run(forge_cluster.write(context.shell))
 
     # These features and profile flags are set as strings
     enable_failpoints = forge_enable_failpoints == "true"
@@ -1315,19 +1343,6 @@ def test(
         forge_cli_args=forge_cli_args,
         test_args=test_args,
     )
-
-    # cloud
-    if cloud.upper() == "AWS":
-        cloud = Cloud.AWS
-    elif cloud.upper() == "GCP":
-        cloud = Cloud.GCP
-    else:
-        raise Exception(f"Unknown cloud: {cloud}")
-
-    print(f"Using cluster: {forge_cluster_name} in cloud: {cloud.value}")
-    temp = context.filesystem.mkstemp()
-    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud)
-    asyncio.run(forge_cluster.write(context.shell))
 
     forge_context = ForgeContext(
         shell=shell,
