@@ -951,21 +951,22 @@ fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<
 
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(20)
+        .with_initial_validator_count(NonZeroUsize::new(3).unwrap())
+        .with_initial_fullnode_count(3)
         .with_network_tests(vec![&PerformanceBenchmarkWithFN])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 3600.into();
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] = 3200.into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                10000.into();
             helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                3200.into();
+                10000.into();
             helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
-                (2 * 1024 * 1024).into();
+                (3 * 1024 * 1024).into();
             helm_values["validator"]["config"]["consensus"]["max_receiving_block_bytes"] =
-                (2 * 1024 * 1024).into();
+                (3 * 1024 * 1024).into();
 
             let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
             // Generally if we are stress testing the consensus, we don't want to slow it down.
@@ -984,7 +985,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
                 ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
         }))
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 70000,
+            mempool_backlog: 150000,
         }))
         .with_success_criteria(
             SuccessCriteria::new(if duration.as_secs() > 1200 {
