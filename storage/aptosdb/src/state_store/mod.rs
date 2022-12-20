@@ -3,7 +3,6 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
-use crate::utils::iterators::PrefixedStateValueIterator;
 use crate::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     epoch_by_version::EpochByVersionSchema,
@@ -13,6 +12,7 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotProgress, StateSnapshotRestore, StateValueWriter},
     state_store::buffered_state::BufferedState,
+    utils::iterators::PrefixedStateValueIterator,
     version_data::VersionDataSchema,
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
     StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
@@ -43,6 +43,7 @@ use aptos_types::{
     transaction::Version,
 };
 use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     ops::Deref,
@@ -447,19 +448,27 @@ impl StateStore {
         value_state_sets: Vec<&HashMap<StateKey, Option<StateValue>>>,
         first_version: Version,
         expected_usage: StateStorageUsage,
-        batch: &mut SchemaBatch,
+        batch: &SchemaBatch,
     ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["put_value_sets"])
+            .start_timer();
+
         self.put_stats_and_indices(&value_state_sets, first_version, expected_usage, batch)?;
 
-        let kv_batch = value_state_sets
-            .iter()
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["add_kv_batch"])
+            .start_timer();
+
+        value_state_sets
+            .par_iter()
             .enumerate()
-            .flat_map(|(i, kvs)| {
+            .flat_map_iter(|(i, kvs)| {
+                let version = first_version + i as Version;
                 kvs.iter()
-                    .map(move |(k, v)| ((k.clone(), first_version + i as Version), v.clone()))
+                    .map(move |(k, v)| batch.put::<StateValueSchema>(&(k.clone(), version), v))
             })
-            .collect::<HashMap<_, _>>();
-        add_kv_batch(batch, &kv_batch)
+            .collect()
     }
 
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
@@ -483,7 +492,7 @@ impl StateStore {
         value_state_sets: &[&HashMap<StateKey, Option<StateValue>>],
         first_version: Version,
         expected_usage: StateStorageUsage,
-        batch: &mut SchemaBatch,
+        batch: &SchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])
@@ -496,6 +505,9 @@ impl StateStore {
         ));
 
         if let Some(base_version) = base_version {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["put_stats_and_indices__total_get"])
+                .start_timer();
             let key_set = value_state_sets
                 .iter()
                 .flat_map(|value_state_set| value_state_set.iter())
@@ -522,6 +534,9 @@ impl StateStore {
             });
         }
 
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["put_stats_and_indices__calculate_total_size"])
+            .start_timer();
         // calculate total state size in bytes
         for (idx, kvs) in value_state_sets.iter().enumerate() {
             let version = first_version + idx as Version;
@@ -690,7 +705,7 @@ impl StateStore {
         &self,
         begin: Version,
         end: Version,
-        db_batch: &mut SchemaBatch,
+        db_batch: &SchemaBatch,
     ) -> Result<()> {
         let mut iter = self
             .state_db
@@ -746,8 +761,8 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["state_value_writer_write_chunk"])
             .start_timer();
-        let mut batch = SchemaBatch::new();
-        add_kv_batch(&mut batch, node_batch)?;
+        let batch = SchemaBatch::new();
+        add_kv_batch(&batch, node_batch)?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateSnapshotRestoreProgress(version),
             &DbMetadataValue::StateSnapshotProgress(progress),
@@ -768,9 +783,10 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
     }
 }
 
-fn add_kv_batch(batch: &mut SchemaBatch, kv_batch: &StateValueBatch) -> Result<()> {
-    for (k, v) in kv_batch {
-        batch.put::<StateValueSchema>(k, v)?;
-    }
+fn add_kv_batch(batch: &SchemaBatch, kv_batch: &StateValueBatch) -> Result<()> {
+    kv_batch
+        .par_iter()
+        .map(|(k, v)| batch.put::<StateValueSchema>(k, v))
+        .collect::<Result<Vec<_>>>()?;
     Ok(())
 }
