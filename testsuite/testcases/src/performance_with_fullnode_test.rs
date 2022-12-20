@@ -14,7 +14,7 @@ impl Test for PerformanceBenchmarkWithFN {
 
 impl NetworkLoadTest for PerformanceBenchmarkWithFN {
     fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllValidators)
+        Ok(LoadDestination::AllFullnodes)
     }
 }
 

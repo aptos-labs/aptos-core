@@ -192,7 +192,6 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
-    let duration = Duration::from_secs(1200);
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -567,14 +566,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     }),
             ),
         "graceful_overload" => config
-            // .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-            // // if we have smaller number of full nodes, TPS drops.
-            // // Validators without VFN are proposing almost empty blocks,
-            // // as no useful transaction reach their mempool.
-            // // something to potentially improve upon.
-            // .with_initial_fullnode_count(20)
-            // .with_network_tests(vec![&PerformanceBenchmarkWithFN])
-            // .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 15000 }))
             .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
             // if we have full nodes for subset of validators, TPS drops.
             // Validators without VFN are proposing almost empty blocks,
@@ -623,7 +614,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_fullnode_count(10)
             .with_network_tests(vec![&LoadVsPerfBenchmark {
                 test: &PerformanceBenchmarkWithFN,
-                tps: &[1000, 6500, 10000],
+                tps: &[
+                    200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
+                ],
             }])
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 // no epoch change.
@@ -874,7 +867,7 @@ fn state_sync_perf_validators(forge_config: ForgeConfig<'static>) -> ForgeConfig
 /// The config for running a validator join and leave test.
 fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<'static> {
     forge_config
-        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 60.into();
             helm_values["chain"]["allow_new_validators"] = true.into();
@@ -899,29 +892,13 @@ fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<
 
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
-        .with_initial_fullnode_count(0)
-        .with_network_tests(vec![&ThreeRegionSimulationTest {
-            add_execution_delay: None,
-        }])
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(10)
+        .with_network_tests(vec![&PerformanceBenchmarkWithFN])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
-            helm_values["chain"]["epoch_duration_secs"] = 600.into();
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
-        // // .with_node_helm_config_fn(Arc::new(|helm_values| {
-        // //     helm_values["validator"]["config"]["execution"]
-        // //         ["processed_transactions_detailed_counters"] = true.into();
-        // // }))
-        // .with_emit_job(
-        //     EmitJobRequest::default()
-        //         .mode(EmitJobMode::ConstTps { tps: 8000 })
-        //         .transaction_mix(vec![
-        //             (TransactionType::P2P, 80),
-        //             // (TransactionType::AccountGeneration, 20),
-        //         ]),
-        // )
-        // .with_success_criteria(SuccessCriteria::new(
-        //     if duration.as_secs() > 1200 {
         .with_success_criteria(
             SuccessCriteria::new(if duration.as_secs() > 1200 {
                 5000
@@ -938,9 +915,6 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
                 MetricsThreshold::new(12, 30),
                 // Check that we don't use more than 10 GB of memory for 30% of the time.
                 MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-                // )),
-                // Some(StateProgressThreshold {
-                //     max_no_progress_secs: 20.0,
             ))
             .add_chain_progress(StateProgressThreshold {
                 max_no_progress_secs: 10.0,
