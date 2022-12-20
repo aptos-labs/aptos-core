@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_storage_interface::{DbReader, DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT};
 use aptos_types::{
