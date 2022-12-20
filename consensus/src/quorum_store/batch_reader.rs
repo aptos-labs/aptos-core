@@ -410,7 +410,8 @@ impl BatchReader {
         );
 
         // TODO: experiment / decide on the parameter for generating the interval duration (i.e. "/2").
-        let mut interval = time::interval(Duration::from_millis((request_timeout_ms / 2) as u64));
+        // TODO: changed because we need to be able to shutdown fast-ish, not in 5 seconds
+        let mut interval = time::interval(Duration::from_millis(100));
 
         loop {
             // TODO: shutdown?
