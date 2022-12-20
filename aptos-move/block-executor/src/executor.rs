@@ -435,11 +435,11 @@ where
                             current_gas += txn_gas;
                             // If the per-block gas limit is exceeded, the commit thread halts PE.
                             if current_gas > scheduler.max_gas() {
-                                println!(
-                                    "[Parallel Execution]: commit thread {} halts PE at local_cmt_idx {}",
-                                    rayon::current_thread_index().unwrap(),
-                                    local_cmt_idx
-                                );
+                                // println!(
+                                //     "[Parallel Execution]: commit thread {} halts PE at local_cmt_idx {}",
+                                //     rayon::current_thread_index().unwrap(),
+                                //     local_cmt_idx
+                                // );
                                 scheduler.set_done(local_cmt_idx);
                                 break;
                             }
@@ -449,11 +449,11 @@ where
                 }
                 // The commit thread commits all the transactions in the block, can finish PE.
                 if local_cmt_idx == num_txns {
-                    println!(
-                        "[Parallel Execution]: commit thread {} halts PE at local_cmt_idx {}",
-                        rayon::current_thread_index().unwrap(),
-                        local_cmt_idx
-                    );
+                    // println!(
+                    //     "[Parallel Execution]: commit thread {} halts PE at local_cmt_idx {}",
+                    //     rayon::current_thread_index().unwrap(),
+                    //     local_cmt_idx
+                    // );
                     scheduler.set_done(local_cmt_idx);
                     break;
                 }
@@ -514,8 +514,8 @@ where
     > {
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
-        println!("");
-        println!("PE starts level {}", self.concurrency_level);
+        // println!("");
+        // println!("PE starts level {}", self.concurrency_level);
 
         let versioned_data_cache = MVHashMap::new();
 
@@ -541,7 +541,7 @@ where
             }
         });
 
-        println!("all threads finish");
+        // println!("all threads finish");
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let num_txns = scheduler.num_txn_to_commit();
