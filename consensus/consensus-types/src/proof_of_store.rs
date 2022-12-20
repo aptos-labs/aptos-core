@@ -3,11 +3,14 @@
 
 use crate::common::Round;
 use anyhow::Context;
-use aptos_crypto::HashValue;
+use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::aggregate_signature::AggregateSignature;
+use aptos_types::validator_signer::ValidatorSigner;
 use aptos_types::validator_verifier::ValidatorVerifier;
+use aptos_types::PeerId;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
 pub struct LogicalTime {
@@ -39,14 +42,60 @@ pub struct SignedDigestInfo {
     pub num_bytes: u64,
 }
 
+impl SignedDigestInfo {
+    pub fn new(digest: HashValue, expiration: LogicalTime, num_txns: u64, num_bytes: u64) -> Self {
+        Self {
+            digest,
+            expiration,
+            num_txns,
+            num_bytes,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SignedDigest {
+    epoch: u64,
+    peer_id: PeerId,
+    info: SignedDigestInfo,
+    signature: bls12381::Signature,
+}
+
+impl SignedDigest {
+    pub fn new(
+        epoch: u64,
+        digest: HashValue,
+        expiration: LogicalTime,
+        num_txns: u64,
+        num_bytes: u64,
+        validator_signer: Arc<ValidatorSigner>,
+    ) -> Result<Self, CryptoMaterialError> {
+        let info = SignedDigestInfo::new(digest, expiration, num_txns, num_bytes);
+        let signature = validator_signer.sign(&info)?;
+
+        Ok(Self {
+            epoch,
+            peer_id: validator_signer.author(),
+            info,
+            signature,
+        })
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        Ok(validator.verify(self.peer_id, &self.info, &self.signature)?)
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct ProofOfStore {
     info: SignedDigestInfo,
     multi_signature: AggregateSignature,
 }
 
-#[allow(dead_code)]
 impl ProofOfStore {
     pub fn new(info: SignedDigestInfo, multi_signature: AggregateSignature) -> Self {
         Self {

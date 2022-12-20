@@ -1594,6 +1594,7 @@ async fn test_get_transactions_or_outputs_with_proof_chunk_limit() {
         // Create test data
         let max_output_chunk_size =
             StorageServiceConfig::default().max_transaction_output_chunk_size;
+        let max_transaction_chunk_size = StorageServiceConfig::default().max_transaction_chunk_size;
         let chunk_size = max_output_chunk_size * 10; // Set a chunk request larger than the max
         let start_version = 0;
         let end_version = start_version + max_output_chunk_size - 1;
@@ -1616,7 +1617,7 @@ async fn test_get_transactions_or_outputs_with_proof_chunk_limit() {
             expect_get_transactions(
                 &mut db_reader,
                 start_version,
-                max_output_chunk_size,
+                max_transaction_chunk_size,
                 proof_version,
                 false,
                 transaction_list_with_proof.clone(),

@@ -5,9 +5,13 @@ use crate::data_notification::{
     NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
     TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
+use crate::data_notification::{
+    NewTransactionsOrOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+};
 use crate::streaming_client::{
-    ContinuouslyStreamTransactionOutputsRequest, ContinuouslyStreamTransactionsRequest,
-    GetAllTransactionOutputsRequest,
+    ContinuouslyStreamTransactionOutputsRequest, ContinuouslyStreamTransactionsOrOutputsRequest,
+    ContinuouslyStreamTransactionsRequest, GetAllTransactionOutputsRequest,
+    GetAllTransactionsOrOutputsRequest,
 };
 use crate::tests::utils::{
     create_output_list_with_proof, MAX_ADVERTISED_TRANSACTION, MAX_NOTIFICATION_TIMEOUT_SECS,
@@ -418,7 +422,13 @@ async fn test_continuous_stream_epoch_change_retry() {
         MIN_ADVERTISED_TRANSACTION_OUTPUT,
         MIN_ADVERTISED_EPOCH_END,
     );
-    for mut data_stream in [data_stream_1, data_stream_2] {
+    let (data_stream_3, _stream_listener_3) = create_continuous_transaction_or_output_stream(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
+        MIN_ADVERTISED_TRANSACTION_OUTPUT,
+        MIN_ADVERTISED_EPOCH_END,
+    );
+    for mut data_stream in [data_stream_1, data_stream_2, data_stream_3] {
         // Initialize the data stream and drive progress
         let global_data_summary = create_global_data_summary(1);
         initialize_data_requests(&mut data_stream, &global_data_summary);
@@ -482,9 +492,16 @@ async fn test_continuous_stream_subscription_retry() {
         MAX_ADVERTISED_TRANSACTION_OUTPUT,
         MAX_ADVERTISED_EPOCH_END,
     );
-    for (mut data_stream, mut stream_listener, transactions_only) in [
-        (data_stream_1, stream_listener_1, true),
-        (data_stream_2, stream_listener_2, false),
+    let (data_stream_3, stream_listener_3) = create_continuous_transaction_or_output_stream(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
+        MAX_ADVERTISED_TRANSACTION_OUTPUT,
+        MAX_ADVERTISED_EPOCH_END,
+    );
+    for (mut data_stream, mut stream_listener, transactions_only, allow_transactions_or_outputs) in [
+        (data_stream_1, stream_listener_1, true, false),
+        (data_stream_2, stream_listener_2, false, false),
+        (data_stream_3, stream_listener_3, false, true),
     ] {
         // Initialize the data stream
         let global_data_summary = create_global_data_summary(1);
@@ -494,9 +511,17 @@ async fn test_continuous_stream_subscription_retry() {
         let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
         assert_eq!(sent_requests.as_ref().unwrap().len(), 1);
 
-        // Verify the request is for new transaction data
+        // Verify the request is for the correct data
         let client_request = get_pending_client_request(&mut data_stream, 0);
-        let expected_request = if transactions_only {
+        let expected_request = if allow_transactions_or_outputs {
+            DataClientRequest::NewTransactionsOrOutputsWithProof(
+                NewTransactionsOrOutputsWithProofRequest {
+                    known_version: MAX_ADVERTISED_TRANSACTION_OUTPUT,
+                    known_epoch: MAX_ADVERTISED_EPOCH_END,
+                    include_events: false,
+                },
+            )
+        } else if transactions_only {
             DataClientRequest::NewTransactionsWithProof(NewTransactionsWithProofRequest {
                 known_version: MAX_ADVERTISED_TRANSACTION,
                 known_epoch: MAX_ADVERTISED_EPOCH_END,
@@ -525,8 +550,8 @@ async fn test_continuous_stream_subscription_retry() {
             process_data_responses(&mut data_stream, &global_data_summary).await;
 
             // Verify the same subscription request was resent to the network
-            let client_request = get_pending_client_request(&mut data_stream, 0);
-            assert_eq!(client_request, expected_request);
+            let new_client_request = get_pending_client_request(&mut data_stream, 0);
+            assert_eq!(new_client_request, client_request);
         }
 
         // Set a subscription response in the queue and process it
@@ -542,7 +567,15 @@ async fn test_continuous_stream_subscription_retry() {
         let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
         assert_eq!(sent_requests.as_ref().unwrap().len(), 1);
         let client_request = get_pending_client_request(&mut data_stream, 0);
-        let expected_request = if transactions_only {
+        let expected_request = if allow_transactions_or_outputs {
+            DataClientRequest::NewTransactionsOrOutputsWithProof(
+                NewTransactionsOrOutputsWithProofRequest {
+                    known_version: MAX_ADVERTISED_TRANSACTION_OUTPUT + 1,
+                    known_epoch: MAX_ADVERTISED_EPOCH_END,
+                    include_events: false,
+                },
+            )
+        } else if transactions_only {
             DataClientRequest::NewTransactionsWithProof(NewTransactionsWithProofRequest {
                 known_version: MAX_ADVERTISED_TRANSACTION + 1,
                 known_epoch: MAX_ADVERTISED_EPOCH_END,
@@ -579,9 +612,18 @@ async fn test_continuous_stream_subscription_retry() {
         let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
         assert_eq!(sent_requests.as_ref().unwrap().len(), 3);
         for i in 0..3 {
-            let expected_version = MAX_ADVERTISED_TRANSACTION + 2 + i as u64;
             let client_request = get_pending_client_request(&mut data_stream, i);
-            let expected_request = if transactions_only {
+            let expected_version = MAX_ADVERTISED_TRANSACTION + 2 + i as u64;
+            let expected_request = if allow_transactions_or_outputs {
+                DataClientRequest::TransactionsOrOutputsWithProof(
+                    TransactionsOrOutputsWithProofRequest {
+                        start_version: expected_version,
+                        end_version: expected_version,
+                        proof_version: new_highest_synced_version,
+                        include_events: false,
+                    },
+                )
+            } else if transactions_only {
                 DataClientRequest::TransactionsWithProof(TransactionsWithProofRequest {
                     start_version: expected_version,
                     end_version: expected_version,
@@ -622,9 +664,16 @@ async fn test_continuous_stream_subscription_timeout() {
         MAX_ADVERTISED_TRANSACTION_OUTPUT,
         MAX_ADVERTISED_EPOCH_END,
     );
-    for (mut data_stream, mut stream_listener, transactions_only) in [
-        (data_stream_1, stream_listener_1, true),
-        (data_stream_2, stream_listener_2, false),
+    let (data_stream_3, stream_listener_3) = create_continuous_transaction_or_output_stream(
+        data_client_config,
+        DataStreamingServiceConfig::default(),
+        MAX_ADVERTISED_TRANSACTION_OUTPUT,
+        MAX_ADVERTISED_EPOCH_END,
+    );
+    for (mut data_stream, mut stream_listener, transactions_only, allow_transactions_or_outputs) in [
+        (data_stream_1, stream_listener_1, true, false),
+        (data_stream_2, stream_listener_2, false, false),
+        (data_stream_3, stream_listener_3, false, true),
     ] {
         // Initialize the data stream
         let global_data_summary = create_global_data_summary(1);
@@ -640,6 +689,7 @@ async fn test_continuous_stream_subscription_timeout() {
             &mut data_stream,
             &mut stream_listener,
             transactions_only,
+            allow_transactions_or_outputs,
             true,
             &global_data_summary,
         )
@@ -658,6 +708,7 @@ async fn test_continuous_stream_subscription_timeout() {
             &mut data_stream,
             &mut stream_listener,
             transactions_only,
+            allow_transactions_or_outputs,
             true,
             &global_data_summary,
         )
@@ -666,7 +717,7 @@ async fn test_continuous_stream_subscription_timeout() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_transaction_and_output_stream_timeout() {
+async fn test_transactions_and_output_stream_timeout() {
     // Create a test data client config
     let max_response_timeout_ms = 85;
     let response_timeout_ms = 7;
@@ -685,7 +736,7 @@ async fn test_transaction_and_output_stream_timeout() {
         ..Default::default()
     };
 
-    // Test both types of data streams
+    // Test all types of data streams
     let (data_stream_1, stream_listener_1) = create_transaction_stream(
         data_client_config,
         streaming_service_config,
@@ -698,9 +749,16 @@ async fn test_transaction_and_output_stream_timeout() {
         MIN_ADVERTISED_TRANSACTION_OUTPUT,
         MAX_ADVERTISED_TRANSACTION_OUTPUT,
     );
-    for (mut data_stream, mut stream_listener, transactions_only) in [
-        (data_stream_1, stream_listener_1, true),
-        (data_stream_2, stream_listener_2, false),
+    let (data_stream_3, stream_listener_3) = create_transactions_or_output_stream(
+        data_client_config,
+        streaming_service_config,
+        MIN_ADVERTISED_TRANSACTION_OUTPUT,
+        MAX_ADVERTISED_TRANSACTION_OUTPUT,
+    );
+    for (mut data_stream, mut stream_listener, transactions_only, allow_transactions_or_outputs) in [
+        (data_stream_1, stream_listener_1, true, false),
+        (data_stream_2, stream_listener_2, false, false),
+        (data_stream_3, stream_listener_3, false, true),
     ] {
         // Initialize the data stream
         let global_data_summary = create_global_data_summary(1);
@@ -730,6 +788,7 @@ async fn test_transaction_and_output_stream_timeout() {
             &mut data_stream,
             &mut stream_listener,
             transactions_only,
+            allow_transactions_or_outputs,
             false,
             &global_data_summary,
         )
@@ -762,6 +821,7 @@ async fn test_transaction_and_output_stream_timeout() {
             &mut data_stream,
             &mut stream_listener,
             transactions_only,
+            allow_transactions_or_outputs,
             false,
             &global_data_summary,
         )
@@ -892,6 +952,25 @@ fn create_continuous_transaction_stream(
     create_data_stream(data_client_config, streaming_service_config, stream_request)
 }
 
+/// Creates a continuous transaction or output stream for the given `version`.
+fn create_continuous_transaction_or_output_stream(
+    data_client_config: AptosDataClientConfig,
+    streaming_service_config: DataStreamingServiceConfig,
+    known_version: Version,
+    known_epoch: Version,
+) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
+    // Create a continuous transaction stream request
+    let stream_request = StreamRequest::ContinuouslyStreamTransactionsOrOutputs(
+        ContinuouslyStreamTransactionsOrOutputsRequest {
+            known_version,
+            known_epoch,
+            include_events: false,
+            target: None,
+        },
+    );
+    create_data_stream(data_client_config, streaming_service_config, stream_request)
+}
+
 /// Creates a transaction stream for the given `version`.
 fn create_transaction_stream(
     data_client_config: AptosDataClientConfig,
@@ -922,6 +1001,24 @@ fn create_output_stream(
         end_version,
         proof_version: end_version,
     });
+    create_data_stream(data_client_config, streaming_service_config, stream_request)
+}
+
+/// Creates an output stream for the given `version`.
+fn create_transactions_or_output_stream(
+    data_client_config: AptosDataClientConfig,
+    streaming_service_config: DataStreamingServiceConfig,
+    start_version: Version,
+    end_version: Version,
+) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
+    // Create a transaction or output stream request
+    let stream_request =
+        StreamRequest::GetAllTransactionsOrOutputs(GetAllTransactionsOrOutputsRequest {
+            start_version,
+            end_version,
+            proof_version: end_version,
+            include_events: false,
+        });
     create_data_stream(data_client_config, streaming_service_config, stream_request)
 }
 
@@ -1206,7 +1303,8 @@ fn get_pending_client_request(
 async fn wait_for_notification_and_verify(
     data_stream: &mut DataStream<MockAptosDataClient>,
     stream_listener: &mut DataStreamListener,
-    transactions_only: bool,
+    transaction_syncing: bool,
+    allow_transactions_or_outputs: bool,
     subscription_notification: bool,
     global_data_summary: &GlobalDataSummary,
 ) {
@@ -1216,42 +1314,37 @@ async fn wait_for_notification_and_verify(
         {
             if subscription_notification {
                 // Verify we got the correct subscription data
-                if transactions_only {
-                    if !matches!(
-                        data_notification.data_payload,
-                        DataPayload::ContinuousTransactionsWithProof(..)
-                    ) {
+                match data_notification.data_payload {
+                    DataPayload::ContinuousTransactionsWithProof(..) => {
+                        assert!(allow_transactions_or_outputs || transaction_syncing);
+                    }
+                    DataPayload::ContinuousTransactionOutputsWithProof(..) => {
+                        assert!(allow_transactions_or_outputs || !transaction_syncing);
+                    }
+                    _ => {
                         panic!(
                             "Invalid data notification found: {:?}",
                             data_notification.data_payload
                         );
                     }
-                } else if !matches!(
-                    data_notification.data_payload,
-                    DataPayload::ContinuousTransactionOutputsWithProof(..)
-                ) {
-                    panic!("Invalid data notification found: {:?}", data_notification);
                 }
             } else {
                 // Verify we got the correct transaction data
-                if transactions_only {
-                    if !matches!(
-                        data_notification.data_payload,
-                        DataPayload::TransactionsWithProof(..)
-                    ) {
+                match data_notification.data_payload {
+                    DataPayload::TransactionsWithProof(..) => {
+                        assert!(allow_transactions_or_outputs || transaction_syncing);
+                    }
+                    DataPayload::TransactionOutputsWithProof(..) => {
+                        assert!(allow_transactions_or_outputs || !transaction_syncing);
+                    }
+                    _ => {
                         panic!(
                             "Invalid data notification found: {:?}",
                             data_notification.data_payload
                         );
                     }
-                } else if !matches!(
-                    data_notification.data_payload,
-                    DataPayload::TransactionOutputsWithProof(..)
-                ) {
-                    panic!("Invalid data notification found: {:?}", data_notification);
                 }
             }
-
             break;
         } else {
             process_data_responses(data_stream, global_data_summary).await;

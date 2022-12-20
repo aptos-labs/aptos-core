@@ -89,6 +89,17 @@ module std::features {
         is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
     }
 
+    /// Whether the new `aptos_stdlib::multi_ed25519::public_key_validate_internal_v2()` native is enabled.
+    /// This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const MULTI_ED25519_PK_VALIDATE_V2_NATIVES: u64 = 7;
+
+    public fun multi_ed25519_pk_validate_v2_feature(): u64 { MULTI_ED25519_PK_VALIDATE_V2_NATIVES }
+
+    public fun multi_ed25519_pk_validate_v2_enabled(): bool acquires Features {
+        is_enabled(MULTI_ED25519_PK_VALIDATE_V2_NATIVES)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

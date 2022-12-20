@@ -10,7 +10,7 @@ use aptos_crypto::{
 };
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
-use aptos_state_view::StateView;
+use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},

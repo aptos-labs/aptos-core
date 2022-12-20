@@ -33,13 +33,13 @@ fn put_value_set(
     let root = state_store
         .merklize_value_set(jmt_update_refs(&jmt_updates), None, version, base_version)
         .unwrap();
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     state_store
         .put_value_sets(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
-            &mut batch,
+            &batch,
         )
         .unwrap();
     state_store.ledger_db.write_schemas(batch).unwrap();

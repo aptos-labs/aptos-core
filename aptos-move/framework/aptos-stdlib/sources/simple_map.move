@@ -1,8 +1,8 @@
 /// This module provides a solution for sorted maps, that is it has the properties that
 /// 1) Keys point to Values
 /// 2) Each Key must be unique
-/// 3) A Key can be found within O(Log N) time
-/// 4) The data is stored as sorted by Key
+/// 3) A Key can be found within O(N) time
+/// 4) The keys are unsorted.
 /// 5) Adds and removals take O(N) time
 module aptos_std::simple_map {
     use std::error;
@@ -83,16 +83,8 @@ module aptos_std::simple_map {
     ): (Key, Value) {
         let maybe_idx = find(map, key);
         assert!(option::is_some(&maybe_idx), error::invalid_argument(EKEY_NOT_FOUND));
-
         let placement = option::extract(&mut maybe_idx);
-        let end = vector::length(&map.data) - 1;
-
-        while (placement < end) {
-            vector::swap(&mut map.data, placement, placement + 1);
-            placement = placement + 1;
-        };
-
-        let Element { key, value } = vector::pop_back(&mut map.data);
+        let Element { key, value } = vector::swap_remove(&mut map.data, placement);
         (key, value)
     }
 

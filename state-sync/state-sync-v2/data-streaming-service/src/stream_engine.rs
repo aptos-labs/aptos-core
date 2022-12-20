@@ -1,13 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::data_notification::DataClientRequest::NewTransactionsOrOutputsWithProof;
+use crate::data_notification::{
+    NewTransactionsOrOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+};
 use crate::{
     data_notification::{
         DataClientRequest,
         DataClientRequest::{
             EpochEndingLedgerInfos, NewTransactionOutputsWithProof, NewTransactionsWithProof,
             NumberOfStates, StateValuesWithProof, TransactionOutputsWithProof,
-            TransactionsWithProof,
+            TransactionsOrOutputsWithProof, TransactionsWithProof,
         },
         DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
         NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
@@ -121,6 +125,9 @@ impl StreamEngine {
             StreamRequest::ContinuouslyStreamTransactions(_) => {
                 Ok(ContinuousTransactionStreamEngine::new(stream_request)?.into())
             }
+            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
+                Ok(ContinuousTransactionStreamEngine::new(stream_request)?.into())
+            }
             StreamRequest::GetAllStates(request) => Ok(StateStreamEngine::new(request)?.into()),
             StreamRequest::GetAllEpochEndingLedgerInfos(request) => {
                 Ok(EpochEndingStreamEngine::new(request, advertised_data)?.into())
@@ -129,6 +136,9 @@ impl StreamEngine {
                 Ok(TransactionStreamEngine::new(stream_request)?.into())
             }
             StreamRequest::GetAllTransactions(_) => {
+                Ok(TransactionStreamEngine::new(stream_request)?.into())
+            }
+            StreamRequest::GetAllTransactionsOrOutputs(_) => {
                 Ok(TransactionStreamEngine::new(stream_request)?.into())
             }
             _ => Err(Error::UnsupportedRequestEncountered(format!(
@@ -352,39 +362,28 @@ pub struct ContinuousTransactionStreamEngine {
 
 impl ContinuousTransactionStreamEngine {
     fn new(stream_request: &StreamRequest) -> Result<Self, Error> {
-        match stream_request {
+        let (next_version, next_epoch) = match stream_request {
             StreamRequest::ContinuouslyStreamTransactions(request) => {
-                let (next_version, next_epoch) = Self::calculate_next_version_and_epoch(
-                    request.known_version,
-                    request.known_epoch,
-                )?;
-                Ok(ContinuousTransactionStreamEngine {
-                    request: stream_request.clone(),
-                    current_target_ledger_info: None,
-                    end_of_epoch_requested: false,
-                    subscription_requested: false,
-                    next_stream_version_and_epoch: (next_version, next_epoch),
-                    next_request_version_and_epoch: (next_version, next_epoch),
-                    stream_is_complete: false,
-                })
+                Self::calculate_next_version_and_epoch(request.known_version, request.known_epoch)?
             }
             StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
-                let (next_version, next_epoch) = Self::calculate_next_version_and_epoch(
-                    request.known_version,
-                    request.known_epoch,
-                )?;
-                Ok(ContinuousTransactionStreamEngine {
-                    request: stream_request.clone(),
-                    current_target_ledger_info: None,
-                    end_of_epoch_requested: false,
-                    subscription_requested: false,
-                    next_stream_version_and_epoch: (next_version, next_epoch),
-                    next_request_version_and_epoch: (next_version, next_epoch),
-                    stream_is_complete: false,
-                })
+                Self::calculate_next_version_and_epoch(request.known_version, request.known_epoch)?
+            }
+            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
+                Self::calculate_next_version_and_epoch(request.known_version, request.known_epoch)?
             }
             request => invalid_stream_request!(request),
-        }
+        };
+
+        Ok(ContinuousTransactionStreamEngine {
+            request: stream_request.clone(),
+            current_target_ledger_info: None,
+            end_of_epoch_requested: false,
+            subscription_requested: false,
+            next_stream_version_and_epoch: (next_version, next_epoch),
+            next_request_version_and_epoch: (next_version, next_epoch),
+            stream_is_complete: false,
+        })
     }
 
     fn calculate_next_version_and_epoch(
@@ -409,6 +408,11 @@ impl ContinuousTransactionStreamEngine {
                 }
             }
             StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
+                if let Some(target) = &request.target {
+                    return Ok(Some(target.clone()));
+                }
+            }
+            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
                 if let Some(target) = &request.target {
                     return Ok(Some(target.clone()));
                 }
@@ -525,19 +529,24 @@ impl ContinuousTransactionStreamEngine {
 
         let data_client_request = match &self.request {
             StreamRequest::ContinuouslyStreamTransactions(request) => {
-                DataClientRequest::NewTransactionsWithProof(NewTransactionsWithProofRequest {
+                NewTransactionsWithProof(NewTransactionsWithProofRequest {
                     known_version,
                     known_epoch,
                     include_events: request.include_events,
                 })
             }
             StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
-                DataClientRequest::NewTransactionOutputsWithProof(
-                    NewTransactionOutputsWithProofRequest {
-                        known_version,
-                        known_epoch,
-                    },
-                )
+                NewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
+                    known_version,
+                    known_epoch,
+                })
+            }
+            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
+                NewTransactionsOrOutputsWithProof(NewTransactionsOrOutputsWithProofRequest {
+                    known_version,
+                    known_epoch,
+                    include_events: request.include_events,
+                })
             }
             request => invalid_stream_request!(request),
         };
@@ -624,6 +633,13 @@ impl ContinuousTransactionStreamEngine {
                     }
                 }
             }
+            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
+                if let Some(target) = &request.target {
+                    if request_end_version == target.ledger_info().version() {
+                        self.stream_is_complete = true;
+                    }
+                }
+            }
             request => invalid_stream_request!(request),
         };
 
@@ -683,6 +699,19 @@ impl ContinuousTransactionStreamEngine {
                 for client_request in client_requests {
                     match client_request {
                         DataClientRequest::TransactionOutputsWithProof(request) => {
+                            self.update_request_version_and_epoch(
+                                request.end_version,
+                                target_ledger_info,
+                            )?;
+                        }
+                        request => invalid_client_request!(request, self),
+                    }
+                }
+            }
+            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
+                for client_request in client_requests {
+                    match client_request {
+                        DataClientRequest::TransactionsOrOutputsWithProof(request) => {
                             self.update_request_version_and_epoch(
                                 request.end_version,
                                 target_ledger_info,
@@ -768,6 +797,11 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                         .optimal_chunk_sizes
                         .transaction_output_chunk_size
                 }
+                StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
+                    global_data_summary
+                        .optimal_chunk_sizes
+                        .transaction_output_chunk_size
+                }
                 request => invalid_stream_request!(request),
             };
             let client_requests = create_data_client_requests(
@@ -793,6 +827,9 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         let advertised_ranges = match &self.request {
             StreamRequest::ContinuouslyStreamTransactions(_) => &advertised_data.transactions,
             StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
+                &advertised_data.transaction_outputs
+            }
+            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
                 &advertised_data.transaction_outputs
             }
             request => invalid_stream_request!(request),
@@ -846,6 +883,17 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                 (LogSchema::new(LogEntry::RequestTimeout)
                     .message("Subscription request for new transaction outputs timed out!"))
             );
+        } else if matches!(
+            self.request,
+            StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_)
+        ) && matches!(
+            client_request,
+            DataClientRequest::NewTransactionsOrOutputsWithProof(_)
+        ) {
+            info!(
+                (LogSchema::new(LogEntry::RequestTimeout)
+                    .message("Subscription request for new transactions or outputs timed out!"))
+            );
         } else {
             return Err(Error::UnexpectedErrorEncountered(format!("Received a subscription request timeout but the request did not match the expected type for the stream! Request: {:?}, Stream: {:?}", client_request, self.request)));
         }
@@ -894,6 +942,17 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                 }
                 request => invalid_stream_request!(request),
             },
+            NewTransactionsOrOutputsWithProof(request) => match &self.request {
+                StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
+                    let data_notification = self.create_notification_for_subscription_data(
+                        request.known_version,
+                        client_response_payload,
+                        notification_id_generator,
+                    )?;
+                    Ok(Some(data_notification))
+                }
+                request => invalid_stream_request!(request),
+            },
             TransactionsWithProof(request) => match &self.request {
                 StreamRequest::ContinuouslyStreamTransactions(_) => {
                     let data_notification = self.create_notification_for_continuous_data(
@@ -908,6 +967,18 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             },
             TransactionOutputsWithProof(request) => match &self.request {
                 StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
+                    let data_notification = self.create_notification_for_continuous_data(
+                        request.start_version,
+                        request.end_version,
+                        client_response_payload,
+                        notification_id_generator,
+                    )?;
+                    Ok(Some(data_notification))
+                }
+                request => invalid_stream_request!(request),
+            },
+            TransactionsOrOutputsWithProof(request) => match &self.request {
+                StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
                     let data_notification = self.create_notification_for_continuous_data(
                         request.start_version,
                         request.end_version,
@@ -1074,7 +1145,7 @@ impl DataStreamEngine for EpochEndingStreamEngine {
 
 #[derive(Clone, Debug)]
 pub struct TransactionStreamEngine {
-    // The original stream request made by the client (i.e., a transaction or
+    // The original stream request made by the client (e.g., a transaction or
     // transaction output stream request).
     pub request: StreamRequest,
 
@@ -1100,6 +1171,12 @@ impl TransactionStreamEngine {
                 stream_is_complete: false,
             }),
             StreamRequest::GetAllTransactionOutputs(request) => Ok(TransactionStreamEngine {
+                request: stream_request.clone(),
+                next_stream_version: request.start_version,
+                next_request_version: request.start_version,
+                stream_is_complete: false,
+            }),
+            StreamRequest::GetAllTransactionsOrOutputs(request) => Ok(TransactionStreamEngine {
                 request: stream_request.clone(),
                 next_stream_version: request.start_version,
                 next_request_version: request.start_version,
@@ -1166,6 +1243,16 @@ impl TransactionStreamEngine {
                     }
                 }
             }
+            StreamRequest::GetAllTransactionsOrOutputs(_) => {
+                for client_request in client_requests.iter() {
+                    match client_request {
+                        TransactionsOrOutputsWithProof(request) => {
+                            self.update_request_version(request.end_version)?;
+                        }
+                        request => invalid_client_request!(request, self),
+                    }
+                }
+            }
             request => invalid_stream_request!(request),
         }
 
@@ -1187,6 +1274,12 @@ impl DataStreamEngine for TransactionStreamEngine {
                     .transaction_chunk_size,
             ),
             StreamRequest::GetAllTransactionOutputs(request) => (
+                request.end_version,
+                global_data_summary
+                    .optimal_chunk_sizes
+                    .transaction_output_chunk_size,
+            ),
+            StreamRequest::GetAllTransactionsOrOutputs(request) => (
                 request.end_version,
                 global_data_summary
                     .optimal_chunk_sizes
@@ -1214,6 +1307,9 @@ impl DataStreamEngine for TransactionStreamEngine {
                 (request.end_version, &advertised_data.transactions)
             }
             StreamRequest::GetAllTransactionOutputs(request) => {
+                (request.end_version, &advertised_data.transaction_outputs)
+            }
+            StreamRequest::GetAllTransactionsOrOutputs(request) => {
                 (request.end_version, &advertised_data.transaction_outputs)
             }
             request => invalid_stream_request!(request),
@@ -1249,6 +1345,17 @@ impl DataStreamEngine for TransactionStreamEngine {
             },
             StreamRequest::GetAllTransactionOutputs(stream_request) => match client_request {
                 TransactionOutputsWithProof(request) => {
+                    let stream_end_version = stream_request.end_version;
+                    self.update_stream_version(
+                        request.start_version,
+                        request.end_version,
+                        stream_end_version,
+                    )?;
+                }
+                request => invalid_client_request!(request, self),
+            },
+            StreamRequest::GetAllTransactionsOrOutputs(stream_request) => match client_request {
+                TransactionsOrOutputsWithProof(request) => {
                     let stream_end_version = stream_request.end_version;
                     self.update_stream_version(
                         request.start_version,
@@ -1351,7 +1458,7 @@ fn create_data_client_request(
 ) -> DataClientRequest {
     match stream_engine {
         StreamEngine::StateStreamEngine(stream_engine) => {
-            DataClientRequest::StateValuesWithProof(StateValuesWithProofRequest {
+            StateValuesWithProof(StateValuesWithProofRequest {
                 version: stream_engine.request.version,
                 start_index,
                 end_index,
@@ -1364,7 +1471,7 @@ fn create_data_client_request(
                 .version();
             match &stream_engine.request {
                 StreamRequest::ContinuouslyStreamTransactions(request) => {
-                    DataClientRequest::TransactionsWithProof(TransactionsWithProofRequest {
+                    TransactionsWithProof(TransactionsWithProofRequest {
                         start_version: start_index,
                         end_version: end_index,
                         proof_version: target_ledger_info_version,
@@ -1372,26 +1479,32 @@ fn create_data_client_request(
                     })
                 }
                 StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
-                    DataClientRequest::TransactionOutputsWithProof(
-                        TransactionOutputsWithProofRequest {
-                            start_version: start_index,
-                            end_version: end_index,
-                            proof_version: target_ledger_info_version,
-                        },
-                    )
+                    TransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+                        start_version: start_index,
+                        end_version: end_index,
+                        proof_version: target_ledger_info_version,
+                    })
+                }
+                StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
+                    TransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
+                        start_version: start_index,
+                        end_version: end_index,
+                        proof_version: target_ledger_info_version,
+                        include_events: request.include_events,
+                    })
                 }
                 request => invalid_stream_request!(request),
             }
         }
         StreamEngine::EpochEndingStreamEngine(_) => {
-            DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
+            EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
                 start_epoch: start_index,
                 end_epoch: end_index,
             })
         }
         StreamEngine::TransactionStreamEngine(stream_engine) => match &stream_engine.request {
             StreamRequest::GetAllTransactions(request) => {
-                DataClientRequest::TransactionsWithProof(TransactionsWithProofRequest {
+                TransactionsWithProof(TransactionsWithProofRequest {
                     start_version: start_index,
                     end_version: end_index,
                     proof_version: request.proof_version,
@@ -1399,10 +1512,18 @@ fn create_data_client_request(
                 })
             }
             StreamRequest::GetAllTransactionOutputs(request) => {
-                DataClientRequest::TransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+                TransactionOutputsWithProof(TransactionOutputsWithProofRequest {
                     start_version: start_index,
                     end_version: end_index,
                     proof_version: request.proof_version,
+                })
+            }
+            StreamRequest::GetAllTransactionsOrOutputs(request) => {
+                TransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
+                    start_version: start_index,
+                    end_version: end_index,
+                    proof_version: request.proof_version,
+                    include_events: request.include_events,
                 })
             }
             request => invalid_stream_request!(request),

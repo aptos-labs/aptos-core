@@ -433,6 +433,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
         event_subscription_service,
         aptos_data_client,
         streaming_service_client,
+        TimeService::real(),
     );
 
     // Create and return the new state sync handle

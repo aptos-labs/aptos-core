@@ -55,7 +55,10 @@ pub trait FromOnChainGasSchedule: Sized {
     /// Constructs a value of this type from a map representation of the on-chain gas schedule.
     /// `None` should be returned when the gas schedule is missing some required entries.
     /// Unused entries should be safely ignored.
-    fn from_on_chain_gas_schedule(gas_schedule: &BTreeMap<String, u64>) -> Option<Self>;
+    fn from_on_chain_gas_schedule(
+        gas_schedule: &BTreeMap<String, u64>,
+        feature_version: u64,
+    ) -> Option<Self>;
 }
 
 /// A trait for converting to a list of entries of the on-chain gas schedule.
@@ -63,7 +66,7 @@ pub trait ToOnChainGasSchedule {
     /// Converts `self` into a list of entries of the on-chain gas schedule.
     /// Each entry is a key-value pair where the key is a string representing the name of the
     /// parameter, where the value is the gas parameter itself.
-    fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)>;
+    fn to_on_chain_gas_schedule(&self, feature_version: u64) -> Vec<(String, u64)>;
 }
 
 /// A trait for defining an initial value to be used in the genesis.
@@ -81,20 +84,35 @@ pub struct NativeGasParameters {
 }
 
 impl FromOnChainGasSchedule for NativeGasParameters {
-    fn from_on_chain_gas_schedule(gas_schedule: &BTreeMap<String, u64>) -> Option<Self> {
+    fn from_on_chain_gas_schedule(
+        gas_schedule: &BTreeMap<String, u64>,
+        feature_version: u64,
+    ) -> Option<Self> {
         Some(Self {
-            move_stdlib: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
-            aptos_framework: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
-            table: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
+            move_stdlib: FromOnChainGasSchedule::from_on_chain_gas_schedule(
+                gas_schedule,
+                feature_version,
+            )?,
+            aptos_framework: FromOnChainGasSchedule::from_on_chain_gas_schedule(
+                gas_schedule,
+                feature_version,
+            )?,
+            table: FromOnChainGasSchedule::from_on_chain_gas_schedule(
+                gas_schedule,
+                feature_version,
+            )?,
         })
     }
 }
 
 impl ToOnChainGasSchedule for NativeGasParameters {
-    fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)> {
-        let mut entries = self.move_stdlib.to_on_chain_gas_schedule();
-        entries.extend(self.aptos_framework.to_on_chain_gas_schedule());
-        entries.extend(self.table.to_on_chain_gas_schedule());
+    fn to_on_chain_gas_schedule(&self, feature_version: u64) -> Vec<(String, u64)> {
+        let mut entries = self.move_stdlib.to_on_chain_gas_schedule(feature_version);
+        entries.extend(
+            self.aptos_framework
+                .to_on_chain_gas_schedule(feature_version),
+        );
+        entries.extend(self.table.to_on_chain_gas_schedule(feature_version));
         entries
     }
 }
@@ -130,22 +148,34 @@ pub struct AptosGasParameters {
 }
 
 impl FromOnChainGasSchedule for AptosGasParameters {
-    fn from_on_chain_gas_schedule(gas_schedule: &BTreeMap<String, u64>) -> Option<Self> {
+    fn from_on_chain_gas_schedule(
+        gas_schedule: &BTreeMap<String, u64>,
+        feature_version: u64,
+    ) -> Option<Self> {
         Some(Self {
-            misc: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
-            instr: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
-            txn: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
-            natives: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
+            misc: FromOnChainGasSchedule::from_on_chain_gas_schedule(
+                gas_schedule,
+                feature_version,
+            )?,
+            instr: FromOnChainGasSchedule::from_on_chain_gas_schedule(
+                gas_schedule,
+                feature_version,
+            )?,
+            txn: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule, feature_version)?,
+            natives: FromOnChainGasSchedule::from_on_chain_gas_schedule(
+                gas_schedule,
+                feature_version,
+            )?,
         })
     }
 }
 
 impl ToOnChainGasSchedule for AptosGasParameters {
-    fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)> {
-        let mut entries = self.instr.to_on_chain_gas_schedule();
-        entries.extend(self.txn.to_on_chain_gas_schedule());
-        entries.extend(self.natives.to_on_chain_gas_schedule());
-        entries.extend(self.misc.to_on_chain_gas_schedule());
+    fn to_on_chain_gas_schedule(&self, feature_version: u64) -> Vec<(String, u64)> {
+        let mut entries = self.instr.to_on_chain_gas_schedule(feature_version);
+        entries.extend(self.txn.to_on_chain_gas_schedule(feature_version));
+        entries.extend(self.natives.to_on_chain_gas_schedule(feature_version));
+        entries.extend(self.misc.to_on_chain_gas_schedule(feature_version));
         entries
     }
 }

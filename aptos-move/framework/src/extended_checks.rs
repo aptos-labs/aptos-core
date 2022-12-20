@@ -182,7 +182,7 @@ impl<'a> ExtendedChecker<'a> {
                 .fun_attributes
                 .entry(fun.get_simple_name_string().to_string())
                 .or_default()
-                .push(KnownAttribute::ViewFunction);
+                .push(KnownAttribute::view_function());
         }
     }
 }

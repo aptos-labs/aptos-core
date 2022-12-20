@@ -64,10 +64,10 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
     );
 
     // write sets
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     for (ver, ws) in write_sets.iter().enumerate() {
         transaction_store
-            .put_write_set(ver as Version, ws, &mut batch)
+            .put_write_set(ver as Version, ws, &batch)
             .unwrap();
     }
     aptos_db.ledger_db.write_schemas(batch).unwrap();
@@ -230,14 +230,14 @@ fn put_txn_in_store(
     txn_infos: &[TransactionInfo],
     txns: &[Transaction],
 ) {
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     for i in 0..txns.len() {
         transaction_store
-            .put_transaction(i as u64, txns.get(i).unwrap(), &mut batch)
+            .put_transaction(i as u64, txns.get(i).unwrap(), &batch)
             .unwrap();
     }
     ledger_store
-        .put_transaction_infos(0, txn_infos, &mut batch)
+        .put_transaction_infos(0, txn_infos, &batch)
         .unwrap();
     aptos_db.ledger_db.write_schemas(batch).unwrap();
 }
