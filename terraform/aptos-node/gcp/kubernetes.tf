@@ -28,17 +28,22 @@ locals {
   monitoring_helm_chart_path = "${path.module}/../../helm/monitoring"
   logger_helm_chart_path     = "${path.module}/../../helm/logger"
   aptos_node_helm_chart_path = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
+
+  # override the helm release name if an override exists, otherwise adopt the workspace name
+  helm_release_name = var.helm_release_name_override != "" ? var.helm_release_name_override : local.workspace_name
 }
 
 resource "helm_release" "validator" {
-  name        = terraform.workspace
+  name        = local.helm_release_name
   chart       = local.aptos_node_helm_chart_path
   max_history = 5
   wait        = false
 
   values = [
     jsonencode({
-      imageTag = var.image_tag
+      numValidators     = var.num_validators
+      numFullnodeGroups = var.num_fullnode_groups
+      imageTag          = var.image_tag
       chain = {
         era      = var.era
         chain_id = var.chain_id
@@ -49,7 +54,7 @@ resource "helm_release" "validator" {
         storage = {
           class = kubernetes_storage_class.ssd.metadata[0].name
         }
-        nodeSelector = {
+        nodeSelector = var.gke_enable_node_autoprovisioning ? {} : {
           "cloud.google.com/gke-nodepool" = google_container_node_pool.validators.name
         }
         tolerations = [{
@@ -62,7 +67,7 @@ resource "helm_release" "validator" {
         storage = {
           class = kubernetes_storage_class.ssd.metadata[0].name
         }
-        nodeSelector = {
+        nodeSelector = var.gke_enable_node_autoprovisioning ? {} : {
           "cloud.google.com/gke-nodepool" = google_container_node_pool.validators.name
         }
         tolerations = [{
@@ -88,7 +93,7 @@ resource "helm_release" "validator" {
 
 resource "helm_release" "logger" {
   count       = var.enable_logger ? 1 : 0
-  name        = "${terraform.workspace}-log"
+  name        = "${local.helm_release_name}-log"
   chart       = local.logger_helm_chart_path
   max_history = 10
   wait        = false
@@ -103,8 +108,8 @@ resource "helm_release" "logger" {
       }
       serviceAccount = {
         create = false
-        name   = "${terraform.workspace}-aptos-node-validator"
-      }
+        # this name must match the serviceaccount created by the aptos-node helm chart
+      name = local.helm_release_name == "aptos-node" ? "aptos-node-validator" : "${local.helm_release_name}-aptos-node-validator" }
     }),
     jsonencode(var.logger_helm_values),
   ]
@@ -118,7 +123,7 @@ resource "helm_release" "logger" {
 
 resource "helm_release" "monitoring" {
   count       = var.enable_monitoring ? 1 : 0
-  name        = "${terraform.workspace}-mon"
+  name        = "${local.helm_release_name}-mon"
   chart       = local.monitoring_helm_chart_path
   max_history = 10
   wait        = false
