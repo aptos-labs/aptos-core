@@ -12,9 +12,6 @@ inputs:
   GCP_SERVICE_ACCOUNT_EMAIL:
     required: true
     description: "GCP service account email"
-  GCP_DOCKER_ARTIFACT_REPO:
-    required: true
-    description: "GCP GAR repo to authenticate to"
   # AWS auth
   AWS_ACCESS_KEY_ID:
     required: true
@@ -69,10 +66,17 @@ runs:
         workload_identity_provider: ${{ inputs.GCP_WORKLOAD_IDENTITY_PROVIDER }}
         service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
 
-    - name: Login to Google Artifact Registry
+    - name: Login to us-west1 Google Artifact Registry
       uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
       with:
         registry: us-west1-docker.pkg.dev
+        username: oauth2accesstoken
+        password: ${{ steps.auth.outputs.access_token }}
+
+    - name: Login to US multi-region Google Artifact Registry
+      uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
+      with:
+        registry: us-docker.pkg.dev
         username: oauth2accesstoken
         password: ${{ steps.auth.outputs.access_token }}
 
