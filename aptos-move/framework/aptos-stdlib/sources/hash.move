@@ -204,6 +204,14 @@ module aptos_std::aptos_hash {
         };
     }
 
+    #[test(fx = @aptos_std)]
+    #[expected_failure(abort_code = 196609, location = Self)]
+    fun blake2b_256_aborts(fx: signer) {
+        // We disable the feature to make sure the `blake2b_256` call aborts
+        features::change_feature_flags(&fx, vector[], vector[features::get_blake2b_256_feature()]);
+
+        blake2b_256(b"This will abort");
+    }
 
     #[test(fx = @aptos_std)]
     fun blake2b_256_test(fx: signer) {
