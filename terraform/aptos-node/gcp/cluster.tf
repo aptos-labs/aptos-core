@@ -1,6 +1,6 @@
 resource "google_container_cluster" "aptos" {
   provider = google-beta
-  name     = "aptos-${terraform.workspace}"
+  name     = "aptos-${local.workspace_name}"
   location = local.zone
   network  = google_compute_network.aptos.id
 
@@ -35,7 +35,7 @@ resource "google_container_cluster" "aptos" {
   }
 
   ip_allocation_policy {
-    cluster_ipv4_cidr_block = ""
+    cluster_ipv4_cidr_block = var.cluster_ipv4_cidr_block
   }
 
   workload_identity_config {
@@ -56,14 +56,32 @@ resource "google_container_cluster" "aptos" {
   pod_security_policy_config {
     enabled = true
   }
+
+  cluster_autoscaling {
+    enabled = var.gke_enable_node_autoprovisioning
+
+    dynamic "resource_limits" {
+      for_each = var.gke_enable_node_autoprovisioning ? {
+        "cpu"    = var.gke_node_autoprovisioning_max_cpu
+        "memory" = var.gke_node_autoprovisioning_max_memory
+      } : {}
+      content {
+        resource_type = resource_limits.key
+        minimum       = 1
+        maximum       = resource_limits.value
+      }
+    }
+  }
 }
 
 resource "google_container_node_pool" "utilities" {
-  provider   = google-beta
-  name       = "utilities"
-  location   = local.zone
-  cluster    = google_container_cluster.aptos.name
-  node_count = lookup(var.node_pool_sizes, "utilities", var.utility_instance_num)
+  provider = google-beta
+  name     = "utilities"
+  location = local.zone
+  cluster  = google_container_cluster.aptos.name
+  # If cluster autoscaling is enabled, node_count should not be set
+  # If node auto-provisioning is enabled, node_count should be set to 0 as this nodepool is most likely ignored
+  node_count = var.gke_enable_autoscaling ? null : (var.gke_enable_node_autoprovisioning ? 0 : lookup(var.node_pool_sizes, "utilities", var.utility_instance_num))
 
   node_config {
     machine_type    = var.utility_instance_type
@@ -91,14 +109,24 @@ resource "google_container_node_pool" "utilities" {
       }
     }
   }
+
+  dynamic "autoscaling" {
+    for_each = var.gke_enable_autoscaling ? [1] : []
+    content {
+      min_node_count = 1
+      max_node_count = var.gke_autoscaling_max_node_count
+    }
+  }
 }
 
 resource "google_container_node_pool" "validators" {
-  provider   = google-beta
-  name       = "validators"
-  location   = local.zone
-  cluster    = google_container_cluster.aptos.name
-  node_count = lookup(var.node_pool_sizes, "validators", var.validator_instance_num)
+  provider = google-beta
+  name     = "validators"
+  location = local.zone
+  cluster  = google_container_cluster.aptos.name
+  # If cluster autoscaling is enabled, node_count should not be set
+  # If node auto-provisioning is enabled, node_count should be set to 0 as this nodepool is most likely ignored
+  node_count = var.gke_enable_autoscaling ? null : (var.gke_enable_node_autoprovisioning ? 0 : lookup(var.node_pool_sizes, "validators", var.validator_instance_num))
 
   node_config {
     machine_type    = var.validator_instance_type
@@ -124,6 +152,14 @@ resource "google_container_node_pool" "validators" {
         value  = taint.key
         effect = "NO_EXECUTE"
       }
+    }
+  }
+
+  dynamic "autoscaling" {
+    for_each = var.gke_enable_autoscaling ? [1] : []
+    content {
+      min_node_count = 1
+      max_node_count = var.gke_autoscaling_max_node_count
     }
   }
 }
