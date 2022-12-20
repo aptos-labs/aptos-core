@@ -100,6 +100,17 @@ module std::features {
         is_enabled(MULTI_ED25519_PK_VALIDATE_V2_NATIVES)
     }
 
+    /// Whether the new BLAKE2B-256 hash function native is enabled.
+    /// This is needed because of the introduction of new native function(s).
+    /// Lifetime: transient
+    const BLAKE2B_256_NATIVE: u64 = 8;
+
+    public fun get_blake2b_256_feature(): u64 { BLAKE2B_256_NATIVE }
+
+    public fun blake2b_256_enabled(): bool acquires Features {
+        is_enabled(BLAKE2B_256_NATIVE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
