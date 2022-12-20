@@ -90,6 +90,10 @@ impl AptosVM {
         Self(AptosVMImpl::new(state))
     }
 
+    pub fn new_with_existing_vm<S: StateView>(self, state: &S) -> Self {
+        Self(AptosVMImpl::new_with_existing_vm(self.0, state))
+    }
+
     pub fn new_for_validation<S: StateView>(state: &S) -> Self {
         info!(
             AdapterLogSchema::new(state.id(), 0),

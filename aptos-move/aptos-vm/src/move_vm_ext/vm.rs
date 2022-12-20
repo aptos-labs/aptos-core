@@ -14,8 +14,9 @@ use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_table_extension::NativeTableContext;
-use move_vm_runtime::config::VMConfig;
-use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
+use move_vm_runtime::{
+    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+};
 use std::ops::Deref;
 
 pub struct MoveVmExt {
@@ -35,11 +36,11 @@ impl MoveVmExt {
         // Note: binary format v6 adds a few new integer types and their corresponding instructions.
         //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
         //       the gas schedule hasn't been updated yet.
-        let max_binary_format_version = if allow_binary_format_v6 && gas_feature_version >= 5 {
-            6
-        } else {
-            5
-        };
+        // let max_binary_format_version = if allow_binary_format_v6 && gas_feature_version >= 5 {
+        //     6
+        // } else {
+        //     5
+        // };
 
         Ok(Self {
             inner: MoveVM::new_with_config(
@@ -50,7 +51,7 @@ impl MoveVmExt {
                 ),
                 VMConfig {
                     verifier: verifier_config(treat_friend_as_private),
-                    max_binary_format_version,
+                    max_binary_format_version: 6,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                 },
             )?,

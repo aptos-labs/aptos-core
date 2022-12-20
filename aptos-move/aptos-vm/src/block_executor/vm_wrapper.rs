@@ -18,8 +18,11 @@ use move_core_types::{
     vm_status::VMStatus,
 };
 
+use std::cell::RefCell;
+
+thread_local!(static CACHE_VM: RefCell<Option<AptosVM>> = RefCell::new(None));
+
 pub(crate) struct AptosExecutorTask<'a, S> {
-    vm: AptosVM,
     base_view: &'a S,
 }
 
@@ -30,23 +33,16 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosExecutorTask<'a, S> {
     type Argument = &'a S;
 
     fn init(argument: &'a S) -> Self {
-        let vm = AptosVM::new(argument);
-
-        // Loading `0x1::account` and its transitive dependency into the code cache.
-        //
-        // This should give us a warm VM to avoid the overhead of VM cold start.
-        // Result of this load could be omitted as this is a best effort approach and won't hurt if that fails.
-        //
-        // Loading up `0x1::account` should be sufficient as this is the most common module
-        // used for prologue, epilogue and transfer functionality.
-
-        let _ = vm.load_module(
-            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &StorageAdapter::new(argument),
-        );
-
+        CACHE_VM.with(|cell| {
+            let borrow = cell.replace(None);
+            let vm = if let Some(vm) = borrow {
+                AptosVM::new_with_existing_vm(vm, argument)
+            } else {
+                AptosVM::new(argument)
+            };
+            cell.replace(Some(vm.clone()));
+        });
         Self {
-            vm,
             base_view: argument,
         }
     }
@@ -62,11 +58,9 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosExecutorTask<'a, S> {
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
+        let vm = CACHE_VM.with(|cell| cell.borrow().as_ref().cloned().unwrap());
 
-        match self
-            .vm
-            .execute_single_transaction(txn, &view.as_move_resolver(), &log_context)
-        {
+        match vm.execute_single_transaction(txn, &view.as_move_resolver(), &log_context) {
             Ok((vm_status, mut output_ext, sender)) => {
                 if materialize_deltas {
                     // Keep TransactionOutputExt type for wrapper.
