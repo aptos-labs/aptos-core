@@ -5,30 +5,45 @@ syntax = "proto3";
 
 package aptos.datastream.v1;
 
+// Transaction data is transferred via 1 stream with batches until terminated.
+// One stream consists:
+//  StreamStatus: INIT with version x
+//  loop k:
+//    TransactionOutput data(size n)
+//    StreamStatus: BATCH_END with version x + k * n
+
 message TransactionsOutput {
   repeated TransactionOutput transactions  = 1;
 }
 
 message TransactionOutput {
+  // Encoded aptos.proto.v1.Transaction proto data.
   string encoded_proto_data = 1;
   uint64 version = 2;
 }
 
 message StreamStatus {
   enum StatusType {
-    BATCH_START = 0;
+    // Signal for the start of the stream.
+    INIT = 0;
+    // Signal for the end of the batch.
     BATCH_END = 1;
   }
   StatusType type = 1;
+  // Required. Start version of current batch/stream, inclusive.
   uint64 start_version = 2;
-  uint64 end_version = 3;
+  // End version of current *batch*, exclusive.
+  optional uint64 end_version = 3;
 }
 
 message RawDatastreamRequest {
+  // Required; start version of current stream.
   uint64 starting_version = 1;
   uint64 processor_task_count = 3;
   uint64 processor_batch_size = 2;
+  // Required; batch size in the response.
   uint64 output_batch_size = 4;
+  // Required; for validation purpose.
   uint32 chain_id = 5;
 }
 
