@@ -32,6 +32,7 @@ aptos-executor-types = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-indexer = { workspace = true, optional = true }
+aptos-indexer-grpc = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-logger = { workspace = true }

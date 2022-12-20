@@ -41,6 +41,9 @@ members = [
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
+    "crates/aptos-datastream-indexer",
+    "crates/aptos-datastream-service",
+    "crates/aptos-datastream-worker",
     "crates/aptos-faucet",
     "crates/aptos-faucet-cli",
     "crates/aptos-genesis",
@@ -69,7 +72,9 @@ members = [
     "crates/crash-handler",
     "crates/fallible",
     "crates/indexer",
+    "crates/indexer-grpc",
     "crates/inspection-service",
+    "crates/moving-average",
     "crates/node-resource-metrics",
     "crates/num-variants",
     "crates/proxy",
@@ -211,6 +216,11 @@ aptos-github-client = { path = "secure/storage/github" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
+aptos-indexer-grpc = { path = "crates/indexer-grpc" }
+aptos-datastream-worker = { path = "crates/aptos-datastream-worker" }
+aptos-datastream-service = { path = "crates/aptos-datastream-service" }
+aptos-datastream-indexer = { path = "crates/aptos-datastream-indexer" }
+moving-average = { path = "crates/moving-average" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
@@ -316,6 +326,7 @@ crossbeam-queue = "0.3.5"
 curve25519-dalek = "3"
 dashmap = "5.2.0"
 datatest-stable = "0.1.1"
+deadpool-redis = "0.11.0"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 diesel = { version = "2.0.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
 diesel_migrations = { version = "2.0.0", features = ["postgres"] }
@@ -398,6 +409,7 @@ quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
 rayon = "1.5.2"
+redis = "0.22.1"
 regex = "1.5.5"
 reqwest = { version = "0.11.11", features = ["blocking", "cookies", "json", "stream"] }
 reqwest-middleware = "0.1.6"
