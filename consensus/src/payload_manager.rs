@@ -70,9 +70,18 @@ impl PayloadManager {
                     .map(|proof| *proof.digest())
                     .collect();
 
-                let _ = quorum_store_wrapper_tx
-                    .lock()
-                    .send(PayloadRequest::CleanRequest(logical_time, digests));
+                let mut tx = quorum_store_wrapper_tx.lock().clone();
+
+                // TODO: don't even need to warn on fail?
+                if let Err(e) = tx
+                    .send(PayloadRequest::CleanRequest(logical_time, digests))
+                    .await
+                {
+                    warn!(
+                        "CleanRequest failed. Is the epoch shutting down? error: {}",
+                        e
+                    );
+                }
             }
         }
     }
