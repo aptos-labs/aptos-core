@@ -67,7 +67,9 @@ members = [
     "crates/crash-handler",
     "crates/fallible",
     "crates/indexer",
+    "crates/indexer-grpc",
     "crates/inspection-service",
+    "crates/moving-average",
     "crates/node-resource-metrics",
     "crates/num-variants",
     "crates/proxy",
@@ -168,6 +170,8 @@ rust-version = "1.64"
 aptos = { path = "crates/aptos" }
 aptos-accumulator = { path = "storage/accumulator" }
 aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
+moving-average = { path = "crates/moving-average" }
+aptos-indexer-grpc = { path = "crates/indexer-grpc" }
 aptos-api = { path = "api" }
 aptos-api-test-context = { path = "api/test-context" }
 aptos-api-types = { path = "api/types" }

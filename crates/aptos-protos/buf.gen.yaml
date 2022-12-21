@@ -12,5 +12,8 @@ plugins:
     opt:
       - no_features
 
+  - name: prost-serde
+    out: src/pb
+
   - name: tonic
     out: src/pb

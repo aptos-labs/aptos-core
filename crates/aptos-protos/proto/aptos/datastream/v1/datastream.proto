@@ -5,36 +5,62 @@ syntax = "proto3";
 
 package aptos.datastream.v1;
 
+// Transaction data is transferred via 1 stream with batches until terminated.
+// One stream consists:
+//  StreamStatus: INIT with start_version x_0
+//  loop:
+//    (for kth iteration, start_version = x_k)
+//    stream of TransactionOutput each with size(number of transactions)
+//        t_0, t_1, ...
+//    StreamStatus:
+//      BATCH_END == x_k + sum(t_i) == x_{k + 1}
+
 message TransactionsOutput {
   repeated TransactionOutput transactions  = 1;
 }
 
 message TransactionOutput {
+  // Encoded aptos.proto.transaction.v1.Transaction.
   string encoded_proto_data = 1;
   uint64 version = 2;
 }
 
 message StreamStatus {
   enum StatusType {
-    BATCH_START = 0;
+    // Signal for the start of the stream.
+    INIT = 0;
+    // Signal for the end of the batch.
+    // Responses between BATCH_ENDs are NOT garanteed to be in order.
+    // Data in the response is garanteed to be in order.
     BATCH_END = 1;
   }
   StatusType type = 1;
+  // Required. Start version of current batch/stream, inclusive.
   uint64 start_version = 2;
-  uint64 end_version = 3;
+  // End version of current *batch*, exclusive.
+  optional uint64 end_version = 3;
 }
 
 message RawDatastreamRequest {
+  // Required; start version of current stream.
   uint64 starting_version = 1;
+  // Required; number of processors.
   uint64 processor_task_count = 3;
+  // Required; number of transactions per processor.
   uint64 processor_batch_size = 2;
+  // Required; number of transactions in the response.
+  // Each batch will be split into multiple responses with size upto output_batch_size.
   uint64 output_batch_size = 4;
+  // Required; for validation purpose.
   uint32 chain_id = 5;
 }
 
+
 message RawDatastreamResponse {
   enum response_type {
+    // Signal for streaming status.
     STATUS = 0;
+    // Data for transactions.
     DATA = 1;
   }
   oneof response {
