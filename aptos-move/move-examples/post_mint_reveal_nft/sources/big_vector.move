@@ -1,4 +1,4 @@
-module post_mint_reveal_nft::big_vector {
+module post_mint_reveal_nft_custom::big_vector {
     use std::error;
     use std::vector;
     use aptos_std::table_with_length::{Self, TableWithLength};

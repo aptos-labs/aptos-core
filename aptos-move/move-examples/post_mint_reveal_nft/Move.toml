@@ -1,5 +1,5 @@
 [package]
-name = "test_package"
+name = "mingo_mint"
 version = "0.0.0"
 upgrade_policy = "compatible"
 
