@@ -16,3 +16,16 @@ rustflags = ["--cfg", "tokio_unstable", "-C", "force-frame-pointers=yes", "-C", 
 
 [target.x86_64-unknown-linux-gnu]
 rustflags = ["--cfg", "tokio_unstable", "-C", "link-arg=-fuse-ld=lld", "-C", "force-frame-pointers=yes", "-C", "force-unwind-tables=yes"]
+
+# 64 bit MSVC
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+  "--cfg",
+  "tokio_unstable",
+  "-C",
+  "force-frame-pointers=yes",
+  "-C",
+  "force-unwind-tables=yes",
+  "-C",
+  "link-arg=/STACK:8000000" # Set stack to 8 MB
+]
