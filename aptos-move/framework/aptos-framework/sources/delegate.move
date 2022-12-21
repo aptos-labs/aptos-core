@@ -15,6 +15,7 @@ module aptos_framework::delegate {
     redeem_active_shares,
     redeem_inactive_shares,
     commit_epoch_rewards,
+    pending_withdrawal_exists,
     };
 
     use aptos_framework::account;
@@ -34,7 +35,7 @@ module aptos_framework::delegate {
     /// Account is already owning a delegation pool.
     const EOWNER_CAP_ALREADY_EXISTS: u64 = 2;
 
-    const EWITHDRAW_PENDING_INACTIVE_STAKE: u64 = 3;
+    const MAX_U64: u64 = 18446744073709551615;
 
     /// Capability that represents ownership over not-shared operations of underlying stake pool.
     struct DelegationPoolOwnership has key, store {
@@ -115,6 +116,9 @@ module aptos_framework::delegate {
     }
 
     public entry fun unlock(delegator: &signer, pool_address: address, amount: u64) {
+        // execute pending withdrawal if existing before creating a new one
+        withdraw(delegator, pool_address, MAX_U64);
+
         let stake_pool_signer = get_stake_pool_signer(pool_address);
         let delegator_address = signer::address_of(delegator);
 
@@ -140,16 +144,23 @@ module aptos_framework::delegate {
         delegation_pool::emit_reactivate_stake_event(pool_address, delegator_address, amount);
     }
 
-    public entry fun withdraw(delegator: &signer, pool_address: address, amount: u64, lockup_epoch: u64) {
+    public entry fun withdraw(delegator: &signer, pool_address: address, amount: u64) {
         let stake_pool_signer = get_stake_pool_signer(pool_address);
         let delegator_address = signer::address_of(delegator);
 
-        assert!((stake::get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE &&
-                 timestamp::now_seconds() >= stake::get_lockup_secs(pool_address))
-                || (lockup_epoch < current_lockup_epoch(pool_address)),
-            error::invalid_argument(EWITHDRAW_PENDING_INACTIVE_STAKE));
+        let (withdrawal_exists, withdrawal_lockup_epoch) = pending_withdrawal_exists(pool_address, delegator_address);
+        if (!(
+            withdrawal_exists &&
+            (
+                withdrawal_lockup_epoch < current_lockup_epoch(pool_address) ||
+                (
+                    stake::get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE &&
+                    timestamp::now_seconds() >= stake::get_lockup_secs(pool_address)
+                )
+            )
+        )) { return };
 
-        let amount = redeem_inactive_shares(pool_address, delegator_address, amount, lockup_epoch);
+        let amount = redeem_inactive_shares(pool_address, delegator_address, amount, withdrawal_lockup_epoch);
         stake::withdraw(&stake_pool_signer, amount);
         coin::transfer<AptosCoin>(&stake_pool_signer, delegator_address, amount);
 
