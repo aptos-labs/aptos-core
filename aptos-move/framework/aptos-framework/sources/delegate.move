@@ -14,12 +14,14 @@ module aptos_framework::delegate {
     buy_in_inactive_shares,
     redeem_active_shares,
     redeem_inactive_shares,
+    commit_epoch_rewards,
     };
 
     use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
     use aptos_framework::stake;
+    use aptos_framework::staking_config;
     use aptos_framework::timestamp;
 
     const SALT: vector<u8> = b"aptos_framework::delegate";
@@ -98,6 +100,15 @@ module aptos_framework::delegate {
         coin::transfer<AptosCoin>(delegator, signer::address_of(&stake_pool_signer), amount);
         stake::add_stake(&stake_pool_signer, amount);
 
+        let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(&staking_config::get());
+        let (active, _, _, _) = stake::get_stake(pool_address);
+        let current_epoch_max_active_reward = if (rewards_rate_denominator > 0) {
+            (((active as u128) * (rewards_rate as u128) / (rewards_rate_denominator as u128)) as u64)
+        } else { 0 };
+        let add_stake_fee = current_epoch_max_active_reward * amount / (active + amount);
+
+        commit_epoch_rewards(pool_address, add_stake_fee, 0);
+        amount = amount - add_stake_fee;
         buy_in_active_shares(pool_address, delegator_address, amount);
 
         delegation_pool::emit_add_stake_event(pool_address, delegator_address, amount);

@@ -210,7 +210,7 @@ module aptos_framework::delegation_pool {
     fun amount_to_shares_to_redeem(
         shares_pool: &pool_u64::Pool,
         shareholder: address,
-        coins_amount: u64
+        coins_amount: u64,
     ): u64 {
         if (coins_amount >= pool_u64::balance(shares_pool, shareholder)) {
             // take into account rounding errors and extract entire shares amount
@@ -288,13 +288,17 @@ module aptos_framework::delegation_pool {
         let pool = borrow_global_mut<DelegationPool>(pool_address);
 
         // update total coins accumulated by active shares
-        let total_coins_active = pool_u64::total_coins(&pool.active_shares);
-        pool_u64::update_total_coins(&mut pool.active_shares, total_coins_active + rewards_active);
+        if (rewards_active > 0) {
+            let total_coins_active = pool_u64::total_coins(&pool.active_shares);
+            pool_u64::update_total_coins(&mut pool.active_shares, total_coins_active + rewards_active);
+        };
 
         // update total coins accumulated by pending_inactive shares
-        let inactive_shares = latest_inactive_shares_pool(pool);
-        let total_coins_pending_inactive = pool_u64::total_coins(inactive_shares);
-        pool_u64::update_total_coins(inactive_shares, total_coins_pending_inactive + rewards_pending_inactive);
+        if (rewards_pending_inactive > 0) {
+            let inactive_shares = latest_inactive_shares_pool(pool);
+            let total_coins_pending_inactive = pool_u64::total_coins(inactive_shares);
+            pool_u64::update_total_coins(inactive_shares, total_coins_pending_inactive + rewards_pending_inactive);
+        };
         true
     }
 }
