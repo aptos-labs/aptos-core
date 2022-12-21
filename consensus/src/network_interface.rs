@@ -192,6 +192,7 @@ impl ConsensusNetworkSender {
         let remote_protocols = self.supported_protocols(peer)?;
         for protocol in local_protocols {
             if remote_protocols.contains(*protocol) {
+                debug!("QS: protocolID {}", *protocol);
                 return Ok(*protocol);
             }
         }

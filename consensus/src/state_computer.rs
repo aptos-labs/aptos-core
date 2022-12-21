@@ -85,6 +85,7 @@ impl ExecutionProxy {
     }
 }
 
+// TODO: filter duplicated transaction before executing
 #[async_trait::async_trait]
 impl StateComputer for ExecutionProxy {
     async fn compute(
@@ -123,6 +124,7 @@ impl StateComputer for ExecutionProxy {
             .await
         )
         .expect("spawn_blocking failed")?;
+
         observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
 
         // notify mempool about failed transaction

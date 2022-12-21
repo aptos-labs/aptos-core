@@ -11,6 +11,7 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, bls12381::PublicKey, hash::CryptoHash, Signature, VerifyingKey};
+use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -213,6 +214,10 @@ impl ValidatorVerifier {
             .map_err(|_| VerifyError::FailedToAggregateSignature)?;
 
         Ok(AggregateSignature::new(masks, Some(aggregated_sig)))
+    }
+
+    pub fn validator_addresses(&self) -> Vec<AccountAddress> {
+        self.get_ordered_account_addresses_iter().collect_vec()
     }
 
     /// This function will successfully return when at least quorum_size signatures of known authors
@@ -487,14 +492,17 @@ pub fn random_validator_verifier(
         ));
         signers.push(random_signer);
     }
-    (signers, match custom_voting_power_quorum {
-        Some(custom_voting_power_quorum) => ValidatorVerifier::new_with_quorum_voting_power(
-            validator_infos,
-            custom_voting_power_quorum,
-        )
-        .expect("Unable to create testing validator verifier"),
-        None => ValidatorVerifier::new(validator_infos),
-    })
+    (
+        signers,
+        match custom_voting_power_quorum {
+            Some(custom_voting_power_quorum) => ValidatorVerifier::new_with_quorum_voting_power(
+                validator_infos,
+                custom_voting_power_quorum,
+            )
+            .expect("Unable to create testing validator verifier"),
+            None => ValidatorVerifier::new(validator_infos),
+        },
+    )
 }
 
 #[cfg(test)]

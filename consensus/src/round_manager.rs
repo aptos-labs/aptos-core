@@ -55,6 +55,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use tokio::sync::oneshot as TokioOneshot;
 use tokio::time::{sleep, Instant};
 
 #[derive(Serialize, Clone)]
@@ -81,6 +82,7 @@ impl UnverifiedEvent {
         quorum_store_enabled: bool,
     ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
+            //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 p.verify(validator, quorum_store_enabled)?;
                 VerifiedEvent::ProposalMsg(p)
@@ -173,6 +175,8 @@ pub enum VerifiedEvent {
     ProofOfStoreMsg(Box<ProofOfStore>),
     // local messages
     LocalTimeout(Round),
+    // Shutdown the NetworkListener
+    Shutdown(TokioOneshot::Sender<()>),
 }
 
 #[cfg(test)]
