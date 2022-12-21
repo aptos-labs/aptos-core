@@ -457,7 +457,6 @@ impl DbReader for FakeAptosDB {
             && struct_tag.is_some()
             && struct_tag.unwrap() == AccountResource::struct_tag()
         {
-            // println!("getting non-root account");
             let seq_num = match self.account_seq_num.get(&account_address).as_deref() {
                 Some(seq_num) => *seq_num,
                 None => {
