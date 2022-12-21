@@ -111,7 +111,7 @@ impl Mempool {
 
     /// Used to add a transaction to the Mempool.
     /// Performs basic validation: checks account's sequence number.
-    pub fn add_txn(
+    pub(crate) fn add_txn(
         &mut self,
         txn: SignedTransaction,
         ranking_score: u64,

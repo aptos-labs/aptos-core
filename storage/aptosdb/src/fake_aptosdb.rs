@@ -30,13 +30,12 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use arc_swap::ArcSwap;
 use move_core_types::move_resource::MoveStructType;
 
 use anyhow::{format_err, Result};
 use dashmap::DashMap;
 use itertools::zip_eq;
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     errors::AptosDbError,
@@ -56,7 +55,6 @@ pub struct FakeAptosDB {
     // A map of account address to the highest executed sequence number
     account_seq_num: Arc<DashMap<AccountAddress, u64>>,
     ledger_commit_lock: std::sync::Mutex<()>,
-    latest_ledger_info: ArcSwap<Option<LedgerInfoWithSignatures>>,
 }
 
 impl FakeAptosDB {
@@ -68,7 +66,6 @@ impl FakeAptosDB {
             txn_info_by_version: Arc::new(DashMap::new()),
             account_seq_num: Arc::new(DashMap::new()),
             ledger_commit_lock: std::sync::Mutex::new(()),
-            latest_ledger_info: ArcSwap::from(Arc::new(None)),
         }
     }
 }
@@ -133,7 +130,7 @@ impl DbWriter for FakeAptosDB {
 
             // Once everything is successfully stored, update the latest in-memory ledger info.
             if let Some(x) = ledger_info_with_sigs {
-                self.latest_ledger_info.store(Arc::new(Some(x.clone())));
+                self.inner.ledger_store.set_latest_ledger_info(x.clone());
 
                 LEDGER_VERSION.set(x.ledger_info().version() as i64);
                 NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
@@ -397,9 +394,7 @@ impl DbReader for FakeAptosDB {
     }
 
     fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
-        let ledger_info_ptr = self.latest_ledger_info.load();
-        let ledger_info: &Option<_> = ledger_info_ptr.deref();
-        Ok(ledger_info.clone())
+        self.inner.get_latest_ledger_info_option()
     }
 
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {

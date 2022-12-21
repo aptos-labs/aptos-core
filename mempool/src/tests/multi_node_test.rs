@@ -369,9 +369,6 @@ impl TestHarness {
                                 HashSet::new(),
                             );
                             for txn in transactions.iter() {
-                                if !block.contains(txn) {
-                                    println!("here: {}", txn.raw_txn_bytes_len());
-                                }
                                 assert!(block.contains(txn));
                             }
                         }

@@ -49,8 +49,7 @@ proptest = { workspace = true }
 rand = { workspace = true }
 
 [features]
-# default = []
-default = [ "consensus-only-perf-test" ]
+default = []
 fuzzing = ["aptos-consensus-types/fuzzing", "aptos-crypto/fuzzing", "aptos-types/fuzzing", "aptos-storage-interface/fuzzing"]
 failpoints = ["fail/failpoints", "aptos-vm/failpoints"]
 consensus-only-perf-test = []
