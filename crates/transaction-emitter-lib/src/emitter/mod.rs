@@ -425,18 +425,6 @@ impl TxnEmitter {
         let all_addresses: Vec<_> = all_accounts.iter().map(|d| d.address()).collect();
         let all_addresses = Arc::new(RwLock::new(all_addresses));
         let mut all_accounts = all_accounts.into_iter();
-
-        let num_receiver_accounts = 300000;
-        info!("Create additional {} receivers.", num_receiver_accounts);
-        let all_receivers = account_minter
-            .create_accounts(&req, &mode_params, num_receiver_accounts)
-            .await?;
-        let all_receivers = all_receivers
-            .iter()
-            .map(|r| r.address())
-            .collect::<Vec<_>>();
-        info!("Finished creating {} receivers.", num_receiver_accounts);
-
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
@@ -450,7 +438,7 @@ impl TxnEmitter {
                     self.from_rng(),
                     txn_factory.clone(),
                     SEND_AMOUNT,
-                    all_receivers.clone(),
+                    all_addresses.clone(),
                     req.invalid_transaction_ratio,
                     req.gas_price,
                 )),

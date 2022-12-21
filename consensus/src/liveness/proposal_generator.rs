@@ -17,11 +17,8 @@ use aptos_logger::{error, sample, sample::SampleRate, warn};
 
 use aptos_consensus_types::common::{Payload, PayloadFilter};
 use futures::future::BoxFuture;
-use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
-    sync::Arc,
-    time::Duration,
-};
+use std::collections::{HashMap, VecDeque};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use super::{
     proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
@@ -269,7 +266,7 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            (optimize_payload(payload), timestamp.as_micros() as u64)
+            (payload, timestamp.as_micros() as u64)
         };
 
         let quorum_cert = hqc.as_ref().clone();
