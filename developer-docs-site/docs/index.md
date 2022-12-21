@@ -153,4 +153,4 @@ We are excited that you are here, and we look forward to getting to know you. We
 
 ## Community projects on Aptos
 
-Here's a [list of community-maintained projects](https://github.com/aptos-foundation/ecosystem-projects) provided by the Aptos Foundation.  If you have a project that you want added to the list, just edit the page and add a GitHub pull request.
+Here's a [list of community-maintained projects](https://github.com/aptos-foundation/ecosystem-projects) collected by the [Aptos Foundation](https://aptosfoundation.org/).  If you have a project that you want added to the list, just edit the page and add a GitHub pull request.
