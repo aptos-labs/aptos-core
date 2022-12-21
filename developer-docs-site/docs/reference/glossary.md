@@ -291,6 +291,12 @@ See [Resource accounts](../guides/resource-accounts.md).
 
 ## T
 
+### Table
+
+- A [**table**](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/doc/table.md) implements the Table type and in Aptos is used to store information as key-value data within an account at large scale.
+
+See [`table.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/table.move) for the associated Aptos source file.
+
 ### Transaction
 
 - A raw **transaction** contains the following fields:

@@ -34,6 +34,7 @@ Then review our auto-generated contents for more [Move References](../../referen
 
 Use these external resources to learn about the core Move programming language.
 
+* [Formal Verification, the Move Language, and the Move Prover](https://www.certik.com/resources/blog/2wSOZ3mC55AB6CYol6Q2rP-formal-verification-the-move-language-and-the-move-prover)
 * [IMCODING Move Tutorials](https://imcoding.online/courses/move-language)
 * [Pontem Move Playground](https://playground.pontem.network/)
 * [Collection of nestable Move resources](https://github.com/taoheorg/taohe)
@@ -42,3 +43,6 @@ Use these external resources to learn about the core Move programming language.
 * [Move Tutorial](https://github.com/move-language/move/tree/main/language/documentation/tutorial)
 * [Move language repository](https://github.com/move-language/move)
 * [Move by example](https://move-book.com/)
+* [Awesome Move resources](https://github.com/MystenLabs/awesome-move)
+
+Add your own recommended Move resources here. Simply click *Edit this page* below to go to the source and trigger editing there. See [Markdown syntax](https://www.markdownguide.org/basic-syntax/) for help.
