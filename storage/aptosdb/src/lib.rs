@@ -742,63 +742,74 @@ impl AptosDB {
         txns_to_commit: &[TransactionToCommit],
         first_version: u64,
         expected_state_db_usage: StateStorageUsage,
-        cs: &mut SchemaBatch,
+        cs: &SchemaBatch,
     ) -> Result<HashValue> {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
-        // Account state updates.
-        {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["save_transactions_state"])
-                .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["save_transactions_impl"])
+            .start_timer();
+        thread::scope(|s| {
+            let t0 = s.spawn(|| {
+                // Account state updates.
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["save_transactions_state"])
+                    .start_timer();
 
-            let state_updates_vec = txns_to_commit
-                .iter()
-                .map(|txn_to_commit| txn_to_commit.state_updates())
-                .collect::<Vec<_>>();
-            self.state_store.put_value_sets(
-                state_updates_vec,
-                first_version,
-                expected_state_db_usage,
-                cs,
-            )?;
-        }
+                let state_updates_vec = txns_to_commit
+                    .iter()
+                    .map(|txn_to_commit| txn_to_commit.state_updates())
+                    .collect::<Vec<_>>();
 
-        // Event updates. Gather event accumulator root hashes.
-        {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["save_transactions_events"])
-                .start_timer();
-            zip_eq(first_version..=last_version, txns_to_commit)
-                .map(|(ver, txn_to_commit)| {
-                    self.event_store.put_events(ver, txn_to_commit.events(), cs)
-                })
-                .collect::<Result<Vec<_>>>()?;
-        }
+                self.state_store.put_value_sets(
+                    state_updates_vec,
+                    first_version,
+                    expected_state_db_usage,
+                    cs,
+                )
+            });
 
-        let new_root_hash = {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["save_transactions_txn_infos"])
-                .start_timer();
-            zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
-                |(ver, txn_to_commit)| {
-                    // Transaction updates. Gather transaction hashes.
-                    self.transaction_store
-                        .put_transaction(ver, txn_to_commit.transaction(), cs)?;
-                    self.transaction_store
-                        .put_write_set(ver, txn_to_commit.write_set(), cs)
-                },
-            )?;
-            // Transaction accumulator updates. Get result root hash.
-            let txn_infos: Vec<_> = txns_to_commit
-                .iter()
-                .map(|t| t.transaction_info())
-                .cloned()
-                .collect();
-            self.ledger_store
-                .put_transaction_infos(first_version, &txn_infos, cs)?
-        };
-        Ok(new_root_hash)
+            let t1 = s.spawn(|| {
+                // Event updates. Gather event accumulator root hashes.
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["save_transactions_events"])
+                    .start_timer();
+                zip_eq(first_version..=last_version, txns_to_commit)
+                    .map(|(ver, txn_to_commit)| {
+                        self.event_store.put_events(ver, txn_to_commit.events(), cs)
+                    })
+                    .collect::<Result<Vec<_>>>()
+            });
+
+            let t2 = s.spawn(|| {
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["save_transactions_txn_infos"])
+                    .start_timer();
+                zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
+                    |(ver, txn_to_commit)| {
+                        // Transaction updates. Gather transaction hashes.
+                        self.transaction_store.put_transaction(
+                            ver,
+                            txn_to_commit.transaction(),
+                            cs,
+                        )?;
+                        self.transaction_store
+                            .put_write_set(ver, txn_to_commit.write_set(), cs)
+                    },
+                )?;
+                // Transaction accumulator updates. Get result root hash.
+                let txn_infos: Vec<_> = txns_to_commit
+                    .iter()
+                    .map(|t| t.transaction_info())
+                    .cloned()
+                    .collect();
+                self.ledger_store
+                    .put_transaction_infos(first_version, &txn_infos, cs)
+            });
+            t0.join().unwrap()?;
+            t1.join().unwrap()?;
+            t2.join().unwrap()
+        })
     }
 
     /// Write the whole schema batch including all data necessary to mutate the ledger
@@ -1522,13 +1533,13 @@ impl DbWriter for AptosDB {
             }
 
             // Gather db mutations to `batch`.
-            let mut batch = SchemaBatch::new();
+            let batch = SchemaBatch::new();
 
             let new_root_hash = self.save_transactions_impl(
                 txns_to_commit,
                 first_version,
                 latest_in_memory_state.current.usage(),
-                &mut batch,
+                &batch,
             )?;
 
             // If expected ledger info is provided, verify result root hash and save the ledger info.
@@ -1541,7 +1552,7 @@ impl DbWriter for AptosDB {
                     expected_root_hash,
                 );
 
-                self.ledger_store.put_ledger_info(x, &mut batch)?;
+                self.ledger_store.put_ledger_info(x, &batch)?;
             }
 
             ensure!(Some(last_version) == latest_in_memory_state.current_version,
@@ -1614,6 +1625,7 @@ impl DbWriter for AptosDB {
                 } else {
                     None
                 };
+
                 buffered_state.update(
                     updates_until_latest_checkpoint_since_current,
                     latest_in_memory_state,
