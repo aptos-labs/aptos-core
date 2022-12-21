@@ -4,7 +4,6 @@
 use aptos_infallible::Mutex;
 use crossbeam::utils::CachePadded;
 use std::{
-    cmp::min,
     hint,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -156,6 +155,15 @@ pub struct Scheduler {
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
     /// An index i maps to the most up-to-date status of transaction i.
     txn_status: Vec<CachePadded<Mutex<TransactionStatus>>>,
+    /// An atomic variable that helps to elect one thread (referred as the commit thread) dedicated for
+    /// performing the commit and gas calculation. Whichever thread first set this atomic boolean to false
+    /// will be the commit thread.
+    is_commit_thread: AtomicBool,
+    /// TODO: figure out how to pass in the per-block gas limit
+    per_block_gas_limit: u64,
+    /// Number of transactions that is committed by parallel execution.
+    /// The number can be smaller than the block size when per-block gas limit is reached.
+    commit_idx: AtomicUsize,
 }
 
 /// Public Interfaces for the Scheduler
@@ -174,12 +182,29 @@ impl Scheduler {
             txn_status: (0..num_txns)
                 .map(|_| CachePadded::new(Mutex::new(TransactionStatus::ReadyToExecute(0, None))))
                 .collect(),
+            is_commit_thread: AtomicBool::new(true),
+            per_block_gas_limit: u64::MAX,
+            commit_idx: AtomicUsize::new(num_txns),
         }
     }
 
-    /// Return the number of transactions to be executed from the block.
-    pub fn num_txn_to_execute(&self) -> usize {
-        self.num_txns
+    /// Whichever thread that first sets this atomic variable to false will be in charge of commit and gas calculation.
+    pub fn is_commit_thread(&self) -> bool {
+        self.is_commit_thread.fetch_and(false, Ordering::SeqCst)
+    }
+
+    pub fn per_block_gas_limit(&self) -> u64 {
+        self.per_block_gas_limit
+    }
+
+    pub fn set_commit_idx(&self, commit_idx: usize) {
+        self.commit_idx.store(commit_idx, Ordering::SeqCst);
+    }
+
+    /// Return the number of transactions that is committed from the block.
+    /// The number can be smaller than the block size when per-block gas limit is exceeded.
+    pub fn commit_idx(&self) -> usize {
+        self.commit_idx.load(Ordering::SeqCst)
     }
 
     /// Try to abort version = (txn_idx, incarnation), called upon validation failure.
@@ -400,6 +425,15 @@ impl Scheduler {
             }
         }
     }
+
+    /// Check if the status of the transaction is Executed
+    pub fn ready_for_commit(&self, idx_to_commit: usize) -> bool {
+        let status = self.txn_status[idx_to_commit].lock();
+        if let TransactionStatus::Executed(_) = *status {
+            return true;
+        }
+        false
+    }
 }
 
 /// Private functions of the Scheduler
@@ -464,7 +498,7 @@ impl Scheduler {
         let idx_to_validate = self.validation_idx.load(Ordering::SeqCst);
 
         if idx_to_validate >= self.num_txns {
-            if !self.check_done() {
+            if !self.done() {
                 // Avoid pointlessly spinning, and give priority to other threads that may
                 // be working to finish the remaining tasks.
                 hint::spin_loop();
@@ -494,7 +528,7 @@ impl Scheduler {
         let idx_to_execute = self.execution_idx.load(Ordering::SeqCst);
 
         if idx_to_execute >= self.num_txns {
-            if !self.check_done() {
+            if !self.done() {
                 // Avoid pointlessly spinning, and give priority to other threads that may
                 // be working to finish the remaining tasks.
                 hint::spin_loop();
@@ -588,28 +622,28 @@ impl Scheduler {
     /// so it must first perform the next instruction in 'decrease_validation_idx' or
     /// 'decrease_execution_idx' functions, which is to increment the decrease_cnt++.
     /// Final check will then detect a change in decrease_cnt and not allow a false positive.
-    fn check_done(&self) -> bool {
-        if self.done() {
-            return true;
-        }
-        let observed_cnt = self.decrease_cnt.load(Ordering::SeqCst);
+    // fn check_done(&self) -> bool {
+    //     if self.done() {
+    //         return true;
+    //     }
+    //     let observed_cnt = self.decrease_cnt.load(Ordering::SeqCst);
 
-        let val_idx = self.validation_idx.load(Ordering::SeqCst);
-        let exec_idx = self.execution_idx.load(Ordering::SeqCst);
-        let num_tasks = self.num_active_tasks.load(Ordering::SeqCst);
-        if min(exec_idx, val_idx) < self.num_txns || num_tasks > 0 {
-            // There is work remaining.
-            return false;
-        }
+    //     let val_idx = self.validation_idx.load(Ordering::SeqCst);
+    //     let exec_idx = self.execution_idx.load(Ordering::SeqCst);
+    //     let num_tasks = self.num_active_tasks.load(Ordering::SeqCst);
+    //     if min(exec_idx, val_idx) < self.num_txns || num_tasks > 0 {
+    //         // There is work remaining.
+    //         return false;
+    //     }
 
-        // Re-read and make sure decrease_cnt hasn't changed.
-        if observed_cnt == self.decrease_cnt.load(Ordering::SeqCst) {
-            self.done_marker.store(true, Ordering::Release);
-            true
-        } else {
-            false
-        }
-    }
+    //     // Re-read and make sure decrease_cnt hasn't changed.
+    //     if observed_cnt == self.decrease_cnt.load(Ordering::SeqCst) {
+    //         self.done_marker.store(true, Ordering::Release);
+    //         true
+    //     } else {
+    //         false
+    //     }
+    // }
 
     /// Checks whether the done marker is set. The marker can only be set by 'check_done' and 'halt'.
     fn done(&self) -> bool {

@@ -10,11 +10,11 @@ use crate::{
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
-use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
+use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput, TxnIndex};
 use aptos_state_view::TStateView;
 use num_cpus;
 use once_cell::sync::Lazy;
-use std::{collections::btree_map::BTreeMap, marker::PhantomData};
+use std::{collections::btree_map::BTreeMap, hint, marker::PhantomData};
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -127,6 +127,8 @@ where
             .record(idx_to_execute, speculative_view.take_reads(), result)
             .is_err()
         {
+            // To terminate the commit thread.
+            scheduler.set_commit_idx(0);
             // Optimization for module publishing fallback.
             // When there is module r/w intersection, can halt parallel execution
             // and fallback to sequential execution immediately.
@@ -185,6 +187,39 @@ where
         }
     }
 
+    fn commit<'a>(
+        &self,
+        idx_to_commit: TxnIndex,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
+    ) -> bool {
+        use MVHashMapError::*;
+        use MVHashMapOutput::*;
+
+        let read_set = last_input_output
+            .read_set(idx_to_commit)
+            .expect("Prior read-set must be recorded");
+
+        let valid = read_set.iter().all(|r| {
+            match versioned_data_cache.read(r.path(), idx_to_commit) {
+                Ok(Version(version, _)) => r.validate_version(version),
+                Ok(Resolved(value)) => r.validate_resolved(value),
+                Err(Dependency(_)) => false, // Dependency implies a validation failure.
+                Err(Unresolved(delta)) => r.validate_unresolved(delta),
+                Err(NotFound) => r.validate_storage(),
+                // We successfully validate when read (again) results in a delta application
+                // failure. If the failure is speculative, a later validation will fail due to
+                // a read without this error. However, if the failure is real, passing
+                // validation here allows to avoid infinitely looping and instead panic when
+                // materializing deltas as writes in the final output preparation state. Panic
+                // is also preferrable as it allows testing for this scenario.
+                Err(DeltaApplicationFailure) => r.validate_delta_application_failure(),
+            }
+        });
+
+        valid
+    }
+
     fn work_task_with_scope(
         &self,
         executor_arguments: &E::Argument,
@@ -198,37 +233,72 @@ where
         let executor = E::init(*executor_arguments);
 
         let mut scheduler_task = SchedulerTask::NoTask;
-        loop {
-            scheduler_task = match scheduler_task {
-                SchedulerTask::ValidationTask(version_to_validate, guard) => self.validate(
-                    version_to_validate,
-                    guard,
-                    last_input_output,
-                    versioned_data_cache,
-                    scheduler,
-                ),
-                SchedulerTask::ExecutionTask(version_to_execute, None, guard) => self.execute(
-                    version_to_execute,
-                    guard,
-                    block,
-                    last_input_output,
-                    versioned_data_cache,
-                    scheduler,
-                    &executor,
-                    base_view,
-                ),
-                SchedulerTask::ExecutionTask(_, Some(condvar), _guard) => {
-                    let (lock, cvar) = &*condvar;
-                    // Mark dependency resolved.
-                    *lock.lock() = DependencyStatus::Resolved;
-                    // Wake up the process waiting for dependency.
-                    cvar.notify_one();
 
-                    SchedulerTask::NoTask
+        let is_commit_thread = scheduler.is_commit_thread();
+
+        if is_commit_thread {
+            // The commit thread keeps validating the next transaction.
+            // If validated, it increment the local commit index.
+            let mut local_commit_idx = 0;
+            let mut local_commit_gas = 0;
+
+            while local_commit_idx < scheduler.commit_idx()
+                && local_commit_gas < scheduler.per_block_gas_limit()
+            {
+                if !scheduler.ready_for_commit(local_commit_idx) {
+                    // Avoid pointlessly spinning, and give priority to other threads that may
+                    // be working to finish the remaining tasks.
+                    hint::spin_loop();
+                    continue;
                 }
-                SchedulerTask::NoTask => scheduler.next_task(),
-                SchedulerTask::Done => {
-                    break;
+
+                if self.commit(local_commit_idx, last_input_output, versioned_data_cache) {
+                    // Read the gas from the execution output.
+                    let txn_gas = match last_input_output.write_set(local_commit_idx).as_ref() {
+                        ExecutionStatus::Success(t) => t.gas_used(),
+                        ExecutionStatus::SkipRest(t) => t.gas_used(),
+                        ExecutionStatus::Abort(_) => 0,
+                    };
+                    local_commit_gas += txn_gas;
+                    local_commit_idx += 1;
+                }
+            }
+            scheduler.set_commit_idx(local_commit_idx);
+            scheduler.halt();
+        } else {
+            // Other threads perform execution/vaidation tasks.
+            loop {
+                scheduler_task = match scheduler_task {
+                    SchedulerTask::ValidationTask(version_to_validate, guard) => self.validate(
+                        version_to_validate,
+                        guard,
+                        last_input_output,
+                        versioned_data_cache,
+                        scheduler,
+                    ),
+                    SchedulerTask::ExecutionTask(version_to_execute, None, guard) => self.execute(
+                        version_to_execute,
+                        guard,
+                        block,
+                        last_input_output,
+                        versioned_data_cache,
+                        scheduler,
+                        &executor,
+                        base_view,
+                    ),
+                    SchedulerTask::ExecutionTask(_, Some(condvar), _guard) => {
+                        let (lock, cvar) = &*condvar;
+                        // Mark dependency resolved.
+                        *lock.lock() = DependencyStatus::Resolved;
+                        // Wake up the process waiting for dependency.
+                        cvar.notify_one();
+
+                        SchedulerTask::NoTask
+                    }
+                    SchedulerTask::NoTask => scheduler.next_task(),
+                    SchedulerTask::Done => {
+                        break;
+                    }
                 }
             }
         }
@@ -268,7 +338,7 @@ where
         });
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.
-        let num_txns = scheduler.num_txn_to_execute();
+        let num_txns = scheduler.commit_idx();
         let mut final_results = Vec::with_capacity(num_txns);
 
         let maybe_err = if last_input_output.module_publishing_may_race() {
