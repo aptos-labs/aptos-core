@@ -8,24 +8,26 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Upgrade Move code
 
-Move code (e.g., move modules) on the Aptos blockchain can be upgraded. This
+Move code (e.g., Move modules) on the Aptos blockchain can be upgraded. This
 allows code owners and module developers to update and evolve their contracts
 under a single, stable, well-known account address that doesn't change. If a
 module upgrade happens, all consumers of that module will automatically receive
 the latest version of the code (e.g., the next time they interact with it).
 
 The Aptos blockchain natively supports different _upgrade policies_, which allow
-move developers to explicitly define the constraints around which their move code
+move developers to explicitly define the constraints around how their move code
 can be upgraded. The default policy is _(backwards) compatible_. This means that
-code upgrades are only accepted if they guarantee that no existing public APIs 
-and/or resource storage are broken by the upgrade (this includes public functions).
-This compatibility checking is possible because of Move's strongly typed byte code
+code upgrades are accepted only if they guarantee that no existing resource storage
+or public APIs are broken by the upgrade (including public functions).
+This compatibility checking is possible because of Move's strongly typed bytecode
 semantics.
 
 We note, however, that even compatible upgrades can have hazardous effects on
-applications and dependent move code (e.g., if the semantics of the underlying module
-is modified). As a result, developers should be careful when depending on third-party move
-code that can be upgraded on-chain. See below for a brief discussion on security.
+applications and dependent Move code (for example, if the semantics of the underlying
+module are modified). As a result, developers should be careful when depending on
+third-party Move code that can be upgraded on-chain. See
+[Security considerations for dependencies](#security-considerations-for-dependencies)
+for more details.
 
 ## How it works
 
@@ -40,15 +42,15 @@ upgrade_policy = "compatible"
 ...
 ```
 :::tip Compatibility check
-Aptos checks compatibility at the time a [Move package](https://move-language.github.io/move/packages.html) is published via an Aptos transaction. This transaction will abort if compatibility is not satisfied.
+Aptos checks compatibility at the time a [Move package](https://move-language.github.io/move/packages.html) is published via an Aptos transaction. This transaction will abort if deemed incompatible.
 :::
 
 ## How to upgrade
 
-To upgrade already published move code, simply attempt to republish the code at
-the same address that it was previous published. This can be done by following the
-instructions for code compilation and publishing using the Aptos CLI. For example,
-see the [Move module tutorial](../tutorials/first-move-module.md).
+To upgrade already published Move code, simply attempt to republish the code at
+the same address that it was previously published. This can be done by following the
+instructions for code compilation and publishing using the Aptos CLI. For an example,
+see the [Your First Move Module](../../tutorials/first-move-module.md) tutorial.
 
 ## Upgrade policies
 
@@ -60,7 +62,7 @@ There are two different upgrade policies currently supported by Aptos:
     correctly interpreted by the new code. However, new struct declarations 
     can be added.
   - For APIs, all existing public functions must have the same signature as 
-    before. New functions, incl. public and entry functions, can be added.
+    before. New functions, including public and entry functions, can be added.
 - `immutable`: the code is not upgradeable and is guaranteed to stay the same 
   forever.
 
@@ -82,33 +84,33 @@ As mentioned above, even compatible upgrades can have disastrous effects for
 applications that depend on the upgraded code. These effects can come from bugs,
 but they can also be the result of malicious upgrades. For example,
 an upgraded dependency can suddenly make all functions abort, breaking the
-operation of your move code. Alternativaly, an upgraded dependency can make
-all functions suddenly cost much more gas to execute then before the upgrade,
-resulting in high gas costs. As result, dependencies to upgradeable packages
-need to be handled with care:
+operation of your Move code. Alternatively, an upgraded dependency can make
+all functions suddenly cost much more gas to execute then before the upgrade.
+As result, dependencies to upgradeable packages need to be handled with care:
 
 - The safest dependency is, of course, an `immutable` package. This guarantees
   that the dependency will never change, including its transitive dependencies.
   In order to update an immutable package, the owner would have to introduce a
   new major version, which is practically like deploying a new, separate
-  and independent package. This is because major versioning can only be
-  expressed by name (e.g. `module feature_v1` and `module feature_v2`). However,
+  and independent package. This is because major versioning can be expressed
+  only by name (e.g. `module feature_v1` and `module feature_v2`). However,
   not all package owners like to publish their code as `immutable`, because this
   takes away the ability to fix bugs and update the code in place.
-- If you have a dependency to a `compatible` package it is highly 
-  recommended that you know and understand the entity publishing the package. 
-  The highest level of assurance is that the package is governed by a DAO where 
-  no single user can initiate an upgrade, but a vote or similar has 
-  to be taken. This is (for example) the case for the Aptos framework.
+- If you have a dependency to a `compatible` package, it is highly 
+  recommended you know and understand the entity publishing the package. 
+  The highest level of assurance is when the package is governed by a
+  Decentralized Autonomous Organization (DAO) where no single user can initiate
+  an upgrade; a vote or similar has to be taken. This is the case for the Aptos
+  framework.
    
 ## Programmatic upgrade
 
 In general, Aptos offers, via the Move module `aptos_framework::code`, 
 ways to publish code from anywhere in your smart contracts. However,
-notice that code published in the current transaction cannot be executed 
-before that transaction ends.
+notice that code published in the current transaction can be executed 
+only after that transaction ends.
 
-The Aptos Framework itself, including all the on-chain administration logic, is
+The Aptos framework itself, including all the on-chain administration logic, is
 an example for programmatic upgrade. The framework is marked as `compatible`.
-Upgrade happens via specific generated governance scripts. For more details,
-see [Aptos Governance](/concepts/governance.md).
+Upgrades happen via specific generated governance scripts. For more details,
+see [Aptos Governance](../../concepts/governance.md).
