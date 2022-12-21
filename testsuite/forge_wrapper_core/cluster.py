@@ -130,6 +130,8 @@ class ForgeCluster:
                 "update-kubeconfig",
                 "--name",
                 cluster_name,
+                "--region",
+                "us-east-1",
                 "--kubeconfig",
                 temp,
             ]
