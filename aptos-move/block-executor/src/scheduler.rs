@@ -550,13 +550,14 @@ impl Scheduler {
     }
 
     /// Set status of the transaction to Executed(incarnation).
-    fn set_executed_status(&self, txn_idx: TxnIndex, _incarnation: Incarnation) {
+    fn set_executed_status(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
         let mut status = self.txn_status[txn_idx].lock();
 
         // Only makes sense when the current status is 'Executing'.
         match &*status {
-            TransactionStatus::Executing(incarnation) => {
-                *status = TransactionStatus::Executed(*incarnation);
+            TransactionStatus::Executing(incarnation_) => {
+                debug_assert!(incarnation == *incarnation_);
+                *status = TransactionStatus::Executed(incarnation);
             }
             TransactionStatus::ExecutionHalted => {
                 // Ignore the transaction status due to ExecutionHalted.
