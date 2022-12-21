@@ -271,7 +271,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             genesis_helm_config_fn: None,
             node_helm_config_fn: None,
             emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-                mempool_backlog: 50000,
+                mempool_backlog: 80000,
             }),
             success_criteria,
             existing_db_tag: None,

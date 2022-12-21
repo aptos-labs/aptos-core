@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
-use aptos_infallible::RwLock;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
@@ -14,13 +13,13 @@ use rand::{
     Rng,
 };
 use rand_core::RngCore;
-use std::{cmp::max, sync::Arc};
+use std::cmp::max;
 
 pub struct P2PTransactionGenerator {
     rng: StdRng,
     send_amount: u64,
     txn_factory: TransactionFactory,
-    all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+    all_receivers: Vec<AccountAddress>,
     invalid_transaction_ratio: usize,
     gas_price: u64,
 }
@@ -30,7 +29,7 @@ impl P2PTransactionGenerator {
         rng: StdRng,
         send_amount: u64,
         txn_factory: TransactionFactory,
-        all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+        all_receivers: Vec<AccountAddress>,
         invalid_transaction_ratio: usize,
         gas_price: u64,
     ) -> Self {
@@ -38,7 +37,7 @@ impl P2PTransactionGenerator {
             rng,
             send_amount,
             txn_factory,
-            all_addresses,
+            all_receivers,
             invalid_transaction_ratio,
             gas_price,
         }
@@ -153,8 +152,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
         let mut num_valid_tx = transactions_per_account * (accounts.len() - invalid_size);
         for sender in accounts {
             let receivers = self
-                .all_addresses
-                .read()
+                .all_receivers
                 .choose_multiple(&mut self.rng, transactions_per_account)
                 .cloned()
                 .collect::<Vec<_>>();
@@ -165,7 +163,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
                 transactions_per_account
             );
             for i in 0..transactions_per_account {
-                let receiver = receivers.get(i).expect("all_addresses can't be empty");
+                let receiver = receivers.get(i).expect("all_receivers can't be empty");
                 let request = if num_valid_tx > 0 {
                     num_valid_tx -= 1;
                     self.gen_single_txn(
@@ -173,7 +171,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
                         receiver,
                         self.send_amount,
                         &self.txn_factory,
-                        self.gas_price,
+                        self.gas_price + i as u64,
                     )
                 } else {
                     self.generate_invalid_transaction(
@@ -194,7 +192,7 @@ pub struct P2PTransactionGeneratorCreator {
     rng: StdRng,
     txn_factory: TransactionFactory,
     amount: u64,
-    all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+    all_receivers: Vec<AccountAddress>,
     invalid_transaction_ratio: usize,
     gas_price: u64,
 }
@@ -204,7 +202,7 @@ impl P2PTransactionGeneratorCreator {
         rng: StdRng,
         txn_factory: TransactionFactory,
         amount: u64,
-        all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+        all_receivers: Vec<AccountAddress>,
         invalid_transaction_ratio: usize,
         gas_price: u64,
     ) -> Self {
@@ -212,7 +210,7 @@ impl P2PTransactionGeneratorCreator {
             rng,
             txn_factory,
             amount,
-            all_addresses,
+            all_receivers,
             invalid_transaction_ratio,
             gas_price,
         }
@@ -226,7 +224,7 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
             self.rng.clone(),
             self.amount,
             self.txn_factory.clone(),
-            self.all_addresses.clone(),
+            self.all_receivers.clone(),
             self.invalid_transaction_ratio,
             self.gas_price,
         ))
