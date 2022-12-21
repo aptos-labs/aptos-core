@@ -145,6 +145,10 @@ impl LocalSwarm {
                         config
                             .state_sync
                             .state_sync_driver
+                            .enable_auto_bootstrapping = true;
+                        config
+                            .state_sync
+                            .state_sync_driver
                             .max_connection_deadline_secs = 1;
                     }
 

@@ -244,6 +244,10 @@ async fn create_validator_driver(
 ) {
     let mut node_config = NodeConfig::default();
     node_config.base.role = RoleType::Validator;
+    node_config
+        .state_sync
+        .state_sync_driver
+        .enable_auto_bootstrapping = true;
 
     create_driver_for_tests(node_config, Waypoint::default(), event_key_subscriptions).await
 }
