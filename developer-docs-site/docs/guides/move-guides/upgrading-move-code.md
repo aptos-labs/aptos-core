@@ -49,7 +49,8 @@ Aptos checks compatibility at the time a [Move package](https://move-language.gi
 
 To upgrade already published Move code, simply attempt to republish the code at
 the same address that it was previously published. This can be done by following the
-instructions for code compilation and publishing using the Aptos CLI. For an example,
+instructions for code compilation and publishing using the
+[Aptos CLI](../../cli-tools/aptos-cli-tool/use-aptos-cli.md). For an example,
 see the [Your First Move Module](../../tutorials/first-move-module.md) tutorial.
 
 ## Upgrade policies
