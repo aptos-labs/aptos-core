@@ -23,20 +23,22 @@ use aptos_jellyfish_merkle::metrics::{
 
 use crate::pipeline::Pipeline;
 use aptos_executor::block_executor::BlockExecutor;
-use aptos_metrics_core::{
-    register_int_counter_vec, register_int_gauge_vec, IntCounterVec, IntGaugeVec,
-};
+use aptos_metrics_core::{exponential_buckets, histogram_opts, HistogramVec};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
 use once_cell::sync::Lazy;
 use std::{env, fs, path::Path};
 
-pub static EXECUTOR_BENCHMARK_LATENCY: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!("executor_benchmark_latency_ms", "blah", &["foo"]).unwrap()
-});
-
-pub static EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!("executor_benchmark_committed_txn_count", "blah", &["foo"]).unwrap()
+pub static EXECUTOR_BENCHMARK_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        histogram_opts!(
+            "executor_benchmark_latency_ms",
+            "blah.",
+            exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 20,).unwrap(),
+        ),
+        &["foo"],
+    )
+    .unwrap()
 });
 
 pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<AptosVM>) {

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT, EXECUTOR_BENCHMARK_LATENCY};
+use crate::EXECUTOR_BENCHMARK_LATENCY;
 use aptos_crypto::hash::HashValue;
 use aptos_db::metrics::API_LATENCY_SECONDS;
 use aptos_executor::{
@@ -115,10 +115,7 @@ fn report_block(
         .as_millis();
     EXECUTOR_BENCHMARK_LATENCY
         .with_label_values(&["bar"])
-        .set(latency as i64);
-    EXECUTOR_BENCHMARK_COMMITTED_TRANSACTION_COUNT
-        .with_label_values(&["bar"])
-        .inc_by(block_size as u64);
+        .observe(latency as f64);
     info!(
         "Version: {}. latency: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0}. Accumulative TPS: {:.0}",
         version,
