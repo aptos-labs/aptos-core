@@ -151,7 +151,6 @@ We are excited that you are here, and we look forward to getting to know you. We
 * [Telegram](https://t.me/aptos_official)
 * [Twitter](https://twitter.com/Aptos_Network)
 
-## Projects built on Aptos by the community
+## Community projects on Aptos
 
-Here's a list of community maintained projects provided by the Aptos foundation.  If you have a project that you want added to the list feel free to add a GitHub pull request there:
-* [List of projects](https://github.com/aptos-foundation/ecosystem-projects)
+Here's a [list of community-maintained projects](https://github.com/aptos-foundation/ecosystem-projects) provided by the Aptos Foundation.  If you have a project that you want added to the list, just edit the page and add a GitHub pull request.
