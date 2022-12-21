@@ -22,6 +22,8 @@ cargo build --locked --profile=$PROFILE \
     -p aptos-telemetry-service \
     -p aptos-db-bootstrapper \
     -p aptos-transaction-emitter \
+    -p aptos-datastream-worker \
+    -p aptos-datastream-service \
     "$@"
 
 # Build aptos-node separately
@@ -50,6 +52,8 @@ BINS=(
     db-restore
     forge
     aptos-transaction-emitter
+    aptos-datastream-worker
+    aptos-datastream-service
 )
 
 mkdir dist

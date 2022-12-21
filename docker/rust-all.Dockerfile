@@ -275,6 +275,63 @@ ARG GIT_SHA
 ENV GIT_SHA ${GIT_SHA}
 
 
+### Datastream Worker Image ###
+
+FROM debian-base AS datastream-worker
+
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
+    libpq-dev \
+    curl \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+COPY --link --from=builder /aptos/dist/aptos-datastream-worker /usr/local/bin/aptos-datastream-worker
+
+ENV RUST_LOG_FORMAT=json
+
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
+
+
+### Datastream Worker Image ###
+
+FROM debian-base AS datastream-service
+
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
+    libpq-dev \
+    curl \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+COPY --link --from=builder /aptos/dist/aptos-datastream-worker /usr/local/bin/aptos-datastream-service
+
+EXPOSE 50051
+ENV RUST_LOG_FORMAT=json
+
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
+
+
 ### EXPERIMENTAL ###
 
 FROM debian-base as validator-testing-base 
