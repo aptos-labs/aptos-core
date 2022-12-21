@@ -5,8 +5,9 @@ upgrade_policy = "compatible"
 
 [dependencies]
 AptosFramework = { local = "../../framework/aptos-framework" }
+AptosStdlib = { local = "../../framework/aptos-stdlib" }
 AptosToken = { local = "../../framework/aptos-token" }
 DataStructure = { local = "../data_structures" }
 
 [addresses]
-source_addr = "0xcafe"
+source_addr = "_"
