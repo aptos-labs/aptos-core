@@ -523,6 +523,7 @@ impl<
     async fn check_auto_bootstrapping(&mut self) {
         if !self.bootstrapper.is_bootstrapped()
             && self.is_validator()
+            && self.driver_configuration.config.enable_auto_bootstrapping
             && self.driver_configuration.waypoint.version() == 0
         {
             if let Some(start_time) = self.start_time {

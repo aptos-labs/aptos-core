@@ -35,6 +35,10 @@ pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
             config
                 .state_sync
                 .state_sync_driver
+                .enable_auto_bootstrapping = true;
+            config
+                .state_sync
+                .state_sync_driver
                 .max_connection_deadline_secs = 3;
         }))
         .build()
