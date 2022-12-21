@@ -288,6 +288,7 @@ RUN apt-get update && apt-get install -y \
     netcat \
     libpq-dev \
     curl \
+    redis \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 COPY --link --from=builder /aptos/dist/aptos-datastream-worker /usr/local/bin/aptos-datastream-worker
