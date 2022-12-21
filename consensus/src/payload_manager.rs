@@ -16,13 +16,14 @@ use aptos_logger::{debug, warn};
 use aptos_types::transaction::SignedTransaction;
 use futures::channel::mpsc::Sender;
 use futures::SinkExt;
+use std::sync::Arc;
 use tokio::sync::oneshot;
 
 /// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
 pub enum PayloadManager {
     DirectMempool,
-    InQuorumStore(BatchReader, Mutex<Sender<PayloadRequest>>),
+    InQuorumStore(Arc<BatchReader>, Mutex<Sender<PayloadRequest>>),
 }
 
 impl PayloadManager {
@@ -69,9 +70,18 @@ impl PayloadManager {
                     .map(|proof| *proof.digest())
                     .collect();
 
-                let _ = quorum_store_wrapper_tx
-                    .lock()
-                    .send(PayloadRequest::CleanRequest(logical_time, digests));
+                let mut tx = quorum_store_wrapper_tx.lock().clone();
+
+                // TODO: don't even need to warn on fail?
+                if let Err(e) = tx
+                    .send(PayloadRequest::CleanRequest(logical_time, digests))
+                    .await
+                {
+                    warn!(
+                        "CleanRequest failed. Is the epoch shutting down? error: {}",
+                        e
+                    );
+                }
             }
         }
     }

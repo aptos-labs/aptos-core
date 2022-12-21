@@ -49,6 +49,7 @@ impl fmt::Display for PayloadRequest {
     }
 }
 
+#[derive(Debug)]
 pub enum ConsensusResponse {
     GetBlockResponse(Payload),
 }

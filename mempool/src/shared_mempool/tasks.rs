@@ -395,7 +395,7 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
 ) {
     // Start latency timer
     let start_time = Instant::now();
-    debug!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
+    // debug!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
 
     let (resp, callback, counter_label) = match req {
         QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, transactions, callback) => {
@@ -420,7 +420,9 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                     // gc before pulling block as extra protection against txns that may expire in consensus
                     // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
                     let curr_time = aptos_infallible::duration_since_epoch();
-                    mempool.gc_by_expiration_time(curr_time);
+                    mempool.gc_by_expiration_time(curr_time.saturating_add(Duration::new(5, 0)));
+                    // mempool.gc_by_expiration_time(curr_time);
+                    // add 2 sec to expiration for high loads
                 }
 
                 let max_txns = cmp::max(max_txns, 1);

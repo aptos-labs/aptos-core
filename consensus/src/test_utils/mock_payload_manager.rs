@@ -17,6 +17,7 @@ use aptos_types::{
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
 
+#[allow(dead_code)]
 pub struct MockPayloadManager {
     // used non-mocked TxnManager to test interaction with shared mempool
     _quorum_store_client: Option<QuorumStoreClient>,

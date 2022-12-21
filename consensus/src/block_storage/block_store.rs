@@ -12,11 +12,11 @@ use crate::{
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
+    quorum_store,
     state_replication::StateComputer,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
-
 use aptos_consensus_types::{
     block::Block, common::Round, executed_block::ExecutedBlock, quorum_cert::QuorumCert,
     sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
@@ -56,6 +56,9 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
         counters::LAST_COMMITTED_ROUND.set(block.round() as i64);
         counters::LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
 
+        // Quorum store metrics
+        quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
+
         for status in txn_status.iter() {
             match status {
                 TransactionStatus::Keep(_) => {
@@ -63,7 +66,8 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
                         .with_label_values(&["success"])
                         .inc();
                 }
-                TransactionStatus::Discard(_) => {
+                TransactionStatus::Discard(status) => {
+                    debug!("QS: discard status {:?}", status);
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["failed"])
                         .inc();
@@ -121,6 +125,10 @@ impl BlockStore {
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
+        debug!(
+            "QS: number of block in storage in a new epoch {}",
+            blocks.len()
+        );
         let block_store = block_on(Self::build(
             root,
             root_metadata,
@@ -565,6 +573,10 @@ impl BlockReader for BlockStore {
             self.highest_2chain_timeout_cert()
                 .map(|tc| tc.as_ref().clone()),
         )
+    }
+
+    fn back_pressure(&self) -> bool {
+        self.back_pressure()
     }
 }
 

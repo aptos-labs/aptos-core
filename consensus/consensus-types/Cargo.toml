@@ -27,6 +27,7 @@ itertools = { workspace = true }
 mirai-annotations = { workspace = true }
 proptest = { workspace = true, optional = true }
 rayon = { workspace = true }
+rand = {workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 

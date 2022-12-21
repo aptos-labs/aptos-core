@@ -8,11 +8,11 @@ use crate::quorum_store::types::{Batch, BatchRequest, Fragment};
 use anyhow::anyhow;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_consensus_types::proof_of_store::{ProofOfStore, SignedDigest};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
@@ -190,6 +190,7 @@ impl ConsensusNetworkSender {
         let remote_protocols = self.supported_protocols(peer)?;
         for protocol in local_protocols {
             if remote_protocols.contains(*protocol) {
+                debug!("QS: protocolID {}", *protocol);
                 return Ok(*protocol);
             }
         }

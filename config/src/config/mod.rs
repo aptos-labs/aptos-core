@@ -18,6 +18,8 @@ use thiserror::Error;
 
 mod consensus_config;
 pub use consensus_config::*;
+mod quorum_store_config;
+pub use quorum_store_config::*;
 mod error;
 pub use error::*;
 mod execution_config;
