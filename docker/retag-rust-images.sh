@@ -9,7 +9,6 @@ IMAGES=(
   faucet
   forge
   telemetry-service
-  datastream-worker
   datastream-service
 )
 
