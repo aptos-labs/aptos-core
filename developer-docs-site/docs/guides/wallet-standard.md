@@ -131,7 +131,7 @@ The dApp may want to query for the current connected account to get the address 
 
 ### network()
 **Needs to be connected**
-The dApp may want to query for the current network to get the network name, chain_id and url.
+The dApp may want to query for the current connected network to get the network name, chain_id and url.
 
 - `network()` no prompt to the user
     - returns `Promise<NetworkInfo>`
