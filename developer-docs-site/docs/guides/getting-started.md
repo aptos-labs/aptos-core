@@ -66,25 +66,20 @@ This tool will help you compile, test, and publish contracts as well as run cont
 
 As described in [Workflows](#workflows), you may interact with Aptos using only the CLI. For more advanced users, if you need the source you may clone the `aptos-core` GitHub repo from [GitHub](https://github.com/aptos-labs/aptos-core).
 
-1. Setup Git
-   [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) is required to clone the aptos-core repo, and will be need to be installed prior to continuing.  You can install it with the instructions on the official [Git website](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
+1. Install [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git). Git is required to clone the aptos-core repo, and will be need to be installed prior to continuing.  You can install it with the instructions on the official [Git website](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
 
-1. Clone the Aptos repository
-
-   To clone the Aptos repository (repo), you first need to open a command line prompt (Terminal on Mac / Linux, Powershell on Windows).  Then, you can run the following command to clone the Git repository from Github.
+1. Clone the Aptos repository. To clone the Aptos repository (repo), you first need to open a command line prompt (Terminal on Mac / Linux, Powershell on Windows).  Then run the following command to clone the Git repository from GitHub.
 
       ```
       git clone https://github.com/aptos-labs/aptos-core.git
       ```
 
-1. `cd` into `aptos-core` directory.
-
-   Now we'll want to go into the newly created directory `aptos-core`
+1. Now let's go into the newly created directory `aptos-core` by *changing directory* or `cd`ing into it:
     ```
     cd aptos-core
     ```
    
-1. Setup Build Dependencies
+1. Set up build dependencies -
 
    Prepare your developer environment by installing the dependencies needed to build, test and inspect Aptos Core.
    No matter your selected mechanism for installing these dependencies, **it is imperative you keep your entire toolchain up-to-date**. If you encounter issues later, update all packages and try again.
