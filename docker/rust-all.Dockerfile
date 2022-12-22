@@ -12,6 +12,45 @@ WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
 RUN apt-get update && apt-get install binutils lld
 
+FROM debian-base as validator-testing-base 
+
+RUN apt-get update && apt-get install -y \
+    # Extra goodies for debugging
+    less \
+    git \
+    vim \
+    nano \
+    libjemalloc-dev \
+    binutils \
+    graphviz \
+    ghostscript \
+    strace \
+    htop \
+    sysstat \
+    valgrind \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+RUN echo "deb http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+RUN echo "deb-src http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+
+RUN apt-get update && apt-get install -y \
+		arping bison clang-format cmake dh-python \
+		dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
+		libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
+		libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
+		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+RUN git clone https://github.com/aptos-labs/bcc.git
+RUN mkdir bcc/build
+WORKDIR bcc/
+RUN git checkout 5258d14cb35ba08a8757a68386bebc9ea05f00c9
+WORKDIR build/
+RUN cmake ..
+RUN make
+RUN make install
+WORKDIR ..
+
 ### Build Rust code ###
 FROM rust-base as builder
 
@@ -278,44 +317,54 @@ ENV GIT_SHA ${GIT_SHA}
 ### EXPERIMENTAL ###
 
 ### Validator Image ###
-FROM validator AS validator-testing
+# We will build a base testing image with the necessary packages and 
+# duplicate steps from validator step. This will, however, reduce 
+# cache invalidation and reduce build times. 
+FROM validator-testing-base  AS validator-testing
 
 RUN apt-get update && apt-get install -y \
-    # Extra goodies for debugging
-    less \
-    git \
-    vim \
-    nano \
-    libjemalloc-dev \
-    binutils \
-    graphviz \
-    ghostscript \
-    strace \
-    htop \
-    sysstat \
-    valgrind \
+    libssl1.1 \
+    ca-certificates \
+    # Needed to run debugging tools like perf
+    linux-perf \
+    sudo \
+    procps \
+    gdb \
+    curl \
+    # postgres client lib required for indexer
+    libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN echo "deb http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
-RUN echo "deb-src http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+### Because build machine perf might not match run machine perf, we have to symlink
+### Even if version slightly off, still mostly works
+RUN ln -sf /usr/bin/perf_* /usr/bin/perf
 
-RUN apt-get update && apt-get install -y \
-		arping bison clang-format cmake dh-python \
-		dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
-		libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
-		libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
-		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
-    && apt-get clean && rm -r /var/lib/apt/lists/*
+RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
 
-RUN git clone https://github.com/aptos-labs/bcc.git
-RUN mkdir bcc/build
-WORKDIR bcc/
-RUN git checkout 5258d14cb35ba08a8757a68386bebc9ea05f00c9
-WORKDIR build/
-RUN cmake ..
-RUN make
-RUN make install
-WORKDIR ..
+RUN mkdir -p /opt/aptos/etc
+COPY --link --from=builder /aptos/dist/aptos-node /usr/local/bin/
+COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/
+COPY --link --from=builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/
+COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/
+
+# Admission control
+EXPOSE 8000
+# Validator network
+EXPOSE 6180
+# Metrics
+EXPOSE 9101
+# Backup
+EXPOSE 6186
+
+# add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
 
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1
