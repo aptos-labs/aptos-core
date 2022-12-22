@@ -14,30 +14,26 @@
 -  [Function `get_scalar_handle`](#0x1_curves_get_scalar_handle)
 -  [Function `get_point_handle`](#0x1_curves_get_point_handle)
 -  [Function `pairing`](#0x1_curves_pairing)
--  [Function `scalar_zero`](#0x1_curves_scalar_zero)
--  [Function `scalar_one`](#0x1_curves_scalar_one)
 -  [Function `scalar_from_u64`](#0x1_curves_scalar_from_u64)
 -  [Function `scalar_neg`](#0x1_curves_scalar_neg)
 -  [Function `scalar_add`](#0x1_curves_scalar_add)
 -  [Function `scalar_mul`](#0x1_curves_scalar_mul)
 -  [Function `scalar_inv`](#0x1_curves_scalar_inv)
 -  [Function `scalar_eq`](#0x1_curves_scalar_eq)
--  [Function `bytes_into_scalar`](#0x1_curves_bytes_into_scalar)
+-  [Function `scalar_from_bytes`](#0x1_curves_scalar_from_bytes)
 -  [Function `point_identity`](#0x1_curves_point_identity)
 -  [Function `point_generator`](#0x1_curves_point_generator)
 -  [Function `point_add`](#0x1_curves_point_add)
 -  [Function `point_mul`](#0x1_curves_point_mul)
 -  [Function `scalar_to_bytes`](#0x1_curves_scalar_to_bytes)
 -  [Function `point_to_bytes`](#0x1_curves_point_to_bytes)
--  [Function `bytes_into_point`](#0x1_curves_bytes_into_point)
+-  [Function `element_from_bytes`](#0x1_curves_element_from_bytes)
 -  [Function `point_eq`](#0x1_curves_point_eq)
 -  [Function `get_group_id`](#0x1_curves_get_group_id)
 -  [Function `get_pairing_id`](#0x1_curves_get_pairing_id)
--  [Function `bytes_into_point_internal`](#0x1_curves_bytes_into_point_internal)
--  [Function `bytes_into_scalar_internal`](#0x1_curves_bytes_into_scalar_internal)
--  [Function `scalar_zero_internal`](#0x1_curves_scalar_zero_internal)
--  [Function `scalar_one_internal`](#0x1_curves_scalar_one_internal)
+-  [Function `element_from_bytes_internal`](#0x1_curves_element_from_bytes_internal)
 -  [Function `scalar_from_u64_internal`](#0x1_curves_scalar_from_u64_internal)
+-  [Function `scalar_from_bytes_internal`](#0x1_curves_scalar_from_bytes_internal)
 -  [Function `scalar_neg_internal`](#0x1_curves_scalar_neg_internal)
 -  [Function `scalar_add_internal`](#0x1_curves_scalar_add_internal)
 -  [Function `scalar_mul_internal`](#0x1_curves_scalar_mul_internal)
@@ -53,7 +49,8 @@
 -  [Function `point_to_bytes_internal`](#0x1_curves_point_to_bytes_internal)
 
 
-<pre><code><b>use</b> <a href="type_info.md#0x1_type_info">0x1::type_info</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="type_info.md#0x1_type_info">0x1::type_info</a>;
 </code></pre>
 
 
@@ -145,7 +142,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;Group&gt; <b>has</b> drop
+<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;Group&gt; <b>has</b> <b>copy</b>, drop
 </code></pre>
 
 
@@ -172,7 +169,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Point">Point</a>&lt;Group&gt; <b>has</b> drop
+<pre><code><b>struct</b> <a href="curves.md#0x1_curves_Point">Point</a>&lt;Group&gt; <b>has</b> <b>copy</b>, drop
 </code></pre>
 
 
@@ -335,63 +332,11 @@ TODO: is it possible to have 2+ mappings between same (G1,G2,Gt)? If so we need 
 
 </details>
 
-<a name="0x1_curves_scalar_zero"></a>
-
-## Function `scalar_zero`
-
-Scalar basics.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_zero">scalar_zero</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_zero">scalar_zero</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
-    <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
-        handle: <a href="curves.md#0x1_curves_scalar_zero_internal">scalar_zero_internal</a>(<a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;G&gt;())
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_curves_scalar_one"></a>
-
-## Function `scalar_one`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_one">scalar_one</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_one">scalar_one</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
-    <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
-        handle: <a href="curves.md#0x1_curves_scalar_one_internal">scalar_one_internal</a>(<a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;G&gt;())
-    }
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_curves_scalar_from_u64"></a>
 
 ## Function `scalar_from_u64`
 
+Scalar basics.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_u64">scalar_from_u64</a>&lt;G&gt;(value: u64): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;
@@ -431,7 +376,7 @@ Scalar basics.
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_neg">scalar_neg</a>&lt;T&gt;(_scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; {
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; {
-        handle: <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>(<a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;())
+        handle: <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>(_scalar_1.handle, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;())
     }
 }
 </code></pre>
@@ -498,7 +443,7 @@ Scalar basics.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv">scalar_inv</a>&lt;T&gt;(scalar: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv">scalar_inv</a>&lt;T&gt;(scalar: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;&gt;
 </code></pre>
 
 
@@ -507,9 +452,13 @@ Scalar basics.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv">scalar_inv</a>&lt;T&gt;(scalar: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; {
-    <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; {
-        handle: <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(scalar.handle, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;())
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv">scalar_inv</a>&lt;T&gt;(scalar: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt;): Option&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt;&gt; {
+    <b>let</b> (succeeded, handle) = <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(scalar.handle, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;());
+    <b>if</b> (succeeded) {
+        <b>let</b> scalar = <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; { handle };
+        std::option::some(scalar)
+    } <b>else</b> {
+        std::option::none()
     }
 }
 </code></pre>
@@ -542,13 +491,13 @@ Scalar basics.
 
 </details>
 
-<a name="0x1_curves_bytes_into_scalar"></a>
+<a name="0x1_curves_scalar_from_bytes"></a>
 
-## Function `bytes_into_scalar`
+## Function `scalar_from_bytes`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_bytes_into_scalar">bytes_into_scalar</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_bytes">scalar_from_bytes</a>&lt;T&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;T&gt;&gt;
 </code></pre>
 
 
@@ -557,9 +506,15 @@ Scalar basics.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_bytes_into_scalar">bytes_into_scalar</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; {
-    <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; {
-        handle: <a href="curves.md#0x1_curves_bytes_into_scalar_internal">bytes_into_scalar_internal</a>(bytes, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;())
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_bytes">scalar_from_bytes</a>&lt;T&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt;&gt; {
+    <b>let</b> (succeeded, handle) = <a href="curves.md#0x1_curves_scalar_from_bytes_internal">scalar_from_bytes_internal</a>(*bytes, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;());
+    <b>if</b> (succeeded) {
+        <b>let</b> scalar = <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;T&gt; {
+            handle
+        };
+        std::option::some(scalar)
+    } <b>else</b> {
+        std::option::none()
     }
 }
 </code></pre>
@@ -720,13 +675,13 @@ Scalar basics.
 
 </details>
 
-<a name="0x1_curves_bytes_into_point"></a>
+<a name="0x1_curves_element_from_bytes"></a>
 
-## Function `bytes_into_point`
+## Function `element_from_bytes`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_bytes_into_point">bytes_into_point</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_from_bytes">element_from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;T&gt;
 </code></pre>
 
 
@@ -735,9 +690,9 @@ Scalar basics.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_bytes_into_point">bytes_into_point</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="curves.md#0x1_curves_Point">Point</a>&lt;T&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_from_bytes">element_from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="curves.md#0x1_curves_Point">Point</a>&lt;T&gt; {
     <a href="curves.md#0x1_curves_Point">Point</a>&lt;T&gt; {
-        handle: <a href="curves.md#0x1_curves_bytes_into_point_internal">bytes_into_point_internal</a>(bytes, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;())
+        handle: <a href="curves.md#0x1_curves_element_from_bytes_internal">element_from_bytes_internal</a>(bytes, <a href="curves.md#0x1_curves_get_group_id">get_group_id</a>&lt;T&gt;())
     }
 }
 </code></pre>
@@ -833,13 +788,13 @@ Map a pairing group set to its bilinear mapping ID.
 
 </details>
 
-<a name="0x1_curves_bytes_into_point_internal"></a>
+<a name="0x1_curves_element_from_bytes_internal"></a>
 
-## Function `bytes_into_point_internal`
+## Function `element_from_bytes_internal`
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_bytes_into_point_internal">bytes_into_point_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): u8
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_element_from_bytes_internal">element_from_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): u8
 </code></pre>
 
 
@@ -848,73 +803,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_bytes_into_point_internal">bytes_into_point_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): u8;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_curves_bytes_into_scalar_internal"></a>
-
-## Function `bytes_into_scalar_internal`
-
-
-
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_bytes_into_scalar_internal">bytes_into_scalar_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): u8
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_bytes_into_scalar_internal">bytes_into_scalar_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): u8;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_curves_scalar_zero_internal"></a>
-
-## Function `scalar_zero_internal`
-
-
-
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_zero_internal">scalar_zero_internal</a>(gid: u8): u8
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_zero_internal">scalar_zero_internal</a>(gid: u8): u8;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_curves_scalar_one_internal"></a>
-
-## Function `scalar_one_internal`
-
-
-
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_one_internal">scalar_one_internal</a>(gid: u8): u8
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_one_internal">scalar_one_internal</a>(gid: u8): u8;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_element_from_bytes_internal">element_from_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): u8;
 </code></pre>
 
 
@@ -943,13 +832,13 @@ Map a pairing group set to its bilinear mapping ID.
 
 </details>
 
-<a name="0x1_curves_scalar_neg_internal"></a>
+<a name="0x1_curves_scalar_from_bytes_internal"></a>
 
-## Function `scalar_neg_internal`
+## Function `scalar_from_bytes_internal`
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>(gid: u8): u8
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_from_bytes_internal">scalar_from_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): (bool, u8)
 </code></pre>
 
 
@@ -958,7 +847,29 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>(gid: u8): u8;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_bytes_internal">scalar_from_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gid: u8): (bool, u8);
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_scalar_neg_internal"></a>
+
+## Function `scalar_neg_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>(handle: u8, gid: u8): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>(handle: u8, gid: u8): u8;
 </code></pre>
 
 
@@ -1015,7 +926,7 @@ Map a pairing group set to its bilinear mapping ID.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(handle: u8, gid: u8): u8
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(handle: u8, gid: u8): (bool, u8)
 </code></pre>
 
 
@@ -1024,7 +935,7 @@ Map a pairing group set to its bilinear mapping ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(handle: u8, gid: u8): u8;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>(handle: u8, gid: u8): (bool, u8);
 </code></pre>
 
 

@@ -1,5 +1,6 @@
 module aptos_std::curves {
     use aptos_std::type_info::type_of;
+    use std::option::Option;
 
     // Structs and consts.
 
@@ -9,11 +10,11 @@ module aptos_std::curves {
     struct BLS12_381_Gt {}
 
     //TODO: handle as u8 temporarily. Upgrade to u64.
-    struct Scalar<phantom Group> has drop {
+    struct Scalar<phantom Group> has copy, drop {
         handle: u8
     }
 
-    struct Point<phantom Group> has drop {
+    struct Point<phantom Group> has copy, drop {
         handle: u8
     }
 
@@ -38,18 +39,6 @@ module aptos_std::curves {
     }
 
     /// Scalar basics.
-    public fun scalar_zero<G>(): Scalar<G> {
-        Scalar<G> {
-            handle: scalar_zero_internal(get_group_id<G>())
-        }
-    }
-
-    public fun scalar_one<G>(): Scalar<G> {
-        Scalar<G> {
-            handle: scalar_one_internal(get_group_id<G>())
-        }
-    }
-
     public fun scalar_from_u64<G>(value: u64): Scalar<G> {
         Scalar<G> {
             handle: scalar_from_u64_internal(value, get_group_id<G>())
@@ -58,7 +47,7 @@ module aptos_std::curves {
 
     public fun scalar_neg<T>(_scalar_1: &Scalar<T>): Scalar<T> {
         Scalar<T> {
-            handle: scalar_neg_internal(get_group_id<T>())
+            handle: scalar_neg_internal(_scalar_1.handle, get_group_id<T>())
         }
     }
 
@@ -74,9 +63,13 @@ module aptos_std::curves {
         }
     }
 
-    public fun scalar_inv<T>(scalar: &Scalar<T>): Scalar<T> {
-        Scalar<T> {
-            handle: scalar_inv_internal(scalar.handle, get_group_id<T>())
+    public fun scalar_inv<T>(scalar: &Scalar<T>): Option<Scalar<T>> {
+        let (succeeded, handle) = scalar_inv_internal(scalar.handle, get_group_id<T>());
+        if (succeeded) {
+            let scalar = Scalar<T> { handle };
+            std::option::some(scalar)
+        } else {
+            std::option::none()
         }
     }
 
@@ -84,9 +77,15 @@ module aptos_std::curves {
         scalar_eq_internal(scalar_1.handle, scalar_2.handle, get_group_id<T>())
     }
 
-    public fun bytes_into_scalar<T>(bytes: vector<u8>): Scalar<T> {
-        Scalar<T> {
-            handle: bytes_into_scalar_internal(bytes, get_group_id<T>())
+    public fun scalar_from_bytes<T>(bytes: &vector<u8>): Option<Scalar<T>> {
+        let (succeeded, handle) = scalar_from_bytes_internal(*bytes, get_group_id<T>());
+        if (succeeded) {
+            let scalar = Scalar<T> {
+                handle
+            };
+            std::option::some(scalar)
+        } else {
+            std::option::none()
         }
     }
 
@@ -123,9 +122,9 @@ module aptos_std::curves {
         point_to_bytes_internal(point.handle, get_group_id<T>())
     }
 
-    public fun bytes_into_point<T>(bytes: vector<u8>): Point<T> {
+    public fun element_from_bytes<T>(bytes: vector<u8>): Point<T> {
         Point<T> {
-            handle: bytes_into_point_internal(bytes, get_group_id<T>())
+            handle: element_from_bytes_internal(bytes, get_group_id<T>())
         }
     }
 
@@ -168,15 +167,13 @@ module aptos_std::curves {
 
     // Native functions.
 
-    native fun bytes_into_point_internal(bytes: vector<u8>, gid: u8): u8;
-    native fun bytes_into_scalar_internal(bytes: vector<u8>, gid: u8): u8;
-    native fun scalar_zero_internal(gid: u8): u8;
-    native fun scalar_one_internal(gid: u8): u8;
+    native fun element_from_bytes_internal(bytes: vector<u8>, gid: u8): u8;
     native fun scalar_from_u64_internal(value: u64, gid: u8): u8;
-    native fun scalar_neg_internal(gid: u8): u8;
+    native fun scalar_from_bytes_internal(bytes: vector<u8>, gid: u8): (bool, u8);
+    native fun scalar_neg_internal(handle: u8, gid: u8): u8;
     native fun scalar_add_internal(handle_1: u8, handle_2: u8, gid: u8): u8;
     native fun scalar_mul_internal(handle_1: u8, handle_2: u8, gid: u8): u8;
-    native fun scalar_inv_internal(handle: u8, gid: u8): u8;
+    native fun scalar_inv_internal(handle: u8, gid: u8): (bool, u8);
     native fun scalar_eq_internal(handle_1: u8, handle_2: u8, gid: u8): bool;
     native fun scalar_to_bytes_internal(h: u8, gid: u8): vector<u8>;
     native fun pairing_internal(p1_handle: u8, p2_handle: u8, pairing_id: u8): u8;
@@ -188,13 +185,33 @@ module aptos_std::curves {
     native fun point_to_bytes_internal(handle: u8, gid: u8): vector<u8>;
 
     #[test]
-    fun test_scalar_point_arithmatics() {
-        let one = scalar_one<BLS12_381_G2>();
-        let two = scalar_add(&one, &one);
-        let point_p1 = point_generator<BLS12_381_G2>();
-        let point_p2 = point_add(&point_p1, &point_p1);
-        let point_q = point_mul(&two, &point_p1);
-        assert!(point_eq(&point_q, &point_p2), 1);
+    fun test_scalar_mul() {
+        let scalar_33 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"2100000000000000000000000000000000000000000000000000000000000000"));
+        let scalar_34 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"2200000000000000000000000000000000000000000000000000000000000000"));
+        let scalar_1122 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"6204000000000000000000000000000000000000000000000000000000000000"));
+        assert!(scalar_eq(&scalar_1122, &scalar_mul(&scalar_33, &scalar_34)), 1);
+    }
+
+    #[test]
+    fun test_scalar_neg() {
+        let scalar_33 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"2100000000000000000000000000000000000000000000000000000000000000"));
+        let scalar_33_neg = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"e0fffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73"));
+        assert!(scalar_eq(&scalar_33_neg, &scalar_neg(&scalar_33)), 1);
+    }
+
+    #[test]
+    fun test_scalar_add() {
+        let scalar_33 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"2100000000000000000000000000000000000000000000000000000000000000"));
+        let scalar_32_neg = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"e1fffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73"));
+        assert!(scalar_eq(&scalar_from_u64(1), &scalar_add(&scalar_33, &scalar_32_neg)), 1);
+    }
+
+    #[test]
+    fun test_scalar_inv() {
+        let scalar_33 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"2100000000000000000000000000000000000000000000000000000000000000"));
+        let scalar_33_inv = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"01000000e0830f3ed8e4eec16713724981f09c205d5530413e81bfbbad546a70"));
+        assert!(scalar_eq(&scalar_33_inv, &std::option::extract(&mut scalar_inv(&scalar_33))), 1);
+        assert!(scalar_eq(&scalar_from_u64<BLS12_381_G1>(1), &scalar_mul(&scalar_33,&scalar_33_inv)), 1);
     }
 
     #[test]
@@ -204,12 +221,12 @@ module aptos_std::curves {
             &point_mul(&scalar_from_u64(7), &point_generator<BLS12_381_G2>()),
         );
         let gt_point_2 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
-            &point_mul(&scalar_one(), &point_generator()),
+            &point_mul(&scalar_from_u64(1), &point_generator()),
             &point_mul(&scalar_from_u64(35), &point_generator()),
         );
         let gt_point_3 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
             &point_mul(&scalar_from_u64(35), &point_generator<BLS12_381_G1>()),
-            &point_mul(&scalar_one(), &point_generator<BLS12_381_G2>()),
+            &point_mul(&scalar_from_u64(1), &point_generator<BLS12_381_G2>()),
         );
         assert!(point_eq(&gt_point_1, &gt_point_2), 1);
         assert!(point_eq(&gt_point_1, &gt_point_3), 1);

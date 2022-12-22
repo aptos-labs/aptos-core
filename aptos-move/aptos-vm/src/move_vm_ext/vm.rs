@@ -5,7 +5,7 @@ use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
-use aptos_framework::natives::cryptography::curves::Bls12381Context;
+use aptos_framework::natives::cryptography::curves::{ArksContext, Bls12381Context};
 use aptos_framework::natives::cryptography::groth16_bls12381_bellman::BellmanContext;
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
@@ -65,6 +65,7 @@ impl MoveVmExt {
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(BellmanContext::new());
         extensions.add(Bls12381Context::new());
+        extensions.add(ArksContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
         let script_hash = match session_id {

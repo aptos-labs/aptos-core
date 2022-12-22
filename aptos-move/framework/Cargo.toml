@@ -21,6 +21,10 @@ aptos-module-verifier = { workspace = true }
 aptos-sdk-builder = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
+ark-bls12-381 = "0.3.0"
+ark-ec = "0.3.0"
+ark-ff = "0.3.0"
+ark-serialize = "0.3.0"
 base64 = { workspace = true }
 bcs = { workspace = true }
 bellman = "0.13.1"
@@ -49,6 +53,7 @@ move-stackless-bytecode ={ workspace = true }
 move-table-extension ={ workspace = true }
 move-vm-runtime ={ workspace = true }
 move-vm-types ={ workspace = true }
+num-traits = "0.2.15"
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
