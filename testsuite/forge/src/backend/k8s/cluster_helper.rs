@@ -993,6 +993,8 @@ fn check_namespace_for_cleanup(
     false
 }
 
+/// Ensures that the label is at most 64 characters to meet k8s
+/// label length requirements.
 pub fn make_k8s_label(value: String) -> String {
     value.get(..63).unwrap_or(&value).to_string()
 }

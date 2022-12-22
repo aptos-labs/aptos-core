@@ -77,7 +77,7 @@ impl NetworkTest for LoadVsPerfBenchmark {
             results.push(result);
 
             let mut aptos_info = ctx.swarm().aptos_public_info();
-            runtime.block_on(aptos_info.reconfig());
+            // runtime.block_on(aptos_info.reconfig());
 
             println!(
                 "{: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",

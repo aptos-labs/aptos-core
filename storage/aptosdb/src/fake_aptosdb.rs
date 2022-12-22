@@ -44,6 +44,7 @@ use crate::{
     AptosDB,
 };
 
+/// Provides a "fake" AptosDB.
 pub struct FakeAptosDB {
     inner: AptosDB,
     // A map of transaction hash to transaction version
@@ -453,6 +454,9 @@ impl DbReader for FakeAptosDB {
         let account_address = access_path.address;
         let struct_tag = access_path.get_struct_tag();
 
+        // Since the genesis write set is persisted with AptosDB, we call
+        // it to serve state values targetting the framework account.
+        // The in-memory data structures only handle "normal user" accounts.
         if (account_address != AccountAddress::ONE)
             && struct_tag.is_some()
             && struct_tag.unwrap() == AccountResource::struct_tag()

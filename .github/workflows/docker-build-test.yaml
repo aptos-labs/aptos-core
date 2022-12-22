@@ -231,7 +231,7 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      FORGE_TEST_SUITE: load_vs_perf_benchmark
+      FORGE_TEST_SUITE: consensus_only_perf_benchmark
       IMAGE_TAG: consensus_only_perf_test_${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-consensus-only-perf-test

@@ -606,9 +606,9 @@ def find_the_killer(
 class LocalForgeRunner(ForgeRunner):
     def run(self, context: ForgeContext) -> ForgeResult:
         # Set rlimit to unlimited for txn emitter locally
-        context.filesystem.rlimit(
-            resource.RLIMIT_NOFILE, resource.RLIM_INFINITY, resource.RLIM_INFINITY
-        )
+        # context.filesystem.rlimit(
+        #     resource.RLIMIT_NOFILE, resource.RLIM_INFINITY, resource.RLIM_INFINITY
+        # )
 
         with ForgeResult.with_context(context) as forge_result:
             result = context.shell.run(

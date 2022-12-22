@@ -62,6 +62,6 @@ proptest-derive = { workspace = true }
 rand = { workspace = true }
 
 [features]
-default = []
+default = ["consensus-only-perf-test"]
 fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "aptos-executor-types/fuzzing", "aptos-schemadb/fuzzing", "aptos-scratchpad/fuzzing"]
 consensus-only-perf-test = []

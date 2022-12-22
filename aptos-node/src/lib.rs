@@ -31,11 +31,11 @@ use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
-    move_resource::MoveStorage, on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
+    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 
 use aptos_db::AptosDB;
-use aptos_event_notifications::{EventNotificationSender, EventSubscriptionService};
+use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
 use aptos_framework::ReleaseBundle;
 use aptos_mempool::MempoolClientSender;
@@ -53,7 +53,7 @@ use aptos_storage_service_server::{
 };
 use aptos_vm::AptosVM;
 use clap::Parser;
-use futures::{channel::mpsc, StreamExt};
+use futures::channel::mpsc;
 use hex::FromHex;
 use log_build_information::log_build_information;
 use rand::{rngs::StdRng, SeedableRng};
