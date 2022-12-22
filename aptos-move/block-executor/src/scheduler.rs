@@ -385,20 +385,16 @@ impl Scheduler {
                 TransactionStatus::Suspended(_, condvar)
                 | TransactionStatus::ReadyToExecute(_, Some(condvar)) => {
                     let (lock, cvar) = &*(condvar.clone());
-                    // Set the all transactions' status to be ExecutionHalted.
-                    // Then any dependency read (wait_for_dependency) will immediately return and abort the VM execution.
-                    *status = TransactionStatus::ExecutionHalted;
                     // Mark parallel execution halted due to reasons like module r/w intersection.
                     *lock.lock() = DependencyStatus::ExecutionHalted;
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
                 }
-                _ => {
-                    // Set the all transactions' status to be ExecutionHalted.
-                    // Then any dependency read (wait_for_dependency) will immediately return and abort the VM execution.
-                    *status = TransactionStatus::ExecutionHalted;
-                }
+                _ => (),
             }
+            // Set the all transactions' status to be ExecutionHalted.
+            // Then any dependency read (wait_for_dependency) will immediately return and abort the VM execution.
+            *status = TransactionStatus::ExecutionHalted;
         }
     }
 }
