@@ -187,7 +187,7 @@ where
         }
     }
 
-    fn commit<'a>(
+    fn commit(
         &self,
         idx_to_commit: TxnIndex,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
