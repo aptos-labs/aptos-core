@@ -254,22 +254,19 @@ impl Scheduler {
                 return DependencyResult::Resolved;
             }
 
-            self.suspend(txn_idx, dep_condvar.clone());
+            // If the execution is already halted, suspend will return false.
+            // The synchronization is guaranteed by the Mutex around txn_status.
+            // If the execution is halted, the first finishing thread will first set the status of each txn
+            // to be ExecutionHalted, then notify the conditional variable. So if a thread sees ExecutionHalted,
+            // it knows the execution is halted and it can return; otherwise, the finishing thread will notify
+            // the conditional variable later and awake the pending thread.
+            if !self.suspend(txn_idx, dep_condvar.clone()) {
+                return DependencyResult::ExecutionHalted;
+            }
 
             // Safe to add dependency here (still holding the lock) - finish_execution of txn
             // dep_txn_idx is guaranteed to acquire the same lock later and clear the dependency.
             stored_deps.push(txn_idx);
-        }
-
-        // When parallel execution halts, done is set first, and then threads waiting on dependencies are notified.
-        // By checking done here, we ensure this isn't a condvar due to stale state in the multi-version
-        // data-structure that will never be notified. If halt() had already passed the index of the
-        // current thread when scheduler.wait_for_dependency set the status, then done was set even earlier,
-        // and it will be observed. Otherwise, the status will be observed by the terminating thread and
-        // condvar will be notified.
-        if self.done() {
-            *self.txn_status[txn_idx].lock() = TransactionStatus::ExecutionHalted;
-            return DependencyResult::ExecutionHalted;
         }
 
         DependencyResult::Dependency(dep_condvar)
@@ -388,15 +385,19 @@ impl Scheduler {
                 TransactionStatus::Suspended(_, condvar)
                 | TransactionStatus::ReadyToExecute(_, Some(condvar)) => {
                     let (lock, cvar) = &*(condvar.clone());
-                    // Set the transaction status to be ExecutionHalted, so it can be ignored when
-                    // we check the invariants for transaction status.
+                    // Set the all transactions' status to be ExecutionHalted.
+                    // Then any dependency read (wait_for_dependency) will immediately return and abort the VM execution.
                     *status = TransactionStatus::ExecutionHalted;
                     // Mark parallel execution halted due to reasons like module r/w intersection.
                     *lock.lock() = DependencyStatus::ExecutionHalted;
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
                 }
-                _ => {}
+                _ => {
+                    // Set the all transactions' status to be ExecutionHalted.
+                    // Then any dependency read (wait_for_dependency) will immediately return and abort the VM execution.
+                    *status = TransactionStatus::ExecutionHalted;
+                }
             }
         }
     }
@@ -517,16 +518,17 @@ impl Scheduler {
 
     /// Put a transaction in a suspended state, with a condition variable that can be
     /// used to wake it up after the dependency is resolved.
-    fn suspend(&self, txn_idx: TxnIndex, dep_condvar: DependencyCondvar) {
+    /// Return true when the txn is successfully suspended.
+    /// Return false when the execution is halted.
+    fn suspend(&self, txn_idx: TxnIndex, dep_condvar: DependencyCondvar) -> bool {
         let mut status = self.txn_status[txn_idx].lock();
 
         match *status {
             TransactionStatus::Executing(incarnation) => {
                 *status = TransactionStatus::Suspended(incarnation, dep_condvar);
+                true
             }
-            TransactionStatus::ExecutionHalted => {
-                // Ignore the transaction status due to ExecutionHalted.
-            }
+            TransactionStatus::ExecutionHalted => false,
             _ => unreachable!(),
         }
     }
@@ -537,43 +539,38 @@ impl Scheduler {
     fn resume(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx].lock();
 
-        match &*status {
-            TransactionStatus::Suspended(incarnation, dep_condvar) => {
-                *status =
-                    TransactionStatus::ReadyToExecute(*incarnation, Some(dep_condvar.clone()));
-            }
-            TransactionStatus::ExecutionHalted => {
-                // Ignore the transaction status due to ExecutionHalted.
-            }
-            _ => unreachable!(),
+        if matches!(*status, TransactionStatus::ExecutionHalted) {
+            return;
+        }
+        if let TransactionStatus::Suspended(incarnation, dep_condvar) = &*status {
+            *status = TransactionStatus::ReadyToExecute(*incarnation, Some(dep_condvar.clone()));
+        } else {
+            unreachable!();
         }
     }
 
     /// Set status of the transaction to Executed(incarnation).
     fn set_executed_status(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
         let mut status = self.txn_status[txn_idx].lock();
-
-        // Only makes sense when the current status is 'Executing'.
-        match &*status {
-            TransactionStatus::Executing(incarnation_) => {
-                debug_assert!(incarnation == *incarnation_);
-                *status = TransactionStatus::Executed(incarnation);
-            }
-            TransactionStatus::ExecutionHalted => {
-                // Ignore the transaction status due to ExecutionHalted.
-            }
-            _ => unreachable!(),
+        // The execution is already halted.
+        if matches!(*status, TransactionStatus::ExecutionHalted) {
+            return;
         }
+        // Only makes sense when the current status is 'Executing'.
+        debug_assert!(*status == TransactionStatus::Executing(incarnation));
+        *status = TransactionStatus::Executed(incarnation);
     }
 
     /// After a successful abort, mark the transaction as ready for re-execution with
     /// an incremented incarnation number.
     fn set_aborted_status(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
         let mut status = self.txn_status[txn_idx].lock();
-
+        // The execution is already halted.
+        if matches!(*status, TransactionStatus::ExecutionHalted) {
+            return;
+        }
         // Only makes sense when the current status is 'Aborting'.
         debug_assert!(*status == TransactionStatus::Aborting(incarnation));
-
         *status = TransactionStatus::ReadyToExecute(incarnation + 1, None);
     }
 
