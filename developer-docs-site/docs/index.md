@@ -150,3 +150,7 @@ We are excited that you are here, and we look forward to getting to know you. We
 * [Medium](https://medium.com/aptoslabs)
 * [Telegram](https://t.me/aptos_official)
 * [Twitter](https://twitter.com/Aptos_Network)
+
+## Community projects on Aptos
+
+Here's a [list of community-maintained projects](https://github.com/aptos-foundation/ecosystem-projects) collected by the [Aptos Foundation](https://aptosfoundation.org/).  If you have a project that you want added to the list, just edit the page and add a GitHub pull request.
