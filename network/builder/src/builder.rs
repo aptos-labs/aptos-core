@@ -426,6 +426,11 @@ impl NetworkBuilder {
             .push(listener);
     }
 
+    /// Add a Aptos NetPerf to the network.
+    fn add_network_perf(&mut self) -> &mut Self {
+        self
+    }
+
     /// Add a HealthChecker to the network.
     fn add_connection_monitoring(
         &mut self,

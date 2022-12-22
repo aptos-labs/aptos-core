@@ -3,6 +3,7 @@
 
 pub mod error;
 pub mod interface;
+pub mod netperf;
 pub mod storage;
 pub mod types;
 
