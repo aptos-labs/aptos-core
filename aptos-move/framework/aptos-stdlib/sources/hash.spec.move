@@ -77,9 +77,4 @@ spec aptos_std::aptos_hash {
         ensures result == spec_ripemd160_internal(bytes);
     }
 
-    spec blake2b_256 {
-        // TODO: temporary mockup.
-        pragma opaque;
-    }
-
 }
