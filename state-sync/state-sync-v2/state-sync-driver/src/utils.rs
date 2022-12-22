@@ -71,11 +71,10 @@ impl SpeculativeStreamState {
 
     /// Returns the proof ledger info that all data along the stream should have
     /// proofs relative to. This assumes the proof ledger info exists!
-    pub fn get_proof_ledger_info(&self) -> LedgerInfoWithSignatures {
+    pub fn get_proof_ledger_info(&self) -> Result<LedgerInfoWithSignatures, Error> {
         self.proof_ledger_info
-            .as_ref()
-            .expect("Proof ledger info is missing!")
             .clone()
+            .ok_or_else(|| Error::UnexpectedError("The proof ledger info is missing!".into()))
     }
 
     /// Updates the currently synced version of the stream
@@ -195,14 +194,13 @@ impl OutputFallbackHandler {
 /// error if the data stream times out after `max_stream_wait_time_ms`. Also,
 /// tracks the number of consecutive timeouts to identify when the stream has
 /// timed out too many times.
-///
-/// Note: this assumes the `active_data_stream` exists.
 pub async fn get_data_notification(
     max_stream_wait_time_ms: u64,
     max_num_stream_timeouts: u64,
     active_data_stream: Option<&mut DataStreamListener>,
 ) -> Result<DataNotification, Error> {
-    let active_data_stream = active_data_stream.expect("The active data stream should exist!");
+    let active_data_stream = active_data_stream
+        .ok_or_else(|| Error::UnexpectedError("The active data stream does not exist!".into()))?;
 
     let timeout_ms = Duration::from_millis(max_stream_wait_time_ms);
     if let Ok(data_notification) = timeout(timeout_ms, active_data_stream.select_next_some()).await

@@ -323,10 +323,9 @@ impl<
         notification_id: NotificationId,
         state_value_chunk_with_proof: StateValueChunkWithProof,
     ) -> Result<(), Error> {
-        let state_snapshot_notifier = &mut self
-            .state_snapshot_notifier
-            .as_mut()
-            .expect("The state snapshot receiver has not been initialized!");
+        let state_snapshot_notifier = self.state_snapshot_notifier.as_mut().ok_or_else(|| {
+            Error::UnexpectedError("The state snapshot receiver has not been initialized!".into())
+        })?;
         let storage_data_chunk =
             StorageDataChunk::States(notification_id, state_value_chunk_with_proof);
         if let Err(error) = state_snapshot_notifier.try_send(storage_data_chunk) {
@@ -478,10 +477,13 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     (notification_id, result)
                 }
                 storage_data_chunk => {
-                    panic!(
-                        "Invalid storage data chunk sent to executor: {:?}",
-                        storage_data_chunk
+                    error!(
+                        LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                            "Invalid storage data chunk sent to executor: {:?}",
+                            storage_data_chunk
+                        ))
                     );
+                    break;
                 }
             };
 
@@ -737,9 +739,11 @@ fn spawn_state_snapshot_receiver<
                     }
                 }
                 storage_data_chunk => {
-                    panic!(
-                        "Invalid storage data chunk sent to state snapshot receiver: {:?}",
-                        storage_data_chunk
+                    error!(
+                        LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                            "Invalid storage data chunk sent to state snapshot receiver: {:?}",
+                            storage_data_chunk
+                        ))
                     );
                 }
             }
@@ -911,7 +915,12 @@ async fn send_storage_synchronizer_error(
         notification_id,
     };
     if let Err(error) = error_notification_sender.send(error_notification).await {
-        panic!("Failed to send error notification! Error: {:?}", error);
+        error!(
+            LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                "Failed to send error notification! Error: {:?}",
+                error
+            ))
+        );
     }
 
     // Update the metrics
