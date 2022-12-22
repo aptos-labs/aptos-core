@@ -72,7 +72,7 @@ fn main() {
             let mut out = stdout.lock();
             match options.language {
                 Language::Rust => {
-                    aptos_sdk_builder::rust::output(&mut out, &abis, /* local types */ false)
+                    aptos_sdk_builder::rust::output(&mut out, &abis, /* local types */ true)
                         .unwrap()
                 }
                 Language::Go => {
