@@ -23,7 +23,10 @@ use aptos_event_notifications::{EventSubscriptionService, ReconfigNotificationLi
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::tcp::TCPBufferCfg;
+use aptos_network::application::netperf::builder::NetPerfBuilder;
+use aptos_network::protocols::wire::handshake::v1::ProtocolId::NetPerfDirectSendCompressed;
 use aptos_network::{
+    application::netperf::NetPerf,
     application::storage::PeerMetadataStorage,
     connectivity_manager::{builder::ConnectivityManagerBuilder, ConnectivityRequest},
     constants::MAX_MESSAGE_SIZE,
@@ -70,6 +73,7 @@ pub struct NetworkBuilder {
     health_checker_builder: Option<HealthCheckerBuilder>,
     peer_manager_builder: PeerManagerBuilder,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
+    netperf_builder: Option<NetPerfBuilder>,
 }
 
 impl NetworkBuilder {
@@ -125,6 +129,7 @@ impl NetworkBuilder {
             health_checker_builder: None,
             peer_manager_builder,
             peer_metadata_storage,
+            netperf_builder: None,
         }
     }
 
@@ -226,6 +231,10 @@ impl NetworkBuilder {
             config.ping_failures_tolerated,
         );
 
+        if config.enable_netperf_client == true {
+            network_builder.add_network_perf();
+        }
+
         // Always add a connectivity manager to keep track of known peers
         let seeds = merge_seeds(config);
 
@@ -312,6 +321,14 @@ impl NetworkBuilder {
             debug!(
                 NetworkSchema::new(&self.network_context),
                 "{} Started health checker", self.network_context
+            );
+        }
+
+        if let Some(netperf_builder) = self.netperf_builder.as_mut() {
+            netperf_builder.start(executor);
+            debug!(
+                NetworkSchema::new(&self.network_context),
+                "{} Started Aptos NetPerf", self.network_context
             );
         }
 
@@ -424,6 +441,23 @@ impl NetworkBuilder {
             .as_mut()
             .expect("Can only add listeners before starting")
             .push(listener);
+    }
+
+    /// Add a Aptos NetPerf to the network.
+    fn add_network_perf(&mut self) -> &mut Self {
+        let (netperf_tx, netperf_rx) = self.add_p2p_service(&NetPerf::network_endpoint_config());
+        self.netperf_builder = Some(NetPerfBuilder::new(
+            self.network_context(),
+            self.peer_metadata_storage.clone(),
+            Arc::new(netperf_tx),
+            netperf_rx,
+        ));
+        debug!(
+            NetworkSchema::new(&self.network_context),
+            "{} Created Aptos NetPerf", self.network_context
+        );
+
+        self
     }
 
     /// Add a HealthChecker to the network.

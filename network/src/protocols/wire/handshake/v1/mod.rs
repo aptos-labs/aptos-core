@@ -57,6 +57,8 @@ pub enum ProtocolId {
     PeerMonitoringServiceRpc = 10,
     ConsensusRpcCompressed = 11,
     ConsensusDirectSendCompressed = 12,
+    NetPerfRpcCompressed = 13,
+    NetPerfDirectSendCompressed = 14,
 }
 
 /// The encoding types for Protocols
@@ -83,6 +85,8 @@ impl ProtocolId {
             PeerMonitoringServiceRpc => "PeerMonitoringServiceRpc",
             ConsensusRpcCompressed => "ConsensusRpcCompressed",
             ConsensusDirectSendCompressed => "ConsensusDirectSendCompressed",
+            NetPerfRpcCompressed => "NetPerfRpcCompressed",
+            NetPerfDirectSendCompressed => "NetPerfDirectSendCompressed",
         }
     }
 
@@ -101,6 +105,8 @@ impl ProtocolId {
             ProtocolId::PeerMonitoringServiceRpc,
             ProtocolId::ConsensusRpcCompressed,
             ProtocolId::ConsensusDirectSendCompressed,
+            ProtocolId::NetPerfRpcCompressed,
+            ProtocolId::NetPerfDirectSendCompressed,
         ]
     }
 
@@ -109,6 +115,9 @@ impl ProtocolId {
         match self {
             ProtocolId::ConsensusDirectSendJson | ProtocolId::ConsensusRpcJson => Encoding::Json,
             ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
+                Encoding::CompressedBcs(RECURSION_LIMIT)
+            },
+            ProtocolId::NetPerfDirectSendCompressed | ProtocolId::NetPerfRpcCompressed => {
                 Encoding::CompressedBcs(RECURSION_LIMIT)
             },
             ProtocolId::MempoolDirectSend => Encoding::CompressedBcs(USER_INPUT_RECURSION_LIMIT),
