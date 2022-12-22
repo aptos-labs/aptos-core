@@ -165,9 +165,6 @@ impl ApplyChunkOutput {
         let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
             .with_label_values(&["assemble_ledger_diff"])
             .start_timer();
-        let num_txns = to_keep.len();
-        let mut to_commit = Vec::with_capacity(num_txns);
-        let mut txn_info_hashes = Vec::with_capacity(num_txns);
         let hashes_vec = {
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["calculate_ledger_diff_hashes"])
@@ -188,50 +185,49 @@ impl ApplyChunkOutput {
                 .collect::<Vec<_>>()
         };
 
-        for (
-            (txn, txn_output),
-            state_checkpoint_hash,
-            state_updates,
-            (event_hashes, write_set_hash),
-        ) in itertools::izip!(
-            to_keep,
-            state_checkpoint_hashes,
-            state_updates_vec,
-            hashes_vec
-        ) {
-            let (write_set, events, reconfig_events, gas_used, status) = txn_output.unpack();
-            let event_tree =
-                InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes);
+        to_keep
+            .into_par_iter()
+            .with_min_len(16)
+            .zip_eq(state_checkpoint_hashes)
+            .zip_eq(state_updates_vec)
+            .zip_eq(hashes_vec)
+            .map(
+                |(
+                    (((txn, txn_output), state_checkpoint_hash), state_updates),
+                    (event_hashes, write_set_hash),
+                )| {
+                    let (write_set, events, reconfig_events, gas_used, status) =
+                        txn_output.unpack();
+                    let event_tree =
+                        InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes);
 
-            let txn_info = match &status {
-                TransactionStatus::Keep(status) => TransactionInfo::new(
-                    txn.hash(),
-                    write_set_hash,
-                    event_tree.root_hash(),
-                    state_checkpoint_hash,
-                    gas_used,
-                    status.clone(),
-                ),
-                _ => unreachable!("Transaction sorted by status already."),
-            };
-            let txn_info_hash = txn_info.hash();
-            txn_info_hashes.push(txn_info_hash);
-            to_commit.push((
-                txn,
-                TransactionData::new(
-                    state_updates,
-                    write_set,
-                    events,
-                    reconfig_events,
-                    status,
-                    Arc::new(event_tree),
-                    gas_used,
-                    txn_info,
-                    txn_info_hash,
-                ),
-            ))
-        }
-        (to_commit, txn_info_hashes)
+                    let txn_info = match &status {
+                        TransactionStatus::Keep(status) => TransactionInfo::new(
+                            txn.hash(),
+                            write_set_hash,
+                            event_tree.root_hash(),
+                            state_checkpoint_hash,
+                            gas_used,
+                            status.clone(),
+                        ),
+                        _ => unreachable!("Transaction sorted by status already."),
+                    };
+                    let txn_info_hash = txn_info.hash();
+                    let txn_data = TransactionData::new(
+                        state_updates,
+                        write_set,
+                        events,
+                        reconfig_events,
+                        status,
+                        Arc::new(event_tree),
+                        gas_used,
+                        txn_info,
+                        txn_info_hash,
+                    );
+                    ((txn, txn_data), txn_info_hash)
+                },
+            )
+            .unzip()
     }
 }
 
