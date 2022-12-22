@@ -16,6 +16,7 @@ pub async fn generate_traffic(
     nodes: &[PeerId],
     duration: Duration,
     gas_price: u64,
+    txn_mix: Vec<(TransactionType, usize)>,
 ) -> Result<TxnStats> {
     ensure!(gas_price > 0, "gas_price is required to be non zero");
     let mut runtime_builder = Builder::new_multi_thread();
@@ -35,11 +36,7 @@ pub async fn generate_traffic(
     emit_job_request = emit_job_request
         .rest_clients(validator_clients)
         .gas_price(gas_price)
-        .transaction_mix(vec![
-            (TransactionType::P2P, 70),
-            (TransactionType::AccountGeneration, 20),
-            (TransactionType::NftMintAndTransfer, 10),
-        ])
+        .transaction_mix(txn_mix)
         .mode(EmitJobMode::ConstTps { tps: 20 });
     emitter
         .emit_txn_for_with_stats(chain_info.root_account, emit_job_request, duration, 3)
@@ -53,9 +50,19 @@ async fn test_txn_emmitter() {
 
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
-    let txn_stat = generate_traffic(&mut swarm, &all_validators, Duration::from_secs(10), 1)
-        .await
-        .unwrap();
+    let txn_stat = generate_traffic(
+        &mut swarm,
+        &all_validators,
+        Duration::from_secs(10),
+        1,
+        vec![
+            (TransactionType::P2P, 70),
+            (TransactionType::AccountGeneration, 20),
+            (TransactionType::NftMintAndTransfer, 10),
+        ],
+    )
+    .await
+    .unwrap();
     println!("{:?}", txn_stat.rate(Duration::from_secs(10)));
     // assert some much smaller number than expected, so it doesn't fail under contention
     assert!(txn_stat.submitted > 30);

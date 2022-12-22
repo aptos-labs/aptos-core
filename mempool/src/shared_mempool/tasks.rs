@@ -551,17 +551,6 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
 }
 
 /// Remove transactions that are committed (or rejected) so that we can stop broadcasting them.
-#[cfg(feature = "consensus-only-perf-test")]
-pub(crate) fn process_committed_transactions(
-    _mempool: &Mutex<CoreMempool>,
-    _transactions: Vec<TransactionSummary>,
-    _block_timestamp_usecs: u64,
-) {
-    // no-op
-}
-
-/// Remove transactions that are committed (or rejected) so that we can stop broadcasting them.
-#[cfg(not(feature = "consensus-only-perf-test"))]
 pub(crate) fn process_committed_transactions(
     mempool: &Mutex<CoreMempool>,
     transactions: Vec<TransactionSummary>,

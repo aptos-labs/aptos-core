@@ -267,7 +267,7 @@ impl DbReader for FakeAptosDB {
                 TransactionInfoWithProof::new(TransactionAccumulatorProof::new(vec![]), txn_info);
 
             Ok(TransactionWithProof::new(
-                version.clone(),
+                version,
                 txn,
                 None,
                 txn_info_with_proof,

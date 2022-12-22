@@ -221,7 +221,6 @@ jobs:
       # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
 
-  # Run e2e compat test against testnet branch
   forge-consensus-only-perf-test:
     needs:
       [rust-images-consensus-only-perf-test, determine-docker-build-metadata]

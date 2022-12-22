@@ -789,7 +789,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
             .with_network_tests(vec![&LoadVsPerfBenchmark {
                 test: &PerformanceBenchmark,
-                tps: &[5000],
+                tps: &[50000],
             }])
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 // no epoch change.
