@@ -82,6 +82,7 @@ module.resource_signer_cap = option::some(resource_signer_cap);
 -  [Function `create_resource_account_and_publish_package`](#0x1_resource_account_create_resource_account_and_publish_package)
 -  [Function `rotate_account_authentication_key_and_store_capability`](#0x1_resource_account_rotate_account_authentication_key_and_store_capability)
 -  [Function `retrieve_resource_account_cap`](#0x1_resource_account_retrieve_resource_account_cap)
+-  [Function `acquire_resource_account_signer`](#0x1_resource_account_acquire_resource_account_signer)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -357,6 +358,37 @@ the SignerCapability.
 
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(resource, <a href="resource_account.md#0x1_resource_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>);
     resource_signer_cap
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_resource_account_acquire_resource_account_signer"></a>
+
+## Function `acquire_resource_account_signer`
+
+Source account can acquire the signer of a resource account it owns
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="resource_account.md#0x1_resource_account_acquire_resource_account_signer">acquire_resource_account_signer</a>(source_account: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="resource_account.md#0x1_resource_account">resource_account</a>: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="resource_account.md#0x1_resource_account_acquire_resource_account_signer">acquire_resource_account_signer</a>(source_account: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="resource_account.md#0x1_resource_account">resource_account</a>: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="resource_account.md#0x1_resource_account_Container">Container</a> {
+    <b>let</b> src_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source_account);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(src_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="resource_account.md#0x1_resource_account_ECONTAINER_NOT_PUBLISHED">ECONTAINER_NOT_PUBLISHED</a>));
+
+    <b>let</b> container = <b>borrow_global_mut</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(src_addr);
+    <b>assert</b>!(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&container.store, &<a href="resource_account.md#0x1_resource_account">resource_account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="resource_account.md#0x1_resource_account_EUNAUTHORIZED_NOT_OWNER">EUNAUTHORIZED_NOT_OWNER</a>));
+    <b>let</b> signer_cap = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(&container.store, &<a href="resource_account.md#0x1_resource_account">resource_account</a>);
+    create_signer_with_capability(signer_cap)
 }
 </code></pre>
 

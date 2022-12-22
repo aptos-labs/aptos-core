@@ -66,6 +66,7 @@ module aptos_framework::resource_account {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
     use aptos_std::simple_map::{Self, SimpleMap};
+    use aptos_framework::account::create_signer_with_capability;
 
     /// Container resource not found in account
     const ECONTAINER_NOT_PUBLISHED: u64 = 1;
@@ -185,6 +186,17 @@ module aptos_framework::resource_account {
         resource_signer_cap
     }
 
+    /// Source account can acquire the signer of a resource account it owns
+    public fun acquire_resource_account_signer(source_account: &signer, resource_account: address): signer acquires Container {
+        let src_addr = signer::address_of(source_account);
+        assert!(exists<Container>(src_addr), error::not_found(ECONTAINER_NOT_PUBLISHED));
+
+        let container = borrow_global_mut<Container>(src_addr);
+        assert!(simple_map::contains_key(&container.store, &resource_account), error::invalid_argument(EUNAUTHORIZED_NOT_OWNER));
+        let signer_cap = simple_map::borrow(&container.store, &resource_account);
+        create_signer_with_capability(signer_cap)
+    }
+
     #[test(user = @0x1111)]
     public entry fun test_create_account_and_retrieve_cap(user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
@@ -256,5 +268,22 @@ module aptos_framework::resource_account {
 
         coin::destroy_burn_cap(burn);
         coin::destroy_mint_cap(mint);
+    }
+
+    #[test(user = @0x1234)]
+    public fun test_acquire_signer(user: signer)acquires Container {
+        let user_addr = signer::address_of(&user);
+
+        aptos_framework::aptos_account::create_account(user_addr);
+        let seed = x"01";
+        create_resource_account(
+            &user,
+            copy seed,
+            vector::empty()
+        );
+
+        let resource_addr = aptos_framework::account::create_resource_address(&user_addr, seed);
+        let resource_signer = acquire_resource_account_signer(&user, resource_addr);
+        assert!(signer::address_of(&resource_signer) == resource_addr, 1);
     }
 }
