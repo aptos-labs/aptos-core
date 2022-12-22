@@ -94,6 +94,54 @@ module aptos_framework::delegation_pool {
         assert!(delegation_pool_exists(pool_address), error::invalid_argument(EDELEGATION_POOL_DOES_NOT_EXIST));
     }
 
+    public fun get_stake(pool_address: address, delegator_address: address): (u64, u64, u64) acquires DelegationPool {
+        let (active, inactive, pending_active, pending_inactive) = stake::get_stake(pool_address);
+        let (withdrawal_exists, withdrawal_lockup_epoch) = pending_withdrawal_exists(pool_address, delegator_address);
+
+        let pool = borrow_global<DelegationPool>(pool_address);
+        active = pool_u64::shares_to_amount_with_total_coins(
+            &pool.active_shares,
+            pool_u64::shares(&pool.active_shares, delegator_address),
+            active + pending_active
+        );
+
+        (inactive, pending_inactive) = if (withdrawal_exists) {
+            let current_lockup_epoch = current_lockup_epoch_internal(pool);
+            if (withdrawal_lockup_epoch < current_lockup_epoch) {
+                (
+                    pool_u64::balance(
+                        vector::borrow(&pool.inactive_shares, withdrawal_lockup_epoch),
+                        delegator_address
+                    ),
+                    0
+                )
+            } else {
+                let pending_or_inactive_pool = vector::borrow(&pool.inactive_shares, current_lockup_epoch);
+                let pending_or_inactive_shares = pool_u64::shares(pending_or_inactive_pool, delegator_address);
+                if (last_reconfiguration_time() / MICRO_CONVERSION_FACTOR >= pool.locked_until_secs) {
+                    (
+                        pool_u64::shares_to_amount_with_total_coins(
+                            pending_or_inactive_pool,
+                            pending_or_inactive_shares,
+                            inactive - pool.total_coins_inactive
+                        ),
+                        0
+                    )
+                } else {
+                    (
+                        0,
+                        pool_u64::shares_to_amount_with_total_coins(
+                            pending_or_inactive_pool,
+                            pending_or_inactive_shares,
+                            pending_inactive
+                        )
+                    )
+                }
+            }
+        } else { (0, 0) };
+        (active, inactive, pending_inactive)
+    }
+
     public fun current_lockup_epoch(pool_address: address): u64 acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         current_lockup_epoch_internal(borrow_global<DelegationPool>(pool_address))
@@ -113,7 +161,7 @@ module aptos_framework::delegation_pool {
         delegator_address: address,
     ): (bool, u64) acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
+        let pool = borrow_global<DelegationPool>(pool_address);
         if (table::contains(&pool.pending_withdrawal, delegator_address)) {
             (true, *table::borrow(&pool.pending_withdrawal, delegator_address))
         } else {
