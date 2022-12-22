@@ -14,7 +14,6 @@ module aptos_framework::delegate {
     buy_in_inactive_shares,
     redeem_active_shares,
     redeem_inactive_shares,
-    commit_epoch_rewards,
     pending_withdrawal_exists,
     };
 
@@ -108,7 +107,6 @@ module aptos_framework::delegate {
         } else { 0 };
         let add_stake_fee = current_epoch_max_active_reward * amount / (active + amount);
 
-        commit_epoch_rewards(pool_address, add_stake_fee, 0);
         amount = amount - add_stake_fee;
         buy_in_active_shares(pool_address, delegator_address, amount);
 
