@@ -174,8 +174,15 @@ impl DbReader for FakeAptosDB {
         start_version: Version,
         limit: u64,
         ledger_version: Version,
-        _fetch_events: bool,
+        fetch_events: bool,
     ) -> Result<TransactionListWithProof> {
+        // If the genesis transactions is requested, go to AptosDB storage.
+        if start_version == 0 {
+            return self
+                .inner
+                .get_transactions(start_version, limit, ledger_version, fetch_events);
+        }
+
         gauged_api("get_transactions", || {
             error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
@@ -455,7 +462,8 @@ impl DbReader for FakeAptosDB {
         let struct_tag = access_path.get_struct_tag();
 
         // Since the genesis write set is persisted with AptosDB, we call
-        // it to serve state values targetting the framework account.
+        // it to serve state values targetting the framework account
+        // (to access AptosCoin, for example).
         // The in-memory data structures only handle "normal user" accounts.
         if (account_address != AccountAddress::ONE)
             && struct_tag.is_some()
