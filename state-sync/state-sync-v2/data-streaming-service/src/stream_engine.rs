@@ -33,28 +33,28 @@ use std::{cmp, sync::Arc};
 
 macro_rules! invalid_client_request {
     ($client_request:expr, $stream_engine:expr) => {
-        panic!(
+        return Err(Error::UnexpectedErrorEncountered(format!(
             "Invalid client request {:?} found for the data stream engine {:?}",
             $client_request, $stream_engine
-        )
+        )))
     };
 }
 
 macro_rules! invalid_response_type {
     ($client_response:expr) => {
-        panic!(
+        return Err(Error::UnexpectedErrorEncountered(format!(
             "The client response is type mismatched: {:?}",
             $client_response
-        )
+        )))
     };
 }
 
 macro_rules! invalid_stream_request {
     ($stream_request:expr) => {
-        panic!(
+        return Err(Error::UnexpectedErrorEncountered(format!(
             "Invalid stream request found {:?}",
             format!("{:?}", $stream_request)
-        )
+        )))
     };
 }
 
@@ -71,7 +71,7 @@ pub trait DataStreamEngine {
 
     /// Returns true iff all remaining data required to satisfy the stream is
     /// available in the given advertised data.
-    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> bool;
+    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error>;
 
     /// Returns true iff the stream has sent all data to the stream listener.
     fn is_stream_complete(&self) -> bool;
@@ -202,9 +202,10 @@ impl StateStreamEngine {
         Ok(())
     }
 
-    fn get_number_of_states(&self) -> u64 {
-        self.number_of_states
-            .expect("Number of states is not initialized!")
+    fn get_number_of_states(&self) -> Result<u64, Error> {
+        self.number_of_states.ok_or_else(|| {
+            Error::UnexpectedErrorEncountered("Number of states is not initialized!".into())
+        })
     }
 }
 
@@ -252,12 +253,12 @@ impl DataStreamEngine for StateStreamEngine {
         }
     }
 
-    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> bool {
-        AdvertisedData::contains_range(
+    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
+        Ok(AdvertisedData::contains_range(
             self.request.version,
             self.request.version,
             &advertised_data.states,
-        )
+        ))
     }
 
     fn is_stream_complete(&self) -> bool {
@@ -276,7 +277,7 @@ impl DataStreamEngine for StateStreamEngine {
                     self.next_stream_index,
                     request.start_index,
                     request.end_index,
-                );
+                )?;
 
                 // Update the local stream notification tracker
                 self.next_stream_index = request.end_index.checked_add(1).ok_or_else(|| {
@@ -286,7 +287,7 @@ impl DataStreamEngine for StateStreamEngine {
                 // Check if the stream is complete
                 if request.end_index
                     == self
-                        .get_number_of_states()
+                        .get_number_of_states()?
                         .checked_sub(1)
                         .ok_or_else(|| Error::IntegerOverflow("End index has overflown!".into()))?
                 {
@@ -299,7 +300,7 @@ impl DataStreamEngine for StateStreamEngine {
                     client_response_payload,
                     None,
                     self.clone().into(),
-                );
+                )?;
                 return Ok(Some(data_notification));
             }
             NumberOfStates(request) => {
@@ -435,10 +436,10 @@ impl ContinuousTransactionStreamEngine {
         }
     }
 
-    fn get_target_ledger_info(&self) -> &LedgerInfoWithSignatures {
-        self.current_target_ledger_info
-            .as_ref()
-            .expect("No current target ledger info found!")
+    fn get_target_ledger_info(&self) -> Result<&LedgerInfoWithSignatures, Error> {
+        self.current_target_ledger_info.as_ref().ok_or_else(|| {
+            Error::UnexpectedErrorEncountered("No current target ledger info found!".into())
+        })
     }
 
     fn create_notification_for_continuous_data(
@@ -449,7 +450,7 @@ impl ContinuousTransactionStreamEngine {
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<DataNotification, Error> {
         // Update the stream version
-        let target_ledger_info = self.get_target_ledger_info().clone();
+        let target_ledger_info = self.get_target_ledger_info()?.clone();
         self.update_stream_version_and_epoch(request_start, request_end, &target_ledger_info)?;
 
         // Create the data notification
@@ -458,7 +459,7 @@ impl ContinuousTransactionStreamEngine {
             client_response_payload,
             Some(target_ledger_info),
             self.clone().into(),
-        );
+        )?;
         Ok(data_notification)
     }
 
@@ -517,7 +518,7 @@ impl ContinuousTransactionStreamEngine {
             client_response_payload,
             Some(target_ledger_info.clone()),
             self.clone().into(),
-        );
+        )?;
         Ok(data_notification)
     }
 
@@ -602,7 +603,7 @@ impl ContinuousTransactionStreamEngine {
             next_stream_version,
             request_start_version,
             request_end_version,
-        );
+        )?;
 
         // Update the next stream version and epoch
         if request_end_version == target_ledger_info.ledger_info().version()
@@ -823,7 +824,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         Ok(client_requests)
     }
 
-    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> bool {
+    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
         let advertised_ranges = match &self.request {
             StreamRequest::ContinuouslyStreamTransactions(_) => &advertised_data.transactions,
             StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
@@ -837,11 +838,11 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
 
         // Verify we can satisfy the next version
         let (next_request_version, _) = self.next_request_version_and_epoch;
-        AdvertisedData::contains_range(
+        Ok(AdvertisedData::contains_range(
             next_request_version,
             next_request_version,
             advertised_ranges,
-        )
+        ))
     }
 
     fn is_stream_complete(&self) -> bool {
@@ -1091,14 +1092,14 @@ impl DataStreamEngine for EpochEndingStreamEngine {
         Ok(client_requests)
     }
 
-    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> bool {
+    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
         let start_epoch = self.next_stream_epoch;
         let end_epoch = self.end_epoch;
-        AdvertisedData::contains_range(
+        Ok(AdvertisedData::contains_range(
             start_epoch,
             end_epoch,
             &advertised_data.epoch_ending_ledger_infos,
-        )
+        ))
     }
 
     fn is_stream_complete(&self) -> bool {
@@ -1117,7 +1118,7 @@ impl DataStreamEngine for EpochEndingStreamEngine {
                     self.next_stream_epoch,
                     request.start_epoch,
                     request.end_epoch,
-                );
+                )?;
 
                 // Update the local stream notification tracker
                 self.next_stream_epoch = request.end_epoch.checked_add(1).ok_or_else(|| {
@@ -1135,7 +1136,7 @@ impl DataStreamEngine for EpochEndingStreamEngine {
                     client_response_payload,
                     None,
                     self.clone().into(),
-                );
+                )?;
                 Ok(Some(data_notification))
             }
             request => invalid_client_request!(request, self),
@@ -1196,7 +1197,7 @@ impl TransactionStreamEngine {
             self.next_stream_version,
             request_start_version,
             request_end_version,
-        );
+        )?;
 
         // Update the local stream notification tracker
         self.next_stream_version = request_end_version
@@ -1301,7 +1302,7 @@ impl DataStreamEngine for TransactionStreamEngine {
         Ok(client_requests)
     }
 
-    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> bool {
+    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
         let (request_end_version, advertised_ranges) = match &self.request {
             StreamRequest::GetAllTransactions(request) => {
                 (request.end_version, &advertised_data.transactions)
@@ -1314,11 +1315,11 @@ impl DataStreamEngine for TransactionStreamEngine {
             }
             request => invalid_stream_request!(request),
         };
-        AdvertisedData::contains_range(
+        Ok(AdvertisedData::contains_range(
             self.next_stream_version,
             request_end_version,
             advertised_ranges,
-        )
+        ))
     }
 
     fn is_stream_complete(&self) -> bool {
@@ -1374,26 +1375,33 @@ impl DataStreamEngine for TransactionStreamEngine {
             client_response_payload,
             None,
             self.clone().into(),
-        );
+        )?;
         Ok(Some(data_notification))
     }
 }
 
 /// Verifies that the `expected_next_index` matches the `start_index` and that
 /// the `end_index` is greater than or equal to `expected_next_index`.
-fn verify_client_request_indices(expected_next_index: u64, start_index: u64, end_index: u64) {
+fn verify_client_request_indices(
+    expected_next_index: u64,
+    start_index: u64,
+    end_index: u64,
+) -> Result<(), Error> {
     if start_index != expected_next_index {
-        panic!(
+        return Err(Error::UnexpectedErrorEncountered(format!(
             "The start index did not match the expected next index! Given: {:?}, expected: {:?}",
             start_index, expected_next_index
-        );
+        )));
     }
+
     if end_index < expected_next_index {
-        panic!(
+        return Err(Error::UnexpectedErrorEncountered(format!(
             "The end index was less than the expected next index! Given: {:?}, expected: {:?}",
             end_index, expected_next_index
-        );
+        )));
     }
+
+    Ok(())
 }
 
 /// Creates a batch of data client requests for the given stream engine
@@ -1431,7 +1439,7 @@ fn create_data_client_requests(
 
         // Create the data client requests
         let data_client_request =
-            create_data_client_request(request_start_index, request_end_index, &stream_engine);
+            create_data_client_request(request_start_index, request_end_index, &stream_engine)?;
         data_client_requests.push(data_client_request);
 
         // Update the local loop state
@@ -1455,8 +1463,8 @@ fn create_data_client_request(
     start_index: u64,
     end_index: u64,
     stream_engine: &StreamEngine,
-) -> DataClientRequest {
-    match stream_engine {
+) -> Result<DataClientRequest, Error> {
+    let data_client_request = match stream_engine {
         StreamEngine::StateStreamEngine(stream_engine) => {
             StateValuesWithProof(StateValuesWithProofRequest {
                 version: stream_engine.request.version,
@@ -1466,7 +1474,7 @@ fn create_data_client_request(
         }
         StreamEngine::ContinuousTransactionStreamEngine(stream_engine) => {
             let target_ledger_info_version = stream_engine
-                .get_target_ledger_info()
+                .get_target_ledger_info()?
                 .ledger_info()
                 .version();
             match &stream_engine.request {
@@ -1528,7 +1536,8 @@ fn create_data_client_request(
             }
             request => invalid_stream_request!(request),
         },
-    }
+    };
+    Ok(data_client_request)
 }
 
 /// Creates a new data notification for the given client response.
@@ -1537,7 +1546,7 @@ fn create_data_notification(
     client_response: ResponsePayload,
     target_ledger_info: Option<LedgerInfoWithSignatures>,
     stream_engine: StreamEngine,
-) -> DataNotification {
+) -> Result<DataNotification, Error> {
     let notification_id = notification_id_generator.next();
 
     let client_response_type = client_response.get_label();
@@ -1573,10 +1582,12 @@ fn create_data_notification(
         },
         ResponsePayload::TransactionsWithProof(transactions_chunk) => match stream_engine {
             StreamEngine::ContinuousTransactionStreamEngine(_) => {
-                DataPayload::ContinuousTransactionsWithProof(
-                    target_ledger_info.expect("A target ledger info is required!"),
-                    transactions_chunk,
-                )
+                let target_ledger_info = target_ledger_info.ok_or_else(|| {
+                    Error::UnexpectedErrorEncountered(
+                        "The target ledger info was not provided".into(),
+                    )
+                })?;
+                DataPayload::ContinuousTransactionsWithProof(target_ledger_info, transactions_chunk)
             }
             StreamEngine::TransactionStreamEngine(_) => {
                 DataPayload::TransactionsWithProof(transactions_chunk)
@@ -1586,8 +1597,13 @@ fn create_data_notification(
         ResponsePayload::TransactionOutputsWithProof(transactions_output_chunk) => {
             match stream_engine {
                 StreamEngine::ContinuousTransactionStreamEngine(_) => {
+                    let target_ledger_info = target_ledger_info.ok_or_else(|| {
+                        Error::UnexpectedErrorEncountered(
+                            "The target ledger info was not provided".into(),
+                        )
+                    })?;
                     DataPayload::ContinuousTransactionOutputsWithProof(
-                        target_ledger_info.expect("A target ledger info is required!"),
+                        target_ledger_info,
                         transactions_output_chunk,
                     )
                 }
@@ -1600,8 +1616,8 @@ fn create_data_notification(
         _ => invalid_response_type!(client_response_type),
     };
 
-    DataNotification {
+    Ok(DataNotification {
         notification_id,
         data_payload,
-    }
+    })
 }
