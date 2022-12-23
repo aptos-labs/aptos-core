@@ -12,45 +12,6 @@ WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
 RUN apt-get update && apt-get install binutils lld
 
-FROM debian-base as validator-testing-base 
-
-RUN apt-get update && apt-get install -y \
-    # Extra goodies for debugging
-    less \
-    git \
-    vim \
-    nano \
-    libjemalloc-dev \
-    binutils \
-    graphviz \
-    ghostscript \
-    strace \
-    htop \
-    sysstat \
-    valgrind \
-    && apt-get clean && rm -r /var/lib/apt/lists/*
-
-RUN echo "deb http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
-RUN echo "deb-src http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
-
-RUN apt-get update && apt-get install -y \
-		arping bison clang-format cmake dh-python \
-		dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
-		libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
-		libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
-		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
-    && apt-get clean && rm -r /var/lib/apt/lists/*
-
-RUN git clone https://github.com/aptos-labs/bcc.git
-RUN mkdir bcc/build
-WORKDIR bcc/
-RUN git checkout 5258d14cb35ba08a8757a68386bebc9ea05f00c9
-WORKDIR build/
-RUN cmake ..
-RUN make
-RUN make install
-WORKDIR ..
-
 ### Build Rust code ###
 FROM rust-base as builder
 
@@ -316,11 +277,7 @@ ENV GIT_SHA ${GIT_SHA}
 
 ### EXPERIMENTAL ###
 
-### Validator Image ###
-# We will build a base testing image with the necessary packages and 
-# duplicate steps from validator step. This will, however, reduce 
-# cache invalidation and reduce build times. 
-FROM validator-testing-base  AS validator-testing
+FROM debian-base as validator-testing-base 
 
 RUN apt-get update && apt-get install -y \
     libssl1.1 \
@@ -333,11 +290,51 @@ RUN apt-get update && apt-get install -y \
     curl \
     # postgres client lib required for indexer
     libpq-dev \
+    # Extra goodies for debugging
+    less \
+    git \
+    vim \
+    nano \
+    libjemalloc-dev \
+    binutils \
+    graphviz \
+    ghostscript \
+    strace \
+    htop \
+    sysstat \
+    valgrind \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 ### Because build machine perf might not match run machine perf, we have to symlink
 ### Even if version slightly off, still mostly works
 RUN ln -sf /usr/bin/perf_* /usr/bin/perf
+
+RUN echo "deb http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+RUN echo "deb-src http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+
+RUN apt-get update && apt-get install -y \
+		arping bison clang-format cmake dh-python \
+		dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
+		libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
+		libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
+		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+RUN git clone https://github.com/aptos-labs/bcc.git
+RUN mkdir bcc/build
+WORKDIR bcc/
+RUN git checkout 5258d14cb35ba08a8757a68386bebc9ea05f00c9
+WORKDIR build/
+RUN cmake ..
+RUN make
+RUN make install
+WORKDIR ..
+
+### Validator Image ###
+# We will build a base testing image with the necessary packages and 
+# duplicate steps from validator step. This will, however, reduce 
+# cache invalidation and reduce build times. 
+FROM validator-testing-base  AS validator-testing
 
 RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
 
