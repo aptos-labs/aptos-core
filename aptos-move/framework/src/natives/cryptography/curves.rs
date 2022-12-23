@@ -16,6 +16,7 @@ use bls12_381;
 use ark_ec::group::Group;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
+use move_core_types::language_storage::TypeTag;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::loaded_data::runtime_types::Type;
 use move_vm_types::natives::function::NativeResult;
@@ -26,6 +27,10 @@ use num_traits::identities::Zero;
 use smallvec::smallvec;
 use std::collections::VecDeque;
 use std::ops::{Add, Mul, Neg};
+
+pub mod abort_codes {
+    pub const E_CURVE_TYPE_NOT_SUPPORTED: u64 = 1;
+}
 
 #[derive(Debug, Clone)]
 pub struct GasParameters {
@@ -153,13 +158,16 @@ impl Bls12381Context {
 fn element_from_bytes_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
     let bytes = pop_arg!(args, Vec<u8>);
-    let handle = match group_id {
-        GID_BLS12_381_G1 => {
+    let handle = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
             let point = ark_bls12_381::G1Affine::deserialize_uncompressed(bytes.as_slice())
                 .unwrap()
                 .into_projective();
@@ -168,7 +176,7 @@ fn element_from_bytes_internal(
                 .get_mut::<ArksContext>()
                 .add_g1_point(point)
         }
-        GID_BLS12_381_G2 => {
+        "0x1::curves::BLS12_381_G2" => {
             let point = ark_bls12_381::G2Affine::deserialize_uncompressed(bytes.as_slice())
                 .unwrap()
                 .into_projective();
@@ -188,13 +196,16 @@ fn element_from_bytes_internal(
 fn scalar_from_bytes_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
     let bytes = pop_arg!(args, Vec<u8>);
-    let handle = match group_id {
-        GID_BLS12_381_G1 | GID_BLS12_381_G2 => {
+    let handle = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" => {
             let scalar = ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice()).unwrap();
             context
                 .extensions_mut()
@@ -212,13 +223,16 @@ fn scalar_from_bytes_internal(
 fn scalar_from_u64_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
     let v = pop_arg!(args, u64);
-    let handle = match group_id {
-        GID_BLS12_381_G1 | GID_BLS12_381_G2 | GID_BLS12_381_Gt => {
+    let handle = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let handle = context
                 .extensions_mut()
                 .get_mut::<ArksContext>()
@@ -236,14 +250,17 @@ fn scalar_from_u64_internal(
 fn scalar_add_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
     let handle_2 = pop_arg!(args, u8) as usize;
     let handle_1 = pop_arg!(args, u8) as usize;
-    let handle = match group_id {
-        GID_BLS12_381_G1 | GID_BLS12_381_G2 | GID_BLS12_381_Gt => {
+    let handle = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -270,14 +287,17 @@ fn scalar_add_internal(
 fn scalar_mul_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
     let handle_2 = pop_arg!(args, u8) as usize;
     let handle_1 = pop_arg!(args, u8) as usize;
-    let handle = match group_id {
-        GID_BLS12_381_G1 | GID_BLS12_381_G2 | GID_BLS12_381_Gt => {
+    let handle = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -304,13 +324,16 @@ fn scalar_mul_internal(
 fn scalar_neg_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
     let handle = pop_arg!(args, u8) as usize;
-    let result_handle = match group_id {
-        GID_BLS12_381_G1 | GID_BLS12_381_G2 | GID_BLS12_381_Gt => {
+    let result_handle = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let result = context
                 .extensions()
                 .get::<ArksContext>()
@@ -333,13 +356,16 @@ fn scalar_neg_internal(
 fn scalar_inv_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
     let handle = pop_arg!(args, u8) as usize;
-    let (succeeded, result_handle) = match group_id {
-        GID_BLS12_381_G1 | GID_BLS12_381_G2 | GID_BLS12_381_Gt => {
+    let (succeeded, result_handle) = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let op_result = context
                 .extensions()
                 .get::<ArksContext>()
@@ -367,14 +393,17 @@ fn scalar_inv_internal(
 fn scalar_eq_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
     let handle_2 = pop_arg!(args, u8) as usize;
     let handle_1 = pop_arg!(args, u8) as usize;
-    let result = match group_id {
-        GID_BLS12_381_G1 | GID_BLS12_381_G2 | GID_BLS12_381_Gt => {
+    let result = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -385,7 +414,12 @@ fn scalar_eq_internal(
                 .get_scalar(handle_2);
             scalar_1 == scalar_2
         }
-        _ => todo!(),
+        _ => {
+            return Ok(NativeResult::err(
+                gas_params.base,
+                abort_codes::E_CURVE_TYPE_NOT_SUPPORTED,
+            ))
+        }
     };
     Ok(NativeResult::ok(
         gas_params.base,
@@ -396,12 +430,15 @@ fn scalar_eq_internal(
 fn point_identity_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
-    let handle = match group_id {
-        GID_BLS12_381_G1 => {
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let handle = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
             let point = ark_bls12_381::G1Projective::zero();
             let handle = context
                 .extensions_mut()
@@ -409,7 +446,7 @@ fn point_identity_internal(
                 .add_g1_point(point);
             handle
         }
-        GID_BLS12_381_G2 => {
+        "0x1::curves::BLS12_381_G2" => {
             let point = ark_bls12_381::G2Projective::zero();
             let handle = context
                 .extensions_mut()
@@ -417,7 +454,7 @@ fn point_identity_internal(
                 .add_g2_point(point);
             handle
         }
-        GID_BLS12_381_Gt => {
+        "0x1::curves::BLS12_381_Gt" => {
             let point = ark_bls12_381::Fq12::zero();
             let handle = context
                 .extensions_mut()
@@ -433,24 +470,20 @@ fn point_identity_internal(
     ))
 }
 
-/// Group/bilinear mapping ID assignments.
-/// The assignment here should match what is in `/aptos-move/framework/aptos-stdlib/sources/cryptography/curves.move`.
-pub const GID_BLS12_381_G1: u8 = 1;
-pub const GID_BLS12_381_G2: u8 = 2;
-pub const GID_BLS12_381_Gt: u8 = 3;
 pub const PID_BLS12_381: u8 = 1;
 
 fn point_generator_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    assert_eq!(0, _ty_args.len());
-    assert_eq!(1, args.len());
-    let group_id = pop_arg!(args, u8);
-    let handle = match group_id {
-        GID_BLS12_381_G1 => {
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let handle = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
             let point = ark_bls12_381::G1Projective::prime_subgroup_generator();
             let handle = context
                 .extensions_mut()
@@ -458,7 +491,7 @@ fn point_generator_internal(
                 .add_g1_point(point);
             handle
         }
-        GID_BLS12_381_G2 => {
+        "0x1::curves::BLS12_381_G2" => {
             let point = ark_bls12_381::G2Projective::prime_subgroup_generator();
             let handle = context
                 .extensions_mut()
@@ -466,7 +499,7 @@ fn point_generator_internal(
                 .add_g2_point(point);
             handle
         }
-        GID_BLS12_381_Gt => {
+        "0x1::curves::BLS12_381_Gt" => {
             let point = ark_bls12_381::Fq12::zero();
             let handle = context
                 .extensions_mut()
@@ -485,14 +518,17 @@ fn point_generator_internal(
 fn point_eq_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
     let handle_2 = pop_arg!(args, u8) as usize;
     let handle_1 = pop_arg!(args, u8) as usize;
-    let result = match group_id {
-        GID_BLS12_381_G1 => {
+    let result = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -504,7 +540,7 @@ fn point_eq_internal(
             let result = point_1.eq(point_2);
             result
         }
-        GID_BLS12_381_G2 => {
+        "0x1::curves::BLS12_381_G2" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -516,7 +552,7 @@ fn point_eq_internal(
             let result = point_1.eq(point_2);
             result
         }
-        GID_BLS12_381_Gt => {
+        "0x1::curves::BLS12_381_Gt" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -540,14 +576,17 @@ fn point_eq_internal(
 fn point_add_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
     let handle_2 = pop_arg!(args, u8) as usize;
     let handle_1 = pop_arg!(args, u8) as usize;
-    let handle = match group_id {
-        GID_BLS12_381_G1 => {
+    let handle = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -563,7 +602,7 @@ fn point_add_internal(
                 .add_g1_point(result);
             handle
         }
-        GID_BLS12_381_G2 => {
+        "0x1::curves::BLS12_381_G2" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -579,7 +618,7 @@ fn point_add_internal(
                 .add_g2_point(result);
             handle
         }
-        GID_BLS12_381_Gt => {
+        "0x1::curves::BLS12_381_Gt" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -606,14 +645,17 @@ fn point_add_internal(
 fn point_mul_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let group_id = pop_arg!(args, u8);
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
     let point_handle = pop_arg!(args, u8) as usize;
     let scalar_handle = pop_arg!(args, u8) as usize;
-    let handle = match group_id {
-        GID_BLS12_381_G1 => {
+    let handle = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
             let point = context
                 .extensions()
                 .get::<ArksContext>()
@@ -629,7 +671,7 @@ fn point_mul_internal(
                 .add_g1_point(result);
             handle
         }
-        GID_BLS12_381_G2 => {
+        "0x1::curves::BLS12_381_G2" => {
             let point = context
                 .extensions()
                 .get::<ArksContext>()
@@ -645,7 +687,7 @@ fn point_mul_internal(
                 .add_g2_point(result);
             handle
         }
-        // GID_BLS12_381_Gt => {
+        // "0x1::curves::BLS12_381_Gt" => {
         //     let point = context
         //         .extensions()
         //         .get::<ArksContext>()
@@ -672,14 +714,27 @@ fn point_mul_internal(
 fn pairing_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let pid = pop_arg!(args, u8);
+    assert_eq!(3, ty_args.len());
+    let type_tag_0 = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let type_tag_1 = context
+        .type_to_type_tag(ty_args.get(1).unwrap())?
+        .to_string();
+    let type_tag_2 = context
+        .type_to_type_tag(ty_args.get(2).unwrap())?
+        .to_string();
     let handle_2 = pop_arg!(args, u8) as usize;
     let handle_1 = pop_arg!(args, u8) as usize;
-    let handle = match pid {
-        PID_BLS12_381 => {
+    let handle = match (
+        type_tag_0.as_str(),
+        type_tag_1.as_str(),
+        type_tag_2.as_str(),
+    ) {
+        ("0x1::curves::BLS12_381_G1", "0x1::curves::BLS12_381_G2", "0x1::curves::BLS12_381_Gt") => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
