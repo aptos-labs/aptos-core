@@ -370,7 +370,7 @@ impl<
             .checked_add(num_transactions_or_outputs as u64)
             .and_then(|version| version.checked_sub(1)) // synced_version = start + num txns/outputs - 1
             .ok_or_else(|| Error::IntegerOverflow("The synced version has overflown!".into()))?;
-        let speculative_stream_state = self.get_speculative_stream_state();
+        let speculative_stream_state = self.get_speculative_stream_state()?;
         speculative_stream_state.update_synced_version(synced_version);
         speculative_stream_state.maybe_update_epoch_state(ledger_info_with_signatures);
 
@@ -385,7 +385,7 @@ impl<
     ) -> Result<Version, Error> {
         // Compare the payload start version with the expected version
         let expected_version = self
-            .get_speculative_stream_state()
+            .get_speculative_stream_state()?
             .expected_next_version()?;
         if let Some(payload_start_version) = payload_start_version {
             if payload_start_version != expected_version {
@@ -444,7 +444,7 @@ impl<
 
         // Verify the ledger info state and signatures
         if let Err(error) = self
-            .get_speculative_stream_state()
+            .get_speculative_stream_state()?
             .verify_ledger_info_with_signatures(ledger_info_with_signatures)
         {
             self.reset_active_stream(Some(NotificationAndFeedback::new(
@@ -483,11 +483,11 @@ impl<
         }
     }
 
-    /// Returns the speculative stream state. Assumes that the state exists.
-    fn get_speculative_stream_state(&mut self) -> &mut SpeculativeStreamState {
-        self.speculative_stream_state
-            .as_mut()
-            .expect("Speculative stream state does not exist!")
+    /// Returns the speculative stream state
+    fn get_speculative_stream_state(&mut self) -> Result<&mut SpeculativeStreamState, Error> {
+        self.speculative_stream_state.as_mut().ok_or_else(|| {
+            Error::UnexpectedError("Speculative stream state does not exist!".into())
+        })
     }
 
     /// Handles the storage synchronizer error sent by the driver

@@ -512,6 +512,7 @@ dependencies = [
  "serde 1.0.149",
  "serde_yaml 0.8.26",
  "thiserror",
+ "url",
 ]
 
 [[package]]
@@ -1692,6 +1693,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-netcore",
  "aptos-network",
+ "aptos-rest-client",
  "aptos-secure-storage",
  "aptos-short-hex-str",
  "aptos-temppath",
@@ -1703,6 +1705,7 @@ dependencies = [
  "rand 0.7.3",
  "serde_yaml 0.8.26",
  "tokio",
+ "url",
 ]
 
 [[package]]

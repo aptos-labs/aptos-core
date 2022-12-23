@@ -136,9 +136,9 @@ Please remember, community managers will never message or DM you first, and they
 
 ## Join the team
 
-Want to join a great team working on amazing world-scale problems? Take a look at [active roles](https://aptoslabs.com/careers) on [AptosLabs.com](https://www.aptoslabs.com/) and come build with us!
+Want to join a great team working on amazing world-scale problems? Take a look at [active roles](https://aptoslabs.com/careers) on [AptosLabs.com](https://www.aptoslabs.com/) and come build with us! Or [create a pull request](https://github.com/aptos-labs/aptos-core/pulls) to make updates and [file issues](https://github.com/aptos-labs/aptos-core/issues) to report problems.
 
-Or simply [create a pull request](https://github.com/aptos-labs/aptos-core/pulls) to make updates and [file issues](https://github.com/aptos-labs/aptos-core/issues) to report problems.
+We welcome your own [contributions](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) to the Aptos blockchain and this site! Simply click *Edit this page* at the bottom of any location to go to the source and trigger editing there. The contents are in [Markdown](https://www.markdownguide.org/basic-syntax/) format. When ready, [start a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request) with your changes. We will get back to you shortly.
 
 ## Find the ecosystem
 
@@ -150,3 +150,7 @@ We are excited that you are here, and we look forward to getting to know you. We
 * [Medium](https://medium.com/aptoslabs)
 * [Telegram](https://t.me/aptos_official)
 * [Twitter](https://twitter.com/Aptos_Network)
+
+## Community projects on Aptos
+
+Here's a [list of community-maintained projects](https://github.com/aptos-foundation/ecosystem-projects) collected by the [Aptos Foundation](https://aptosfoundation.org/).  If you have a project that you want added to the list, just edit the page and add a GitHub pull request.

@@ -285,6 +285,10 @@ where
         template.execution.num_proof_reading_threads = 1;
         template.peer_monitoring_service.max_concurrent_requests = 1;
         template.mempool.shared_mempool_max_concurrent_inbound_syncs = 1;
+        template
+            .state_sync
+            .state_sync_driver
+            .enable_auto_bootstrapping = true;
 
         let validator_network = template.validator_network.as_mut().unwrap();
         validator_network.max_concurrent_network_reqs = 1;
