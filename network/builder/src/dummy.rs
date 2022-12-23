@@ -12,6 +12,7 @@ use aptos_config::{
 use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
 use aptos_infallible::RwLock;
 use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::application::interface::ApplicationNetworkSender;
 use aptos_network::{
     application::storage::PeerMetadataStorage,
     error::NetworkError,
@@ -20,8 +21,7 @@ use aptos_network::{
     },
     protocols::{
         network::{
-            AppConfig, ApplicationNetworkSender, Event, NetworkEvents, NetworkSender,
-            NewNetworkSender,
+            Event, NetworkApplicationConfig, NetworkEvents, NetworkSender, NewNetworkSender,
         },
         rpc::error::RpcError,
     },
@@ -46,8 +46,8 @@ const TEST_DIRECT_SEND_PROTOCOL: ProtocolId = ProtocolId::ConsensusDirectSendBcs
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct DummyMsg(pub Vec<u8>);
 
-pub fn network_endpoint_config() -> AppConfig {
-    AppConfig::p2p(
+pub fn network_endpoint_config() -> NetworkApplicationConfig {
+    NetworkApplicationConfig::p2p(
         [TEST_RPC_PROTOCOL, TEST_DIRECT_SEND_PROTOCOL],
         aptos_channel::Config::new(NETWORK_CHANNEL_SIZE),
     )

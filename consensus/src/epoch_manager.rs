@@ -51,7 +51,8 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_network::protocols::network::{ApplicationNetworkSender, Event};
+use aptos_network::application::interface::ApplicationNetworkSender;
+use aptos_network::protocols::network::Event;
 use aptos_safety_rules::SafetyRulesManager;
 use aptos_types::{
     account_address::AccountAddress,

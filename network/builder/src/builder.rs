@@ -33,7 +33,7 @@ use aptos_network::{
     },
     protocols::{
         health_checker::{self, builder::HealthCheckerBuilder},
-        network::{AppConfig, NewNetworkEvents, NewNetworkSender},
+        network::{NetworkApplicationConfig, NewNetworkEvents, NewNetworkSender},
     },
 };
 use aptos_time_service::TimeService;
@@ -458,7 +458,7 @@ impl NetworkBuilder {
     /// network and return the specialized client and service interfaces.
     pub fn add_p2p_service<SenderT: NewNetworkSender, EventsT: NewNetworkEvents>(
         &mut self,
-        config: &AppConfig,
+        config: &NetworkApplicationConfig,
     ) -> (SenderT, EventsT) {
         (self.add_client(config), self.add_service(config))
     }
@@ -466,7 +466,10 @@ impl NetworkBuilder {
     /// Register a new client application with network. Return the client
     /// interface for sending messages via network.
     // TODO(philiphayes): return new NetworkClient (name TBD) interface?
-    pub fn add_client<SenderT: NewNetworkSender>(&mut self, config: &AppConfig) -> SenderT {
+    pub fn add_client<SenderT: NewNetworkSender>(
+        &mut self,
+        config: &NetworkApplicationConfig,
+    ) -> SenderT {
         let (peer_mgr_reqs_tx, connection_reqs_tx) = self.peer_manager_builder.add_client(config);
         SenderT::new(peer_mgr_reqs_tx, connection_reqs_tx)
     }
@@ -474,7 +477,10 @@ impl NetworkBuilder {
     /// Register a new service application with network. Return the service
     /// interface for handling new requests from network.
     // TODO(philiphayes): return new NetworkService (name TBD) interface?
-    pub fn add_service<EventsT: NewNetworkEvents>(&mut self, config: &AppConfig) -> EventsT {
+    pub fn add_service<EventsT: NewNetworkEvents>(
+        &mut self,
+        config: &NetworkApplicationConfig,
+    ) -> EventsT {
         let (peer_mgr_reqs_rx, connection_notifs_rx) =
             self.peer_manager_builder.add_service(config);
         EventsT::new(peer_mgr_reqs_rx, connection_notifs_rx)

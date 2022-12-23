@@ -18,15 +18,14 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
 };
 use aptos_logger::prelude::*;
+use aptos_network::application::interface::ApplicationNetworkSender;
 use aptos_network::{
     application::storage::PeerMetadataStorage,
     constants::NETWORK_CHANNEL_SIZE,
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
-        network::{
-            AppConfig, ApplicationNetworkSender, NetworkEvents, NetworkSender, NewNetworkSender,
-        },
+        network::{NetworkApplicationConfig, NetworkEvents, NetworkSender, NewNetworkSender},
         rpc::error::RpcError,
         wire::handshake::v1::ProtocolIdSet,
     },
@@ -140,9 +139,9 @@ pub const DIRECT_SEND: &[ProtocolId] = &[
 
 /// Configuration for the network endpoints to support consensus.
 /// TODO: make this configurable
-pub fn network_endpoint_config() -> AppConfig {
+pub fn network_endpoint_config() -> NetworkApplicationConfig {
     let protos = RPC.iter().chain(DIRECT_SEND.iter()).copied();
-    AppConfig::p2p(
+    NetworkApplicationConfig::p2p(
         protos,
         aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
             .queue_style(QueueStyle::FIFO)

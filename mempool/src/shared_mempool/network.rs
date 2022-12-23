@@ -22,6 +22,7 @@ use aptos_config::{
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::application::interface::ApplicationNetworkSender;
 use aptos_network::{
     application::{
         interface::{MultiNetworkSender, NetworkInterface},
@@ -30,8 +31,7 @@ use aptos_network::{
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::network::{
-        AppConfig, ApplicationNetworkSender, NetworkEvents, NetworkSender, NewNetworkSender,
-        RpcError,
+        NetworkApplicationConfig, NetworkEvents, NetworkSender, NewNetworkSender, RpcError,
     },
     transport::ConnectionMetadata,
     ProtocolId,
@@ -96,8 +96,8 @@ pub struct MempoolNetworkSender {
     inner: NetworkSender<MempoolSyncMsg>,
 }
 
-pub fn network_endpoint_config(max_broadcasts_per_peer: usize) -> AppConfig {
-    AppConfig::p2p(
+pub fn network_endpoint_config(max_broadcasts_per_peer: usize) -> NetworkApplicationConfig {
+    NetworkApplicationConfig::p2p(
         [ProtocolId::MempoolDirectSend],
         aptos_channel::Config::new(max_broadcasts_per_peer)
             .queue_style(QueueStyle::KLAST)

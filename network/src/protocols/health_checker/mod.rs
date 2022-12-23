@@ -17,6 +17,7 @@
 //! - Make the policy for interpreting ping failures pluggable
 //! - Use successful inbound pings as a sign of remote note being healthy
 //! - Ping a peer only in periods of no application-level communication with the peer
+use crate::application::interface::ApplicationNetworkSender;
 use crate::{
     application::interface::NetworkInterface,
     constants::NETWORK_CHANNEL_SIZE,
@@ -27,8 +28,7 @@ use crate::{
     protocols::{
         health_checker::interface::{HealthCheckData, HealthCheckNetworkInterface},
         network::{
-            AppConfig, ApplicationNetworkSender, Event, NetworkEvents, NetworkSender,
-            NewNetworkSender,
+            Event, NetworkApplicationConfig, NetworkEvents, NetworkSender, NewNetworkSender,
         },
         rpc::error::RpcError,
     },
@@ -77,8 +77,8 @@ pub struct HealthCheckerNetworkSender {
 }
 
 /// Configuration for the network endpoints to support HealthChecker.
-pub fn network_endpoint_config() -> AppConfig {
-    AppConfig::p2p(
+pub fn network_endpoint_config() -> NetworkApplicationConfig {
+    NetworkApplicationConfig::p2p(
         [ProtocolId::HealthCheckerRpc],
         aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
             .queue_style(QueueStyle::LIFO)
