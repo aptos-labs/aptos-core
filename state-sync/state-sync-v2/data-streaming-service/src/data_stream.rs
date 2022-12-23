@@ -200,7 +200,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                     notification_id
                 ))
             })?;
-        let response_error = extract_response_error(notification_feedback);
+        let response_error = extract_response_error(notification_feedback)?;
         self.notify_bad_response(response_context, response_error);
 
         Ok(())
@@ -223,7 +223,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         global_data_summary: &GlobalDataSummary,
     ) -> Result<(), Error> {
         // Determine how many requests (at most) can be sent to the network
-        let num_sent_requests = self.get_sent_data_requests().len() as u64;
+        let num_sent_requests = self.get_sent_data_requests()?.len() as u64;
         let max_concurrent_requests = self.get_max_concurrent_requests();
         let max_num_requests_to_send = max_concurrent_requests
             .checked_sub(num_sent_requests)
@@ -241,7 +241,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                     self.send_client_request(false, client_request.clone());
 
                 // Enqueue the pending response
-                self.get_sent_data_requests()
+                self.get_sent_data_requests()?
                     .push_back(pending_client_response);
             }
 
@@ -389,12 +389,11 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
 
         // Process any ready data responses
         for _ in 0..self.get_max_concurrent_requests() {
-            if let Some(pending_response) = self.pop_pending_response_queue() {
-                let client_response = pending_response
-                    .lock()
-                    .client_response
-                    .take()
-                    .expect("The client response should be ready!");
+            if let Some(pending_response) = self.pop_pending_response_queue()? {
+                let maybe_client_response = pending_response.lock().client_response.take();
+                let client_response = maybe_client_response.ok_or_else(|| {
+                    Error::UnexpectedErrorEncountered("The client response should be ready!".into())
+                })?;
                 let client_request = &pending_response.lock().client_request.clone();
 
                 match client_response {
@@ -438,9 +437,9 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
 
     /// Pops and returns the first pending client response if the response has
     /// been received. Returns `None` otherwise.
-    fn pop_pending_response_queue(&mut self) -> Option<PendingClientResponse> {
-        let sent_data_requests = self.get_sent_data_requests();
-        if let Some(data_request) = sent_data_requests.front() {
+    fn pop_pending_response_queue(&mut self) -> Result<Option<PendingClientResponse>, Error> {
+        let sent_data_requests = self.get_sent_data_requests()?;
+        let pending_client_response = if let Some(data_request) = sent_data_requests.front() {
             if data_request.lock().client_response.is_some() {
                 // We've received a response! Pop the requests off the queue.
                 sent_data_requests.pop_front()
@@ -449,7 +448,8 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
             }
         } else {
             None
-        }
+        };
+        Ok(pending_client_response)
     }
 
     /// Handles a client response that failed sanity checks
@@ -496,7 +496,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         let pending_client_response = self.send_client_request(true, data_client_request.clone());
 
         // Push the pending response to the head of the sent requests queue
-        self.get_sent_data_requests()
+        self.get_sent_data_requests()?
             .push_front(pending_client_response);
 
         Ok(())
@@ -571,14 +571,15 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
             .notifications_to_responses
             .insert(notification_id, response_context)
         {
-            panic!(
+            Err(Error::UnexpectedErrorEncountered(format!(
                 "Duplicate sent notification ID found! \
                  Notification ID: {:?}, \
                  previous Response context: {:?}",
-                notification_id, response_context,
-            );
+                notification_id, response_context
+            )))
+        } else {
+            self.garbage_collect_notification_response_map()
         }
-        self.garbage_collect_notification_response_map()
     }
 
     fn garbage_collect_notification_response_map(&mut self) -> Result<(), Error> {
@@ -627,7 +628,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     pub fn ensure_data_is_available(&self, advertised_data: &AdvertisedData) -> Result<(), Error> {
         if !self
             .stream_engine
-            .is_remaining_data_available(advertised_data)
+            .is_remaining_data_available(advertised_data)?
         {
             return Err(Error::DataIsUnavailable(format!(
                 "Unable to satisfy stream engine: {:?}, with advertised data: {:?}",
@@ -639,10 +640,10 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
 
     /// Assumes the caller has already verified that `sent_data_requests` has
     /// been initialized.
-    fn get_sent_data_requests(&mut self) -> &mut VecDeque<PendingClientResponse> {
-        self.sent_data_requests
-            .as_mut()
-            .expect("Sent data requests should be initialized!")
+    fn get_sent_data_requests(&mut self) -> Result<&mut VecDeque<PendingClientResponse>, Error> {
+        self.sent_data_requests.as_mut().ok_or_else(|| {
+            Error::UnexpectedErrorEncountered("Sent data requests should be initialized!".into())
+        })
     }
 
     #[cfg(test)]
@@ -778,17 +779,17 @@ fn sanity_check_client_response(
 
 /// Transforms the notification feedback into a specific response error that
 /// can be sent to the Aptos data client.
-fn extract_response_error(notification_feedback: &NotificationFeedback) -> ResponseError {
+fn extract_response_error(
+    notification_feedback: &NotificationFeedback,
+) -> Result<ResponseError, Error> {
     match notification_feedback {
-        NotificationFeedback::InvalidPayloadData => ResponseError::InvalidData,
-        NotificationFeedback::PayloadTypeIsIncorrect => ResponseError::InvalidPayloadDataType,
-        NotificationFeedback::PayloadProofFailed => ResponseError::ProofVerificationError,
-        _ => {
-            panic!(
-                "Invalid notification feedback given: {:?}",
-                notification_feedback
-            )
-        }
+        NotificationFeedback::InvalidPayloadData => Ok(ResponseError::InvalidData),
+        NotificationFeedback::PayloadTypeIsIncorrect => Ok(ResponseError::InvalidPayloadDataType),
+        NotificationFeedback::PayloadProofFailed => Ok(ResponseError::ProofVerificationError),
+        _ => Err(Error::UnexpectedErrorEncountered(format!(
+            "Invalid notification feedback given: {:?}",
+            notification_feedback
+        ))),
     }
 }
 

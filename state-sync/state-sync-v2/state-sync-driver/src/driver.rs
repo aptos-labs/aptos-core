@@ -434,10 +434,11 @@ impl<
                 ))
                 .await
             {
-                panic!(
-                    "Failed to terminate the active stream for the continuous syncer! Error: {:?}",
-                    error
-                );
+                error!(LogSchema::new(LogEntry::SynchronizerNotification)
+                    .message(&format!(
+                        "Failed to terminate the active stream for the continuous syncer! Error: {:?}",
+                        error
+                    )));
             }
         } else if let Err(error) = self
             .bootstrapper
@@ -447,9 +448,11 @@ impl<
             ))
             .await
         {
-            panic!(
-                "Failed to terminate the active stream for the bootstrapper! Error: {:?}",
-                error
+            error!(
+                LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
+                    "Failed to terminate the active stream for the bootstrapper! Error: {:?}",
+                    error
+                ))
             );
         };
     }
@@ -465,7 +468,11 @@ impl<
         let sync_target_version = sync_request
             .lock()
             .as_ref()
-            .expect("We've already verified there is an active sync request!")
+            .ok_or_else(|| {
+                Error::UnexpectedError(
+                    "We've already verified there is an active sync request!".into(),
+                )
+            })?
             .get_sync_target_version();
         let latest_synced_ledger_info =
             utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
@@ -523,6 +530,7 @@ impl<
     async fn check_auto_bootstrapping(&mut self) {
         if !self.bootstrapper.is_bootstrapped()
             && self.is_validator()
+            && self.driver_configuration.config.enable_auto_bootstrapping
             && self.driver_configuration.waypoint.version() == 0
         {
             if let Some(start_time) = self.start_time {

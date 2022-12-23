@@ -24,8 +24,8 @@ use crate::{
     components::{block_tree::BlockTree, chunk_output::ChunkOutput},
     metrics::{
         APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS, APTOS_EXECUTOR_TRANSACTIONS_SAVED,
-        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
+        APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
 use aptos_storage_interface::DbReaderWriter;
@@ -186,11 +186,16 @@ where
                 "execute_block"
             );
             let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-            let state_view = parent_view.verified_state_view(
-                StateViewId::BlockExecution { block_id },
-                Arc::clone(&self.db.reader),
-                Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
-            )?;
+            let state_view = {
+                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&["verified_state_view"])
+                    .start_timer();
+                parent_view.verified_state_view(
+                    StateViewId::BlockExecution { block_id },
+                    Arc::clone(&self.db.reader),
+                    Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+                )?
+            };
 
             let chunk_output = {
                 let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
@@ -203,11 +208,17 @@ where
             };
             chunk_output.trace_log_transaction_status();
 
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["apply_to_ledger"])
+                .start_timer();
             let (output, _, _) = chunk_output.apply_to_ledger(parent_view)?;
             output
         };
         output.ensure_ends_with_state_checkpoint()?;
 
+        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            .with_label_values(&["as_state_compute_result"])
+            .start_timer();
         let block = self
             .block_tree
             .add_block(parent_block_id, block_id, output)?;
@@ -251,13 +262,18 @@ where
         }
 
         let blocks = self.block_tree.get_blocks(&block_ids)?;
-        let txns_to_commit: Vec<_> = blocks
-            .into_iter()
-            .map(|block| block.output.transactions_to_commit())
-            .collect::<Result<Vec<_>>>()?
-            .into_iter()
-            .flatten()
-            .collect();
+        let txns_to_commit: Vec<_> = {
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["get_txns_to_commit"])
+                .start_timer();
+            blocks
+                .into_iter()
+                .map(|block| block.output.transactions_to_commit())
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .flatten()
+                .collect()
+        };
         let first_version = committed_block
             .output
             .result_view

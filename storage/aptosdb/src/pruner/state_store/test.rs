@@ -9,17 +9,19 @@ use aptos_crypto::HashValue;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 use aptos_temppath::TempPath;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::state_store::state_value::StaleStateValueIndex;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StaleStateValueIndex, StateValue},
+    },
     transaction::Version,
 };
 
-use crate::stale_state_value_index::StaleStateValueIndexSchema;
 use crate::{
     pruner::{state_pruner_worker::StatePrunerWorker, *},
     stale_node_index::StaleNodeIndexSchema,
+    stale_state_value_index::StaleStateValueIndexSchema,
     state_store::StateStore,
     test_helper::{arb_state_kv_sets, update_store},
     AptosDB, LedgerPrunerManager, PrunerManager, StatePrunerManager,
@@ -46,13 +48,13 @@ fn put_value_set(
         )
         .unwrap();
 
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     state_store
         .put_value_sets(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
-            &mut batch,
+            &batch,
         )
         .unwrap();
     db.write_schemas(batch).unwrap();
