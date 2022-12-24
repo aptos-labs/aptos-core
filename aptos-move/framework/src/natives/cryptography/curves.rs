@@ -627,7 +627,7 @@ fn point_add_internal(
                 .extensions()
                 .get::<ArksContext>()
                 .get_gt_point(handle_2);
-            let result = point_1.clone() + point_2.clone();
+            let result = point_1.clone() * point_2.clone();
             let handle = context
                 .extensions_mut()
                 .get_mut::<ArksContext>()

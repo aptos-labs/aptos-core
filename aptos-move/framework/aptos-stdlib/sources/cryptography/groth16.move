@@ -52,7 +52,7 @@ module aptos_std::groth16 {
     }
 
     #[test]
-    fun test1() {
+    fun test_verify_mimc_proof() {
         let gamma_abc_g1: vector<curves::Point<BLS12_381_G1>> = vector[
             element_from_bytes<BLS12_381_G1>(x"00192808ef3f352b15066066b5784284ad310194591851848b9ca5099b7bd35d818a7902e4ec148b244d97c553599d0d0c961ac300485ea9d75a4251b7e54d9b9f2467cff599c19f399a0098f9ce6b88497c3f8e9cde85c9b4cdbf2cbc429118"),
             element_from_bytes<BLS12_381_G1>(x"cdd8b7ce59d13e8f29e7d7083b619feb96e38f0e520c46403be8df7ec7d4025b7e24aadb947528e057b5117cabe62012c8e331dc103e205add7ecdd52d109dd2a56e5e990921b5e1b3aeb724e5b8069011b7589e7ef42d975d0711d51f806e19"),
