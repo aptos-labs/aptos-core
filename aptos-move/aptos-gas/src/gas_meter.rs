@@ -28,9 +28,8 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
-// - V6
-//   - Added a new native function - blake2b_256.
 // - V5
+//   - Added a new native function - blake2b_256.
 //   - u16, u32, u256
 //   - free_write_bytes_quota
 //   - configurable ChangeSetConfigs
