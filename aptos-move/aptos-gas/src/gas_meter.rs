@@ -29,6 +29,7 @@ use std::collections::BTreeMap;
 
 // Change log:
 // - V5
+//   - Added a new native function - blake2b_256.
 //   - u16, u32, u256
 //   - free_write_bytes_quota
 //   - configurable ChangeSetConfigs
