@@ -6,7 +6,7 @@ sidebar_position: 14
 
 # Bootstrap a New Fullnode
 
-Bootstrapping a new fullnode using [state-sync](guides/state-sync) might not be an optimal approach after the network
+Bootstrapping a new fullnode using [state-sync](../../guides/state-sync) might not be an optimal approach after the network
 has been running for a while; it can either take too much time, or it won't be able to fetch the required data since
 most nodes have already pruned the ledger history. The easiest way to avoid this is to bootstrap a new fullnode using
 an existing _fullnode snapshot_. A fullnode snapshot is simply a copy of the storage data of an existing fullnode that
@@ -36,5 +36,5 @@ any questions about the snapshot data, or run into any issues, please reach out 
 
 To reuse a snapshot, simply download and copy the files to the location of your storage database for the fullnode. This
 can be found and/or specified in the fullnode `yaml` configuration file, under `data_dir`. See [Configuring a public
-fullnode](nodes/full-node/fullnode-source-code-or-docker#configuring-a-public-fullnode) for more
+fullnode](../../nodes/full-node/fullnode-source-code-or-docker#configuring-a-public-fullnode) for more
 information.
