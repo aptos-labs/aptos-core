@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{KnownAttribute, RuntimeModuleMetadataV1};
+use move_binary_format::file_format::AbilitySet;
 use move_core_types::{
     account_address::AccountAddress,
     errmap::{ErrorDescription, ErrorMapping},
@@ -9,10 +10,10 @@ use move_core_types::{
     language_storage::ModuleId,
 };
 use move_model::{
-    ast::{Attribute, Value},
+    ast::{Attribute, AttributeValue, Value},
     model::{
         FunctionEnv, FunctionVisibility, GlobalEnv, Loc, ModuleEnv, NamedConstantEnv, Parameter,
-        QualifiedId, StructId,
+        QualifiedId, StructEnv, StructId,
     },
     symbol::Symbol,
     ty::{PrimitiveType, Type},
@@ -20,9 +21,12 @@ use move_model::{
 use std::{collections::BTreeMap, rc::Rc};
 
 const INIT_MODULE_FUN: &str = "init_module";
-const VIEW_FUN_ATTRIBUTE: &str = "view";
 const LEGAC_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
+const RESOURCE_GROUP: &str = "resource_group";
+const RESOURCE_GROUP_MEMBER: &str = "resource_group_member";
+const RESOURCE_GROUP_NAME: &str = "group";
+const VIEW_FUN_ATTRIBUTE: &str = "view";
 
 /// Run the extended context checker on target modules in the environment and returns a map
 /// from module to extended runtime metadata. Any errors during context checking are reported to
@@ -57,9 +61,11 @@ impl<'a> ExtendedChecker<'a> {
     fn run(&mut self) {
         for ref module in self.env.get_modules() {
             if module.is_target() {
-                self.check_init_module(module);
-                self.check_entry_functions(module);
+                self.check_and_record_resource_groups(module);
+                self.check_and_record_resource_group_members(module);
                 self.check_and_record_view_functions(module);
+                self.check_entry_functions(module);
+                self.check_init_module(module);
                 self.build_error_map(module)
             }
         }
@@ -160,6 +166,166 @@ impl<'a> ExtendedChecker<'a> {
     fn is_allowed_input_struct(&self, qid: QualifiedId<StructId>) -> bool {
         let name = self.env.get_struct(qid).get_full_name_with_address();
         matches!(name.as_str(), "0x1::string::String")
+    }
+}
+
+// ----------------------------------------------------------------------------------
+// Resource Group Functions
+
+impl<'a> ExtendedChecker<'a> {
+    // A entry in a resource group should contain the resource group attribute and a parameter that
+    // points to a resource group container.
+    fn check_and_record_resource_group_members(&mut self, module: &ModuleEnv) {
+        let module_id = self.get_runtime_module_id(module);
+
+        for ref struct_ in module.get_structs() {
+            let resource_group = struct_.get_attributes().iter().find(|attr| {
+                if let Attribute::Apply(_, name, _) = attr {
+                    self.env.symbol_pool().string(*name).as_str() == RESOURCE_GROUP_MEMBER
+                } else {
+                    false
+                }
+            });
+            if let Some(Attribute::Apply(_, _, attributes)) = resource_group {
+                if attributes.len() != 1 {
+                    self.env.error(
+                        &struct_.get_loc(),
+                        "resource_group_member must contain 1 parameters",
+                    );
+                }
+
+                let value = if let Attribute::Assign(_, name, value) = &attributes[0] {
+                    if self.env.symbol_pool().string(*name).as_str() != RESOURCE_GROUP_NAME {
+                        self.env.error(
+                            &struct_.get_loc(),
+                            "resource_group_member lacks 'group' parameter",
+                        );
+                    }
+                    value
+                } else {
+                    self.env.error(
+                        &struct_.get_loc(),
+                        "resource_group_member lacks 'group' parameter",
+                    );
+                    continue;
+                };
+
+                let (module_name, container_name) =
+                    if let AttributeValue::Name(_, Some(module), name) = value {
+                        (module, name)
+                    } else {
+                        self.env.error(
+                            &struct_.get_loc(),
+                            "resource_group_member lacks 'group' parameter",
+                        );
+                        continue;
+                    };
+
+                let module = if let Some(module) = self.env.find_module(module_name) {
+                    module
+                } else {
+                    self.env
+                        .error(&struct_.get_loc(), "unable to find resource_group module");
+                    continue;
+                };
+
+                let container = if let Some(container) = module.find_struct(*container_name) {
+                    container
+                } else {
+                    self.env
+                        .error(&struct_.get_loc(), "unable to find resource_group struct");
+                    continue;
+                };
+
+                if self.check_resource_group(&container) {
+                    self.output
+                        .entry(module_id.clone())
+                        .or_default()
+                        .struct_attributes
+                        .entry(
+                            self.env
+                                .symbol_pool()
+                                .string(struct_.get_name())
+                                .to_string(),
+                        )
+                        .or_default()
+                        .push(KnownAttribute::resource_group_member(
+                            container.get_full_name_with_address(),
+                        ));
+                } else {
+                    self.env
+                        .error(&struct_.get_loc(), "container is not a resource_group");
+                }
+            }
+        }
+    }
+
+    // A resource group container should be a unit struct with no attributes or type parameters
+    fn check_and_record_resource_groups(&mut self, module: &ModuleEnv) {
+        let module_id = self.get_runtime_module_id(module);
+
+        for ref struct_ in module.get_structs() {
+            if self.check_resource_group(struct_) {
+                self.output
+                    .entry(module_id.clone())
+                    .or_default()
+                    .struct_attributes
+                    .entry(
+                        self.env
+                            .symbol_pool()
+                            .string(struct_.get_name())
+                            .to_string(),
+                    )
+                    .or_default()
+                    .push(KnownAttribute::resource_group());
+            }
+        }
+    }
+
+    fn check_resource_group(&mut self, struct_: &StructEnv) -> bool {
+        let found = struct_.get_attributes().iter().any(|attr| {
+            if let Attribute::Apply(_, name, _) = attr {
+                self.env.symbol_pool().string(*name).as_str() == RESOURCE_GROUP
+            } else {
+                false
+            }
+        });
+
+        if !found {
+            return false;
+        }
+
+        // Every struct contains the "dummy_field".
+        if struct_.get_field_count() == 1 {
+            let name = self.name_string(struct_.get_fields().next().unwrap().get_name());
+            // TODO: check that the type is bool
+            if *name != "dummy_field" {
+                self.env.error(
+                    &struct_.get_loc(),
+                    "resource_group should not have fields",
+                )
+            }
+        }
+        if struct_.get_field_count() > 1 {
+            self.env.error(
+                &struct_.get_loc(),
+                "resource_group should not have fields",
+            )
+        }
+        if struct_.get_abilities() != AbilitySet::EMPTY {
+            self.env.error(
+                &struct_.get_loc(),
+                "resource_group should not have abilities",
+            )
+        }
+        if !struct_.get_type_parameters().is_empty() {
+            self.env.error(
+                &struct_.get_loc(),
+                "resource_group should not have type parameters",
+            )
+        }
+
+        true
     }
 }
 

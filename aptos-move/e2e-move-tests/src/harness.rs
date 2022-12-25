@@ -375,6 +375,29 @@ impl MoveHarness {
         )
     }
 
+    pub fn read_resource_group(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
+        self.read_resource_raw(addr, struct_tag)
+            .map(|data| bcs::from_bytes(&data).unwrap())
+    }
+
+    pub fn read_resource_from_resource_group<T: DeserializeOwned>(
+        &self,
+        addr: &AccountAddress,
+        resource_group: StructTag,
+        struct_tag: StructTag,
+    ) -> Option<T> {
+        if let Some(group) = self.read_resource_group(addr, resource_group) {
+            if let Some(data) = group.get(&struct_tag) {
+                return Some(bcs::from_bytes::<T>(data).unwrap());
+            }
+        }
+        None
+    }
+
     /// Checks whether resource exists.
     pub fn exists_resource(&self, addr: &AccountAddress, struct_tag: StructTag) -> bool {
         self.read_resource_raw(addr, struct_tag).is_some()
