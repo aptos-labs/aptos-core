@@ -33,6 +33,7 @@ aptos-short-hex-str = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
+axum = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
