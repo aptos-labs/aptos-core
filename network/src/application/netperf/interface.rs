@@ -30,7 +30,16 @@ pub enum NetPerfMsg {
 /// `NetPerfMsg` types. `NetPerfNetworkEvents` is a thin wrapper
 /// around an `channel::Receiver<PeerManagerNotification>`.
 pub type NetPerfNetworkEvents = NetworkEvents<NetPerfMsg>;
+/*
+impl Stream for HealthCheckNetworkInterface {
+    type Item = Event<HealthCheckerMsg>;
 
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.get_mut().receiver).poll_next(cx)
+    }
+}
+
+ */
 /// The interface from NetPerf to Networking layer.
 ///
 /// This is a thin wrapper around a `NetworkSender<NetPerfMsg>`, so it is
