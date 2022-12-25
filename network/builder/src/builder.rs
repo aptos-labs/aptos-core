@@ -24,6 +24,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::tcp::TCPBufferCfg;
 use aptos_network::{
+    application::netperf::NetPerf,
     application::storage::PeerMetadataStorage,
     connectivity_manager::{builder::ConnectivityManagerBuilder, ConnectivityRequest},
     constants::MAX_MESSAGE_SIZE,
@@ -70,6 +71,7 @@ pub struct NetworkBuilder {
     health_checker_builder: Option<HealthCheckerBuilder>,
     peer_manager_builder: PeerManagerBuilder,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
+    aptos_netperf: bool,
 }
 
 impl NetworkBuilder {
@@ -93,6 +95,7 @@ impl NetworkBuilder {
         inbound_rate_limit_config: Option<RateLimitConfig>,
         outbound_rate_limit_config: Option<RateLimitConfig>,
         tcp_buffer_cfg: TCPBufferCfg,
+        aptos_netperf: bool,
     ) -> Self {
         // A network cannot exist without a PeerManager
         // TODO:  construct this in create and pass it to new() as a parameter. The complication is manual construction of NetworkBuilder in various tests.
@@ -125,6 +128,7 @@ impl NetworkBuilder {
             health_checker_builder: None,
             peer_manager_builder,
             peer_metadata_storage,
+            aptos_netperf,
         }
     }
 
@@ -157,6 +161,7 @@ impl NetworkBuilder {
             None,
             None,
             TCPBufferCfg::default(),
+            false,
         );
 
         builder.add_connectivity_manager(
@@ -181,6 +186,7 @@ impl NetworkBuilder {
         time_service: TimeService,
         mut reconfig_subscription_service: Option<&mut EventSubscriptionService>,
         peer_metadata_storage: Arc<PeerMetadataStorage>,
+        aptos_netperf: bool,
     ) -> NetworkBuilder {
         let peer_id = config.peer_id();
         let identity_key = config.identity_key();
@@ -218,6 +224,7 @@ impl NetworkBuilder {
                 config.outbound_rx_buffer_size_bytes,
                 config.outbound_tx_buffer_size_bytes,
             ),
+            aptos_netperf,
         );
 
         network_builder.add_connection_monitoring(
@@ -225,6 +232,10 @@ impl NetworkBuilder {
             config.ping_timeout_ms,
             config.ping_failures_tolerated,
         );
+
+        if (aptos_netperf == true) {
+            network_builder.add_network_perf();
+        }
 
         // Always add a connectivity manager to keep track of known peers
         let seeds = merge_seeds(config);
@@ -428,6 +439,12 @@ impl NetworkBuilder {
 
     /// Add a Aptos NetPerf to the network.
     fn add_network_perf(&mut self) -> &mut Self {
+        let (netperf_tx, netperf_rx) = self.add_p2p_service(&NetPerf::network_endpoint_config());
+        debug!(
+            NetworkSchema::new(&self.network_context),
+            "{} Created Aptos NetPerf", self.network_context
+        );
+
         self
     }
 
