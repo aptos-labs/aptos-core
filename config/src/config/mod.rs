@@ -434,10 +434,12 @@ impl NodeConfig {
 
         if let Some(network) = self.validator_network.as_mut() {
             network.listen_address = crate::utils::get_available_port_in_multiaddr(true);
+            network.randomize_ports();
         }
 
         for network in self.full_node_networks.iter_mut() {
             network.listen_address = crate::utils::get_available_port_in_multiaddr(true);
+            network.randomize_ports();
         }
     }
 

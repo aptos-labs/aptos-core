@@ -23,12 +23,14 @@ impl NetPerfBuilder {
         peer_metadata_storage: Arc<PeerMetadataStorage>,
         network_tx: Arc<NetPerfNetworkSender>,
         network_rx: NetPerfNetworkEvents,
+        netperf_port: u16,
     ) -> Self {
         let service = NetPerf::new(
             network_context,
             peer_metadata_storage,
             network_tx,
             network_rx,
+            netperf_port,
         );
         Self {
             service: Some(service),

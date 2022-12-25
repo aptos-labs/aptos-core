@@ -287,7 +287,7 @@ assert_approx_eq = "1.1.0"
 assert_unordered = "0.1.1"
 async-stream = "0.3"
 async-trait = "0.1.53"
-axum = "0.5.16"
+axum = "0.6.1"
 base64 = "0.13.0"
 backtrace = "0.3.58"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
@@ -345,7 +345,7 @@ hkdf = "0.10.0"
 hostname = "0.3.1"
 http = "0.2.3"
 httpmock = "0.6"
-hyper = { version = "0.14.18", features = ["full"] }
+hyper = { version = "0.14.23", features = ["full"] }
 hyper-tls = "0.5.0"
 include_dir = { version = "0.7.2", features = ["glob"] }
 indicatif = "0.15.0"
