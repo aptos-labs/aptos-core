@@ -54,6 +54,7 @@ pub const INBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 
 pub const INBOUND_TCP_TX_BUFFER_SIZE: u32 = 512 * 1024; // 1MB use a bigger spoon
 pub const OUTBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 500ms latency
 pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB use a bigger spoon
+pub const ENABLE_APTOS_NETPERF_CLIENT: bool = true;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -80,6 +81,7 @@ pub struct NetworkConfig {
     // Select this to enforce that both peers should authenticate each other, otherwise
     // authentication only occurs for outgoing connections.
     pub mutual_authentication: bool,
+    pub enable_netperf_client: bool,
     pub network_id: NetworkId,
     pub runtime_threads: Option<usize>,
     pub inbound_rx_buffer_size_bytes: Option<u32>,
@@ -129,6 +131,7 @@ impl NetworkConfig {
             identity: Identity::None,
             listen_address: "/ip4/0.0.0.0/tcp/6180".parse().unwrap(),
             mutual_authentication,
+            enable_netperf_client: ENABLE_APTOS_NETPERF_CLIENT,
             network_id,
             runtime_threads: None,
             seed_addrs: HashMap::new(),
