@@ -34,6 +34,7 @@ use axum::{routing::get, Extension, Json, Router};
 use dashmap::DashMap;
 use futures::StreamExt;
 use serde::Serialize;
+use std::fs::OpenOptions;
 use std::sync::Arc;
 
 pub mod builder;
@@ -98,15 +99,13 @@ impl NetPerf {
     }
 
     async fn start(mut self) {
+        let port = preferred_axum_port(self.netperf_port);
         info!(
             NetworkSchema::new(&self.network_context),
-            "{} NetPerf Event Listener started", self.network_context
+            "{} NetPerf Event Listener started", self.network_context,
         );
 
-        spawn_named!(
-            "NetPerf Axum",
-            start_axum(self.net_perf_state(), self.netperf_port)
-        );
+        spawn_named!("NetPerf Axum", start_axum(self.net_perf_state(), port));
 
         loop {
             futures::select! {
@@ -140,6 +139,21 @@ impl NetPerf {
             "{} NetPerf event listener terminated", self.network_context
         );
     }
+}
+
+fn preferred_axum_port(netperf_port: u16) -> u16 {
+    if netperf_port != 9107 {
+        let _ = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open("/tmp/9107.tmp");
+
+        let _ = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(format!("/tmp/{}.tmp", netperf_port));
+    }
+    return netperf_port;
 }
 
 async fn start_axum(state: NetPerfState, netperf_port: u16) {

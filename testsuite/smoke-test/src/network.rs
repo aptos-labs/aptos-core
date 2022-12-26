@@ -24,7 +24,7 @@ use std::{
 
 #[tokio::test]
 async fn test_connection_limiting() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_aptos(5).await;
     let version = swarm.versions().max().unwrap();
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
 
@@ -130,6 +130,9 @@ async fn test_connection_limiting() {
             .unwrap()
             .unwrap_or(0)
     );
+    while std::path::Path::new("/tmp/9107.tmp").exists() {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
 
 #[tokio::test]

@@ -325,11 +325,13 @@ impl NetworkBuilder {
         }
 
         if let Some(netperf_builder) = self.netperf_builder.as_mut() {
-            netperf_builder.start(executor);
-            debug!(
-                NetworkSchema::new(&self.network_context),
-                "{} Started Aptos NetPerf", self.network_context
-            );
+            if self.network_context.role() == RoleType::Validator {
+                netperf_builder.start(executor);
+                debug!(
+                    NetworkSchema::new(&self.network_context),
+                    "{} Started Aptos NetPerf", self.network_context
+                );
+            }
         }
 
         if let Some(discovery_listeners) = self.discovery_listeners.take() {
