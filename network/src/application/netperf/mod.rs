@@ -8,6 +8,7 @@
 //!
 
 use crate::application::storage::PeerMetadataStorage;
+use crate::transport::ConnectionMetadata;
 use crate::{
     application::netperf::interface::{NetPerfNetworkEvents, NetPerfNetworkSender},
     constants::NETWORK_CHANNEL_SIZE,
@@ -27,7 +28,12 @@ use crate::{
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
-use axum::{routing::get, Extension, Router};
+use aptos_types::account_address::AccountAddress;
+use aptos_types::PeerId;
+use axum::{routing::get, Extension, Json, Router};
+use dashmap::DashMap;
+use futures::StreamExt;
+use serde::Serialize;
 use std::sync::Arc;
 
 pub mod builder;
@@ -36,14 +42,23 @@ mod interface;
 pub struct NetPerf {
     network_context: NetworkContext,
     peers: Arc<PeerMetadataStorage>,
+    peer_list: Arc<DashMap<PeerId, PeerNetPerfStat>>, //with capacity and hasher
     sender: Arc<NetPerfNetworkSender>,
     events: NetPerfNetworkEvents,
 }
 
+struct PeerNetPerfStat {}
+
+impl PeerNetPerfStat {
+    pub fn new(_md: ConnectionMetadata) -> Self {
+        PeerNetPerfStat {}
+    }
+}
+
 #[derive(Clone)]
 struct NetPerfState {
-    peers: Arc<PeerMetadataStorage>,
-    peer_list: DashMap<PeerId, ()>, //with capacity and hasher
+    peers: Arc<PeerMetadataStorage>, //TODO: DO I need this?
+    peer_list: Arc<DashMap<PeerId, PeerNetPerfStat>>, //with capacity and hasher
     sender: Arc<NetPerfNetworkSender>,
 }
 
@@ -57,6 +72,7 @@ impl NetPerf {
         NetPerf {
             network_context,
             peers,
+            peer_list: Arc::new(DashMap::with_capacity(128)),
             sender,
             events,
         }
@@ -70,11 +86,21 @@ impl NetPerf {
         )
     }
 
-    async fn event_handler(self) {
+    fn net_perf_state(&self) -> NetPerfState {
+        NetPerfState {
+            peers: self.peers.clone(),
+            sender: self.sender.clone(),
+            peer_list: self.peer_list.clone(),
+        }
+    }
+
+    async fn start(mut self) {
         info!(
             NetworkSchema::new(&self.network_context),
             "{} NetPerf Event Listener started", self.network_context
         );
+
+        spawn_named!("NetPerf Axum", start_axum(self.net_perf_state()));
 
         loop {
             futures::select! {
@@ -88,86 +114,18 @@ impl NetPerf {
 
                     match event {
                         Event::NewPeer(metadata) => {
-                            self.network_interface.app_data().insert(
+                            self.peer_list.insert(
                                 metadata.remote_peer_id,
-                                HealthCheckData::new(self.round)
+                                PeerNetPerfStat::new(metadata)
                             );
                         }
                         Event::LostPeer(metadata) => {
-                            self.network_interface.app_data().remove(
+                            self.peer_list.remove(
                                 &metadata.remote_peer_id
                             );
                         }
-                            /*
-                        Event::RpcRequest(peer_id, msg, protocol, res_tx) => {
-                            match msg {
-                                NetPerfMsg::Ping(ping) => self.handle_ping_request(peer_id, ping, protocol, res_tx),
-                                _ => {
-                                    warn!(
-                                        SecurityEvent::InvalidNetPerfMsg,
-                                        NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                                        rpc_message = msg,
-                                        "{} Unexpected RPC message from {}",
-                                        self.network_context,
-                                        peer_id
-                                    );
-                                    debug_assert!(false, "Unexpected rpc request");
-                                }
-                            };
-                        }
-                        Event::Message(peer_id, msg) => {
-                            error!(
-                                SecurityEvent::InvalidNetworkEventHC,
-                                NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                                "{} Unexpected direct send from {} msg {:?}",
-                                self.network_context,
-                                peer_id,
-                                msg,
-                            );
-                            debug_assert!(false, "Unexpected network event");
-                        }
-                             */
+                        _ => {/* Currently ignore all*/}
                     }
-                }
-                _ = ticker.select_next_some() => {
-                    self.round += 1;
-                    let connected = self.network_interface.connected_peers();
-                    if connected.is_empty() {
-                        trace!(
-                            NetworkSchema::new(&self.network_context),
-                            round = self.round,
-                            "{} No connected peer to ping round: {}",
-                            self.network_context,
-                            self.round
-                        );
-                        continue
-                    }
-
-                    for peer_id in connected {
-                        let nonce = self.rng.gen::<u32>();
-                        trace!(
-                            NetworkSchema::new(&self.network_context),
-                            round = self.round,
-                            "{} Will ping: {} for round: {} nonce: {}",
-                            self.network_context,
-                            peer_id.short_str(),
-                            self.round,
-                            nonce
-                        );
-
-                        tick_handlers.push(Self::ping_peer(
-                            self.network_context,
-                            self.network_interface.sender(),
-                            peer_id,
-                            self.round,
-                            nonce,
-                            self.ping_timeout,
-                        ));
-                    }
-                }
-                res = tick_handlers.select_next_some() => {
-                    let (peer_id, round, nonce, ping_result) = res;
-                    self.handle_ping_response(peer_id, round, nonce, ping_result).await;
                 }
             }
         }
@@ -176,53 +134,48 @@ impl NetPerf {
             "{} NetPerf event listener terminated", self.network_context
         );
     }
+}
 
-    pub async fn start(self) {
-        let state = NetPerfState {
-            peers: self.peers.clone(),
-            sender: self.sender.clone(),
-        };
+async fn start_axum(state: NetPerfState) {
+    let app = Router::new()
+        .route("/", get(usage_handler))
+        .route("/peers", get(get_peers).layer(Extension(state)));
 
-        let app = Router::new()
-            .route("/", get(usage_handler))
-            .route("/peers", get(get_peers).layer(Extension(state)));
-
-        // run it with hyper on localhost:9107
-        axum::Server::bind(&"0.0.0.0:9107".parse().unwrap())
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
-    }
+    // run it with hyper on localhost:9107
+    axum::Server::bind(&"0.0.0.0:9107".parse().unwrap())
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
 
 async fn usage_handler() -> &'static str {
     "Usage: curl 127.0.0.01:9107/peers"
 }
 
-//#TODO: Json output
-async fn get_peers(Extension(state): Extension<NetPerfState>) -> &'static str {
-    let connected = self.network_interface.connected_peers();
-    if connected.is_empty() {
-        trace!(
-            NetworkSchema::new(&self.network_context),
-            round = self.round,
-            "{} No connected peer to ping round: {}",
-            self.network_context,
-            self.round
-        );
+#[derive(Serialize)]
+struct PeerList {
+    len: usize,
+    peers: Vec<PeerId>,
+}
+
+impl PeerList {
+    pub fn new(len: usize) -> Self {
+        PeerList {
+            len,
+            peers: Vec::with_capacity(len),
+        }
+    }
+}
+
+async fn get_peers(Extension(state): Extension<NetPerfState>) -> Json<PeerList> {
+    let mut out = PeerList::new(state.peer_list.len());
+
+    let connected = state.peer_list.iter();
+
+    for peer in connected {
+        //I hate cloning, but lets worry about lifetimes later
+        out.peers.push(peer.key().to_owned());
     }
 
-    for peer_id in connected {
-        let nonce = self.rng.gen::<u32>();
-        trace!(
-            NetworkSchema::new(&self.network_context),
-            round = self.round,
-            "{} Will ping: {} for round: {} nonce: {}",
-            self.network_context,
-            peer_id.short_str(),
-            self.round,
-            nonce
-        );
-    }
-    "Usage: curl 127.0.0.01:9107/peers"
+    Json(out)
 }
