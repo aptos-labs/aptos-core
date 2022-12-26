@@ -55,6 +55,7 @@ pub const INBOUND_TCP_TX_BUFFER_SIZE: u32 = 512 * 1024; // 1MB use a bigger spoo
 pub const OUTBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 500ms latency
 pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB use a bigger spoon
 pub const ENABLE_APTOS_NETPERF_CLIENT: bool = true;
+pub const DEFAULT_APTOS_NETPERF_CLIENT_PORT: u16 = 9107;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -81,7 +82,7 @@ pub struct NetworkConfig {
     // Select this to enforce that both peers should authenticate each other, otherwise
     // authentication only occurs for outgoing connections.
     pub mutual_authentication: bool,
-    pub enable_netperf_client: bool,
+    pub netperf_client_port: Option<u16>,
     pub network_id: NetworkId,
     pub runtime_threads: Option<usize>,
     pub inbound_rx_buffer_size_bytes: Option<u32>,
@@ -122,7 +123,19 @@ impl Default for NetworkConfig {
     }
 }
 
+fn netperf_client_port(enabled: bool) -> Option<u16> {
+    if enabled {
+        Some(DEFAULT_APTOS_NETPERF_CLIENT_PORT)
+    } else {
+        None
+    }
+}
+
 impl NetworkConfig {
+    pub fn randomize_ports(&mut self) {
+        self.netperf_client_port = Some(utils::get_available_port());
+    }
+
     pub fn network_with_id(network_id: NetworkId) -> NetworkConfig {
         let mutual_authentication = network_id.is_validator_network();
         let mut config = Self {
@@ -131,7 +144,7 @@ impl NetworkConfig {
             identity: Identity::None,
             listen_address: "/ip4/0.0.0.0/tcp/6180".parse().unwrap(),
             mutual_authentication,
-            enable_netperf_client: ENABLE_APTOS_NETPERF_CLIENT,
+            netperf_client_port: netperf_client_port(ENABLE_APTOS_NETPERF_CLIENT),
             network_id,
             runtime_threads: None,
             seed_addrs: HashMap::new(),

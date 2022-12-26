@@ -231,8 +231,8 @@ impl NetworkBuilder {
             config.ping_failures_tolerated,
         );
 
-        if config.enable_netperf_client == true {
-            network_builder.add_network_perf();
+        if let Some(netperf_port) = config.netperf_client_port {
+            network_builder.add_network_perf(netperf_port);
         }
 
         // Always add a connectivity manager to keep track of known peers
@@ -444,13 +444,14 @@ impl NetworkBuilder {
     }
 
     /// Add a Aptos NetPerf to the network.
-    fn add_network_perf(&mut self) -> &mut Self {
+    fn add_network_perf(&mut self, netperf_port: u16) -> &mut Self {
         let (netperf_tx, netperf_rx) = self.add_p2p_service(&NetPerf::network_endpoint_config());
         self.netperf_builder = Some(NetPerfBuilder::new(
             self.network_context(),
             self.peer_metadata_storage.clone(),
             Arc::new(netperf_tx),
             netperf_rx,
+            netperf_port,
         ));
         debug!(
             NetworkSchema::new(&self.network_context),

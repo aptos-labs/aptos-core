@@ -45,6 +45,7 @@ pub struct NetPerf {
     peer_list: Arc<DashMap<PeerId, PeerNetPerfStat>>, //with capacity and hasher
     sender: Arc<NetPerfNetworkSender>,
     events: NetPerfNetworkEvents,
+    netperf_port: u16,
 }
 
 struct PeerNetPerfStat {}
@@ -68,6 +69,7 @@ impl NetPerf {
         peers: Arc<PeerMetadataStorage>,
         sender: Arc<NetPerfNetworkSender>,
         events: NetPerfNetworkEvents,
+        netperf_port: u16,
     ) -> Self {
         NetPerf {
             network_context,
@@ -75,6 +77,7 @@ impl NetPerf {
             peer_list: Arc::new(DashMap::with_capacity(128)),
             sender,
             events,
+            netperf_port,
         }
     }
 
@@ -100,7 +103,10 @@ impl NetPerf {
             "{} NetPerf Event Listener started", self.network_context
         );
 
-        spawn_named!("NetPerf Axum", start_axum(self.net_perf_state()));
+        spawn_named!(
+            "NetPerf Axum",
+            start_axum(self.net_perf_state(), self.netperf_port)
+        );
 
         loop {
             futures::select! {
@@ -136,13 +142,15 @@ impl NetPerf {
     }
 }
 
-async fn start_axum(state: NetPerfState) {
+async fn start_axum(state: NetPerfState, netperf_port: u16) {
     let app = Router::new()
         .route("/", get(usage_handler))
         .route("/peers", get(get_peers).layer(Extension(state)));
 
-    // run it with hyper on localhost:9107
-    axum::Server::bind(&"0.0.0.0:9107".parse().unwrap())
+    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], netperf_port));
+
+    // run it with hyper on netperf_port
+    axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
@@ -173,7 +181,6 @@ async fn get_peers(Extension(state): Extension<NetPerfState>) -> Json<PeerList> 
     let connected = state.peer_list.iter();
 
     for peer in connected {
-        //I hate cloning, but lets worry about lifetimes later
         out.peers.push(peer.key().to_owned());
     }
 
