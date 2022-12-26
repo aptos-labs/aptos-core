@@ -71,6 +71,7 @@ use std::{
 };
 use tokio::runtime::{Builder, Runtime};
 
+use aptos_mempool::network::mempool_client_and_server_network_config;
 use aptos_mempool::MempoolClientSender;
 use aptos_network::application::interface::NetworkClient;
 use aptos_network::protocols::network::NetworkSender;
@@ -791,7 +792,7 @@ pub fn setup_environment(
 
         // Create the endpoints to connect the Network to mempool.
         let (mempool_sender, mempool_events) = network_builder.add_p2p_service(
-            &aptos_mempool::network::network_endpoint_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
+            &mempool_client_and_server_network_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
         );
         mempool_network_handles.push((network_id, mempool_sender, mempool_events));
 

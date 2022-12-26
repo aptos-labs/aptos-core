@@ -3,7 +3,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::{MempoolNetworkEvents, MempoolNetworkSender},
+    network::MempoolNetworkEvents,
     shared_mempool::start_shared_mempool,
     MempoolClientSender, QuorumStoreRequest,
 };
@@ -16,6 +16,7 @@ use aptos_config::{
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_mempool_notifications::{self, MempoolNotifier};
+use aptos_network::protocols::network::NetworkSender;
 use aptos_network::{
     application::storage::PeerMetadataStorage,
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
@@ -108,7 +109,7 @@ impl MockSharedMempool {
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_, conn_notifs_rx) = conn_notifs_channel::new();
-        let network_sender = MempoolNetworkSender::new(
+        let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );

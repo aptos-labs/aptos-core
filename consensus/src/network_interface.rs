@@ -19,13 +19,14 @@ use aptos_consensus_types::{
 };
 use aptos_logger::prelude::*;
 use aptos_network::application::interface::ApplicationNetworkSender;
+use aptos_network::protocols::network::NewNetworkSender;
 use aptos_network::{
     application::storage::PeerMetadataStorage,
     constants::NETWORK_CHANNEL_SIZE,
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
-        network::{NetworkApplicationConfig, NetworkEvents, NetworkSender, NewNetworkSender},
+        network::{NetworkApplicationConfig, NetworkEvents, NetworkSender},
         rpc::error::RpcError,
         wire::handshake::v1::ProtocolIdSet,
     },

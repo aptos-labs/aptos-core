@@ -252,8 +252,7 @@ impl<TMessage> FusedStream for NetworkEvents<TMessage> {
 /// a thin wrapper on `aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>`,
 /// mostly focused on providing a more ergonomic API. However, network applications will usually
 /// provide their own thin wrapper around `NetworkSender` that narrows the API to the specific
-/// interface they need. For instance, `mempool` only requires direct-send functionality so its
-/// `MempoolNetworkSender` only exposes a `send_to` function.
+/// interface they need.
 ///
 /// Provide Protobuf wrapper over `[peer_manager::PeerManagerRequestSender]`
 #[derive(Clone, Debug)]

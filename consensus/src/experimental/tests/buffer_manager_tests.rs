@@ -30,9 +30,10 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
+use aptos_network::protocols::network::NewNetworkSender;
 use aptos_network::{
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{Event, NewNetworkSender},
+    protocols::network::Event,
 };
 use aptos_safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use aptos_secure_storage::Storage;
