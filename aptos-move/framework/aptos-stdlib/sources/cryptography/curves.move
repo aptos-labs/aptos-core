@@ -24,6 +24,24 @@ module aptos_std::curves {
         }
     }
 
+    public fun multi_pairing<G1,G2,Gt>(g1_elements: &vector<Point<G1>>, g2_elements: &vector<Point<G2>>): Point<Gt> {
+        let num_g1 = std::vector::length(g1_elements);
+        let num_g2 = std::vector::length(g2_elements);
+        assert!(num_g1 == num_g2, 1);
+        let g1_handles = vector[];
+        let g2_handles = vector[];
+        let i = 0;
+        while (i < num_g2) {
+            std::vector::push_back(&mut g1_handles, std::vector::borrow(g1_elements, i).handle);
+            std::vector::push_back(&mut g2_handles, std::vector::borrow(g2_elements, i).handle);
+            i = i + 1;
+        };
+
+        Point<Gt> {
+            handle: multi_pairing_internal<G1,G2,Gt>(g1_handles, g2_handles)
+        }
+    }
+
     /// Scalar basics.
     public fun scalar_from_u64<G>(value: u64): Scalar<G> {
         Scalar<G> {
@@ -129,7 +147,8 @@ module aptos_std::curves {
     native fun scalar_inv_internal<G>(handle: u8): (bool, u8);
     native fun scalar_eq_internal<G>(handle_1: u8, handle_2: u8): bool;
     native fun scalar_to_bytes_internal<G>(h: u8): vector<u8>;
-    native fun pairing_internal<G1,G2,Gt>(p1_handle: u8, p2_handle: u8): u8;
+    native fun pairing_internal<G1,G2,Gt>(g1_handle: u8, g2_handle: u8): u8;
+    native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u8>, g2_handles: vector<u8>): u8;
     native fun point_add_internal<G>(handle_1: u8, handle_2: u8): u8;
     native fun point_eq_internal<G>(handle_1: u8, handle_2: u8): bool;
     native fun point_identity_internal<G>(): u8;
@@ -183,5 +202,18 @@ module aptos_std::curves {
         );
         assert!(point_eq(&gt_point_1, &gt_point_2), 1);
         assert!(point_eq(&gt_point_1, &gt_point_3), 1);
+    }
+
+    #[test]
+    fun test_multi_pairing() {
+        let g1_point_1 = point_generator<BLS12_381_G1>();
+        let g2_point_1 = point_generator<BLS12_381_G2>();
+        let g1_point_2 = point_mul(&scalar_from_u64<BLS12_381_G1>(5), &g1_point_1);
+        let g2_point_2 = point_mul(&scalar_from_u64<BLS12_381_G2>(2), &g2_point_1);
+        let g1_point_3 = point_mul(&scalar_from_u64<BLS12_381_G1>(20), &g1_point_1);
+        let g2_point_3 = point_mul(&scalar_from_u64<BLS12_381_G2>(5), &g2_point_1);
+        let expected = point_mul(&scalar_from_u64<BLS12_381_Gt>(111), &pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point_1, &g2_point_1));
+        let actual = multi_pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&vector[g1_point_1, g1_point_2, g1_point_3], &vector[g2_point_1, g2_point_2, g2_point_3]);
+        assert!(point_eq(&expected, &actual), 1);
     }
 }

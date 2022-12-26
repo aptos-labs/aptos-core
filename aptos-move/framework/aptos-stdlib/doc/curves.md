@@ -11,6 +11,7 @@
 -  [Struct `Scalar`](#0x1_curves_Scalar)
 -  [Struct `Point`](#0x1_curves_Point)
 -  [Function `pairing`](#0x1_curves_pairing)
+-  [Function `multi_pairing`](#0x1_curves_multi_pairing)
 -  [Function `scalar_from_u64`](#0x1_curves_scalar_from_u64)
 -  [Function `scalar_neg`](#0x1_curves_scalar_neg)
 -  [Function `scalar_add`](#0x1_curves_scalar_add)
@@ -36,6 +37,7 @@
 -  [Function `scalar_eq_internal`](#0x1_curves_scalar_eq_internal)
 -  [Function `scalar_to_bytes_internal`](#0x1_curves_scalar_to_bytes_internal)
 -  [Function `pairing_internal`](#0x1_curves_pairing_internal)
+-  [Function `multi_pairing_internal`](#0x1_curves_multi_pairing_internal)
 -  [Function `point_add_internal`](#0x1_curves_point_add_internal)
 -  [Function `point_eq_internal`](#0x1_curves_point_eq_internal)
 -  [Function `point_identity_internal`](#0x1_curves_point_identity_internal)
@@ -203,6 +205,44 @@ Perform a bilinear mapping.
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing">pairing</a>&lt;G1,G2,Gt&gt;(point_1: &<a href="curves.md#0x1_curves_Point">Point</a>&lt;G1&gt;, point_2: &<a href="curves.md#0x1_curves_Point">Point</a>&lt;G2&gt;): <a href="curves.md#0x1_curves_Point">Point</a>&lt;Gt&gt; {
     <a href="curves.md#0x1_curves_Point">Point</a>&lt;Gt&gt; {
         handle: <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>&lt;G1,G2,Gt&gt;(point_1.handle, point_2.handle)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_multi_pairing"></a>
+
+## Function `multi_pairing`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_multi_pairing">multi_pairing</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;&gt;): <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;Gt&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_multi_pairing">multi_pairing</a>&lt;G1,G2,Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">Point</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">Point</a>&lt;G2&gt;&gt;): <a href="curves.md#0x1_curves_Point">Point</a>&lt;Gt&gt; {
+    <b>let</b> num_g1 = std::vector::length(g1_elements);
+    <b>let</b> num_g2 = std::vector::length(g2_elements);
+    <b>assert</b>!(num_g1 == num_g2, 1);
+    <b>let</b> g1_handles = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+    <b>let</b> g2_handles = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; num_g2) {
+        std::vector::push_back(&<b>mut</b> g1_handles, std::vector::borrow(g1_elements, i).handle);
+        std::vector::push_back(&<b>mut</b> g2_handles, std::vector::borrow(g2_elements, i).handle);
+        i = i + 1;
+    };
+
+    <a href="curves.md#0x1_curves_Point">Point</a>&lt;Gt&gt; {
+        handle: <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(g1_handles, g2_handles)
     }
 }
 </code></pre>
@@ -808,7 +848,7 @@ Scalar basics.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>&lt;G1, G2, Gt&gt;(p1_handle: u8, p2_handle: u8): u8
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>&lt;G1, G2, Gt&gt;(g1_handle: u8, g2_handle: u8): u8
 </code></pre>
 
 
@@ -817,7 +857,29 @@ Scalar basics.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>&lt;G1,G2,Gt&gt;(p1_handle: u8, p2_handle: u8): u8;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>&lt;G1,G2,Gt&gt;(g1_handle: u8, g2_handle: u8): u8;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_multi_pairing_internal"></a>
+
+## Function `multi_pairing_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1, G2, Gt&gt;(g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, g2_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, g2_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u8;
 </code></pre>
 
 

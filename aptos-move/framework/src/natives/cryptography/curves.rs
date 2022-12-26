@@ -13,7 +13,11 @@ use ark_serialize::CanonicalDeserialize;
 use better_any::{Tid, TidAble};
 use bls12_381;
 // use group::{Group};
+use ark_bls12_381::{Fq12, Fr, Parameters};
+use ark_ec::bls12::{Bls12Parameters, G1Prepared};
 use ark_ec::group::Group;
+use ark_ff::PrimeField;
+use bls12_381::G2Prepared;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
 use move_core_types::language_storage::TypeTag;
@@ -26,7 +30,9 @@ use move_vm_types::values::Value;
 use num_traits::identities::Zero;
 use smallvec::smallvec;
 use std::collections::VecDeque;
+use std::iter::Map;
 use std::ops::{Add, Mul, Neg};
+use std::slice::Iter;
 
 pub mod abort_codes {
     pub const E_CURVE_TYPE_NOT_SUPPORTED: u64 = 1;
@@ -687,22 +693,22 @@ fn point_mul_internal(
                 .add_g2_point(result);
             handle
         }
-        // "0x1::curves::BLS12_381_Gt" => {
-        //     let point = context
-        //         .extensions()
-        //         .get::<ArksContext>()
-        //         .get_gt_point(point_handle);
-        //     let scalar = context
-        //         .extensions()
-        //         .get::<ArksContext>()
-        //         .get_scalar(scalar_handle);
-        //     let result = point.mul(scalar);
-        //     let handle = context
-        //         .extensions_mut()
-        //         .get_mut::<ArksContext>()
-        //         .add_gt_point(result);
-        //     handle
-        // }
+        "0x1::curves::BLS12_381_Gt" => {
+            let point = context
+                .extensions()
+                .get::<ArksContext>()
+                .get_gt_point(point_handle);
+            let scalar = context
+                .extensions()
+                .get::<ArksContext>()
+                .get_scalar(scalar_handle);
+            let result = point.pow(scalar.into_repr().as_ref());
+            let handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_gt_point(result);
+            handle
+        }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
@@ -751,6 +757,73 @@ fn pairing_internal(
                 .get_mut::<ArksContext>()
                 .add_gt_point(result);
             handle
+        }
+        _ => todo!(),
+    };
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::u8(handle as u8)],
+    ))
+}
+
+fn multi_pairing_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(3, ty_args.len());
+    let type_tag_0 = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let type_tag_1 = context
+        .type_to_type_tag(ty_args.get(1).unwrap())?
+        .to_string();
+    let type_tag_2 = context
+        .type_to_type_tag(ty_args.get(2).unwrap())?
+        .to_string();
+    let g2_handles = pop_arg!(args, Vec<u8>);
+    let g1_handles = pop_arg!(args, Vec<u8>);
+    let handle = match (
+        type_tag_0.as_str(),
+        type_tag_1.as_str(),
+        type_tag_2.as_str(),
+    ) {
+        ("0x1::curves::BLS12_381_G1", "0x1::curves::BLS12_381_G2", "0x1::curves::BLS12_381_Gt") => {
+            let g1_prepared: Vec<ark_ec::models::bls12::g1::G1Prepared<Parameters>> = g1_handles
+                .iter()
+                .map(|&handle| {
+                    let element = context
+                        .extensions()
+                        .get::<ArksContext>()
+                        .get_g1_point(handle as usize);
+                    ark_ec::prepare_g1::<ark_bls12_381::Bls12_381>(element.into_affine())
+                })
+                .collect();
+            let g2_prepared: Vec<ark_ec::models::bls12::g2::G2Prepared<Parameters>> = g2_handles
+                .iter()
+                .map(|&handle| {
+                    let element = context
+                        .extensions()
+                        .get::<ArksContext>()
+                        .get_g2_point(handle as usize);
+                    ark_ec::prepare_g2::<ark_bls12_381::Bls12_381>(element.into_affine())
+                })
+                .collect();
+
+            let z: Vec<(
+                ark_ec::models::bls12::g1::G1Prepared<Parameters>,
+                ark_ec::models::bls12::g2::G2Prepared<Parameters>,
+            )> = g1_prepared
+                .into_iter()
+                .zip(g2_prepared.into_iter())
+                .collect();
+            let result = ark_bls12_381::Bls12_381::product_of_pairings(z.as_slice());
+            let result_handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_gt_point(result);
+            result_handle
         }
         _ => todo!(),
     };
@@ -820,6 +893,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "pairing_internal",
             make_native_from_func(gas_params.clone(), pairing_internal),
+        ),
+        (
+            "multi_pairing_internal",
+            make_native_from_func(gas_params.clone(), multi_pairing_internal),
         ),
     ]);
 
