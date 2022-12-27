@@ -785,41 +785,50 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     }),
             ),
         "large_db_simple_test" => large_db_test(10, 500, 300, "10-validators".to_string()),
-        "consensus_only_perf_benchmark" => config
-            .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-            .with_network_tests(vec![&LoadVsPerfBenchmark {
-                test: &PerformanceBenchmark,
-                tps: &[45000],
-            }])
-            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-                // no epoch change.
-                helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
-            }))
-            .with_node_helm_config_fn(Arc::new(|helm_values| {
-                helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
-                helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
-                    (3 as u64 * 1024 * 1024 * 1024).into();
-                helm_values["validator"]["config"]["mempool"]["capacity_per_user"] = 100_000.into();
-                helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
-                    7000.into();
-                helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                    30000.into();
-                helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
-                    (3 * 1024 * 1024).into();
-                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                    ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
-                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                    ["continuous_syncing_mode"] = "ExecuteTransactions".into();
-            }))
-            .with_success_criteria(
-                SuccessCriteria::new(0)
-                    .add_no_restarts()
-                    .add_wait_for_catchup_s(60)
-                    .add_chain_progress(StateProgressThreshold {
-                        max_no_progress_secs: 30.0,
-                        max_round_gap: 10,
-                    }),
-            ),
+        "consensus_only_perf_benchmark" => {
+            let emit_job = config.get_emit_job().clone();
+            config
+                .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+                .with_network_tests(vec![&LoadVsPerfBenchmark {
+                    test: &PerformanceBenchmark,
+                    tps: &[45000],
+                }])
+                .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                    // no epoch change.
+                    helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+                }))
+                .with_emit_job(emit_job.txn_expiration_time_secs(5 * 60))
+                .with_node_helm_config_fn(Arc::new(|helm_values| {
+                    helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
+                    helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
+                        (3 as u64 * 1024 * 1024 * 1024).into();
+                    helm_values["validator"]["config"]["mempool"]["capacity_per_user"] =
+                        100_000.into();
+                    helm_values["validator"]["config"]["mempool"]
+                        ["system_transaction_timeout_secs"] = (5 * 60 * 60).into();
+                    helm_values["validator"]["config"]["mempool"]
+                        ["system_transaction_gc_interval_ms"] = (5 * 60 * 60_000).into();
+                    helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                        10000.into();
+                    helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
+                        30000.into();
+                    helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+                        (3 * 1024 * 1024).into();
+                    helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                        ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
+                    helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                        ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+                }))
+                .with_success_criteria(
+                    SuccessCriteria::new(0)
+                        .add_no_restarts()
+                        .add_wait_for_catchup_s(60)
+                        .add_chain_progress(StateProgressThreshold {
+                            max_no_progress_secs: 30.0,
+                            max_round_gap: 10,
+                        }),
+                )
+        }
         "consensus_only_three_region_simulation" => config
             .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
             .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
