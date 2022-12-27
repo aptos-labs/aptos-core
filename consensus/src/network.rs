@@ -7,7 +7,7 @@ use crate::{
     counters,
     logging::LogEvent,
     monitor,
-    network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
+    network_interface::{ConsensusMsg, ConsensusNetworkClient},
 };
 use anyhow::{anyhow, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -21,7 +21,8 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
 };
 use aptos_logger::prelude::*;
-use aptos_network::application::interface::ApplicationNetworkSender;
+use aptos_network::application::interface::NetworkClient;
+use aptos_network::protocols::network::NetworkEvents;
 use aptos_network::{
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
@@ -78,7 +79,7 @@ pub(crate) trait QuorumStoreSender {
 #[derive(Clone)]
 pub struct NetworkSender {
     author: Author,
-    network_sender: ConsensusNetworkSender,
+    consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
     // Note that we do not support self rpc requests as it might cause infinite recursive calls.
@@ -89,13 +90,13 @@ pub struct NetworkSender {
 impl NetworkSender {
     pub fn new(
         author: Author,
-        network_sender: ConsensusNetworkSender,
+        consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
         validators: ValidatorVerifier,
     ) -> Self {
         NetworkSender {
             author,
-            network_sender,
+            consensus_network_client,
             self_sender,
             validators,
         }
@@ -123,7 +124,9 @@ impl NetworkSender {
             .inc();
         let response_msg = monitor!(
             "block_retrieval",
-            self.network_sender.send_rpc(from, msg, timeout).await
+            self.consensus_network_client
+                .send_rpc(from, msg, timeout)
+                .await
         )?;
         let response = match response_msg {
             ConsensusMsg::BlockRetrievalResponse(resp) => *resp,
@@ -178,7 +181,7 @@ impl NetworkSender {
             .inc_by(other_validators.len() as u64);
         // Broadcast message over direct-send to all other validators.
         if let Err(err) = self
-            .network_sender
+            .consensus_network_client
             .send_to_many(other_validators.into_iter(), msg)
         {
             warn!(error = ?err, "Error broadcasting message");
@@ -188,7 +191,7 @@ impl NetworkSender {
     /// Tries to send msg to given recipients.
     async fn send(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send::any", |_| ());
-        let network_sender = self.network_sender.clone();
+        let network_sender = self.consensus_network_client.clone();
         let mut self_sender = self.self_sender.clone();
         for peer in recipients {
             if self.author == peer {
@@ -337,7 +340,7 @@ pub struct NetworkTask {
 impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
-        network_events: ConsensusNetworkEvents,
+        network_events: NetworkEvents<ConsensusMsg>,
         self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) =

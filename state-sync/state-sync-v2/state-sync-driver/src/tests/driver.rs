@@ -322,8 +322,8 @@ async fn create_driver_for_tests(
     // Create a test aptos data client
     let time_service = TimeService::mock();
     let network_client = StorageServiceClient::new(NetworkClient::new(
-        None,
-        None,
+        vec![],
+        vec![],
         HashMap::new(),
         PeerMetadataStorage::new(&[]),
     ));

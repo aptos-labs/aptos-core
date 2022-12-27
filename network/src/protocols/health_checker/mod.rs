@@ -58,8 +58,8 @@ mod test;
 pub type HealthCheckerNetworkEvents = NetworkEvents<HealthCheckerMsg>;
 
 /// Returns a network application config for the health check client and service
-pub fn health_checker_client_service_network_config() -> NetworkApplicationConfig {
-    NetworkApplicationConfig::p2p(
+pub fn health_checker_network_config() -> NetworkApplicationConfig {
+    NetworkApplicationConfig::client_and_service(
         [ProtocolId::HealthCheckerRpc],
         aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
             .queue_style(QueueStyle::LIFO)

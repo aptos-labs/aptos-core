@@ -97,8 +97,8 @@ impl MockNetwork {
             .unwrap_or_else(|| vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public]);
         let peer_metadata_storage = PeerMetadataStorage::new(&networks);
         let network_client = NetworkClient::new(
-            None,
-            Some(ProtocolId::StorageServiceRpc),
+            vec![],
+            vec![ProtocolId::StorageServiceRpc],
             hashmap! {
             NetworkId::Validator => network_sender},
             peer_metadata_storage.clone(),

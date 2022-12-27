@@ -34,8 +34,8 @@ impl HealthCheckerBuilder {
     ) -> Self {
         let network_senders = hashmap! {network_context.network_id() => network_sender};
         let network_client = NetworkClient::new(
-            None,
-            Some(HealthCheckerRpc),
+            vec![],
+            vec![HealthCheckerRpc],
             network_senders,
             peer_metadata_storage,
         );

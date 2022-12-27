@@ -68,8 +68,8 @@ fn test_new_initialized_configs() {
 
     // Create a test aptos data client
     let network_client = StorageServiceClient::new(NetworkClient::new(
-        None,
-        None,
+        vec![],
+        vec![],
         HashMap::new(),
         PeerMetadataStorage::new(&[]),
     ));

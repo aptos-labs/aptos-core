@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::application::error::Error;
+use crate::application::storage::PeerMetadataStorage;
 use crate::protocols::network::Message;
 use crate::protocols::network::NetworkSender;
-use crate::protocols::wire::handshake::v1::ProtocolId;
-use crate::{
-    application::storage::PeerMetadataStorage, error::NetworkError, protocols::network::RpcError,
-};
+use crate::protocols::wire::handshake::v1::{ProtocolId, ProtocolIdSet};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_logger::sample;
+use aptos_logger::{prelude::*, sample::SampleRate};
 use aptos_types::network_address::NetworkAddress;
-use aptos_types::PeerId;
 use async_trait::async_trait;
 use itertools::Itertools;
 use std::sync::Arc;
@@ -66,37 +65,28 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
 /// state sync and mempool, etc.) to interact with the network and other peers.
 #[derive(Clone, Debug)]
 pub struct NetworkClient<Message> {
-    direct_send_protocol_id: Option<ProtocolId>,
-    rpc_protocol_id: Option<ProtocolId>,
+    direct_send_protocols_and_preferences: Vec<ProtocolId>, // Protocols are sorted by preference (highest to lowest)
+    rpc_protocols_and_preferences: Vec<ProtocolId>, // Protocols are sorted by preference (highest to lowest)
     network_senders: HashMap<NetworkId, NetworkSender<Message>>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 }
 
 impl<Message: NetworkMessageTrait> NetworkClient<Message> {
     pub fn new(
-        direct_send_protocol_id: Option<ProtocolId>,
-        rpc_protocol_id: Option<ProtocolId>,
+        direct_send_protocols_and_preferences: Vec<ProtocolId>,
+        rpc_protocols_and_preferences: Vec<ProtocolId>,
         network_senders: HashMap<NetworkId, NetworkSender<Message>>,
         peer_metadata_storage: Arc<PeerMetadataStorage>,
     ) -> Self {
         Self {
-            direct_send_protocol_id,
-            rpc_protocol_id,
+            direct_send_protocols_and_preferences,
+            rpc_protocols_and_preferences,
             network_senders,
             peer_metadata_storage,
         }
     }
 
-    fn get_direct_send_protocol_id(&self) -> Result<ProtocolId, Error> {
-        self.direct_send_protocol_id
-            .ok_or_else(|| Error::UnexpectedError("Direct send protocol ID not found!".into()))
-    }
-
-    fn get_rpc_protocol_id(&self) -> Result<ProtocolId, Error> {
-        self.rpc_protocol_id
-            .ok_or_else(|| Error::UnexpectedError("RPC protocol ID not found!".into()))
-    }
-
+    /// Returns the network sender for the specified network ID
     fn get_sender_for_network_id(
         &self,
         network_id: &NetworkId,
@@ -104,6 +94,37 @@ impl<Message: NetworkMessageTrait> NetworkClient<Message> {
         self.network_senders.get(network_id).ok_or_else(|| {
             Error::UnexpectedError(format!("Unknown network ID specified: {:?}", network_id))
         })
+    }
+
+    /// Identify the supported protocols from the specified peer's connection
+    fn get_supported_protocols(&self, peer: &PeerNetworkId) -> Result<ProtocolIdSet, Error> {
+        let peer_metadata_storage = self.get_peer_metadata_storage();
+        peer_metadata_storage
+            .read(*peer)
+            .map(|peer_info| peer_info.active_connection.application_protocols)
+            .ok_or_else(|| {
+                Error::UnexpectedError(format!("Peer info not found for peer: {:?}", peer))
+            })
+    }
+
+    /// Selects the preferred protocol for the specified peer. The preferred protocols
+    /// should be sorted from most to least preferable.
+    fn get_preferred_protocol_for_peer(
+        &self,
+        peer: &PeerNetworkId,
+        preferred_protocols: &[ProtocolId],
+    ) -> Result<ProtocolId, Error> {
+        let protocols_supported_by_peer = self.get_supported_protocols(peer)?;
+        for protocol in preferred_protocols {
+            if protocols_supported_by_peer.contains(*protocol) {
+                return Ok(*protocol);
+            }
+        }
+        Err(Error::NetworkError(format!(
+            "None of the preferred protocols are supported by this peer! \
+            Peer: {:?}, supported protocols: {:?}",
+            peer, protocols_supported_by_peer
+        )))
     }
 }
 
@@ -127,21 +148,49 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
 
     fn send_to_peer(&self, message: Message, peer: PeerNetworkId) -> Result<(), Error> {
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
-        let protocol_id = self.get_direct_send_protocol_id()?;
-        Ok(network_sender.send_to(peer.peer_id(), protocol_id, message)?)
+        let direct_send_protocol_id = self
+            .get_preferred_protocol_for_peer(&peer, &self.direct_send_protocols_and_preferences)?;
+        Ok(network_sender.send_to(peer.peer_id(), direct_send_protocol_id, message)?)
     }
 
     fn send_to_peers(&self, message: Message, peers: &[PeerNetworkId]) -> Result<(), Error> {
-        let protocol_id = self.get_direct_send_protocol_id()?;
-        for (network_id, peers) in &peers
-            .iter()
-            .group_by(|peer_network_id| peer_network_id.network_id())
-        {
-            let network_sender = self.get_sender_for_network_id(&network_id)?;
-            let peer_ids = peers.map(|peer_network_id| peer_network_id.peer_id());
-            network_sender.send_to_many(peer_ids, protocol_id, message.clone())?;
+        // Sort peers by protocol
+        let mut peers_per_protocol = HashMap::new();
+        let mut peers_without_a_protocol = vec![];
+        for peer in peers {
+            match self
+                .get_preferred_protocol_for_peer(peer, &self.direct_send_protocols_and_preferences)
+            {
+                Ok(protocol) => peers_per_protocol
+                    .entry(protocol)
+                    .or_insert_with(Vec::new)
+                    .push(peer),
+                Err(_) => peers_without_a_protocol.push(peer),
+            }
         }
 
+        // We only periodically log any unavailable peers (to prevent log spamming)
+        if !peers_without_a_protocol.is_empty() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(10)),
+                warn!(
+                    "Unavailable peers (without a common network protocol): {:?}",
+                    peers_without_a_protocol
+                )
+            );
+        }
+
+        // Send to all peers in each protocol group and network
+        for (protocol_id, peers) in peers_per_protocol {
+            for (network_id, peers) in &peers
+                .iter()
+                .group_by(|peer_network_id| peer_network_id.network_id())
+            {
+                let network_sender = self.get_sender_for_network_id(&network_id)?;
+                let peer_ids = peers.map(|peer_network_id| peer_network_id.peer_id());
+                network_sender.send_to_many(peer_ids, protocol_id, message.clone())?;
+            }
+        }
         Ok(())
     }
 
@@ -151,34 +200,11 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         rpc_timeout: Duration,
         peer: PeerNetworkId,
     ) -> Result<Message, Error> {
-        let protocol_id = self.get_rpc_protocol_id()?;
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
+        let rpc_protocol_id =
+            self.get_preferred_protocol_for_peer(&peer, &self.rpc_protocols_and_preferences)?;
         Ok(network_sender
-            .send_rpc(peer.peer_id(), protocol_id, message, rpc_timeout)
+            .send_rpc(peer.peer_id(), rpc_protocol_id, message, rpc_timeout)
             .await?)
     }
-}
-
-/// A simplified version of `NetworkSender` that doesn't use `ProtocolId` in the input
-/// It was already being implemented for every application, but is now standardized
-#[async_trait]
-pub trait ApplicationNetworkSender<TMessage: Send>: Clone {
-    fn send_to(&self, _recipient: PeerId, _message: TMessage) -> Result<(), NetworkError> {
-        unimplemented!()
-    }
-
-    fn send_to_many(
-        &self,
-        _recipients: impl Iterator<Item = PeerId>,
-        _message: TMessage,
-    ) -> Result<(), NetworkError> {
-        unimplemented!()
-    }
-
-    async fn send_rpc(
-        &self,
-        recipient: PeerId,
-        req_msg: TMessage,
-        timeout: Duration,
-    ) -> Result<TMessage, RpcError>;
 }

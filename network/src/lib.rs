@@ -10,8 +10,6 @@
 // tracking issue: https://github.com/rust-lang/rust/issues/78835
 // #![doc = include_str!("../README.md")]
 
-extern crate core;
-
 pub mod application;
 pub mod connectivity_manager;
 pub mod constants;

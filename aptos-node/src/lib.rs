@@ -19,42 +19,50 @@ use aptos_config::{
     utils::get_genesis_txn,
 };
 use aptos_consensus::consensus_provider::start_consensus;
+use aptos_consensus::network_interface::consensus_network_config;
 use aptos_consensus_notifications::ConsensusNotificationListener;
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_data_streaming_service::{
     streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
     streaming_service::DataStreamingService,
 };
-use aptos_infallible::RwLock;
-use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
-use aptos_state_view::account_with_state_view::AsAccountWithStateView;
-use aptos_time_service::TimeService;
-use aptos_types::{
-    account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
-    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
-};
-
 use aptos_db::AptosDB;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
 use aptos_framework::ReleaseBundle;
+use aptos_infallible::RwLock;
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
+use aptos_mempool::network::mempool_network_config;
+use aptos_mempool::MempoolClientSender;
 use aptos_mempool_notifications::MempoolNotificationSender;
+use aptos_network::application::interface::NetworkClient;
 use aptos_network::application::storage::PeerMetadataStorage;
+use aptos_network::protocols::network::NetworkSender;
+use aptos_network::ProtocolId;
 use aptos_network_builder::builder::NetworkBuilder;
 use aptos_state_sync_driver::{
     driver_factory::{DriverFactory, StateSyncRuntimes},
     metadata_storage::PersistentMetadataStorage,
 };
+use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_storage_service_client::{storage_client_network_config, StorageServiceClient};
+use aptos_storage_service_server::network::storage_service_network_config;
 use aptos_storage_service_server::{
     network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
+};
+use aptos_storage_service_types::StorageServiceMessage;
+use aptos_time_service::TimeService;
+use aptos_types::{
+    account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
+    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::FromHex;
 use log_build_information::log_build_information;
+use maplit::hashmap;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     boxed::Box,
@@ -70,14 +78,6 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::{Builder, Runtime};
-
-use aptos_mempool::network::mempool_client_service_network_config;
-use aptos_mempool::MempoolClientSender;
-use aptos_network::application::interface::NetworkClient;
-use aptos_network::protocols::network::NetworkSender;
-use aptos_network::ProtocolId;
-use aptos_storage_service_server::network::storage_service_network_config;
-use aptos_storage_service_types::StorageServiceMessage;
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -487,8 +487,8 @@ fn setup_aptos_data_client(
 ) -> anyhow::Result<(AptosNetDataClient, Runtime)> {
     // Create the storage service client
     let network_client = NetworkClient::new(
-        None,
-        Some(ProtocolId::StorageServiceRpc),
+        vec![],
+        vec![ProtocolId::StorageServiceRpc],
         network_senders,
         peer_metadata_storage,
     );
@@ -791,9 +791,8 @@ pub fn setup_environment(
         storage_client_network_senders.insert(network_id, storage_client_network_sender);
 
         // Create the endpoints to connect the Network to mempool.
-        let (mempool_sender, mempool_events) = network_builder.add_client_and_service(
-            &mempool_client_service_network_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
-        );
+        let (mempool_sender, mempool_events) = network_builder
+            .add_client_and_service(&mempool_network_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE));
         mempool_network_handles.push((network_id, mempool_sender, mempool_events));
 
         // Perform steps relevant specifically to Validator networks.
@@ -804,8 +803,9 @@ pub fn setup_environment(
                 panic!("There can be at most one validator network!");
             }
 
-            consensus_network_handles = Some(network_builder.add_client_and_service(
-                &aptos_consensus::network_interface::network_endpoint_config(),
+            consensus_network_handles = Some((
+                NetworkId::Validator,
+                network_builder.add_client_and_service(&consensus_network_config()),
             ));
         }
 
@@ -878,7 +878,7 @@ pub fn setup_environment(
     // StateSync should be instantiated and started before Consensus to avoid a cyclic dependency:
     // network provider -> consensus -> state synchronizer -> network provider.  This has resulted
     // in a deadlock as observed in GitHub issue #749.
-    if let Some((consensus_network_sender, consensus_network_events)) = consensus_network_handles {
+    if let Some((network_id, (network_sender, network_events))) = consensus_network_handles {
         // Make sure that state synchronizer is caught up at least to its waypoint
         // (in case it's present). There is no sense to start consensus prior to that.
         // TODO: Note that we need the networking layer to be able to discover & connect to the
@@ -891,8 +891,8 @@ pub fn setup_environment(
         instant = Instant::now();
         consensus_runtime = Some(start_consensus(
             &node_config,
-            consensus_network_sender,
-            consensus_network_events,
+            hashmap! {network_id => network_sender},
+            network_events,
             Arc::new(consensus_notifier),
             consensus_to_mempool_sender,
             db_rw,

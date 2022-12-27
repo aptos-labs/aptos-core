@@ -422,21 +422,6 @@ impl PeerManagerBuilder {
             .tcp_buffer_cfg
     }
 
-    /// Register a peer-to-peer service (i.e., both client and service) for given
-    /// protocols.
-    pub fn add_p2p_service(
-        &mut self,
-        config: &NetworkApplicationConfig,
-    ) -> (
-        (PeerManagerRequestSender, ConnectionRequestSender),
-        (
-            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-            conn_notifs_channel::Receiver,
-        ),
-    ) {
-        (self.add_client(config), self.add_service(config))
-    }
-
     /// Register a client that's interested in some set of protocols and return
     /// the outbound channels into network.
     pub fn add_client(

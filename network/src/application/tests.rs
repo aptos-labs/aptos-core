@@ -49,8 +49,12 @@ fn peers(
 #[test]
 fn test_interface() {
     let peer_metadata_storage = PeerMetadataStorage::test();
-    let network_client: NetworkClient<DummyMessage> =
-        NetworkClient::new(None, None, HashMap::new(), peer_metadata_storage.clone());
+    let network_client: NetworkClient<DummyMessage> = NetworkClient::new(
+        vec![],
+        vec![],
+        HashMap::new(),
+        peer_metadata_storage.clone(),
+    );
 
     let network_id = NetworkId::Validator;
     let peer_1 = PeerId::random();

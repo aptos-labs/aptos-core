@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::network_interface::{DIRECT_SEND, RPC};
 use crate::{
     block_storage::BlockStore,
     liveness::{
@@ -10,7 +11,7 @@ use crate::{
     },
     metrics_safety_rules::MetricsSafetyRules,
     network::NetworkSender,
-    network_interface::ConsensusNetworkSender,
+    network_interface::ConsensusNetworkClient,
     payload_manager::PayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     round_manager::RoundManager,
@@ -19,8 +20,12 @@ use crate::{
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::ConsensusConfig;
+use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::proposal_msg::ProposalMsg;
 use aptos_infallible::Mutex;
+use aptos_network::application::interface::NetworkClient;
+use aptos_network::application::storage::PeerMetadataStorage;
+use aptos_network::protocols::network;
 use aptos_network::{
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::network::NewNetworkSender,
@@ -37,6 +42,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use futures::{channel::mpsc, executor::block_on};
+use maplit::hashmap;
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
 use tokio::runtime::Runtime;
@@ -120,10 +126,18 @@ fn create_node_for_fuzzing() -> RoundManager {
     // TODO: mock channels
     let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-    let network_sender = ConsensusNetworkSender::new(
+    let network_sender = network::NetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
+    let network_client = NetworkClient::new(
+        DIRECT_SEND.into(),
+        RPC.into(),
+        hashmap! {NetworkId::Validator => network_sender},
+        PeerMetadataStorage::new(&[NetworkId::Validator]),
+    );
+    let consensus_network_client = ConsensusNetworkClient::new(network_client);
+
     let (self_sender, _self_receiver) = aptos_channels::new_test(8);
 
     let epoch_state = EpochState {
@@ -132,7 +146,7 @@ fn create_node_for_fuzzing() -> RoundManager {
     };
     let network = NetworkSender::new(
         signer.author(),
-        network_sender,
+        consensus_network_client,
         self_sender,
         epoch_state.verifier.clone(),
     );

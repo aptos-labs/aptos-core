@@ -58,8 +58,8 @@ impl TestHarness {
         let network_context = NetworkContext::mock();
         let peer_metadata_storage = PeerMetadataStorage::test();
         let network_client = NetworkClient::new(
-            None,
-            Some(HealthCheckerRpc),
+            vec![],
+            vec![HealthCheckerRpc],
             hashmap! {network_context.network_id() => network_sender},
             peer_metadata_storage,
         );

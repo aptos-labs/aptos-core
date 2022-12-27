@@ -135,10 +135,11 @@ impl MockClient {
 
         // Create the peer monitoring service event stream
         let peer_monitoring_service_config = PeerMonitoringServiceConfig::default();
-        let network_endpoint_config =
-            crate::network::network_endpoint_config(peer_monitoring_service_config.clone())
-                .inbound_queue
-                .unwrap();
+        let network_endpoint_config = crate::network::peer_monitoring_service_network_config(
+            peer_monitoring_service_config.clone(),
+        )
+        .inbound_queue
+        .unwrap();
         let (peer_notification_sender, peer_notification_receiver) =
             network_endpoint_config.build();
         let (_connection_notifications_receiver, connection_notifications_sender) =

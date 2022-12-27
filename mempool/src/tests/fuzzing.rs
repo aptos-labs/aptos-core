@@ -40,8 +40,8 @@ pub fn test_mempool_process_incoming_transactions_impl(
     let mock_db = MockDbReaderWriter;
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));
     let network_client = NetworkClient::new(
-        Some(MempoolDirectSend),
-        None,
+        vec![MempoolDirectSend],
+        vec![],
         HashMap::new(),
         PeerMetadataStorage::new(&[NetworkId::Validator]),
     );

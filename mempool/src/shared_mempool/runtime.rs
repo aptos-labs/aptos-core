@@ -68,8 +68,8 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
     }
 
     let network_client = NetworkClient::new(
-        Some(MempoolDirectSend),
-        None,
+        vec![MempoolDirectSend],
+        vec![],
         network_senders,
         peer_metadata_storage,
     );

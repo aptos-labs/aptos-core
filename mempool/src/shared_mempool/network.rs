@@ -77,10 +77,8 @@ pub enum MempoolSyncMsg {
 pub type MempoolNetworkEvents = NetworkEvents<MempoolSyncMsg>;
 
 /// Returns a network application config for the mempool client and service
-pub fn mempool_client_service_network_config(
-    max_broadcasts_per_peer: usize,
-) -> NetworkApplicationConfig {
-    NetworkApplicationConfig::p2p(
+pub fn mempool_network_config(max_broadcasts_per_peer: usize) -> NetworkApplicationConfig {
+    NetworkApplicationConfig::client_and_service(
         [ProtocolId::MempoolDirectSend],
         aptos_channel::Config::new(max_broadcasts_per_peer)
             .queue_style(QueueStyle::KLAST)

@@ -435,9 +435,8 @@ impl NetworkBuilder {
         ping_failures_tolerated: u64,
     ) -> &mut Self {
         // Initialize and start HealthChecker.
-        let (hc_network_tx, hc_network_rx) = self.add_client_and_service(
-            &health_checker::health_checker_client_service_network_config(),
-        );
+        let (hc_network_tx, hc_network_rx) =
+            self.add_client_and_service(&health_checker::health_checker_network_config());
         self.health_checker_builder = Some(HealthCheckerBuilder::new(
             self.network_context(),
             self.time_service.clone(),

@@ -116,9 +116,8 @@ impl NetworkApplicationConfig {
         }
     }
 
-    /// AptosNet peer-to-peer service configuration. A peer-to-peer service is both
-    /// a client and a service.
-    pub fn p2p(
+    /// AptosNet client and service configuration
+    pub fn client_and_service(
         protocols: impl IntoIterator<Item = ProtocolId>,
         inbound_queue: aptos_channel::Config,
     ) -> Self {

@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::network_interface::{DIRECT_SEND, RPC};
 use crate::{
     counters,
     epoch_manager::EpochManager,
     experimental::buffer_manager::OrderedBlocks,
     network::NetworkTask,
-    network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
+    network_interface::ConsensusNetworkClient,
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
     test_utils::{MockStateComputer, MockStorage},
@@ -21,6 +22,9 @@ use aptos_config::{
 use aptos_consensus_types::common::{Author, Round};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_mempool::mocks::MockSharedMempool;
+use aptos_network::application::interface::NetworkClient;
+use aptos_network::protocols::network;
+use aptos_network::protocols::network::NetworkEvents;
 use aptos_network::{
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
@@ -43,6 +47,7 @@ use aptos_types::{
 };
 use futures::channel::mpsc;
 use futures::StreamExt;
+use maplit::hashmap;
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
 use tokio::runtime::{Builder, Runtime};
 
@@ -73,12 +78,18 @@ impl SMRNode {
         let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
         let (_, conn_notifs_channel) = conn_notifs_channel::new();
-        let mut network_sender = ConsensusNetworkSender::new(
+        let network_sender = network::NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
-        network_sender.initialize(playground.peer_protocols());
-        let network_events = ConsensusNetworkEvents::new(consensus_rx, conn_notifs_channel);
+        let network_client = NetworkClient::new(
+            DIRECT_SEND.into(),
+            RPC.into(),
+            hashmap! {NetworkId::Validator => network_sender},
+            playground.peer_protocols(),
+        );
+        let consensus_network_client = ConsensusNetworkClient::new(network_client);
+        let network_events = NetworkEvents::new(consensus_rx, conn_notifs_channel);
 
         playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
@@ -140,7 +151,7 @@ impl SMRNode {
             &config,
             time_service,
             self_sender,
-            network_sender,
+            consensus_network_client,
             timeout_sender,
             quorum_store_to_mempool_sender,
             state_computer.clone(),

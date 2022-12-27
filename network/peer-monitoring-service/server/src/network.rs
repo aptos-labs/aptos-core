@@ -30,7 +30,8 @@ use std::{
 // TODO(joshlind): remove the code duplication and boilerplate between
 // the different AptosNet services.
 
-pub fn network_endpoint_config(
+/// Returns a network application config for the peer monitoring service
+pub fn peer_monitoring_service_network_config(
     peer_monitoring_config: PeerMonitoringServiceConfig,
 ) -> NetworkApplicationConfig {
     let max_network_channel_size = peer_monitoring_config.max_network_channel_size as usize;
