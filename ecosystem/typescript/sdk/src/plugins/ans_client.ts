@@ -25,7 +25,7 @@ export class AnsClient {
     this.contractAddress = ans_contracts[this.aptosClient.nodeUrl] ?? contractAddress;
   }
 
-  async getNameFromAddress(address: string) {}
+  async getNamebyAddress(address: string) {}
 
   async getAddressByName(name: string): Promise<string> {
     const ansResource: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(
