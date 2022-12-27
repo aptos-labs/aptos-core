@@ -9,7 +9,7 @@ import fs from "fs";
 import path from "path";
 
 export const ans_owner_address = "0xdc710fee87bd16028864920d50a5e444560fcbf207850f1a68cea2d606825c7c";
-jest.setTimeout(100000);
+
 describe("AnsClient", () => {
   it("fails to create a new ANS class instance", () => {
     const client = new AptosClient(NODE_URL);
