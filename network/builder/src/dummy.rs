@@ -149,7 +149,9 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     let (listener_sender, mut listener_events) = network_builder
-        .add_p2p_service::<DummyNetworkSender, DummyNetworkEvents>(&network_endpoint_config());
+        .add_client_and_service::<DummyNetworkSender, DummyNetworkEvents>(
+            &network_endpoint_config(),
+        );
     network_builder.build(runtime.handle().clone()).start();
 
     // Add the listener address with port
@@ -179,7 +181,9 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     let (dialer_sender, mut dialer_events) = network_builder
-        .add_p2p_service::<DummyNetworkSender, DummyNetworkEvents>(&network_endpoint_config());
+        .add_client_and_service::<DummyNetworkSender, DummyNetworkEvents>(
+            &network_endpoint_config(),
+        );
     network_builder.build(runtime.handle().clone()).start();
 
     // Wait for establishing connection

@@ -76,7 +76,8 @@ pub enum MempoolSyncMsg {
 /// `channel::Receiver<PeerManagerNotification>`.
 pub type MempoolNetworkEvents = NetworkEvents<MempoolSyncMsg>;
 
-pub fn mempool_client_and_server_network_config(
+/// Returns a network application config for the mempool client and service
+pub fn mempool_client_service_network_config(
     max_broadcasts_per_peer: usize,
 ) -> NetworkApplicationConfig {
     NetworkApplicationConfig::p2p(

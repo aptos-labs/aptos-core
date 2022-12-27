@@ -6,12 +6,7 @@ use crate::protocols::network::Message;
 use crate::protocols::network::NetworkSender;
 use crate::protocols::wire::handshake::v1::ProtocolId;
 use crate::{
-    application::{
-        storage::{LockingHashMap, PeerMetadataStorage},
-        types::{PeerInfo, PeerState},
-    },
-    error::NetworkError,
-    protocols::network::RpcError,
+    application::storage::PeerMetadataStorage, error::NetworkError, protocols::network::RpcError,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_types::network_address::NetworkAddress;
@@ -19,7 +14,7 @@ use aptos_types::PeerId;
 use async_trait::async_trait;
 use itertools::Itertools;
 use std::sync::Arc;
-use std::{collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData, time::Duration};
+use std::{collections::HashMap, fmt::Debug, time::Duration};
 
 /// A simple definition to handle all the trait bounds for messages.
 // TODO: we should remove the duplication across the different files
@@ -38,33 +33,23 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
     async fn add_peers_to_discovery(
         &self,
         _peers: &[(PeerNetworkId, NetworkAddress)],
-    ) -> Result<(), Error> {
-        unimplemented!()
-    }
+    ) -> Result<(), Error>;
 
     /// Requests that the network connection for the specified peer
     /// is disconnected.
     // TODO: support disconnect reasons.
-    async fn disconnect_from_peer(&self, _peer: PeerNetworkId) -> Result<(), Error> {
-        unimplemented!()
-    }
+    async fn disconnect_from_peer(&self, _peer: PeerNetworkId) -> Result<(), Error>;
 
     /// Returns a handle to the global `PeerMetadataStorage`
-    fn get_peer_metadata_storage(&self) -> Arc<PeerMetadataStorage> {
-        unimplemented!()
-    }
+    fn get_peer_metadata_storage(&self) -> Arc<PeerMetadataStorage>;
 
     /// Sends the given message to the specified peer. Note: this
     /// method does not guarantee message delivery or handle responses.
-    fn send_to_peer(&self, _message: Message, _peer: PeerNetworkId) -> Result<(), Error> {
-        unimplemented!()
-    }
+    fn send_to_peer(&self, _message: Message, _peer: PeerNetworkId) -> Result<(), Error>;
 
     /// Sends the given message to each peer in the specified peer list.
     /// Note: this method does not guarantee message delivery or handle responses.
-    fn send_to_peers(&self, _message: Message, _peers: &[PeerNetworkId]) -> Result<(), Error> {
-        unimplemented!()
-    }
+    fn send_to_peers(&self, _message: Message, _peers: &[PeerNetworkId]) -> Result<(), Error>;
 
     /// Sends the given message to the specified peer with the corresponding
     /// timeout. Awaits a response from the peer, or hits the timeout
@@ -74,9 +59,7 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
         _message: Message,
         _rpc_timeout: Duration,
         _peer: PeerNetworkId,
-    ) -> Result<Message, Error> {
-        unimplemented!()
-    }
+    ) -> Result<Message, Error>;
 }
 
 /// A network component that can be used by client applications (e.g., consensus,
@@ -126,6 +109,13 @@ impl<Message: NetworkMessageTrait> NetworkClient<Message> {
 
 #[async_trait]
 impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkClient<Message> {
+    async fn add_peers_to_discovery(
+        &self,
+        _peers: &[(PeerNetworkId, NetworkAddress)],
+    ) -> Result<(), Error> {
+        unimplemented!("Adding peers to discovery is not yet supported!");
+    }
+
     async fn disconnect_from_peer(&self, peer: PeerNetworkId) -> Result<(), Error> {
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
         Ok(network_sender.disconnect_peer(peer.peer_id()).await?)
@@ -166,104 +156,6 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         Ok(network_sender
             .send_rpc(peer.peer_id(), protocol_id, message, rpc_timeout)
             .await?)
-    }
-}
-
-/// A generic `NetworkInterface` for applications to connect to networking
-///
-/// Each application would implement their own `NetworkInterface`.  This would hold `AppData` specific
-/// to the application as well as a specific `Sender` for cloning across threads and sending requests.
-#[async_trait]
-pub trait NetworkInterface<TMessage: Message + Send, NetworkSender> {
-    /// The application specific key for `AppData`
-    type AppDataKey: Clone + Debug + Eq + Hash;
-    /// The application specific data to be stored
-    type AppData: Clone + Debug;
-
-    /// Provides the `PeerMetadataStorage` for other functions.  Not expected to be used externally.
-    fn peer_metadata_storage(&self) -> &PeerMetadataStorage;
-
-    /// Give a copy of the sender for the network
-    fn sender(&self) -> NetworkSender;
-
-    /// Retrieve only connected peers
-    fn connected_peers(&self, network_id: NetworkId) -> HashMap<PeerNetworkId, PeerInfo> {
-        self.filtered_peers(network_id, |(_, peer_info)| {
-            peer_info.status == PeerState::Connected
-        })
-    }
-
-    /// Filter peers with according `filter`
-    fn filtered_peers<F: FnMut(&(&PeerId, &PeerInfo)) -> bool>(
-        &self,
-        network_id: NetworkId,
-        filter: F,
-    ) -> HashMap<PeerNetworkId, PeerInfo> {
-        self.peer_metadata_storage()
-            .read_filtered(network_id, filter)
-    }
-
-    /// Retrieve PeerInfo for the node
-    fn peers(&self, network_id: NetworkId) -> HashMap<PeerNetworkId, PeerInfo> {
-        self.peer_metadata_storage().read_all(network_id)
-    }
-
-    /// Application specific data interface
-    fn app_data(&self) -> &LockingHashMap<Self::AppDataKey, Self::AppData>;
-}
-
-#[derive(Clone, Debug)]
-pub struct MultiNetworkSender<
-    TMessage: Message + Send,
-    Sender: ApplicationNetworkSender<TMessage> + Send,
-> {
-    senders: HashMap<NetworkId, Sender>,
-    _phantom: PhantomData<TMessage>,
-}
-
-impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage> + Send>
-    MultiNetworkSender<TMessage, Sender>
-{
-    pub fn new(senders: HashMap<NetworkId, Sender>) -> Self {
-        MultiNetworkSender {
-            senders,
-            _phantom: Default::default(),
-        }
-    }
-
-    fn sender(&self, network_id: &NetworkId) -> &Sender {
-        self.senders.get(network_id).expect("Unknown NetworkId")
-    }
-
-    pub fn send_to(&self, recipient: PeerNetworkId, message: TMessage) -> Result<(), NetworkError> {
-        self.sender(&recipient.network_id())
-            .send_to(recipient.peer_id(), message)
-    }
-
-    pub fn send_to_many(
-        &self,
-        recipients: impl Iterator<Item = PeerNetworkId>,
-        message: TMessage,
-    ) -> Result<(), NetworkError> {
-        for (network_id, recipients) in
-            &recipients.group_by(|peer_network_id| peer_network_id.network_id())
-        {
-            let sender = self.sender(&network_id);
-            let peer_ids = recipients.map(|peer_network_id| peer_network_id.peer_id());
-            sender.send_to_many(peer_ids, message.clone())?;
-        }
-        Ok(())
-    }
-
-    pub async fn send_rpc(
-        &self,
-        recipient: PeerNetworkId,
-        req_msg: TMessage,
-        timeout: Duration,
-    ) -> Result<TMessage, RpcError> {
-        self.sender(&recipient.network_id())
-            .send_rpc(recipient.peer_id(), req_msg, timeout)
-            .await
     }
 }
 

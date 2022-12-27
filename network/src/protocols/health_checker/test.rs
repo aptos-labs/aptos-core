@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
+use crate::application::interface::NetworkClient;
+use crate::peer_manager::{ConnectionRequestSender, PeerManagerRequestSender};
+use crate::protocols::network::NetworkSender;
+use crate::protocols::wire::handshake::v1::ProtocolId::HealthCheckerRpc;
 use crate::{
     application::storage::PeerMetadataStorage,
     peer_manager::{
@@ -17,6 +21,7 @@ use crate::{
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_time_service::{MockTimeService, TimeService};
 use futures::{executor::block_on, future};
+use maplit::hashmap;
 
 const PING_INTERVAL: Duration = Duration::from_secs(1);
 const PING_TIMEOUT: Duration = Duration::from_millis(500);
@@ -30,7 +35,9 @@ struct TestHarness {
 }
 
 impl TestHarness {
-    fn new_permissive(ping_failures_tolerated: u64) -> (Self, HealthChecker) {
+    fn new_permissive(
+        ping_failures_tolerated: u64,
+    ) -> (Self, HealthChecker<NetworkClient<HealthCheckerMsg>>) {
         ::aptos_logger::Logger::init_for_testing();
         let mock_time = TimeService::mock();
 
@@ -41,20 +48,26 @@ impl TestHarness {
             aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (connection_notifs_tx, connection_notifs_rx) = conn_notifs_channel::new();
 
-        let hc_network_tx = HealthCheckerNetworkSender::new(
+        let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(peer_mgr_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
         let hc_network_rx =
             HealthCheckerNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
+
+        let network_context = NetworkContext::mock();
+        let peer_metadata_storage = PeerMetadataStorage::test();
+        let network_client = NetworkClient::new(
+            None,
+            Some(HealthCheckerRpc),
+            hashmap! {network_context.network_id() => network_sender},
+            peer_metadata_storage,
+        );
+
         let health_checker = HealthChecker::new(
-            NetworkContext::mock(),
+            network_context,
             mock_time.clone(),
-            HealthCheckNetworkInterface::new(
-                PeerMetadataStorage::test(),
-                hc_network_tx,
-                hc_network_rx,
-            ),
+            HealthCheckNetworkInterface::new(network_client, hc_network_rx),
             PING_INTERVAL,
             PING_TIMEOUT,
             ping_failures_tolerated,
@@ -72,7 +85,7 @@ impl TestHarness {
         )
     }
 
-    fn new_strict() -> (Self, HealthChecker) {
+    fn new_strict() -> (Self, HealthChecker<NetworkClient<HealthCheckerMsg>>) {
         Self::new_permissive(0 /* ping_failures_tolerated */)
     }
 

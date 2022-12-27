@@ -435,8 +435,9 @@ impl NetworkBuilder {
         ping_failures_tolerated: u64,
     ) -> &mut Self {
         // Initialize and start HealthChecker.
-        let (hc_network_tx, hc_network_rx) =
-            self.add_p2p_service(&health_checker::network_endpoint_config());
+        let (hc_network_tx, hc_network_rx) = self.add_client_and_service(
+            &health_checker::health_checker_client_service_network_config(),
+        );
         self.health_checker_builder = Some(HealthCheckerBuilder::new(
             self.network_context(),
             self.time_service.clone(),
@@ -454,17 +455,18 @@ impl NetworkBuilder {
         self
     }
 
-    /// Register a new Peer-to-Peer (both client and service) application with
-    /// network and return the specialized client and service interfaces.
-    pub fn add_p2p_service<SenderT: NewNetworkSender, EventsT: NewNetworkEvents>(
+    /// Register a new client and service application with the network. Return
+    /// the client interface for sending messages and the service interface
+    /// for handling network requests.
+    pub fn add_client_and_service<SenderT: NewNetworkSender, EventsT: NewNetworkEvents>(
         &mut self,
         config: &NetworkApplicationConfig,
     ) -> (SenderT, EventsT) {
         (self.add_client(config), self.add_service(config))
     }
 
-    /// Register a new client application with network. Return the client
-    /// interface for sending messages via network.
+    /// Register a new client application with the network. Return the client
+    /// interface for sending messages.
     // TODO(philiphayes): return new NetworkClient (name TBD) interface?
     pub fn add_client<SenderT: NewNetworkSender>(
         &mut self,
@@ -474,8 +476,8 @@ impl NetworkBuilder {
         SenderT::new(peer_mgr_reqs_tx, connection_reqs_tx)
     }
 
-    /// Register a new service application with network. Return the service
-    /// interface for handling new requests from network.
+    /// Register a new service application with the network. Return the service
+    /// interface for handling network requests.
     // TODO(philiphayes): return new NetworkService (name TBD) interface?
     pub fn add_service<EventsT: NewNetworkEvents>(
         &mut self,

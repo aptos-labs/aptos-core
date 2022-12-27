@@ -71,7 +71,7 @@ use std::{
 };
 use tokio::runtime::{Builder, Runtime};
 
-use aptos_mempool::network::mempool_client_and_server_network_config;
+use aptos_mempool::network::mempool_client_service_network_config;
 use aptos_mempool::MempoolClientSender;
 use aptos_network::application::interface::NetworkClient;
 use aptos_network::protocols::network::NetworkSender;
@@ -791,8 +791,8 @@ pub fn setup_environment(
         storage_client_network_senders.insert(network_id, storage_client_network_sender);
 
         // Create the endpoints to connect the Network to mempool.
-        let (mempool_sender, mempool_events) = network_builder.add_p2p_service(
-            &mempool_client_and_server_network_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
+        let (mempool_sender, mempool_events) = network_builder.add_client_and_service(
+            &mempool_client_service_network_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
         );
         mempool_network_handles.push((network_id, mempool_sender, mempool_events));
 
@@ -804,10 +804,9 @@ pub fn setup_environment(
                 panic!("There can be at most one validator network!");
             }
 
-            consensus_network_handles =
-                Some(network_builder.add_p2p_service(
-                    &aptos_consensus::network_interface::network_endpoint_config(),
-                ));
+            consensus_network_handles = Some(network_builder.add_client_and_service(
+                &aptos_consensus::network_interface::network_endpoint_config(),
+            ));
         }
 
         let network_context = network_builder.network_context();
