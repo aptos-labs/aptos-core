@@ -87,7 +87,7 @@ describe("AnsClient", () => {
 
     it("gets name from address", async () => {
       const ans = new AnsClient(client, ans_owner_address);
-      const address = await ans.getAddressFromName("alice");
+      const address = await ans.getAddressByName("alice");
       expect(alice.address().hex()).toEqual(address);
     });
   });
