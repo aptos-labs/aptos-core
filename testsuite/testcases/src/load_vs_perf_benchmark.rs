@@ -34,7 +34,9 @@ impl LoadVsPerfBenchmark {
         duration: Duration,
     ) -> Result<SingleRunStats> {
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
-        let emit_job_request = ctx.emit_job.clone().mode(EmitJobMode::ConstTps { tps });
+        let emit_job_request = ctx.emit_job.clone().mode(EmitJobMode::MaxLoad {
+            mempool_backlog: tps,
+        });
         let (stats, actual_duration, ledger_transactions) = self.test.network_load_test(
             ctx,
             emit_job_request,
