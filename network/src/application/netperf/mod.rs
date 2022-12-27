@@ -30,7 +30,13 @@ use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::PeerId;
-use axum::{routing::get, Extension, Json, Router};
+use axum::{
+    extract::Query,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
+    Extension, Json, Router,
+};
 use dashmap::DashMap;
 use futures::StreamExt;
 use serde::Serialize;
@@ -159,7 +165,11 @@ fn preferred_axum_port(netperf_port: u16) -> u16 {
 async fn start_axum(state: NetPerfState, netperf_port: u16) {
     let app = Router::new()
         .route("/", get(usage_handler))
-        .route("/peers", get(get_peers).layer(Extension(state)));
+        .route("/peers", get(get_peers).layer(Extension(state.clone())))
+        .route(
+            "/command",
+            post(parse_query).layer(Extension(state.clone())),
+        );
 
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], netperf_port));
 
@@ -199,4 +209,11 @@ async fn get_peers(Extension(state): Extension<NetPerfState>) -> Json<PeerList> 
     }
 
     Json(out)
+}
+
+async fn parse_query(
+    Extension(state): Extension<NetPerfState>,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> impl IntoResponse {
+    StatusCode::OK
 }
