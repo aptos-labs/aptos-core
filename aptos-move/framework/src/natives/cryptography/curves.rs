@@ -191,6 +191,13 @@ fn element_from_bytes_internal(
                 .get_mut::<ArksContext>()
                 .add_g2_point(point)
         }
+        "0x1::curves::BLS12_381_Gt" => {
+            let point = ark_bls12_381::Fq12::deserialize_uncompressed(bytes.as_slice()).unwrap();
+            context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_gt_point(point)
+        }
         _ => todo!(),
     };
     Ok(NativeResult::ok(

@@ -118,6 +118,22 @@ module aptos_std::curves {
         }
     }
 
+    public fun simul_point_mul<G>(scalars: &vector<Scalar<G>>, points: &vector<Point<G>>): Point<G> {
+        //TODO: replace the naive implementation.
+        let result = point_identity<G>();
+        let num_points = std::vector::length(points);
+        let num_scalars = std::vector::length(scalars);
+        assert!(num_points == num_scalars, 1);
+        let i = 0;
+        while (i < num_points) {
+            let scalar = std::vector::borrow(scalars, i);
+            let point = std::vector::borrow(points, i);
+            result = point_add(&result, &point_mul(scalar, point));
+            i = i + 1;
+        };
+        result
+    }
+
     public fun scalar_to_bytes<G>(scalar: &Scalar<G>): vector<u8> {
         scalar_to_bytes_internal<G>(scalar.handle)
     }

@@ -23,6 +23,7 @@
 -  [Function `point_generator`](#0x1_curves_point_generator)
 -  [Function `point_add`](#0x1_curves_point_add)
 -  [Function `point_mul`](#0x1_curves_point_mul)
+-  [Function `simul_point_mul`](#0x1_curves_simul_point_mul)
 -  [Function `scalar_to_bytes`](#0x1_curves_scalar_to_bytes)
 -  [Function `point_to_bytes`](#0x1_curves_point_to_bytes)
 -  [Function `element_from_bytes`](#0x1_curves_element_from_bytes)
@@ -539,6 +540,42 @@ Scalar basics.
     <a href="curves.md#0x1_curves_Point">Point</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_point_mul_internal">point_mul_internal</a>&lt;G&gt;(_scalar.handle, _point.handle)
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_simul_point_mul"></a>
+
+## Function `simul_point_mul`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_simul_point_mul">simul_point_mul</a>&lt;G&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;&gt;, points: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G&gt;&gt;): <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_simul_point_mul">simul_point_mul</a>&lt;G&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;&gt;, points: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">Point</a>&lt;G&gt;&gt;): <a href="curves.md#0x1_curves_Point">Point</a>&lt;G&gt; {
+    //TODO: replace the naive implementation.
+    <b>let</b> result = <a href="curves.md#0x1_curves_point_identity">point_identity</a>&lt;G&gt;();
+    <b>let</b> num_points = std::vector::length(points);
+    <b>let</b> num_scalars = std::vector::length(scalars);
+    <b>assert</b>!(num_points == num_scalars, 1);
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; num_points) {
+        <b>let</b> scalar = std::vector::borrow(scalars, i);
+        <b>let</b> point = std::vector::borrow(points, i);
+        result = <a href="curves.md#0x1_curves_point_add">point_add</a>(&result, &<a href="curves.md#0x1_curves_point_mul">point_mul</a>(scalar, point));
+        i = i + 1;
+    };
+    result
 }
 </code></pre>
 
