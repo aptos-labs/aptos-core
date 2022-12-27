@@ -10,6 +10,7 @@
 -  [Struct `Proof`](#0x1_groth16_Proof)
 -  [Function `new_vk`](#0x1_groth16_new_vk)
 -  [Function `new_pvk`](#0x1_groth16_new_pvk)
+-  [Function `prepare_verifying_key`](#0x1_groth16_prepare_verifying_key)
 -  [Function `new_proof`](#0x1_groth16_new_proof)
 -  [Function `verify_proof`](#0x1_groth16_verify_proof)
 -  [Function `verify_proof_with_pvk`](#0x1_groth16_verify_proof_with_pvk)
@@ -207,6 +208,35 @@
         gamma_g2_neg,
         delta_g2_neg,
         gamma_abc_g1,
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_groth16_prepare_verifying_key"></a>
+
+## Function `prepare_verifying_key`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_prepare_verifying_key">prepare_verifying_key</a>&lt;G1, G2, Gt&gt;(vk: &<a href="groth16.md#0x1_groth16_VerifyingKey">groth16::VerifyingKey</a>&lt;G1, G2, Gt&gt;): <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">groth16::PreparedVerifyingKey</a>&lt;G1, G2, Gt&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_prepare_verifying_key">prepare_verifying_key</a>&lt;G1,G2,Gt&gt;(vk: &<a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>&lt;G1,G2,Gt&gt;): <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">PreparedVerifyingKey</a>&lt;G1,G2,Gt&gt; {
+    <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">PreparedVerifyingKey</a> {
+        alpha_g1_beta_g2: <a href="curves.md#0x1_curves_pairing">curves::pairing</a>&lt;G1,G2,Gt&gt;(&vk.alpha_g1, &vk.beta_g2),
+        gamma_g2_neg: <a href="curves.md#0x1_curves_point_neg">curves::point_neg</a>(&vk.gamma_g2),
+        delta_g2_neg: <a href="curves.md#0x1_curves_point_neg">curves::point_neg</a>(&vk.delta_g2),
+        gamma_abc_g1: vk.gamma_abc_g1,
     }
 }
 </code></pre>

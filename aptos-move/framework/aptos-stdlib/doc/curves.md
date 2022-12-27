@@ -21,6 +21,7 @@
 -  [Function `scalar_from_bytes`](#0x1_curves_scalar_from_bytes)
 -  [Function `point_identity`](#0x1_curves_point_identity)
 -  [Function `point_generator`](#0x1_curves_point_generator)
+-  [Function `point_neg`](#0x1_curves_point_neg)
 -  [Function `point_add`](#0x1_curves_point_add)
 -  [Function `point_mul`](#0x1_curves_point_mul)
 -  [Function `simul_point_mul`](#0x1_curves_simul_point_mul)
@@ -44,6 +45,7 @@
 -  [Function `point_identity_internal`](#0x1_curves_point_identity_internal)
 -  [Function `point_generator_internal`](#0x1_curves_point_generator_internal)
 -  [Function `point_mul_internal`](#0x1_curves_point_mul_internal)
+-  [Function `point_neg_internal`](#0x1_curves_point_neg_internal)
 -  [Function `point_to_bytes_internal`](#0x1_curves_point_to_bytes_internal)
 
 
@@ -487,6 +489,32 @@ Scalar basics.
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_point_generator">point_generator</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Point">Point</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_Point">Point</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_point_generator_internal">point_generator_internal</a>&lt;G&gt;()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_point_neg"></a>
+
+## Function `point_neg`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_point_neg">point_neg</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_point_neg">point_neg</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Point">Point</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Point">Point</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_Point">Point</a>&lt;G&gt; {
+        handle: <a href="curves.md#0x1_curves_point_neg_internal">point_neg_internal</a>&lt;G&gt;(point.handle)
     }
 }
 </code></pre>
@@ -1027,6 +1055,28 @@ Scalar basics.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_mul_internal">point_mul_internal</a>&lt;G&gt;(scalar_handle: u8, point_handle: u8): u8;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_point_neg_internal"></a>
+
+## Function `point_neg_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_point_neg_internal">point_neg_internal</a>&lt;G&gt;(handle: u8): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_point_neg_internal">point_neg_internal</a>&lt;G&gt;(handle: u8): u8;
 </code></pre>
 
 

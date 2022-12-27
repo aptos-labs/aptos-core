@@ -106,6 +106,12 @@ module aptos_std::curves {
         }
     }
 
+    public fun point_neg<G>(point: &Point<G>): Point<G> {
+        Point<G> {
+            handle: point_neg_internal<G>(point.handle)
+        }
+    }
+
     public fun point_add<G>(point_1: &Point<G>, point_2: &Point<G>): Point<G> {
         Point<G> {
             handle: point_add_internal<G>(point_1.handle, point_2.handle)
@@ -170,6 +176,7 @@ module aptos_std::curves {
     native fun point_identity_internal<G>(): u8;
     native fun point_generator_internal<G>(): u8;
     native fun point_mul_internal<G>(scalar_handle: u8, point_handle: u8): u8;
+    native fun point_neg_internal<G>(handle: u8): u8;
     native fun point_to_bytes_internal<G>(handle: u8): vector<u8>;
 
     #[test]

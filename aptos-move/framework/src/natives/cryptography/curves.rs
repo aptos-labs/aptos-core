@@ -724,6 +724,62 @@ fn point_mul_internal(
     ))
 }
 
+fn point_neg_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let point_handle = pop_arg!(args, u8) as usize;
+    let handle = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
+            let point = context
+                .extensions()
+                .get::<ArksContext>()
+                .get_g1_point(point_handle);
+            let result = point.neg();
+            let handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_g1_point(result);
+            handle
+        }
+        "0x1::curves::BLS12_381_G2" => {
+            let point = context
+                .extensions()
+                .get::<ArksContext>()
+                .get_g2_point(point_handle);
+            let result = point.neg();
+            let handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_g2_point(result);
+            handle
+        }
+        "0x1::curves::BLS12_381_Gt" => {
+            let point = context
+                .extensions()
+                .get::<ArksContext>()
+                .get_gt_point(point_handle);
+            let result = point.inverse().unwrap();
+            let handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_gt_point(result);
+            handle
+        }
+        _ => todo!(),
+    };
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::u8(handle as u8)],
+    ))
+}
+
 fn pairing_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -892,6 +948,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "point_mul_internal",
             make_native_from_func(gas_params.clone(), point_mul_internal),
+        ),
+        (
+            "point_neg_internal",
+            make_native_from_func(gas_params.clone(), point_neg_internal),
         ),
         (
             "point_eq_internal",

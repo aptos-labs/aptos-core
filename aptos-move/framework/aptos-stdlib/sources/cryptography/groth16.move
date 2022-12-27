@@ -43,6 +43,15 @@ module aptos_std::groth16 {
         }
     }
 
+    public fun prepare_verifying_key<G1,G2,Gt>(vk: &VerifyingKey<G1,G2,Gt>): PreparedVerifyingKey<G1,G2,Gt> {
+        PreparedVerifyingKey {
+            alpha_g1_beta_g2: curves::pairing<G1,G2,Gt>(&vk.alpha_g1, &vk.beta_g2),
+            gamma_g2_neg: curves::point_neg(&vk.gamma_g2),
+            delta_g2_neg: curves::point_neg(&vk.delta_g2),
+            gamma_abc_g1: vk.gamma_abc_g1,
+        }
+    }
+
     public fun new_proof<G1,G2,Gt>(a: curves::Point<G1>, b: curves::Point<G2>, c: curves::Point<G1>): Proof<G1,G2,Gt> {
         Proof { a, b, c }
     }
@@ -101,6 +110,9 @@ module aptos_std::groth16 {
             std::option::extract(&mut scalar_from_bytes(&x"08436a5c0c09f30892728d4ad89cc85523967b1c4f57f1e7b10dffd751e0483b")),
         ];
         assert!(verify_proof(&vk, &public_inputs, &proof), 1);
+
+        let pvk = prepare_verifying_key(&vk);
+        assert!(verify_proof_with_pvk(&pvk, &public_inputs, &proof), 1);
     }
 
     #[test]
