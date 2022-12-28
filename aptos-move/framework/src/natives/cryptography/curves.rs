@@ -934,27 +934,27 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), scalar_mul_internal),
         ),
         (
-            "point_identity_internal",
+            "identity_internal",
             make_native_from_func(gas_params.clone(), point_identity_internal),
         ),
         (
-            "point_generator_internal",
+            "generator_internal",
             make_native_from_func(gas_params.clone(), point_generator_internal),
         ),
         (
-            "point_add_internal",
+            "element_add_internal",
             make_native_from_func(gas_params.clone(), point_add_internal),
         ),
         (
-            "point_mul_internal",
+            "element_mul_internal",
             make_native_from_func(gas_params.clone(), point_mul_internal),
         ),
         (
-            "point_neg_internal",
+            "element_neg_internal",
             make_native_from_func(gas_params.clone(), point_neg_internal),
         ),
         (
-            "point_eq_internal",
+            "element_eq_internal",
             make_native_from_func(gas_params.clone(), point_eq_internal),
         ),
         (

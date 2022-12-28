@@ -39,31 +39,31 @@
 
 <dl>
 <dt>
-<code>alpha_g1: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;</code>
+<code>alpha_g1: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>beta_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;</code>
+<code>beta_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>gamma_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;</code>
+<code>gamma_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>delta_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;</code>
+<code>delta_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;&gt;</code>
+<code>gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;&gt;</code>
 </dt>
 <dd>
 
@@ -90,25 +90,25 @@
 
 <dl>
 <dt>
-<code>alpha_g1_beta_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;Gt&gt;</code>
+<code>alpha_g1_beta_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;Gt&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>gamma_g2_neg: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;</code>
+<code>gamma_g2_neg: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>delta_g2_neg: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;</code>
+<code>delta_g2_neg: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;&gt;</code>
+<code>gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;&gt;</code>
 </dt>
 <dd>
 
@@ -135,19 +135,19 @@
 
 <dl>
 <dt>
-<code>a: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;</code>
+<code>a: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>b: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;</code>
+<code>b: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>c: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;</code>
+<code>c: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;</code>
 </dt>
 <dd>
 
@@ -163,7 +163,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_vk">new_vk</a>&lt;G1, G2, Gt&gt;(alpha_g1: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;, beta_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, gamma_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, delta_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;&gt;): <a href="groth16.md#0x1_groth16_VerifyingKey">groth16::VerifyingKey</a>&lt;G1, G2, Gt&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_vk">new_vk</a>&lt;G1, G2, Gt&gt;(alpha_g1: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;, beta_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, gamma_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, delta_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;&gt;): <a href="groth16.md#0x1_groth16_VerifyingKey">groth16::VerifyingKey</a>&lt;G1, G2, Gt&gt;
 </code></pre>
 
 
@@ -172,7 +172,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_vk">new_vk</a>&lt;G1,G2,Gt&gt;(alpha_g1: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;, beta_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, gamma_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, delta_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;&gt;): <a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>&lt;G1,G2,Gt&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_vk">new_vk</a>&lt;G1,G2,Gt&gt;(alpha_g1: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;, beta_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, gamma_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, delta_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;&gt;): <a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>&lt;G1,G2,Gt&gt; {
     <a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a> {
         alpha_g1,
         beta_g2,
@@ -193,7 +193,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_pvk">new_pvk</a>&lt;G1, G2, Gt&gt;(alpha_g1_beta_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;Gt&gt;, gamma_g2_neg: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, delta_g2_neg: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;&gt;): <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">groth16::PreparedVerifyingKey</a>&lt;G1, G2, Gt&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_pvk">new_pvk</a>&lt;G1, G2, Gt&gt;(alpha_g1_beta_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;Gt&gt;, gamma_g2_neg: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, delta_g2_neg: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;&gt;): <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">groth16::PreparedVerifyingKey</a>&lt;G1, G2, Gt&gt;
 </code></pre>
 
 
@@ -202,7 +202,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_pvk">new_pvk</a>&lt;G1,G2,Gt&gt;(alpha_g1_beta_g2: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;Gt&gt;, gamma_g2_neg: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, delta_g2_neg: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;&gt;): <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">PreparedVerifyingKey</a>&lt;G1,G2,Gt&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_pvk">new_pvk</a>&lt;G1,G2,Gt&gt;(alpha_g1_beta_g2: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;Gt&gt;, gamma_g2_neg: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, delta_g2_neg: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;&gt;): <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">PreparedVerifyingKey</a>&lt;G1,G2,Gt&gt; {
     <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">PreparedVerifyingKey</a> {
         alpha_g1_beta_g2,
         gamma_g2_neg,
@@ -234,8 +234,8 @@
 <pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_prepare_verifying_key">prepare_verifying_key</a>&lt;G1,G2,Gt&gt;(vk: &<a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>&lt;G1,G2,Gt&gt;): <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">PreparedVerifyingKey</a>&lt;G1,G2,Gt&gt; {
     <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">PreparedVerifyingKey</a> {
         alpha_g1_beta_g2: <a href="curves.md#0x1_curves_pairing">curves::pairing</a>&lt;G1,G2,Gt&gt;(&vk.alpha_g1, &vk.beta_g2),
-        gamma_g2_neg: <a href="curves.md#0x1_curves_point_neg">curves::point_neg</a>(&vk.gamma_g2),
-        delta_g2_neg: <a href="curves.md#0x1_curves_point_neg">curves::point_neg</a>(&vk.delta_g2),
+        gamma_g2_neg: <a href="curves.md#0x1_curves_element_neg">curves::element_neg</a>(&vk.gamma_g2),
+        delta_g2_neg: <a href="curves.md#0x1_curves_element_neg">curves::element_neg</a>(&vk.delta_g2),
         gamma_abc_g1: vk.gamma_abc_g1,
     }
 }
@@ -251,7 +251,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_proof">new_proof</a>&lt;G1, G2, Gt&gt;(a: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;, b: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, c: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;): <a href="groth16.md#0x1_groth16_Proof">groth16::Proof</a>&lt;G1, G2, Gt&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_proof">new_proof</a>&lt;G1, G2, Gt&gt;(a: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;, b: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, c: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;): <a href="groth16.md#0x1_groth16_Proof">groth16::Proof</a>&lt;G1, G2, Gt&gt;
 </code></pre>
 
 
@@ -260,7 +260,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_proof">new_proof</a>&lt;G1,G2,Gt&gt;(a: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;, b: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;, c: <a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;): <a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1,G2,Gt&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_proof">new_proof</a>&lt;G1,G2,Gt&gt;(a: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;, b: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;, c: <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;): <a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1,G2,Gt&gt; {
     <a href="groth16.md#0x1_groth16_Proof">Proof</a> { a, b, c }
 }
 </code></pre>
@@ -294,14 +294,14 @@
     <b>while</b> (i &lt; n) {
         <b>let</b> cur_scalar = std::vector::borrow(public_inputs, i);
         <b>let</b> cur_point = std::vector::borrow(&vk.gamma_abc_g1, i+1);
-        acc = <a href="curves.md#0x1_curves_point_add">curves::point_add</a>(&acc, &<a href="curves.md#0x1_curves_point_mul">curves::point_mul</a>(cur_scalar, cur_point));
+        acc = <a href="curves.md#0x1_curves_element_add">curves::element_add</a>(&acc, &<a href="curves.md#0x1_curves_element_mul">curves::element_mul</a>(cur_scalar, cur_point));
         i = i + 1;
     };
 
     <b>let</b> right_2 = <a href="curves.md#0x1_curves_pairing">curves::pairing</a>(&acc, &vk.gamma_g2);
     <b>let</b> right_3 = <a href="curves.md#0x1_curves_pairing">curves::pairing</a>(&proof.c, &vk.delta_g2);
-    <b>let</b> right = <a href="curves.md#0x1_curves_point_add">curves::point_add</a>(&<a href="curves.md#0x1_curves_point_add">curves::point_add</a>(&right_1, &right_2), &right_3);
-    <a href="curves.md#0x1_curves_point_eq">curves::point_eq</a>(&left, &right)
+    <b>let</b> right = <a href="curves.md#0x1_curves_element_add">curves::element_add</a>(&<a href="curves.md#0x1_curves_element_add">curves::element_add</a>(&right_1, &right_2), &right_3);
+    <a href="curves.md#0x1_curves_element_eq">curves::element_eq</a>(&left, &right)
 }
 </code></pre>
 
@@ -327,10 +327,10 @@
 <pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof_with_pvk">verify_proof_with_pvk</a>&lt;G1,G2,Gt&gt;(pvk: &<a href="groth16.md#0x1_groth16_PreparedVerifyingKey">PreparedVerifyingKey</a>&lt;G1,G2,Gt&gt;, public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G1&gt;&gt;, proof: &<a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1,G2,Gt&gt;): bool {
     <b>let</b> scalars: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G1&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="curves.md#0x1_curves_scalar_from_u64">curves::scalar_from_u64</a>&lt;G1&gt;(1)];
     std::vector::append(&<b>mut</b> scalars, *public_inputs);
-    <b>let</b> g1_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G1&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.a, <a href="curves.md#0x1_curves_simul_point_mul">curves::simul_point_mul</a>(&scalars, &pvk.gamma_abc_g1), proof.c];
-    <b>let</b> g2_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Point">curves::Point</a>&lt;G2&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];
+    <b>let</b> g1_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.a, <a href="curves.md#0x1_curves_simul_point_mul">curves::simul_point_mul</a>(&scalars, &pvk.gamma_abc_g1), proof.c];
+    <b>let</b> g2_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];
 
-    <a href="curves.md#0x1_curves_point_eq">curves::point_eq</a>(&pvk.alpha_g1_beta_g2, &<a href="curves.md#0x1_curves_multi_pairing">curves::multi_pairing</a>&lt;G1,G2,Gt&gt;(&g1_elements, &g2_elements))
+    <a href="curves.md#0x1_curves_element_eq">curves::element_eq</a>(&pvk.alpha_g1_beta_g2, &<a href="curves.md#0x1_curves_multi_pairing">curves::multi_pairing</a>&lt;G1,G2,Gt&gt;(&g1_elements, &g2_elements))
 }
 </code></pre>
 

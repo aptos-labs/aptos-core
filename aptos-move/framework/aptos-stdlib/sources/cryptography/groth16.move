@@ -4,27 +4,27 @@ module aptos_std::groth16 {
     use aptos_std::curves;
 
     struct VerifyingKey<phantom G1, phantom G2, phantom Gt> has drop {
-        alpha_g1: curves::Point<G1>,
-        beta_g2: curves::Point<G2>,
-        gamma_g2: curves::Point<G2>,
-        delta_g2: curves::Point<G2>,
-        gamma_abc_g1: vector<curves::Point<G1>>,
+        alpha_g1: curves::Element<G1>,
+        beta_g2: curves::Element<G2>,
+        gamma_g2: curves::Element<G2>,
+        delta_g2: curves::Element<G2>,
+        gamma_abc_g1: vector<curves::Element<G1>>,
     }
 
     struct PreparedVerifyingKey<phantom G1, phantom G2, phantom Gt> has drop {
-        alpha_g1_beta_g2: curves::Point<Gt>,
-        gamma_g2_neg: curves::Point<G2>,
-        delta_g2_neg: curves::Point<G2>,
-        gamma_abc_g1: vector<curves::Point<G1>>,
+        alpha_g1_beta_g2: curves::Element<Gt>,
+        gamma_g2_neg: curves::Element<G2>,
+        delta_g2_neg: curves::Element<G2>,
+        gamma_abc_g1: vector<curves::Element<G1>>,
     }
 
     struct Proof<phantom G1, phantom G2, phantom Gt> has drop {
-        a: curves::Point<G1>,
-        b: curves::Point<G2>,
-        c: curves::Point<G1>,
+        a: curves::Element<G1>,
+        b: curves::Element<G2>,
+        c: curves::Element<G1>,
     }
 
-    public fun new_vk<G1,G2,Gt>(alpha_g1: curves::Point<G1>, beta_g2: curves::Point<G2>, gamma_g2: curves::Point<G2>, delta_g2: curves::Point<G2>, gamma_abc_g1: vector<curves::Point<G1>>): VerifyingKey<G1,G2,Gt> {
+    public fun new_vk<G1,G2,Gt>(alpha_g1: curves::Element<G1>, beta_g2: curves::Element<G2>, gamma_g2: curves::Element<G2>, delta_g2: curves::Element<G2>, gamma_abc_g1: vector<curves::Element<G1>>): VerifyingKey<G1,G2,Gt> {
         VerifyingKey {
             alpha_g1,
             beta_g2,
@@ -34,7 +34,7 @@ module aptos_std::groth16 {
         }
     }
 
-    public fun new_pvk<G1,G2,Gt>(alpha_g1_beta_g2: curves::Point<Gt>, gamma_g2_neg: curves::Point<G2>, delta_g2_neg: curves::Point<G2>, gamma_abc_g1: vector<curves::Point<G1>>): PreparedVerifyingKey<G1,G2,Gt> {
+    public fun new_pvk<G1,G2,Gt>(alpha_g1_beta_g2: curves::Element<Gt>, gamma_g2_neg: curves::Element<G2>, delta_g2_neg: curves::Element<G2>, gamma_abc_g1: vector<curves::Element<G1>>): PreparedVerifyingKey<G1,G2,Gt> {
         PreparedVerifyingKey {
             alpha_g1_beta_g2,
             gamma_g2_neg,
@@ -46,13 +46,13 @@ module aptos_std::groth16 {
     public fun prepare_verifying_key<G1,G2,Gt>(vk: &VerifyingKey<G1,G2,Gt>): PreparedVerifyingKey<G1,G2,Gt> {
         PreparedVerifyingKey {
             alpha_g1_beta_g2: curves::pairing<G1,G2,Gt>(&vk.alpha_g1, &vk.beta_g2),
-            gamma_g2_neg: curves::point_neg(&vk.gamma_g2),
-            delta_g2_neg: curves::point_neg(&vk.delta_g2),
+            gamma_g2_neg: curves::element_neg(&vk.gamma_g2),
+            delta_g2_neg: curves::element_neg(&vk.delta_g2),
             gamma_abc_g1: vk.gamma_abc_g1,
         }
     }
 
-    public fun new_proof<G1,G2,Gt>(a: curves::Point<G1>, b: curves::Point<G2>, c: curves::Point<G1>): Proof<G1,G2,Gt> {
+    public fun new_proof<G1,G2,Gt>(a: curves::Element<G1>, b: curves::Element<G2>, c: curves::Element<G1>): Proof<G1,G2,Gt> {
         Proof { a, b, c }
     }
 
@@ -66,28 +66,28 @@ module aptos_std::groth16 {
         while (i < n) {
             let cur_scalar = std::vector::borrow(public_inputs, i);
             let cur_point = std::vector::borrow(&vk.gamma_abc_g1, i+1);
-            acc = curves::point_add(&acc, &curves::point_mul(cur_scalar, cur_point));
+            acc = curves::element_add(&acc, &curves::element_mul(cur_scalar, cur_point));
             i = i + 1;
         };
 
         let right_2 = curves::pairing(&acc, &vk.gamma_g2);
         let right_3 = curves::pairing(&proof.c, &vk.delta_g2);
-        let right = curves::point_add(&curves::point_add(&right_1, &right_2), &right_3);
-        curves::point_eq(&left, &right)
+        let right = curves::element_add(&curves::element_add(&right_1, &right_2), &right_3);
+        curves::element_eq(&left, &right)
     }
 
     public fun verify_proof_with_pvk<G1,G2,Gt>(pvk: &PreparedVerifyingKey<G1,G2,Gt>, public_inputs: &vector<curves::Scalar<G1>>, proof: &Proof<G1,G2,Gt>): bool {
         let scalars: vector<curves::Scalar<G1>> = vector[curves::scalar_from_u64<G1>(1)];
         std::vector::append(&mut scalars, *public_inputs);
-        let g1_elements: vector<curves::Point<G1>> = vector[proof.a, curves::simul_point_mul(&scalars, &pvk.gamma_abc_g1), proof.c];
-        let g2_elements: vector<curves::Point<G2>> = vector[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];
+        let g1_elements: vector<curves::Element<G1>> = vector[proof.a, curves::simul_point_mul(&scalars, &pvk.gamma_abc_g1), proof.c];
+        let g2_elements: vector<curves::Element<G2>> = vector[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];
 
-        curves::point_eq(&pvk.alpha_g1_beta_g2, &curves::multi_pairing<G1,G2,Gt>(&g1_elements, &g2_elements))
+        curves::element_eq(&pvk.alpha_g1_beta_g2, &curves::multi_pairing<G1,G2,Gt>(&g1_elements, &g2_elements))
     }
 
     #[test]
     fun test_verify_mimc_proof() {
-        let gamma_abc_g1: vector<curves::Point<BLS12_381_G1>> = vector[
+        let gamma_abc_g1: vector<curves::Element<BLS12_381_G1>> = vector[
             element_from_bytes<BLS12_381_G1>(x"00192808ef3f352b15066066b5784284ad310194591851848b9ca5099b7bd35d818a7902e4ec148b244d97c553599d0d0c961ac300485ea9d75a4251b7e54d9b9f2467cff599c19f399a0098f9ce6b88497c3f8e9cde85c9b4cdbf2cbc429118"),
             element_from_bytes<BLS12_381_G1>(x"cdd8b7ce59d13e8f29e7d7083b619feb96e38f0e520c46403be8df7ec7d4025b7e24aadb947528e057b5117cabe62012c8e331dc103e205add7ecdd52d109dd2a56e5e990921b5e1b3aeb724e5b8069011b7589e7ef42d975d0711d51f806e19"),
         ];
@@ -117,7 +117,7 @@ module aptos_std::groth16 {
 
     #[test]
     fun test_verify_mimc_proof_with_pvk() {
-        let gamma_abc_g1: vector<curves::Point<BLS12_381_G1>> = vector[
+        let gamma_abc_g1: vector<curves::Element<BLS12_381_G1>> = vector[
         element_from_bytes<BLS12_381_G1>(x"00192808ef3f352b15066066b5784284ad310194591851848b9ca5099b7bd35d818a7902e4ec148b244d97c553599d0d0c961ac300485ea9d75a4251b7e54d9b9f2467cff599c19f399a0098f9ce6b88497c3f8e9cde85c9b4cdbf2cbc429118"),
         element_from_bytes<BLS12_381_G1>(x"cdd8b7ce59d13e8f29e7d7083b619feb96e38f0e520c46403be8df7ec7d4025b7e24aadb947528e057b5117cabe62012c8e331dc103e205add7ecdd52d109dd2a56e5e990921b5e1b3aeb724e5b8069011b7589e7ef42d975d0711d51f806e19"),
         ];
