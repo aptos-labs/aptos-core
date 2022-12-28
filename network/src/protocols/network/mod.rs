@@ -338,6 +338,7 @@ impl<TMessage: Message> NetworkSender<TMessage> {
         timeout: Duration,
     ) -> Result<TMessage, RpcError> {
         // serialize request
+        //TODO(AlexM): In Bcast next line repeats 100 Times, ergo, Bcast should be a Network function.
         let req_data = protocol.to_bytes(&req_msg)?.into();
         let res_data = self
             .peer_mgr_reqs_tx

@@ -10,7 +10,7 @@
 use crate::application::storage::PeerMetadataStorage;
 use crate::transport::ConnectionMetadata;
 use crate::{
-    application::netperf::interface::{NetPerfNetworkEvents, NetPerfNetworkSender},
+    application::netperf::interface::{NetPerfMsg::*, NetPerfNetworkEvents, NetPerfNetworkSender},
     constants::NETWORK_CHANNEL_SIZE,
     counters,
     error::NetworkError,
@@ -29,6 +29,7 @@ use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_types::account_address::AccountAddress;
+use aptos_types::network_address::ParseError::NetworkLayerMissing;
 use aptos_types::PeerId;
 use axum::{
     extract::Query,
@@ -39,12 +40,17 @@ use axum::{
 };
 use dashmap::DashMap;
 use futures::StreamExt;
+use futures_util::stream::FuturesUnordered;
 use serde::Serialize;
 use std::fs::OpenOptions;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
+use tokio::spawn;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 pub mod builder;
 mod interface;
+
+const NETPERF_COMMAND_CHANNEL_SIZE: usize = 1024;
 
 pub struct NetPerf {
     network_context: NetworkContext,
@@ -68,6 +74,7 @@ struct NetPerfState {
     peers: Arc<PeerMetadataStorage>, //TODO: DO I need this?
     peer_list: Arc<DashMap<PeerId, PeerNetPerfStat>>, //with capacity and hasher
     sender: Arc<NetPerfNetworkSender>,
+    tx: Sender<NetPerfCommands>,
 }
 
 impl NetPerf {
@@ -92,26 +99,37 @@ impl NetPerf {
     pub fn network_endpoint_config() -> AppConfig {
         AppConfig::p2p(
             [ProtocolId::NetPerfRpcCompressed],
-            aptos_channel::Config::new(NETWORK_CHANNEL_SIZE).queue_style(QueueStyle::LIFO),
+            aptos_channel::Config::new(NETWORK_CHANNEL_SIZE).queue_style(QueueStyle::FIFO),
         )
     }
 
-    fn net_perf_state(&self) -> NetPerfState {
+    fn net_perf_state(&self, sender: Sender<NetPerfCommands>) -> NetPerfState {
         NetPerfState {
             peers: self.peers.clone(),
             sender: self.sender.clone(),
             peer_list: self.peer_list.clone(),
+            tx: sender,
         }
     }
 
     async fn start(mut self) {
         let port = preferred_axum_port(self.netperf_port);
+        let (tx, mut rx) =
+            tokio::sync::mpsc::channel::<NetPerfCommands>(NETPERF_COMMAND_CHANNEL_SIZE);
+
         info!(
             NetworkSchema::new(&self.network_context),
             "{} NetPerf Event Listener started", self.network_context,
         );
 
-        spawn_named!("NetPerf Axum", start_axum(self.net_perf_state(), port));
+        spawn_named!(
+            "NetPerf Axum",
+            start_axum(self.net_perf_state(tx.clone()), port)
+        );
+        spawn_named!(
+            "NetPerf EventHandler",
+            netperf_comp_handler(self.net_perf_state(tx.clone()), rx)
+        );
 
         loop {
             futures::select! {
@@ -145,6 +163,10 @@ impl NetPerf {
             "{} NetPerf event listener terminated", self.network_context
         );
     }
+}
+#[derive(Clone)]
+enum NetPerfCommands {
+    Broadcast,
 }
 
 fn preferred_axum_port(netperf_port: u16) -> u16 {
@@ -215,5 +237,40 @@ async fn parse_query(
     Extension(state): Extension<NetPerfState>,
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
+    spawn_named!("[NetPerf] Broadcast Task", netperf_broadcast(state.clone()));
+
     StatusCode::OK
+}
+
+async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfCommands>) {
+    let mut rpc_handlers = FuturesUnordered::new();
+
+    loop {
+        tokio::select! {
+            opt_cmd = rx.recv() => {
+                match opt_cmd {
+                    Some(cmd) => {
+                        for peer in state.peer_list.iter() {
+                            //TODO(AlexM): Yet another Alloc + Copy OPs.
+                            // Best use Refs - Just ARC
+                            rpc_handlers.push(state.sender.send_rpc(
+                                peer.key().to_owned(),
+                                ProtocolId::NetPerfRpcCompressed,
+                                BlockOfBytes64K,
+                                Duration::from_secs(5),
+                            ));
+                        }
+                    }
+                    None => break,
+                }
+            }
+            res = rpc_handlers.select_next_some() => {}
+        }
+    }
+}
+
+async fn netperf_broadcast(state: NetPerfState) {
+    loop {
+        let _ = state.tx.send(NetPerfCommands::Broadcast).await;
+    }
 }
