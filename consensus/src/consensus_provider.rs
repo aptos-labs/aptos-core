@@ -5,33 +5,39 @@ use crate::{
     counters,
     epoch_manager::EpochManager,
     network::NetworkTask,
-    network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
+    network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     persistent_liveness_storage::StorageWriteProxy,
     state_computer::ExecutionProxy,
     txn_notifier::MempoolNotifier,
     util::time_service::ClockTimeService,
 };
-use aptos_config::config::NodeConfig;
+use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_network::application::storage::PeerMetadataStorage;
+use aptos_network::{
+    application::{interface::NetworkClient, storage::PeerMetadataStorage},
+    protocols::network::{NetworkEvents, NetworkSender},
+};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
 use futures::channel::mpsc;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 use tokio::runtime::{self, Runtime};
 
 /// Helper function to start consensus based on configuration and return the runtime
 pub fn start_consensus(
     node_config: &NodeConfig,
-    mut network_sender: ConsensusNetworkSender,
-    network_events: ConsensusNetworkEvents,
+    network_senders: HashMap<NetworkId, NetworkSender<ConsensusMsg>>,
+    network_events: NetworkEvents<ConsensusMsg>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
     aptos_db: DbReaderWriter,
@@ -66,13 +72,19 @@ pub fn start_consensus(
     let (timeout_sender, timeout_receiver) =
         aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
-    network_sender.initialize(peer_metadata_storage);
+    let network_client = NetworkClient::new(
+        DIRECT_SEND.into(),
+        RPC.into(),
+        network_senders,
+        peer_metadata_storage,
+    );
+    let consensus_network_client = ConsensusNetworkClient::new(network_client);
 
     let epoch_mgr = EpochManager::new(
         node_config,
         time_service,
         self_sender,
-        network_sender,
+        consensus_network_client,
         timeout_sender,
         consensus_to_mempool_sender,
         state_computer,

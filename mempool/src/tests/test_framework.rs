@@ -3,7 +3,7 @@
 
 use crate::{
     core_mempool::CoreMempool,
-    network::{MempoolNetworkEvents, MempoolNetworkSender, MempoolSyncMsg},
+    network::{MempoolNetworkEvents, MempoolSyncMsg},
     shared_mempool::{start_shared_mempool, types::MultiBatchId},
     tests::{common, common::TestTransaction},
     MempoolClientRequest, MempoolClientSender, QuorumStoreRequest,
@@ -20,7 +20,7 @@ use aptos_mempool_notifications::MempoolNotifier;
 use aptos_network::{
     application::storage::PeerMetadataStorage,
     peer_manager::{PeerManagerNotification, PeerManagerRequest},
-    protocols::{direct_send::Message, rpc::InboundRpcRequest},
+    protocols::{direct_send::Message, network::NetworkSender, rpc::InboundRpcRequest},
     testutils::{
         builder::TestFrameworkBuilder,
         test_framework::{setup_node_networks, TestFramework},
@@ -462,7 +462,9 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
 /// the way to the [`SharedMempool`]
 fn setup_mempool(
     config: NodeConfig,
-    network_handles: Vec<ApplicationNetworkHandle<MempoolNetworkSender, MempoolNetworkEvents>>,
+    network_handles: Vec<
+        ApplicationNetworkHandle<NetworkSender<MempoolSyncMsg>, MempoolNetworkEvents>,
+    >,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> (
     MempoolClientSender,

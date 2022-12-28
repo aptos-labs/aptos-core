@@ -11,14 +11,16 @@ use aptos_backup_service::start_backup_service;
 use aptos_build_info::build_information;
 use aptos_config::{
     config::{
-        AptosDataClientConfig, BaseConfig, NetworkConfig, NodeConfig, PersistableConfig,
-        RocksdbConfigs, StateSyncConfig, StorageServiceConfig, BUFFERED_STATE_TARGET_ITEMS,
+        NetworkConfig, NodeConfig, PersistableConfig, RocksdbConfigs, StateSyncConfig,
+        StorageServiceConfig, BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     },
     network_id::NetworkId,
     utils::get_genesis_txn,
 };
-use aptos_consensus::consensus_provider::start_consensus;
+use aptos_consensus::{
+    consensus_provider::start_consensus, network_interface::consensus_network_config,
+};
 use aptos_consensus_notifications::ConsensusNotificationListener;
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_data_streaming_service::{
@@ -31,9 +33,13 @@ use aptos_executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_boots
 use aptos_framework::ReleaseBundle;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
-use aptos_mempool::MempoolClientSender;
+use aptos_mempool::{network::mempool_network_config, MempoolClientSender};
 use aptos_mempool_notifications::MempoolNotificationSender;
-use aptos_network::application::storage::PeerMetadataStorage;
+use aptos_network::{
+    application::{interface::NetworkClient, storage::PeerMetadataStorage},
+    protocols::network::NetworkSender,
+    ProtocolId,
+};
 use aptos_network_builder::builder::NetworkBuilder;
 use aptos_state_sync_driver::{
     driver_factory::{DriverFactory, StateSyncRuntimes},
@@ -41,10 +47,12 @@ use aptos_state_sync_driver::{
 };
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
-use aptos_storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
+use aptos_storage_service_client::{storage_client_network_config, StorageServiceClient};
 use aptos_storage_service_server::{
-    network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
+    network::{storage_service_network_config, StorageServiceNetworkEvents},
+    StorageReader, StorageServiceServer,
 };
+use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
@@ -55,6 +63,7 @@ use clap::Parser;
 use futures::channel::mpsc;
 use hex::FromHex;
 use log_build_information::log_build_information;
+use maplit::hashmap;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     boxed::Box,
@@ -387,10 +396,7 @@ fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
 fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     node_config: &NodeConfig,
     storage_service_server_network_handles: Vec<StorageServiceNetworkEvents>,
-    storage_service_client_network_handles: HashMap<
-        NetworkId,
-        aptos_storage_service_client::StorageServiceNetworkSender,
-    >,
+    storage_client_network_senders: HashMap<NetworkId, NetworkSender<StorageServiceMessage>>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
     mempool_notifier: M,
     consensus_listener: ConsensusNotificationListener,
@@ -407,10 +413,8 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
 
     // Start the data client
     let (aptos_data_client, aptos_data_client_runtime) = setup_aptos_data_client(
-        node_config.state_sync.storage_service,
-        node_config.state_sync.aptos_data_client,
-        node_config.base.clone(),
-        storage_service_client_network_handles,
+        node_config,
+        storage_client_network_senders,
         peer_metadata_storage,
     )?;
 
@@ -478,17 +482,18 @@ fn setup_data_streaming_service(
 }
 
 fn setup_aptos_data_client(
-    storage_service_config: StorageServiceConfig,
-    aptos_data_client_config: AptosDataClientConfig,
-    base_config: BaseConfig,
-    network_handles: HashMap<NetworkId, aptos_storage_service_client::StorageServiceNetworkSender>,
+    node_config: &NodeConfig,
+    network_senders: HashMap<NetworkId, NetworkSender<StorageServiceMessage>>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> anyhow::Result<(AptosNetDataClient, Runtime)> {
-    // Combine all storage service client handles
-    let network_client = StorageServiceClient::new(
-        StorageServiceMultiSender::new(network_handles),
+    // Create the storage service client
+    let network_client = NetworkClient::new(
+        vec![],
+        vec![ProtocolId::StorageServiceRpc],
+        network_senders,
         peer_metadata_storage,
     );
+    let network_client = StorageServiceClient::new(network_client);
 
     // Create a new runtime for the data client
     let aptos_data_client_runtime = Builder::new_multi_thread()
@@ -504,9 +509,9 @@ fn setup_aptos_data_client(
 
     // Create the data client and spawn the data poller
     let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
-        aptos_data_client_config,
-        base_config,
-        storage_service_config,
+        node_config.state_sync.aptos_data_client,
+        node_config.base.clone(),
+        node_config.state_sync.storage_service,
         TimeService::real(),
         network_client,
         Some(aptos_data_client_runtime.handle().clone()),
@@ -675,7 +680,7 @@ pub fn setup_environment(
     let mut mempool_network_handles = vec![];
     let mut consensus_network_handles = None;
     let mut storage_service_server_network_handles = vec![];
-    let mut storage_service_client_network_handles = HashMap::new();
+    let mut storage_client_network_senders = HashMap::new();
 
     // Create an event subscription service so that components can be notified of events and reconfigs
     let mut event_subscription_service = EventSubscriptionService::new(
@@ -776,22 +781,19 @@ pub fn setup_environment(
         // storage service at all.
 
         // Register the network-facing storage service with Network.
-        let storage_service_events = network_builder.add_service(
-            &aptos_storage_service_server::network::network_endpoint_config(
-                node_config.state_sync.storage_service,
-            ),
-        );
+        let storage_service_events = network_builder.add_service(&storage_service_network_config(
+            node_config.state_sync.storage_service,
+        ));
         storage_service_server_network_handles.push(storage_service_events);
 
         // Register the storage-service clients with Network
-        let storage_service_sender =
-            network_builder.add_client(&aptos_storage_service_client::network_endpoint_config());
-        storage_service_client_network_handles.insert(network_id, storage_service_sender);
+        let storage_client_network_sender =
+            network_builder.add_client(&storage_client_network_config());
+        storage_client_network_senders.insert(network_id, storage_client_network_sender);
 
         // Create the endpoints to connect the Network to mempool.
-        let (mempool_sender, mempool_events) = network_builder.add_p2p_service(
-            &aptos_mempool::network::network_endpoint_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
-        );
+        let (mempool_sender, mempool_events) = network_builder
+            .add_client_and_service(&mempool_network_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE));
         mempool_network_handles.push((network_id, mempool_sender, mempool_events));
 
         // Perform steps relevant specifically to Validator networks.
@@ -802,10 +804,10 @@ pub fn setup_environment(
                 panic!("There can be at most one validator network!");
             }
 
-            consensus_network_handles =
-                Some(network_builder.add_p2p_service(
-                    &aptos_consensus::network_interface::network_endpoint_config(),
-                ));
+            consensus_network_handles = Some((
+                NetworkId::Validator,
+                network_builder.add_client_and_service(&consensus_network_config()),
+            ));
         }
 
         let network_context = network_builder.network_context();
@@ -833,7 +835,7 @@ pub fn setup_environment(
     let state_sync_runtimes = create_state_sync_runtimes(
         &node_config,
         storage_service_server_network_handles,
-        storage_service_client_network_handles,
+        storage_client_network_senders,
         peer_metadata_storage.clone(),
         mempool_notifier,
         consensus_listener,
@@ -877,7 +879,7 @@ pub fn setup_environment(
     // StateSync should be instantiated and started before Consensus to avoid a cyclic dependency:
     // network provider -> consensus -> state synchronizer -> network provider.  This has resulted
     // in a deadlock as observed in GitHub issue #749.
-    if let Some((consensus_network_sender, consensus_network_events)) = consensus_network_handles {
+    if let Some((network_id, (network_sender, network_events))) = consensus_network_handles {
         // Make sure that state synchronizer is caught up at least to its waypoint
         // (in case it's present). There is no sense to start consensus prior to that.
         // TODO: Note that we need the networking layer to be able to discover & connect to the
@@ -890,8 +892,8 @@ pub fn setup_environment(
         instant = Instant::now();
         consensus_runtime = Some(start_consensus(
             &node_config,
-            consensus_network_sender,
-            consensus_network_events,
+            hashmap! {network_id => network_sender},
+            network_events,
             Arc::new(consensus_notifier),
             consensus_to_mempool_sender,
             db_rw,

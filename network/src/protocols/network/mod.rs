@@ -18,7 +18,6 @@ use aptos_channels::aptos_channel;
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{network_address::NetworkAddress, PeerId};
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
@@ -84,7 +83,7 @@ impl<TMessage: PartialEq> PartialEq for Event<TMessage> {
 /// builder. Supports client-only, service-only, and P2p (both) applications.
 // TODO(philiphayes): separate configs for client & server?
 #[derive(Clone, Default)]
-pub struct AppConfig {
+pub struct NetworkApplicationConfig {
     /// The set of protocols needed for this application.
     pub protocols: ProtocolIdSet,
     /// The config for the inbound message queue from network to the application.
@@ -95,7 +94,7 @@ pub struct AppConfig {
     pub inbound_queue: Option<aptos_channel::Config>,
 }
 
-impl AppConfig {
+impl NetworkApplicationConfig {
     /// AptosNet client configuration. Requires the set of protocols used by the
     /// client in its requests.
     pub fn client(protocols: impl IntoIterator<Item = ProtocolId>) -> Self {
@@ -117,9 +116,8 @@ impl AppConfig {
         }
     }
 
-    /// AptosNet peer-to-peer service configuration. A peer-to-peer service is both
-    /// a client and a service.
-    pub fn p2p(
+    /// AptosNet client and service configuration
+    pub fn client_and_service(
         protocols: impl IntoIterator<Item = ProtocolId>,
         inbound_queue: aptos_channel::Config,
     ) -> Self {
@@ -253,8 +251,7 @@ impl<TMessage> FusedStream for NetworkEvents<TMessage> {
 /// a thin wrapper on `aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>`,
 /// mostly focused on providing a more ergonomic API. However, network applications will usually
 /// provide their own thin wrapper around `NetworkSender` that narrows the API to the specific
-/// interface they need. For instance, `mempool` only requires direct-send functionality so its
-/// `MempoolNetworkSender` only exposes a `send_to` function.
+/// interface they need.
 ///
 /// Provide Protobuf wrapper over `[peer_manager::PeerManagerRequestSender]`
 #[derive(Clone, Debug)]
@@ -349,30 +346,6 @@ impl<TMessage: Message> NetworkSender<TMessage> {
         let res_msg: TMessage = protocol.from_bytes(&res_data)?;
         Ok(res_msg)
     }
-}
-
-/// A simplified version of `NetworkSender` that doesn't use `ProtocolId` in the input
-/// It was already being implemented for every application, but is now standardized
-#[async_trait]
-pub trait ApplicationNetworkSender<TMessage: Send>: Clone {
-    fn send_to(&self, _recipient: PeerId, _message: TMessage) -> Result<(), NetworkError> {
-        unimplemented!()
-    }
-
-    fn send_to_many(
-        &self,
-        _recipients: impl Iterator<Item = PeerId>,
-        _message: TMessage,
-    ) -> Result<(), NetworkError> {
-        unimplemented!()
-    }
-
-    async fn send_rpc(
-        &self,
-        recipient: PeerId,
-        req_msg: TMessage,
-        timeout: Duration,
-    ) -> Result<TMessage, RpcError>;
 }
 
 /// Generalized functionality for any request across `DirectSend` and `Rpc`.
