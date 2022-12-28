@@ -123,6 +123,7 @@ impl<K: Eq + Hash + Clone, T> PerKeyQueue<K, T> {
             // For example, many of our queues have a max capacity of 1024. To
             // handle a single rpc from a transient peer, we would end up
             // allocating ~ 96 b * 1024 ~ 64 Kib per queue.
+            //TODO: Reconsider this. Maybe true for VFN but not Validators
             .or_insert_with(|| VecDeque::with_capacity(1));
 
         // Add the key to our round-robin queue if it's not already there
