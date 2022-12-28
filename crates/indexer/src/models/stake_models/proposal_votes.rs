@@ -44,7 +44,7 @@ impl ProposalVote {
                         should_pass: ev.should_pass,
                         transaction_timestamp: parse_timestamp(user_txn.timestamp.0, txn_version),
                     }),
-                    None => {}
+                    None => {},
                 };
             }
         }

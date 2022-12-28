@@ -1,24 +1,24 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{ConfigSearchMode, DEFAULT_PROFILE};
 use crate::common::{
     types::{
         account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-        EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions,
-        RngArgs,
+        ConfigSearchMode, EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions,
+        PromptOptions, RngArgs, DEFAULT_PROFILE,
     },
     utils::{fund_account, prompt_yes_with_override, read_line},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
-use aptos_rest_client::aptos_api_types::{AptosError, AptosErrorCode};
-use aptos_rest_client::error::{AptosErrorResponse, RestError};
+use aptos_rest_client::{
+    aptos_api_types::{AptosError, AptosErrorCode},
+    error::{AptosErrorResponse, RestError},
+};
 use async_trait::async_trait;
 use clap::Parser;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 /// 1 APT (might not actually get that much, depending on the faucet)
 const NUM_DEFAULT_OCTAS: u64 = 100000000;
@@ -109,20 +109,20 @@ impl CliCommand<()> for InitTool {
                 profile_config.rest_url =
                     Some("https://fullnode.mainnet.aptoslabs.com".to_string());
                 profile_config.faucet_url = None;
-            }
+            },
             Network::Testnet => {
                 profile_config.rest_url =
                     Some("https://fullnode.testnet.aptoslabs.com".to_string());
                 profile_config.faucet_url = None;
-            }
+            },
             Network::Devnet => {
                 profile_config.rest_url = Some("https://fullnode.devnet.aptoslabs.com".to_string());
                 profile_config.faucet_url = Some("https://faucet.devnet.aptoslabs.com".to_string());
-            }
+            },
             Network::Local => {
                 profile_config.rest_url = Some("http://localhost:8080".to_string());
                 profile_config.faucet_url = Some("http://localhost:8081".to_string());
-            }
+            },
             Network::Custom => self.custom_network(&mut profile_config)?,
         }
 
@@ -192,7 +192,7 @@ impl CliCommand<()> for InitTool {
                         err
                     )));
                 }
-            }
+            },
         };
         if let Some(ref faucet_url) = profile_config.faucet_url {
             if account_exists {
@@ -338,7 +338,7 @@ impl FromStr for Network {
                     "Invalid network {}.  Must be one of [devnet, testnet, mainnet, local, custom]",
                     str
                 )))
-            }
+            },
         })
     }
 }

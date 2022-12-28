@@ -387,7 +387,7 @@ impl NetworkServer {
                     )
                     .error(&err));
                     return Err(err);
-                }
+                },
             };
 
             self.increment_counter(Method::Connect, MethodResult::Success);

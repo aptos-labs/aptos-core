@@ -209,10 +209,10 @@ async fn loopback_commit_vote(
                     .push(author, event.verify(author, verifier, false).unwrap())
                     .ok();
             }
-        }
+        },
         _ => {
             panic!("We are expecting a commit vote message.");
-        }
+        },
     };
 }
 

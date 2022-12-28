@@ -65,10 +65,10 @@ impl fmt::Display for ConnectionNotification {
         match self {
             ConnectionNotification::NewPeer(metadata, context) => {
                 write!(f, "[{},{}]", metadata, context)
-            }
+            },
             ConnectionNotification::LostPeer(metadata, context, reason) => {
                 write!(f, "[{},{},{}]", metadata, context, reason)
-            }
+            },
         }
     }
 }

@@ -260,7 +260,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                                 KeyType(key, module_write_fn(i)),
                                 ValueType(value.clone(), !is_deletion),
                             ));
-                        }
+                        },
                     }
                 }
             }
@@ -406,10 +406,10 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
-    type Txn = Transaction<K, V>;
-    type Output = Output<K, V>;
-    type Error = usize;
     type Argument = ();
+    type Error = usize;
+    type Output = Output<K, V>;
+    type Txn = Transaction<K, V>;
 
     fn init(_argument: Self::Argument) -> Self {
         Self::new()
@@ -447,7 +447,7 @@ where
                     writes_and_deltas[write_idx].1.clone(),
                     reads_result,
                 ))
-            }
+            },
             Transaction::SkipRest => ExecutionStatus::SkipRest(Output(vec![], vec![], vec![])),
             Transaction::Abort => ExecutionStatus::Abort(txn_idx),
         }
@@ -557,14 +557,14 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                                         .unwrap()
                                         .into(),
                                 );
-                            }
+                            },
                             None => {
                                 let base = match (&latest_write, delta_world.remove(k)) {
                                     (Some(_), Some(_)) => {
                                         unreachable!(
                                             "Must record latest value or resolved delta, not both"
                                         );
-                                    }
+                                    },
                                     // Get base value from the latest write.
                                     (Some(w_value), None) => AggregatorValue::from_write(w_value)
                                         .map(|value| value.into()),
@@ -581,19 +581,19 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                                             return Self::DeltaFailure(idx, result_vec);
                                         }
                                         delta_world.insert(k.clone(), applied_delta.unwrap());
-                                    }
+                                    },
                                     None => {
                                         // Latest write was a deletion, can't resolve any delta to
                                         // it, must keep the deletion as the latest Op.
                                         current_world.insert(k.clone(), latest_write.unwrap());
-                                    }
+                                    },
                                 }
-                            }
+                            },
                         }
                     }
 
                     result_vec.push(result)
-                }
+                },
                 Transaction::SkipRest => return Self::SkipRest(idx, result_vec),
             }
         }
@@ -608,21 +608,21 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                 Some(value) => match expected_result {
                     (Some(v), None) => {
                         assert_eq!(v.extract_raw_bytes().unwrap(), *value);
-                    }
+                    },
                     (None, Some(v)) => {
                         assert_eq!(serialize(v), *value);
-                    }
+                    },
                     (Some(_), Some(_)) => unreachable!("A"),
                     (None, None) => {
                         assert_eq!(deserialize(value), STORAGE_AGGREGATOR_VALUE);
-                    }
+                    },
                 },
                 None => {
                     if let Some(val) = &expected_result.0 {
                         assert_none!(val.extract_raw_bytes());
                     }
                     assert_eq!(expected_result.1, None);
-                }
+                },
             })
     }
 
@@ -632,7 +632,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
         match (self, results) {
             (Self::Aborted(i), Err(Error::UserError(idx))) => {
                 assert_eq!(i, idx);
-            }
+            },
             (Self::SkipRest(skip_at, expected_results), Ok(results)) => {
                 // Check_result asserts internally, so no need to return a bool.
                 results
@@ -647,7 +647,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .iter()
                     .skip(*skip_at)
                     .for_each(|Output(_, _, result)| assert!(result.is_empty()))
-            }
+            },
             (Self::DeltaFailure(fail_idx, expected_results), Ok(results)) => {
                 // Check_result asserts internally, so no need to return a bool.
                 results
@@ -657,7 +657,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .for_each(|(Output(_, _, result), expected_results)| {
                         Self::check_result(expected_results, result)
                     });
-            }
+            },
             (Self::Success(expected_results), Ok(results)) => results
                 .iter()
                 .zip(expected_results.iter())

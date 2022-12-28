@@ -1,9 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
-
 use shadow_rs::{is_release, shadow};
+use std::collections::BTreeMap;
 
 /// Build information keys
 pub const BUILD_BRANCH: &str = "build_branch";

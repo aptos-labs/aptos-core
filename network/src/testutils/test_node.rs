@@ -342,10 +342,10 @@ pub trait TestNode: ApplicationNode + Sync {
                 // Forcefully close the oneshot channel, otherwise listening task will hang forever.
                 drop(res_tx);
                 (peer_id, protocol_id, data)
-            }
+            },
             PeerManagerRequest::SendDirectSend(peer_id, message) => {
                 (peer_id, message.protocol_id, message.mdata)
-            }
+            },
         }
     }
 
@@ -362,7 +362,7 @@ pub trait TestNode: ApplicationNode + Sync {
             ),
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                 (peer_id, msg.protocol_id, msg.mdata, None)
-            }
+            },
         };
 
         let sender_peer_network_id = self.peer_network_id(network_id);
@@ -372,22 +372,16 @@ pub trait TestNode: ApplicationNode + Sync {
 
         // TODO: Add timeout functionality
         let peer_manager_notif = if let Some((_timeout, res_tx)) = maybe_rpc_info {
-            PeerManagerNotification::RecvRpc(
-                sender_peer_id,
-                InboundRpcRequest {
-                    protocol_id,
-                    data,
-                    res_tx,
-                },
-            )
+            PeerManagerNotification::RecvRpc(sender_peer_id, InboundRpcRequest {
+                protocol_id,
+                data,
+                res_tx,
+            })
         } else {
-            PeerManagerNotification::RecvMessage(
-                sender_peer_id,
-                Message {
-                    protocol_id,
-                    mdata: data,
-                },
-            )
+            PeerManagerNotification::RecvMessage(sender_peer_id, Message {
+                protocol_id,
+                mdata: data,
+            })
         };
         receiver_handle
             .inbound_message_sender

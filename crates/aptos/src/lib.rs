@@ -15,8 +15,10 @@ pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
 
-use crate::common::types::{CliCommand, CliResult, CliTypedResult};
-use crate::common::utils::cli_build_information;
+use crate::common::{
+    types::{CliCommand, CliResult, CliTypedResult},
+    utils::cli_build_information,
+};
 use async_trait::async_trait;
 use clap::Parser;
 use std::collections::BTreeMap;

@@ -1,6 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{
+    errors::AptosDbError,
+    gauged_api,
+    metrics::{LEDGER_VERSION, NEXT_BLOCK_EPOCH},
+    AptosDB,
+};
+use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_storage_interface::{
@@ -34,19 +41,10 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use arc_swap::ArcSwapOption;
-use move_core_types::move_resource::MoveStructType;
-
-use anyhow::{ensure, format_err, Result};
 use dashmap::DashMap;
 use itertools::zip_eq;
+use move_core_types::move_resource::MoveStructType;
 use std::{collections::HashMap, mem::swap, sync::Arc};
-
-use crate::{
-    errors::AptosDbError,
-    gauged_api,
-    metrics::{LEDGER_VERSION, NEXT_BLOCK_EPOCH},
-    AptosDB,
-};
 
 pub struct FakeBufferedState {
     // state until the latest checkpoint.
@@ -604,7 +602,7 @@ impl DbReader for FakeAptosDB {
                     self.account_seq_num
                         .insert(account_address, initial_seq_num);
                     initial_seq_num
-                }
+                },
             };
             let account = AccountResource::new(
                 seq_num,
@@ -742,22 +740,23 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
 #[cfg(test)]
 mod tests {
 
-    use crate::test_helper::{arb_blocks_to_commit, update_in_memory_state};
-    use crate::AptosDB;
+    use crate::{
+        fake_aptosdb::FakeAptosDB,
+        test_helper::{arb_blocks_to_commit, update_in_memory_state},
+        AptosDB,
+    };
     use anyhow::{ensure, Result};
     use aptos_crypto::{hash::CryptoHash, HashValue};
     use aptos_storage_interface::{DbReader, DbWriter};
     use aptos_temppath::TempPath;
-    use aptos_types::account_address::AccountAddress;
-    use aptos_types::transaction::{
-        TransactionListWithProof, TransactionOutputListWithProof, TransactionStatus,
-    };
     use aptos_types::{
+        account_address::AccountAddress,
         ledger_info::LedgerInfoWithSignatures,
-        transaction::{TransactionToCommit, TransactionWithProof, Version},
+        transaction::{
+            TransactionListWithProof, TransactionOutputListWithProof, TransactionStatus,
+            TransactionToCommit, TransactionWithProof, Version,
+        },
     };
-
-    use crate::fake_aptosdb::FakeAptosDB;
     use proptest::prelude::*;
 
     proptest! {

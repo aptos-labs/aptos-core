@@ -1,11 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::backend::k8s::stateful_set;
 use crate::{
-    get_free_port, scale_stateful_set_replicas, FullNode, HealthCheckError, Node, NodeExt, Result,
-    Validator, Version, KUBECTL_BIN, LOCALHOST, NODE_METRIC_PORT, REST_API_HAPROXY_SERVICE_PORT,
-    REST_API_SERVICE_PORT,
+    backend::k8s::stateful_set, get_free_port, scale_stateful_set_replicas, FullNode,
+    HealthCheckError, Node, NodeExt, Result, Validator, Version, KUBECTL_BIN, LOCALHOST,
+    NODE_METRIC_PORT, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
 };
 use anyhow::{anyhow, format_err};
 use aptos_config::config::NodeConfig;
@@ -87,21 +86,21 @@ impl K8sNode {
                     Ok(Some(status)) => {
                         info!("Port-forward may have started already: exit {}", status);
                         Ok(())
-                    }
+                    },
                     Ok(None) => {
                         info!(
                             "Port-forward started for {:?} from {} --> {}",
                             self, port, remote_port
                         );
                         Ok(())
-                    }
+                    },
                     Err(err) => Err(anyhow!(
                         "Port-forward did not work: {:?} error {}",
                         port_forward_args,
                         err
                     )),
                 }
-            }
+            },
             Err(err) => Err(anyhow!(
                 "Port-forward did not start: {:?} error {}",
                 port_forward_args,

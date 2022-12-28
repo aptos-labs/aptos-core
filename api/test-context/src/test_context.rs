@@ -7,11 +7,14 @@ use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
-use aptos_config::config::{
-    NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
-    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+use aptos_config::{
+    config::{
+        NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+    },
+    keys::ConfigKey,
 };
-use aptos_crypto::{hash::HashValue, SigningKey};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
 use aptos_db::AptosDB;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
@@ -24,10 +27,11 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
-use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -35,14 +39,9 @@ use aptos_types::{
     transaction::{Transaction, TransactionStatus},
 };
 use aptos_vm::AptosVM;
+use aptos_vm_validator::vm_validator::VMValidator;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
-
-use aptos_config::keys::ConfigKey;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_storage_interface::state_view::DbStateView;
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_vm_validator::vm_validator::VMValidator;
 use rand::SeedableRng;
 use serde_json::{json, Value};
 use std::{boxed::Box, iter::once, net::SocketAddr, sync::Arc, time::Duration};
@@ -269,22 +268,22 @@ impl TestContext {
         nval["data"] = match val["type"].as_str() {
             Some("0x1::code::PackageRegistry") => {
                 Value::String("package registry omitted".to_string())
-            }
+            },
             // Ideally this wouldn't be stripped, but it changes by minor changes to the
             // Move modules, which leads to a bad devx.
             Some("0x1::state_storage::StateStorageUsage") => {
                 Value::String("state storage omitted".to_string())
-            }
+            },
             Some("0x1::state_storage::GasParameter") => {
                 Value::String("state storage gas parameter omitted".to_string())
-            }
+            },
             _ => {
                 if val["bytecode"].as_str().is_some() {
                     Value::String("bytecode omitted".to_string())
                 } else {
                     val["data"].clone()
                 }
-            }
+            },
         };
         nval
     }

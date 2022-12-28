@@ -1,13 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
-use anyhow::anyhow;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_config::config::NodeConfig;
 use aptos_db::AptosDB;
 use aptos_storage_interface::DbReaderWriter;
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 #[cfg(not(feature = "consensus-only-perf-test"))]

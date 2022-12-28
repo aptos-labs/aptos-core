@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{net::SocketAddr, sync::Arc};
-
 use crate::{
     accounts::AccountsApi, basic::BasicApi, blocks::BlocksApi, check_size::PostSizeLimit,
     context::Context, error_converter::convert_error, events::EventsApi, index::IndexApi,
@@ -22,7 +20,13 @@ use poem::{
     EndpointExt, Route, Server,
 };
 use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 use tokio::runtime::{Builder, Handle, Runtime};
 
 const VERSION: &str = include_str!("../doc/.version");
@@ -154,11 +158,11 @@ pub fn attach_poem_to_runtime(
             let rustls_certificate = RustlsCertificate::new().cert(cert).key(key);
             let rustls_config = RustlsConfig::new().fallback(rustls_certificate);
             TcpListener::bind(address).rustls(rustls_config).boxed()
-        }
+        },
         _ => {
             info!("Not using TLS for API");
             TcpListener::bind(address).boxed()
-        }
+        },
     };
 
     let acceptor = tokio::task::block_in_place(move || {
@@ -213,13 +217,11 @@ pub fn attach_poem_to_runtime(
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
+    use super::bootstrap;
     use aptos_api_test_context::{new_test_context, TestContext};
     use aptos_config::config::NodeConfig;
     use aptos_types::chain_id::ChainId;
-
-    use super::bootstrap;
+    use std::time::Duration;
 
     // TODO: Unignore this when I figure out why this only works when being
     // run alone (it fails when run with other tests).
@@ -272,7 +274,7 @@ mod tests {
                 Err(_) if remaining_attempts > 0 => {
                     remaining_attempts -= 1;
                     std::thread::sleep(Duration::from_millis(100));
-                }
+                },
                 Err(error) => return Err(error),
             }
         }

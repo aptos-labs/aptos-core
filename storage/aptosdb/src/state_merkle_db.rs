@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema;
 use crate::{
     lru_node_cache::LruNodeCache, metrics::NODE_CACHE_SECONDS,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    stale_node_index::StaleNodeIndexSchema, versioned_node_cache::VersionedNodeCache,
-    OTHER_TIMERS_SECONDS,
+    stale_node_index::StaleNodeIndexSchema,
+    stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
+    versioned_node_cache::VersionedNodeCache, OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -38,6 +38,7 @@ pub struct StateMerkleDb {
 
 impl Deref for StateMerkleDb {
     type Target = DB;
+
     fn deref(&self) -> &Self::Target {
         &self.db
     }
@@ -219,7 +220,7 @@ impl StateMerkleDb {
                         if leaf_node.account_key() > other.1.account_key() {
                             ret = Some((node_key, leaf_node));
                         }
-                    }
+                    },
                 }
             }
         }
@@ -273,7 +274,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
                 if node.node_type() == NodeType::Null || node_key.version() != version {
                     return Ok(None);
                 }
-            }
+            },
             None => return Ok(None),
         };
 
@@ -315,7 +316,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
                             if leaf_node.account_key() > other.1.account_key() {
                                 ret = Some((node_key, leaf_node));
                             }
-                        }
+                        },
                     }
                 }
             }

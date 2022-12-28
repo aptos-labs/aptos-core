@@ -1,11 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::gas_algebra::{GasQuantity, InternalGasUnit, UnitDiv};
-
 pub use aptos_gas_algebra_ext::{
     AbstractValueSize, AbstractValueSizePerArg, AbstractValueUnit, InternalGasPerAbstractValueUnit,
 };
+use move_core_types::gas_algebra::{GasQuantity, InternalGasUnit, UnitDiv};
 
 /// Unit of (external) gas.
 pub enum GasUnit {}

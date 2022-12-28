@@ -25,16 +25,16 @@ use aptos_network::{
     protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
 };
 use aptos_storage_service_client::StorageServiceClient;
-use aptos_storage_service_types::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-    NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-    StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
-    TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+use aptos_storage_service_types::{
+    requests::{
+        DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
+        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+    },
+    responses::{StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof},
+    Epoch,
 };
-use aptos_storage_service_types::responses::{
-    StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof,
-};
-use aptos_storage_service_types::Epoch;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     epoch_change::EpochChangeProof,
@@ -363,7 +363,7 @@ impl AptosNetDataClient {
                     .response_callback
                     .notify_bad_response(ResponseError::InvalidPayloadDataType);
                 Err(err.into())
-            }
+            },
         }
     }
 
@@ -427,7 +427,7 @@ impl AptosNetDataClient {
                     response_callback: Box::new(response_callback),
                 };
                 Ok(Response::new(context, response))
-            }
+            },
             Err(error) => {
                 // Convert network error and storage service error types into
                 // data client errors. Also categorize the error type for scoring
@@ -440,7 +440,7 @@ impl AptosNetDataClient {
                     },
                     aptos_storage_service_client::Error::StorageServiceError(err) => {
                         Error::UnexpectedErrorEncountered(err.to_string())
-                    }
+                    },
                 };
 
                 warn!(
@@ -460,7 +460,7 @@ impl AptosNetDataClient {
 
                 self.notify_bad_response(id, peer, &request, ErrorType::NotUseful);
                 Err(client_error)
-            }
+            },
         }
     }
 
@@ -871,7 +871,7 @@ pub(crate) fn poll_peer(
                         .peer(&peer))
                 );
                 return;
-            }
+            },
         };
 
         // Update the summary for the peer

@@ -3,16 +3,18 @@
 
 //! Interface between Consensus and Network layers.
 
-use crate::counters;
-use crate::quorum_store::types::{Batch, BatchRequest, Fragment};
+use crate::{
+    counters,
+    quorum_store::types::{Batch, BatchRequest, Fragment},
+};
 use anyhow::anyhow;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_consensus_types::proof_of_store::{ProofOfStore, SignedDigest};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,

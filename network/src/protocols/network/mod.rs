@@ -3,6 +3,7 @@
 
 //! Convenience Network API for Aptos
 
+use super::wire::handshake::v1::ProtocolIdSet;
 pub use crate::protocols::rpc::error::RpcError;
 use crate::{
     error::NetworkError,
@@ -27,10 +28,9 @@ use futures::{
 };
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{cmp::min, iter::FromIterator, marker::PhantomData, pin::Pin, time::Duration};
-
-use super::wire::handshake::v1::ProtocolIdSet;
-use std::fmt::Debug;
+use std::{
+    cmp::min, fmt::Debug, iter::FromIterator, marker::PhantomData, pin::Pin, time::Duration,
+};
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -72,7 +72,7 @@ impl<TMessage: PartialEq> PartialEq for Event<TMessage> {
             // ignore oneshot::Sender in comparison
             (RpcRequest(pid1, msg1, proto1, _), RpcRequest(pid2, msg2, proto2, _)) => {
                 pid1 == pid2 && msg1 == msg2 && proto1 == proto2
-            }
+            },
             (NewPeer(metadata1), NewPeer(metadata2)) => metadata1 == metadata2,
             (LostPeer(metadata1), LostPeer(metadata2)) => metadata1 == metadata2,
             _ => false,
@@ -201,10 +201,10 @@ fn peer_mgr_notif_to_event<TMessage: Message>(
         PeerManagerNotification::RecvRpc(peer_id, rpc_req) => {
             request_to_network_event(peer_id, &rpc_req)
                 .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_req.res_tx))
-        }
+        },
         PeerManagerNotification::RecvMessage(peer_id, request) => {
             request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
-        }
+        },
     };
     future::ready(maybe_event)
 }
@@ -226,7 +226,7 @@ fn request_to_network_event<TMessage: Message, Request: SerializedRequest>(
                 data_prefix = hex::encode(&data[..min(16, data.len())]),
             );
             None
-        }
+        },
     }
 }
 

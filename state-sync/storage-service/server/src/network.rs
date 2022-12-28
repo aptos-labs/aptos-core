@@ -9,9 +9,10 @@ use aptos_network::{
     protocols::network::{AppConfig, Event, NetworkEvents, NewNetworkEvents, RpcError},
     ProtocolId,
 };
-use aptos_storage_service_types::requests::StorageServiceRequest;
-use aptos_storage_service_types::responses::StorageServiceResponse;
-use aptos_storage_service_types::{Result, StorageServiceMessage};
+use aptos_storage_service_types::{
+    requests::StorageServiceRequest, responses::StorageServiceResponse, Result,
+    StorageServiceMessage,
+};
 use aptos_types::PeerId;
 use bytes::Bytes;
 use futures::{
@@ -66,7 +67,7 @@ impl StorageServiceNetworkEvents {
             ) => {
                 let response_tx = ResponseSender::new(response_tx);
                 Some((peer_id, protocol_id, request, response_tx))
-            }
+            },
             // We don't use DirectSend and don't care about connection events.
             _ => None,
         }

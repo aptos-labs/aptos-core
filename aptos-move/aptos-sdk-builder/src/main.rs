@@ -74,7 +74,7 @@ fn main() {
                 Language::Rust => {
                     aptos_sdk_builder::rust::output(&mut out, &abis, /* local types */ true)
                         .unwrap()
-                }
+                },
                 Language::Go => {
                     aptos_sdk_builder::golang::output(
                         &mut out,
@@ -84,10 +84,10 @@ fn main() {
                         &abis,
                     )
                     .unwrap();
-                }
+                },
             }
             return;
-        }
+        },
         Some(dir) => dir,
     };
 

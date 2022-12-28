@@ -1,16 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{
-    CliCommand, CliError, CliResult, CliTypedResult, TransactionOptions, TransactionSummary,
+use crate::{
+    common::{
+        types::{
+            CliCommand, CliError, CliResult, CliTypedResult, TransactionOptions, TransactionSummary,
+        },
+        utils::prompt_yes_with_override,
+    },
+    node::{get_stake_pools, StakePoolType},
 };
-use crate::common::utils::prompt_yes_with_override;
-use crate::node::{get_stake_pools, StakePoolType};
 use aptos_cached_packages::aptos_stdlib;
-use aptos_types::account_address::{
-    create_vesting_contract_address, default_stake_pool_address, AccountAddress,
+use aptos_types::{
+    account_address::{
+        create_vesting_contract_address, default_stake_pool_address, AccountAddress,
+    },
+    vesting::VestingAdminStore,
 };
-use aptos_types::vesting::VestingAdminStore;
 use async_trait::async_trait;
 use clap::Parser;
 
@@ -88,7 +94,7 @@ impl CliCommand<Vec<TransactionSummary>> for AddStake {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
                 StakePoolType::StakingContract => {
                     transaction_summaries.push(
                         self.txn_options
@@ -99,12 +105,12 @@ impl CliCommand<Vec<TransactionSummary>> for AddStake {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
                 StakePoolType::Vesting => {
                     return Err(CliError::UnexpectedError(
                         "Adding stake is not supported for vesting contracts".into(),
                     ))
-                }
+                },
             }
         }
         Ok(transaction_summaries)
@@ -149,7 +155,7 @@ impl CliCommand<Vec<TransactionSummary>> for UnlockStake {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
                 StakePoolType::StakingContract => {
                     transaction_summaries.push(
                         self.txn_options
@@ -160,12 +166,12 @@ impl CliCommand<Vec<TransactionSummary>> for UnlockStake {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
                 StakePoolType::Vesting => {
                     return Err(CliError::UnexpectedError(
                         "Unlocking stake is not supported for vesting contracts".into(),
                     ))
-                }
+                },
             }
         }
         Ok(transaction_summaries)
@@ -233,7 +239,7 @@ impl CliCommand<Vec<TransactionSummary>> for IncreaseLockup {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
                 StakePoolType::StakingContract => {
                     transaction_summaries.push(
                         self.txn_options
@@ -243,7 +249,7 @@ impl CliCommand<Vec<TransactionSummary>> for IncreaseLockup {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
                 StakePoolType::Vesting => {
                     transaction_summaries.push(
                         self.txn_options
@@ -253,7 +259,7 @@ impl CliCommand<Vec<TransactionSummary>> for IncreaseLockup {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
             }
         }
         Ok(transaction_summaries)
@@ -343,7 +349,7 @@ impl CliCommand<Vec<TransactionSummary>> for SetOperator {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
                 StakePoolType::StakingContract => {
                     transaction_summaries.push(
                         self.txn_options
@@ -356,7 +362,7 @@ impl CliCommand<Vec<TransactionSummary>> for SetOperator {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
                 StakePoolType::Vesting => {
                     transaction_summaries.push(
                         self.txn_options
@@ -369,7 +375,7 @@ impl CliCommand<Vec<TransactionSummary>> for SetOperator {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
             }
         }
         Ok(transaction_summaries)
@@ -418,7 +424,7 @@ impl CliCommand<Vec<TransactionSummary>> for SetDelegatedVoter {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
                 StakePoolType::StakingContract => {
                     transaction_summaries.push(
                         self.txn_options
@@ -429,7 +435,7 @@ impl CliCommand<Vec<TransactionSummary>> for SetDelegatedVoter {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
                 StakePoolType::Vesting => {
                     transaction_summaries.push(
                         self.txn_options
@@ -440,7 +446,7 @@ impl CliCommand<Vec<TransactionSummary>> for SetDelegatedVoter {
                             .await
                             .map(|inner| inner.into())?,
                     );
-                }
+                },
             }
         }
         Ok(transaction_summaries)

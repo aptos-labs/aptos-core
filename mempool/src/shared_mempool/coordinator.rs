@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Processes that are directly spawned by shared mempool runtime initialization
+use super::types::MempoolClientRequest;
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     counters,
@@ -35,8 +36,6 @@ use std::{
 };
 use tokio::{runtime::Handle, time::interval};
 use tokio_stream::wrappers::IntervalStream;
-
-use super::types::MempoolClientRequest;
 
 /// Coordinator that handles inbound network events and outbound txn broadcasts.
 pub(crate) async fn coordinator<V>(
@@ -137,7 +136,7 @@ async fn handle_client_request<V>(
                     task_start_timer,
                 ))
                 .await;
-        }
+        },
         MempoolClientRequest::GetTransactionByHash(hash, callback) => {
             // This timer measures how long it took for the bounded executor to *schedule* the
             // task.
@@ -158,7 +157,7 @@ async fn handle_client_request<V>(
                     task_start_timer,
                 ))
                 .await;
-        }
+        },
     }
 }
 
@@ -263,7 +262,7 @@ async fn handle_network_event<V>(
                 tasks::execute_broadcast(peer, false, smp, scheduled_broadcasts, executor.clone())
                     .await;
             }
-        }
+        },
         Event::LostPeer(metadata) => {
             counters::shared_mempool_event_inc("lost_peer");
             let peer = PeerNetworkId::new(network_id, metadata.remote_peer_id);
@@ -275,7 +274,7 @@ async fn handle_network_event<V>(
                 ));
             smp.network_interface.disable_peer(peer);
             notify_subscribers(SharedMempoolNotification::PeerStateChange, &smp.subscribers);
-        }
+        },
         Event::Message(peer_id, msg) => {
             counters::shared_mempool_event_inc("message");
             match msg {
@@ -315,7 +314,7 @@ async fn handle_network_event<V>(
                             task_start_timer,
                         ))
                         .await;
-                }
+                },
                 MempoolSyncMsg::BroadcastTransactionsResponse {
                     request_id,
                     retry,
@@ -329,9 +328,9 @@ async fn handle_network_event<V>(
                         backoff,
                         ack_timestamp,
                     );
-                }
+                },
             }
-        }
+        },
         Event::RpcRequest(peer_id, _msg, _, _res_tx) => {
             counters::unexpected_msg_count_inc(&network_id);
             sample!(
@@ -339,7 +338,7 @@ async fn handle_network_event<V>(
                 warn!(LogSchema::new(LogEntry::UnexpectedNetworkMsg)
                     .peer(&PeerNetworkId::new(network_id, peer_id)))
             );
-        }
+        },
     }
 }
 

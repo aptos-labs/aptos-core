@@ -97,7 +97,7 @@ fn test_get_bit() {
 
 #[test]
 fn test_bit_iter() {
-    let bytes = vec![0xc3, 0xa0];
+    let bytes = vec![0xC3, 0xA0];
     let nibble_path = NibblePath::new_odd(bytes);
     let mut iter = nibble_path.bits();
     // c: 0b1100

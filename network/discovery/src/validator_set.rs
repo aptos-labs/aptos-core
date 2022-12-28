@@ -260,13 +260,10 @@ mod tests {
         );
         let payload = OnChainConfigPayload::new(1, Arc::new(configs));
         reconfig_tx
-            .push(
-                (),
-                ReconfigNotification {
-                    version: 1,
-                    on_chain_configs: payload,
-                },
-            )
+            .push((), ReconfigNotification {
+                version: 1,
+                on_chain_configs: payload,
+            })
             .unwrap();
     }
 

@@ -6,6 +6,7 @@
 mod bootstrap;
 mod log_build_information;
 
+use crate::bootstrap::bootstrap_db;
 use anyhow::{anyhow, Context};
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
@@ -25,19 +26,12 @@ use aptos_data_streaming_service::{
     streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
     streaming_service::DataStreamingService,
 };
-use aptos_infallible::RwLock;
-use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
-use aptos_state_view::account_with_state_view::AsAccountWithStateView;
-use aptos_time_service::TimeService;
-use aptos_types::{
-    account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
-    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
-};
-
 use aptos_db::AptosDB;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
 use aptos_framework::ReleaseBundle;
+use aptos_infallible::RwLock;
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_mempool::MempoolClientSender;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_network::application::storage::PeerMetadataStorage;
@@ -46,10 +40,16 @@ use aptos_state_sync_driver::{
     driver_factory::{DriverFactory, StateSyncRuntimes},
     metadata_storage::PersistentMetadataStorage,
 };
+use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
 use aptos_storage_service_server::{
     network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
+};
+use aptos_time_service::TimeService;
+use aptos_types::{
+    account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
+    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
 use clap::Parser;
@@ -71,8 +71,6 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::{Builder, Runtime};
-
-use crate::bootstrap::bootstrap_db;
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;

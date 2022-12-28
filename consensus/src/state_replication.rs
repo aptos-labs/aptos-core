@@ -1,8 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::{QuorumStoreError, StateSyncError};
-use crate::payload_manager::PayloadManager;
+use crate::{
+    error::{QuorumStoreError, StateSyncError},
+    payload_manager::PayloadManager,
+};
 use anyhow::Result;
 use aptos_consensus_types::{
     block::Block,

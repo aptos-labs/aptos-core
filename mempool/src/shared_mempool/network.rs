@@ -42,13 +42,10 @@ use async_trait::async_trait;
 use fail::fail_point;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::RandomState;
-use std::collections::BTreeSet;
-use std::hash::BuildHasher;
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, HashMap},
-    hash::Hasher,
+    collections::{hash_map::RandomState, BTreeMap, BTreeSet, HashMap},
+    hash::{BuildHasher, Hasher},
     ops::Add,
     sync::Arc,
     time::{Duration, Instant, SystemTime},
@@ -439,7 +436,7 @@ impl MempoolNetworkInterface {
 
                     let txns = mempool.timeline_range(&id.0);
                     (id.clone(), txns, metric_label)
-                }
+                },
                 None => {
                     // Fresh broadcast
                     let (txns, new_timeline_id) = mempool.read_timeline(
@@ -451,7 +448,7 @@ impl MempoolNetworkInterface {
                         txns,
                         None,
                     )
-                }
+                },
             };
 
         if transactions.is_empty() {
@@ -554,8 +551,8 @@ impl MempoolNetworkInterface {
 }
 
 impl NetworkInterface<MempoolSyncMsg, MempoolMultiNetworkSender> for MempoolNetworkInterface {
-    type AppDataKey = PeerNetworkId;
     type AppData = PeerSyncState;
+    type AppDataKey = PeerNetworkId;
 
     fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
         &self.peer_metadata_storage
@@ -607,10 +604,10 @@ impl PrioritizedPeersComparator {
                         let hash_b = self.hash_peer_id(&peer_network_id_b.peer_id());
 
                         hash_a.cmp(&hash_b)
-                    }
+                    },
                     ordering => ordering,
                 }
-            }
+            },
             ordering => ordering,
         }
     }

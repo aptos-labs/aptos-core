@@ -47,7 +47,7 @@ impl PollRateLimiter {
                     self.delay = Some(Box::pin(sleep_until(tokio::time::Instant::from_std(
                         wait_time,
                     ))));
-                }
+                },
             }
         }
     }

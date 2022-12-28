@@ -1,25 +1,30 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{
+    context::JsonWebTokenService,
+    tests::test_context::new_test_context,
+    types::{
+        auth::{AuthResponse, Claims},
+        common::NodeType,
+    },
+};
 use aptos_config::config::{Peer, PeerRole, PeerSet, RoleType};
-use aptos_crypto::noise::{InitiatorHandshakeState, NoiseConfig};
-use aptos_crypto::{noise, x25519, Uniform};
-use aptos_types::network_address::Protocol::{Dns, Handshake, NoiseIK, Tcp};
+use aptos_crypto::{
+    noise,
+    noise::{InitiatorHandshakeState, NoiseConfig},
+    x25519, Uniform,
+};
 use aptos_types::{
     account_address,
     chain_id::ChainId,
-    network_address::{DnsName, NetworkAddress},
+    network_address::{
+        DnsName, NetworkAddress,
+        Protocol::{Dns, Handshake, NoiseIK, Tcp},
+    },
     PeerId,
 };
-
 use serde_json::json;
-
-use crate::context::JsonWebTokenService;
-use crate::types::common::NodeType;
-use crate::{
-    tests::test_context::new_test_context,
-    types::auth::{AuthResponse, Claims},
-};
 
 fn init(
     peer_role: PeerRole,
@@ -133,17 +138,14 @@ async fn test_auth_validator() {
         resp,
     );
 
-    assert_eq!(
-        decoded.claims,
-        Claims {
-            chain_id,
-            peer_id,
-            node_type: NodeType::Validator,
-            epoch: 1,
-            exp: decoded.claims.exp,
-            iat: decoded.claims.iat
-        },
-    )
+    assert_eq!(decoded.claims, Claims {
+        chain_id,
+        peer_id,
+        node_type: NodeType::Validator,
+        epoch: 1,
+        exp: decoded.claims.exp,
+        iat: decoded.claims.iat
+    },)
 }
 
 #[tokio::test]
@@ -179,17 +181,14 @@ async fn test_auth_validatorfullnode() {
         resp,
     );
 
-    assert_eq!(
-        decoded.claims,
-        Claims {
-            chain_id,
-            peer_id,
-            node_type: NodeType::ValidatorFullNode,
-            epoch: 1,
-            exp: decoded.claims.exp,
-            iat: decoded.claims.iat
-        },
-    )
+    assert_eq!(decoded.claims, Claims {
+        chain_id,
+        peer_id,
+        node_type: NodeType::ValidatorFullNode,
+        epoch: 1,
+        exp: decoded.claims.exp,
+        iat: decoded.claims.iat
+    },)
 }
 
 #[tokio::test]

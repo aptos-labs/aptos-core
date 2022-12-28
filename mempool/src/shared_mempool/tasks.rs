@@ -24,15 +24,12 @@ use aptos_metrics_core::HistogramTimer;
 use aptos_network::application::interface::NetworkInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
 use aptos_types::{
-    mempool_status::MempoolStatus, on_chain_config::OnChainConsensusConfig,
+    mempool_status::{MempoolStatus, MempoolStatusCode},
+    on_chain_config::{OnChainConfigPayload, OnChainConsensusConfig},
+    transaction::SignedTransaction,
     vm_status::DiscardedVMStatus,
 };
-use aptos_types::{
-    mempool_status::MempoolStatusCode, on_chain_config::OnChainConfigPayload,
-    transaction::SignedTransaction,
-};
 use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
-
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use rayon::prelude::*;
 use std::{
@@ -73,7 +70,7 @@ pub(crate) async fn execute_broadcast<V>(
                 .error(&error)),
                 _ => {
                     trace!("{:?}", err)
-                }
+                },
             }
         }
     } else {
@@ -328,7 +325,7 @@ where
                             timeline_state,
                         );
                         statuses.push((transaction, (mempool_status, None)));
-                    }
+                    },
                     Some(validation_status) => {
                         statuses.push((
                             transaction.clone(),
@@ -337,7 +334,7 @@ where
                                 Some(validation_status),
                             ),
                         ));
-                    }
+                    },
                 }
             } else {
                 statuses.push((
@@ -522,7 +519,7 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 callback,
                 counters::GET_BLOCK_LABEL,
             )
-        }
+        },
         QuorumStoreRequest::RejectNotification(transactions, callback) => {
             counters::mempool_service_transactions(
                 counters::COMMIT_CONSENSUS_LABEL,
@@ -534,7 +531,7 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 callback,
                 counters::COMMIT_CONSENSUS_LABEL,
             )
-        }
+        },
     };
     // Send back to callback
     let result = if callback.send(Ok(resp)).is_err() {
@@ -604,13 +601,13 @@ pub(crate) async fn process_config_update<V>(
     match consensus_config {
         Ok(consensus_config) => {
             *broadcast_within_validator_network.write() = !consensus_config.quorum_store_enabled();
-        }
+        },
         Err(e) => {
             error!(
                 "Failed to read on-chain consensus config, keeping value broadcast_within_validator_network={}: {}",
                 *broadcast_within_validator_network.read(),
                 e
             );
-        }
+        },
     }
 }

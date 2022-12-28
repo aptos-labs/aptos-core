@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::ReplayConcurrencyLevelOpt;
 use crate::{
     backup_types::{
         state_snapshot::{
@@ -17,7 +16,7 @@ use crate::{
     utils::{
         backup_service_client::BackupServiceClient, test_utils::start_local_backup_service,
         ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, GlobalRestoreOptions,
-        RocksdbOpt, TrustedWaypointOpt,
+        ReplayConcurrencyLevelOpt, RocksdbOpt, TrustedWaypointOpt,
     },
 };
 use aptos_db::AptosDB;

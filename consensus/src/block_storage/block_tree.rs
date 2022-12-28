@@ -275,7 +275,7 @@ impl BlockTree {
                     self.highest_certified_block_id = block.id();
                     self.highest_quorum_cert = Arc::clone(&qc);
                 }
-            }
+            },
             None => bail!("Block {} not found", block_id),
         }
 
@@ -377,11 +377,11 @@ impl BlockTree {
             match self.get_block(&cur_block_id) {
                 Some(ref block) if block.round() <= root_round => {
                     break;
-                }
+                },
                 Some(block) => {
                     cur_block_id = block.parent_id();
                     res.push(block);
-                }
+                },
                 None => return None,
             }
         }

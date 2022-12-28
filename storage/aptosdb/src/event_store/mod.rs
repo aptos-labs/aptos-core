@@ -230,7 +230,7 @@ impl EventStore {
                 } else {
                     Ok(None)
                 }
-            }
+            },
         }
     }
 
@@ -258,7 +258,7 @@ impl EventStore {
                 } else {
                     Ok(None)
                 }
-            }
+            },
         }
     }
 
@@ -286,7 +286,7 @@ impl EventStore {
                 } else {
                     Ok(None)
                 }
-            }
+            },
         }
     }
 

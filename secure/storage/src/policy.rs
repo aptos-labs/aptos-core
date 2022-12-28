@@ -15,10 +15,10 @@ impl Policy {
     }
 
     pub fn public() -> Self {
-        Self::new(vec![Permission::new(
-            Identity::Anyone,
-            vec![Capability::Read, Capability::Write],
-        )])
+        Self::new(vec![Permission::new(Identity::Anyone, vec![
+            Capability::Read,
+            Capability::Write,
+        ])])
     }
 }
 

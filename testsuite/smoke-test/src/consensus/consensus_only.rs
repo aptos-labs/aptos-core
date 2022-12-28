@@ -1,11 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Duration;
-
-use aptos_forge::TransactionType;
-
 use crate::{smoke_test_environment::new_local_swarm_with_aptos, txn_emitter::generate_traffic};
+use aptos_forge::TransactionType;
+use std::time::Duration;
 
 #[ignore]
 #[tokio::test]

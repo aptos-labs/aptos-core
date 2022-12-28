@@ -83,25 +83,25 @@ impl<
                         .lock()
                         .push(ReadDescriptor::from_version(key.clone(), idx, incarnation));
                     return ReadResult::Value(v);
-                }
+                },
                 Ok(Resolved(value)) => {
                     self.captured_reads
                         .lock()
                         .push(ReadDescriptor::from_resolved(key.clone(), value));
                     return ReadResult::U128(value);
-                }
+                },
                 Err(NotFound) => {
                     self.captured_reads
                         .lock()
                         .push(ReadDescriptor::from_storage(key.clone()));
                     return ReadResult::None;
-                }
+                },
                 Err(Unresolved(delta)) => {
                     self.captured_reads
                         .lock()
                         .push(ReadDescriptor::from_unresolved(key.clone(), delta));
                     return ReadResult::Unresolved(delta);
-                }
+                },
                 Err(Dependency(dep_idx)) => {
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     match self.scheduler.wait_for_dependency(txn_idx, dep_idx) {
@@ -126,10 +126,10 @@ impl<
                             while !*dep_resolved {
                                 dep_resolved = cvar.wait(dep_resolved).unwrap();
                             }
-                        }
+                        },
                         None => continue,
                     }
-                }
+                },
                 Err(DeltaApplicationFailure) => {
                     // Delta application failure currently should never happen. Here, we assume it
                     // happened because of speculation and return 0 to the Move-VM. Validation will
@@ -138,7 +138,7 @@ impl<
                         .lock()
                         .push(ReadDescriptor::from_delta_application_failure(key.clone()));
                     return ReadResult::U128(0);
-                }
+                },
             };
         }
     }
@@ -200,7 +200,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                         .apply_to(from_storage)
                         .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
                     Ok(Some(serialize(&result)))
-                }
+                },
                 ReadResult::None => self.base_view.get_state_value(state_key),
             },
             ViewMapKind::BTree(map) => map.get(state_key).map_or_else(

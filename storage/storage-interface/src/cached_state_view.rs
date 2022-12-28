@@ -8,8 +8,9 @@ use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatu
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     proof::SparseMerkleProofExt,
-    state_store::state_storage_usage::StateStorageUsage,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::Version,
     write_set::WriteSet,
 };
@@ -169,10 +170,10 @@ impl CachedStateView {
                                 })?;
                         }
                         value
-                    }
+                    },
                     None => None,
                 }
-            }
+            },
         };
 
         Ok(state_value_option)

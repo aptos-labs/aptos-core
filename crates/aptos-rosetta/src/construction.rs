@@ -24,11 +24,10 @@
 //! a connection to a full node.  The online ones need a connection to a full node.
 //!
 
-use crate::common::parse_currency;
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
-        native_coin, with_context,
+        native_coin, parse_currency, with_context,
     },
     error::{ApiError, ApiResult},
     types::{InternalOperation, *},
@@ -44,16 +43,18 @@ use aptos_sdk::{
     move_types::language_storage::{StructTag, TypeTag},
     transaction_builder::TransactionFactory,
 };
-use aptos_types::chain_id::ChainId;
 use aptos_types::{
     account_address::AccountAddress,
+    chain_id::ChainId,
     transaction::{
         authenticator::AuthenticationKey, RawTransaction, SignedTransaction, TransactionPayload,
     },
 };
 use serde::de::DeserializeOwned;
-use std::convert::TryFrom;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    convert::TryFrom,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use warp::Filter;
 
 pub fn combine_route(
@@ -255,7 +256,7 @@ async fn fill_in_operator(
                     );
                 }
             }
-        }
+        },
         InternalOperation::SetVoter(op) => {
             // If there was no operator set, and there is only one, we should use that
             if op.operator.is_none() {
@@ -284,8 +285,8 @@ async fn fill_in_operator(
                     );
                 }
             }
-        }
-        _ => {}
+        },
+        _ => {},
     }
 
     Ok(internal_operation)
@@ -531,13 +532,13 @@ async fn construction_parse(
             ) {
                 (AccountAddress::ONE, COIN_MODULE, TRANSFER_FUNCTION) => {
                     parse_transfer_operation(sender, &type_args, &args)?
-                }
+                },
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNCTION) => {
                     parse_account_transfer_operation(sender, &type_args, &args)?
-                }
+                },
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                     parse_create_account_operation(sender, &type_args, &args)?
-                }
+                },
                 (
                     AccountAddress::ONE,
                     STAKING_CONTRACT_MODULE,
@@ -545,7 +546,7 @@ async fn construction_parse(
                 ) => parse_set_operator_operation(sender, &type_args, &args)?,
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER_FUNCTION) => {
                     parse_set_voter_operation(sender, &type_args, &args)?
-                }
+                },
                 (
                     AccountAddress::ONE,
                     STAKING_CONTRACT_MODULE,
@@ -553,7 +554,7 @@ async fn construction_parse(
                 ) => parse_create_stake_pool_operation(sender, &type_args, &args)?,
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, RESET_LOCKUP_FUNCTION) => {
                     parse_reset_lockup_operation(sender, &type_args, &args)?
-                }
+                },
                 _ => {
                     return Err(ApiError::TransactionParseError(Some(format!(
                         "Unsupported entry function type {:x}::{}::{}",
@@ -561,15 +562,15 @@ async fn construction_parse(
                         module.name(),
                         function_name
                     ))));
-                }
+                },
             }
-        }
+        },
         payload => {
             return Err(ApiError::TransactionParseError(Some(format!(
                 "Unsupported transaction payload type {:?}",
                 payload
             ))))
-        }
+        },
     };
 
     Ok(ConstructionParseResponse {
@@ -628,12 +629,12 @@ fn parse_transfer_operation(
             } = &**struct_tag;
 
             parse_currency(*address, module.as_str(), name.as_str())?
-        }
+        },
         _ => {
             return Err(ApiError::TransactionParseError(Some(
                 "No coin type in transfer".to_string(),
             )))
-        }
+        },
     };
 
     // Retrieve the args for the operations
@@ -857,7 +858,7 @@ async fn construction_payloads(
                     operation, metadata.internal_operation
                 ))));
             }
-        }
+        },
         InternalOperation::Transfer(_) => {
             if operation != metadata.internal_operation {
                 return Err(ApiError::InvalidInput(Some(format!(
@@ -865,7 +866,7 @@ async fn construction_payloads(
                     operation, metadata.internal_operation
                 ))));
             }
-        }
+        },
         InternalOperation::SetOperator(inner) => {
             if let InternalOperation::SetOperator(ref metadata_op) = metadata.internal_operation {
                 if inner.owner == metadata_op.owner
@@ -886,7 +887,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        }
+        },
         InternalOperation::SetVoter(inner) => {
             if let InternalOperation::SetVoter(ref metadata_op) = metadata.internal_operation {
                 if inner.owner == metadata_op.owner && inner.new_voter == metadata_op.new_voter {
@@ -905,7 +906,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        }
+        },
         InternalOperation::InitializeStakePool(_) => {
             if operation != metadata.internal_operation {
                 return Err(ApiError::InvalidInput(Some(format!(
@@ -913,7 +914,7 @@ async fn construction_payloads(
                     operation, metadata.internal_operation
                 ))));
             }
-        }
+        },
         InternalOperation::ResetLockup(inner) => {
             if let InternalOperation::ResetLockup(ref metadata_op) = metadata.internal_operation {
                 if inner.owner != metadata_op.owner || inner.operator != metadata_op.operator {
@@ -928,7 +929,7 @@ async fn construction_payloads(
                     inner, metadata.internal_operation
                 ))));
             }
-        }
+        },
     }
 
     // Encode operation

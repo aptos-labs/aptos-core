@@ -6,8 +6,10 @@ use crate::{
     pending_votes::{PendingVotes, VoteReceptionResult},
     util::time_service::{SendTask, TimeService},
 };
-use aptos_consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
-use aptos_consensus_types::{common::Round, sync_info::SyncInfo, vote::Vote};
+use aptos_consensus_types::{
+    common::Round, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutWithPartialSignatures,
+    vote::Vote,
+};
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
 use aptos_types::{
