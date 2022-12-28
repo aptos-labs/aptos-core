@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{DbReader, DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT};
+use aptos_infallible::Mutex;
+use aptos_storage_interface::{
+    state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT,
+};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -12,8 +15,8 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     ledger_info::LedgerInfoWithSignatures,
     proof::{
-        AccumulatorConsistencyProof, AccumulatorRangeProof, SparseMerkleProofExt,
-        TransactionAccumulatorProof, TransactionAccumulatorRangeProof,
+        accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, AccumulatorRangeProof,
+        SparseMerkleProofExt, TransactionAccumulatorProof, TransactionAccumulatorRangeProof,
         TransactionAccumulatorSummary, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
     state_proof::StateProof,
@@ -30,12 +33,13 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
+use arc_swap::ArcSwapOption;
 use move_core_types::move_resource::MoveStructType;
 
-use anyhow::{format_err, Result};
+use anyhow::{ensure, format_err, Result};
 use dashmap::DashMap;
 use itertools::zip_eq;
-use std::sync::Arc;
+use std::{collections::HashMap, mem::swap, sync::Arc};
 
 use crate::{
     errors::AptosDbError,
@@ -43,6 +47,51 @@ use crate::{
     metrics::{LEDGER_VERSION, NEXT_BLOCK_EPOCH},
     AptosDB,
 };
+
+pub struct FakeBufferedState {
+    // state until the latest checkpoint.
+    state_until_checkpoint: Option<Box<StateDelta>>,
+    // state after the latest checkpoint.
+    state_after_checkpoint: StateDelta,
+}
+
+impl FakeBufferedState {
+    pub fn update(
+        &mut self,
+        updates_until_next_checkpoint_since_current_option: Option<
+            HashMap<StateKey, Option<StateValue>>,
+        >,
+        mut new_state_after_checkpoint: StateDelta,
+    ) -> Result<()> {
+        ensure!(
+            new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version
+        );
+        if let Some(updates_until_next_checkpoint_since_current) =
+            updates_until_next_checkpoint_since_current_option
+        {
+            self.state_after_checkpoint
+                .updates_since_base
+                .extend(updates_until_next_checkpoint_since_current);
+            self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
+            self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
+            swap(
+                &mut self.state_after_checkpoint,
+                &mut new_state_after_checkpoint,
+            );
+            if let Some(ref mut delta) = self.state_until_checkpoint {
+                delta.merge(new_state_after_checkpoint);
+            } else {
+                self.state_until_checkpoint = Some(Box::new(new_state_after_checkpoint));
+            }
+        } else {
+            ensure!(
+                new_state_after_checkpoint.base_version == self.state_after_checkpoint.base_version
+            );
+            self.state_after_checkpoint = new_state_after_checkpoint;
+        }
+        Ok(())
+    }
+}
 
 /// Provides a "fake" AptosDB.
 pub struct FakeAptosDB {
@@ -53,9 +102,12 @@ pub struct FakeAptosDB {
     txn_by_version: Arc<DashMap<Version, Transaction>>,
     // A map of transaction to TransactionInfo
     txn_info_by_version: Arc<DashMap<Version, TransactionInfo>>,
+    // Max version and transaction
+    latest_txn_info: ArcSwapOption<(Version, TransactionInfo)>,
     // A map of account address to the highest executed sequence number
     account_seq_num: Arc<DashMap<AccountAddress, u64>>,
     ledger_commit_lock: std::sync::Mutex<()>,
+    buffered_state: Mutex<FakeBufferedState>,
 }
 
 impl FakeAptosDB {
@@ -65,8 +117,13 @@ impl FakeAptosDB {
             txn_by_version: Arc::new(DashMap::new()),
             txn_version_by_hash: Arc::new(DashMap::new()),
             txn_info_by_version: Arc::new(DashMap::new()),
+            latest_txn_info: ArcSwapOption::from(None),
             account_seq_num: Arc::new(DashMap::new()),
             ledger_commit_lock: std::sync::Mutex::new(()),
+            buffered_state: Mutex::new(FakeBufferedState {
+                state_until_checkpoint: None,
+                state_after_checkpoint: StateDelta::new_empty(),
+            }),
         }
     }
 }
@@ -100,6 +157,67 @@ impl DbWriter for FakeAptosDB {
                     base_state_version,
                     ledger_info_with_sigs,
                     sync_commit,
+                    latest_in_memory_state.clone(),
+                )?;
+            }
+
+            {
+                let mut buffered_state = self.buffered_state.lock();
+                ensure!(
+                    base_state_version == buffered_state.state_after_checkpoint.base_version,
+                    "base_state_version {:?} does not equal to the base_version {:?} in buffered state with current version {:?}",
+                    base_state_version,
+                    buffered_state.state_after_checkpoint.base_version,
+                    buffered_state.state_after_checkpoint.current_version,
+                );
+
+                // Ensure the incoming committing requests are always consecutive and the version in
+                // buffered state is consistent with that in db.
+                let next_version_in_buffered_state = buffered_state
+                    .state_after_checkpoint
+                    .current_version
+                    .map(|version| version + 1)
+                    .unwrap_or(0);
+                let num_transactions_in_db = self
+                    .get_latest_transaction_info_option()?
+                    .map(|(version, _)| version + 1)
+                    .unwrap_or(0);
+                ensure!(
+                     num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
+                    "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
+                    first_version,
+                    next_version_in_buffered_state,
+                    num_transactions_in_db,
+                );
+
+                let updates_until_latest_checkpoint_since_current = if let Some(
+                    latest_checkpoint_version,
+                ) =
+                    latest_in_memory_state.base_version
+                {
+                    if latest_checkpoint_version >= first_version {
+                        let idx = (latest_checkpoint_version - first_version) as usize;
+                        ensure!(
+                            txns_to_commit[idx].is_state_checkpoint(),
+                            "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
+                            latest_checkpoint_version,
+                            first_version + idx as u64
+                        );
+                        Some(
+                            txns_to_commit[..=idx]
+                                .iter()
+                                .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
+                                .collect(),
+                        )
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                buffered_state.update(
+                    updates_until_latest_checkpoint_since_current,
                     latest_in_memory_state,
                 )?;
             }
@@ -113,6 +231,10 @@ impl DbWriter for FakeAptosDB {
                         .insert(ver, txn_to_commit.transaction().clone());
                     self.txn_info_by_version
                         .insert(ver, txn_to_commit.transaction_info().clone());
+                    self.latest_txn_info.store(Some(Arc::new((
+                        ver,
+                        txn_to_commit.transaction_info().clone(),
+                    ))));
                     self.txn_version_by_hash
                         .insert(txn_to_commit.transaction().hash(), ver);
 
@@ -406,7 +528,13 @@ impl DbReader for FakeAptosDB {
     }
 
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
-        Ok(Some(self.get_latest_ledger_info()?.ledger_info().version()))
+        gauged_api("get_latest_state_checkpoint_version", || {
+            Ok(self
+                .buffered_state
+                .lock()
+                .state_after_checkpoint
+                .current_version)
+        })
     }
 
     fn get_state_snapshot_before(
@@ -510,7 +638,21 @@ impl DbReader for FakeAptosDB {
     }
 
     fn get_latest_executed_trees(&self) -> Result<ExecutedTrees> {
-        self.inner.get_latest_executed_trees()
+        gauged_api("get_latest_executed_trees", || {
+            let buffered_state = self.buffered_state.lock();
+            let num_txns = buffered_state
+                .state_after_checkpoint
+                .current_version
+                .map_or(0, |v| v + 1);
+
+            let mut transaction_accumulator = InMemoryAccumulator::new_empty();
+            transaction_accumulator.num_leaves = num_txns;
+            let executed_trees = ExecutedTrees::new(
+                buffered_state.state_after_checkpoint.clone(),
+                Arc::new(transaction_accumulator),
+            );
+            Ok(executed_trees)
+        })
     }
 
     fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures> {
@@ -520,7 +662,10 @@ impl DbReader for FakeAptosDB {
     fn get_latest_transaction_info_option(
         &self,
     ) -> Result<Option<(Version, aptos_types::transaction::TransactionInfo)>> {
-        self.inner.get_latest_transaction_info_option()
+        Ok(self
+            .latest_txn_info
+            .load_full()
+            .map(|txn| txn.as_ref().clone()))
     }
 
     fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue> {
