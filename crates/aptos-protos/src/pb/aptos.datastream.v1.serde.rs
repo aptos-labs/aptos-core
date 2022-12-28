@@ -747,10 +747,16 @@ impl serde::Serialize for TransactionsOutput {
         if !self.transactions.is_empty() {
             len += 1;
         }
+        if self.transactions_timestamp.is_some() {
+            len += 1;
+        }
         let mut struct_ser =
             serializer.serialize_struct("aptos.datastream.v1.TransactionsOutput", len)?;
         if !self.transactions.is_empty() {
             struct_ser.serialize_field("transactions", &self.transactions)?;
+        }
+        if let Some(v) = self.transactions_timestamp.as_ref() {
+            struct_ser.serialize_field("transactionsTimestamp", v)?;
         }
         struct_ser.end()
     }
@@ -761,11 +767,16 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["transactions"];
+        const FIELDS: &[&str] = &[
+            "transactions",
+            "transactions_timestamp",
+            "transactionsTimestamp",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Transactions,
+            TransactionsTimestamp,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -791,6 +802,9 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
                     {
                         match value {
                             "transactions" => Ok(GeneratedField::Transactions),
+                            "transactionsTimestamp" | "transactions_timestamp" => {
+                                Ok(GeneratedField::TransactionsTimestamp)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -811,6 +825,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
                 V: serde::de::MapAccess<'de>,
             {
                 let mut transactions__ = None;
+                let mut transactions_timestamp__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Transactions => {
@@ -819,10 +834,19 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
                             }
                             transactions__ = Some(map.next_value()?);
                         }
+                        GeneratedField::TransactionsTimestamp => {
+                            if transactions_timestamp__.is_some() {
+                                return Err(serde::de::Error::duplicate_field(
+                                    "transactionsTimestamp",
+                                ));
+                            }
+                            transactions_timestamp__ = map.next_value()?;
+                        }
                     }
                 }
                 Ok(TransactionsOutput {
                     transactions: transactions__.unwrap_or_default(),
+                    transactions_timestamp: transactions_timestamp__,
                 })
             }
         }
