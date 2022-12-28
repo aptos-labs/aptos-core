@@ -26,8 +26,8 @@ use futures::{
     task::{Context, Poll},
 };
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
 use std::{
+    cmp::Ordering,
     collections::{BTreeMap, BTreeSet, HashMap},
     fmt,
     pin::Pin,
@@ -143,7 +143,9 @@ impl ScheduledBroadcast {
 }
 
 impl Future for ScheduledBroadcast {
-    type Output = (PeerNetworkId, bool); // (peer, whether this broadcast was scheduled as a backoff broadcast)
+    type Output = (PeerNetworkId, bool);
+
+    // (peer, whether this broadcast was scheduled as a backoff broadcast)
 
     fn poll(self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
         if Instant::now() < self.deadline {
@@ -189,13 +191,13 @@ impl fmt::Display for QuorumStoreRequest {
                     max_bytes,
                     excluded_txns.len()
                 )
-            }
+            },
             QuorumStoreRequest::RejectNotification(rejected_txns, _) => {
                 format!(
                     "RejectNotification [rejected_txns_length: {}]",
                     rejected_txns.len()
                 )
-            }
+            },
         };
         write!(f, "{}", payload)
     }

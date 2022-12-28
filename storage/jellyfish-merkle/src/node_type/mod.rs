@@ -12,7 +12,10 @@
 #[cfg(test)]
 mod node_type_test;
 
-use crate::metrics::{APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES};
+use crate::{
+    metrics::{APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES},
+    TreeReader,
+};
 use anyhow::{ensure, Context, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -20,7 +23,7 @@ use aptos_crypto::{
 };
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
-    proof::{SparseMerkleInternalNode, SparseMerkleLeafNode},
+    proof::{definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode},
     transaction::Version,
 };
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
@@ -31,9 +34,6 @@ use num_traits::cast::FromPrimitive;
 use proptest::{collection::hash_map, prelude::*};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-
-use crate::TreeReader;
-use aptos_types::proof::definition::NodeInProof;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::hash_map::HashMap,
@@ -128,7 +128,7 @@ impl NodeKey {
         let nibble_path = if num_nibbles % 2 == 0 {
             NibblePath::new_even(nibble_bytes)
         } else {
-            let padding = nibble_bytes.last().unwrap() & 0x0f;
+            let padding = nibble_bytes.last().unwrap() & 0x0F;
             ensure!(
                 padding == 0,
                 "Padding nibble expected to be 0, got: {}",
@@ -351,7 +351,7 @@ impl InternalNode {
                 NodeType::Leaf => (),
                 NodeType::Internal { leaf_count } => {
                     serialize_u64_varint(leaf_count as u64, binary);
-                }
+                },
                 NodeType::Null => unreachable!("Child cannot be Null"),
             };
             existence_bitmap &= !(1 << next_child);
@@ -374,7 +374,7 @@ impl InternalNode {
                     leaves: leaf_bitmap,
                 }
                 .into())
-            }
+            },
             _ => (),
         }
 
@@ -524,7 +524,7 @@ impl InternalNode {
                     ),
                     Node::Leaf(leaf_node) => {
                         NodeInProof::Leaf(SparseMerkleLeafNode::from(leaf_node))
-                    }
+                    },
                     Node::Null => unreachable!("Child cannot be Null"),
                 }
             } else {
@@ -639,7 +639,7 @@ pub(crate) fn get_child_and_sibling_half_start(n: Nibble, height: u8) -> (u8, u8
     // Get the index of the first child belonging to the same subtree whose root, let's say `r` is
     // at `height` that the n-th child belongs to.
     // Note: `child_half_start` will be always equal to `n` at height 0.
-    let child_half_start = (0xff << height) & u8::from(n);
+    let child_half_start = (0xFF << height) & u8::from(n);
 
     // Get the index of the first child belonging to the subtree whose root is the sibling of `r`
     // at `height`.
@@ -788,15 +788,15 @@ where
                 out.push(NodeTag::Internal as u8);
                 internal_node.serialize(&mut out)?;
                 APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES.inc_by(out.len() as u64);
-            }
+            },
             Node::Leaf(leaf_node) => {
                 out.push(NodeTag::Leaf as u8);
                 out.extend(bcs::to_bytes(&leaf_node)?);
                 APTOS_JELLYFISH_LEAF_ENCODED_BYTES.inc_by(out.len() as u64);
-            }
+            },
             Node::Null => {
                 out.push(NodeTag::Null as u8);
-            }
+            },
         }
         Ok(out)
     }
@@ -855,7 +855,7 @@ pub enum NodeDecodeError {
 /// We use a super simple encoding - the high bit is set if more bytes follow.
 fn serialize_u64_varint(mut num: u64, binary: &mut Vec<u8>) {
     for _ in 0..8 {
-        let low_bits = num as u8 & 0x7f;
+        let low_bits = num as u8 & 0x7F;
         num >>= 7;
         let more = match num {
             0 => 0u8,
@@ -868,7 +868,7 @@ fn serialize_u64_varint(mut num: u64, binary: &mut Vec<u8>) {
     }
     // Last byte is encoded raw; this means there are no bad encodings.
     assert_ne!(num, 0);
-    assert!(num <= 0xff);
+    assert!(num <= 0xFF);
     binary.push(num as u8);
 }
 
@@ -880,7 +880,7 @@ where
     let mut num = 0u64;
     for i in 0..8 {
         let byte = reader.read_u8()?;
-        num |= u64::from(byte & 0x7f) << (i * 7);
+        num |= u64::from(byte & 0x7F) << (i * 7);
         if (byte & 0x80) == 0 {
             return Ok(num);
         }

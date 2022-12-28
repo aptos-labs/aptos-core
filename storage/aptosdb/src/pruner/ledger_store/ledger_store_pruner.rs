@@ -91,11 +91,11 @@ impl DBPruner for LedgerPruner {
                     "Try to update stored min readable transaction version to the actual one.",
                 );
                 Ok(version)
-            }
+            },
             std::cmp::Ordering::Equal => Ok(version),
             std::cmp::Ordering::Less => {
                 panic!("No transaction is found at or after stored ledger pruner progress ({}), db might be corrupted.", stored_min_version)
-            }
+            },
         }
     }
 

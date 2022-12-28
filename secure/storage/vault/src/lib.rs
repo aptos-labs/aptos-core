@@ -510,13 +510,13 @@ pub fn process_policy_list_response(resp: Response) -> Result<Vec<String>, Error
         200 => {
             let policies: ListPoliciesResponse = serde_json::from_str(&resp.into_string()?)?;
             Ok(policies.policies)
-        }
+        },
         // There are no policies.
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Ok(vec![])
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -535,13 +535,13 @@ pub fn process_secret_list_response(resp: Response) -> Result<Vec<String>, Error
         200 => {
             let resp: ReadSecretListResponse = serde_json::from_str(&resp.into_string()?)?;
             Ok(resp.data.keys)
-        }
+        },
         // There are no secrets.
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Ok(vec![])
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -563,12 +563,12 @@ pub fn process_secret_read_response(
             let created_time = data.metadata.created_time.clone();
             let version = data.metadata.version;
             Ok(ReadResponse::new(created_time, value, version))
-        }
+        },
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Err(Error::NotFound(secret.into(), key.into()))
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -600,12 +600,12 @@ pub fn process_transit_create_response(name: &str, resp: Response) -> Result<(),
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Ok(())
-        }
+        },
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Err(Error::NotFound("transit/".into(), name.into()))
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -647,12 +647,12 @@ pub fn process_transit_list_response(resp: Response) -> Result<Vec<String>, Erro
         200 => {
             let list_keys: ListKeysResponse = serde_json::from_str(&resp.into_string()?)?;
             Ok(list_keys.data.keys)
-        }
+        },
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Err(Error::NotFound("transit/".into(), "keys".into()))
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -674,12 +674,12 @@ pub fn process_transit_read_response(
                 ));
             }
             Ok(read_resp)
-        }
+        },
         404 => {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Err(Error::NotFound("transit/".into(), name.into()))
-        }
+        },
         _ => Err(resp.into()),
     }
 }
@@ -691,7 +691,7 @@ pub fn process_transit_restore_response(resp: Response) -> Result<(), Error> {
             // Explicitly clear buffer so the stream can be re-used.
             resp.into_string()?;
             Ok(())
-        }
+        },
         _ => Err(resp.into()),
     }
 }

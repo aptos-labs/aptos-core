@@ -46,7 +46,7 @@ impl<K: Hash + Clone + Eq + Send + 'static, V: TransactionWrite + Send + Sync + 
                 match &entry.cell {
                     EntryCell::Write(_, data) => {
                         latest_value = data.extract_raw_bytes().map(|bytes| deserialize(&bytes))
-                    }
+                    },
                     EntryCell::Delta(delta) => {
                         // Apply to the latest value and store in outputs.
                         let aggregator_value = delta
@@ -61,7 +61,7 @@ impl<K: Hash + Clone + Eq + Send + 'static, V: TransactionWrite + Send + Sync + 
                             WriteOp::Modification(serialize(&aggregator_value)),
                         ));
                         latest_value = Some(aggregator_value);
-                    }
+                    },
                 }
             }
         }

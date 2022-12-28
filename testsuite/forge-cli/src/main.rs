@@ -249,7 +249,7 @@ fn main() -> Result<()> {
                         &args.options,
                         args.changelog.clone(),
                     )
-                }
+                },
                 TestCommand::K8sSwarm(k8s) => {
                     if let Some(move_modules_dir) = &k8s.move_modules_dir {
                         test_suite = test_suite.with_genesis_modules_path(move_modules_dir.clone());
@@ -271,9 +271,9 @@ fn main() -> Result<()> {
                         args.changelog,
                     )?;
                     Ok(())
-                }
+                },
             }
-        }
+        },
         // cmd input for cluster operations
         CliCommand::Operator(op_cmd) => match op_cmd {
             OperatorCommand::SetNodeImageTag(set_stateful_set_image_tag_config) => {
@@ -284,7 +284,7 @@ fn main() -> Result<()> {
                     set_stateful_set_image_tag_config.namespace,
                 ))?;
                 Ok(())
-            }
+            },
             OperatorCommand::CleanUp(cleanup) => {
                 if let Some(namespace) = cleanup.namespace {
                     runtime.block_on(uninstall_testnet_resources(namespace))?;
@@ -292,7 +292,7 @@ fn main() -> Result<()> {
                     runtime.block_on(cleanup_cluster_with_management())?;
                 }
                 Ok(())
-            }
+            },
             OperatorCommand::Resize(resize) => {
                 runtime.block_on(install_testnet_resources(
                     resize.namespace,
@@ -307,7 +307,7 @@ fn main() -> Result<()> {
                     None,
                 ))?;
                 Ok(())
-            }
+            },
         },
     }
 }
@@ -339,11 +339,11 @@ pub fn run_forge<F: Factory>(
                 send_changelog_message(&report.to_string(), &from_commit, &to_commit);
             }
             Ok(())
-        }
+        },
         Err(e) => {
             eprintln!("Failed to run tests:\n{}", e);
             Err(e)
-        }
+        },
     }
 }
 
@@ -372,7 +372,7 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
         Err(e) => {
             println!("Failed to get github commits: {:?}", e);
             format!("*Revision upstream_{}*", upstream_commit)
-        }
+        },
         Ok(commits) => {
             let mut msg = format!("*Revision {}*", upstream_commit);
             for commit in commits {
@@ -391,7 +391,7 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
                 msg.push_str(&line);
             }
             msg
-        }
+        },
     }
 }
 
@@ -449,10 +449,10 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             })),
         "state_sync_perf_fullnodes_apply_outputs" => {
             state_sync_perf_fullnodes_apply_outputs(config)
-        }
+        },
         "state_sync_perf_fullnodes_execute_transactions" => {
             state_sync_perf_fullnodes_execute_transactions(config)
-        }
+        },
         "state_sync_perf_fullnodes_fast_sync" => state_sync_perf_fullnodes_fast_sync(config),
         "state_sync_perf_validators" => state_sync_perf_validators(config),
         "validators_join_and_leave" => validators_join_and_leave(config),
@@ -561,11 +561,13 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     .mode(EmitJobMode::MaxLoad {
                         mempool_backlog: 30000,
                     })
-                    .transaction_type(if test_name == "account_creation" {
-                        TransactionType::AccountGeneration
-                    } else {
-                        TransactionType::NftMintAndTransfer
-                    }),
+                    .transaction_type(
+                        if test_name == "account_creation" {
+                            TransactionType::AccountGeneration
+                        } else {
+                            TransactionType::NftMintAndTransfer
+                        },
+                    ),
             )
             .with_success_criteria(
                 SuccessCriteria::new(4000)
@@ -645,22 +647,16 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
         // reusing changing_working_quorum_test just for invariants/asserts, but with max_down_nodes = 0.
-        "consensus_stress_test" => changing_working_quorum_test(
-            10,
-            60,
-            100,
-            80,
-            true,
-            false,
-            &ChangingWorkingQuorumTest {
+        "consensus_stress_test" => {
+            changing_working_quorum_test(10, 60, 100, 80, true, false, &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 10,
                 max_down_nodes: 0,
                 num_large_validators: 0,
                 add_execution_delay: false,
                 check_period_s: 27,
-            },
-        ),
+            })
+        },
         "changing_working_quorum_test" => changing_working_quorum_test(
             20,
             120,
@@ -912,11 +908,13 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(if duration.as_secs() > 1200 {
-                5000
-            } else {
-                5500
-            })
+            SuccessCriteria::new(
+                if duration.as_secs() > 1200 {
+                    5000
+                } else {
+                    5500
+                },
+            )
             .add_no_restarts()
             .add_wait_for_catchup_s(
                 // Give at least 60s for catchup, give 10% of the run for longer durations.
@@ -952,11 +950,13 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
             &NetworkLossTest,
         ])
         .with_success_criteria(
-            SuccessCriteria::new(if duration > Duration::from_secs(1200) {
-                100
-            } else {
-                1000
-            })
+            SuccessCriteria::new(
+                if duration > Duration::from_secs(1200) {
+                    100
+                } else {
+                    1000
+                },
+            )
             .add_no_restarts()
             .add_system_metrics_threshold(SystemMetricsThreshold::new(
                 // Check that we don't use more than 12 CPU cores for 30% of the time.
@@ -980,11 +980,13 @@ fn changing_working_quorum_test(
     let num_large_validators = test.num_large_validators;
     config
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(if test.max_down_nodes == 0 {
-            0
-        } else {
-            std::cmp::max(2, target_tps / 1000)
-        })
+        .with_initial_fullnode_count(
+            if test.max_down_nodes == 0 {
+                0
+            } else {
+                std::cmp::max(2, target_tps / 1000)
+            },
+        )
         .with_network_tests(vec![test])
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration.into();

@@ -3,9 +3,12 @@
 
 use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
-use move_core_types::identifier::Identifier;
-use move_core_types::language_storage::{StructTag, TypeTag};
-use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+    parser::parse_struct_tag,
+    vm_status::StatusCode,
+};
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -271,14 +274,14 @@ fn string_args_bad_utf8() {
     let mut tests = vec![];
 
     // simple strings
-    let args = vec![bcs::to_bytes(&vec![0xf0u8, 0x28u8, 0x8cu8, 0xbcu8]).unwrap()];
+    let args = vec![bcs::to_bytes(&vec![0xF0u8, 0x28u8, 0x8Cu8, 0xBCu8]).unwrap()];
     tests.push((
         "0xcafe::test::hi",
         args,
         StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
     ));
 
-    let args = vec![bcs::to_bytes(&vec![0xc3u8, 0x28u8]).unwrap()];
+    let args = vec![bcs::to_bytes(&vec![0xC3u8, 0x28u8]).unwrap()];
     tests.push((
         "0xcafe::test::hi",
         args,
@@ -286,7 +289,7 @@ fn string_args_bad_utf8() {
     ));
 
     // vector of strings
-    let bad = vec![0xc3u8, 0x28u8];
+    let bad = vec![0xC3u8, 0x28u8];
     let s_vec = vec![&bad[..], "hello".as_bytes(), "world".as_bytes()];
     let i = 0u64;
     let args = vec![bcs::to_bytes(&s_vec).unwrap(), bcs::to_bytes(&i).unwrap()];
@@ -296,7 +299,7 @@ fn string_args_bad_utf8() {
         StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
     ));
 
-    let bad = vec![0xc3u8, 0x28u8];
+    let bad = vec![0xC3u8, 0x28u8];
     let s_vec = vec![&bad[..], "hello".as_bytes(), "world".as_bytes()];
     let args = vec![bcs::to_bytes(&s_vec).unwrap(), bcs::to_bytes(&i).unwrap()];
     tests.push((
@@ -309,7 +312,7 @@ fn string_args_bad_utf8() {
     let i = 0u64;
     let j = 0u64;
 
-    let bad = vec![0x40u8, 0xfeu8];
+    let bad = vec![0x40u8, 0xFEu8];
     let s_vec = vec![
         vec![&bad[..], "hello".as_bytes(), "world".as_bytes()],
         vec![
@@ -334,7 +337,7 @@ fn string_args_bad_utf8() {
         StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
     ));
 
-    let bad = vec![0xf0u8, 0x28u8, 0x8cu8, 0x28u8];
+    let bad = vec![0xF0u8, 0x28u8, 0x8Cu8, 0x28u8];
     let s_vec = vec![
         vec![
             "hi there!".as_bytes(),
@@ -359,7 +362,7 @@ fn string_args_bad_utf8() {
         StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
     ));
 
-    let bad = vec![0x60u8, 0xffu8];
+    let bad = vec![0x60u8, 0xFFu8];
     let s_vec = vec![
         vec![
             "hi there!".as_bytes(),
@@ -570,7 +573,7 @@ fn string_args_bad_length() {
     // u64 max in ule128 in opposite order so vector swap_remove is good
     // but we need to remove a 0 after to keep the vector consistent... don't ask...
     // u64 max in ule128 in opposite order so vector swap_remove is good
-    let mut u64_max: Vec<u8> = vec![0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+    let mut u64_max: Vec<u8> = vec![0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
     let len = u64_max.len();
     bcs_vec.append(&mut u64_max);
     let mut i = 0;

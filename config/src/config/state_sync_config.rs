@@ -30,11 +30,11 @@ impl BootstrappingMode {
         match self {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 "apply_transaction_outputs_from_genesis"
-            }
+            },
             BootstrappingMode::DownloadLatestStates => "download_latest_states",
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 "execute_transactions_from_genesis"
-            }
+            },
             BootstrappingMode::ExecuteOrApplyFromGenesis => "execute_or_apply_from_genesis",
         }
     }
@@ -57,7 +57,7 @@ impl ContinuousSyncingMode {
             ContinuousSyncingMode::ExecuteTransactions => "execute_transactions",
             ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs => {
                 "execute_transactions_or_apply_outputs"
-            }
+            },
         }
     }
 }

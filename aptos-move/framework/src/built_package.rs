@@ -1,36 +1,36 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::docgen::DocgenOptions;
-use crate::natives::code::{
-    ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
-};
 use crate::{
-    extended_checks, zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY_V1,
+    docgen::DocgenOptions,
+    extended_checks,
+    natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
+    zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY_V1,
 };
 use anyhow::bail;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::EntryABI;
+use aptos_types::{account_address::AccountAddress, transaction::EntryABI};
 use clap::Parser;
-use codespan_reporting::diagnostic::Severity;
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use itertools::Itertools;
 use move_binary_format::CompiledModule;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_core_types::language_storage::ModuleId;
-use move_core_types::metadata::Metadata;
+use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::model::GlobalEnv;
-use move_package::compilation::compiled_package::CompiledPackage;
-use move_package::compilation::package_layout::CompiledPackageLayout;
-use move_package::source_package::manifest_parser::{
-    parse_move_manifest_string, parse_source_manifest,
+use move_package::{
+    compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
+    source_package::manifest_parser::{parse_move_manifest_string, parse_source_manifest},
+    BuildConfig, ModelConfig,
 };
-use move_package::{BuildConfig, ModelConfig};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
-use std::io::stderr;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    io::stderr,
+    path::{Path, PathBuf},
+};
 
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
 pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
@@ -107,13 +107,10 @@ pub(crate) fn build_model(
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
     };
-    build_config.move_model_for_package(
-        package_path,
-        ModelConfig {
-            target_filter,
-            all_files_as_targets: false,
-        },
-    )
+    build_config.move_model_for_package(package_path, ModelConfig {
+        target_filter,
+        all_files_as_targets: false,
+    })
 }
 
 impl BuiltPackage {
@@ -371,8 +368,8 @@ fn inject_runtime_metadata(
                         }
                     }
                 }
-            }
-            CompiledUnit::Script(_) => {}
+            },
+            CompiledUnit::Script(_) => {},
         }
     }
     Ok(())

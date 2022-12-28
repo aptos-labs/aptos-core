@@ -1,17 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{
+    context::{Context, JsonWebTokenService},
+    error,
+    errors::{JwtAuthError, ServiceError},
+    types::{auth::Claims, common::NodeType},
+};
 use aptos_types::{chain_id::ChainId, PeerId};
-
-use crate::error;
 use chrono::Utc;
 use jsonwebtoken::{errors::Error, TokenData};
 use warp::{reject, Rejection};
-
-use crate::context::JsonWebTokenService;
-use crate::errors::JwtAuthError;
-use crate::{context::Context, types::auth::Claims};
-use crate::{errors::ServiceError, types::common::NodeType};
 
 const BEARER: &str = "BEARER ";
 
@@ -58,7 +57,7 @@ pub async fn authorize_jwt(
             return Err(reject::custom(ServiceError::unauthorized(
                 JwtAuthError::ExpiredAuthToken.into(),
             )));
-        }
+        },
     };
 
     if !allow_roles.contains(&claims.node_type) {
@@ -83,7 +82,7 @@ pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<Stri
             return Err(reject::custom(ServiceError::unauthorized(
                 JwtAuthError::from("bearer token missing".to_owned()).into(),
             )))
-        }
+        },
     };
     let auth_header = auth_header.split(',').next().unwrap_or_default();
     if !auth_header
@@ -104,12 +103,9 @@ pub async fn jwt_from_header(auth_header: Option<String>) -> anyhow::Result<Stri
 #[cfg(test)]
 mod tests {
 
+    use super::{super::tests::test_context, *};
     use std::collections::HashMap;
-
     use warp::hyper::StatusCode;
-
-    use super::super::tests::test_context;
-    use super::*;
 
     #[tokio::test]
     async fn jwt_from_header_valid_bearer() {

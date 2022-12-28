@@ -35,7 +35,7 @@ fn test_direct_send() {
             Event::Message(peer_id, msg) => {
                 assert_eq!(peer_id, dialer_peer_id);
                 assert_eq!(msg, msg_clone);
-            }
+            },
             event => panic!("Unexpected event {:?}", event),
         }
     };
@@ -49,7 +49,7 @@ fn test_direct_send() {
             Event::Message(peer_id, incoming_msg) => {
                 assert_eq!(peer_id, listener_peer_id);
                 assert_eq!(incoming_msg, msg);
-            }
+            },
             event => panic!("Unexpected event {:?}", event),
         }
     };
@@ -80,7 +80,7 @@ fn test_rpc() {
                 assert_eq!(peer_id, dialer_peer_id);
                 assert_eq!(msg, msg_clone);
                 rs.send(Ok(bcs::to_bytes(&msg).unwrap().into())).unwrap();
-            }
+            },
             event => panic!("Unexpected event: {:?}", event),
         }
     };
@@ -98,7 +98,7 @@ fn test_rpc() {
                 assert_eq!(peer_id, listener_peer_id);
                 assert_eq!(msg, msg_clone);
                 rs.send(Ok(bcs::to_bytes(&msg).unwrap().into())).unwrap();
-            }
+            },
             event => panic!("Unexpected event: {:?}", event),
         }
     };

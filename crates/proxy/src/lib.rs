@@ -124,12 +124,12 @@ impl IpMatcher {
                     if &addr == address {
                         return true;
                     }
-                }
+                },
                 Ip::Network(net) => {
                     if net.contains(&addr) {
                         return true;
                     }
-                }
+                },
             }
         }
         false

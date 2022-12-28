@@ -14,8 +14,9 @@ use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_table_extension::NativeTableContext;
-use move_vm_runtime::config::VMConfig;
-use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
+use move_vm_runtime::{
+    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+};
 use std::ops::Deref;
 
 pub struct MoveVmExt {

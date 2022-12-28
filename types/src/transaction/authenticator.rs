@@ -126,7 +126,7 @@ impl TransactionAuthenticator {
                     signer.verify(&message)?;
                 }
                 Ok(())
-            }
+            },
         }
     }
 
@@ -190,7 +190,7 @@ impl fmt::Display for TransactionAuthenticator {
                     "TransactionAuthenticator[scheme: Ed25519, sender: {}]",
                     self.sender()
                 )
-            }
+            },
             Self::MultiEd25519 {
                 public_key: _,
                 signature: _,
@@ -200,7 +200,7 @@ impl fmt::Display for TransactionAuthenticator {
                     "TransactionAuthenticator[scheme: MultiEd25519, sender: {}]",
                     self.sender()
                 )
-            }
+            },
             Self::MultiAgent {
                 sender,
                 secondary_signer_addresses,
@@ -223,7 +223,7 @@ impl fmt::Display for TransactionAuthenticator {
                         \tsecondary signers: {}]",
                     sender, sec_addrs, sec_signers,
                 )
-            }
+            },
         }
     }
 }
@@ -373,6 +373,9 @@ impl AccountAuthenticator {
 pub struct AuthenticationKey([u8; AuthenticationKey::LENGTH]);
 
 impl AuthenticationKey {
+    /// The number of bytes in an authentication key.
+    pub const LENGTH: usize = 32;
+
     /// Create an authentication key from `bytes`
     pub const fn new(bytes: [u8; Self::LENGTH]) -> Self {
         Self(bytes)
@@ -383,9 +386,6 @@ impl AuthenticationKey {
     pub const fn zero() -> Self {
         Self([0; 32])
     }
-
-    /// The number of bytes in an authentication key.
-    pub const LENGTH: usize = 32;
 
     /// Create an authentication key from a preimage by taking its sha3 hash
     pub fn from_preimage(preimage: &AuthenticationKeyPreimage) -> AuthenticationKey {

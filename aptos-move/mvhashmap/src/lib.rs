@@ -196,7 +196,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                             // Resolve to the write if no deltas were applied in between.
                             let write_version = (*idx, *incarnation);
                             return Ok(Version(write_version, data.clone()));
-                        }
+                        },
                         (EntryCell::Write(incarnation, data), Some(accumulator)) => {
                             // Deltas were applied. We must deserialize the value
                             // of the write and apply the aggregated delta accumulator.
@@ -216,7 +216,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                                 .apply_to(maybe_value.unwrap().into())
                                 .map_err(|_| DeltaApplicationFailure)
                                 .map(|result| Resolved(result));
-                        }
+                        },
                         (EntryCell::Delta(delta), Some(accumulator)) => {
                             // Read hit a delta during traversing the
                             // block and aggregating other deltas. Merge
@@ -226,12 +226,12 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                             accumulator
                                 .merge_onto(*delta)
                                 .map_err(|_| DeltaApplicationFailure)?;
-                        }
+                        },
                         (EntryCell::Delta(delta), None) => {
                             // Read hit a delta and must start accumulating.
                             // Initialize the accumulator and continue traversal.
                             accumulator = Some(*delta)
-                        }
+                        },
                     }
                 }
 
@@ -242,7 +242,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                     Some(accumulator) => Err(Unresolved(accumulator)),
                     None => Err(NotFound),
                 }
-            }
+            },
             None => Err(NotFound),
         }
     }

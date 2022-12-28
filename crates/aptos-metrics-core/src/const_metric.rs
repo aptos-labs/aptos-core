@@ -117,10 +117,9 @@ fn label_pairs(desc: &Desc, label_values: &[String]) -> Vec<LabelPair> {
 
 #[cfg(test)]
 mod tests {
+    use super::ConstMetric;
     use claims::{assert_err, assert_ok};
     use prometheus::{core::Describer, Opts};
-
-    use super::ConstMetric;
 
     #[test]
     fn test_const_metric_invalid_label_values() {

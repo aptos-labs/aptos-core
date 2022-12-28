@@ -9,8 +9,7 @@ use crate::{
         verify_mempool_and_event_notification,
     },
 };
-use aptos_config::config::StateSyncDriverConfig;
-use aptos_config::config::{NodeConfig, RoleType};
+use aptos_config::config::{NodeConfig, RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
@@ -35,8 +34,7 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use claims::{assert_err, assert_none};
 use futures::{FutureExt, StreamExt};
-use std::time::Duration;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 // TODO(joshlind): extend these tests to cover more functionality!
 

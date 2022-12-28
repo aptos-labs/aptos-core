@@ -92,7 +92,7 @@ impl HealthCheckNetworkInterface {
                 Entry::Occupied(inner) => {
                     inner.get_mut().status = state;
                     Ok(())
-                }
+                },
             })
     }
 }
@@ -101,8 +101,8 @@ impl HealthCheckNetworkInterface {
 impl NetworkInterface<HealthCheckerMsg, HealthCheckerNetworkSender>
     for HealthCheckNetworkInterface
 {
-    type AppDataKey = PeerId;
     type AppData = HealthCheckData;
+    type AppDataKey = PeerId;
 
     fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
         &self.peer_metadata_storage

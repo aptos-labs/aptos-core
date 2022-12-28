@@ -13,17 +13,15 @@ mod provider_collection;
 pub mod system_information;
 mod traits;
 
-use std::time::Duration;
-
-pub use helpers::MISSING_PROVIDER_MESSAGE;
-pub use provider_collection::ProviderCollection;
-use serde::{Deserialize, Serialize};
-pub use traits::{Provider, ProviderError};
-
 use self::{
     api_index::ApiIndexProviderConfig, metrics::MetricsProviderConfig, noise::NoiseProviderConfig,
     system_information::SystemInformationProviderConfig,
 };
+pub use helpers::MISSING_PROVIDER_MESSAGE;
+pub use provider_collection::ProviderCollection;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
+pub use traits::{Provider, ProviderError};
 
 /// Some Providers might have configuration needs. They can put any configs here
 /// and they'll get stored in the ProviderCollection so they can be used when

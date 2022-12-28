@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::types::{Batch, BatchRequest, Fragment};
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -22,6 +21,7 @@ use crate::{
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
+    quorum_store::types::{Batch, BatchRequest, Fragment},
 };
 use anyhow::{bail, ensure, Context, Result};
 use aptos_channels::aptos_channel;
@@ -84,42 +84,42 @@ impl UnverifiedEvent {
             UnverifiedEvent::ProposalMsg(p) => {
                 p.verify(validator, quorum_store_enabled)?;
                 VerifiedEvent::ProposalMsg(p)
-            }
+            },
             UnverifiedEvent::VoteMsg(v) => {
                 v.verify(validator)?;
                 VerifiedEvent::VoteMsg(v)
-            }
+            },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::CommitVote(cv) => {
                 cv.verify(validator)?;
                 VerifiedEvent::CommitVote(cv)
-            }
+            },
             UnverifiedEvent::CommitDecision(cd) => {
                 cd.verify(validator)?;
                 VerifiedEvent::CommitDecision(cd)
-            }
+            },
             UnverifiedEvent::FragmentMsg(f) => {
                 f.verify(peer_id)?;
                 VerifiedEvent::FragmentMsg(f)
-            }
+            },
             UnverifiedEvent::BatchRequestMsg(br) => {
                 br.verify(peer_id)?;
                 VerifiedEvent::BatchRequestMsg(br)
-            }
+            },
             // Only sender is verified. Remaining verification is on-demand (when it's used).
             UnverifiedEvent::BatchMsg(b) => {
                 b.verify(peer_id)?;
                 VerifiedEvent::UnverifiedBatchMsg(b)
-            }
+            },
             UnverifiedEvent::SignedDigestMsg(sd) => {
                 sd.verify(validator)?;
                 VerifiedEvent::SignedDigestMsg(sd)
-            }
+            },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
                 p.verify(validator)?;
                 VerifiedEvent::ProofOfStoreMsg(p)
-            }
+            },
         })
     }
 
@@ -280,10 +280,10 @@ impl RoundManager {
         match new_round_event.reason {
             NewRoundReason::QCReady => {
                 counters::QC_ROUNDS_COUNT.inc();
-            }
+            },
             NewRoundReason::Timeout => {
                 counters::TIMEOUT_ROUNDS_COUNT.inc();
-            }
+            },
         };
         info!(
             self.new_log(LogEvent::NewRound),
@@ -571,7 +571,7 @@ impl RoundManager {
         let (is_nil_vote, mut timeout_vote) = match self.round_state.vote_sent() {
             Some(vote) if vote.vote_data().proposed().round() == round => {
                 (vote.vote_data().is_for_nil(), vote)
-            }
+            },
             _ => {
                 // Didn't vote in this round yet, generate a backup vote
                 let nil_block = self
@@ -584,7 +584,7 @@ impl RoundManager {
                 counters::VOTE_NIL_COUNT.inc();
                 let nil_vote = self.execute_and_vote(nil_block).await?;
                 (true, nil_vote)
-            }
+            },
         };
 
         if !timeout_vote.is_timeout() {
@@ -867,13 +867,13 @@ impl RoundManager {
                     );
                 }
                 self.new_qc_aggregated(qc, vote.author()).await
-            }
+            },
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
-            }
+            },
             VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_vote_timeout() => {
                 self.process_local_timeout(round).await
-            }
+            },
             VoteReceptionResult::VoteAdded(_)
             | VoteReceptionResult::EchoTimeout(_)
             | VoteReceptionResult::DuplicateVote => Ok(()),

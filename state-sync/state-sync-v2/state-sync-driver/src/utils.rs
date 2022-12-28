@@ -1,38 +1,38 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::driver::DriverConfiguration;
-use crate::storage_synchronizer::StorageSynchronizerInterface;
 use crate::{
+    driver::DriverConfiguration,
     error::Error,
     logging::{LogEntry, LogSchema},
     metrics,
     notification_handlers::{
         CommitNotification, CommittedTransactions, MempoolNotificationHandler,
     },
+    storage_synchronizer::StorageSynchronizerInterface,
 };
-use aptos_data_streaming_service::data_notification::NotificationId;
-use aptos_data_streaming_service::data_stream::DataStreamId;
-use aptos_data_streaming_service::streaming_client::NotificationAndFeedback;
 use aptos_data_streaming_service::{
-    data_notification::DataNotification, data_stream::DataStreamListener,
-    streaming_client::DataStreamingClient,
+    data_notification::{DataNotification, NotificationId},
+    data_stream::{DataStreamId, DataStreamListener},
+    streaming_client::{DataStreamingClient, NotificationAndFeedback},
 };
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReader;
-use aptos_time_service::TimeService;
-use aptos_time_service::TimeServiceTrait;
-use aptos_types::transaction::{TransactionListWithProof, TransactionOutputListWithProof};
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
-    epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    transaction::Version,
+    epoch_change::Verifier,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use futures::StreamExt;
-use std::time::Instant;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::time::timeout;
 
 pub const PENDING_DATA_LOG_FREQ_SECS: u64 = 3;
@@ -329,14 +329,14 @@ pub async fn handle_committed_transactions<M: MempoolNotificationSender>(
                         .error(&error)
                         .message("Failed to fetch latest synced ledger info!"));
                     return;
-                }
+                },
             },
             Err(error) => {
                 error!(LogSchema::new(LogEntry::SynchronizerNotification)
                     .error(&error)
                     .message("Failed to fetch latest synced version!"));
                 return;
-            }
+            },
         };
 
     // Handle the commit notification

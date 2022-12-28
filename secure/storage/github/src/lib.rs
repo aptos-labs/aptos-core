@@ -124,7 +124,7 @@ impl Client {
                 let resp = resp.into_string()?;
                 let branches: Vec<Branch> = serde_json::from_str(&resp)?;
                 Ok(branches.into_iter().map(|b| b.name).collect())
-            }
+            },
             _ => Err(resp.into()),
         }
     }
@@ -169,10 +169,10 @@ impl Client {
         let json = match self.get_sha(path) {
             Ok(hash) => {
                 json!({ "branch": self.branch.to_string(), "content": content, "message": format!("[aptos-management] {}", path), "sha": hash })
-            }
+            },
             Err(Error::NotFound(_)) => {
                 json!({ "branch": self.branch.to_string(), "content": content, "message": format!("[aptos-management] {}", path) })
-            }
+            },
             Err(e) => return Err(e),
         };
 
@@ -223,7 +223,7 @@ impl Client {
                 }
 
                 Err(Error::SerializationError(resp))
-            }
+            },
             404 => Err(Error::NotFound(path.into())),
             _ => Err(resp.into()),
         }

@@ -48,8 +48,14 @@ use crate::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
-    pruner::{pruner_manager::PrunerManager, pruner_utils},
+    pruner::{
+        ledger_pruner_manager::LedgerPrunerManager,
+        ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
+        pruner_utils, state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
+    },
     schema::*,
+    stale_node_index::StaleNodeIndexSchema,
+    stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
     state_store::StateStore,
     transaction_store::TransactionStore,
 };
@@ -60,13 +66,16 @@ use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
-
 use aptos_crypto::hash::HashValue;
 use aptos_db_indexer::Indexer;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
+use aptos_storage_interface::{
+    state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
+    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -105,20 +114,6 @@ use std::{
     thread,
     thread::JoinHandle,
     time::{Duration, Instant},
-};
-
-use crate::{
-    pruner::{
-        ledger_pruner_manager::LedgerPrunerManager,
-        ledger_store::ledger_store_pruner::LedgerPruner, state_pruner_manager::StatePrunerManager,
-        state_store::StateMerklePruner,
-    },
-    stale_node_index::StaleNodeIndexSchema,
-    stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
-};
-use aptos_storage_interface::{
-    state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
-    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
@@ -825,7 +820,7 @@ impl AptosDB {
             Some(indexer) => indexer.get_table_info(handle),
             None => {
                 bail!("Indexer not enabled.");
-            }
+            },
         }
     }
 
@@ -1822,7 +1817,7 @@ where
                 "AptosDB API returned error."
             );
             "Err"
-        }
+        },
     };
     API_LATENCY_SECONDS
         .with_label_values(&[api_name, res_type])

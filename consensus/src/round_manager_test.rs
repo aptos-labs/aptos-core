@@ -330,7 +330,7 @@ impl NodeSetup {
                 self.identity_desc()
             ),
             Some(_) => panic!("Unexpected Network Event"),
-            None => {}
+            None => {},
         }
     }
 
@@ -394,7 +394,7 @@ impl NodeSetup {
     pub fn no_next_ordered(&mut self) {
         match self.ordered_blocks_events.next().now_or_never() {
             Some(_) => panic!("Unexpected Ordered Blocks Event"),
-            None => {}
+            None => {},
         }
     }
 
@@ -1093,7 +1093,7 @@ fn response_on_block_retrieval() {
                 };
                 assert_eq!(response.status(), BlockRetrievalStatus::Succeeded);
                 assert_eq!(response.blocks().first().unwrap().id(), block_id);
-            }
+            },
             _ => panic!("block retrieval failure"),
         }
 
@@ -1117,7 +1117,7 @@ fn response_on_block_retrieval() {
                 };
                 assert_eq!(response.status(), BlockRetrievalStatus::IdNotFound);
                 assert!(response.blocks().is_empty());
-            }
+            },
             _ => panic!("block retrieval failure"),
         }
 
@@ -1144,7 +1144,7 @@ fn response_on_block_retrieval() {
                     node.block_store.ordered_root().id(),
                     response.blocks().get(1).unwrap().id()
                 );
-            }
+            },
             _ => panic!("block retrieval failure"),
         }
     });
@@ -1789,7 +1789,7 @@ pub fn forking_retrieval_test() {
             nodes[proposal_node]
                 .pending_network_events
                 .push(Event::Message(peer, ConsensusMsg::ProposalMsg(msg)))
-        }
+        },
         _ => panic!("unexpected network message {:?}", next_message),
     }
     process_and_vote_on_proposal(

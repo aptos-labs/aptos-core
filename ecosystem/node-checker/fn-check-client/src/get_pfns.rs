@@ -4,6 +4,7 @@
 //! This file contains logic for reading the node information from the input
 //! file and converting it into the format check.rs expects.
 
+use crate::check::{IncompleteNetworkAddress, NodeInfo, SingleCheck, SingleCheckResult};
 use anyhow::{Context, Result};
 use aptos_sdk::{
     crypto::{x25519, ValidCryptoMaterialStringExt},
@@ -13,8 +14,6 @@ use clap::Parser;
 use reqwest::Url;
 use serde::Deserialize;
 use std::{collections::HashMap, convert::TryInto, fs::File, path::PathBuf};
-
-use crate::check::{IncompleteNetworkAddress, NodeInfo, SingleCheck, SingleCheckResult};
 
 #[derive(Clone, Debug, Parser)]
 pub struct GetPublicFullNodes {

@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use criterion::{criterion_group, criterion_main, Criterion};
 // Run this bencher via `cargo bench --features fuzzing`.
 use aptos_parallel_executor::proptest_types::bencher::Bencher;
+use criterion::{criterion_group, criterion_main, Criterion};
 use proptest::prelude::*;
 
 //

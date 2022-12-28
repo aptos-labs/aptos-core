@@ -3,9 +3,7 @@
 
 use aptos_types::transaction::AbortInfo;
 use move_binary_format::CompiledModule;
-use move_core_types::errmap::ErrorDescription;
-use move_core_types::language_storage::ModuleId;
-use move_core_types::metadata::Metadata;
+use move_core_types::{errmap::ErrorDescription, language_storage::ModuleId, metadata::Metadata};
 use move_vm_runtime::move_vm::MoveVM;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -115,7 +113,7 @@ impl RuntimeModuleMetadataV1 {
 
     pub fn extract_abort_info(&self, code: u64) -> Option<AbortInfo> {
         self.error_map
-            .get(&(code & 0xfff))
+            .get(&(code & 0xFFF))
             .or_else(|| self.error_map.get(&code))
             .map(|descr| AbortInfo {
                 reason_name: descr.code_name.clone(),

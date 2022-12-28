@@ -13,9 +13,12 @@
 //! [AptosNet Handshake v1 Specification]: https://github.com/aptos-labs/aptos-core/blob/main/specifications/network/handshake-v1.md
 
 use anyhow::anyhow;
-use aptos_config::network_id::NetworkId;
+use aptos_compression::metrics::CompressionClient;
+use aptos_config::{config::MAX_APPLICATION_MESSAGE_SIZE, network_id::NetworkId};
 use aptos_types::chain_id::ChainId;
-use serde::{Deserialize, Serialize};
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest_derive::Arbitrary;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     fmt,
@@ -23,12 +26,6 @@ use std::{
     ops::{BitAnd, BitOr},
 };
 use thiserror::Error;
-
-use aptos_compression::metrics::CompressionClient;
-use aptos_config::config::MAX_APPLICATION_MESSAGE_SIZE;
-#[cfg(any(test, feature = "fuzzing"))]
-use proptest_derive::Arbitrary;
-use serde::de::DeserializeOwned;
 
 #[cfg(test)]
 mod test;
@@ -113,7 +110,7 @@ impl ProtocolId {
             ProtocolId::ConsensusDirectSendJson | ProtocolId::ConsensusRpcJson => Encoding::Json,
             ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
                 Encoding::CompressedBcs(RECURSION_LIMIT)
-            }
+            },
             ProtocolId::MempoolDirectSend => Encoding::CompressedBcs(USER_INPUT_RECURSION_LIMIT),
             ProtocolId::MempoolRpc => Encoding::Bcs(USER_INPUT_RECURSION_LIMIT),
             _ => Encoding::Bcs(RECURSION_LIMIT),
@@ -125,7 +122,7 @@ impl ProtocolId {
         match self {
             ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
                 CompressionClient::Consensus
-            }
+            },
             ProtocolId::MempoolDirectSend => CompressionClient::Mempool,
             protocol_id => unreachable!(
                 "The given protocol ({:?}) should not be using compression!",
@@ -151,7 +148,7 @@ impl ProtocolId {
                     MAX_APPLICATION_MESSAGE_SIZE,
                 )
                 .map_err(|e| anyhow!("{:?}", e))
-            }
+            },
             Encoding::Json => serde_json::to_vec(value).map_err(|e| anyhow!("{:?}", e)),
         }
     }
@@ -168,7 +165,7 @@ impl ProtocolId {
                 )
                 .map_err(|e| anyhow! {"{:?}", e})?;
                 self.bcs_decode(&raw_bytes, limit)
-            }
+            },
             Encoding::Json => serde_json::from_slice(bytes).map_err(|e| anyhow!("{:?}", e)),
         }
     }

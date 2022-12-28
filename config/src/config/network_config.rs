@@ -170,11 +170,11 @@ impl NetworkConfig {
                 let key = x25519::PrivateKey::from_ed25519_private_bytes(&key.to_bytes())
                     .expect("Unable to convert key");
                 Some(key)
-            }
+            },
             Identity::FromFile(config) => {
                 let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
                 Some(identity_blob.network_private_key)
-            }
+            },
             Identity::None => None,
         };
         key.expect("identity key should be present")
@@ -238,7 +238,7 @@ impl NetworkConfig {
                     .expect("Unable to read peer id")
                     .value;
                 Some(peer_id)
-            }
+            },
             Identity::FromFile(config) => {
                 let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
 
@@ -250,7 +250,7 @@ impl NetworkConfig {
                         identity_blob.network_private_key.public_key(),
                     ))
                 }
-            }
+            },
             Identity::None => None,
         }
         .expect("peer id should be present")
@@ -265,14 +265,14 @@ impl NetworkConfig {
                 let peer_id =
                     aptos_types::account_address::from_identity_public_key(key.public_key());
                 self.identity = Identity::from_config(key, peer_id);
-            }
+            },
             Identity::FromConfig(config) => {
                 let peer_id =
                     aptos_types::account_address::from_identity_public_key(config.key.public_key());
                 if config.peer_id == PeerId::ZERO {
                     config.peer_id = peer_id;
                 }
-            }
+            },
             Identity::FromFile(_) => (),
         };
     }

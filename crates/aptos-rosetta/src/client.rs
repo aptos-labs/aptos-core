@@ -1,31 +1,30 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::native_coin;
-use crate::types::{
-    AccountBalanceRequest, AccountBalanceResponse, AccountIdentifier, BlockRequest, BlockResponse,
-    ConstructionCombineRequest, ConstructionCombineResponse, ConstructionDeriveRequest,
-    ConstructionDeriveResponse, ConstructionHashRequest, ConstructionMetadata,
-    ConstructionMetadataRequest, ConstructionMetadataResponse, ConstructionParseRequest,
-    ConstructionParseResponse, ConstructionPayloadsRequest, ConstructionPayloadsResponse,
-    ConstructionPreprocessRequest, ConstructionPreprocessResponse, ConstructionSubmitRequest,
-    ConstructionSubmitResponse, Error, MetadataRequest, NetworkIdentifier, NetworkListResponse,
-    NetworkOptionsResponse, NetworkRequest, NetworkStatusResponse, Operation, PreprocessMetadata,
-    PublicKey, Signature, SignatureType, TransactionIdentifier, TransactionIdentifierResponse,
+use crate::{
+    common::native_coin,
+    types::{
+        AccountBalanceRequest, AccountBalanceResponse, AccountIdentifier, BlockRequest,
+        BlockResponse, ConstructionCombineRequest, ConstructionCombineResponse,
+        ConstructionDeriveRequest, ConstructionDeriveResponse, ConstructionHashRequest,
+        ConstructionMetadata, ConstructionMetadataRequest, ConstructionMetadataResponse,
+        ConstructionParseRequest, ConstructionParseResponse, ConstructionPayloadsRequest,
+        ConstructionPayloadsResponse, ConstructionPreprocessRequest,
+        ConstructionPreprocessResponse, ConstructionSubmitRequest, ConstructionSubmitResponse,
+        Error, MetadataRequest, NetworkIdentifier, NetworkListResponse, NetworkOptionsResponse,
+        NetworkRequest, NetworkStatusResponse, Operation, PreprocessMetadata, PublicKey, Signature,
+        SignatureType, TransactionIdentifier, TransactionIdentifierResponse,
+    },
 };
 use anyhow::anyhow;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::SigningKey;
-use aptos_crypto::{PrivateKey, ValidCryptoMaterialStringExt};
+use aptos_crypto::{
+    ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, ValidCryptoMaterialStringExt,
+};
 use aptos_rest_client::aptos_api_types::mime_types::JSON;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::RawTransaction;
+use aptos_types::{account_address::AccountAddress, transaction::RawTransaction};
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
 use serde::{de::DeserializeOwned, Serialize};
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::fmt::Debug;
-use std::str::FromStr;
+use std::{collections::HashMap, convert::TryInto, fmt::Debug, str::FromStr};
 use url::Url;
 
 /// Client for testing & interacting with a Rosetta service

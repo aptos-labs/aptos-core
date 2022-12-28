@@ -305,7 +305,7 @@ fn insert_table_data(
         .filter_map(|detail| match detail {
             WriteSetChangeDetail::Table(table_item, table_metadata) => {
                 Some((table_item.clone(), table_metadata.clone()))
-            }
+            },
             _ => None,
         })
         .collect::<Vec<(TableItem, Option<TableMetadata>)>>()

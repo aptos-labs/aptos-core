@@ -153,7 +153,7 @@ where
 
                 let start_time = self.time_service.now();
                 Some(upgrade.map(move |out| (out, addr, start_time)).boxed())
-            }
+            },
             Err(e) => {
                 info!(
                     NetworkSchema::new(&self.network_context),
@@ -163,7 +163,7 @@ where
                     e
                 );
                 None
-            }
+            },
         }
     }
 
@@ -199,7 +199,7 @@ where
                                 .map(move |out| (out, addr, peer_id, start_time, response_tx))
                                 .boxed(),
                         )
-                    }
+                    },
                     Err(error) => {
                         if let Err(send_err) =
                             response_tx.send(Err(PeerManagerError::from_transport_error(error)))
@@ -213,9 +213,9 @@ where
                             );
                         }
                         None
-                    }
+                    },
                 }
-            }
+            },
         }
     }
 
@@ -245,7 +245,7 @@ where
                         peer_id.short_str()
                     )))
                 }
-            }
+            },
             Err(err) => Err(PeerManagerError::from_transport_error(err)),
         };
 
@@ -254,7 +254,7 @@ where
                 self.send_connection_to_peer_manager(connection, &addr, elapsed_time)
                     .await;
                 Ok(())
-            }
+            },
             Err(err) => {
                 warn!(
                     NetworkSchema::new(&self.network_context)
@@ -276,7 +276,7 @@ where
                 .observe(elapsed_time);
 
                 Err(err)
-            }
+            },
         };
 
         if let Err(send_err) = response_tx.send(response) {
@@ -305,7 +305,7 @@ where
             Ok(connection) => {
                 self.send_connection_to_peer_manager(connection, &addr, elapsed_time)
                     .await;
-            }
+            },
             Err(err) => {
                 warn!(
                     NetworkSchema::new(&self.network_context)
@@ -324,7 +324,7 @@ where
                     FAILED_LABEL,
                 )
                 .observe(elapsed_time);
-            }
+            },
         }
     }
 

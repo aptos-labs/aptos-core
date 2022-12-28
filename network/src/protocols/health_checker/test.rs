@@ -165,7 +165,7 @@ impl TestHarness {
 async fn expect_pong(res_rx: oneshot::Receiver<Result<Bytes, RpcError>>) {
     let res_data = res_rx.await.unwrap().unwrap();
     match bcs::from_bytes(&res_data).unwrap() {
-        HealthCheckerMsg::Pong(_) => {}
+        HealthCheckerMsg::Pong(_) => {},
         msg => panic!("Unexpected HealthCheckerMsg: {:?}", msg),
     };
 }

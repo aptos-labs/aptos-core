@@ -157,6 +157,7 @@ impl From<&ModuleId> for AccessPath {
 
 impl TryFrom<StateKey> for AccessPath {
     type Error = Error;
+
     fn try_from(state_key: StateKey) -> Result<Self> {
         match state_key {
             StateKey::AccessPath(access_path) => Ok(access_path),

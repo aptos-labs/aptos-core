@@ -29,8 +29,9 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::on_chain_config::OnChainConfigPayload;
-use aptos_types::{account_config::AccountSequenceInfo, PeerId};
+use aptos_types::{
+    account_config::AccountSequenceInfo, on_chain_config::OnChainConfigPayload, PeerId,
+};
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use enum_dispatch::enum_dispatch;
 use futures::{
@@ -577,13 +578,10 @@ fn start_node_mempool(
         notification_receiver: reconfig_events,
     };
     reconfig_sender
-        .push(
-            (),
-            ReconfigNotification {
-                version: 1,
-                on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
-            },
-        )
+        .push((), ReconfigNotification {
+            version: 1,
+            on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+        })
         .unwrap();
     let runtime = Builder::new_multi_thread()
         .thread_name("shared-mem")

@@ -333,10 +333,10 @@ async fn test_insert_vote() {
             block_store
                 .insert_single_quorum_cert(qc.as_ref().clone())
                 .unwrap();
-        }
+        },
         _ => {
             panic!("QC not formed!");
-        }
+        },
     }
 
     let block_qc = block_store.get_quorum_cert_for_block(block.id()).unwrap();

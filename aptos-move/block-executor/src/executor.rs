@@ -106,16 +106,16 @@ where
                 // Apply the writes/deltas to the versioned_data_cache.
                 apply_updates(&output);
                 ExecutionStatus::Success(output)
-            }
+            },
             ExecutionStatus::SkipRest(output) => {
                 // Apply the writes/deltas and record status indicating skip.
                 apply_updates(&output);
                 ExecutionStatus::SkipRest(output)
-            }
+            },
             ExecutionStatus::Abort(err) => {
                 // Record the status indicating abort.
                 ExecutionStatus::Abort(Error::UserError(err))
-            }
+            },
         };
 
         // Remove entries from previous write/delta set that were not overwritten.
@@ -216,11 +216,11 @@ where
                     cvar.notify_one();
 
                     SchedulerTask::NoTask
-                }
+                },
                 SchedulerTask::NoTask => scheduler.next_task(),
                 SchedulerTask::Done => {
                     break;
-                }
+                },
             }
         }
     }
@@ -273,11 +273,11 @@ where
                     ExecutionStatus::SkipRest(t) => {
                         final_results.push(t);
                         break;
-                    }
+                    },
                     ExecutionStatus::Abort(err) => {
                         ret = Some(err);
                         break;
-                    }
+                    },
                 };
             }
             ret
@@ -297,7 +297,7 @@ where
                     final_results,
                     OutputDeltaResolver::new(versioned_data_cache),
                 ))
-            }
+            },
         }
     }
 
@@ -334,11 +334,11 @@ where
                         data_map.insert(ap, write_op);
                     }
                     ret.push(output);
-                }
+                },
                 ExecutionStatus::Abort(err) => {
                     // Record the status indicating abort.
                     return Err(Error::UserError(err));
-                }
+                },
             }
 
             if must_skip {

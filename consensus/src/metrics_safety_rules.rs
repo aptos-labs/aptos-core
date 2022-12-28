@@ -56,7 +56,7 @@ impl MetricsSafetyRules {
                     waypoint_version = curr_version;
                     info!("Previous waypoint version {}, updated version {}, current epoch {}, provided epoch {}", prev_version, curr_version, current_epoch, provided_epoch);
                     continue;
-                }
+                },
                 result => return result,
             }
         }
@@ -73,7 +73,7 @@ impl MetricsSafetyRules {
             | Err(Error::WaypointOutOfDate(_, _, _, _)) => {
                 self.perform_initialize()?;
                 f(&mut self.inner)
-            }
+            },
             _ => result,
         }
     }

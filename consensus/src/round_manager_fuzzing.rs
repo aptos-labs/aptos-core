@@ -196,7 +196,7 @@ pub fn fuzz_proposal(data: &[u8]) {
                 panic!();
             }
             return;
-        }
+        },
     };
 
     let proposal = match proposal.verify_well_formed() {
@@ -207,7 +207,7 @@ pub fn fuzz_proposal(data: &[u8]) {
                 panic!();
             }
             return;
-        }
+        },
     };
 
     block_on(async move {

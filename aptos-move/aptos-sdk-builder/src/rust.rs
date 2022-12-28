@@ -5,24 +5,22 @@ use crate::common;
 use aptos_types::transaction::{
     ArgumentABI, EntryABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
+use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
 use move_core_types::{
     account_address::AccountAddress,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
 };
+use once_cell::sync::Lazy;
 use serde_generate::{
     indent::{IndentConfig, IndentedWriter},
     rust, CodeGeneratorConfig,
 };
-
-use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
-use move_core_types::language_storage::StructTag;
-use once_cell::sync::Lazy;
 use serde_reflection::ContainerFormat;
-use std::str::FromStr;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
     path::PathBuf,
+    str::FromStr,
 };
 
 /// Output transaction builders in Rust for the given ABIs.
@@ -186,7 +184,7 @@ where
                                     sf.module_name().name().to_string().to_camel_case(),
                                     abi.name().to_camel_case()
                                 )
-                            }
+                            },
                             _ => abi.name().to_camel_case(),
                         },
                     ],
@@ -256,31 +254,27 @@ impl EntryFunctionCall {
     fn get_external_definitions(local_types: bool) -> serde_generate::ExternalDefinitions {
         let definitions = if local_types {
             vec![
-                (
-                    "move_core_types::language_storage",
-                    vec!["ModuleId", "TypeTag"],
-                ),
+                ("move_core_types::language_storage", vec![
+                    "ModuleId", "TypeTag",
+                ]),
                 ("move_core_types", vec!["ident_str"]),
-                (
-                    "aptos_types::transaction",
-                    vec!["TransactionPayload", "EntryFunction"],
-                ),
+                ("aptos_types::transaction", vec![
+                    "TransactionPayload",
+                    "EntryFunction",
+                ]),
                 ("aptos_types::account_address", vec!["AccountAddress"]),
             ]
         } else {
-            vec![(
-                "aptos_types",
-                vec![
-                    "AccountAddress",
-                    "TypeTag",
-                    "Script",
-                    "EntryFunction",
-                    "TransactionArgument",
-                    "TransactionPayload",
-                    "ModuleId",
-                    "Identifier",
-                ],
-            )]
+            vec![("aptos_types", vec![
+                "AccountAddress",
+                "TypeTag",
+                "Script",
+                "EntryFunction",
+                "TransactionArgument",
+                "TransactionPayload",
+                "ModuleId",
+                "Identifier",
+            ])]
         };
 
         definitions
@@ -875,7 +869,7 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
             Address => "AccountAddress".into(),
             Vector(type_tag) => {
                 format!("Vec<{}>", Self::quote_type(type_tag.as_ref(), local_types))
-            }
+            },
             Struct(struct_tag) => match struct_tag {
                 tag if &**tag == Lazy::force(&str_tag) => "Vec<u8>".into(),
                 _ => common::type_not_allowed(type_tag),
@@ -994,14 +988,14 @@ fn swap_keyworded_fields(fields: Option<&mut ContainerFormat>) {
                     _ => (),
                 }
             }
-        }
+        },
         Some(ContainerFormat::Struct(fields)) => {
             for entry in fields.iter_mut() {
                 if entry.name.as_str() == "type_args" {
                     entry.name = String::from("type_params")
                 }
             }
-        }
+        },
         _ => (),
     }
 }

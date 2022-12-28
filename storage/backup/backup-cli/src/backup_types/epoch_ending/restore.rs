@@ -250,11 +250,11 @@ impl PreheatedEpochEndingRestore {
 
                 EPOCH_ENDING_EPOCH.set(last_li.epoch() as i64);
                 EPOCH_ENDING_VERSION.set(last_li.version() as i64);
-            }
+            },
             RestoreRunMode::Verify => {
                 VERIFY_EPOCH_ENDING_EPOCH.set(last_li.epoch() as i64);
                 VERIFY_EPOCH_ENDING_VERSION.set(last_li.version() as i64);
-            }
+            },
         };
 
         Ok(preheat_data

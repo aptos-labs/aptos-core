@@ -1,18 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::path::PathBuf;
-
-use super::common::ServerArgs;
+use super::{
+    api::{build_openapi_service, Api},
+    build::build_baseline_configuration_runners,
+    common::ServerArgs,
+};
 use anyhow::{Context, Result};
 use aptos_logger::info;
 use clap::Parser;
 use poem::{http::Method, listener::TcpListener, middleware::Cors, EndpointExt, Route, Server};
-
-use super::{
-    api::{build_openapi_service, Api},
-    build::build_baseline_configuration_runners,
-};
+use std::path::PathBuf;
 
 #[derive(Clone, Debug, Parser)]
 pub struct Run {

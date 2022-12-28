@@ -15,8 +15,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    transaction::SignedTransaction,
-    transaction::{Transaction, Version},
+    transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -247,7 +246,7 @@ impl Block {
                     .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
                 validator.verify(*author, &self.block_data, signature)?;
                 self.quorum_cert().verify(validator)
-            }
+            },
         }
     }
 

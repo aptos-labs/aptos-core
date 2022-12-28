@@ -30,8 +30,7 @@ use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tokio::runtime::Builder;
-use tokio::runtime::Runtime;
+use tokio::runtime::{Builder, Runtime};
 
 const WARMUP_DURATION_FRACTION: f32 = 0.07;
 const COOLDOWN_DURATION_FRACTION: f32 = 0.04;

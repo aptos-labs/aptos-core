@@ -4,9 +4,7 @@
 mod rest_interface;
 mod storage_interface;
 
-pub use crate::rest_interface::RestDebuggerInterface;
-pub use crate::storage_interface::DBDebuggerInterface;
-
+pub use crate::{rest_interface::RestDebuggerInterface, storage_interface::DBDebuggerInterface};
 use anyhow::{anyhow, Result};
 use aptos_state_view::TStateView;
 use aptos_types::{
@@ -15,8 +13,9 @@ use aptos_types::{
     account_state::AccountState,
     account_view::AccountView,
     on_chain_config::ValidatorSet,
-    state_store::state_storage_usage::StateStorageUsage,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::{Transaction, Version},
 };
 use move_binary_format::file_format::CompiledModule;

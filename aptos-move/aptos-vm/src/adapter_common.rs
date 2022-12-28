@@ -12,8 +12,10 @@ use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_metadata::BlockMetadata,
-    transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
-    transaction::{Transaction, TransactionOutput, TransactionStatus, WriteSetPayload},
+    transaction::{
+        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionOutput,
+        TransactionStatus, VMValidatorResult, WriteSetPayload,
+    },
     vm_status::{StatusCode, VMStatus},
     write_set::WriteSet,
 };
@@ -75,7 +77,7 @@ pub fn validate_signed_transaction<A: VMAdapter>(
         Ok(t) => t,
         _ => {
             return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
-        }
+        },
     };
 
     let resolver = state_view.as_move_resolver();
@@ -122,7 +124,7 @@ pub(crate) fn validate_signature_checked_transaction<S: MoveResolverExt, A: VMAd
     match prologue_status {
         Err(err) if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => {
             Err(err)
-        }
+        },
         _ => Ok(()),
     }
 }
@@ -152,10 +154,10 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
                 Ok(checked_txn) => checked_txn,
                 _ => {
                     return PreprocessedTransaction::InvalidSignature;
-                }
+                },
             };
             PreprocessedTransaction::UserTransaction(Box::new(checked_txn))
-        }
+        },
         Transaction::StateCheckpoint(_) => PreprocessedTransaction::StateCheckpoint,
     }
 }
@@ -166,7 +168,7 @@ pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOu
         Ok(_) => {
             debug_assert!(false, "discarding non-discardable error: {:?}", vm_status);
             vm_status.status_code()
-        }
+        },
         Err(code) => code,
     };
     (vm_status, discard_error_output(error_code))
