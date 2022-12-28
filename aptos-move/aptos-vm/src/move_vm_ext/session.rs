@@ -34,8 +34,10 @@ use move_core_types::{
 use move_table_extension::{NativeTableContext, TableChange, TableChangeSet};
 use move_vm_runtime::session::Session;
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -197,7 +199,7 @@ impl SessionOutput {
                         } else {
                             WriteOp::Creation(blob)
                         }
-                    }
+                    },
                     Modify(blob) => WriteOp::Modification(blob),
                 };
                 write_set_mut.insert((StateKey::AccessPath(ap), op))
@@ -223,7 +225,7 @@ impl SessionOutput {
                     New(bytes) => write_set_mut.insert((state_key, WriteOp::Creation(bytes))),
                     Modify(bytes) => {
                         write_set_mut.insert((state_key, WriteOp::Modification(bytes)))
-                    }
+                    },
                 }
             }
         }
@@ -237,12 +239,12 @@ impl SessionOutput {
                 AggregatorChange::Write(value) => {
                     let write_op = WriteOp::Modification(serialize(&value));
                     write_set_mut.insert((state_key, write_op));
-                }
+                },
                 AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
                 AggregatorChange::Delete => {
                     let write_op = WriteOp::Deletion;
                     write_set_mut.insert((state_key, write_op));
-                }
+                },
             }
         }
 

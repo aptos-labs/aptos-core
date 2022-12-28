@@ -1,8 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::rest::RestStream;
-use crate::{counters::DISCOVERY_COUNTS, file::FileStream, validator_set::ValidatorSetStream};
+use crate::{
+    counters::DISCOVERY_COUNTS, file::FileStream, rest::RestStream,
+    validator_set::ValidatorSetStream,
+};
 use aptos_config::{config::PeerSet, network_id::NetworkContext};
 use aptos_crypto::x25519;
 use aptos_event_notifications::ReconfigNotificationListener;

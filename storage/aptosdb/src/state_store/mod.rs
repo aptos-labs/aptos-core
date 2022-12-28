@@ -638,7 +638,7 @@ impl StateStore {
         .map(move |res| match res {
             Ok((_hashed_key, (key, version))) => {
                 Ok((key.clone(), store.expect_value_by_version(&key, version)?))
-            }
+            },
             Err(err) => Err(err),
         }))
     }

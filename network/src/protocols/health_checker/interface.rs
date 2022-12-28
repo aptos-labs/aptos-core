@@ -3,26 +3,22 @@
 
 use crate::{
     application::{
-        interface::NetworkInterface,
-        storage::{LockingHashMap, PeerMetadataStorage},
+        interface::NetworkClientInterface,
+        storage::LockingHashMap,
         types::{PeerError, PeerState},
     },
     error::NetworkError,
     protocols::{
-        health_checker::{
-            HealthCheckerMsg, HealthCheckerNetworkEvents, HealthCheckerNetworkSender,
-        },
+        health_checker::{HealthCheckerMsg, HealthCheckerNetworkEvents},
         network::Event,
     },
 };
 use aptos_config::network_id::PeerNetworkId;
 use aptos_types::PeerId;
-use async_trait::async_trait;
 use futures::{stream::FusedStream, Stream};
 use std::{
     collections::hash_map::Entry,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -39,23 +35,19 @@ impl HealthCheckData {
 }
 
 /// HealthChecker's view into networking
-pub struct HealthCheckNetworkInterface {
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
-    app_data: LockingHashMap<PeerId, HealthCheckData>,
-    sender: HealthCheckerNetworkSender,
+pub struct HealthCheckNetworkInterface<NetworkClient> {
+    health_check_data: LockingHashMap<PeerId, HealthCheckData>,
+    network_client: NetworkClient,
     receiver: HealthCheckerNetworkEvents,
 }
 
-impl HealthCheckNetworkInterface {
-    pub fn new(
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
-        sender: HealthCheckerNetworkSender,
-        receiver: HealthCheckerNetworkEvents,
-    ) -> Self {
+impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg>>
+    HealthCheckNetworkInterface<NetworkClient>
+{
+    pub fn new(network_client: NetworkClient, receiver: HealthCheckerNetworkEvents) -> Self {
         Self {
-            peer_metadata_storage,
-            app_data: LockingHashMap::new(),
-            sender,
+            health_check_data: LockingHashMap::new(),
+            network_client,
             receiver,
         }
     }
@@ -68,16 +60,20 @@ impl HealthCheckNetworkInterface {
     ) -> Result<(), NetworkError> {
         // Possibly already disconnected, but try anyways
         let _ = self.update_state(peer_network_id, PeerState::Disconnecting);
+        let result = self
+            .network_client
+            .disconnect_from_peer(peer_network_id)
+            .await
+            .map_err(NetworkError::from);
         let peer_id = peer_network_id.peer_id();
-        let result = self.sender.disconnect_peer(peer_id).await;
         if result.is_ok() {
-            self.app_data().remove(&peer_id);
+            self.health_check_data.remove(&peer_id);
         }
         result
     }
 
     pub fn connected_peers(&self) -> Vec<PeerId> {
-        self.app_data.keys()
+        self.health_check_data.keys()
     }
 
     /// Update state of peer globally
@@ -86,38 +82,29 @@ impl HealthCheckNetworkInterface {
         peer_network_id: PeerNetworkId,
         state: PeerState,
     ) -> Result<(), PeerError> {
-        self.peer_metadata_storage()
-            .write(peer_network_id, |entry| match entry {
+        self.network_client.get_peer_metadata_storage().write(
+            peer_network_id,
+            |entry| match entry {
                 Entry::Vacant(..) => Err(PeerError::NotFound),
                 Entry::Occupied(inner) => {
                     inner.get_mut().status = state;
                     Ok(())
-                }
-            })
+                },
+            },
+        )
+    }
+
+    pub fn health_check_data(&self) -> &LockingHashMap<PeerId, HealthCheckData> {
+        &self.health_check_data
+    }
+
+    // TODO: we shouldn't need to expose this
+    pub fn network_client(&self) -> NetworkClient {
+        self.network_client.clone()
     }
 }
 
-#[async_trait]
-impl NetworkInterface<HealthCheckerMsg, HealthCheckerNetworkSender>
-    for HealthCheckNetworkInterface
-{
-    type AppDataKey = PeerId;
-    type AppData = HealthCheckData;
-
-    fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
-        &self.peer_metadata_storage
-    }
-
-    fn sender(&self) -> HealthCheckerNetworkSender {
-        self.sender.clone()
-    }
-
-    fn app_data(&self) -> &LockingHashMap<PeerId, HealthCheckData> {
-        &self.app_data
-    }
-}
-
-impl Stream for HealthCheckNetworkInterface {
+impl<NetworkClient: Unpin> Stream for HealthCheckNetworkInterface<NetworkClient> {
     type Item = Event<HealthCheckerMsg>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -125,7 +112,7 @@ impl Stream for HealthCheckNetworkInterface {
     }
 }
 
-impl FusedStream for HealthCheckNetworkInterface {
+impl<NetworkClient: Unpin> FusedStream for HealthCheckNetworkInterface<NetworkClient> {
     fn is_terminated(&self) -> bool {
         self.receiver.is_terminated()
     }

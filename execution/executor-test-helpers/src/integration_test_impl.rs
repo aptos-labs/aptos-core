@@ -13,6 +13,7 @@ use aptos_sdk::{
     types::{AccountKey, LocalAccount},
 };
 use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
+use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter, Order};
 use aptos_types::{
     account_config::aptos_test_root_address,
     account_view::AccountView,
@@ -30,8 +31,6 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use rand::SeedableRng;
 use std::sync::Arc;
-
-use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter, Order};
 
 pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     const B: u64 = 1_000_000_000;

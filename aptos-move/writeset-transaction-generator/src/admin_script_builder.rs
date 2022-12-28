@@ -8,7 +8,6 @@ use aptos_types::{
     transaction::{Script, WriteSetPayload},
 };
 use handlebars::Handlebars;
-
 use move_command_line_common::env::get_bytecode_version_from_env;
 use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
 use serde::Serialize;

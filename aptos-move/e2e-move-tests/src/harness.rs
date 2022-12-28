@@ -4,28 +4,29 @@
 use crate::{assert_success, AptosPackageHooks};
 use aptos::move_tool::MemberId;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::{PrivateKey, Uniform};
-use aptos_framework::natives::code::PackageMetadata;
-use aptos_framework::{BuildOptions, BuiltPackage};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
 use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
 use aptos_language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
 };
-use aptos_types::contract_event::ContractEvent;
-use aptos_types::on_chain_config::{FeatureFlag, GasScheduleV2};
-use aptos_types::transaction::TransactionOutput;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::AccountResource,
+    contract_event::ContractEvent,
+    on_chain_config::{FeatureFlag, GasScheduleV2},
     state_store::state_key::StateKey,
-    transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
+    transaction::{
+        EntryFunction, SignedTransaction, TransactionOutput, TransactionPayload, TransactionStatus,
+    },
 };
-use move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
-use move_core_types::move_resource::MoveStructType;
-use move_core_types::value::MoveValue;
+use move_core_types::{
+    language_storage::{ResourceKey, StructTag, TypeTag},
+    move_resource::MoveStructType,
+    value::MoveValue,
+};
 use move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
 use rand::{
@@ -33,8 +34,7 @@ use rand::{
     Rng, SeedableRng,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::collections::BTreeMap;
-use std::path::Path;
+use std::{collections::BTreeMap, path::Path};
 
 /// A simple test harness for defining Move e2e tests.
 ///
@@ -398,18 +398,14 @@ impl MoveHarness {
         let acc = self.aptos_framework_account();
         let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
-        self.executor.exec(
-            "features",
-            "change_feature_flags",
-            vec![],
-            vec![
+        self.executor
+            .exec("features", "change_feature_flags", vec![], vec![
                 MoveValue::Signer(*acc.address())
                     .simple_serialize()
                     .unwrap(),
                 bcs::to_bytes(&enabled).unwrap(),
                 bcs::to_bytes(&disabled).unwrap(),
-            ],
-        );
+            ]);
     }
 
     /// Increase maximal transaction size.
@@ -434,19 +430,15 @@ impl MoveHarness {
             entries,
         };
         let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
-        self.executor.exec(
-            "gas_schedule",
-            "set_gas_schedule",
-            vec![],
-            vec![
+        self.executor
+            .exec("gas_schedule", "set_gas_schedule", vec![], vec![
                 MoveValue::Signer(AccountAddress::ONE)
                     .simple_serialize()
                     .unwrap(),
                 MoveValue::vector_u8(schedule_bytes)
                     .simple_serialize()
                     .unwrap(),
-            ],
-        );
+            ]);
     }
 
     pub fn sequence_number(&self, addr: &AccountAddress) -> u64 {

@@ -197,16 +197,16 @@ impl OutboundStream {
         let rest = match &mut message {
             NetworkMessage::Error(_) => {
                 unreachable!("NetworkMessage::Error should always fit in a single frame")
-            }
+            },
             NetworkMessage::RpcRequest(request) => {
                 request.raw_request.split_off(self.max_frame_size)
-            }
+            },
             NetworkMessage::RpcResponse(response) => {
                 response.raw_response.split_off(self.max_frame_size)
-            }
+            },
             NetworkMessage::DirectSendMsg(message) => {
                 message.raw_msg.split_off(self.max_frame_size)
-            }
+            },
         };
         let chunks = rest.chunks(self.max_frame_size);
         ensure!(

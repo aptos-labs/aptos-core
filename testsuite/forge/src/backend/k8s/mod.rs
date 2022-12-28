@@ -16,14 +16,13 @@ pub mod prometheus;
 mod stateful_set;
 mod swarm;
 
+use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 pub use cluster_helper::*;
 pub use constants::*;
 pub use kube_api::*;
 pub use node::K8sNode;
 pub use stateful_set::*;
 pub use swarm::*;
-
-use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 
 pub struct K8sFactory {
     root_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
@@ -52,16 +51,16 @@ impl K8sFactory {
         match kube_namespace.as_str() {
             "default" => {
                 info!("Using the default kubernetes namespace");
-            }
+            },
             s if s.starts_with("forge") => {
                 info!("Using forge namespace: {}", s);
-            }
+            },
             _ => {
                 bail!(
                     "Invalid kubernetes namespace provided: {}. Use forge-*",
                     kube_namespace
                 );
-            }
+            },
         }
 
         Ok(Self {
@@ -104,7 +103,7 @@ impl Factory for K8sFactory {
             Some(config) => match config {
                 GenesisConfig::Bundle(_) => {
                     bail!("k8s forge backend does not support raw bytes as genesis modules. please specify a path instead")
-                }
+                },
                 GenesisConfig::Path(path) => Some(path.clone()),
             },
             None => None,
@@ -123,7 +122,7 @@ impl Factory for K8sFactory {
                 Ok(res) => res,
                 Err(e) => {
                     bail!(e);
-                }
+                },
             }
         } else {
             // clear the cluster of resources
@@ -166,7 +165,7 @@ impl Factory for K8sFactory {
                 Err(e) => {
                     uninstall_testnet_resources(self.kube_namespace.clone()).await?;
                     bail!(e);
-                }
+                },
             }
         };
 

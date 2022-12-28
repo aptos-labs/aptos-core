@@ -12,7 +12,7 @@ use crate::{
     },
     metrics_safety_rules::MetricsSafetyRules,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
-    network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
+    network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
     persistent_liveness_storage::RecoveryData,
@@ -42,9 +42,11 @@ use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::info;
 use aptos_network::{
+    application::interface::NetworkClient,
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
-        network::{Event, NewNetworkEvents, NewNetworkSender},
+        network,
+        network::{Event, NetworkEvents, NewNetworkEvents, NewNetworkSender},
         wire::handshake::v1::ProtocolIdSet,
     },
     transport::ConnectionMetadata,
@@ -67,6 +69,7 @@ use futures::{
     stream::select,
     FutureExt, Stream, StreamExt,
 };
+use maplit::hashmap;
 use std::{
     iter::FromIterator,
     sync::{
@@ -183,12 +186,18 @@ impl NodeSetup {
         let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
         let (_, conn_status_rx) = conn_notifs_channel::new();
-        let mut network_sender = ConsensusNetworkSender::new(
+        let network_sender = network::NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
-        network_sender.initialize(playground.peer_protocols());
-        let network_events = ConsensusNetworkEvents::new(consensus_rx, conn_status_rx);
+        let network_client = NetworkClient::new(
+            DIRECT_SEND.into(),
+            RPC.into(),
+            hashmap! {NetworkId::Validator => network_sender},
+            playground.peer_protocols(),
+        );
+        let consensus_network_client = ConsensusNetworkClient::new(network_client);
+        let network_events = NetworkEvents::new(consensus_rx, conn_status_rx);
         let author = signer.author();
 
         let twin_id = TwinId { id, author };
@@ -196,7 +205,7 @@ impl NodeSetup {
         playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
         let (self_sender, self_receiver) = aptos_channels::new_test(1000);
-        let network = NetworkSender::new(author, network_sender, self_sender, validators);
+        let network = NetworkSender::new(author, consensus_network_client, self_sender, validators);
 
         let all_network_events = Box::new(select(network_events, self_receiver));
 
@@ -330,7 +339,7 @@ impl NodeSetup {
                 self.identity_desc()
             ),
             Some(_) => panic!("Unexpected Network Event"),
-            None => {}
+            None => {},
         }
     }
 
@@ -394,7 +403,7 @@ impl NodeSetup {
     pub fn no_next_ordered(&mut self) {
         match self.ordered_blocks_events.next().now_or_never() {
             Some(_) => panic!("Unexpected Ordered Blocks Event"),
-            None => {}
+            None => {},
         }
     }
 
@@ -1093,7 +1102,7 @@ fn response_on_block_retrieval() {
                 };
                 assert_eq!(response.status(), BlockRetrievalStatus::Succeeded);
                 assert_eq!(response.blocks().first().unwrap().id(), block_id);
-            }
+            },
             _ => panic!("block retrieval failure"),
         }
 
@@ -1117,7 +1126,7 @@ fn response_on_block_retrieval() {
                 };
                 assert_eq!(response.status(), BlockRetrievalStatus::IdNotFound);
                 assert!(response.blocks().is_empty());
-            }
+            },
             _ => panic!("block retrieval failure"),
         }
 
@@ -1144,7 +1153,7 @@ fn response_on_block_retrieval() {
                     node.block_store.ordered_root().id(),
                     response.blocks().get(1).unwrap().id()
                 );
-            }
+            },
             _ => panic!("block retrieval failure"),
         }
     });
@@ -1789,7 +1798,7 @@ pub fn forking_retrieval_test() {
             nodes[proposal_node]
                 .pending_network_events
                 .push(Event::Message(peer, ConsensusMsg::ProposalMsg(msg)))
-        }
+        },
         _ => panic!("unexpected network message {:?}", next_message),
     }
     process_and_vote_on_proposal(

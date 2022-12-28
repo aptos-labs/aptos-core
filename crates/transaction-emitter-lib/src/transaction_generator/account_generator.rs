@@ -9,11 +9,9 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
-use rand::prelude::StdRng;
-use rand::Rng;
+use rand::{prelude::StdRng, Rng};
 use rand_core::{OsRng, SeedableRng};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub struct AccountGenerator {
     rng: StdRng,

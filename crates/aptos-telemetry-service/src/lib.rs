@@ -2,17 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    clients::humio,
-    clients::{big_query, victoria_metrics_api::Client as MetricsClient},
+    clients::{big_query, humio, victoria_metrics_api::Client as MetricsClient},
     context::{ClientTuple, Context, JsonWebTokenService, PeerStoreTuple},
     index::routes,
     metrics::PrometheusExporter,
     validator_cache::PeerSetCacheUpdater,
 };
-
 use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
 use aptos_types::{chain_id::ChainId, PeerId};
-
 use clap::Parser;
 use gcp_bigquery_client::Client as BigQueryClient;
 use reqwest::Url;
@@ -188,7 +185,7 @@ impl AptosTelemetryServiceArgs {
                     .key_path(config.tls_key_path.as_ref().unwrap())
                     .bind(config.address)
                     .await
-            }
+            },
         };
     }
 }

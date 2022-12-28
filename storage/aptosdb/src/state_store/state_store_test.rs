@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::*;
 use crate::{
     state_restore::StateSnapshotRestore,
     test_helper::{arb_state_kv_sets, update_store},
@@ -15,8 +16,6 @@ use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
 };
 use proptest::{collection::hash_map, prelude::*};
-
-use super::*;
 
 fn put_value_set(
     state_store: &StateStore,

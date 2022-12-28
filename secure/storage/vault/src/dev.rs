@@ -17,7 +17,7 @@ static APTOS_VAULT: Lazy<Option<VaultRunner>> = Lazy::new(|| match VaultRunner::
         );
         println!("Vault is not running: {}", err);
         None
-    }
+    },
     Ok(vr) => Some(vr),
 });
 

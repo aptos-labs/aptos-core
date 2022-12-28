@@ -1,11 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::response::{
-    bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
-    block_pruned_by_height, json_api_disabled, version_not_found, version_pruned, ForbiddenError,
-    InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
+use crate::{
+    accept_type::AcceptType,
+    response::{
+        bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
+        block_pruned_by_height, json_api_disabled, version_not_found, version_pruned,
+        ForbiddenError, InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
+    },
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
@@ -39,8 +41,10 @@ use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned
 use futures::{channel::oneshot, SinkExt};
 use itertools::Itertools;
 use move_core_types::language_storage::{ModuleId, StructTag};
-use std::sync::RwLock;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -950,12 +954,12 @@ impl Context {
                 if !self.node_config.api.json_output_enabled {
                     return Err(json_api_disabled(api_name));
                 }
-            }
+            },
             AcceptType::Bcs => {
                 if !self.node_config.api.bcs_output_enabled {
                     return Err(bcs_api_disabled(api_name));
                 }
-            }
+            },
         }
         Ok(())
     }

@@ -30,14 +30,13 @@ use crate::{
 use anyhow::{format_err, Result};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use std::{collections::HashMap, iter::Iterator, path::Path};
-
 use iterator::{ScanDirection, SchemaIterator};
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
 pub use rocksdb::{
     BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions,
     SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
 };
+use std::{collections::HashMap, iter::Iterator, path::Path};
 
 pub type ColumnFamilyName = &'static str;
 
@@ -248,10 +247,10 @@ impl DB {
                         APTOS_SCHEMADB_PUT_BYTES
                             .with_label_values(&[cf_name])
                             .observe((key.len() + value.len()) as f64);
-                    }
+                    },
                     WriteOp::Deletion { key: _ } => {
                         APTOS_SCHEMADB_DELETES.with_label_values(&[cf_name]).inc();
-                    }
+                    },
                 }
             }
         }

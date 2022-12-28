@@ -348,7 +348,7 @@ mod tests {
                         reconfiguration_events,
                         commit_notification.reconfiguration_events
                     );
-                }
+                },
                 result => panic!(
                     "Expected consensus commit notification but got: {:?}",
                     result
@@ -370,7 +370,7 @@ mod tests {
             Some(consensus_notification) => match consensus_notification {
                 ConsensusNotification::SyncToTarget(sync_notification) => {
                     assert_eq!(create_ledger_info(), sync_notification.target);
-                }
+                },
                 result => panic!("Expected consensus sync notification but got: {:?}", result),
             },
             result => panic!("Expected consensus notification but got: {:?}", result),
@@ -393,14 +393,14 @@ mod tests {
                         consensus_listener
                             .respond_to_commit_notification(commit_notification, Ok(())),
                     );
-                }
+                },
                 Some(ConsensusNotification::SyncToTarget(sync_notification)) => {
                     let _result = block_on(consensus_listener.respond_to_sync_notification(
                         sync_notification,
                         Err(Error::UnexpectedErrorEncountered("Oops?".into())),
                     ));
-                }
-                _ => { /* Do nothing */ }
+                },
+                _ => { /* Do nothing */ },
             }
         });
 

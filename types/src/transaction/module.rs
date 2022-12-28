@@ -74,8 +74,8 @@ impl From<Module> for ModuleBundle {
 }
 
 impl IntoIterator for ModuleBundle {
-    type Item = Module;
     type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = Module;
 
     fn into_iter(self) -> Self::IntoIter {
         self.codes.into_iter()

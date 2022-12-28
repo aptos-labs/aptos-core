@@ -11,12 +11,15 @@ use aptos_config::{
 use aptos_crypto::HashValue;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
-    application::{interface::MultiNetworkSender, storage::PeerMetadataStorage, types::PeerState},
+    application::{interface::NetworkClient, storage::PeerMetadataStorage, types::PeerState},
     peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
-    protocols::{network::NewNetworkSender, wire::handshake::v1::ProtocolId},
+    protocols::{
+        network::{NetworkSender, NewNetworkSender},
+        wire::handshake::v1::ProtocolId,
+    },
     transport::ConnectionMetadata,
 };
-use aptos_storage_service_client::{StorageServiceClient, StorageServiceNetworkSender};
+use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_server::network::{NetworkRequest, ResponseSender};
 use aptos_storage_service_types::{
     requests::{
@@ -72,7 +75,7 @@ fn mock_storage_summary(version: Version) -> StorageServerSummary {
 
 struct MockNetwork {
     peer_mgr_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-    peer_infos: Arc<PeerMetadataStorage>,
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
 }
 
 impl MockNetwork {
@@ -81,22 +84,31 @@ impl MockNetwork {
         data_client_config: Option<AptosDataClientConfig>,
         networks: Option<Vec<NetworkId>>,
     ) -> (Self, MockTimeService, AptosNetDataClient, DataSummaryPoller) {
+        // Setup the request managers
         let queue_cfg = aptos_channel::Config::new(10).queue_style(QueueStyle::FIFO);
         let (peer_mgr_reqs_tx, peer_mgr_reqs_rx) = queue_cfg.build();
         let (connection_reqs_tx, _connection_reqs_rx) = queue_cfg.build();
 
-        let network_sender = MultiNetworkSender::new(hashmap! {
-            NetworkId::Validator => StorageServiceNetworkSender::new(
-                PeerManagerRequestSender::new(peer_mgr_reqs_tx),
-                ConnectionRequestSender::new(connection_reqs_tx),
-            )
-        });
-
+        // Setup the network client
+        let network_sender = NetworkSender::new(
+            PeerManagerRequestSender::new(peer_mgr_reqs_tx),
+            ConnectionRequestSender::new(connection_reqs_tx),
+        );
         let networks = networks
             .unwrap_or_else(|| vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public]);
-        let peer_infos = PeerMetadataStorage::new(&networks);
-        let network_client = StorageServiceClient::new(network_sender, peer_infos.clone());
+        let peer_metadata_storage = PeerMetadataStorage::new(&networks);
+        let network_client = NetworkClient::new(
+            vec![],
+            vec![ProtocolId::StorageServiceRpc],
+            hashmap! {
+            NetworkId::Validator => network_sender},
+            peer_metadata_storage.clone(),
+        );
 
+        // Create a storage service client
+        let storage_service_client = StorageServiceClient::new(network_client);
+
+        // Create an aptos data client
         let mock_time = TimeService::mock();
         let base_config = base_config.unwrap_or_default();
         let data_client_config = data_client_config.unwrap_or_default();
@@ -105,14 +117,16 @@ impl MockNetwork {
             base_config,
             StorageServiceConfig::default(),
             mock_time.clone(),
-            network_client,
+            storage_service_client,
             None,
         );
 
+        // Create the mock network
         let mock_network = Self {
             peer_mgr_reqs_rx,
-            peer_infos,
+            peer_metadata_storage,
         };
+
         (mock_network, mock_time.into_mock(), client, poller)
     }
 
@@ -147,7 +161,7 @@ impl MockNetwork {
         connection_metadata
             .application_protocols
             .insert(ProtocolId::StorageServiceRpc);
-        self.peer_infos
+        self.peer_metadata_storage
             .insert_connection(network_id, connection_metadata);
 
         // Return the new peer
@@ -166,13 +180,13 @@ impl MockNetwork {
 
     /// Updates the state of the given peer
     fn update_peer_state(&mut self, peer: PeerNetworkId, state: PeerState) {
-        self.peer_infos
+        self.peer_metadata_storage
             .write(peer, |entry| match entry {
                 Entry::Vacant(..) => panic!("Peer must exist!"),
                 Entry::Occupied(inner) => {
                     inner.get_mut().status = state;
                     Ok(())
-                }
+                },
             })
             .unwrap();
     }
@@ -193,7 +207,7 @@ impl MockNetwork {
                 let response_sender = ResponseSender::new(res_tx);
 
                 Some((peer_id, protocol, request, response_sender))
-            }
+            },
             Some(PeerManagerRequest::SendDirectSend(_, _)) => panic!("Unexpected direct send msg"),
             None => None,
         }
@@ -1072,10 +1086,10 @@ async fn bad_peer_is_eventually_banned_callback() {
                         .context
                         .response_callback
                         .notify_bad_response(crate::ResponseError::ProofVerificationError);
-                }
+                },
                 Err(Error::DataIsUnavailable(_)) => {
                     seen_data_unavailable_err = true;
-                }
+                },
                 Err(_) => panic!("unexpected result: {:?}", result),
             }
         } else {
@@ -1288,7 +1302,7 @@ async fn bad_peer_is_eventually_added_back() {
                         request.use_compression,
                     )
                     .unwrap()));
-                }
+                },
                 DataRequest::GetStorageServerSummary => {
                     let data_response =
                         DataResponse::StorageServerSummary(mock_storage_summary(200));
@@ -1297,7 +1311,7 @@ async fn bad_peer_is_eventually_added_back() {
                         request.use_compression,
                     )
                     .unwrap()));
-                }
+                },
                 _ => panic!("unexpected: {:?}", request),
             }
         }

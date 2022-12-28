@@ -1,17 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::ExecutingComponent;
-use crate::utils::OutputFallbackHandler;
 use crate::{
     driver::DriverConfiguration,
     error::Error,
     logging::{LogEntry, LogSchema},
     metadata_storage::MetadataStorageInterface,
     metrics,
+    metrics::ExecutingComponent,
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
-    utils::{SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
+    utils::{OutputFallbackHandler, SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
@@ -151,7 +150,7 @@ impl VerifiedEpochStates {
                             format!("Failed to verify the waypoint: {:?}! Waypoint: {:?}, given ledger info: {:?}",
                                     error, waypoint, ledger_info)
                         ));
-                    }
+                    },
                 }
             }
         }
@@ -483,7 +482,7 @@ impl<
                     highest_known_ledger_info,
                 )
                 .await
-            }
+            },
             _ => {
                 // We're either transaction or output syncing
                 self.fetch_missing_transaction_data(
@@ -491,7 +490,7 @@ impl<
                     highest_known_ledger_info,
                 )
                 .await
-            }
+            },
         }
     }
 
@@ -583,14 +582,14 @@ impl<
                         state_value_chunk_with_proof,
                     )
                     .await?;
-                }
+                },
                 DataPayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos) => {
                     self.process_epoch_ending_payload(
                         data_notification.notification_id,
                         epoch_ending_ledger_infos,
                     )
                     .await?;
-                }
+                },
                 DataPayload::TransactionsWithProof(transactions_with_proof) => {
                     let payload_start_version = transactions_with_proof.first_transaction_version;
                     self.process_transaction_or_output_payload(
@@ -600,7 +599,7 @@ impl<
                         payload_start_version,
                     )
                     .await?;
-                }
+                },
                 DataPayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
                     let payload_start_version =
                         transaction_outputs_with_proof.first_transaction_output_version;
@@ -611,12 +610,12 @@ impl<
                         payload_start_version,
                     )
                     .await?;
-                }
+                },
                 _ => {
                     return self
                         .handle_end_of_stream_or_invalid_payload(data_notification)
                         .await
-                }
+                },
             }
         }
 
@@ -713,7 +712,7 @@ impl<
                         highest_known_ledger_version,
                     )
                     .await?
-            }
+            },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 self.streaming_client
                     .get_all_transactions(
@@ -723,7 +722,7 @@ impl<
                         false,
                     )
                     .await?
-            }
+            },
             BootstrappingMode::ExecuteOrApplyFromGenesis => {
                 if self.output_fallback_handler.in_fallback_mode() {
                     metrics::set_gauge(
@@ -753,10 +752,10 @@ impl<
                         )
                         .await?
                 }
-            }
+            },
             bootstrapping_mode => {
                 unreachable!("Bootstrapping mode not supported: {:?}", bootstrapping_mode)
-            }
+            },
         };
         self.speculative_stream_state = Some(SpeculativeStreamState::new(
             utils::fetch_latest_epoch_state(self.storage.clone())?,
@@ -1151,7 +1150,7 @@ impl<
                         "Did not receive transaction outputs with proof!".into(),
                     ));
                 }
-            }
+            },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
@@ -1172,7 +1171,7 @@ impl<
                         "Did not receive transactions with proof!".into(),
                     ));
                 }
-            }
+            },
             BootstrappingMode::ExecuteOrApplyFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
@@ -1203,10 +1202,10 @@ impl<
                         "Did not receive transactions or outputs with proof!".into(),
                     ));
                 }
-            }
+            },
             bootstrapping_mode => {
                 unreachable!("Bootstrapping mode not supported: {:?}", bootstrapping_mode)
-            }
+            },
         };
         let synced_version = payload_start_version
             .checked_add(num_transactions_or_outputs as u64)
@@ -1248,7 +1247,7 @@ impl<
                     Ok(()) => {
                         self.state_value_syncer
                             .set_transaction_output_to_sync(transaction_outputs_with_proof);
-                    }
+                    },
                     Err(error) => {
                         self.reset_active_stream(Some(NotificationAndFeedback::new(
                             notification_id,
@@ -1259,7 +1258,7 @@ impl<
                             "Transaction outputs with proof is invalid! Error: {:?}",
                             error
                         )));
-                    }
+                    },
                 }
             } else {
                 self.reset_active_stream(Some(NotificationAndFeedback::new(
@@ -1345,7 +1344,7 @@ impl<
                         "Did not receive transaction outputs with proof!".into(),
                     ));
                 }
-            }
+            },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     transaction_list_with_proof.transactions.len()
@@ -1359,7 +1358,7 @@ impl<
                         "Did not receive transactions with proof!".into(),
                     ));
                 }
-            }
+            },
             BootstrappingMode::ExecuteOrApplyFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     transaction_list_with_proof.transactions.len()
@@ -1375,10 +1374,10 @@ impl<
                         "Did not receive transactions or outputs with proof!".into(),
                     ));
                 }
-            }
+            },
             bootstrapping_mode => {
                 unimplemented!("Bootstrapping mode not supported: {:?}", bootstrapping_mode)
-            }
+            },
         };
         let payload_end_version = payload_start_version
             .checked_add(num_versions as u64)

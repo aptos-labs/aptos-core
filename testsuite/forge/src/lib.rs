@@ -12,9 +12,8 @@ mod runner;
 pub use runner::*;
 
 mod backend;
-pub use backend::*;
-
 pub use aptos_transaction_emitter_lib::*;
+pub use backend::*;
 
 mod report;
 pub use report::*;

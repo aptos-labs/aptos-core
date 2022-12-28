@@ -16,7 +16,6 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
-
 use aptos_consensus_types::{
     block::Block, common::Round, executed_block::ExecutedBlock, quorum_cert::QuorumCert,
     sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
@@ -27,12 +26,11 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionStatus};
 use futures::executor::block_on;
-use std::{sync::Arc, time::Duration};
-
 #[cfg(test)]
 use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::{sync::Arc, time::Duration};
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
@@ -62,17 +60,17 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["success"])
                         .inc();
-                }
+                },
                 TransactionStatus::Discard(_) => {
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["failed"])
                         .inc();
-                }
+                },
                 TransactionStatus::Retry => {
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["retry"])
                         .inc();
-                }
+                },
             }
         }
     }
@@ -365,7 +363,7 @@ impl BlockStore {
                     self.execute_block(block.block().clone()).await?;
                 }
                 self.execute_block(block).await
-            }
+            },
             err => err,
         }?;
 
@@ -425,7 +423,7 @@ impl BlockStore {
                     executed_block.block().timestamp_usecs(),
                     BlockStage::QC_ADDED,
                 );
-            }
+            },
             None => bail!("Insert {} without having the block in store first", qc),
         };
 

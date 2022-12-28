@@ -3,6 +3,12 @@
 
 #![forbid(unsafe_code)]
 
+use crate::{
+    constants::*, core_metrics::create_core_metric_telemetry_event, metrics,
+    network_metrics::create_network_metric_telemetry_event, sender::TelemetrySender,
+    system_information::create_system_info_telemetry_event,
+    telemetry_log_sender::TelemetryLogSender, utils::create_build_info_telemetry_event,
+};
 use aptos_config::config::NodeConfig;
 use aptos_logger::{
     aptos_logger::RUST_LOG_TELEMETRY, prelude::*, telemetry_log_writer::TelemetryLog,
@@ -28,13 +34,6 @@ use tokio::{
     time,
 };
 use uuid::Uuid;
-
-use crate::{
-    constants::*, core_metrics::create_core_metric_telemetry_event, metrics,
-    network_metrics::create_network_metric_telemetry_event, sender::TelemetrySender,
-    system_information::create_system_info_telemetry_event,
-    telemetry_log_sender::TelemetryLogSender, utils::create_build_info_telemetry_event,
-};
 
 // The chain ID key
 const CHAIN_ID_KEY: &str = "CHAIN_ID";
@@ -536,14 +535,14 @@ fn spawn_telemetry_event_sender(
                     debug!("Failed telemetry response: {:?}", response.text().await);
                     metrics::increment_telemetry_failures(&event_name);
                 }
-            }
+            },
             Err(error) => {
                 debug!(
                     "Failed to send telemetry event: {}. Error: {:?}",
                     event_name, error
                 );
                 metrics::increment_telemetry_failures(&event_name);
-            }
+            },
         }
     })
 }

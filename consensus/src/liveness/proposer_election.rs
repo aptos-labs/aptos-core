@@ -1,11 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::cmp::Ordering;
-
 use aptos_consensus_types::common::{Author, Round};
 use aptos_fallible::copy_from_slice::copy_slice_to_vec;
 use num_traits::CheckedAdd;
+use std::cmp::Ordering;
 
 /// ProposerElection incorporates the logic of choosing a leader among multiple candidates.
 pub trait ProposerElection {

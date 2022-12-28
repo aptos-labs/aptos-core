@@ -123,7 +123,7 @@ pub fn prepare_executed_blocks_with_executed_ledger_info(
         signer,
         1,
         HashValue::random(),
-        HashValue::from_u64(0xbeef),
+        HashValue::from_u64(0xBEEF),
         None,
         Some(genesis_qc),
         0,

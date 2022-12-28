@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::OutputFallbackHandler;
 use crate::{
     bootstrapper::{Bootstrapper, GENESIS_TRANSACTION_VERSION},
     driver::DriverConfiguration,
@@ -18,12 +17,12 @@ use crate::{
             create_transaction_info, create_transaction_list_with_proof,
         },
     },
+    utils::OutputFallbackHandler,
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
-use aptos_data_streaming_service::data_notification::NotificationId;
 use aptos_data_streaming_service::{
-    data_notification::{DataNotification, DataPayload},
+    data_notification::{DataNotification, DataPayload, NotificationId},
     streaming_client::{NotificationAndFeedback, NotificationFeedback},
 };
 use aptos_time_service::TimeService;
@@ -34,8 +33,7 @@ use aptos_types::{
 use claims::{assert_matches, assert_none, assert_ok};
 use futures::{channel::oneshot, FutureExt, SinkExt};
 use mockall::{predicate::eq, Sequence};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 #[tokio::test]
 async fn test_bootstrap_genesis_waypoint() {

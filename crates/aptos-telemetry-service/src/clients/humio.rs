@@ -1,13 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::types::humio::UnstructuredLog;
 use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
 use reqwest::{Client as ReqwestClient, Url};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
-
-use crate::types::humio::UnstructuredLog;
 
 pub const PEER_ID_FIELD_NAME: &str = "peer_id";
 pub const EPOCH_FIELD_NAME: &str = "epoch";

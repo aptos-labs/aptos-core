@@ -1,15 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fmt::Debug;
-use thiserror::Error;
-
+use super::{tps::TpsCheckerError, CheckResult};
 use crate::{
     common::get_type_name,
     provider::{ProviderCollection, ProviderError},
 };
-
-use super::{tps::TpsCheckerError, CheckResult};
+use std::fmt::Debug;
+use thiserror::Error;
 
 /// A Checker is a component of NHC that is responsible for checking a
 /// particular aspect of the node under investigation, be that metrics,
