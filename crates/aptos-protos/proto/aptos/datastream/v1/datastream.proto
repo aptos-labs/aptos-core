@@ -5,6 +5,8 @@ syntax = "proto3";
 
 package aptos.datastream.v1;
 
+import "aptos/util/timestamp/timestamp.proto";
+
 // Transaction data is transferred via 1 stream with batches until terminated.
 // One stream consists:
 //  StreamStatus: INIT with version x
@@ -14,6 +16,8 @@ package aptos.datastream.v1;
 
 message TransactionsOutput {
   repeated TransactionOutput transactions  = 1;
+  // First transaction timestamp in batch.
+  aptos.util.timestamp.Timestamp transaction_timestamp = 2;
 }
 
 message TransactionOutput {
@@ -45,6 +49,7 @@ message RawDatastreamRequest {
   uint64 output_batch_size = 4;
   // Required; for validation purpose.
   uint32 chain_id = 5;
+  optional uint64 end_version = 6;
 }
 
 message RawDatastreamResponse {
