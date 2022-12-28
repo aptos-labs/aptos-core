@@ -1,10 +1,6 @@
 module aptos_std::curves {
     use std::option::Option;
 
-    // Structs and consts.
-
-    // Fake structs representing group type.
-
     /// This is a phantom type that represents the 1st pairing input group `G1` in BLS12-381 pairing:
     /// TODO: describe the encoding.
     struct BLS12_381_G1 {}
@@ -63,21 +59,21 @@ module aptos_std::curves {
         }
     }
 
-    public fun scalar_neg<G>(_scalar_1: &Scalar<G>): Scalar<G> {
+    public fun scalar_neg<G>(scalar_1: &Scalar<G>): Scalar<G> {
         Scalar<G> {
-            handle: scalar_neg_internal<G>(_scalar_1.handle)
+            handle: scalar_neg_internal<G>(scalar_1.handle)
         }
     }
 
-    public fun scalar_add<G>(_scalar_1: &Scalar<G>, _scalar_2: &Scalar<G>): Scalar<G> {
+    public fun scalar_add<G>(scalar_1: &Scalar<G>, scalar_2: &Scalar<G>): Scalar<G> {
         Scalar<G> {
-            handle: scalar_add_internal<G>(_scalar_1.handle, _scalar_2.handle)
+            handle: scalar_add_internal<G>(scalar_1.handle, scalar_2.handle)
         }
     }
 
-    public fun scalar_mul<G>(_scalar_1: &Scalar<G>, _scalar_2: &Scalar<G>): Scalar<G> {
+    public fun scalar_mul<G>(scalar_1: &Scalar<G>, scalar_2: &Scalar<G>): Scalar<G> {
         Scalar<G> {
-            handle: scalar_mul_internal<G>(_scalar_1.handle, _scalar_2.handle)
+            handle: scalar_mul_internal<G>(scalar_1.handle, scalar_2.handle)
         }
     }
 
@@ -162,9 +158,12 @@ module aptos_std::curves {
         element_to_bytes_internal<G>(point.handle)
     }
 
-    public fun element_from_bytes<G>(bytes: vector<u8>): Element<G> {
-        Element<G> {
-            handle: element_from_bytes_internal<G>(bytes)
+    public fun deserialize_element_uncompressed<G>(bytes: vector<u8>): Option<Element<G>> {
+        let (succ, handle) = deserialize_element_uncompressed_internal<G>(bytes);
+        if (succ) {
+            std::option::some(Element<G> { handle })
+        } else {
+            std::option::none()
         }
     }
 
@@ -173,7 +172,7 @@ module aptos_std::curves {
     }
 
     // Native functions.
-    native fun element_from_bytes_internal<G>(bytes: vector<u8>): u8;
+    native fun deserialize_element_uncompressed_internal<G>(bytes: vector<u8>): (bool, u8);
     native fun scalar_from_u64_internal<G>(value: u64): u8;
     native fun scalar_from_bytes_internal<G>(bytes: vector<u8>): (bool, u8);
     native fun scalar_neg_internal<G>(handle: u8): u8;
@@ -182,8 +181,6 @@ module aptos_std::curves {
     native fun scalar_inv_internal<G>(handle: u8): (bool, u8);
     native fun scalar_eq_internal<G>(handle_1: u8, handle_2: u8): bool;
     native fun scalar_to_bytes_internal<G>(h: u8): vector<u8>;
-    native fun pairing_internal<G1,G2,Gt>(g1_handle: u8, g2_handle: u8): u8;
-    native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u8>, g2_handles: vector<u8>): u8;
     native fun element_add_internal<G>(handle_1: u8, handle_2: u8): u8;
     native fun element_eq_internal<G>(handle_1: u8, handle_2: u8): bool;
     native fun identity_internal<G>(): u8;
@@ -191,6 +188,8 @@ module aptos_std::curves {
     native fun element_mul_internal<G>(scalar_handle: u8, point_handle: u8): u8;
     native fun element_neg_internal<G>(handle: u8): u8;
     native fun element_to_bytes_internal<G>(handle: u8): vector<u8>;
+    native fun pairing_internal<G1,G2,Gt>(g1_handle: u8, g2_handle: u8): u8;
+    native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u8>, g2_handles: vector<u8>): u8;
 
     #[test]
     fun test_scalar_mul() {
@@ -252,4 +251,16 @@ module aptos_std::curves {
         let actual = multi_pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&vector[g1_point_1, g1_point_2, g1_point_3], &vector[g2_point_1, g2_point_2, g2_point_3]);
         assert!(element_eq(&expected, &actual), 1);
     }
+
+//    #[test]
+//    fun test_bls12_381_g1_basics() {
+//        let p = deserialize_element_uncompressed<BLS12_381_G1>(x"");
+//        let generator = generator<BLS12_381_G1>();
+//        let point_10g = element_mul(&scalar_from_u64<BLS12_381_G1>(10), &generator);
+//        let point_2g = element_mul(&scalar_from_u64<BLS12_381_G1>(2), &generator);
+//        let point_12g = element_mul(&scalar_from_u64<BLS12_381_G1>(12), &generator);
+//        let point_20g = element_mul(&scalar_from_u64<BLS12_381_G1>(20), &generator);
+//        let point_8g = element_mul(&scalar_from_u64<BLS12_381_G1>(8), &generator);
+//        let point_5g = element_mul(&scalar_from_u64<BLS12_381_G1>(5), &generator);
+//    }
 }
