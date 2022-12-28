@@ -10,7 +10,6 @@ use prometheus::{
     Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec,
     Opts,
 };
-
 use std::time::Duration;
 
 /// A small wrapper around Histogram to handle the special case

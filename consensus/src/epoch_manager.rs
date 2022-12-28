@@ -197,12 +197,12 @@ impl EpochManager {
         match &onchain_config.proposer_election_type() {
             ProposerElectionType::RotatingProposer(contiguous_rounds) => {
                 Box::new(RotatingProposer::new(proposers, *contiguous_rounds))
-            }
+            },
             // We don't really have a fixed proposer!
             ProposerElectionType::FixedProposer(contiguous_rounds) => {
                 let proposer = choose_leader(proposers);
                 Box::new(RotatingProposer::new(vec![proposer], *contiguous_rounds))
-            }
+            },
             ProposerElectionType::LeaderReputation(leader_reputation_type) => {
                 let (
                     heuristic,
@@ -233,7 +233,7 @@ impl EpochManager {
                             proposer_and_voter_config.weight_by_voting_power,
                             proposer_and_voter_config.use_history_from_previous_epoch_max_count,
                         )
-                    }
+                    },
                 };
 
                 let seek_len = onchain_config.leader_reputation_exclude_round() as usize
@@ -308,7 +308,7 @@ impl EpochManager {
                     onchain_config.max_failed_authors_to_store()
                         + PROPSER_ELECTION_CACHING_WINDOW_ADDITION,
                 ))
-            }
+            },
             ProposerElectionType::RoundProposer(round_proposers) => {
                 // Hardcoded to the first proposer
                 let default_proposer = proposers.first().unwrap();
@@ -316,7 +316,7 @@ impl EpochManager {
                     round_proposers.clone(),
                     *default_proposer,
                 ))
-            }
+            },
         }
     }
 
@@ -384,7 +384,7 @@ impl EpochManager {
                         )
                     )
                 }
-            }
+            },
             // We request proof to join higher epoch
             Ordering::Greater => {
                 let request = EpochRetrievalRequest {
@@ -396,10 +396,10 @@ impl EpochManager {
                     "[EpochManager] Failed to send epoch retrieval to {}",
                     peer_id
                 ))
-            }
+            },
             Ordering::Equal => {
                 bail!("[EpochManager] Same epoch should not come to process_different_epoch");
-            }
+            },
         }
     }
 
@@ -727,10 +727,10 @@ impl EpochManager {
                 self.quorum_store_enabled = onchain_config.quorum_store_enabled();
                 self.start_round_manager(initial_data, epoch_state, onchain_config)
                     .await
-            }
+            },
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.start_recovery_manager(ledger_data, epoch_state).await
-            }
+            },
         }
     }
 
@@ -807,7 +807,7 @@ impl EpochManager {
                         self.process_different_epoch(event.epoch(), peer_id)
                     )?;
                 }
-            }
+            },
             ConsensusMsg::EpochChangeProof(proof) => {
                 let msg_epoch = proof.epoch()?;
                 debug!(
@@ -825,7 +825,7 @@ impl EpochManager {
                         self.epoch()
                     );
                 }
-            }
+            },
             ConsensusMsg::EpochRetrievalRequest(request) => {
                 ensure!(
                     request.end_epoch <= self.epoch(),
@@ -835,10 +835,10 @@ impl EpochManager {
                     "process_epoch_retrieval",
                     self.process_epoch_retrieval(*request, peer_id)
                 )?;
-            }
+            },
             _ => {
                 bail!("[EpochManager] Unexpected messages: {:?}", msg);
-            }
+            },
         }
         Ok(None)
     }
@@ -862,7 +862,7 @@ impl EpochManager {
                         peer_id,
                     ))
                 }
-            }
+            },
             _ => Ok(()),
         }
     }
@@ -886,10 +886,10 @@ impl EpochManager {
                 } else {
                     bail!("Commit Phase not started but received Commit Message (CommitVote/CommitDecision)");
                 }
-            }
+            },
             round_manager_event => {
                 self.forward_to_round_manager(peer_id, round_manager_event);
-            }
+            },
         }
         Ok(())
     }

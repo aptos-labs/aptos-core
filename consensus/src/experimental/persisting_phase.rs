@@ -1,11 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    fmt::{Debug, Display, Formatter},
-    sync::Arc,
-};
-
 use crate::{
     experimental::pipeline_phase::StatelessPipeline,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
@@ -14,6 +9,10 @@ use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_executor_types::Error;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use async_trait::async_trait;
+use std::{
+    fmt::{Debug, Display, Formatter},
+    sync::Arc,
+};
 
 /// [ This class is used when consensus.decoupled = true ]
 /// PersistingPhase is a singleton that receives aggregated blocks from
@@ -58,6 +57,7 @@ impl PersistingPhase {
 impl StatelessPipeline for PersistingPhase {
     type Request = PersistingRequest;
     type Response = PersistingResponse;
+
     async fn process(&self, req: PersistingRequest) -> PersistingResponse {
         let PersistingRequest {
             blocks,

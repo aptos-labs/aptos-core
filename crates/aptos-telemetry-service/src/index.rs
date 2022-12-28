@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::debug;
 use crate::{
     auth,
     constants::GCP_CLOUD_TRACE_CONTEXT_HEADER,
     context::Context,
-    custom_event,
+    custom_event, debug,
     errors::ServiceError,
     log_ingest,
     metrics::SERVICE_ERROR_COUNTS,

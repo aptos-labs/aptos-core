@@ -12,7 +12,6 @@ use crate::{
         transaction::{authenticator::AuthenticationKey, RawTransaction, SignedTransaction},
     },
 };
-
 use anyhow::Result;
 use aptos_types::event::EventKey;
 pub use aptos_types::*;

@@ -1,23 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::ExecutingComponent;
-use crate::utils::OutputFallbackHandler;
 use crate::{
     driver::DriverConfiguration,
     error::Error,
     metrics,
+    metrics::ExecutingComponent,
     notification_handlers::ConsensusSyncRequest,
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
-    utils::{SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
+    utils::{OutputFallbackHandler, SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
 use aptos_config::config::ContinuousSyncingMode;
-use aptos_data_streaming_service::streaming_client::NotificationAndFeedback;
 use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, Epoch, NotificationFeedback},
+    streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback, NotificationFeedback},
 };
 use aptos_infallible::Mutex;
 use aptos_logger::{prelude::*, sample, sample::SampleRate};
@@ -129,7 +127,7 @@ impl<
                         sync_request_target,
                     )
                     .await?
-            }
+            },
             ContinuousSyncingMode::ExecuteTransactions => {
                 self.streaming_client
                     .continuously_stream_transactions(
@@ -139,7 +137,7 @@ impl<
                         sync_request_target,
                     )
                     .await?
-            }
+            },
             ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs => {
                 if self.output_fallback_handler.in_fallback_mode() {
                     metrics::set_gauge(
@@ -169,7 +167,7 @@ impl<
                         )
                         .await?
                 }
-            }
+            },
         };
         self.speculative_stream_state = Some(SpeculativeStreamState::new(
             highest_epoch_state,
@@ -227,7 +225,7 @@ impl<
                         payload_start_version,
                     )
                     .await?;
-                }
+                },
                 DataPayload::ContinuousTransactionsWithProof(
                     ledger_info_with_sigs,
                     transactions_with_proof,
@@ -242,12 +240,12 @@ impl<
                         payload_start_version,
                     )
                     .await?;
-                }
+                },
                 _ => {
                     return self
                         .handle_end_of_stream_or_invalid_payload(data_notification)
                         .await;
-                }
+                },
             }
         }
 
@@ -312,7 +310,7 @@ impl<
                         "Did not receive transaction outputs with proof!".into(),
                     ));
                 }
-            }
+            },
             ContinuousSyncingMode::ExecuteTransactions => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
@@ -333,7 +331,7 @@ impl<
                         "Did not receive transactions with proof!".into(),
                     ));
                 }
-            }
+            },
             ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
@@ -364,7 +362,7 @@ impl<
                         "No transactions or output with proof was provided!".into(),
                     ));
                 }
-            }
+            },
         };
         let synced_version = payload_start_version
             .checked_add(num_transactions_or_outputs as u64)

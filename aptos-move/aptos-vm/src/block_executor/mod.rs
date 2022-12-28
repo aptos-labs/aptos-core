@@ -180,7 +180,7 @@ impl BlockAptosVM {
             Ok(outputs) => Ok(outputs),
             Err(Error::ModulePathReadWrite) => {
                 unreachable!("[Execution]: Must be handled by sequential fallback")
-            }
+            },
             Err(Error::UserError(err)) => Err(err),
         }
     }

@@ -1,13 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::tracing::{observe_block, BlockStage};
-use crate::quorum_store::types::{Batch, Fragment};
 use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
     counters,
     logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
+    quorum_store::types::{Batch, Fragment},
 };
 use anyhow::{anyhow, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -405,7 +405,7 @@ impl NetworkTask {
                                 quorum_store_msg,
                                 &self.quorum_store_messages_tx,
                             );
-                        }
+                        },
                         consensus_msg => {
                             if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
                                 observe_block(
@@ -414,9 +414,9 @@ impl NetworkTask {
                                 );
                             }
                             Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
-                        }
+                        },
                     }
-                }
+                },
                 Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
                     ConsensusMsg::BlockRetrievalRequest(request) => {
                         counters::CONSENSUS_RECEIVED_MSGS
@@ -447,15 +447,15 @@ impl NetworkTask {
                         {
                             warn!(error = ?e, "aptos channel closed");
                         }
-                    }
+                    },
                     _ => {
                         warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
                         continue;
-                    }
+                    },
                 },
                 _ => {
                     // Ignore `NewPeer` and `LostPeer` events
-                }
+                },
             }
         }
     }

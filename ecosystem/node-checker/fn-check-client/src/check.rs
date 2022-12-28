@@ -13,12 +13,11 @@ use aptos_sdk::{
     types::account_address::AccountAddress,
 };
 use clap::Parser;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
+use futures::{stream::FuturesUnordered, StreamExt};
 use reqwest::{Client as ReqwestClient, Url};
 use serde::Serialize;
-use std::collections::HashMap;
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -92,16 +91,16 @@ impl NodeHealthCheckerArgs {
             match single_check_result {
                 SingleCheckResult::Success(_) => {
                     info!("NHC returned a 200 for {}", node_url);
-                }
+                },
                 SingleCheckResult::NodeCheckFailure(_) => {
                     info!("NHC did not return a 200 for {}", node_url);
-                }
+                },
                 wildcard => {
                     panic!(
                         "Shouldn't be possible for checK_single_fn_wrapper to return {:?}",
                         wildcard
                     )
-                }
+                },
             }
             nhc_responses
                 .entry(account_address)
@@ -150,7 +149,7 @@ impl NodeHealthCheckerArgs {
                     node_info.public_key,
                 )
                 .await
-            }
+            },
             None => {
                 let mut index = 0;
                 loop {
@@ -182,7 +181,7 @@ impl NodeHealthCheckerArgs {
                     }
                     index += 1;
                 }
-            }
+            },
         }
     }
 
@@ -230,7 +229,7 @@ impl NodeHealthCheckerArgs {
                     format!("Error with request flow to NHC: {:#}", e),
                     NodeCheckFailureCode::RequestResponseError,
                 ));
-            }
+            },
         };
 
         // Handle the case where NHC itself throws an error (as opposed to a success
@@ -250,7 +249,7 @@ impl NodeHealthCheckerArgs {
                     format!("{:#}", e),
                     NodeCheckFailureCode::CouldNotDeserializeResponse,
                 ))
-            }
+            },
         };
 
         // Check specifically if the API port is closed.

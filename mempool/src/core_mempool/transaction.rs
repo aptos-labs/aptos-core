@@ -8,8 +8,10 @@ use aptos_types::{
     transaction::SignedTransaction,
 };
 use serde::{Deserialize, Serialize};
-use std::mem::size_of;
-use std::time::{Duration, SystemTime};
+use std::{
+    mem::size_of,
+    time::{Duration, SystemTime},
+};
 
 /// Estimated per-txn size minus the raw transaction
 pub const TXN_FIXED_ESTIMATED_BYTES: usize = size_of::<MempoolTransaction>();
@@ -46,15 +48,19 @@ impl MempoolTransaction {
             insertion_time,
         }
     }
+
     pub(crate) fn get_sender(&self) -> AccountAddress {
         self.txn.sender()
     }
+
     pub(crate) fn get_gas_price(&self) -> u64 {
         self.txn.gas_unit_price()
     }
+
     pub(crate) fn get_committed_hash(&self) -> HashValue {
         self.txn.clone().committed_hash()
     }
+
     pub(crate) fn get_estimated_bytes(&self) -> usize {
         self.txn.raw_txn_bytes_len() + TXN_FIXED_ESTIMATED_BYTES + TXN_INDEX_ESTIMATED_BYTES
     }
@@ -81,14 +87,13 @@ pub struct SequenceInfo {
 #[cfg(test)]
 mod test {
     use crate::core_mempool::{MempoolTransaction, TimelineState};
-    use aptos_crypto::ed25519::Ed25519PrivateKey;
-    use aptos_crypto::PrivateKey;
-    use aptos_crypto::SigningKey;
-    use aptos_crypto::Uniform;
-    use aptos_types::account_address::AccountAddress;
-    use aptos_types::account_config::AccountSequenceInfo;
-    use aptos_types::chain_id::ChainId;
-    use aptos_types::transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload};
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+    use aptos_types::{
+        account_address::AccountAddress,
+        account_config::AccountSequenceInfo,
+        chain_id::ChainId,
+        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+    };
     use std::time::{Duration, SystemTime};
 
     #[test]

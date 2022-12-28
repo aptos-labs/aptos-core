@@ -186,7 +186,7 @@ impl CoinActivity {
                     &entry_function_id_str,
                     txn_timestamp,
                 )),
-                None => {}
+                None => {},
             };
         }
         (

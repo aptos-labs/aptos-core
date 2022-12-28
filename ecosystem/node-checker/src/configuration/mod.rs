@@ -8,12 +8,10 @@ mod validate;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-
-use validate::{validate, Validate};
-
 pub use common::read_configuration_from_file;
 pub use node_address::NodeAddress;
 pub use types::BaselineConfiguration;
+use validate::{validate, Validate};
 
 #[derive(Clone, Debug, Parser)]
 pub struct Configuration {

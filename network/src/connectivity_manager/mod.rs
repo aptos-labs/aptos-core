@@ -139,16 +139,12 @@ impl fmt::Debug for DiscoverySource {
 
 impl fmt::Display for DiscoverySource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                DiscoverySource::OnChainValidatorSet => "OnChainValidatorSet",
-                DiscoverySource::File => "File",
-                DiscoverySource::Config => "Config",
-                DiscoverySource::Rest => "Rest",
-            }
-        )
+        write!(f, "{}", match self {
+            DiscoverySource::OnChainValidatorSet => "OnChainValidatorSet",
+            DiscoverySource::File => "File",
+            DiscoverySource::Config => "Config",
+            DiscoverySource::Rest => "Rest",
+        })
     }
 }
 
@@ -183,7 +179,7 @@ impl DiscoveredPeerSet {
                 } else {
                     false
                 }
-            }
+            },
             Entry::Vacant(_) => true,
         }
     }
@@ -218,6 +214,7 @@ impl DiscoveredPeer {
             last_dial_time: SystemTime::UNIX_EPOCH,
         }
     }
+
     /// Peers without keys are not able to be mutually authenticated to
     pub fn is_eligible(&self) -> bool {
         !self.keys.is_empty()
@@ -664,13 +661,13 @@ where
                     src,
                 );
                 self.handle_update_discovered_peers(src, discovered_peers);
-            }
+            },
             ConnectivityRequest::GetDialQueueSize(sender) => {
                 sender.send(self.dial_queue.len()).unwrap();
-            }
+            },
             ConnectivityRequest::GetConnectedSize(sender) => {
                 sender.send(self.connected.len()).unwrap();
-            }
+            },
         }
     }
 
@@ -793,7 +790,7 @@ where
                 // Cancel possible queued dial to this peer.
                 self.dial_states.remove(&peer_id);
                 self.dial_queue.remove(&peer_id);
-            }
+            },
             peer_manager::ConnectionNotification::LostPeer(metadata, _context, _reason) => {
                 let peer_id = metadata.remote_peer_id;
                 if let Some(stored_metadata) = self.connected.get(&peer_id) {
@@ -824,7 +821,7 @@ where
                         metadata.addr
                     );
                 }
-            }
+            },
         }
     }
 }
@@ -846,7 +843,7 @@ fn log_dial_result(
                 peer_id.short_str(),
                 addr
             );
-        }
+        },
         DialResult::Cancelled => {
             info!(
                 NetworkSchema::new(&network_context).remote_peer(&peer_id),
@@ -854,7 +851,7 @@ fn log_dial_result(
                 network_context,
                 peer_id.short_str()
             );
-        }
+        },
         DialResult::Failed(err) => match err {
             PeerManagerError::AlreadyConnected(a) => {
                 info!(
@@ -866,7 +863,7 @@ fn log_dial_result(
                     peer_id.short_str(),
                     a
                 );
-            }
+            },
             e => {
                 info!(
                     NetworkSchema::new(&network_context)
@@ -879,7 +876,7 @@ fn log_dial_result(
                     addr,
                     e
                 );
-            }
+            },
         },
     }
 }

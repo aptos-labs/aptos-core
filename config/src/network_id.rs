@@ -240,6 +240,7 @@ impl PeerNetworkId {
             peer_id,
         }
     }
+
     pub fn network_id(&self) -> NetworkId {
         self.network_id
     }

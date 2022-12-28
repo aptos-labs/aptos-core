@@ -17,7 +17,6 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 pub struct Bencher<K, V> {

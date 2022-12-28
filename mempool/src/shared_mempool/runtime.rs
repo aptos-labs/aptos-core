@@ -11,9 +11,8 @@ use crate::{
     QuorumStoreRequest,
 };
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
-use aptos_infallible::{Mutex, RwLock};
-
 use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::storage::PeerMetadataStorage;

@@ -370,7 +370,7 @@ where
                         network_context,
                         remote_peer_id.short_str()
                     );
-                }
+                },
                 Ok(Err(err)) => {
                     info!(
                         log_context,
@@ -380,7 +380,7 @@ where
                         remote_peer_id.short_str(),
                         err
                     );
-                }
+                },
                 Ok(Ok(())) => {
                     info!(
                         log_context,
@@ -388,7 +388,7 @@ where
                         network_context,
                         remote_peer_id.short_str()
                     );
-                }
+                },
             }
         };
         let multiplex_task = async move {
@@ -439,7 +439,7 @@ where
                     self.remote_peer_id().short_str(),
                     error_msg,
                 );
-            }
+            },
             NetworkMessage::RpcRequest(request) => {
                 if let Err(err) = self
                     .inbound_rpcs
@@ -454,10 +454,10 @@ where
                         err
                     );
                 }
-            }
+            },
             NetworkMessage::RpcResponse(response) => {
                 self.outbound_rpcs.handle_inbound_response(response)
-            }
+            },
         };
         Ok(())
     }
@@ -469,12 +469,12 @@ where
         match message {
             StreamMessage::Header(header) => {
                 self.inbound_stream.new_stream(header)?;
-            }
+            },
             StreamMessage::Fragment(fragment) => {
                 if let Some(message) = self.inbound_stream.append_fragment(fragment)? {
                     self.handle_inbound_network_message(message).await?;
                 }
-            }
+            },
         }
         Ok(())
     }
@@ -506,19 +506,19 @@ where
 
                     write_reqs_tx.send(message).await?;
                     return Err(err.into());
-                }
+                },
                 ReadError::IoError(_) => {
                     // IoErrors are mostly unrecoverable so just close the connection.
                     self.shutdown(DisconnectReason::ConnectionLost);
                     return Err(err.into());
-                }
+                },
             },
         };
 
         match message {
             MultiplexMessage::Message(message) => {
                 self.handle_inbound_network_message(message).await
-            }
+            },
             MultiplexMessage::Stream(message) => self.handle_inbound_stream_message(message).await,
         }
     }
@@ -592,7 +592,7 @@ where
                         counters::direct_send_messages(&self.network_context, SENT_LABEL).inc();
                         counters::direct_send_bytes(&self.network_context, SENT_LABEL)
                             .inc_by(message_len as u64);
-                    }
+                    },
                     Err(e) => {
                         warn!(
                             NetworkSchema::new(&self.network_context)
@@ -603,9 +603,9 @@ where
                             self.remote_peer_id().short_str(),
                             e,
                         );
-                    }
+                    },
                 }
-            }
+            },
             PeerRequest::SendRpc(request) => {
                 let protocol_id = request.protocol_id;
                 network_application_outbound_traffic(
@@ -628,7 +628,7 @@ where
                         e,
                     );
                 }
-            }
+            },
         }
     }
 

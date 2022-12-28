@@ -15,8 +15,10 @@ use move_core_types::{account_address::AccountAddress, value::MoveValue, vm_stat
 use move_vm_runtime::session::LoadedFunctionInstantiation;
 use move_vm_types::loaded_data::runtime_types::Type;
 use once_cell::sync::Lazy;
-use std::collections::BTreeMap;
-use std::io::{Cursor, Read};
+use std::{
+    collections::BTreeMap,
+    io::{Cursor, Read},
+};
 
 // A map which contains the structs allowed as transaction input and the
 // validation function for those, if one was needed (None otherwise).
@@ -57,7 +59,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
                 if matches!(&**inner_type, Type::Signer) {
                     signer_param_cnt += 1;
                 }
-            }
+            },
             _ => (),
         }
     }
@@ -121,7 +123,7 @@ pub(crate) fn is_valid_txn_arg<S: MoveResolverExt>(
             } else {
                 (false, false)
             }
-        }
+        },
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => (false, false),
     }
 }
@@ -167,7 +169,7 @@ fn validate_arg<S: MoveResolverExt>(
                 validate_arg(session, inner, cursor, arg_len)?;
                 len -= 1;
             }
-        }
+        },
         // only strings are validated, and given we are here only if one was present
         // (`is_valid_txn_arg`), this match arm must be for a string
         Struct(idx) | StructInstantiation(idx, _) => {
@@ -180,7 +182,7 @@ fn validate_arg<S: MoveResolverExt>(
                     if size > arg_len {
                         return Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT));
                     }
-                }
+                },
                 None => return Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)),
             }
             // load the serialized string
@@ -200,14 +202,14 @@ fn validate_arg<S: MoveResolverExt>(
             if let Some(validator) = option_validator {
                 validator(&s)?;
             }
-        }
+        },
         // this is unreachable given the check in `is_valid_txn_arg` and the
         // fact we collect all arguments that involve strings and we validate
         // them and them only
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Reference(_)
         | MutableReference(_) | TyParam(_) => {
             unreachable!("Validation is only for arguments with String")
-        }
+        },
     })
 }
 

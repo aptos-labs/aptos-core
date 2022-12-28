@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
-
 use crate::{
     checker::build_checkers,
     configuration::{read_configuration_from_file, BaselineConfiguration},
@@ -15,6 +13,7 @@ use crate::{
 };
 use anyhow::{bail, Context, Result};
 use aptos_logger::info;
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 /// This struct is a wrapper to help with all the different baseline
 /// node configurations. The key here is the configuration_id.

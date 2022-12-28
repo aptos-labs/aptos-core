@@ -302,7 +302,7 @@ impl HealthChecker {
                     "{} Unable to serialize pong response: {}", self.network_context, e
                 );
                 return;
-            }
+            },
         };
         trace!(
             NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
@@ -316,11 +316,11 @@ impl HealthChecker {
             match entry {
                 Entry::Vacant(..) => {
                     // Don't do anything if there isn't an entry
-                }
+                },
                 Entry::Occupied(inner) => {
                     let data = inner.get_mut();
                     data.failures = 0;
-                }
+                },
             };
             Ok(())
         });
@@ -352,7 +352,7 @@ impl HealthChecker {
                         match entry {
                             Entry::Vacant(..) => {
                                 // Don't do anything if there isn't an entry
-                            }
+                            },
                             Entry::Occupied(inner) => {
                                 let data = inner.get_mut();
                                 // Update state if it's a newer round
@@ -360,7 +360,7 @@ impl HealthChecker {
                                     data.round = round;
                                     data.failures = 0;
                                 }
-                            }
+                            },
                         };
                         Ok(())
                     });
@@ -376,7 +376,7 @@ impl HealthChecker {
                     );
                     debug_assert!(false, "Pong nonce doesn't match our challenge Ping nonce");
                 }
-            }
+            },
             Err(err) => {
                 warn!(
                     NetworkSchema::new(&self.network_context)
@@ -394,7 +394,7 @@ impl HealthChecker {
                     match entry {
                         Entry::Vacant(..) => {
                             // Don't do anything if there isn't an entry
-                        }
+                        },
                         Entry::Occupied(inner) => {
                             // If this is the result of an older ping, we ignore it.
                             // Increment num of failures.
@@ -402,7 +402,7 @@ impl HealthChecker {
                             if data.round <= round {
                                 data.failures += 1;
                             }
-                        }
+                        },
                     }
                     Ok(())
                 });
@@ -442,7 +442,7 @@ impl HealthChecker {
                         );
                     }
                 }
-            }
+            },
         }
     }
 

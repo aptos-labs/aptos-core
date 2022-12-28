@@ -108,7 +108,7 @@ async fn test_get_connected_peers() {
             Entry::Occupied(inner) => {
                 inner.get_mut().status = PeerState::Disconnected;
                 Ok(())
-            }
+            },
         })
         .unwrap();
 

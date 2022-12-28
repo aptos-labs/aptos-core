@@ -547,7 +547,7 @@ impl EntryFunctionCall {
             AptosAccountCreateAccount { auth_key } => aptos_account_create_account(auth_key),
             AptosAccountSetAllowDirectCoinTransfers { allow } => {
                 aptos_account_set_allow_direct_coin_transfers(allow)
-            }
+            },
             AptosAccountTransfer { to, amount } => aptos_account_transfer(to, amount),
             AptosAccountTransferCoins {
                 coin_type,
@@ -559,7 +559,7 @@ impl EntryFunctionCall {
             AptosCoinMint { dst_addr, amount } => aptos_coin_mint(dst_addr, amount),
             AptosGovernanceAddApprovedScriptHashScript { proposal_id } => {
                 aptos_governance_add_approved_script_hash_script(proposal_id)
-            }
+            },
             AptosGovernanceCreateProposal {
                 stake_pool,
                 execution_hash,
@@ -662,7 +662,7 @@ impl EntryFunctionCall {
                 proof_of_possession,
             } => {
                 stake_rotate_consensus_key(pool_address, new_consensus_pubkey, proof_of_possession)
-            }
+            },
             StakeSetDelegatedVoter { new_voter } => stake_set_delegated_voter(new_voter),
             StakeSetOperator { new_operator } => stake_set_operator(new_operator),
             StakeUnlock { amount } => stake_unlock(amount),
@@ -678,7 +678,7 @@ impl EntryFunctionCall {
             StakeWithdraw { withdraw_amount } => stake_withdraw(withdraw_amount),
             StakingContractAddStake { operator, amount } => {
                 staking_contract_add_stake(operator, amount)
-            }
+            },
             StakingContractCreateStakingContract {
                 operator,
                 voter,
@@ -694,10 +694,10 @@ impl EntryFunctionCall {
             ),
             StakingContractDistribute { staker, operator } => {
                 staking_contract_distribute(staker, operator)
-            }
+            },
             StakingContractRequestCommission { staker, operator } => {
                 staking_contract_request_commission(staker, operator)
-            }
+            },
             StakingContractResetLockup { operator } => staking_contract_reset_lockup(operator),
             StakingContractSwitchOperator {
                 old_operator,
@@ -715,7 +715,7 @@ impl EntryFunctionCall {
             StakingContractUnlockRewards { operator } => staking_contract_unlock_rewards(operator),
             StakingContractUnlockStake { operator, amount } => {
                 staking_contract_unlock_stake(operator, amount)
-            }
+            },
             StakingContractUpdateVoter {
                 operator,
                 new_voter,
@@ -726,10 +726,10 @@ impl EntryFunctionCall {
             } => staking_proxy_set_operator(old_operator, new_operator),
             StakingProxySetStakePoolOperator { new_operator } => {
                 staking_proxy_set_stake_pool_operator(new_operator)
-            }
+            },
             StakingProxySetStakePoolVoter { new_voter } => {
                 staking_proxy_set_stake_pool_voter(new_voter)
-            }
+            },
             StakingProxySetStakingContractOperator {
                 old_operator,
                 new_operator,
@@ -774,7 +774,7 @@ impl EntryFunctionCall {
             } => vesting_set_management_role(contract_address, role, role_holder),
             VestingTerminateVestingContract { contract_address } => {
                 vesting_terminate_vesting_contract(contract_address)
-            }
+            },
             VestingUnlockRewards { contract_address } => vesting_unlock_rewards(contract_address),
             VestingUpdateOperator {
                 contract_address,

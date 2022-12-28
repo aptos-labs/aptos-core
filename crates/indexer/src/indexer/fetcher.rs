@@ -7,10 +7,8 @@ use aptos_api_types::{AsConverter, LedgerInfo, Transaction, TransactionOnChainDa
 use aptos_logger::prelude::*;
 use aptos_storage_interface::state_view::DbStateView;
 use aptos_vm::data_cache::StorageAdapterOwned;
-use futures::channel::mpsc;
-use futures::SinkExt;
-use std::sync::Arc;
-use std::time::Duration;
+use futures::{channel::mpsc, SinkExt};
+use std::{sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 
 // Default Values
@@ -211,7 +209,7 @@ async fn fetch_raw_txns_with_retries(
                     );
                 }
                 tokio::time::sleep(Duration::from_millis(300)).await;
-            }
+            },
         }
     }
 }
@@ -273,23 +271,23 @@ async fn fetch_nexts(
                 match txn {
                     Transaction::PendingTransaction(_) => {
                         unreachable!("Indexer should never see pending transactions")
-                    }
+                    },
                     Transaction::UserTransaction(ref mut ut) => {
                         ut.info.block_height = Some(block_height_bcs);
                         ut.info.epoch = Some(epoch_bcs);
-                    }
+                    },
                     Transaction::GenesisTransaction(ref mut gt) => {
                         gt.info.block_height = Some(block_height_bcs);
                         gt.info.epoch = Some(epoch_bcs);
-                    }
+                    },
                     Transaction::BlockMetadataTransaction(ref mut bmt) => {
                         bmt.info.block_height = Some(block_height_bcs);
                         bmt.info.epoch = Some(epoch_bcs);
-                    }
+                    },
                     Transaction::StateCheckpointTransaction(ref mut sct) => {
                         sct.info.block_height = Some(block_height_bcs);
                         sct.info.epoch = Some(epoch_bcs);
-                    }
+                    },
                 };
                 txn
             }) {
@@ -307,7 +305,7 @@ async fn fetch_nexts(
                     "Could not convert txn {} from OnChainTransactions: {:?}",
                     txn_version, err
                 );
-            }
+            },
         }
     }
 
@@ -355,7 +353,7 @@ where
             } else {
                 v
             }
-        }
+        },
         None => default,
     }
 }
@@ -438,7 +436,7 @@ impl TransactionFetcherTrait for TransactionFetcher {
             Ok(None) => {
                 // We never close the channel, so this should never happen
                 panic!("Transaction fetcher channel closed");
-            }
+            },
             // The error here is when the channel is empty which we definitely expect.
             Err(_) => vec![],
         }

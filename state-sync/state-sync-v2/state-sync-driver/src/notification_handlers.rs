@@ -400,6 +400,7 @@ impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
             mempool_notification_sender,
         }
     }
+
     /// Notifies mempool that transactions have been committed.
     pub async fn notify_mempool_of_committed_transactions(
         &mut self,

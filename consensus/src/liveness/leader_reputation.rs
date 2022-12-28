@@ -189,13 +189,13 @@ impl MetadataBackend for AptosDBBackend {
             match fresh_db_result {
                 Ok((events, _version, hit_end)) => {
                     self.get_from_db_result(target_epoch, target_round, &events, hit_end)
-                }
+                },
                 Err(e) => {
                     error!(
                         error = ?e, "[leader reputation] Fail to refresh window",
                     );
                     (vec![], HashValue::zero())
-                }
+                },
             }
         } else {
             self.get_from_db_result(target_epoch, target_round, events, hit_end)
@@ -376,7 +376,7 @@ impl NewBlockEventAggregation {
                             let count = map.entry(voter).or_insert(0);
                             *count += 1;
                         }
-                    }
+                    },
                     Err(msg) => {
                         error!(
                             "Voter conversion from bitmap failed at epoch {}, round {}: {}",
@@ -384,7 +384,7 @@ impl NewBlockEventAggregation {
                             meta.round(),
                             msg
                         )
-                    }
+                    },
                 }
                 map
             },
@@ -441,7 +441,7 @@ impl NewBlockEventAggregation {
                         let count = map.entry(failed_proposer).or_insert(0);
                         *count += 1;
                     }
-                }
+                },
                 Err(msg) => {
                     error!(
                         "Failed proposer conversion from indices failed at epoch {}, round {}: {}",
@@ -449,7 +449,7 @@ impl NewBlockEventAggregation {
                         meta.round(),
                         msg
                     )
-                }
+                },
             }
             map
         })

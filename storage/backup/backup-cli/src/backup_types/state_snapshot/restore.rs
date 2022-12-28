@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::OTHER_TIMERS_SECONDS;
-use crate::utils::stream::StreamX;
 use crate::{
     backup_types::{
         epoch_ending::restore::EpochHistory, state_snapshot::manifest::StateSnapshotBackup,
@@ -15,11 +13,12 @@ use crate::{
             VERIFY_STATE_SNAPSHOT_LEAF_INDEX, VERIFY_STATE_SNAPSHOT_TARGET_LEAF_INDEX,
             VERIFY_STATE_SNAPSHOT_VERSION,
         },
+        OTHER_TIMERS_SECONDS,
     },
     storage::{BackupStorage, FileHandle},
     utils::{
-        read_record_bytes::ReadRecordBytes, storage_ext::BackupStorageExt, GlobalRestoreOptions,
-        RestoreRunMode,
+        read_record_bytes::ReadRecordBytes, storage_ext::BackupStorageExt, stream::StreamX,
+        GlobalRestoreOptions, RestoreRunMode,
     },
 };
 use anyhow::{anyhow, ensure, Result};

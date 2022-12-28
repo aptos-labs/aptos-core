@@ -163,6 +163,7 @@ impl ConsensusDB {
         batch.delete::<SingleEntrySchema>(&SingleEntryKey::Highest2ChainTimeoutCert)?;
         self.commit(batch)
     }
+
     /// Get serialized latest vote (if available)
     fn get_last_vote(&self) -> Result<Option<Vec<u8>>, DbError> {
         Ok(self

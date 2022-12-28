@@ -18,7 +18,6 @@ use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
 use aptos_gas_algebra_ext::AbstractValueSize;
 use cryptography::ed25519;
-
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
 use move_vm_types::values::Value;
@@ -193,7 +192,7 @@ pub fn all_natives(
     let mut natives = vec![];
 
     macro_rules! add_natives_from_module {
-        ($module_name: expr, $natives: expr) => {
+        ($module_name:expr, $natives:expr) => {
             natives.extend(
                 $natives.map(|(func_name, func)| ($module_name.to_string(), func_name, func)),
             );

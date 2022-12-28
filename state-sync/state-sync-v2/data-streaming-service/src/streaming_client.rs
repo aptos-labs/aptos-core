@@ -1,8 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_stream::DataStreamId;
-use crate::{data_notification::NotificationId, data_stream::DataStreamListener, error::Error};
+use crate::{
+    data_notification::NotificationId,
+    data_stream::{DataStreamId, DataStreamListener},
+    error::Error,
+};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use async_trait::async_trait;
 use futures::{
@@ -190,10 +193,10 @@ impl StreamRequest {
             Self::ContinuouslyStreamTransactions(_) => "continuously_stream_transactions",
             Self::ContinuouslyStreamTransactionOutputs(_) => {
                 "continuously_stream_transaction_outputs"
-            }
+            },
             Self::ContinuouslyStreamTransactionsOrOutputs(_) => {
                 "continuously_stream_transactions_or_outputs"
-            }
+            },
             Self::TerminateStream(_) => "terminate_stream",
         }
     }

@@ -146,7 +146,7 @@ impl MultiEd25519PublicKey {
         // # of sub-PKs is > 0 and <= MAX_NUM_OF_KEYS.
         match check_and_get_threshold(bytes, ED25519_PUBLIC_KEY_LENGTH) {
             Err(_) => return (false, num_deserializations, num_small_order_checks),
-            _ => {}
+            _ => {},
         };
 
         for chunk in bytes.chunks_exact(ED25519_PUBLIC_KEY_LENGTH) {
@@ -193,8 +193,8 @@ impl PrivateKey for MultiEd25519PrivateKey {
 }
 
 impl SigningKey for MultiEd25519PrivateKey {
-    type VerifyingKeyMaterial = MultiEd25519PublicKey;
     type SignatureMaterial = MultiEd25519Signature;
+    type VerifyingKeyMaterial = MultiEd25519PublicKey;
 
     /// Uses the first `threshold` private keys to create a MultiEd25519 signature on `message`.
     /// (Used for testing only.)
@@ -371,8 +371,8 @@ impl TryFrom<&[u8]> for MultiEd25519PublicKey {
 
 /// We deduce VerifyingKey from pointing to the signature material
 impl VerifyingKey for MultiEd25519PublicKey {
-    type SigningKeyMaterial = MultiEd25519PrivateKey;
     type SignatureMaterial = MultiEd25519Signature;
+    type SigningKeyMaterial = MultiEd25519PrivateKey;
 }
 
 impl fmt::Display for MultiEd25519PublicKey {
@@ -539,8 +539,8 @@ impl ValidCryptoMaterial for MultiEd25519Signature {
 }
 
 impl Signature for MultiEd25519Signature {
-    type VerifyingKeyMaterial = MultiEd25519PublicKey;
     type SigningKeyMaterial = MultiEd25519PrivateKey;
+    type VerifyingKeyMaterial = MultiEd25519PublicKey;
 
     fn verify<T: CryptoHash + Serialize>(
         &self,
@@ -572,7 +572,7 @@ impl Signature for MultiEd25519Signature {
                     "{}",
                     CryptoMaterialError::BitVecError("Signature index is out of range".to_string())
                 ))
-            }
+            },
         };
         if bitmap_count_ones(self.bitmap) < public_key.threshold as u32 {
             return Err(anyhow!(

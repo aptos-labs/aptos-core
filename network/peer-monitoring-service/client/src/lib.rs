@@ -70,10 +70,10 @@ impl PeerMonitoringServiceClient {
             PeerMonitoringServiceMessage::Response(Ok(response)) => Ok(response),
             PeerMonitoringServiceMessage::Response(Err(err)) => {
                 Err(Error::PeerMonitoringServiceError(err))
-            }
+            },
             PeerMonitoringServiceMessage::Request(_) => {
                 Err(Error::RpcError(RpcError::InvalidRpcResponse))
-            }
+            },
         }
     }
 }
@@ -82,8 +82,8 @@ impl PeerMonitoringServiceClient {
 impl NetworkInterface<PeerMonitoringServiceMessage, PeerMonitoringServiceMultiSender>
     for PeerMonitoringServiceClient
 {
-    type AppDataKey = ();
     type AppData = ();
+    type AppDataKey = ();
 
     fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
         &self.peer_metadata

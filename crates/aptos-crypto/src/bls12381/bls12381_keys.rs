@@ -106,8 +106,8 @@ impl traits::PrivateKey for PrivateKey {
 }
 
 impl traits::SigningKey for PrivateKey {
-    type VerifyingKeyMaterial = PublicKey;
     type SignatureMaterial = bls12381::Signature;
+    type VerifyingKeyMaterial = PublicKey;
 
     fn sign<T: CryptoHash + Serialize>(
         &self,
@@ -204,8 +204,8 @@ impl traits::PublicKey for PublicKey {
 }
 
 impl VerifyingKey for PublicKey {
-    type SigningKeyMaterial = PrivateKey;
     type SignatureMaterial = bls12381::Signature;
+    type SigningKeyMaterial = PrivateKey;
 }
 
 impl ValidCryptoMaterial for PublicKey {

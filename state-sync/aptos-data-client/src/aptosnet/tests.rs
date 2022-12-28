@@ -172,7 +172,7 @@ impl MockNetwork {
                 Entry::Occupied(inner) => {
                     inner.get_mut().status = state;
                     Ok(())
-                }
+                },
             })
             .unwrap();
     }
@@ -193,7 +193,7 @@ impl MockNetwork {
                 let response_sender = ResponseSender::new(res_tx);
 
                 Some((peer_id, protocol, request, response_sender))
-            }
+            },
             Some(PeerManagerRequest::SendDirectSend(_, _)) => panic!("Unexpected direct send msg"),
             None => None,
         }
@@ -1072,10 +1072,10 @@ async fn bad_peer_is_eventually_banned_callback() {
                         .context
                         .response_callback
                         .notify_bad_response(crate::ResponseError::ProofVerificationError);
-                }
+                },
                 Err(Error::DataIsUnavailable(_)) => {
                     seen_data_unavailable_err = true;
-                }
+                },
                 Err(_) => panic!("unexpected result: {:?}", result),
             }
         } else {
@@ -1288,7 +1288,7 @@ async fn bad_peer_is_eventually_added_back() {
                         request.use_compression,
                     )
                     .unwrap()));
-                }
+                },
                 DataRequest::GetStorageServerSummary => {
                     let data_response =
                         DataResponse::StorageServerSummary(mock_storage_summary(200));
@@ -1297,7 +1297,7 @@ async fn bad_peer_is_eventually_added_back() {
                         request.use_compression,
                     )
                     .unwrap()));
-                }
+                },
                 _ => panic!("unexpected: {:?}", request),
             }
         }

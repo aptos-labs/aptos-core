@@ -79,7 +79,7 @@ impl PeerMonitoringServiceNetworkEvents {
             ) => {
                 let response_tx = ResponseSender::new(response_tx);
                 Some((peer_id, protocol_id, request, response_tx))
-            }
+            },
             _ => None, // We don't use DirectSend and don't care about connection events
         }
     }

@@ -24,10 +24,10 @@ pub(crate) struct AptosExecutorTask<'a, S> {
 }
 
 impl<'a, S: 'a + StateView> ExecutorTask for AptosExecutorTask<'a, S> {
-    type Txn = PreprocessedTransaction;
-    type Output = AptosTransactionOutput;
-    type Error = VMStatus;
     type Argument = &'a S;
+    type Error = VMStatus;
+    type Output = AptosTransactionOutput;
+    type Txn = PreprocessedTransaction;
 
     fn init(argument: &'a S) -> Self {
         let vm = AptosVM::new(argument);
@@ -86,7 +86,7 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosExecutorTask<'a, S> {
                         ),
                         None => {
                             trace!(log_context, "Transaction malformed, error: {:?}", vm_status,)
-                        }
+                        },
                     };
                 }
                 if AptosVM::should_restart_execution(output_ext.txn_output()) {
@@ -95,7 +95,7 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosExecutorTask<'a, S> {
                 } else {
                     ExecutionStatus::Success(AptosTransactionOutput::new(output_ext))
                 }
-            }
+            },
             Err(err) => ExecutionStatus::Abort(err),
         }
     }

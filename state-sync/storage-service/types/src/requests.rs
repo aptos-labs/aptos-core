@@ -61,7 +61,7 @@ impl DataRequest {
             Self::GetTransactionsWithProof(_) => "get_transactions_with_proof",
             Self::GetNewTransactionsOrOutputsWithProof(_) => {
                 "get_new_transactions_or_outputs_with_proof"
-            }
+            },
             Self::GetTransactionsOrOutputsWithProof(_) => "get_transactions_or_outputs_with_proof",
         }
     }

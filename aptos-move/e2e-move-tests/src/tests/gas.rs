@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::common::test_dir_path;
-use crate::MoveHarness;
+use crate::{tests::common::test_dir_path, MoveHarness};
 use aptos_cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};

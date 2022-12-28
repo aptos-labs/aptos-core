@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 use crate::{
     get_provider,
     provider::{api_index::ApiIndexProvider, Provider, ProviderCollection},
@@ -13,8 +14,6 @@ use aptos_transaction_emitter_lib::{
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use thiserror::Error as ThisError;
-
-use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 
 const NODE_REQUIREMENTS_LINK: &str =
     "https://aptos.dev/nodes/validator-node/operator/node-requirements";
@@ -122,7 +121,7 @@ impl Checker for TpsChecker {
                     0,
                     format!("There was an error querying your node's API: {:#}", err),
                 )]);
-            }
+            },
         };
 
         let cluster_config = ClusterArgs {

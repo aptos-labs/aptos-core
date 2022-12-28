@@ -49,7 +49,7 @@ impl StateStorageUsage {
             } => {
                 *items += 1;
                 *bytes += bytes_delta;
-            }
+            },
             Self::Untracked => (),
         }
     }
@@ -62,7 +62,7 @@ impl StateStorageUsage {
             } => {
                 *items -= 1;
                 *bytes -= bytes_delta;
-            }
+            },
             Self::Untracked => (),
         }
     }

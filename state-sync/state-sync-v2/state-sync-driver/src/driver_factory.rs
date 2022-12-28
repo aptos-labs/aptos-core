@@ -66,7 +66,7 @@ impl DriverFactory {
                         error
                     )
                 }
-            }
+            },
             Err(error) => panic!("Failed to fetch the initial synced version: {:?}", error),
         }
 
