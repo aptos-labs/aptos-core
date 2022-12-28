@@ -25,6 +25,9 @@ impl serde::Serialize for RawDatastreamRequest {
         if self.chain_id != 0 {
             len += 1;
         }
+        if self.end_version.is_some() {
+            len += 1;
+        }
         let mut struct_ser =
             serializer.serialize_struct("aptos.datastream.v1.RawDatastreamRequest", len)?;
         if self.starting_version != 0 {
@@ -54,6 +57,9 @@ impl serde::Serialize for RawDatastreamRequest {
         if self.chain_id != 0 {
             struct_ser.serialize_field("chainId", &self.chain_id)?;
         }
+        if let Some(v) = self.end_version.as_ref() {
+            struct_ser.serialize_field("endVersion", ToString::to_string(&v).as_str())?;
+        }
         struct_ser.end()
     }
 }
@@ -74,6 +80,8 @@ impl<'de> serde::Deserialize<'de> for RawDatastreamRequest {
             "outputBatchSize",
             "chain_id",
             "chainId",
+            "end_version",
+            "endVersion",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -83,6 +91,7 @@ impl<'de> serde::Deserialize<'de> for RawDatastreamRequest {
             ProcessorBatchSize,
             OutputBatchSize,
             ChainId,
+            EndVersion,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -120,6 +129,7 @@ impl<'de> serde::Deserialize<'de> for RawDatastreamRequest {
                                 Ok(GeneratedField::OutputBatchSize)
                             }
                             "chainId" | "chain_id" => Ok(GeneratedField::ChainId),
+                            "endVersion" | "end_version" => Ok(GeneratedField::EndVersion),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -144,6 +154,7 @@ impl<'de> serde::Deserialize<'de> for RawDatastreamRequest {
                 let mut processor_batch_size__ = None;
                 let mut output_batch_size__ = None;
                 let mut chain_id__ = None;
+                let mut end_version__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::StartingVersion => {
@@ -195,6 +206,14 @@ impl<'de> serde::Deserialize<'de> for RawDatastreamRequest {
                                     .0,
                             );
                         }
+                        GeneratedField::EndVersion => {
+                            if end_version__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("endVersion"));
+                            }
+                            end_version__ =
+                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                            ;
+                        }
                     }
                 }
                 Ok(RawDatastreamRequest {
@@ -203,6 +222,7 @@ impl<'de> serde::Deserialize<'de> for RawDatastreamRequest {
                     processor_batch_size: processor_batch_size__.unwrap_or_default(),
                     output_batch_size: output_batch_size__.unwrap_or_default(),
                     chain_id: chain_id__.unwrap_or_default(),
+                    end_version: end_version__,
                 })
             }
         }
@@ -747,10 +767,16 @@ impl serde::Serialize for TransactionsOutput {
         if !self.transactions.is_empty() {
             len += 1;
         }
+        if self.transaction_timestamp.is_some() {
+            len += 1;
+        }
         let mut struct_ser =
             serializer.serialize_struct("aptos.datastream.v1.TransactionsOutput", len)?;
         if !self.transactions.is_empty() {
             struct_ser.serialize_field("transactions", &self.transactions)?;
+        }
+        if let Some(v) = self.transaction_timestamp.as_ref() {
+            struct_ser.serialize_field("transactionTimestamp", v)?;
         }
         struct_ser.end()
     }
@@ -761,11 +787,16 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["transactions"];
+        const FIELDS: &[&str] = &[
+            "transactions",
+            "transaction_timestamp",
+            "transactionTimestamp",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Transactions,
+            TransactionTimestamp,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -791,6 +822,9 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
                     {
                         match value {
                             "transactions" => Ok(GeneratedField::Transactions),
+                            "transactionTimestamp" | "transaction_timestamp" => {
+                                Ok(GeneratedField::TransactionTimestamp)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -811,6 +845,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
                 V: serde::de::MapAccess<'de>,
             {
                 let mut transactions__ = None;
+                let mut transaction_timestamp__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Transactions => {
@@ -819,10 +854,19 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
                             }
                             transactions__ = Some(map.next_value()?);
                         }
+                        GeneratedField::TransactionTimestamp => {
+                            if transaction_timestamp__.is_some() {
+                                return Err(serde::de::Error::duplicate_field(
+                                    "transactionTimestamp",
+                                ));
+                            }
+                            transaction_timestamp__ = map.next_value()?;
+                        }
                     }
                 }
                 Ok(TransactionsOutput {
                     transactions: transactions__.unwrap_or_default(),
+                    transaction_timestamp: transaction_timestamp__,
                 })
             }
         }
