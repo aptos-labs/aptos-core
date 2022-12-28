@@ -20,6 +20,8 @@ cargo build --locked --profile=$PROFILE \
     -p aptos-node-checker \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
+    -p aptos-datastream-service \
+    -p aptos-datastream-worker \
     -p aptos-db-bootstrapper \
     -p aptos-transaction-emitter \
     "$@"
@@ -43,6 +45,8 @@ BINS=(
     aptos-node-checker
     aptos-openapi-spec-generator
     aptos-telemetry-service
+    aptos-datastream-service
+    aptos-datastream-worker
     aptos-fn-check-client
     db-backup
     db-backup-verify

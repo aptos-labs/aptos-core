@@ -59,6 +59,7 @@ group "all" {
     "faucet",
     "forge",
     "telemetry-service",
+    "datastream-service",
     BUILD_ADDL_TESTING_IMAGES == "true" ? [
       "validator-testing"
     ] : []
@@ -76,6 +77,7 @@ target "_common" {
     generate_cache_from("faucet"),
     generate_cache_from("forge"),
     generate_cache_from("telemetry-service"),
+    generate_cache_from("datastream-service"),
 
     // testing targets
     generate_cache_from("validator-testing"),
@@ -144,6 +146,13 @@ target "telemetry-service" {
   target   = "telemetry-service"
   cache-to = generate_cache_to("telemetry-service")
   tags     = generate_tags("telemetry-service")
+}
+
+target "datastream-service" {
+  inherits = ["_common"]
+  target   = "datastream-service"
+  cache-to = generate_cache_to("datastream-service")
+  tags     = generate_tags("datastream-service")
 }
 
 function "generate_cache_from" {

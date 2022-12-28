@@ -9,6 +9,7 @@ IMAGES=(
   faucet
   forge
   telemetry-service
+  datastream-service
 )
 
 for IMAGE in "${IMAGES[@]}"
