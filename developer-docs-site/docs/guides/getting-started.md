@@ -147,6 +147,7 @@ Windows.  All dependencies must be manually installed.
 1. Install [C++ build tools for Windows](https://visualstudio.microsoft.com/downloads/#microsoft-visual-c-redistributable-for-visual-studio-2022). Note: This may be installed already with Rust.
 1. Install [LLVM](https://releases.llvm.org/).  The last prebuilt release is [11.0.0](https://releases.llvm.org/download.html#11.0.0)
 1. Open a new powershell terminal after installing all dependencies
+
 </details>
 
 5. Optionally, check out a release branch to install an Aptos node:
