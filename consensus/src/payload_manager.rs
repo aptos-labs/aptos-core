@@ -9,14 +9,12 @@ use aptos_consensus_types::{
     request_response::PayloadRequest,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::Error::DataNotFound;
-use aptos_executor_types::*;
+use aptos_executor_types::{Error::DataNotFound, *};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, warn};
 use aptos_types::transaction::SignedTransaction;
-use futures::channel::mpsc::Sender;
-use futures::SinkExt;
 use std::sync::Arc;
+use futures::{channel::mpsc::Sender, SinkExt};
 use tokio::sync::oneshot;
 
 /// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
@@ -55,7 +53,7 @@ impl PayloadManager {
     ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
     pub async fn notify_commit(&self, logical_time: LogicalTime, payloads: Vec<Payload>) {
         match self {
-            PayloadManager::DirectMempool => {}
+            PayloadManager::DirectMempool => {},
             PayloadManager::InQuorumStore(batch_reader, quorum_store_wrapper_tx) => {
                 batch_reader.update_certified_round(logical_time).await;
 
@@ -64,7 +62,7 @@ impl PayloadManager {
                     .flat_map(|payload| match payload {
                         Payload::DirectMempool(_) => {
                             unreachable!("InQuorumStore should be used");
-                        }
+                        },
                         Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
                     })
                     .map(|proof| *proof.digest())
@@ -93,7 +91,7 @@ impl PayloadManager {
             None => return,
         };
         match self {
-            PayloadManager::DirectMempool => {}
+            PayloadManager::DirectMempool => {},
             PayloadManager::InQuorumStore(batch_reader, _) => match payload {
                 Payload::InQuorumStore(proof_with_status) => {
                     if proof_with_status.status.lock().is_none() {
@@ -108,10 +106,10 @@ impl PayloadManager {
                             .lock()
                             .replace(DataStatus::Requested(receivers));
                     }
-                }
+                },
                 Payload::DirectMempool(_) => {
                     unreachable!()
-                }
+                },
             },
         }
     }
@@ -138,7 +136,7 @@ impl PayloadManager {
                             .lock()
                             .replace(DataStatus::Cached(data.clone()));
                         Ok(data)
-                    }
+                    },
                     DataStatus::Requested(receivers) => {
                         let mut vec_ret = Vec::new();
                         debug!("QSE: waiting for data on {} receivers", receivers.len());
@@ -159,10 +157,10 @@ impl PayloadManager {
                                         .lock()
                                         .replace(DataStatus::Requested(new_receivers));
                                     return Err(DataNotFound(digest));
-                                }
+                                },
                                 Ok(Ok(data)) => {
                                     vec_ret.push(data);
-                                }
+                                },
                                 Ok(Err(e)) => {
                                     let new_receivers = PayloadManager::request_transactions(
                                         proof_with_data.proofs.clone(),
@@ -176,7 +174,7 @@ impl PayloadManager {
                                         .lock()
                                         .replace(DataStatus::Requested(new_receivers));
                                     return Err(e);
-                                }
+                                },
                             }
                         }
                         let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
@@ -186,9 +184,9 @@ impl PayloadManager {
                             .lock()
                             .replace(DataStatus::Cached(ret.clone()));
                         Ok(ret)
-                    }
+                    },
                 }
-            }
+            },
             (_, _) => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",
                 payload,

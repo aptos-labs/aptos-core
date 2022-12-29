@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::natives::aggregator_natives::{helpers::get_handle, NativeAggregatorContext};
 use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_types::account_address::AccountAddress;
@@ -15,8 +16,6 @@ use move_vm_types::{
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
-
-use crate::natives::aggregator_natives::{helpers::get_handle, NativeAggregatorContext};
 
 /***************************************************************************************************
  * native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator;
@@ -63,14 +62,13 @@ fn native_new_aggregator(
     let id = AggregatorID::new(handle, key);
     aggregator_data.create_new_aggregator(id, limit);
 
-    Ok(NativeResult::ok(
-        gas_params.base,
-        smallvec![Value::struct_(Struct::pack(vec![
+    Ok(NativeResult::ok(gas_params.base, smallvec![
+        Value::struct_(Struct::pack(vec![
             Value::address(handle.0),
             Value::address(key.0),
             Value::u128(limit),
-        ]))],
-    ))
+        ]))
+    ]))
 }
 
 pub fn make_native_new_aggregator(gas_params: NewAggregatorGasParameters) -> NativeFunction {

@@ -31,7 +31,7 @@ pub fn lint_bcs_format(format: &ContainerFormat) -> Result<()> {
                 } else {
                     Ok(())
                 }
-            }
+            },
             _ => Ok(()),
         }
     })

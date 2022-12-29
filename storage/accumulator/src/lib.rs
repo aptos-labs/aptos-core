@@ -277,7 +277,7 @@ where
                     Some((x, left_hash)) => {
                         assert_eq!(x, sibling);
                         Self::hash_internal_node(left_hash, hash)
-                    }
+                    },
                     None => Self::hash_internal_node(self.reader.get(sibling)?, hash),
                 };
                 pos = pos.parent();
@@ -300,7 +300,7 @@ where
                     Some((x, left_hash)) => {
                         assert_eq!(x, sibling);
                         Self::hash_internal_node(left_hash, hash)
-                    }
+                    },
                     None => Self::hash_internal_node(self.reader.get(sibling)?, hash),
                 }
             };

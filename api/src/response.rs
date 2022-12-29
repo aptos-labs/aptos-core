@@ -29,16 +29,15 @@
 
 // TODO: https://github.com/aptos-labs/aptos-core/issues/2279
 
-use std::fmt::Display;
-
-use super::accept_type::AcceptType;
+use super::{accept_type::AcceptType, bcs_payload::Bcs};
 use aptos_api_types::{Address, AptosError, AptosErrorCode, HashValue, LedgerInfo};
-use move_core_types::identifier::{IdentStr, Identifier};
-use move_core_types::language_storage::StructTag;
+use move_core_types::{
+    identifier::{IdentStr, Identifier},
+    language_storage::StructTag,
+};
 use poem_openapi::{payload::Json, types::ToJSON, ResponseContent};
 use serde_json::Value;
-
-use super::bcs_payload::Bcs;
+use std::fmt::Display;
 
 /// An enum representing the different types of outputs for APIs
 #[derive(ResponseContent)]

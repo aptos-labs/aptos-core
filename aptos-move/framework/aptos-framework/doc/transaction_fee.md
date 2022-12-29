@@ -19,7 +19,14 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Function `collect_fee`](#0x1_transaction_fee_collect_fee)
 -  [Function `store_aptos_coin_burn_cap`](#0x1_transaction_fee_store_aptos_coin_burn_cap)
 -  [Specification](#@Specification_1)
+    -  [Resource `CollectedFeesPerBlock`](#@Specification_1_CollectedFeesPerBlock)
+    -  [Function `initialize_fee_collection_and_distribution`](#@Specification_1_initialize_fee_collection_and_distribution)
+    -  [Function `upgrade_burn_percentage`](#@Specification_1_upgrade_burn_percentage)
+    -  [Function `register_proposer_for_fee_collection`](#@Specification_1_register_proposer_for_fee_collection)
+    -  [Function `burn_coin_fraction`](#@Specification_1_burn_coin_fraction)
+    -  [Function `process_collected_fees`](#@Specification_1_process_collected_fees)
     -  [Function `burn_fee`](#@Specification_1_burn_fee)
+    -  [Function `collect_fee`](#@Specification_1_collect_fee)
     -  [Function `store_aptos_coin_burn_cap`](#@Specification_1_store_aptos_coin_burn_cap)
 
 
@@ -275,6 +282,10 @@ Burns a specified fraction of the coin.
     <b>assert</b>!(burn_percentage &lt;= 100, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>));
 
     <b>let</b> collected_amount = <a href="coin.md#0x1_coin_value">coin::value</a>(<a href="coin.md#0x1_coin">coin</a>);
+    <b>spec</b> {
+        // We <b>assume</b> that `burn_percentage * collected_amount` does not overflow.
+        <b>assume</b> burn_percentage * collected_amount &lt;= MAX_U64;
+    };
     <b>let</b> amount_to_burn = (burn_percentage <b>as</b> u64) * collected_amount / 100;
     <b>if</b> (amount_to_burn &gt; 0) {
         <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract">coin::extract</a>(<a href="coin.md#0x1_coin">coin</a>, amount_to_burn);
@@ -448,6 +459,125 @@ Only called during genesis.
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_CollectedFeesPerBlock"></a>
+
+### Resource `CollectedFeesPerBlock`
+
+
+<pre><code><b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> <b>has</b> key
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code>amount: <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>proposer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<b>address</b>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>burn_percentage: u8</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>invariant</b> burn_percentage &lt;= 100;
+</code></pre>
+
+
+
+<a name="@Specification_1_initialize_fee_collection_and_distribution"></a>
+
+### Function `initialize_fee_collection_and_distribution`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_percentage: u8)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_upgrade_burn_percentage"></a>
+
+### Function `upgrade_burn_percentage`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_burn_percentage: u8)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_register_proposer_for_fee_collection"></a>
+
+### Function `register_proposer_for_fee_collection`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">register_proposer_for_fee_collection</a>(proposer_addr: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_burn_coin_fraction"></a>
+
+### Function `burn_coin_fraction`
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;, burn_percentage: u8)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_process_collected_fees"></a>
+
+### Function `process_collected_fees`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">process_collected_fees</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
 </code></pre>
 
 
@@ -466,6 +596,22 @@ Only called during genesis.
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_collect_fee"></a>
+
+### Function `collect_fee`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">collect_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
 </code></pre>
 
 

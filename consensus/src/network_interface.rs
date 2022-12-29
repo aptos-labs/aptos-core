@@ -3,8 +3,10 @@
 
 //! Interface between Consensus and Network layers.
 
-use crate::counters;
-use crate::quorum_store::types::{Batch, BatchRequest, Fragment};
+use crate::{
+    counters,
+    quorum_store::types::{Batch, BatchRequest, Fragment},
+};
 use anyhow::anyhow;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};

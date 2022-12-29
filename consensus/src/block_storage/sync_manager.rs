@@ -473,7 +473,7 @@ impl BlockRetriever {
                     progress += batch.len() as u64;
                     last_block_id = batch.last().unwrap().parent_id();
                     result_blocks.extend(batch);
-                }
+                },
                 Ok(result)
                     if matches!(result.status(), BlockRetrievalStatus::SucceededWithTarget) =>
                 {
@@ -481,7 +481,7 @@ impl BlockRetriever {
                     let batch = result.blocks().clone();
                     result_blocks.extend(batch);
                     break;
-                }
+                },
                 e => {
                     warn!(
                         remote_peer = peer,
@@ -499,7 +499,7 @@ impl BlockRetriever {
                     }
                     failed_attempt += 1;
                     peer = self.pick_peer(failed_attempt, peers);
-                }
+                },
             }
         }
         assert_eq!(result_blocks.last().unwrap().id(), target_block_id);

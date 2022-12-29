@@ -15,16 +15,17 @@ use aptos_crypto::SigningKey;
 #[cfg(feature = "testing")]
 use aptos_crypto::Uniform;
 use aptos_crypto::{bls12381, traits};
-use move_binary_format::errors::PartialVMError;
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::{
-    InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{
+    gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes},
+    vm_status::StatusCode,
 };
-use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::values::Struct;
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
+    loaded_data::runtime_types::Type,
+    natives::function::NativeResult,
+    pop_arg,
+    values::{Struct, Value},
 };
 #[cfg(feature = "testing")]
 use rand_core::OsRng;
@@ -222,7 +223,7 @@ impl GasParameters {
             Some(pk) => pk,
             None => {
                 return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
-            }
+            },
         };
 
         if check_pk_subgroup && !self.bls12381_pk_subgroub_check(&pk, &mut cost) {
@@ -233,16 +234,15 @@ impl GasParameters {
             Some(sig) => sig,
             None => {
                 return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
-            }
+            },
         };
 
         // NOTE(Gas): 2 bilinear pairings and a hash-to-curve
         let verify_result = self.signature_verify(&sig, &pk, msg_bytes, &mut cost);
 
-        Ok(NativeResult::ok(
-            cost,
-            smallvec![Value::bool(verify_result)],
-        ))
+        Ok(NativeResult::ok(cost, smallvec![Value::bool(
+            verify_result
+        )]))
     }
 }
 
@@ -280,10 +280,10 @@ fn native_bls12381_aggregate_pubkeys(
 
     // If zero PKs were given as input, return None.
     if pks_bytes.is_empty() {
-        return Ok(NativeResult::ok(
-            cost,
-            smallvec![Value::vector_u8(vec![]), Value::bool(false)],
-        ));
+        return Ok(NativeResult::ok(cost, smallvec![
+            Value::vector_u8(vec![]),
+            Value::bool(false)
+        ]));
     }
 
     let pks = gas_params.bls12381_deserialize_pks(pks_bytes, &mut cost);
@@ -291,10 +291,10 @@ fn native_bls12381_aggregate_pubkeys(
 
     // If not all PKs were successfully deserialized, return None and only charge for the actual work done
     if pks.len() != num_pks {
-        return Ok(NativeResult::ok(
-            cost,
-            smallvec![Value::vector_u8(vec![]), Value::bool(false)],
-        ));
+        return Ok(NativeResult::ok(cost, smallvec![
+            Value::vector_u8(vec![]),
+            Value::bool(false)
+        ]));
     }
 
     // Aggregate the public keys (this will NOT subgroup-check the individual PKs)
@@ -304,20 +304,17 @@ fn native_bls12381_aggregate_pubkeys(
         match bls12381::PublicKey::aggregate(pks.iter().collect::<Vec<&bls12381::PublicKey>>()) {
             Ok(aggpk) => aggpk,
             Err(_) => {
-                return Ok(NativeResult::ok(
-                    cost,
-                    smallvec![Value::vector_u8(vec![]), Value::bool(false)],
-                ))
-            }
+                return Ok(NativeResult::ok(cost, smallvec![
+                    Value::vector_u8(vec![]),
+                    Value::bool(false)
+                ]))
+            },
         };
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![
-            Value::vector_u8(aggpk.to_bytes().to_vec()),
-            Value::bool(true)
-        ],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![
+        Value::vector_u8(aggpk.to_bytes().to_vec()),
+        Value::bool(true)
+    ]))
 }
 
 /***************************************************************************************************
@@ -351,19 +348,19 @@ pub fn native_bls12381_aggregate_signatures(
 
     // If zero signatures were given as input, return None.
     if sigs_serialized.is_empty() {
-        return Ok(NativeResult::ok(
-            cost,
-            smallvec![Value::vector_u8(vec![]), Value::bool(false)],
-        ));
+        return Ok(NativeResult::ok(cost, smallvec![
+            Value::vector_u8(vec![]),
+            Value::bool(false)
+        ]));
     }
 
     let sigs = gas_params.bls12381_deserialize_sigs(sigs_serialized, &mut cost);
 
     if sigs.len() != num_sigs {
-        return Ok(NativeResult::ok(
-            cost,
-            smallvec![Value::vector_u8(vec![]), Value::bool(false)],
-        ));
+        return Ok(NativeResult::ok(cost, smallvec![
+            Value::vector_u8(vec![]),
+            Value::bool(false)
+        ]));
     }
 
     // Aggregate the signatures (this will NOT group-check the individual signatures)
@@ -372,20 +369,17 @@ pub fn native_bls12381_aggregate_signatures(
     let aggsig = match bls12381::Signature::aggregate(sigs) {
         Ok(aggsig) => aggsig,
         Err(_) => {
-            return Ok(NativeResult::ok(
-                cost,
-                smallvec![Value::vector_u8(vec![]), Value::bool(false)],
-            ))
-        }
+            return Ok(NativeResult::ok(cost, smallvec![
+                Value::vector_u8(vec![]),
+                Value::bool(false)
+            ]))
+        },
     };
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![
-            Value::vector_u8(aggsig.to_bytes().to_vec()),
-            Value::bool(true)
-        ],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![
+        Value::vector_u8(aggsig.to_bytes().to_vec()),
+        Value::bool(true)
+    ]))
 }
 
 /***************************************************************************************************
@@ -535,10 +529,9 @@ pub fn native_bls12381_verify_aggregate_signature(
         .verify_aggregate_arbitrary_msg(&msgs_refs, &pks_refs)
         .is_ok();
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::bool(verify_result)],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::bool(
+        verify_result
+    )]))
 }
 
 /***************************************************************************************************
@@ -657,13 +650,10 @@ pub fn native_generate_keys(
     mut _arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut OsRng);
-    Ok(NativeResult::ok(
-        InternalGas::zero(),
-        smallvec![
-            Value::vector_u8(key_pair.private_key.to_bytes()),
-            Value::vector_u8(key_pair.public_key.to_bytes()),
-        ],
-    ))
+    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+        Value::vector_u8(key_pair.private_key.to_bytes()),
+        Value::vector_u8(key_pair.public_key.to_bytes()),
+    ]))
 }
 
 #[cfg(feature = "testing")]
@@ -676,10 +666,9 @@ pub fn native_sign(
     let sk_bytes = pop_arg!(arguments, Vec<u8>);
     let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let sig = sk.sign_arbitrary_message(msg.as_slice());
-    Ok(NativeResult::ok(
-        InternalGas::zero(),
-        smallvec![Value::vector_u8(sig.to_bytes()),],
-    ))
+    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+        Value::vector_u8(sig.to_bytes()),
+    ]))
 }
 
 #[cfg(feature = "testing")]
@@ -691,10 +680,9 @@ pub fn native_generate_proof_of_possession(
     let sk_bytes = pop_arg!(arguments, Vec<u8>);
     let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let pop = ProofOfPossession::create(&sk);
-    Ok(NativeResult::ok(
-        InternalGas::zero(),
-        smallvec![Value::vector_u8(pop.to_bytes()),],
-    ))
+    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+        Value::vector_u8(pop.to_bytes()),
+    ]))
 }
 
 /***************************************************************************************************

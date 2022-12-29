@@ -36,6 +36,7 @@ Non-cryptograhic hashes:
     -  [Function `sha2_512_internal`](#@Specification_1_sha2_512_internal)
     -  [Function `sha3_512_internal`](#@Specification_1_sha3_512_internal)
     -  [Function `ripemd160_internal`](#@Specification_1_ripemd160_internal)
+    -  [Function `blake2b_256_internal`](#@Specification_1_blake2b_256_internal)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -410,6 +411,18 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 </code></pre>
 
 
+<code>spec_blake2b_256_internal</code> is an injective function.
+
+
+<a name="0x1_aptos_hash_spec_blake2b_256_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_spec_blake2b_256_internal">spec_blake2b_256_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<b>axiom</b> <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
+    (<a href="hash.md#0x1_aptos_hash_spec_blake2b_256_internal">spec_blake2b_256_internal</a>(b1) == <a href="hash.md#0x1_aptos_hash_spec_blake2b_256_internal">spec_blake2b_256_internal</a>(b2) ==&gt; b1 == b2);
+</code></pre>
+
+
 
 <a name="@Specification_1_sip_hash"></a>
 
@@ -530,6 +543,8 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> !<a href="../../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../move-stdlib/doc/features.md#0x1_features_BLAKE2B_256_NATIVE">features::BLAKE2B_256_NATIVE</a>);
+<b>ensures</b> result == <a href="hash.md#0x1_aptos_hash_spec_blake2b_256_internal">spec_blake2b_256_internal</a>(bytes);
 </code></pre>
 
 
@@ -584,6 +599,24 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="hash.md#0x1_aptos_hash_spec_ripemd160_internal">spec_ripemd160_internal</a>(bytes);
+</code></pre>
+
+
+
+<a name="@Specification_1_blake2b_256_internal"></a>
+
+### Function `blake2b_256_internal`
+
+
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256_internal">blake2b_256_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="hash.md#0x1_aptos_hash_spec_blake2b_256_internal">spec_blake2b_256_internal</a>(bytes);
 </code></pre>
 
 

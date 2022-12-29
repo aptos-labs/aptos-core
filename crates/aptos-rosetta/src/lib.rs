@@ -5,11 +5,11 @@
 //!
 //! [Rosetta API Spec](https://www.rosetta-api.org/docs/Reference.html)
 
-use crate::types::Store;
 use crate::{
     block::BlockRetriever,
     common::{handle_request, with_context},
     error::{ApiError, ApiResult},
+    types::Store,
 };
 use aptos_config::config::ApiConfig;
 use aptos_logger::{debug, warn};

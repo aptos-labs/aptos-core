@@ -3,7 +3,15 @@
 
 #![forbid(unsafe_code)]
 
-use crate::logging::{LogEntry, LogSchema};
+use crate::{
+    components::{block_tree::BlockTree, chunk_output::ChunkOutput},
+    logging::{LogEntry, LogSchema},
+    metrics::{
+        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
+        APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+    },
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, Error, StateComputeResult};
@@ -11,7 +19,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_state_view::StateViewId;
-use aptos_storage_interface::async_proof_fetcher::AsyncProofFetcher;
+use aptos_storage_interface::{async_proof_fetcher::AsyncProofFetcher, DbReaderWriter};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, state_store::state_value::StateValue,
     transaction::Transaction,
@@ -19,16 +27,6 @@ use aptos_types::{
 use aptos_vm::VMExecutor;
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
-
-use crate::{
-    components::{block_tree::BlockTree, chunk_output::ChunkOutput},
-    metrics::{
-        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
-        APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
-    },
-};
-use aptos_storage_interface::DbReaderWriter;
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,

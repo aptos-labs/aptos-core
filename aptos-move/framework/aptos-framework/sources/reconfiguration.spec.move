@@ -62,6 +62,12 @@ spec aptos_framework::reconfiguration {
     }
 
     spec reconfigure {
+        use aptos_framework::coin::CoinInfo;
+        use aptos_framework::aptos_coin::AptosCoin;
+
+        requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
+
         aborts_if false;
     }
 }

@@ -4,16 +4,18 @@ spec aptos_framework::version {
         pragma aborts_if_is_strict;
     }
 
-    spec set_version {
+    spec set_version(account: &signer, major: u64) {
+        use std::signer;
         use aptos_framework::chain_status;
         use aptos_framework::timestamp;
+        use aptos_framework::stake;
+        use aptos_framework::coin::CoinInfo;
+        use aptos_framework::aptos_coin::AptosCoin;
 
         requires chain_status::is_operating();
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
-    }
-
-    spec set_version(account: &signer, major: u64) {
-        use std::signer;
+        requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
 
         aborts_if !exists<SetVersionCapability>(signer::address_of(account));
         aborts_if !exists<Version>(@aptos_framework);

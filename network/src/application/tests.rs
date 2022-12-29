@@ -23,8 +23,8 @@ struct DummyNetworkInterface {
 }
 
 impl NetworkInterface<HealthCheckerMsg, DummySender> for DummyNetworkInterface {
-    type AppDataKey = PeerId;
     type AppData = ();
+    type AppDataKey = PeerId;
 
     fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
         &self.peer_metadata_storage
@@ -91,7 +91,7 @@ fn update_state(
             Entry::Occupied(inner) => {
                 inner.get_mut().status = state;
                 Ok(())
-            }
+            },
         })
         .unwrap()
 }

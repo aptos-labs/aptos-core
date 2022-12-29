@@ -8,8 +8,7 @@ use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 /***************************************************************************************************
  * native fun create_address
@@ -72,10 +71,9 @@ fn native_create_signer(
     debug_assert!(arguments.len() == 1);
 
     let address = pop_arg!(arguments, AccountAddress);
-    Ok(NativeResult::ok(
-        gas_params.base,
-        smallvec![Value::signer(address)],
-    ))
+    Ok(NativeResult::ok(gas_params.base, smallvec![Value::signer(
+        address
+    )]))
 }
 
 pub fn make_native_create_signer(gas_params: CreateSignerGasParameters) -> NativeFunction {

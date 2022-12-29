@@ -22,17 +22,18 @@ use aptos_network::{
     protocols::network::{NewNetworkEvents, NewNetworkSender},
 };
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
-use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{
     account_config::AccountSequenceInfo, mempool_status::MempoolStatusCode,
-    transaction::SignedTransaction,
+    on_chain_config::OnChainConfigPayload, transaction::SignedTransaction,
 };
 use aptos_vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
 };
 use futures::channel::mpsc;
-use std::collections::HashMap;
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use tokio::runtime::{Builder, Handle, Runtime};
 
 /// Mock of a running instance of shared mempool.
@@ -122,13 +123,10 @@ impl MockSharedMempool {
             notification_receiver: reconfig_events,
         };
         reconfig_sender
-            .push(
-                (),
-                ReconfigNotification {
-                    version: 1,
-                    on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
-                },
-            )
+            .push((), ReconfigNotification {
+                version: 1,
+                on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+            })
             .unwrap();
         let network_handles = vec![(NetworkId::Validator, network_sender, network_events)];
         let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);

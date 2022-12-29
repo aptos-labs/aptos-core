@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
+use super::transactions::TransactionQuery;
 use crate::{models::transactions::Transaction, schema::events, util::standardize_address};
 use aptos_api_types::Event as APIEvent;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-
-use super::transactions::TransactionQuery;
 
 #[derive(Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]

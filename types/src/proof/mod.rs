@@ -10,6 +10,14 @@ pub mod proptest_proof;
 #[cfg(test)]
 mod unit_tests;
 
+pub use self::definition::{
+    AccumulatorConsistencyProof, AccumulatorExtensionProof, AccumulatorProof,
+    AccumulatorRangeProof, SparseMerkleProof, SparseMerkleProofExt, SparseMerkleRangeProof,
+    TransactionAccumulatorProof, TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
+    TransactionInfoListWithProof, TransactionInfoWithProof,
+};
+#[cfg(any(test, feature = "fuzzing"))]
+pub use self::definition::{TestAccumulatorProof, TestAccumulatorRangeProof};
 use crate::{
     ledger_info::LedgerInfo,
     transaction::{TransactionInfo, Version},
@@ -27,16 +35,6 @@ use aptos_crypto_derive::CryptoHasher;
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
-
-pub use self::definition::{
-    AccumulatorConsistencyProof, AccumulatorExtensionProof, AccumulatorProof,
-    AccumulatorRangeProof, SparseMerkleProof, SparseMerkleProofExt, SparseMerkleRangeProof,
-    TransactionAccumulatorProof, TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
-    TransactionInfoListWithProof, TransactionInfoWithProof,
-};
-
-#[cfg(any(test, feature = "fuzzing"))]
-pub use self::definition::{TestAccumulatorProof, TestAccumulatorRangeProof};
 
 /// Verifies that a given `transaction_info` exists in the ledger using provided proof.
 fn verify_transaction_info(

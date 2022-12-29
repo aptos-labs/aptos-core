@@ -58,7 +58,7 @@ impl Signature {
                     0,
                     None,
                 )])
-            }
+            },
             APITransactionSignature::MultiEd25519Signature(sig) => Ok(Self::parse_multi_signature(
                 sig,
                 sender,
@@ -82,10 +82,10 @@ impl Signature {
             APITransactionSignature::Ed25519Signature(_) => String::from("ed25519_signature"),
             APITransactionSignature::MultiEd25519Signature(_) => {
                 String::from("multi_ed25519_signature")
-            }
+            },
             APITransactionSignature::MultiAgentSignature(_) => {
                 String::from("multi_agent_signature")
-            }
+            },
         }
     }
 

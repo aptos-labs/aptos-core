@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 use crate::{
     get_provider,
     provider::{api_index::ApiIndexProvider, Provider, ProviderCollection},
@@ -9,8 +10,6 @@ use anyhow::Result;
 use aptos_rest_client::{aptos_api_types::TransactionData, Client as AptosRestClient};
 use serde::{Deserialize, Serialize};
 use std::cmp::{max, min};
-
-use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 
 const TRANSACTIONS_ENDPOINT: &str = "/transactions/by_version";
 
@@ -108,7 +107,7 @@ impl Checker for TransactionCorrectnessChecker {
                         err
                     ),
                 )]);
-            }
+            },
         };
 
         tokio::time::sleep(target_api_index_provider.config.common.check_delay()).await;
@@ -129,7 +128,7 @@ impl Checker for TransactionCorrectnessChecker {
                         err
                     ),
                 )]);
-            }
+            },
         };
 
         // Get the oldest ledger version between the two nodes.
@@ -220,7 +219,7 @@ impl Checker for TransactionCorrectnessChecker {
                                 ),
                             )
                         }
-                    }
+                    },
                     Err(error) => Self::build_result(
                         "Target node produced recent transaction, but it was missing metadata"
                             .to_string(),
@@ -234,7 +233,7 @@ impl Checker for TransactionCorrectnessChecker {
                         ),
                     ),
                 }
-            }
+            },
             Err(error) => Self::build_result(
                 "Target node failed to produce transaction".to_string(),
                 25,

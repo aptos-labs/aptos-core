@@ -41,8 +41,7 @@ use aptos_types::{
     validator_info::ValidatorInfo,
     waypoint::Waypoint,
 };
-use futures::channel::mpsc;
-use futures::StreamExt;
+use futures::{channel::mpsc, StreamExt};
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
 use tokio::runtime::{Builder, Runtime};
 
@@ -109,13 +108,10 @@ impl SMRNode {
         let payload = OnChainConfigPayload::new(1, Arc::new(configs));
 
         reconfig_sender
-            .push(
-                (),
-                ReconfigNotification {
-                    version: 1,
-                    on_chain_configs: payload,
-                },
-            )
+            .push((), ReconfigNotification {
+                version: 1,
+                on_chain_configs: payload,
+            })
             .unwrap();
 
         let runtime = Builder::new_multi_thread()
@@ -227,7 +223,7 @@ impl SMRNode {
                     })
                 }
                 RoundProposer(round_proposers)
-            }
+            },
             _ => proposer_type,
         };
 

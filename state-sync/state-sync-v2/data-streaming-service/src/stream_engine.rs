@@ -1,21 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_notification::DataClientRequest::NewTransactionsOrOutputsWithProof;
-use crate::data_notification::{
-    NewTransactionsOrOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
-};
 use crate::{
     data_notification::{
         DataClientRequest,
         DataClientRequest::{
-            EpochEndingLedgerInfos, NewTransactionOutputsWithProof, NewTransactionsWithProof,
-            NumberOfStates, StateValuesWithProof, TransactionOutputsWithProof,
-            TransactionsOrOutputsWithProof, TransactionsWithProof,
+            EpochEndingLedgerInfos, NewTransactionOutputsWithProof,
+            NewTransactionsOrOutputsWithProof, NewTransactionsWithProof, NumberOfStates,
+            StateValuesWithProof, TransactionOutputsWithProof, TransactionsOrOutputsWithProof,
+            TransactionsWithProof,
         },
         DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
-        NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        NumberOfStatesRequest, StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
+        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
+        NewTransactionsWithProofRequest, NumberOfStatesRequest, StateValuesWithProofRequest,
+        TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
         TransactionsWithProofRequest,
     },
     error::Error,
@@ -121,26 +119,26 @@ impl StreamEngine {
         match stream_request {
             StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
                 Ok(ContinuousTransactionStreamEngine::new(stream_request)?.into())
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactions(_) => {
                 Ok(ContinuousTransactionStreamEngine::new(stream_request)?.into())
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
                 Ok(ContinuousTransactionStreamEngine::new(stream_request)?.into())
-            }
+            },
             StreamRequest::GetAllStates(request) => Ok(StateStreamEngine::new(request)?.into()),
             StreamRequest::GetAllEpochEndingLedgerInfos(request) => {
                 Ok(EpochEndingStreamEngine::new(request, advertised_data)?.into())
-            }
+            },
             StreamRequest::GetAllTransactionOutputs(_) => {
                 Ok(TransactionStreamEngine::new(stream_request)?.into())
-            }
+            },
             StreamRequest::GetAllTransactions(_) => {
                 Ok(TransactionStreamEngine::new(stream_request)?.into())
-            }
+            },
             StreamRequest::GetAllTransactionsOrOutputs(_) => {
                 Ok(TransactionStreamEngine::new(stream_request)?.into())
-            }
+            },
             _ => Err(Error::UnsupportedRequestEncountered(format!(
                 "Stream request not supported: {:?}",
                 stream_request
@@ -195,7 +193,7 @@ impl StateStreamEngine {
                         request.end_index.checked_add(1).ok_or_else(|| {
                             Error::IntegerOverflow("Next request index has overflown!".into())
                         })?;
-                }
+                },
                 request => invalid_client_request!(request, self),
             }
         }
@@ -302,7 +300,7 @@ impl DataStreamEngine for StateStreamEngine {
                     self.clone().into(),
                 )?;
                 return Ok(Some(data_notification));
-            }
+            },
             NumberOfStates(request) => {
                 if let ResponsePayload::NumberOfStates(number_of_states) = client_response_payload {
                     info!(
@@ -326,7 +324,7 @@ impl DataStreamEngine for StateStreamEngine {
                         self.number_of_states = Some(number_of_states);
                     }
                 }
-            }
+            },
             request => invalid_client_request!(request, self),
         }
         Ok(None)
@@ -366,13 +364,13 @@ impl ContinuousTransactionStreamEngine {
         let (next_version, next_epoch) = match stream_request {
             StreamRequest::ContinuouslyStreamTransactions(request) => {
                 Self::calculate_next_version_and_epoch(request.known_version, request.known_epoch)?
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
                 Self::calculate_next_version_and_epoch(request.known_version, request.known_epoch)?
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
                 Self::calculate_next_version_and_epoch(request.known_version, request.known_epoch)?
-            }
+            },
             request => invalid_stream_request!(request),
         };
 
@@ -407,17 +405,17 @@ impl ContinuousTransactionStreamEngine {
                 if let Some(target) = &request.target {
                     return Ok(Some(target.clone()));
                 }
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
                 if let Some(target) = &request.target {
                     return Ok(Some(target.clone()));
                 }
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
                 if let Some(target) = &request.target {
                     return Ok(Some(target.clone()));
                 }
-            }
+            },
             request => invalid_stream_request!(request),
         };
 
@@ -494,7 +492,7 @@ impl ContinuousTransactionStreamEngine {
                     "Expected new transactions or outputs but got: {:?}",
                     response_payload
                 )));
-            }
+            },
         };
 
         // Calculate the last version
@@ -535,20 +533,20 @@ impl ContinuousTransactionStreamEngine {
                     known_epoch,
                     include_events: request.include_events,
                 })
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
                 NewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
                     known_version,
                     known_epoch,
                 })
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
                 NewTransactionsOrOutputsWithProof(NewTransactionsOrOutputsWithProofRequest {
                     known_version,
                     known_epoch,
                     include_events: request.include_events,
                 })
-            }
+            },
             request => invalid_stream_request!(request),
         };
         Ok(data_client_request)
@@ -574,14 +572,14 @@ impl ContinuousTransactionStreamEngine {
                     );
                     self.current_target_ledger_info = Some(target_ledger_info.clone());
                     Ok(())
-                }
+                },
                 response_payload => {
                     // TODO(joshlind): eventually we want to notify the data client of the bad response
                     Err(Error::AptosDataClientResponseIsInvalid(format!(
                         "Received an incorrect number of epoch ending ledger infos. Response: {:?}",
                         response_payload
                     )))
-                }
+                },
             }
         } else {
             // TODO(joshlind): eventually we want to notify the data client of the bad response
@@ -626,21 +624,21 @@ impl ContinuousTransactionStreamEngine {
                         self.stream_is_complete = true;
                     }
                 }
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
                 if let Some(target) = &request.target {
                     if request_end_version == target.ledger_info().version() {
                         self.stream_is_complete = true;
                     }
                 }
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
                 if let Some(target) = &request.target {
                     if request_end_version == target.ledger_info().version() {
                         self.stream_is_complete = true;
                     }
                 }
-            }
+            },
             request => invalid_stream_request!(request),
         };
 
@@ -691,11 +689,11 @@ impl ContinuousTransactionStreamEngine {
                                 request.end_version,
                                 target_ledger_info,
                             )?;
-                        }
+                        },
                         request => invalid_client_request!(request, self),
                     }
                 }
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
                 for client_request in client_requests {
                     match client_request {
@@ -704,11 +702,11 @@ impl ContinuousTransactionStreamEngine {
                                 request.end_version,
                                 target_ledger_info,
                             )?;
-                        }
+                        },
                         request => invalid_client_request!(request, self),
                     }
                 }
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
                 for client_request in client_requests {
                     match client_request {
@@ -717,11 +715,11 @@ impl ContinuousTransactionStreamEngine {
                                 request.end_version,
                                 target_ledger_info,
                             )?;
-                        }
+                        },
                         request => invalid_client_request!(request, self),
                     }
                 }
-            }
+            },
             request => invalid_stream_request!(request),
         }
 
@@ -792,17 +790,17 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                     global_data_summary
                         .optimal_chunk_sizes
                         .transaction_chunk_size
-                }
+                },
                 StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
                     global_data_summary
                         .optimal_chunk_sizes
                         .transaction_output_chunk_size
-                }
+                },
                 StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
                     global_data_summary
                         .optimal_chunk_sizes
                         .transaction_output_chunk_size
-                }
+                },
                 request => invalid_stream_request!(request),
             };
             let client_requests = create_data_client_requests(
@@ -829,10 +827,10 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             StreamRequest::ContinuouslyStreamTransactions(_) => &advertised_data.transactions,
             StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
                 &advertised_data.transaction_outputs
-            }
+            },
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
                 &advertised_data.transaction_outputs
-            }
+            },
             request => invalid_stream_request!(request),
         };
 
@@ -920,7 +918,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             EpochEndingLedgerInfos(_) => {
                 self.handle_epoch_ending_response(client_response_payload)?;
                 Ok(None)
-            }
+            },
             NewTransactionsWithProof(request) => match &self.request {
                 StreamRequest::ContinuouslyStreamTransactions(_) => {
                     let data_notification = self.create_notification_for_subscription_data(
@@ -929,7 +927,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                         notification_id_generator,
                     )?;
                     Ok(Some(data_notification))
-                }
+                },
                 request => invalid_stream_request!(request),
             },
             NewTransactionOutputsWithProof(request) => match &self.request {
@@ -940,7 +938,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                         notification_id_generator,
                     )?;
                     Ok(Some(data_notification))
-                }
+                },
                 request => invalid_stream_request!(request),
             },
             NewTransactionsOrOutputsWithProof(request) => match &self.request {
@@ -951,7 +949,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                         notification_id_generator,
                     )?;
                     Ok(Some(data_notification))
-                }
+                },
                 request => invalid_stream_request!(request),
             },
             TransactionsWithProof(request) => match &self.request {
@@ -963,7 +961,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                         notification_id_generator,
                     )?;
                     Ok(Some(data_notification))
-                }
+                },
                 request => invalid_stream_request!(request),
             },
             TransactionOutputsWithProof(request) => match &self.request {
@@ -975,7 +973,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                         notification_id_generator,
                     )?;
                     Ok(Some(data_notification))
-                }
+                },
                 request => invalid_stream_request!(request),
             },
             TransactionsOrOutputsWithProof(request) => match &self.request {
@@ -987,7 +985,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                         notification_id_generator,
                     )?;
                     Ok(Some(data_notification))
-                }
+                },
                 request => invalid_stream_request!(request),
             },
             request => invalid_client_request!(request, self),
@@ -1064,7 +1062,7 @@ impl EpochEndingStreamEngine {
                         request.end_epoch.checked_add(1).ok_or_else(|| {
                             Error::IntegerOverflow("Next request epoch has overflown!".into())
                         })?;
-                }
+                },
                 request => invalid_client_request!(request, self),
             }
         }
@@ -1138,7 +1136,7 @@ impl DataStreamEngine for EpochEndingStreamEngine {
                     self.clone().into(),
                 )?;
                 Ok(Some(data_notification))
-            }
+            },
             request => invalid_client_request!(request, self),
         }
     }
@@ -1229,31 +1227,31 @@ impl TransactionStreamEngine {
                     match client_request {
                         TransactionsWithProof(request) => {
                             self.update_request_version(request.end_version)?;
-                        }
+                        },
                         request => invalid_client_request!(request, self),
                     }
                 }
-            }
+            },
             StreamRequest::GetAllTransactionOutputs(_) => {
                 for client_request in client_requests.iter() {
                     match client_request {
                         TransactionOutputsWithProof(request) => {
                             self.update_request_version(request.end_version)?;
-                        }
+                        },
                         request => invalid_client_request!(request, self),
                     }
                 }
-            }
+            },
             StreamRequest::GetAllTransactionsOrOutputs(_) => {
                 for client_request in client_requests.iter() {
                     match client_request {
                         TransactionsOrOutputsWithProof(request) => {
                             self.update_request_version(request.end_version)?;
-                        }
+                        },
                         request => invalid_client_request!(request, self),
                     }
                 }
-            }
+            },
             request => invalid_stream_request!(request),
         }
 
@@ -1306,13 +1304,13 @@ impl DataStreamEngine for TransactionStreamEngine {
         let (request_end_version, advertised_ranges) = match &self.request {
             StreamRequest::GetAllTransactions(request) => {
                 (request.end_version, &advertised_data.transactions)
-            }
+            },
             StreamRequest::GetAllTransactionOutputs(request) => {
                 (request.end_version, &advertised_data.transaction_outputs)
-            }
+            },
             StreamRequest::GetAllTransactionsOrOutputs(request) => {
                 (request.end_version, &advertised_data.transaction_outputs)
-            }
+            },
             request => invalid_stream_request!(request),
         };
         Ok(AdvertisedData::contains_range(
@@ -1341,7 +1339,7 @@ impl DataStreamEngine for TransactionStreamEngine {
                         request.end_version,
                         stream_end_version,
                     )?;
-                }
+                },
                 request => invalid_client_request!(request, self),
             },
             StreamRequest::GetAllTransactionOutputs(stream_request) => match client_request {
@@ -1352,7 +1350,7 @@ impl DataStreamEngine for TransactionStreamEngine {
                         request.end_version,
                         stream_end_version,
                     )?;
-                }
+                },
                 request => invalid_client_request!(request, self),
             },
             StreamRequest::GetAllTransactionsOrOutputs(stream_request) => match client_request {
@@ -1363,7 +1361,7 @@ impl DataStreamEngine for TransactionStreamEngine {
                         request.end_version,
                         stream_end_version,
                     )?;
-                }
+                },
                 request => invalid_client_request!(request, self),
             },
             request => invalid_stream_request!(request),
@@ -1471,7 +1469,7 @@ fn create_data_client_request(
                 start_index,
                 end_index,
             })
-        }
+        },
         StreamEngine::ContinuousTransactionStreamEngine(stream_engine) => {
             let target_ledger_info_version = stream_engine
                 .get_target_ledger_info()?
@@ -1485,14 +1483,14 @@ fn create_data_client_request(
                         proof_version: target_ledger_info_version,
                         include_events: request.include_events,
                     })
-                }
+                },
                 StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
                     TransactionOutputsWithProof(TransactionOutputsWithProofRequest {
                         start_version: start_index,
                         end_version: end_index,
                         proof_version: target_ledger_info_version,
                     })
-                }
+                },
                 StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
                     TransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
                         start_version: start_index,
@@ -1500,16 +1498,16 @@ fn create_data_client_request(
                         proof_version: target_ledger_info_version,
                         include_events: request.include_events,
                     })
-                }
+                },
                 request => invalid_stream_request!(request),
             }
-        }
+        },
         StreamEngine::EpochEndingStreamEngine(_) => {
             EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
                 start_epoch: start_index,
                 end_epoch: end_index,
             })
-        }
+        },
         StreamEngine::TransactionStreamEngine(stream_engine) => match &stream_engine.request {
             StreamRequest::GetAllTransactions(request) => {
                 TransactionsWithProof(TransactionsWithProofRequest {
@@ -1518,14 +1516,14 @@ fn create_data_client_request(
                     proof_version: request.proof_version,
                     include_events: request.include_events,
                 })
-            }
+            },
             StreamRequest::GetAllTransactionOutputs(request) => {
                 TransactionOutputsWithProof(TransactionOutputsWithProofRequest {
                     start_version: start_index,
                     end_version: end_index,
                     proof_version: request.proof_version,
                 })
-            }
+            },
             StreamRequest::GetAllTransactionsOrOutputs(request) => {
                 TransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
                     start_version: start_index,
@@ -1533,7 +1531,7 @@ fn create_data_client_request(
                     proof_version: request.proof_version,
                     include_events: request.include_events,
                 })
-            }
+            },
             request => invalid_stream_request!(request),
         },
     };
@@ -1553,10 +1551,10 @@ fn create_data_notification(
     let data_payload = match client_response {
         ResponsePayload::StateValuesWithProof(states_chunk) => {
             DataPayload::StateValuesWithProof(states_chunk)
-        }
+        },
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)
-        }
+        },
         ResponsePayload::NewTransactionsWithProof((transactions_chunk, target_ledger_info)) => {
             match stream_engine {
                 StreamEngine::ContinuousTransactionStreamEngine(_) => {
@@ -1564,10 +1562,10 @@ fn create_data_notification(
                         target_ledger_info,
                         transactions_chunk,
                     )
-                }
+                },
                 _ => invalid_response_type!(client_response_type),
             }
-        }
+        },
         ResponsePayload::NewTransactionOutputsWithProof((
             transactions_output_chunk,
             target_ledger_info,
@@ -1577,7 +1575,7 @@ fn create_data_notification(
                     target_ledger_info,
                     transactions_output_chunk,
                 )
-            }
+            },
             _ => invalid_response_type!(client_response_type),
         },
         ResponsePayload::TransactionsWithProof(transactions_chunk) => match stream_engine {
@@ -1588,10 +1586,10 @@ fn create_data_notification(
                     )
                 })?;
                 DataPayload::ContinuousTransactionsWithProof(target_ledger_info, transactions_chunk)
-            }
+            },
             StreamEngine::TransactionStreamEngine(_) => {
                 DataPayload::TransactionsWithProof(transactions_chunk)
-            }
+            },
             _ => invalid_response_type!(client_response_type),
         },
         ResponsePayload::TransactionOutputsWithProof(transactions_output_chunk) => {
@@ -1606,13 +1604,13 @@ fn create_data_notification(
                         target_ledger_info,
                         transactions_output_chunk,
                     )
-                }
+                },
                 StreamEngine::TransactionStreamEngine(_) => {
                     DataPayload::TransactionOutputsWithProof(transactions_output_chunk)
-                }
+                },
                 _ => invalid_response_type!(client_response_type),
             }
-        }
+        },
         _ => invalid_response_type!(client_response_type),
     };
 

@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::OutputFallbackHandler;
 use crate::{
     bootstrapper::Bootstrapper,
     continuous_syncer::ContinuousSyncer,
@@ -18,12 +17,12 @@ use crate::{
     },
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
-    utils::PENDING_DATA_LOG_FREQ_SECS,
+    utils::{OutputFallbackHandler, PENDING_DATA_LOG_FREQ_SECS},
 };
 use aptos_config::config::{RoleType, StateSyncDriverConfig};
-use aptos_consensus_notifications::ConsensusCommitNotification;
-use aptos_consensus_notifications::ConsensusNotification;
-use aptos_consensus_notifications::ConsensusSyncNotification;
+use aptos_consensus_notifications::{
+    ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
+};
 use aptos_data_client::AptosDataClient;
 use aptos_data_streaming_service::streaming_client::{
     DataStreamingClient, NotificationAndFeedback, NotificationFeedback,
@@ -33,14 +32,14 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReader;
-use aptos_time_service::TimeService;
-use aptos_time_service::TimeServiceTrait;
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::waypoint::Waypoint;
 use futures::StreamExt;
-use std::sync::Arc;
-use std::time::Instant;
-use tokio::task::yield_now;
-use tokio::time::{interval, Duration};
+use std::{sync::Arc, time::Instant};
+use tokio::{
+    task::yield_now,
+    time::{interval, Duration},
+};
 use tokio_stream::wrappers::IntervalStream;
 
 // Useful constants for the driver
@@ -237,13 +236,13 @@ impl<
                         .consensus_notification_handler
                         .respond_to_commit_notification(commit_notification, Err(error.clone()))
                         .await;
-                }
+                },
                 ConsensusNotification::SyncToTarget(sync_notification) => {
                     let _ = self
                         .consensus_notification_handler
                         .respond_to_sync_notification(sync_notification, Err(error.clone()))
                         .await;
-                }
+                },
             }
             warn!(LogSchema::new(LogEntry::ConsensusNotification)
                 .error(&error)
@@ -256,11 +255,11 @@ impl<
             ConsensusNotification::NotifyCommit(commit_notification) => {
                 self.handle_consensus_commit_notification(commit_notification)
                     .await
-            }
+            },
             ConsensusNotification::SyncToTarget(sync_notification) => {
                 self.handle_consensus_sync_notification(sync_notification)
                     .await
-            }
+            },
         };
 
         // Log any errors from notification handling

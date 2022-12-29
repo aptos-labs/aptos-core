@@ -19,8 +19,7 @@ use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::transaction::Version;
+use aptos_types::{state_store::state_storage_usage::StateStorageUsage, transaction::Version};
 use byteorder::{BigEndian, ReadBytesExt};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;

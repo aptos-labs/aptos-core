@@ -3,61 +3,63 @@
 
 pub mod analyze;
 
-use crate::common::types::{
-    ConfigSearchMode, OptionalPoolAddressArgs, PoolAddressArgs, PromptOptions, TransactionSummary,
-};
-use crate::common::utils::prompt_yes_with_override;
-use crate::config::GlobalConfig;
-use crate::node::analyze::analyze_validators::{AnalyzeValidators, ValidatorStats};
-use crate::node::analyze::fetch_metadata::FetchMetadata;
 use crate::{
     common::{
         types::{
-            CliCommand, CliError, CliResult, CliTypedResult, ProfileOptions, RestOptions,
-            TransactionOptions,
+            CliCommand, CliError, CliResult, CliTypedResult, ConfigSearchMode,
+            OptionalPoolAddressArgs, PoolAddressArgs, ProfileOptions, PromptOptions, RestOptions,
+            TransactionOptions, TransactionSummary,
         },
-        utils::read_from_file,
+        utils::{prompt_yes_with_override, read_from_file},
     },
+    config::GlobalConfig,
     genesis::git::from_yaml,
+    node::analyze::{
+        analyze_validators::{AnalyzeValidators, ValidatorStats},
+        fetch_metadata::FetchMetadata,
+    },
 };
-use aptos_backup_cli::coordinators::restore::{RestoreCoordinator, RestoreCoordinatorOpt};
-use aptos_backup_cli::metadata::cache::MetadataCacheOpt;
-use aptos_backup_cli::storage::command_adapter::{config::CommandAdapterConfig, CommandAdapter};
-use aptos_backup_cli::utils::{
-    ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt,
+use aptos_backup_cli::{
+    coordinators::restore::{RestoreCoordinator, RestoreCoordinatorOpt},
+    metadata::cache::MetadataCacheOpt,
+    storage::command_adapter::{config::CommandAdapterConfig, CommandAdapter},
+    utils::{ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt},
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::NodeConfig;
-use aptos_crypto::bls12381::PublicKey;
-use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
+use aptos_crypto::{bls12381, bls12381::PublicKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
-use aptos_rest_client::aptos_api_types::VersionedEvent;
-use aptos_rest_client::{Client, State};
-use aptos_types::account_config::BlockResource;
-use aptos_types::chain_id::ChainId;
-use aptos_types::network_address::NetworkAddress;
-use aptos_types::on_chain_config::{ConfigurationResource, ConsensusScheme, ValidatorSet};
-use aptos_types::stake_pool::StakePool;
-use aptos_types::staking_contract::StakingContractStore;
-use aptos_types::validator_info::ValidatorInfo;
-use aptos_types::validator_performances::ValidatorPerformances;
-use aptos_types::vesting::VestingAdminStore;
-use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
+use aptos_rest_client::{aptos_api_types::VersionedEvent, Client, State};
+use aptos_types::{
+    account_address::AccountAddress,
+    account_config::{BlockResource, CORE_CODE_ADDRESS},
+    chain_id::ChainId,
+    network_address::NetworkAddress,
+    on_chain_config::{ConfigurationResource, ConsensusScheme, ValidatorSet},
+    stake_pool::StakePool,
+    staking_contract::StakingContractStore,
+    validator_info::ValidatorInfo,
+    validator_performances::ValidatorPerformances,
+    vesting::VestingAdminStore,
+};
 use async_trait::async_trait;
 use bcs::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
 use hex::FromHex;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rand::{rngs::StdRng, SeedableRng};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
-use std::pin::Pin;
-use std::sync::Arc;
-use std::{path::PathBuf, thread, time::Duration};
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    path::PathBuf,
+    pin::Pin,
+    sync::Arc,
+    thread,
+    time::Duration,
+};
 use tokio::time::Instant;
 
 const SECS_TO_MICROSECS: u64 = 1_000_000;
@@ -624,7 +626,7 @@ impl CliCommand<TransactionSummary> for InitializeValidator {
                         "If specifying fullnode addresses, both host and public key are required."
                             .to_string(),
                     ))
-                }
+                },
             };
 
         self.txn_options
@@ -1301,7 +1303,7 @@ impl CliCommand<TransactionSummary> for UpdateValidatorNetworkAddresses {
                         "If specifying fullnode addresses, both host and public key are required."
                             .to_string(),
                     ))
-                }
+                },
             };
 
         self.txn_options

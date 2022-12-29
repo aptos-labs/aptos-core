@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 use crate::{
     get_provider,
     provider::{api_index::ApiIndexProvider, Provider, ProviderCollection},
@@ -8,8 +9,6 @@ use crate::{
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tokio::time::{Duration, Instant};
-
-use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 
 const LINK: &str =
     "https://aptos.dev/nodes/node-health-checker/node-health-checker-faq#how-does-the-latency-evaluator-work";

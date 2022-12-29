@@ -4,7 +4,6 @@
 use crate::{Address, Bytecode, IdentifierWrapper, VerifyInput, VerifyInputWithRecursion};
 use anyhow::{bail, format_err};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
-
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -19,7 +18,6 @@ use move_core_types::{
     transaction_argument::TransactionArgument,
 };
 use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
-
 use poem_openapi::{types::Type, Enum, Object, Union};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -52,7 +50,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
 }
 
 macro_rules! define_integer_type {
-    ($n: ident, $t: ty, $d: literal) => {
+    ($n:ident, $t:ty, $d:literal) => {
         #[doc = $d]
         #[doc = "Encoded as a string to encode into JSON."]
         #[derive(Clone, Debug, Default, Eq, PartialEq, Copy)]
@@ -203,6 +201,7 @@ impl From<HexEncodedBytes> for move_core_types::value::MoveValue {
 
 impl TryFrom<HexEncodedBytes> for EventKey {
     type Error = anyhow::Error;
+
     fn try_from(bytes: HexEncodedBytes) -> anyhow::Result<Self> {
         Ok(bcs::from_bytes(&bytes.0)?)
     }
@@ -220,6 +219,7 @@ pub struct MoveStructValue(pub BTreeMap<IdentifierWrapper, serde_json::Value>);
 
 impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
     type Error = anyhow::Error;
+
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         let mut map = BTreeMap::new();
         for (id, val) in s.value {
@@ -271,7 +271,7 @@ impl MoveValue {
                         "Unparsable utf-8 {}",
                         HexEncodedBytes(bytes)
                     )))
-                }
+                },
             }
         } else {
             bail!("expect string::String, but failed to decode struct value");
@@ -304,7 +304,7 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
                 } else {
                     MoveValue::Struct(v.try_into()?)
                 }
-            }
+            },
         })
     }
 }
@@ -460,6 +460,7 @@ impl<'de> Deserialize<'de> for MoveStructTag {
 
 impl TryFrom<MoveStructTag> for StructTag {
     type Error = anyhow::Error;
+
     fn try_from(tag: MoveStructTag) -> anyhow::Result<Self> {
         Ok(Self {
             address: tag.address.into(),
@@ -554,10 +555,10 @@ impl MoveType {
                 } else {
                     format!("array<{}>", items.json_type_name())
                 }
-            }
+            },
             MoveType::Struct(_) | MoveType::GenericTypeParam { index: _ } => {
                 "string<move_struct_tag_id>".to_owned()
-            }
+            },
             MoveType::Reference { mutable: _, to } => to.json_type_name(),
             MoveType::Unparsable(string) => string.to_string(),
         }
@@ -585,7 +586,7 @@ impl fmt::Display for MoveType {
                 } else {
                     write!(f, "&{}", to)
                 }
-            }
+            },
             MoveType::Unparsable(string) => write!(f, "unparsable<{}>", string),
         }
     }
@@ -699,6 +700,7 @@ impl From<&TypeTag> for MoveType {
 
 impl TryFrom<MoveType> for TypeTag {
     type Error = anyhow::Error;
+
     fn try_from(tag: MoveType) -> anyhow::Result<Self> {
         let ret = match tag {
             MoveType::Bool => TypeTag::Bool,
@@ -714,7 +716,7 @@ impl TryFrom<MoveType> for TypeTag {
                     "Invalid move type for converting into `TypeTag`: {:?}",
                     &tag
                 ))
-            }
+            },
         };
         Ok(ret)
     }
@@ -1198,7 +1200,6 @@ pub fn verify_identifier(identifier: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use aptos_types::account_address::AccountAddress;
     use move_binary_format::file_format::AbilitySet;
     use move_core_types::{
@@ -1206,7 +1207,6 @@ mod tests {
         language_storage::{StructTag, TypeTag},
     };
     use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
-
     use serde::{de::DeserializeOwned, Serialize};
     use serde_json::{json, to_value, Value};
     use std::{boxed::Box, convert::TryFrom, fmt::Debug};
@@ -1237,40 +1237,30 @@ mod tests {
     fn test_serialize_move_resource() {
         use AnnotatedMoveValue::*;
 
-        let res = MoveResource::try_from(annotated_move_struct(
-            "Values",
-            vec![
-                (identifier("field_u8"), U8(7)),
-                (identifier("field_u64"), U64(7)),
-                (identifier("field_u128"), U128(7)),
-                (identifier("field_bool"), Bool(true)),
-                (identifier("field_address"), Address(address("0xdd"))),
-                (
-                    identifier("field_vector"),
-                    Vector(TypeTag::U128, vec![U128(128)]),
-                ),
-                (identifier("field_bytes"), Bytes(vec![9, 9])),
-                (
-                    identifier("field_struct"),
-                    Struct(annotated_move_struct(
-                        "Nested",
-                        vec![(
-                            identifier("nested_vector"),
-                            Vector(
-                                TypeTag::Struct(Box::new(type_struct("Host"))),
-                                vec![Struct(annotated_move_struct(
-                                    "String",
-                                    vec![
-                                        (identifier("address1"), Address(address("0x0"))),
-                                        (identifier("address2"), Address(address("0x123"))),
-                                    ],
-                                ))],
-                            ),
-                        )],
-                    )),
-                ),
-            ],
-        ))
+        let res = MoveResource::try_from(annotated_move_struct("Values", vec![
+            (identifier("field_u8"), U8(7)),
+            (identifier("field_u64"), U64(7)),
+            (identifier("field_u128"), U128(7)),
+            (identifier("field_bool"), Bool(true)),
+            (identifier("field_address"), Address(address("0xdd"))),
+            (
+                identifier("field_vector"),
+                Vector(TypeTag::U128, vec![U128(128)]),
+            ),
+            (identifier("field_bytes"), Bytes(vec![9, 9])),
+            (
+                identifier("field_struct"),
+                Struct(annotated_move_struct("Nested", vec![(
+                    identifier("nested_vector"),
+                    Vector(TypeTag::Struct(Box::new(type_struct("Host"))), vec![
+                        Struct(annotated_move_struct("String", vec![
+                            (identifier("address1"), Address(address("0x0"))),
+                            (identifier("address2"), Address(address("0x123"))),
+                        ])),
+                    ]),
+                )])),
+            ),
+        ]))
         .unwrap();
         let value = to_value(&res).unwrap();
         assert_json(
@@ -1295,13 +1285,10 @@ mod tests {
 
     #[test]
     fn test_serialize_move_resource_with_address_0x0() {
-        let res = MoveResource::try_from(annotated_move_struct(
-            "Values",
-            vec![(
-                identifier("address_0x0"),
-                AnnotatedMoveValue::Address(address("0x0")),
-            )],
-        ))
+        let res = MoveResource::try_from(annotated_move_struct("Values", vec![(
+            identifier("address_0x0"),
+            AnnotatedMoveValue::Address(address("0x0")),
+        )]))
         .unwrap();
         let value = to_value(&res).unwrap();
         assert_json(

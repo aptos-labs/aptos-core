@@ -1,14 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{system_metrics::SystemMetricsThreshold, Swarm, SwarmExt};
 use anyhow::{bail, Context};
 use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos_sdk::types::PeerId;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
 use std::time::Duration;
-
-use crate::system_metrics::SystemMetricsThreshold;
-use crate::{Swarm, SwarmExt};
 
 #[derive(Clone, Debug)]
 pub struct StateProgressThreshold {
