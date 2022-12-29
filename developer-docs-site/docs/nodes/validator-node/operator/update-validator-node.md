@@ -42,7 +42,7 @@ To replace the validator node:
 
 You may want to have a VFN ready for failover or need access to REST APIs for building without any rate limits. Note you have the ability to run a [local multinode network](../../../guides/running-a-local-multi-node-network.md) that may be suitable.
 
-With caution, you may also run multiple fullnodes on the Aptos network. Do not run multiple VFNs with the same [network identity](../../identity-and-configuration.md) and connect them to the validator using the `vfn` network, as this may cause issues with node metrics and telemetry.
+With caution, you may also run multiple fullnodes on the Aptos network. Note that it is not currently recommended to run multiple VFNs with the same [network identity](../../identity-and-configuration.md) and connect them to the validator using the `vfn` network, as this may cause issues with node metrics and telemetry.
 
 To run multiple fullnodes and connect them to your validator:
 
