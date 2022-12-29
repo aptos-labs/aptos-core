@@ -80,6 +80,8 @@ EXPOSE 6180
 EXPOSE 9101
 # Backup
 EXPOSE 6186
+# Indexer GRPC
+EXPOSE 50051
 
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1
