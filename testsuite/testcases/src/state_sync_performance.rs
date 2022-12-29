@@ -94,7 +94,7 @@ impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
                     "No instant vectors found for prom query {}",
                     prom_query
                 ));
-            }
+            },
         };
         info!(
             "Number of reported state values found on-chain is: {}",

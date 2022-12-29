@@ -8,8 +8,7 @@ use crate::{
 };
 use aptos_build_info::build_information;
 use aptos_logger::{debug, Level};
-use aptos_rest_client::aptos_api_types::HashValue;
-use aptos_rest_client::{Account, Client};
+use aptos_rest_client::{aptos_api_types::HashValue, Account, Client};
 use aptos_telemetry::service::telemetry_is_disabled;
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use itertools::Itertools;

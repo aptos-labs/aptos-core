@@ -22,12 +22,10 @@ use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     on_chain_config::{
-        ApprovedExecutionHashes, GasSchedule, GasScheduleV2, OnChainConfig, StorageGasSchedule,
-        Version,
+        ApprovedExecutionHashes, FeatureFlag, Features, GasSchedule, GasScheduleV2, OnChainConfig,
+        StorageGasSchedule, Version,
     },
-    on_chain_config::{FeatureFlag, Features},
-    transaction::AbortInfo,
-    transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
+    transaction::{AbortInfo, ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use fail::fail_point;
@@ -71,12 +69,12 @@ impl AptosVMImpl {
                         AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
                         feature_version,
                     )
-                }
+                },
                 None => match GasSchedule::fetch_config(&storage) {
                     Some(gas_schedule) => {
                         let map = gas_schedule.to_btree_map();
                         (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
-                    }
+                    },
                     None => (None, 0),
                 },
             };

@@ -118,20 +118,20 @@ fn test_vault_key_value_policies() {
     let root = Policy::new(vec![]);
     let partial = Policy::new(vec![
         Permission::new(Identity::User(READER.into()), vec![Capability::Read]),
-        Permission::new(
-            Identity::User(WRITER.into()),
-            vec![Capability::Read, Capability::Write],
-        ),
+        Permission::new(Identity::User(WRITER.into()), vec![
+            Capability::Read,
+            Capability::Write,
+        ]),
     ]);
     let full = Policy::new(vec![
-        Permission::new(
-            Identity::User(READER.into()),
-            vec![Capability::Read, Capability::Write],
-        ),
-        Permission::new(
-            Identity::User(WRITER.into()),
-            vec![Capability::Read, Capability::Write],
-        ),
+        Permission::new(Identity::User(READER.into()), vec![
+            Capability::Read,
+            Capability::Write,
+        ]),
+        Permission::new(Identity::User(WRITER.into()), vec![
+            Capability::Read,
+            Capability::Write,
+        ]),
     ]);
 
     // Provide a TTL to verify that lease renews work
@@ -234,10 +234,10 @@ fn test_vault_crypto_policies() {
     let policy = Policy::new(vec![
         Permission::new(Identity::User(EXPORTER.into()), vec![Capability::Export]),
         Permission::new(Identity::User(READER.into()), vec![Capability::Read]),
-        Permission::new(
-            Identity::User(ROTATER.into()),
-            vec![Capability::Read, Capability::Rotate],
-        ),
+        Permission::new(Identity::User(ROTATER.into()), vec![
+            Capability::Read,
+            Capability::Rotate,
+        ]),
         Permission::new(Identity::User(SIGNER.into()), vec![Capability::Sign]),
     ]);
 
@@ -339,10 +339,10 @@ fn test_vault_crypto_policies() {
 fn test_vault_tokens() {
     let mut storage = create_vault_policy_with_namespace(Some(VAULT_NAMESPACE_1.into()));
 
-    let partial = Policy::new(vec![Permission::new(
-        Identity::User(WRITER.into()),
-        vec![Capability::Read, Capability::Write],
-    )]);
+    let partial = Policy::new(vec![Permission::new(Identity::User(WRITER.into()), vec![
+        Capability::Read,
+        Capability::Write,
+    ])]);
 
     // Initialize data and policies
     storage.set(PARTIAL, 3).unwrap();

@@ -1,16 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::process::{Command, Stdio};
-
-use anyhow::bail;
-use aptos_logger::info;
-use tempfile::TempDir;
-
 use crate::{
     dump_string_to_file, K8sSwarm, Result, Swarm, SwarmChaos, SwarmNetworkBandwidth,
     SwarmNetworkDelay, SwarmNetworkLoss, SwarmNetworkPartition, KUBECTL_BIN,
 };
+use anyhow::bail;
+use aptos_logger::info;
+use std::process::{Command, Stdio};
+use tempfile::TempDir;
 
 macro_rules! DELAY_NETWORK_CHAOS_TEMPLATE {
     () => {
@@ -71,11 +69,11 @@ impl K8sSwarm {
                     }
                 }
                 Ok(())
-            }
+            },
             _ => {
                 let template = self.create_chaos_template(chaos)?;
                 self.remove_chaos_template(template)
-            }
+            },
         }
     }
 

@@ -3,6 +3,8 @@
 
 //! This file implements traits for Ed25519 private keys and public keys.
 
+#[cfg(any(test, feature = "fuzzing"))]
+use crate::test_utils::{self, KeyPair};
 use crate::{
     ed25519::{Ed25519Signature, ED25519_PRIVATE_KEY_LENGTH, ED25519_PUBLIC_KEY_LENGTH},
     hash::CryptoHash,
@@ -10,13 +12,10 @@ use crate::{
 };
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
-use serde::Serialize;
-use std::fmt;
-
-#[cfg(any(test, feature = "fuzzing"))]
-use crate::test_utils::{self, KeyPair};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
+use serde::Serialize;
+use std::fmt;
 
 /// An Ed25519 private key
 #[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
@@ -134,8 +133,8 @@ impl PrivateKey for Ed25519PrivateKey {
 }
 
 impl SigningKey for Ed25519PrivateKey {
-    type VerifyingKeyMaterial = Ed25519PublicKey;
     type SignatureMaterial = Ed25519Signature;
+    type VerifyingKeyMaterial = Ed25519PublicKey;
 
     fn sign<T: CryptoHash + Serialize>(
         &self,
@@ -245,8 +244,8 @@ impl Eq for Ed25519PublicKey {}
 // We deduce VerifyingKey from pointing to the signature material
 // we get the ability to do `pubkey.validate(msg, signature)`
 impl VerifyingKey for Ed25519PublicKey {
-    type SigningKeyMaterial = Ed25519PrivateKey;
     type SignatureMaterial = Ed25519Signature;
+    type SigningKeyMaterial = Ed25519PrivateKey;
 }
 
 impl fmt::Display for Ed25519PublicKey {

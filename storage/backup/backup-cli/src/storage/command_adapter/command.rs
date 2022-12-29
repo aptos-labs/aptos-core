@@ -120,7 +120,7 @@ impl SpawnedCommand {
                         output.status
                     )
                 }
-            }
+            },
             Err(e) => bail!("Failed joining command {:?}: {}", self.command, e),
         }
     }
@@ -153,7 +153,7 @@ impl<'a> AsyncRead for ChildStdoutAsDataSource<'a> {
                 Poll::Ready(Ok(())) if buf.filled().len() == filled_before_poll => {
                     // hit EOF, start joining self.child
                     self.join_fut = Some(self.child.take().unwrap().join().boxed());
-                }
+                },
                 _ => return res,
             }
         }

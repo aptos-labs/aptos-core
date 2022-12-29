@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
 use super::{
     api_index::ApiIndexProvider, metrics::MetricsProvider, noise::NoiseProvider,
     system_information::SystemInformationProvider,
 };
+use std::sync::Arc;
 
 /// This struct is a container for all the different providers that we have.
 /// It is used to provide a single point of access to all Providers that can

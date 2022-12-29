@@ -75,7 +75,7 @@ async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &s
                         ])
                         .status()
                         .expect("Failed to tail genesis logs");
-                }
+                },
                 None => info!("Genesis completed running"),
             }
             info!("Genesis status: {:?}", status);
@@ -83,7 +83,7 @@ async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &s
                 Some(_) => {
                     info!("Genesis done");
                     Ok(())
-                }
+                },
                 None => bail!("Genesis did not succeed"),
             }
         })
@@ -119,11 +119,11 @@ async fn wait_node_haproxy(
                         }
                         info!("Deployment {} has no status", deployment_name);
                         bail!("Deployment not ready");
-                    }
+                    },
                     Err(e) => {
                         info!("Failed to get deployment: {}", e);
                         bail!("Failed to get deployment: {}", e);
-                    }
+                    },
                 }
             }
             Ok(())
@@ -173,10 +173,10 @@ async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
         either::Left(list) => {
             let names: Vec<_> = list.iter().map(Meta::name).collect();
             info!("Deleting collection of {}: {:?}", name, names);
-        }
+        },
         either::Right(status) => {
             info!("Deleted collection of {}: status={:?}", name, status);
-        }
+        },
     }
 
     Ok(())
@@ -267,11 +267,11 @@ async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
                     } else {
                         bail!(api_err);
                     }
-                }
+                },
                 Err(e) => bail!(e),
             };
             delete_k8s_resources(client, "default").await?;
-        }
+        },
         s if s.starts_with("forge") => {
             let namespaces: Api<Namespace> = Api::all(client);
             namespaces
@@ -279,13 +279,13 @@ async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
                 .await?
                 .map_left(|namespace| info!("Deleting namespace {}: {:?}", s, namespace.status))
                 .map_right(|status| info!("Deleted namespace {}: {:?}", s, status));
-        }
+        },
         _ => {
             bail!(
                 "Invalid kubernetes namespace provided: {}. Use forge-*",
                 kube_namespace
             );
-        }
+        },
     }
 
     Ok(())
@@ -1032,7 +1032,7 @@ mod tests {
         let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(401));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
         match result {
-            Err(ApiError::FinalError(_)) => {}
+            Err(ApiError::FinalError(_)) => {},
             _ => panic!("Expected final error"),
         }
     }
@@ -1105,7 +1105,7 @@ labels:
         let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(403));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
         match result {
-            Err(ApiError::RetryableError(_)) => {}
+            Err(ApiError::RetryableError(_)) => {},
             _ => panic!("Expected retryable error"),
         }
     }

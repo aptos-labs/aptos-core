@@ -11,7 +11,6 @@ use aptos_types::{
     account_config,
     transaction::{SignedTransaction, TransactionPayload},
 };
-
 use move_bytecode_utils::module_cache::SyncModuleCache;
 use move_core_types::{
     ident_str,
@@ -20,9 +19,8 @@ use move_core_types::{
     resolver::ModuleResolver,
     value::{serialize_values, MoveValue},
 };
-use read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis};
-
 use once_cell::sync::Lazy;
+use read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis};
 use std::ops::Deref;
 
 pub struct ReadWriteSetAnalysis<'a, R: ModuleResolver> {
@@ -124,12 +122,12 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
             ),
             TransactionPayload::Script(s) => {
                 bail!("Unsupported transaction script type {:?}", s)
-            }
+            },
             payload => {
                 // TODO: support tx scripts here. Slightly tricky since we will need to run
                 // analyzer on the fly
                 bail!("Unsupported transaction payload type {:?}", payload)
-            }
+            },
         }
     }
 
@@ -172,7 +170,7 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
         match tx {
             PreprocessedTransaction::UserTransaction(tx) => {
                 self.get_keys_user_transaction_impl(tx, concretize)
-            }
+            },
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 let args = serialize_values(
                     &block_metadata
@@ -188,12 +186,12 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
                     &self.module_cache,
                 )?;
                 self.concretize_secondary_indexes(metadata_access, concretize)
-            }
+            },
             PreprocessedTransaction::InvalidSignature => Ok((vec![], vec![])),
             PreprocessedTransaction::StateCheckpoint => Ok((vec![], vec![])),
             PreprocessedTransaction::WaypointWriteSet(_) => {
                 bail!("Unsupported writeset transaction")
-            }
+            },
         }
     }
 

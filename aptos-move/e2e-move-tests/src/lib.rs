@@ -8,8 +8,7 @@ pub mod stake;
 use anyhow::bail;
 use aptos_framework::UPGRADE_POLICY_CUSTOM_FIELD;
 pub use harness::*;
-use move_package::package_hooks::PackageHooks;
-use move_package::source_package::parsed_manifest::CustomDepInfo;
+use move_package::{package_hooks::PackageHooks, source_package::parsed_manifest::CustomDepInfo};
 use move_symbol_pool::Symbol;
 pub use stake::*;
 

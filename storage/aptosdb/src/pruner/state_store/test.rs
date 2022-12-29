@@ -1,10 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{
+    pruner::{state_pruner_worker::StatePrunerWorker, *},
+    stale_node_index::StaleNodeIndexSchema,
+    stale_state_value_index::StaleStateValueIndexSchema,
+    state_store::StateStore,
+    test_helper::{arb_state_kv_sets, update_store},
+    AptosDB, LedgerPrunerManager, PrunerManager, StatePrunerManager,
+};
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
-use proptest::{prelude::*, proptest};
-use std::{collections::HashMap, sync::Arc};
-
 use aptos_crypto::HashValue;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, DbReader};
@@ -17,15 +22,8 @@ use aptos_types::{
     },
     transaction::Version,
 };
-
-use crate::{
-    pruner::{state_pruner_worker::StatePrunerWorker, *},
-    stale_node_index::StaleNodeIndexSchema,
-    stale_state_value_index::StaleStateValueIndexSchema,
-    state_store::StateStore,
-    test_helper::{arb_state_kv_sets, update_store},
-    AptosDB, LedgerPrunerManager, PrunerManager, StatePrunerManager,
-};
+use proptest::{prelude::*, proptest};
+use std::{collections::HashMap, sync::Arc};
 
 fn put_value_set(
     db: &DB,
@@ -79,14 +77,11 @@ fn create_state_pruner_manager(
     state_merkle_db: &Arc<DB>,
     prune_batch_size: usize,
 ) -> StatePrunerManager<StaleNodeIndexSchema> {
-    StatePrunerManager::new(
-        Arc::clone(state_merkle_db),
-        StateMerklePrunerConfig {
-            enable: true,
-            prune_window: 0,
-            batch_size: prune_batch_size,
-        },
-    )
+    StatePrunerManager::new(Arc::clone(state_merkle_db), StateMerklePrunerConfig {
+        enable: true,
+        prune_window: 0,
+        batch_size: prune_batch_size,
+    })
 }
 
 #[test]
@@ -349,14 +344,11 @@ fn test_worker_quit_eagerly() {
         let state_pruner = pruner_utils::create_state_pruner::<StaleNodeIndexSchema>(Arc::clone(
             &aptos_db.state_merkle_db,
         ));
-        let worker = StatePrunerWorker::new(
-            state_pruner,
-            StateMerklePrunerConfig {
-                enable: true,
-                prune_window: 1,
-                batch_size: 100,
-            },
-        );
+        let worker = StatePrunerWorker::new(state_pruner, StateMerklePrunerConfig {
+            enable: true,
+            prune_window: 1,
+            batch_size: 100,
+        });
         worker.set_target_db_version(/*target_db_version=*/ 1);
         worker.set_target_db_version(/*target_db_version=*/ 2);
         // Worker quits immediately.

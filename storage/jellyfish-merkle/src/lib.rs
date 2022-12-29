@@ -566,14 +566,14 @@ where
                 }
                 let new_internal_node = InternalNode::new(new_children);
                 Ok(Some(new_internal_node.into()))
-            }
+            },
             Node::Leaf(leaf_node) => self.batch_update_subtree_with_existing_leaf(
                 node_key, version, leaf_node, kvs, depth, hash_cache, batch,
             ),
             Node::Null => {
                 ensure!(depth == 0, "Null node can only exist at depth 0");
                 self.batch_update_subtree(node_key, version, kvs, 0, hash_cache, batch)
-            }
+            },
         }
     }
 
@@ -840,9 +840,9 @@ where
                                     siblings
                                 }),
                             ))
-                        }
+                        },
                     };
-                }
+                },
                 Node::Leaf(leaf_node) => {
                     return Ok((
                         if leaf_node.account_key() == key {
@@ -855,10 +855,10 @@ where
                             siblings
                         }),
                     ));
-                }
+                },
                 Node::Null => {
                     return Ok((None, SparseMerkleProofExt::new(None, vec![])));
-                }
+                },
             }
         }
         bail!("Jellyfish Merkle tree has cyclic graph inside.");
@@ -937,8 +937,8 @@ where
                         out_keys,
                     )?;
                 }
-            }
-            Node::Leaf(_) | Node::Null => {}
+            },
+            Node::Leaf(_) | Node::Null => {},
         };
 
         out_keys.push(key);
@@ -954,11 +954,13 @@ trait NibbleExt {
 impl NibbleExt for HashValue {
     /// Returns the `index`-th nibble.
     fn get_nibble(&self, index: usize) -> Nibble {
-        Nibble::from(if index % 2 == 0 {
-            self[index / 2] >> 4
-        } else {
-            self[index / 2] & 0x0F
-        })
+        Nibble::from(
+            if index % 2 == 0 {
+                self[index / 2] >> 4
+            } else {
+                self[index / 2] & 0x0F
+            },
+        )
     }
 
     /// Returns the length of common prefix of `self` and `other` in nibbles.

@@ -1,17 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared_mempool::types::MultiBatchId;
-use crate::tests::common;
 use crate::{
     core_mempool::CoreMempool,
     network::{MempoolNetworkEvents, MempoolNetworkSender, MempoolSyncMsg},
-    shared_mempool::start_shared_mempool,
-    tests::common::TestTransaction,
+    shared_mempool::{start_shared_mempool, types::MultiBatchId},
+    tests::{common, common::TestTransaction},
     MempoolClientRequest, MempoolClientSender, QuorumStoreRequest,
 };
-use aptos_channels::aptos_channel;
-use aptos_channels::message_queues::QueueStyle;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
@@ -35,10 +32,9 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{
     account_address::AccountAddress, mempool_status::MempoolStatusCode,
-    transaction::SignedTransaction,
+    on_chain_config::OnChainConfigPayload, transaction::SignedTransaction,
 };
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use futures::{channel::oneshot, SinkExt};
@@ -250,27 +246,21 @@ impl MempoolNode {
         let data = protocol_id.to_bytes(&msg).unwrap().into();
         let (notif, maybe_receiver) = match protocol_id {
             ProtocolId::MempoolDirectSend => (
-                PeerManagerNotification::RecvMessage(
-                    remote_peer_id,
-                    Message {
-                        protocol_id,
-                        mdata: data,
-                    },
-                ),
+                PeerManagerNotification::RecvMessage(remote_peer_id, Message {
+                    protocol_id,
+                    mdata: data,
+                }),
                 None,
             ),
             ProtocolId::MempoolRpc => {
                 let (res_tx, res_rx) = oneshot::channel();
-                let notif = PeerManagerNotification::RecvRpc(
-                    remote_peer_id,
-                    InboundRpcRequest {
-                        protocol_id,
-                        data,
-                        res_tx,
-                    },
-                );
+                let notif = PeerManagerNotification::RecvRpc(remote_peer_id, InboundRpcRequest {
+                    protocol_id,
+                    data,
+                    res_tx,
+                });
                 (notif, Some(res_rx))
-            }
+            },
             _ => panic!("Invalid protocol"),
         };
         inbound_handle
@@ -286,7 +276,7 @@ impl MempoolNode {
                 PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                     assert_eq!(peer_id, remote_peer_id);
                     msg.protocol_id.from_bytes(&msg.mdata).unwrap()
-                }
+                },
                 _ => panic!("Should not be getting an RPC response"),
             }
         };
@@ -348,10 +338,10 @@ impl MempoolNode {
         let (peer_id, protocol_id, data, maybe_rpc_sender) = match message {
             PeerManagerRequest::SendRpc(peer_id, msg) => {
                 (peer_id, msg.protocol_id, msg.data, Some(msg.res_tx))
-            }
+            },
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                 (peer_id, msg.protocol_id, msg.mdata, None)
-            }
+            },
         };
         assert_eq!(peer_id, expected_peer_id);
         let mempool_message = common::decompress_and_deserialize(&data.to_vec());
@@ -381,10 +371,10 @@ impl MempoolNode {
                     );
                 }
                 request_id
-            }
+            },
             MempoolSyncMsg::BroadcastTransactionsResponse { .. } => {
                 panic!("We aren't supposed to be getting as response here");
-            }
+            },
         };
         let response = MempoolSyncMsg::BroadcastTransactionsResponse {
             request_id,
@@ -396,13 +386,10 @@ impl MempoolNode {
         if let Some(rpc_sender) = maybe_rpc_sender {
             rpc_sender.send(Ok(bytes.into())).unwrap();
         } else {
-            let notif = PeerManagerNotification::RecvMessage(
-                peer_id,
-                Message {
-                    protocol_id,
-                    mdata: bytes.into(),
-                },
-            );
+            let notif = PeerManagerNotification::RecvMessage(peer_id, Message {
+                protocol_id,
+                mdata: bytes.into(),
+            });
             inbound_handle
                 .inbound_message_sender
                 .push((peer_id, protocol_id), notif)
@@ -498,13 +485,10 @@ fn setup_mempool(
         notification_receiver: reconfig_events,
     };
     reconfig_sender
-        .push(
-            (),
-            ReconfigNotification {
-                version: 1,
-                on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
-            },
-        )
+        .push((), ReconfigNotification {
+            version: 1,
+            on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+        })
         .unwrap();
 
     start_shared_mempool(

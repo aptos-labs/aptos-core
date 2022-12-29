@@ -10,7 +10,6 @@ use crate::{
     test_utils::{random_serializable_struct, uniform_keypair_strategy},
     traits::*,
 };
-
 use aptos_crypto_derive::{
     PrivateKey, PublicKey, Signature, SigningKey, SilentDebug, ValidCryptoMaterial, VerifyingKey,
 };

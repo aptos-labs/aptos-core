@@ -287,7 +287,7 @@ impl PersistentLivenessStorage for EmptyStorage {
             Err(e) => {
                 eprintln!("{}", e);
                 panic!("Construct recovery data during genesis should never fail");
-            }
+            },
         }
     }
 

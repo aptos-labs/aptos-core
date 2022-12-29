@@ -60,7 +60,7 @@ fn bad_module_address() {
                     ))
             );
             // assert!(status.status_code() == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER);
-        }
+        },
         vm_status => panic!("Unexpected verification status: {:?}", vm_status),
     };
 }

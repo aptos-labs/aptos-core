@@ -183,7 +183,7 @@ impl BackupCoordinator {
                         .map_err(|e| anyhow!("Receivers should not be cancelled: {}", e))
                         .unwrap()
                 }
-            }
+            },
             Err(e) => warn!(
                 "Failed pulling DbState from local node: {}. Will keep trying.",
                 e

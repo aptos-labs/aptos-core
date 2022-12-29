@@ -3,8 +3,7 @@
 
 use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::HashValue;
-use aptos_types::transaction::SignedTransaction;
-use aptos_types::PeerId;
+use aptos_types::{transaction::SignedTransaction, PeerId};
 use bcs::to_bytes;
 use serde::{Deserialize, Serialize};
 use std::mem;

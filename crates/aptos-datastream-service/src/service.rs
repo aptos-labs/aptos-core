@@ -75,6 +75,7 @@ impl IndexerStream for DatastreamServer {
                                     version: current_version + i as u64,
                                 })
                                 .collect(),
+                            ..TransactionsOutput::default()
                         })),
                     };
                     current_version += batch_size;

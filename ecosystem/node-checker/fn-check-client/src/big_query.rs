@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::check::SingleCheck;
 use anyhow::{bail, Context, Result};
 use aptos_logger::info;
 use aptos_sdk::types::account_address::AccountAddress;
@@ -14,11 +15,7 @@ use gcp_bigquery_client::{
     Client as BigQueryClient,
 };
 use serde::Serialize;
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::path::PathBuf;
-
-use crate::check::SingleCheck;
+use std::{collections::HashMap, convert::TryFrom, path::PathBuf};
 
 #[derive(Debug, Parser)]
 pub struct BigQueryArgs {
@@ -81,7 +78,7 @@ fn ignore_already_exists_error<T>(result: Result<T, BQError>) -> Result<(), BQEr
                 } else {
                     Err(err)
                 }
-            }
+            },
             wildcard => Err(wildcard),
         },
     }

@@ -130,7 +130,7 @@ pub fn update_counters_for_processed_chunk(
                 ),
                 ExecutionStatus::ExecutionFailure { .. } => {
                     ("keep_rejected", "ExecutionFailure", "error".to_string())
-                }
+                },
                 ExecutionStatus::MiscellaneousError(e) => (
                     "keep_rejected",
                     "MiscellaneousError",
@@ -183,12 +183,12 @@ pub fn update_counters_for_processed_chunk(
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
                         .with_label_values(&[process_type, "script", state])
                         .inc();
-                }
+                },
                 aptos_types::transaction::TransactionPayload::ModuleBundle(_module) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
                         .with_label_values(&[process_type, "module", state])
                         .inc();
-                }
+                },
                 aptos_types::transaction::TransactionPayload::EntryFunction(function) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
                         .with_label_values(&[process_type, "function", state])
@@ -220,7 +220,7 @@ pub fn update_counters_for_processed_chunk(
                             ])
                             .inc();
                     }
-                }
+                },
             }
         }
 

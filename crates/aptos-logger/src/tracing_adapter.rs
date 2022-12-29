@@ -153,7 +153,7 @@ where
                     event.metadata().level()
                 );
                 return;
-            }
+            },
         };
 
         let mut acc = BTreeMap::new();

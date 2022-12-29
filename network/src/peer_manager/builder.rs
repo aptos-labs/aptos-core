@@ -303,7 +303,7 @@ impl PeerManagerBuilder {
                     ),
                     executor,
                 )))
-            }
+            },
             #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
             [Memory(_)] => Some(TransportPeerManager::Memory(self.build_with_transport(
                 AptosNetTransport::new(

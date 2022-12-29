@@ -67,7 +67,7 @@ fn fetch_and_equals<T: OnChainConfig + PartialEq>(
             )?;
 
             Ok(&config == expected)
-        }
+        },
         None => Ok(false),
     }
 }

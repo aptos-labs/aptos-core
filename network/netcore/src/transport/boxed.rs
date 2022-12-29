@@ -66,11 +66,11 @@ impl<O, E> Transport for BoxedTransport<O, E>
 where
     E: ::std::error::Error + Send + Sync + 'static,
 {
-    type Output = O;
     type Error = E;
-    type Listener = Listener<O, E>;
     type Inbound = Inbound<O, E>;
+    type Listener = Listener<O, E>;
     type Outbound = Outbound<O, E>;
+    type Output = O;
 
     fn listen_on(
         &self,

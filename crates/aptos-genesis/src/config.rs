@@ -3,17 +3,16 @@
 
 use aptos_config::config::HANDSHAKE_VERSION;
 use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519};
-use aptos_types::account_address::AccountAddressWithChecks;
 use aptos_types::{
-    account_address::AccountAddress,
+    account_address::{AccountAddress, AccountAddressWithChecks},
     chain_id::ChainId,
     network_address::{DnsName, NetworkAddress, Protocol},
     transaction::authenticator::AuthenticationKey,
 };
 use aptos_vm_genesis::{AccountBalance, EmployeePool, Validator, ValidatorWithCommissionRate};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::{BTreeMap, HashSet};
 use std::{
+    collections::{BTreeMap, HashSet},
     convert::TryFrom,
     fs::File,
     io::Read,

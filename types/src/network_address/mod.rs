@@ -425,8 +425,8 @@ impl NetworkAddress {
 }
 
 impl IntoIterator for NetworkAddress {
-    type Item = Protocol;
     type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = Protocol;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -946,30 +946,24 @@ mod test {
                     Handshake(123),
                 ],
             ),
-            (
-                "/ip6/::1/tcp/0",
-                vec![Ip6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), Tcp(0)],
-            ),
-            (
-                "/ip6/dead:beef::c0de/tcp/8080",
-                vec![
-                    Ip6(Ipv6Addr::new(0xdead, 0xbeef, 0, 0, 0, 0, 0, 0xc0de)),
-                    Tcp(8080),
-                ],
-            ),
-            (
-                "/dns/example.com/tcp/80",
-                vec![Dns(DnsName("example.com".to_owned())), Tcp(80)],
-            ),
-            (
-                &noise_addr_str,
-                vec![
-                    Dns(DnsName("example.com".to_owned())),
-                    Tcp(1234),
-                    NoiseIK(pubkey),
-                    Handshake(5),
-                ],
-            ),
+            ("/ip6/::1/tcp/0", vec![
+                Ip6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
+                Tcp(0),
+            ]),
+            ("/ip6/dead:beef::c0de/tcp/8080", vec![
+                Ip6(Ipv6Addr::new(0xDEAD, 0xBEEF, 0, 0, 0, 0, 0, 0xC0DE)),
+                Tcp(8080),
+            ]),
+            ("/dns/example.com/tcp/80", vec![
+                Dns(DnsName("example.com".to_owned())),
+                Tcp(80),
+            ]),
+            (&noise_addr_str, vec![
+                Dns(DnsName("example.com".to_owned())),
+                Tcp(1234),
+                NoiseIK(pubkey),
+                Handshake(5),
+            ]),
         ];
 
         for (addr_str, expected_address) in &test_cases {

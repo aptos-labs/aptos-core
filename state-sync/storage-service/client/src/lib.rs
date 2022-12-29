@@ -15,9 +15,10 @@ use aptos_network::{
     },
     ProtocolId,
 };
-use aptos_storage_service_types::requests::StorageServiceRequest;
-use aptos_storage_service_types::responses::StorageServiceResponse;
-use aptos_storage_service_types::{StorageServiceError, StorageServiceMessage};
+use aptos_storage_service_types::{
+    requests::StorageServiceRequest, responses::StorageServiceResponse, StorageServiceError,
+    StorageServiceMessage,
+};
 use aptos_types::PeerId;
 use async_trait::async_trait;
 use std::{sync::Arc, time::Duration};
@@ -78,9 +79,9 @@ impl StorageServiceClient {
 // TODO(philiphayes): not clear yet what value this trait is providing
 #[async_trait]
 impl NetworkInterface<StorageServiceMessage, StorageServiceMultiSender> for StorageServiceClient {
+    type AppData = ();
     // TODO(philiphayes): flesh out
     type AppDataKey = ();
-    type AppData = ();
 
     fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
         &self.peer_metadata

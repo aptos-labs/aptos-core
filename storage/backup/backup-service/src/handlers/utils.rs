@@ -122,7 +122,7 @@ pub(super) fn unwrap_or_500(result: Result<Box<dyn Reply>>) -> Box<dyn Reply> {
         Err(e) => {
             warn!("Request handler exception: {:#}", e);
             Box::new(warp::http::StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        },
     }
 }
 

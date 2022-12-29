@@ -189,19 +189,19 @@ impl WriteSetMut {
                         (Modification(_) | Creation(_), Creation(_))
                         | (Deletion, Deletion | Modification(_)) => {
                             bail!("The given change sets cannot be squashed")
-                        }
+                        },
                         (Modification(_), Modification(data)) => *r = Modification(data),
                         (Creation(_), Modification(data)) => *r = Creation(data),
                         (Modification(_), Deletion) => *r = Deletion,
                         (Deletion, Creation(data)) => *r = Modification(data),
                         (Creation(_), Deletion) => {
                             entry.remove();
-                        }
+                        },
                     }
-                }
+                },
                 Vacant(entry) => {
                     entry.insert(op);
-                }
+                },
             }
         }
 
@@ -220,8 +220,8 @@ impl ::std::iter::FromIterator<(StateKey, WriteOp)> for WriteSetMut {
 }
 
 impl<'a> IntoIterator for &'a WriteSet {
-    type Item = (&'a StateKey, &'a WriteOp);
     type IntoIter = btree_map::Iter<'a, StateKey, WriteOp>;
+    type Item = (&'a StateKey, &'a WriteOp);
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
@@ -231,8 +231,8 @@ impl<'a> IntoIterator for &'a WriteSet {
 }
 
 impl ::std::iter::IntoIterator for WriteSet {
-    type Item = (StateKey, WriteOp);
     type IntoIter = btree_map::IntoIter<StateKey, WriteOp>;
+    type Item = (StateKey, WriteOp);
 
     fn into_iter(self) -> Self::IntoIter {
         match self {

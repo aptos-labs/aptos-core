@@ -19,11 +19,10 @@ use std::{
 mod cargo;
 mod node;
 mod swarm;
+pub use self::swarm::ActiveNodesGuard;
 pub use cargo::cargo_build_common_args;
 pub use node::LocalNode;
 pub use swarm::{LocalSwarm, SwarmDirectory};
-
-pub use self::swarm::ActiveNodesGuard;
 
 #[derive(Clone, Debug)]
 pub struct LocalVersion {
@@ -188,7 +187,7 @@ impl Factory for LocalFactory {
                 GenesisConfig::Bundle(bundle) => Some(bundle.clone()),
                 GenesisConfig::Path(_) => {
                     bail!("local forge backend does not support flattened dir for genesis")
-                }
+                },
             },
             None => None,
         };

@@ -210,7 +210,7 @@ impl MemoryListener {
             Poll::Ready(None) => {
                 let err = Error::new(ErrorKind::Other, "MemoryListener unknown error");
                 Poll::Ready(Err(err))
-            }
+            },
             Poll::Pending => Poll::Pending,
         }
     }
@@ -373,7 +373,7 @@ impl AsyncRead for MemorySocket {
                         .take(bytes_to_read)
                         .copy_to_slice(&mut buf[bytes_read..(bytes_read + bytes_to_read)]);
                     bytes_read += bytes_to_read;
-                }
+                },
 
                 // Either we've exhausted our current buffer or don't have one
                 _ => {
@@ -386,12 +386,12 @@ impl AsyncRead for MemorySocket {
                                 } else {
                                     return Poll::Pending;
                                 }
-                            }
+                            },
                             Poll::Ready(Some(buf)) => Some(buf),
                             Poll::Ready(None) => return Poll::Ready(Ok(bytes_read)),
                         }
                     };
-                }
+                },
             }
         }
     }
@@ -416,7 +416,7 @@ impl AsyncWrite for MemorySocket {
                     // Unbounded channels should only ever have "Disconnected" errors
                     unreachable!();
                 }
-            }
+            },
             Poll::Ready(Err(e)) => {
                 if e.is_disconnected() {
                     return Poll::Ready(Err(Error::new(ErrorKind::BrokenPipe, e)));
@@ -424,7 +424,7 @@ impl AsyncWrite for MemorySocket {
 
                 // Unbounded channels should only ever have "Disconnected" errors
                 unreachable!();
-            }
+            },
             Poll::Pending => return Poll::Pending,
         }
 

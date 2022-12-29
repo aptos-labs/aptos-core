@@ -2,26 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{AptosDB, LedgerPrunerManager, LedgerStore, PrunerManager, TransactionStore};
-use aptos_temppath::TempPath;
-use proptest::proptest;
-use std::sync::Arc;
-
-use aptos_types::{
-    account_address::AccountAddress,
-    block_metadata::BlockMetadata,
-    transaction::{SignedTransaction, Transaction},
-};
-
 use aptos_accumulator::HashReader;
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::DbReader;
+use aptos_temppath::TempPath;
 use aptos_types::{
+    account_address::AccountAddress,
+    block_metadata::BlockMetadata,
     proof::position::Position,
-    transaction::{TransactionInfo, Version},
+    transaction::{SignedTransaction, Transaction, TransactionInfo, Version},
     write_set::WriteSet,
 };
-use proptest::{collection::vec, prelude::*};
+use proptest::{collection::vec, prelude::*, proptest};
+use std::sync::Arc;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
