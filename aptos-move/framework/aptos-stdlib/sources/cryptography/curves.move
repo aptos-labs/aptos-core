@@ -18,14 +18,14 @@ module aptos_std::curves {
     /// See the comments on the specific `G` for more details about `Scalar<G>`.
     struct Scalar<phantom G> has copy, drop {
         //TODO: handle as u8 temporarily. Upgrade to u64.
-        handle: u8
+        handle: u64
     }
 
     /// This struct represents a group element, usually a point in an elliptic curve.
     /// The group is determined by the type argument `G`.
     /// See the comments on the specific `G` for more details about `Element<G>`.
     struct Element<phantom G> has copy, drop {
-        handle: u8
+        handle: u64
     }
 
     /// Perform a bilinear mapping.
@@ -38,7 +38,7 @@ module aptos_std::curves {
     public fun multi_pairing<G1,G2,Gt>(g1_elements: &vector<Element<G1>>, g2_elements: &vector<Element<G2>>): Element<Gt> {
         let num_g1 = std::vector::length(g1_elements);
         let num_g2 = std::vector::length(g2_elements);
-        assert!(num_g1 == num_g2, 1);
+        assert!(num_g1 == num_g2, std::error::invalid_argument(1));
         let g1_handles = vector[];
         let g2_handles = vector[];
         let i = 0;
@@ -49,7 +49,7 @@ module aptos_std::curves {
         };
 
         Element<Gt> {
-            handle: multi_pairing_internal<G1,G2,Gt>(g1_handles, g2_handles)
+            handle: multi_pairing_internal<G1,G2,Gt>(num_g1, g1_handles, num_g2, g2_handles)
         }
     }
 
@@ -185,26 +185,27 @@ module aptos_std::curves {
     }
 
     // Native functions.
-    native fun deserialize_element_uncompressed_internal<G>(bytes: vector<u8>): (bool, u8);
-    native fun deserialize_element_compressed_internal<G>(bytes: vector<u8>): (bool, u8);
-    native fun scalar_from_u64_internal<G>(value: u64): u8;
-    native fun scalar_from_bytes_internal<G>(bytes: vector<u8>): (bool, u8);
-    native fun scalar_neg_internal<G>(handle: u8): u8;
-    native fun scalar_add_internal<G>(handle_1: u8, handle_2: u8): u8;
-    native fun scalar_mul_internal<G>(handle_1: u8, handle_2: u8): u8;
-    native fun scalar_inv_internal<G>(handle: u8): (bool, u8);
-    native fun scalar_eq_internal<G>(handle_1: u8, handle_2: u8): bool;
-    native fun scalar_to_bytes_internal<G>(h: u8): vector<u8>;
-    native fun element_add_internal<G>(handle_1: u8, handle_2: u8): u8;
-    native fun element_eq_internal<G>(handle_1: u8, handle_2: u8): bool;
-    native fun identity_internal<G>(): u8;
-    native fun generator_internal<G>(): u8;
-    native fun element_mul_internal<G>(scalar_handle: u8, point_handle: u8): u8;
-    native fun element_neg_internal<G>(handle: u8): u8;
-    native fun serialize_element_uncompressed_internal<G>(handle: u8): vector<u8>;
-    native fun serialize_element_compressed_internal<G>(handle: u8): vector<u8>;
-    native fun pairing_internal<G1,G2,Gt>(g1_handle: u8, g2_handle: u8): u8;
-    native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u8>, g2_handles: vector<u8>): u8;
+    native fun deserialize_element_uncompressed_internal<G>(bytes: vector<u8>): (bool, u64);
+    native fun deserialize_element_compressed_internal<G>(bytes: vector<u8>): (bool, u64);
+    native fun scalar_from_u64_internal<G>(value: u64): u64;
+    native fun scalar_from_bytes_internal<G>(bytes: vector<u8>): (bool, u64);
+    native fun scalar_neg_internal<G>(handle: u64): u64;
+    native fun scalar_add_internal<G>(handle_1: u64, handle_2: u64): u64;
+    native fun scalar_mul_internal<G>(handle_1: u64, handle_2: u64): u64;
+    native fun scalar_inv_internal<G>(handle: u64): (bool, u64);
+    native fun scalar_eq_internal<G>(handle_1: u64, handle_2: u64): bool;
+    native fun scalar_to_bytes_internal<G>(h: u64): vector<u8>;
+    native fun element_add_internal<G>(handle_1: u64, handle_2: u64): u64;
+    native fun element_eq_internal<G>(handle_1: u64, handle_2: u64): bool;
+    native fun identity_internal<G>(): u64;
+    native fun generator_internal<G>(): u64;
+    native fun element_mul_internal<G>(scalar_handle: u64, point_handle: u64): u64;
+    native fun element_neg_internal<G>(handle: u64): u64;
+    native fun serialize_element_uncompressed_internal<G>(handle: u64): vector<u8>;
+    native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
+    native fun pairing_internal<G1,G2,Gt>(g1_handle: u64, g2_handle: u64): u64;
+    ///TODO: Remove `g1_handle_count` and `g2_handle_count` once working with `vector<u64>` in rust is well supported.
+    native fun multi_pairing_internal<G1,G2,Gt>(g1_handle_count: u64, g1_handles: vector<u64>, g2_handle_count: u64, g2_handles: vector<u64>): u64;
 
     #[test]
     fun test_bls12_381_g1() {

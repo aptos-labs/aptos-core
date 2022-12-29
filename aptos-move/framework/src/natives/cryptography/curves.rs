@@ -25,8 +25,8 @@ use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::loaded_data::runtime_types::Type;
 use move_vm_types::natives::function::NativeResult;
 use move_vm_types::pop_arg;
-use move_vm_types::values::Struct;
 use move_vm_types::values::Value;
+use move_vm_types::values::{Struct, Vector};
 use num_traits::identities::Zero;
 use smallvec::smallvec;
 use std::collections::VecDeque;
@@ -171,7 +171,7 @@ fn serialize_element_uncompressed_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle = pop_arg!(args, u8) as usize;
+    let handle = pop_arg!(args, u64) as usize;
     let serialized = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let mut buf = vec![];
@@ -218,7 +218,7 @@ fn serialize_element_compressed_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle = pop_arg!(args, u8) as usize;
+    let handle = pop_arg!(args, u64) as usize;
     let serialized = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let mut buf = vec![];
@@ -310,7 +310,7 @@ fn deserialize_element_uncompressed_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::bool(succ), Value::u8(handle as u8)],
+        smallvec![Value::bool(succ), Value::u64(handle as u64)],
     ))
 }
 
@@ -369,7 +369,7 @@ fn deserialize_element_compressed_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::bool(succ), Value::u8(handle as u8)],
+        smallvec![Value::bool(succ), Value::u64(handle as u64)],
     ))
 }
 
@@ -402,7 +402,7 @@ fn scalar_from_bytes_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::bool(succ), Value::u8(handle as u8)],
+        smallvec![Value::bool(succ), Value::u64(handle as u64)],
     ))
 }
 
@@ -416,7 +416,7 @@ fn scalar_to_bytes_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle = pop_arg!(args, u8) as usize;
+    let handle = pop_arg!(args, u64) as usize;
     let serialized = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let mut buf = vec![];
@@ -458,7 +458,7 @@ fn scalar_from_u64_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u8(handle as u8)],
+        smallvec![Value::u64(handle as u64)],
     ))
 }
 
@@ -472,8 +472,8 @@ fn scalar_add_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle_2 = pop_arg!(args, u8) as usize;
-    let handle_1 = pop_arg!(args, u8) as usize;
+    let handle_2 = pop_arg!(args, u64) as usize;
+    let handle_1 = pop_arg!(args, u64) as usize;
     let handle = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let scalar_1 = context
@@ -495,7 +495,7 @@ fn scalar_add_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u8(handle as u8)],
+        smallvec![Value::u64(handle as u64)],
     ))
 }
 
@@ -509,8 +509,8 @@ fn scalar_mul_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle_2 = pop_arg!(args, u8) as usize;
-    let handle_1 = pop_arg!(args, u8) as usize;
+    let handle_2 = pop_arg!(args, u64) as usize;
+    let handle_1 = pop_arg!(args, u64) as usize;
     let handle = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let scalar_1 = context
@@ -532,7 +532,7 @@ fn scalar_mul_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u8(handle as u8)],
+        smallvec![Value::u64(handle as u64)],
     ))
 }
 
@@ -546,7 +546,7 @@ fn scalar_neg_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle = pop_arg!(args, u8) as usize;
+    let handle = pop_arg!(args, u64) as usize;
     let result_handle = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let result = context
@@ -564,7 +564,7 @@ fn scalar_neg_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u8(result_handle as u8)],
+        smallvec![Value::u64(result_handle as u64)],
     ))
 }
 
@@ -578,7 +578,7 @@ fn scalar_inv_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle = pop_arg!(args, u8) as usize;
+    let handle = pop_arg!(args, u64) as usize;
     let (succeeded, result_handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let op_result = context
@@ -601,7 +601,7 @@ fn scalar_inv_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::bool(succeeded), Value::u8(result_handle as u8)],
+        smallvec![Value::bool(succeeded), Value::u64(result_handle as u64)],
     ))
 }
 
@@ -615,8 +615,8 @@ fn scalar_eq_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle_2 = pop_arg!(args, u8) as usize;
-    let handle_1 = pop_arg!(args, u8) as usize;
+    let handle_2 = pop_arg!(args, u64) as usize;
+    let handle_1 = pop_arg!(args, u64) as usize;
     let result = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let scalar_1 = context
@@ -681,7 +681,7 @@ fn point_identity_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u8(handle as u8)],
+        smallvec![Value::u64(handle as u64)],
     ))
 }
 
@@ -726,7 +726,7 @@ fn point_generator_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u8(handle as u8)],
+        smallvec![Value::u64(handle as u64)],
     ))
 }
 
@@ -740,8 +740,8 @@ fn point_eq_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle_2 = pop_arg!(args, u8) as usize;
-    let handle_1 = pop_arg!(args, u8) as usize;
+    let handle_2 = pop_arg!(args, u64) as usize;
+    let handle_1 = pop_arg!(args, u64) as usize;
     let result = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let point_1 = context
@@ -798,8 +798,8 @@ fn point_add_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle_2 = pop_arg!(args, u8) as usize;
-    let handle_1 = pop_arg!(args, u8) as usize;
+    let handle_2 = pop_arg!(args, u64) as usize;
+    let handle_1 = pop_arg!(args, u64) as usize;
     let handle = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let point_1 = context
@@ -853,7 +853,7 @@ fn point_add_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u8(handle as u8)],
+        smallvec![Value::u64(handle as u64)],
     ))
 }
 
@@ -867,8 +867,8 @@ fn point_mul_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let point_handle = pop_arg!(args, u8) as usize;
-    let scalar_handle = pop_arg!(args, u8) as usize;
+    let point_handle = pop_arg!(args, u64) as usize;
+    let scalar_handle = pop_arg!(args, u64) as usize;
     let handle = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let point = context
@@ -922,7 +922,7 @@ fn point_mul_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u8(handle as u8)],
+        smallvec![Value::u64(handle as u64)],
     ))
 }
 
@@ -936,7 +936,7 @@ fn point_neg_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let point_handle = pop_arg!(args, u8) as usize;
+    let point_handle = pop_arg!(args, u64) as usize;
     let handle = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let point = context
@@ -978,7 +978,7 @@ fn point_neg_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u8(handle as u8)],
+        smallvec![Value::u64(handle as u64)],
     ))
 }
 
@@ -998,8 +998,8 @@ fn pairing_internal(
     let type_tag_2 = context
         .type_to_type_tag(ty_args.get(2).unwrap())?
         .to_string();
-    let handle_2 = pop_arg!(args, u8) as usize;
-    let handle_1 = pop_arg!(args, u8) as usize;
+    let handle_2 = pop_arg!(args, u64) as usize;
+    let handle_1 = pop_arg!(args, u64) as usize;
     let handle = match (
         type_tag_0.as_str(),
         type_tag_1.as_str(),
@@ -1027,7 +1027,7 @@ fn pairing_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u8(handle as u8)],
+        smallvec![Value::u64(handle as u64)],
     ))
 }
 
@@ -1047,8 +1047,8 @@ fn multi_pairing_internal(
     let type_tag_2 = context
         .type_to_type_tag(ty_args.get(2).unwrap())?
         .to_string();
-    let g2_handles = pop_arg!(args, Vec<u8>);
-    let g1_handles = pop_arg!(args, Vec<u8>);
+    let g2_handles = pop_vec_u64(&mut args)?;
+    let g1_handles = pop_vec_u64(&mut args)?;
     let handle = match (
         type_tag_0.as_str(),
         type_tag_1.as_str(),
@@ -1094,7 +1094,7 @@ fn multi_pairing_internal(
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::u8(handle as u8)],
+        smallvec![Value::u64(handle as u64)],
     ))
 }
 
@@ -1193,4 +1193,20 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     natives.append(&mut vec![]);
 
     crate::natives::helpers::make_module_natives(natives)
+}
+
+/// A workaround for popping a vector<u64> from the argument stack,
+/// before [a proper fix](`https://github.com/move-language/move/pull/773`) is complete.
+/// It requires the move native function to push 2 items in the argument stack:
+/// first the length of the vector as a u64, then the vector itself.
+/// TODO: Remove this once working with `vector<u64>` in rust is well supported.
+fn pop_vec_u64(args: &mut VecDeque<Value>) -> PartialVMResult<Vec<u64>> {
+    let vector = args.pop_back().unwrap().value_as::<Vector>()?;
+    let vector_len = args.pop_back().unwrap().value_as::<u64>()?;
+    let mut values = Vec::with_capacity(vector_len as usize);
+    for item in vector.unpack(&Type::U64, vector_len)?.into_iter() {
+        let value = item.value_as::<u64>()?;
+        values.push(value);
+    }
+    Ok(values)
 }
