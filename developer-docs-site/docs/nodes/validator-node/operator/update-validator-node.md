@@ -13,9 +13,10 @@ This page explains how to make this swap, which largely amounts to switching out
 
 ## Secure
 
-Do not run multiple VFNs with the same [network identity](../../identity-and-configuration.md) and connect them to the validator using the `vfn` network, as this may cause issues with node metrics and telemetry. Nevertheless, we realize you may need access to REST APIs for building without any rate limits.
+Do not run multiple VFNs with the same [network identity](../../identity-and-configuration.md) and connect them to the validator using the `vfn` network, as this may cause issues with node metrics and telemetry. Note you have the ability to run a [local multinode network](../../../guides/running-a-local-multi-node-network.md) that may be suitable instead.
 
-If you wish to run multiple fullnodes and connect them to your validator, please:
+Still, you may want to have a VFN ready for failover or need access to REST APIs for building without any rate limits. If you wish to run multiple fullnodes and connect them to your validator:
+
 1. Connect only one fullnode using the `vfn` network configuration in the validator configuration `.yaml` file. This will be your single VFN (as registered on-chain) that other Aptos nodes will connect to.
 1. Connect the rest of your fullnodes to the validator using a `public` network configuration *and a different network identity* in the validator configuration `.yaml` file. These will be your additional VFNs that you can use for other purposes.
 
