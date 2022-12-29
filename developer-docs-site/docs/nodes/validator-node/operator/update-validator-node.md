@@ -41,8 +41,8 @@ To failover from an outdated or erroneous validator node to an updated and relia
 To replace the validator node:
 
 1. Update DNS to [swap the node network addresses on-chain](staking-pool-operations.md#3-update-validator-network-addresses-on-chain).
-1. Turn down the validator node and validator full node intended to replace the validator.
-1. Restart the former validator full node with the validator node configuration.
+1. Turn down the validator node and validator fullnode intended to replace the validator.
+1. Restart the former validator fullnode with the validator node configuration.
 1. Observe that before DNS changes take effect that only outbound connections will form.
 1. Either reuse the former validator node or create anew to backfill the validator fullnode.
 1. Start the validator fullnode.
