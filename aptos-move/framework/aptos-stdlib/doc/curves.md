@@ -26,10 +26,13 @@
 -  [Function `element_mul`](#0x1_curves_element_mul)
 -  [Function `simul_point_mul`](#0x1_curves_simul_point_mul)
 -  [Function `scalar_to_bytes`](#0x1_curves_scalar_to_bytes)
--  [Function `element_to_bytes`](#0x1_curves_element_to_bytes)
+-  [Function `serialize_element_uncompressed`](#0x1_curves_serialize_element_uncompressed)
+-  [Function `serialize_element_compressed`](#0x1_curves_serialize_element_compressed)
 -  [Function `deserialize_element_uncompressed`](#0x1_curves_deserialize_element_uncompressed)
+-  [Function `deserialize_element_compressed`](#0x1_curves_deserialize_element_compressed)
 -  [Function `element_eq`](#0x1_curves_element_eq)
 -  [Function `deserialize_element_uncompressed_internal`](#0x1_curves_deserialize_element_uncompressed_internal)
+-  [Function `deserialize_element_compressed_internal`](#0x1_curves_deserialize_element_compressed_internal)
 -  [Function `scalar_from_u64_internal`](#0x1_curves_scalar_from_u64_internal)
 -  [Function `scalar_from_bytes_internal`](#0x1_curves_scalar_from_bytes_internal)
 -  [Function `scalar_neg_internal`](#0x1_curves_scalar_neg_internal)
@@ -44,7 +47,8 @@
 -  [Function `generator_internal`](#0x1_curves_generator_internal)
 -  [Function `element_mul_internal`](#0x1_curves_element_mul_internal)
 -  [Function `element_neg_internal`](#0x1_curves_element_neg_internal)
--  [Function `element_to_bytes_internal`](#0x1_curves_element_to_bytes_internal)
+-  [Function `serialize_element_uncompressed_internal`](#0x1_curves_serialize_element_uncompressed_internal)
+-  [Function `serialize_element_compressed_internal`](#0x1_curves_serialize_element_compressed_internal)
 -  [Function `pairing_internal`](#0x1_curves_pairing_internal)
 -  [Function `multi_pairing_internal`](#0x1_curves_multi_pairing_internal)
 
@@ -298,7 +302,7 @@ Perform a bilinear mapping.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_neg">scalar_neg</a>&lt;G&gt;(_scalar_1: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_neg">scalar_neg</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;
 </code></pre>
 
 
@@ -307,9 +311,9 @@ Perform a bilinear mapping.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_neg">scalar_neg</a>&lt;G&gt;(_scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_neg">scalar_neg</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
-        handle: <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>&lt;G&gt;(_scalar_1.handle)
+        handle: <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>&lt;G&gt;(scalar_1.handle)
     }
 }
 </code></pre>
@@ -324,7 +328,7 @@ Perform a bilinear mapping.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_add">scalar_add</a>&lt;G&gt;(_scalar_1: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;, _scalar_2: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_add">scalar_add</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;, scalar_2: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;
 </code></pre>
 
 
@@ -333,9 +337,9 @@ Perform a bilinear mapping.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_add">scalar_add</a>&lt;G&gt;(_scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;, _scalar_2: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_add">scalar_add</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;, scalar_2: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
-        handle: <a href="curves.md#0x1_curves_scalar_add_internal">scalar_add_internal</a>&lt;G&gt;(_scalar_1.handle, _scalar_2.handle)
+        handle: <a href="curves.md#0x1_curves_scalar_add_internal">scalar_add_internal</a>&lt;G&gt;(scalar_1.handle, scalar_2.handle)
     }
 }
 </code></pre>
@@ -350,7 +354,7 @@ Perform a bilinear mapping.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_mul">scalar_mul</a>&lt;G&gt;(_scalar_1: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;, _scalar_2: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_mul">scalar_mul</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;, scalar_2: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;
 </code></pre>
 
 
@@ -359,9 +363,9 @@ Perform a bilinear mapping.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_mul">scalar_mul</a>&lt;G&gt;(_scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;, _scalar_2: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_mul">scalar_mul</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;, scalar_2: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
-        handle: <a href="curves.md#0x1_curves_scalar_mul_internal">scalar_mul_internal</a>&lt;G&gt;(_scalar_1.handle, _scalar_2.handle)
+        handle: <a href="curves.md#0x1_curves_scalar_mul_internal">scalar_mul_internal</a>&lt;G&gt;(scalar_1.handle, scalar_2.handle)
     }
 }
 </code></pre>
@@ -646,13 +650,13 @@ Perform a bilinear mapping.
 
 </details>
 
-<a name="0x1_curves_element_to_bytes"></a>
+<a name="0x1_curves_serialize_element_uncompressed"></a>
 
-## Function `element_to_bytes`
+## Function `serialize_element_uncompressed`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_to_bytes">element_to_bytes</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -661,8 +665,32 @@ Perform a bilinear mapping.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_to_bytes">element_to_bytes</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <a href="curves.md#0x1_curves_element_to_bytes_internal">element_to_bytes_internal</a>&lt;G&gt;(point.handle)
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="curves.md#0x1_curves_serialize_element_uncompressed_internal">serialize_element_uncompressed_internal</a>&lt;G&gt;(point.handle)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_serialize_element_compressed"></a>
+
+## Function `serialize_element_compressed`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed">serialize_element_compressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed">serialize_element_compressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="curves.md#0x1_curves_serialize_element_compressed_internal">serialize_element_compressed_internal</a>&lt;G&gt;(point.handle)
 }
 </code></pre>
 
@@ -687,6 +715,35 @@ Perform a bilinear mapping.
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;&gt; {
     <b>let</b> (succ, handle) = <a href="curves.md#0x1_curves_deserialize_element_uncompressed_internal">deserialize_element_uncompressed_internal</a>&lt;G&gt;(bytes);
+    <b>if</b> (succ) {
+        std::option::some(<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; { handle })
+    } <b>else</b> {
+        std::option::none()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_deserialize_element_compressed"></a>
+
+## Function `deserialize_element_compressed`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_deserialize_element_compressed">deserialize_element_compressed</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_deserialize_element_compressed">deserialize_element_compressed</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;&gt; {
+    <b>let</b> (succ, handle) = <a href="curves.md#0x1_curves_deserialize_element_compressed_internal">deserialize_element_compressed_internal</a>&lt;G&gt;(bytes);
     <b>if</b> (succ) {
         std::option::some(<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; { handle })
     } <b>else</b> {
@@ -739,6 +796,28 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_deserialize_element_uncompressed_internal">deserialize_element_uncompressed_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u8);
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_deserialize_element_compressed_internal"></a>
+
+## Function `deserialize_element_compressed_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_deserialize_element_compressed_internal">deserialize_element_compressed_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u8)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_deserialize_element_compressed_internal">deserialize_element_compressed_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u8);
 </code></pre>
 
 
@@ -1053,13 +1132,13 @@ Perform a bilinear mapping.
 
 </details>
 
-<a name="0x1_curves_element_to_bytes_internal"></a>
+<a name="0x1_curves_serialize_element_uncompressed_internal"></a>
 
-## Function `element_to_bytes_internal`
+## Function `serialize_element_uncompressed_internal`
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_element_to_bytes_internal">element_to_bytes_internal</a>&lt;G&gt;(handle: u8): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_serialize_element_uncompressed_internal">serialize_element_uncompressed_internal</a>&lt;G&gt;(handle: u8): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1068,7 +1147,29 @@ Perform a bilinear mapping.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_element_to_bytes_internal">element_to_bytes_internal</a>&lt;G&gt;(handle: u8): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_uncompressed_internal">serialize_element_uncompressed_internal</a>&lt;G&gt;(handle: u8): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_serialize_element_compressed_internal"></a>
+
+## Function `serialize_element_compressed_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed_internal">serialize_element_compressed_internal</a>&lt;G&gt;(handle: u8): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed_internal">serialize_element_compressed_internal</a>&lt;G&gt;(handle: u8): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 

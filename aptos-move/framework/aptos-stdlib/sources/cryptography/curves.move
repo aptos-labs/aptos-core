@@ -154,12 +154,25 @@ module aptos_std::curves {
         scalar_to_bytes_internal<G>(scalar.handle)
     }
 
-    public fun element_to_bytes<G>(point: &Element<G>): vector<u8> {
-        element_to_bytes_internal<G>(point.handle)
+    public fun serialize_element_uncompressed<G>(point: &Element<G>): vector<u8> {
+        serialize_element_uncompressed_internal<G>(point.handle)
+    }
+
+    public fun serialize_element_compressed<G>(point: &Element<G>): vector<u8> {
+        serialize_element_compressed_internal<G>(point.handle)
     }
 
     public fun deserialize_element_uncompressed<G>(bytes: vector<u8>): Option<Element<G>> {
         let (succ, handle) = deserialize_element_uncompressed_internal<G>(bytes);
+        if (succ) {
+            std::option::some(Element<G> { handle })
+        } else {
+            std::option::none()
+        }
+    }
+
+    public fun deserialize_element_compressed<G>(bytes: vector<u8>): Option<Element<G>> {
+        let (succ, handle) = deserialize_element_compressed_internal<G>(bytes);
         if (succ) {
             std::option::some(Element<G> { handle })
         } else {
@@ -173,6 +186,7 @@ module aptos_std::curves {
 
     // Native functions.
     native fun deserialize_element_uncompressed_internal<G>(bytes: vector<u8>): (bool, u8);
+    native fun deserialize_element_compressed_internal<G>(bytes: vector<u8>): (bool, u8);
     native fun scalar_from_u64_internal<G>(value: u64): u8;
     native fun scalar_from_bytes_internal<G>(bytes: vector<u8>): (bool, u8);
     native fun scalar_neg_internal<G>(handle: u8): u8;
@@ -187,38 +201,98 @@ module aptos_std::curves {
     native fun generator_internal<G>(): u8;
     native fun element_mul_internal<G>(scalar_handle: u8, point_handle: u8): u8;
     native fun element_neg_internal<G>(handle: u8): u8;
-    native fun element_to_bytes_internal<G>(handle: u8): vector<u8>;
+    native fun serialize_element_uncompressed_internal<G>(handle: u8): vector<u8>;
+    native fun serialize_element_compressed_internal<G>(handle: u8): vector<u8>;
     native fun pairing_internal<G1,G2,Gt>(g1_handle: u8, g2_handle: u8): u8;
     native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u8>, g2_handles: vector<u8>): u8;
 
     #[test]
-    fun test_scalar_mul() {
-        let scalar_33 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"2100000000000000000000000000000000000000000000000000000000000000"));
-        let scalar_34 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"2200000000000000000000000000000000000000000000000000000000000000"));
-        let scalar_1122 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"6204000000000000000000000000000000000000000000000000000000000000"));
-        assert!(scalar_eq(&scalar_1122, &scalar_mul(&scalar_33, &scalar_34)), 1);
+    fun test_bls12_381_g1() {
+        // Scalar encoding/decoding.
+        let scalar_7 = scalar_from_u64<BLS12_381_G1>(7);
+        let scalar_7_another = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
+        assert!(scalar_eq(&scalar_7, &scalar_7_another), 1);
+        assert!( x"0700000000000000000000000000000000000000000000000000000000000000" == scalar_to_bytes(&scalar_7), 1);
+        assert!(std::option::is_none(&scalar_from_bytes<BLS12_381_G1>(&x"ffff")), 1);
+
+        // Scalar negation.
+        let scalar_minus_7 = scalar_neg(&scalar_7);
+        assert!(x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == scalar_to_bytes(&scalar_minus_7), 1);
+
+        // Scalar addition.
+        let scalar_9 = scalar_from_u64<BLS12_381_G1>(9);
+        let scalar_2 = scalar_from_u64<BLS12_381_G1>(2);
+        let scalar_2_calc = scalar_add(&scalar_minus_7, &scalar_9);
+        assert!(scalar_eq(&scalar_2, &scalar_2_calc), 1);
+
+        // Scalar multiplication.
+        let scalar_63_calc = scalar_mul(&scalar_7, &scalar_9);
+        let scalar_63 = scalar_from_u64<BLS12_381_G1>(63);
+        assert!(scalar_eq(&scalar_63, &scalar_63_calc), 1);
+
+        // Scalar inversion.
+        let scalar_7_inv_calc = std::option::extract(&mut scalar_inv(&scalar_7));
+        assert!(scalar_eq(&scalar_9, &scalar_mul(&scalar_63, &scalar_7_inv_calc)), 1);
+        let scalar_0 = scalar_from_u64<BLS12_381_G1>(0);
+        assert!(std::option::is_none(&scalar_inv(&scalar_0)), 1);
+
+        // Point encoding/decoding.
+        let point_g = generator<BLS12_381_G1>();
+        assert!(x"bbc622db0af03afbef1a7af93fe8556c58ac1b173f3a4ea105b974974f8c68c30faca94f8c63952694d79731a7d3f117e1e7c5462923aa0ce48a88a244c73cd0edb3042ccb18db00f60ad0d595e0f5fce48a1d74ed309ea0f1a0aae381f4b308" == serialize_element_uncompressed(&point_g), 1);
+        assert!(x"bbc622db0af03afbef1a7af93fe8556c58ac1b173f3a4ea105b974974f8c68c30faca94f8c63952694d79731a7d3f117" == serialize_element_compressed(&point_g), 1);
+        let point_g_from_uncomp = std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"bbc622db0af03afbef1a7af93fe8556c58ac1b173f3a4ea105b974974f8c68c30faca94f8c63952694d79731a7d3f117e1e7c5462923aa0ce48a88a244c73cd0edb3042ccb18db00f60ad0d595e0f5fce48a1d74ed309ea0f1a0aae381f4b308"));
+        let point_g_from_comp = std::option::extract(&mut deserialize_element_compressed<BLS12_381_G1>(x"bbc622db0af03afbef1a7af93fe8556c58ac1b173f3a4ea105b974974f8c68c30faca94f8c63952694d79731a7d3f117"));
+        assert!(element_eq(&point_g, &point_g_from_comp), 1);
+        assert!(element_eq(&point_g, &point_g_from_uncomp), 1);
+        let inf = identity<BLS12_381_G1>();
+        assert!(x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040" == serialize_element_uncompressed(&inf), 1);
+        assert!(x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040" == serialize_element_compressed(&inf), 1);
+        let inf_from_uncomp = std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040"));
+        let inf_from_comp = std::option::extract(&mut deserialize_element_compressed<BLS12_381_G1>(x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040"));
+        assert!(element_eq(&inf, &inf_from_comp), 1);
+        assert!(element_eq(&inf, &inf_from_uncomp), 1);
+        let point_7g_from_uncomp = std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328191c1a98287eec115a8cb0a1cf4968c6fd101ca4593938d73918dd8e81471d8a3ac4b38930aed539564436b6a4baad8d10"));
+        let point_7g_from_comp = std::option::extract(&mut deserialize_element_compressed<BLS12_381_G1>(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32899"));
+        assert!(element_eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
+
+        // Point multiplication by scalar.
+        let point_7g_calc = element_mul(&scalar_7, &point_g);
+        assert!(element_eq(&point_7g_calc, &point_7g_from_comp), 1);
+        assert!(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328191c1a98287eec115a8cb0a1cf4968c6fd101ca4593938d73918dd8e81471d8a3ac4b38930aed539564436b6a4baad8d10" == serialize_element_uncompressed(&point_7g_calc), 1);
+        assert!(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32899" == serialize_element_compressed(&point_7g_calc), 1);
+
+        // Point negation.
+        let point_minus_7g_calc = element_neg(&point_7g_calc);
+        assert!(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32819" == serialize_element_compressed(&point_minus_7g_calc), 1);
+        assert!(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328198f9067d78113ed5f734fb2e1b497e52013da0c9d679a592da735f6713d2eed2913f9c11208d2e1f455b0c9942f647309" == serialize_element_uncompressed(&point_minus_7g_calc), 1);
+
+        // Point addition.
+        let point_9g = element_mul(&scalar_9, &point_g);
+        let point_2g = element_mul(&scalar_2, &point_g);
+        let point_2g_calc = element_add(&point_minus_7g_calc, &point_9g);
+        assert!(element_eq(&point_2g, &point_2g_calc), 1);
+
+        // Simultaneous point multiplication.
+        let point_14g = element_mul(&scalar_from_u64<BLS12_381_G1>(14), &point_g);
+        let scalar_1 = scalar_from_u64<BLS12_381_G1>(1);
+        let scalar_2 = scalar_from_u64<BLS12_381_G1>(2);
+        let scalar_3 = scalar_from_u64<BLS12_381_G1>(3);
+        let point_2g = element_mul(&scalar_2, &point_g);
+        let point_3g = element_mul(&scalar_3, &point_g);
+        let scalars = vector[scalar_1, scalar_2, scalar_3];
+        let points = vector[point_g, point_2g, point_3g];
+        let point_14g_calc = simul_point_mul(&scalars, &points);
+        assert!(element_eq(&point_14g, &point_14g_calc), 1);
     }
 
     #[test]
-    fun test_scalar_neg() {
-        let scalar_33 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"2100000000000000000000000000000000000000000000000000000000000000"));
-        let scalar_33_neg = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"e0fffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73"));
-        assert!(scalar_eq(&scalar_33_neg, &scalar_neg(&scalar_33)), 1);
+    fun test_bls12_381_g2() {
+        //TODO
     }
 
     #[test]
-    fun test_scalar_add() {
-        let scalar_33 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"2100000000000000000000000000000000000000000000000000000000000000"));
-        let scalar_32_neg = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"e1fffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73"));
-        assert!(scalar_eq(&scalar_from_u64(1), &scalar_add(&scalar_33, &scalar_32_neg)), 1);
-    }
-
-    #[test]
-    fun test_scalar_inv() {
-        let scalar_33 = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"2100000000000000000000000000000000000000000000000000000000000000"));
-        let scalar_33_inv = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"01000000e0830f3ed8e4eec16713724981f09c205d5530413e81bfbbad546a70"));
-        assert!(scalar_eq(&scalar_33_inv, &std::option::extract(&mut scalar_inv(&scalar_33))), 1);
-        assert!(scalar_eq(&scalar_from_u64<BLS12_381_G1>(1), &scalar_mul(&scalar_33,&scalar_33_inv)), 1);
+    fun test_bls12_381_gt() {
+        //TODO
     }
 
     #[test]
@@ -251,16 +325,4 @@ module aptos_std::curves {
         let actual = multi_pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&vector[g1_point_1, g1_point_2, g1_point_3], &vector[g2_point_1, g2_point_2, g2_point_3]);
         assert!(element_eq(&expected, &actual), 1);
     }
-
-//    #[test]
-//    fun test_bls12_381_g1_basics() {
-//        let p = deserialize_element_uncompressed<BLS12_381_G1>(x"");
-//        let generator = generator<BLS12_381_G1>();
-//        let point_10g = element_mul(&scalar_from_u64<BLS12_381_G1>(10), &generator);
-//        let point_2g = element_mul(&scalar_from_u64<BLS12_381_G1>(2), &generator);
-//        let point_12g = element_mul(&scalar_from_u64<BLS12_381_G1>(12), &generator);
-//        let point_20g = element_mul(&scalar_from_u64<BLS12_381_G1>(20), &generator);
-//        let point_8g = element_mul(&scalar_from_u64<BLS12_381_G1>(8), &generator);
-//        let point_5g = element_mul(&scalar_from_u64<BLS12_381_G1>(5), &generator);
-//    }
 }

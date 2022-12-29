@@ -9,7 +9,7 @@ use aptos_crypto::bls12381::PrivateKey;
 use ark_ec::ProjectiveCurve;
 use ark_ec::{AffineCurve, PairingEngine};
 use ark_ff::fields::Field;
-use ark_serialize::CanonicalDeserialize;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use better_any::{Tid, TidAble};
 use bls12_381;
 // use group::{Group};
@@ -161,6 +161,100 @@ impl Bls12381Context {
     }
 }
 
+fn serialize_element_uncompressed_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let handle = pop_arg!(args, u8) as usize;
+    let serialized = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
+            let mut buf = vec![];
+            context
+                .extensions()
+                .get::<ArksContext>()
+                .get_g1_point(handle)
+                .serialize_uncompressed(&mut buf);
+            buf
+        }
+        "0x1::curves::BLS12_381_G2" => {
+            let mut buf = vec![];
+            context
+                .extensions()
+                .get::<ArksContext>()
+                .get_g2_point(handle)
+                .serialize_uncompressed(&mut buf);
+            buf
+        }
+        "0x1::curves::BLS12_381_Gt" => {
+            let mut buf = vec![];
+            context
+                .extensions()
+                .get::<ArksContext>()
+                .get_gt_point(handle)
+                .serialize_uncompressed(&mut buf);
+            buf
+        }
+        _ => todo!(),
+    };
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::vector_u8(serialized)],
+    ))
+}
+
+fn serialize_element_compressed_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let handle = pop_arg!(args, u8) as usize;
+    let serialized = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
+            let mut buf = vec![];
+            context
+                .extensions()
+                .get::<ArksContext>()
+                .get_g1_point(handle)
+                .serialize(&mut buf);
+            buf
+        }
+        "0x1::curves::BLS12_381_G2" => {
+            let mut buf = vec![];
+            context
+                .extensions()
+                .get::<ArksContext>()
+                .get_g2_point(handle)
+                .serialize(&mut buf);
+            buf
+        }
+        "0x1::curves::BLS12_381_Gt" => {
+            let mut buf = vec![];
+            context
+                .extensions()
+                .get::<ArksContext>()
+                .get_gt_point(handle)
+                .serialize(&mut buf);
+            buf
+        }
+        _ => todo!(),
+    };
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::vector_u8(serialized)],
+    ))
+}
+
 fn deserialize_element_uncompressed_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -220,6 +314,65 @@ fn deserialize_element_uncompressed_internal(
     ))
 }
 
+fn deserialize_element_compressed_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let bytes = pop_arg!(args, Vec<u8>);
+    let (succ, handle) = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
+            let point = ark_bls12_381::G1Affine::deserialize(bytes.as_slice());
+            match point {
+                Ok(point) => {
+                    let handle = context
+                        .extensions_mut()
+                        .get_mut::<ArksContext>()
+                        .add_g1_point(point.into_projective());
+                    (true, handle)
+                }
+                _ => (false, 0),
+            }
+        }
+        "0x1::curves::BLS12_381_G2" => {
+            let point = ark_bls12_381::G2Affine::deserialize(bytes.as_slice());
+            match point {
+                Ok(point) => {
+                    let handle = context
+                        .extensions_mut()
+                        .get_mut::<ArksContext>()
+                        .add_g2_point(point.into_projective());
+                    (true, handle)
+                }
+                _ => (false, 0),
+            }
+        }
+        "0x1::curves::BLS12_381_Gt" => {
+            let point = ark_bls12_381::Fq12::deserialize(bytes.as_slice());
+            match point {
+                Ok(point) => {
+                    let handle = context
+                        .extensions_mut()
+                        .get_mut::<ArksContext>()
+                        .add_gt_point(point);
+                    (true, handle)
+                }
+                _ => (false, 0),
+            }
+        }
+        _ => todo!(),
+    };
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::bool(succ), Value::u8(handle as u8)],
+    ))
+}
+
 fn scalar_from_bytes_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -231,19 +384,54 @@ fn scalar_from_bytes_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     let bytes = pop_arg!(args, Vec<u8>);
-    let handle = match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" => {
-            let scalar = ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice()).unwrap();
-            context
-                .extensions_mut()
-                .get_mut::<ArksContext>()
-                .add_scalar(scalar)
+    let (succ, handle) = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_G2" => {
+            let scalar = ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice());
+            match (scalar) {
+                Ok(scalar) => {
+                    let handle = context
+                        .extensions_mut()
+                        .get_mut::<ArksContext>()
+                        .add_scalar(scalar);
+                    (true, handle)
+                }
+                _ => (false, 0),
+            }
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::bool(true), Value::u8(handle as u8)],
+        smallvec![Value::bool(succ), Value::u8(handle as u8)],
+    ))
+}
+
+fn scalar_to_bytes_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let handle = pop_arg!(args, u8) as usize;
+    let serialized = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+            let mut buf = vec![];
+            context
+                .extensions()
+                .get::<ArksContext>()
+                .get_scalar(handle)
+                .serialize_uncompressed(&mut buf);
+            buf
+        }
+        _ => todo!(),
+    };
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::vector_u8(serialized)],
     ))
 }
 
@@ -916,6 +1104,14 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     // Always-on natives.
     natives.append(&mut vec![
         (
+            "serialize_element_uncompressed_internal",
+            make_native_from_func(gas_params.clone(), serialize_element_uncompressed_internal),
+        ),
+        (
+            "serialize_element_compressed_internal",
+            make_native_from_func(gas_params.clone(), serialize_element_compressed_internal),
+        ),
+        (
             "deserialize_element_uncompressed_internal",
             make_native_from_func(
                 gas_params.clone(),
@@ -923,8 +1119,16 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             ),
         ),
         (
+            "deserialize_element_compressed_internal",
+            make_native_from_func(gas_params.clone(), deserialize_element_compressed_internal),
+        ),
+        (
             "scalar_from_bytes_internal",
             make_native_from_func(gas_params.clone(), scalar_from_bytes_internal),
+        ),
+        (
+            "scalar_to_bytes_internal",
+            make_native_from_func(gas_params.clone(), scalar_to_bytes_internal),
         ),
         (
             "scalar_eq_internal",
