@@ -16,12 +16,12 @@ use crate::{
     },
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
+    monitor,
     network::NetworkSender,
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::{Batch, BatchRequest, Fragment},
-    monitor,
 };
 use anyhow::{bail, ensure, Context, Result};
 use aptos_channels::aptos_channel;
@@ -55,8 +55,10 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::sync::oneshot as TokioOneshot;
-use tokio::time::{sleep, Instant};
+use tokio::{
+    sync::oneshot as TokioOneshot,
+    time::{sleep, Instant},
+};
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {

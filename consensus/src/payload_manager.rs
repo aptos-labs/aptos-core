@@ -13,8 +13,8 @@ use aptos_executor_types::{Error::DataNotFound, *};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, warn};
 use aptos_types::transaction::SignedTransaction;
-use std::sync::Arc;
 use futures::{channel::mpsc::Sender, SinkExt};
+use std::sync::Arc;
 use tokio::sync::oneshot;
 
 /// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
@@ -80,7 +80,7 @@ impl PayloadManager {
                         e
                     );
                 }
-            }
+            },
         }
     }
 

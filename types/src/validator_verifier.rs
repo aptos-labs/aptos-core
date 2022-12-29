@@ -12,7 +12,6 @@ use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, bls12381::PublicKey, hash::CryptoHash, Signature, VerifyingKey};
 use itertools::Itertools;
-
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Deserializer, Serialize};

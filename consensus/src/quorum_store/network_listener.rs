@@ -79,10 +79,10 @@ impl NetworkListener {
                             .send(persist_cmd)
                             .await
                             .expect("BatchStore receiver not available");
-                    }
+                    },
                     Err(e) => {
                         debug!("Could not append batch from {:?}, error {:?}", source, e);
-                    }
+                    },
                 }
             }
             // Malformed request with an inconsistent expiry epoch.
@@ -125,7 +125,7 @@ impl NetworkListener {
                         .send(())
                         .expect("Failed to send shutdown ack to QuorumStore");
                     break;
-                }
+                },
                 VerifiedEvent::SignedDigestMsg(signed_digest) => {
                     // debug!("QS: got SignedDigest from network");
                     let cmd = ProofBuilderCommand::AppendSignature(*signed_digest);
@@ -133,12 +133,12 @@ impl NetworkListener {
                         .send(cmd)
                         .await
                         .expect("Could not send signed_digest to proof_builder");
-                }
+                },
 
                 VerifiedEvent::FragmentMsg(fragment) => {
                     counters::DELIVERED_FRAGMENTS_COUNT.inc();
                     self.handle_fragment(*fragment).await;
-                }
+                },
 
                 VerifiedEvent::BatchRequestMsg(request) => {
                     counters::RECEIVED_BATCH_REQUEST_COUNT.inc();
@@ -153,7 +153,7 @@ impl NetworkListener {
                         .send(cmd)
                         .await
                         .expect("could not push Batch batch_reader");
-                }
+                },
 
                 VerifiedEvent::UnverifiedBatchMsg(batch) => {
                     counters::RECEIVED_BATCH_COUNT.inc();
@@ -168,11 +168,11 @@ impl NetworkListener {
                         .send(cmd)
                         .await
                         .expect("could not push Batch batch_reader");
-                }
+                },
 
                 _ => {
                     unreachable!()
-                }
+                },
             };
         }
     }

@@ -1,11 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::QuorumStoreSender;
-use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::{Batch, BatchRequest, Fragment};
-use aptos_consensus_types::common::Author;
-use aptos_consensus_types::proof_of_store::{ProofOfStore, SignedDigest};
+use crate::{
+    network::QuorumStoreSender,
+    network_interface::ConsensusMsg,
+    quorum_store::types::{Batch, BatchRequest, Fragment},
+};
+use aptos_consensus_types::{
+    common::Author,
+    proof_of_store::{ProofOfStore, SignedDigest},
+};
 use tokio::sync::mpsc::Sender;
 
 pub struct MockQuorumStoreSender {

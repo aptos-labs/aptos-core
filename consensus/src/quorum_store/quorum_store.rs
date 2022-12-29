@@ -1,22 +1,26 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::{NetworkSender, QuorumStoreSender};
-use crate::quorum_store::{
-    batch_aggregator::BatchAggregator,
-    batch_reader::BatchReader,
-    batch_store::{BatchStore, BatchStoreCommand, PersistRequest},
-    counters,
-    network_listener::NetworkListener,
-    proof_builder::{ProofBuilder, ProofBuilderCommand, ProofReturnChannel},
-    quorum_store_db::QuorumStoreDB,
-    types::{BatchId, Fragment, SerializedTransaction},
+use crate::{
+    network::{NetworkSender, QuorumStoreSender},
+    quorum_store::{
+        batch_aggregator::BatchAggregator,
+        batch_reader::BatchReader,
+        batch_store::{BatchStore, BatchStoreCommand, PersistRequest},
+        counters,
+        network_listener::NetworkListener,
+        proof_builder::{ProofBuilder, ProofBuilderCommand, ProofReturnChannel},
+        quorum_store_db::QuorumStoreDB,
+        types::{BatchId, Fragment, SerializedTransaction},
+    },
+    round_manager::VerifiedEvent,
 };
-use crate::round_manager::VerifiedEvent;
 use aptos_channels::aptos_channel;
 use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::proof_of_store::SignedDigestInfo;
-use aptos_consensus_types::{common::Round, proof_of_store::LogicalTime};
+use aptos_consensus_types::{
+    common::Round,
+    proof_of_store::{LogicalTime, SignedDigestInfo},
+};
 use aptos_logger::debug;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
@@ -239,7 +243,7 @@ impl QuorumStore {
                     "[QuorumStore] Aggregation failed for own fragments with error {:?}",
                     e
                 );
-            }
+            },
         }
     }
 
@@ -287,13 +291,13 @@ impl QuorumStore {
                     expiration,
                 );
                 (BatchStoreCommand::Persist(persist_request), fragment)
-            }
+            },
             Err(e) => {
                 unreachable!(
                     "[QuorumStore] Aggregation failed for own fragments with error {:?}",
                     e
                 );
-            }
+            },
         }
     }
 
@@ -345,14 +349,14 @@ impl QuorumStore {
                         .send(())
                         .expect("Failed to send shutdown ack from QuorumStore");
                     break;
-                }
+                },
                 QuorumStoreCommand::AppendToBatch(fragment_payload, batch_id) => {
                     debug!("QS: end batch cmd received, batch id {}", batch_id);
                     let msg = self.handle_append_to_batch(fragment_payload, batch_id);
                     self.network_sender.broadcast_fragment(msg).await;
 
                     self.fragment_id = self.fragment_id + 1;
-                }
+                },
 
                 QuorumStoreCommand::EndBatch(
                     fragment_payload,
@@ -375,7 +379,7 @@ impl QuorumStore {
                     counters::NUM_FRAGMENT_PER_BATCH.observe(self.fragment_id as f64);
 
                     self.fragment_id = 0;
-                }
+                },
             }
         }
 

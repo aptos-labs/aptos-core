@@ -21,11 +21,13 @@ use aptos_network::application::storage::PeerMetadataStorage;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
 use futures::channel::mpsc;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
-use std::time::Duration;
 use tokio::runtime::{self, Runtime};
 
 /// Helper function to start consensus based on configuration and return the runtime

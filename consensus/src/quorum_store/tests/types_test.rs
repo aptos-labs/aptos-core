@@ -1,8 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::tests::utils::create_vec_signed_transactions;
-use crate::quorum_store::types::{Batch, BatchRequest, Fragment, SerializedTransaction};
+use crate::quorum_store::{
+    tests::utils::create_vec_signed_transactions,
+    types::{Batch, BatchRequest, Fragment, SerializedTransaction},
+};
 use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::hash::DefaultHasher;
 use aptos_types::account_address::AccountAddress;
@@ -115,7 +117,7 @@ fn test_fragment() {
             Ok(signed_txn) => returned_signed_transactions.push(signed_txn),
             Err(_) => {
                 panic!();
-            }
+            },
         }
     }
     assert_eq!(signed_txns, returned_signed_transactions);

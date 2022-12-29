@@ -1,12 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    batch_reader::BatchReader,
-    quorum_store::{QuorumStore, QuorumStoreCommand},
-    quorum_store_db::QuorumStoreDB,
-    quorum_store_wrapper::QuorumStoreWrapper,
-};
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -39,7 +33,13 @@ use crate::{
     payload_client::QuorumStoreClient,
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore,
+    quorum_store::{
+        batch_reader::BatchReader,
+        direct_mempool_quorum_store::DirectMempoolQuorumStore,
+        quorum_store::{QuorumStore, QuorumStoreCommand},
+        quorum_store_db::QuorumStoreDB,
+        quorum_store_wrapper::QuorumStoreWrapper,
+    },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     state_replication::StateComputer,
@@ -82,12 +82,12 @@ use futures::{
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
-use std::path::PathBuf;
 use std::{
     cmp::Ordering,
     collections::HashMap,
     convert::TryInto,
     mem::{discriminant, Discriminant},
+    path::PathBuf,
     sync::Arc,
     time::Duration,
 };
@@ -1131,7 +1131,7 @@ impl EpochManager {
                 } else {
                     bail!("QuorumStore wrapper not started but received QuorumStore Message");
                 }
-            }
+            },
             // quorum_store_event @ (VerifiedEvent::SignedDigest(_)
             // | VerifiedEvent::Fragment(_)
             // | VerifiedEvent::Batch(_)) => {
@@ -1147,15 +1147,15 @@ impl EpochManager {
             quorum_store_event @ VerifiedEvent::BatchRequestMsg(_) => {
                 let sender = &mut self.quorum_store_msg_tx_vec[0];
                 sender.push(peer_id, quorum_store_event)?;
-            }
+            },
             quorum_store_event @ VerifiedEvent::UnverifiedBatchMsg(_) => {
                 let sender = &mut self.quorum_store_msg_tx_vec[0];
                 sender.push(peer_id, quorum_store_event)?;
-            }
+            },
             quorum_store_event @ VerifiedEvent::SignedDigestMsg(_) => {
                 let sender = &mut self.quorum_store_msg_tx_vec[1];
                 sender.push(peer_id, quorum_store_event)?;
-            }
+            },
             quorum_store_event @ VerifiedEvent::FragmentMsg(_) => {
                 let idx = peer_id.to_vec()[0] as usize % self.num_network_workers_for_fragment + 2;
                 debug!(
@@ -1164,7 +1164,7 @@ impl EpochManager {
                 );
                 let sender = &mut self.quorum_store_msg_tx_vec[idx];
                 sender.push(peer_id, quorum_store_event)?;
-            }
+            },
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {
                 if let Some(sender) = &mut self.buffer_manager_msg_tx {

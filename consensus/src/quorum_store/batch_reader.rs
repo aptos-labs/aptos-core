@@ -1,13 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::QuorumStoreSender;
-use crate::quorum_store::{
-    batch_requester::BatchRequester,
-    batch_store::BatchStoreCommand,
-    counters,
-    types::{Batch, PersistedValue},
-    utils::RoundExpirations,
+use crate::{
+    network::QuorumStoreSender,
+    quorum_store::{
+        batch_requester::BatchRequester,
+        batch_store::BatchStoreCommand,
+        counters,
+        types::{Batch, PersistedValue},
+        utils::RoundExpirations,
+    },
 };
 use anyhow::bail;
 use aptos_consensus_types::{
@@ -91,11 +93,11 @@ impl QuotaManager {
         match storage_mode {
             StorageMode::PersistedOnly => {
                 self.db_balance = self.db_balance - num_bytes;
-            }
+            },
             StorageMode::MemoryAndPersisted => {
                 self.memory_balance = self.memory_balance - num_bytes;
                 self.db_balance = self.db_balance - num_bytes;
-            }
+            },
         }
     }
 }
@@ -289,7 +291,7 @@ impl BatchReader {
                     } else {
                         None
                     }
-                }
+                },
                 Vacant(_) => unreachable!("Expired entry not in cache"),
             };
             // No longer holding the lock on db_cache entry.

@@ -1,25 +1,28 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
-use crate::quorum_store::{
-    counters,
-    types::{BatchId, SerializedTransaction},
+use crate::{
+    monitor,
+    quorum_store::{
+        counters,
+        types::{BatchId, SerializedTransaction},
+    },
 };
+// use claims::assert_some;
+use aptos_consensus_types::common::{Round, TransactionSummary};
+use aptos_consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use chrono::Utc;
-// use claims::assert_some;
-use aptos_consensus_types::common::{Round, TransactionSummary};
-use aptos_consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
 use futures::channel::{mpsc::Sender, oneshot};
-use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::HashMap;
 use std::{
     cmp::Reverse,
-    collections::{BinaryHeap, HashSet, VecDeque},
+    collections::{
+        hash_map::Entry::{Occupied, Vacant},
+        BinaryHeap, HashMap, HashSet, VecDeque,
+    },
     hash::Hash,
     mem,
     time::Duration,
@@ -229,14 +232,14 @@ impl ProofQueue {
                 self.digest_queue
                     .push_back((*proof.digest(), proof.expiration()));
                 entry.insert(Some(proof));
-            }
+            },
             Occupied(mut entry) => {
                 if entry.get().is_some()
                     && entry.get().as_ref().unwrap().expiration() < proof.expiration()
                 {
                     entry.insert(Some(proof));
                 }
-            }
+            },
         }
     }
 
@@ -280,8 +283,8 @@ impl ProofQueue {
                             break;
                         }
                         ret.push(proof.clone());
-                    }
-                    None => {} // Proof was already committed, skip.
+                    },
+                    None => {}, // Proof was already committed, skip.
                 }
             }
             if *expiration < current_time {

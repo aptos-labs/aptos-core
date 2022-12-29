@@ -63,7 +63,7 @@ impl IncrementalBatchState {
                     Err(_) => {
                         self.status = Err(BatchAggregatorError::DeserializationError);
                         break;
-                    }
+                    },
                 }
             }
         }
@@ -140,7 +140,7 @@ impl BatchAggregator {
                     );
                     fragment_id > self.next_fragment_id()
                 }
-            }
+            },
             // Allow larger batch_id (> 0) the first time as quorum store might
             // be recovering from a crash and continuing with a larger batch_id.
             None => fragment_id > 0,

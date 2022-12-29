@@ -1,14 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::BatchRequest;
-use crate::quorum_store::{
-    batch_requester::BatchRequester,
-    tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
-    types::Batch,
+use crate::{
+    network_interface::ConsensusMsg,
+    quorum_store::{
+        batch_requester::BatchRequester,
+        tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
+        types::{Batch, BatchRequest},
+    },
+    test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
 };
-use crate::test_utils::mock_quorum_store_sender::MockQuorumStoreSender;
 use aptos_types::account_address::AccountAddress;
 use claims::{assert_err, assert_some};
 use tokio::sync::{mpsc::channel, oneshot};
@@ -42,7 +43,7 @@ async fn test_batch_requester() {
     match msg {
         ConsensusMsg::BatchRequestMsg(request) => {
             assert_eq!(*request, BatchRequest::new(id, epoch, digest))
-        }
+        },
         _ => unreachable!(),
     }
     assert_eq!(signers.len(), 3);

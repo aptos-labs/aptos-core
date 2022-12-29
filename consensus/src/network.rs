@@ -7,7 +7,7 @@ use crate::{
     logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
-    quorum_store::types::{Batch, Fragment, BatchRequest},
+    quorum_store::types::{Batch, BatchRequest, Fragment},
 };
 use anyhow::{anyhow, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};

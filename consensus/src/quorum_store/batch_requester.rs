@@ -1,10 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::QuorumStoreSender;
-use crate::quorum_store::{counters, types::BatchRequest, utils::DigestTimeouts};
-use aptos_crypto::hash::DefaultHasher;
-use aptos_crypto::HashValue;
+use crate::{
+    network::QuorumStoreSender,
+    quorum_store::{counters, types::BatchRequest, utils::DigestTimeouts},
+};
+use aptos_crypto::{hash::DefaultHasher, HashValue};
 use aptos_executor_types::*;
 use aptos_logger::debug;
 use aptos_types::{transaction::SignedTransaction, PeerId};

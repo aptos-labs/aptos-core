@@ -1,21 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::BlockReader;
-use crate::network::{NetworkSender, QuorumStoreSender};
-use crate::quorum_store::utils::ProofQueue;
-use crate::quorum_store::{
-    counters,
-    quorum_store::{QuorumStoreCommand, QuorumStoreError},
-    quorum_store_db::BatchIdDB,
-    types::BatchId,
-    utils::{BatchBuilder, MempoolProxy, RoundExpirations},
+use crate::{
+    block_storage::BlockReader,
+    network::{NetworkSender, QuorumStoreSender},
+    quorum_store::{
+        counters,
+        quorum_store::{QuorumStoreCommand, QuorumStoreError},
+        quorum_store_db::BatchIdDB,
+        types::BatchId,
+        utils::{BatchBuilder, MempoolProxy, ProofQueue, RoundExpirations},
+    },
+    round_manager::VerifiedEvent,
 };
-use crate::round_manager::VerifiedEvent;
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::common::ProofWithData;
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, Round, TransactionSummary},
+    common::{Payload, PayloadFilter, ProofWithData, Round, TransactionSummary},
     proof_of_store::{LogicalTime, ProofOfStore},
     request_response::{ConsensusResponse, PayloadRequest},
 };
@@ -37,7 +37,10 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{sync::mpsc::Sender as TokioSender, sync::oneshot as TokioOneshot, time::Interval};
+use tokio::{
+    sync::{mpsc::Sender as TokioSender, oneshot as TokioOneshot},
+    time::Interval,
+};
 
 type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
@@ -290,7 +293,7 @@ impl QuorumStoreWrapper {
                 counters::LOCAL_POS_COUNT.inc();
                 self.proofs_for_consensus.push(proof.clone());
                 self.broadcast_completed_proof(proof, network_sender).await;
-            }
+            },
             Err(QuorumStoreError::Timeout(batch_id)) => {
                 // Quorum store measurements
                 counters::TIMEOUT_BATCHES_COUNT.inc();
@@ -317,7 +320,7 @@ impl QuorumStoreWrapper {
                 );
                 // Not able to gather the proof, allow transactions to be polled again.
                 self.batches_in_progress.remove(&batch_id);
-            }
+            },
         }
     }
 
@@ -330,7 +333,7 @@ impl QuorumStoreWrapper {
                     PayloadFilter::Empty => HashSet::new(),
                     PayloadFilter::DirectMempool(_) => {
                         unreachable!()
-                    }
+                    },
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
@@ -342,21 +345,23 @@ impl QuorumStoreWrapper {
                 );
                 self.remaining_proof_num = remaining_proof_num;
 
-                let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
-                    Payload::empty(true)
-                } else {
-                    debug!(
-                        "QS: GetBlockRequest excluded len {}, block len {}",
-                        excluded_proofs.len(),
-                        proof_block.len()
-                    );
-                    Payload::InQuorumStore(ProofWithData::new(proof_block))
-                });
+                let res = ConsensusResponse::GetBlockResponse(
+                    if proof_block.is_empty() {
+                        Payload::empty(true)
+                    } else {
+                        debug!(
+                            "QS: GetBlockRequest excluded len {}, block len {}",
+                            excluded_proofs.len(),
+                            proof_block.len()
+                        );
+                        Payload::InQuorumStore(ProofWithData::new(proof_block))
+                    },
+                );
                 match callback.send(Ok(res)) {
                     Ok(_) => (),
                     Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),
                 }
-            }
+            },
             PayloadRequest::CleanRequest(logical_time, digests) => {
                 debug!("QS: got clean request from execution");
                 assert_eq!(
@@ -381,7 +386,7 @@ impl QuorumStoreWrapper {
                     }
                 }
                 self.proofs_for_consensus.mark_committed(digests);
-            }
+            },
         }
     }
 

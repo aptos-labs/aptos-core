@@ -1,15 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::DbError;
-use crate::quorum_store::{
-    quorum_store::QuorumStoreCommand,
-    quorum_store_db::BatchIdDB,
-    quorum_store_wrapper::QuorumStoreWrapper,
-    tests::utils::{create_vec_serialized_transactions, create_vec_signed_transactions},
-    types::{BatchId, SerializedTransaction},
+use crate::{
+    error::DbError,
+    quorum_store::{
+        quorum_store::QuorumStoreCommand,
+        quorum_store_db::BatchIdDB,
+        quorum_store_wrapper::QuorumStoreWrapper,
+        tests::utils::{create_vec_serialized_transactions, create_vec_signed_transactions},
+        types::{BatchId, SerializedTransaction},
+    },
+    test_utils::build_empty_tree,
 };
-use crate::test_utils::build_empty_tree;
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, TransactionSummary},
@@ -18,8 +20,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::{aggregate_signature::AggregateSignature, transaction::SignedTransaction};
 use futures::{
     channel::{
         mpsc::{channel, Receiver},

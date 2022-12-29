@@ -1,23 +1,27 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::QuorumStoreSender;
-use crate::quorum_store::proof_builder::ProofBuilderCommand;
-use crate::quorum_store::types::{Batch, PersistedValue};
-use crate::quorum_store::{
-    batch_reader::{BatchReader, BatchReaderCommand},
-    counters,
-    quorum_store_db::QuorumStoreDB,
+use crate::{
+    network::QuorumStoreSender,
+    quorum_store::{
+        batch_reader::{BatchReader, BatchReaderCommand},
+        counters,
+        proof_builder::ProofBuilderCommand,
+        quorum_store_db::QuorumStoreDB,
+        types::{Batch, PersistedValue},
+    },
 };
-use aptos_crypto::HashValue;
-use aptos_logger::debug;
 // use aptos_logger::spawn_named;
 use aptos_consensus_types::{
     common::Round,
     proof_of_store::{LogicalTime, SignedDigest},
 };
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
+use aptos_crypto::HashValue;
+use aptos_logger::debug;
+use aptos_types::{
+    transaction::SignedTransaction, validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier, PeerId,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::{
@@ -221,7 +225,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                         .send(())
                         .expect("Failed to send shutdown ack to QuorumStore");
                     break;
-                }
+                },
                 BatchStoreCommand::Persist(persist_request) => {
                     let author = persist_request.value.author;
                     if let Some(signed_digest) = self.store(persist_request) {
@@ -241,12 +245,12 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                             debug!("QS: sent signed digest back to sender");
                         }
                     }
-                }
+                },
                 BatchStoreCommand::Clean(digests) => {
                     if let Err(_) = self.db.delete_batches(digests) {
                         // TODO: do something
                     }
-                }
+                },
                 BatchStoreCommand::BatchRequest(digest, peer_id, maybe_tx) => {
                     counters::GET_BATCH_FROM_DB_COUNT.inc();
 
@@ -264,7 +268,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                                     payload_tx
                                         .send(Ok(payload))
                                         .expect("Failed to send PersistedValue");
-                                }
+                                },
                                 None => {
                                     assert_ne!(
                                         self.my_peer_id, peer_id,
@@ -273,17 +277,17 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                                     let batch =
                                         Batch::new(self.my_peer_id, self.epoch, digest, payload);
                                     self.network_sender.send_batch(batch, vec![peer_id]).await;
-                                }
+                                },
                             }
-                        }
+                        },
                         Ok(None) => unreachable!(
                             "Could not read persisted value (according to BatchReader) from DB"
                         ),
                         Err(_) => {
                             // TODO: handle error, e.g. from self or not, log, panic.
-                        }
+                        },
                     }
-                }
+                },
             }
         }
 
