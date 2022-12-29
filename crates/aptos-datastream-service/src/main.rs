@@ -1,12 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use deadpool_redis::{Config, Runtime};
-
 use aptos_datastream_service::service::DatastreamServer;
 use aptos_protos::datastream::v1::indexer_stream_server::IndexerStreamServer;
-use std::net::ToSocketAddrs;
-use std::sync::Arc;
+use deadpool_redis::{Config, Runtime};
+use std::{net::ToSocketAddrs, sync::Arc};
 use tonic::transport::Server;
 
 pub fn get_redis_address() -> String {

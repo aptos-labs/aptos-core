@@ -1,22 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use tonic::{Request, Response, Status};
-
 use crate::constants::REDIS_PROCESS_STATUS;
 use aptos_logger::info;
-use aptos_protos::datastream::v1::indexer_stream_server::IndexerStream;
-use aptos_protos::datastream::v1::raw_datastream_response::Response as DatastreamProtoResponse;
 use aptos_protos::datastream::v1::{
-    RawDatastreamRequest, RawDatastreamResponse, TransactionOutput, TransactionsOutput,
+    indexer_stream_server::IndexerStream,
+    raw_datastream_response::Response as DatastreamProtoResponse, RawDatastreamRequest,
+    RawDatastreamResponse, TransactionOutput, TransactionsOutput,
 };
 use deadpool_redis::{redis::cmd, Pool};
 use futures::Stream;
 use moving_average::MovingAverage;
-use std::sync::Arc;
-use std::{pin::Pin, time};
+use std::{pin::Pin, sync::Arc, time};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+use tonic::{Request, Response, Status};
 
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<RawDatastreamResponse, Status>> + Send>>;
 
@@ -27,6 +25,7 @@ pub struct DatastreamServer {
 #[tonic::async_trait]
 impl IndexerStream for DatastreamServer {
     type RawDatastreamStream = ResponseStream;
+
     async fn raw_datastream(
         &self,
         req: Request<RawDatastreamRequest>,
@@ -89,11 +88,11 @@ impl IndexerStream for DatastreamServer {
                         );
                     }
                     match tx.send(Result::<_, Status>::Ok(item.clone())).await {
-                        Ok(_) => {}
+                        Ok(_) => {},
                         Err(_) => {
                             // Client disconnects.
                             break;
-                        }
+                        },
                     }
                 } else {
                     // if we hit the head,  wait 50 milliseconds.

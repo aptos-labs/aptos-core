@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::models::transactions::TransactionModel;
-use diesel::result::Error;
 use diesel::{
     pg::PgConnection,
     r2d2::{ConnectionManager, PooledConnection},
+    result::Error,
     RunQueryDsl,
 };
 use std::sync::Arc;
@@ -14,12 +14,13 @@ pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type PgDbPool = Arc<PgPool>;
 pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
-use moving_average::MovingAverage;
-
 use aptos_logger::{error, info};
-use aptos_protos::datastream::v1::{self as datastream, RawDatastreamRequest};
-use aptos_protos::transaction::v1::Transaction as TransactionProto;
+use aptos_protos::{
+    datastream::v1::{self as datastream, RawDatastreamRequest},
+    transaction::v1::Transaction as TransactionProto,
+};
 use futures::StreamExt;
+use moving_average::MovingAverage;
 use prost::Message;
 use tokio::sync::mpsc;
 
@@ -111,7 +112,7 @@ impl Worker {
                             self.datastream_service_address, self.postgres_uri
                         );
                         panic!("[Datastream Worker] Error connecting to indexer: {}", e);
-                    }
+                    },
                 };
             let request = tonic::Request::new(datastream::RawDatastreamRequest {
                 // Loads from the recent successful starting version.
@@ -135,7 +136,7 @@ impl Worker {
                             e
                         );
                         break;
-                    }
+                    },
                 };
                 match received.response.unwrap() {
                     datastream::raw_datastream_response::Response::Status(status) => {
@@ -148,19 +149,19 @@ impl Worker {
                                     // The first signal is the initialization signal.
                                     init_signal_received = true;
                                 }
-                            }
+                            },
                             1 => {
                                 // No BATCH_END signal is expected.
                                 error!("[Datastream Indexer] No signal is expected; panic.");
                                 panic!("[Datastream Indexer] No signal is expected; panic.");
-                            }
+                            },
                             _ => {
                                 // There might be protobuf inconsistency between server and client.
                                 // Panic to block running.
                                 panic!("[Datastream Worker] Unknown RawDatastreamResponse status type.");
-                            }
+                            },
                         }
-                    }
+                    },
                     datastream::raw_datastream_response::Response::Data(data) => {
                         let transaction_sender = tx.clone();
 
@@ -176,7 +177,7 @@ impl Worker {
                         for txn in transactions {
                             transaction_sender.send(txn).await.unwrap();
                         }
-                    }
+                    },
                 };
             }
         }
@@ -188,10 +189,10 @@ fn get_conn(pool: Arc<PgDbPool>) -> PgPoolConnection {
         match pool.get() {
             Ok(conn) => {
                 return conn;
-            }
+            },
             Err(err) => {
                 error!("Error getting connection from pool: {}", err);
-            }
+            },
         };
     }
 }

@@ -1,16 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::convert::convert_transaction;
-use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
-use crate::runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS};
+use crate::{
+    convert::convert_transaction,
+    counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
+    runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
+};
 use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
 use aptos_logger::{error, info, sample, sample::SampleRate};
-use aptos_protos::datastream::v1::{
-    raw_datastream_response, RawDatastreamResponse, TransactionOutput, TransactionsOutput,
+use aptos_protos::{
+    datastream::v1::{
+        raw_datastream_response, RawDatastreamResponse, TransactionOutput, TransactionsOutput,
+    },
+    transaction::v1::Transaction as TransactionPB,
 };
-use aptos_protos::transaction::v1::Transaction as TransactionPB;
 use prost::Message;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
@@ -88,11 +92,11 @@ impl IndexerStreamCoordinator {
                         )),
                     };
                     match transaction_sender.send(Result::<_, Status>::Ok(item)).await {
-                        Ok(_) => {}
+                        Ok(_) => {},
                         Err(_) => {
                             // Client disconnects.
                             return Err(Status::aborted("Client disconnected"));
-                        }
+                        },
                     }
                 }
                 Ok(encoded.last().unwrap().version)
@@ -176,7 +180,7 @@ impl IndexerStreamCoordinator {
                         );
                     }
                     tokio::time::sleep(Duration::from_millis(300)).await;
-                }
+                },
             }
         }
     }
@@ -232,23 +236,23 @@ impl IndexerStreamCoordinator {
                     match txn {
                         APITransaction::PendingTransaction(_) => {
                             unreachable!("Indexer should never see pending transactions")
-                        }
+                        },
                         APITransaction::UserTransaction(ref mut ut) => {
                             ut.info.block_height = Some(block_height_bcs);
                             ut.info.epoch = Some(epoch_bcs);
-                        }
+                        },
                         APITransaction::GenesisTransaction(ref mut gt) => {
                             gt.info.block_height = Some(block_height_bcs);
                             gt.info.epoch = Some(epoch_bcs);
-                        }
+                        },
                         APITransaction::BlockMetadataTransaction(ref mut bmt) => {
                             bmt.info.block_height = Some(block_height_bcs);
                             bmt.info.epoch = Some(epoch_bcs);
-                        }
+                        },
                         APITransaction::StateCheckpointTransaction(ref mut sct) => {
                             sct.info.block_height = Some(block_height_bcs);
                             sct.info.epoch = Some(epoch_bcs);
-                        }
+                        },
                     };
                     txn
                 }) {
@@ -266,7 +270,7 @@ impl IndexerStreamCoordinator {
                         "Could not convert txn {} from OnChainTransactions: {:?}",
                         txn_version, err
                     );
-                }
+                },
             }
         }
 

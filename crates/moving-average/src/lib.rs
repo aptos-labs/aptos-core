@@ -40,7 +40,7 @@ impl MovingAverage {
                     } else {
                         break;
                     }
-                }
+                },
             }
         }
         self.avg()

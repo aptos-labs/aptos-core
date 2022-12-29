@@ -5,15 +5,13 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use crate::schema::transactions;
-use crate::util::u64_to_bigdecimal;
+use crate::{schema::transactions, util::u64_to_bigdecimal};
 use aptos_protos::transaction::v1::{
-    transaction::TransactionType, transaction::TxnData, Transaction as TransactionProto,
-    TransactionInfo,
+    transaction::{TransactionType, TxnData},
+    Transaction as TransactionProto, TransactionInfo,
 };
-use serde::{Deserialize, Serialize};
-
 use aptos_rest_client::aptos_api_types::HexEncodedBytes;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Insertable, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(version))]
@@ -48,26 +46,26 @@ impl Transaction {
                 TxnData::BlockMetadata(bm) => {
                     num_events = bm.events.len() as i64;
                     // No payload for BlockMetadata Txn.
-                }
+                },
                 TxnData::User(user) => match &user.request {
                     Some(p) => match p.payload {
                         Some(ref transaction_payload) => {
                             payload = Some(serde_json::to_value(transaction_payload).unwrap());
-                        }
-                        None => {}
+                        },
+                        None => {},
                     },
-                    None => {}
+                    None => {},
                 },
                 TxnData::Genesis(genesis) => {
                     match genesis.payload {
                         Some(ref transaction_payload) => {
                             payload = Some(serde_json::to_value(transaction_payload).unwrap());
-                        }
-                        None => {}
+                        },
+                        None => {},
                     }
                     num_events = genesis.events.len() as i64;
-                }
-                TxnData::StateCheckpoint(_) => {}
+                },
+                TxnData::StateCheckpoint(_) => {},
             }
         }
         Self::from_transaction_info(
