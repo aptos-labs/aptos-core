@@ -424,36 +424,14 @@ To call this function, we need to use the `window.aptos` API provided by the wal
 {
   type: "entry_function_payload",
   function: "<address>::message::set_message",
-  arguments: ["<hex encoded utf-8 message>"],
+  arguments: ["Message to store"],
   type_arguments: []
 }
 ```
 
 There is no need to provide the `account: signer` argument. Aptos provides it automatically.
 
-However, we do need to specify the `message_bytes` argument: this is the `"<hex encoded utf-8 message>"` in the transaction. We need a way to convert a JS string to this format. We can do so by using `TextEncoder` to convert to utf-8 bytes and then a one-liner to hex encode the bytes.
-
-Add this function to `src/App.tsx`:
-
-```typescript
-/** Convert string to hex-encoded utf-8 bytes. */
-function stringToHex(text: string) {
-  const encoder = new TextEncoder();
-  const encoded = encoder.encode(text);
-  return Array.from(encoded, (i) => i.toString(16).padStart(2, "0")).join("");
-}
-```
-
-Using this function, our transaction payload becomes:
-
-```javascript
-{
-  type: "entry_function_payload",
-  function: "<address>::message::set_message",
-  arguments: [stringToHex(message)],
-  type_arguments: []
-}
-```
+However, we do need to specify the `message` argument: this is the `"Message to store"` in the transaction.
 
 ### Use the `window.aptos` API to submit the `set_message` transaction
 
@@ -481,7 +459,7 @@ function App() {
     const transaction = {
       type: "entry_function_payload",
       function: `${address}::message::set_message`,
-      arguments: [stringToHex(message)],
+      arguments: [message],
       type_arguments: [],
     };
 
@@ -497,6 +475,7 @@ function App() {
     <div className="App">
       {hasModule ? (
         <form onSubmit={handleSubmit}>
+          <p>On-chain message</p>
           <textarea ref={ref} />
           <input disabled={isSaving} type="submit" />
         </form>
@@ -598,6 +577,7 @@ function App() {
     <div className="App">
       {hasModule ? (
         <form onSubmit={handleSubmit}>
+          <p>On-chain message</p>
           <textarea ref={ref} defaultValue={message} readOnly={!isEditable} />
           {isEditable && (<input disabled={isSaving} type="submit" />)}
           {isEditable && (<a href={address!}>Get public URL</a>)}
