@@ -192,7 +192,7 @@ const config = {
             position: "left",
             items: [
               {
-                label: "Find Nodes",
+                label: "Understand Nodes",
                 type: "doc",
                 docId: "nodes/nodes-landing",
               },
@@ -205,6 +205,11 @@ const config = {
                 label: "Install FullNodes",
                 type: "doc",
                 docId: "nodes/full-node/index",
+              },
+              {
+                label: "Measure Nodes",
+                type: "doc",
+                docId: "nodes/measure/index",
               },
               {
                 label: "Configure Nodes",
