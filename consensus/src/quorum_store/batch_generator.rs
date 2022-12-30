@@ -7,10 +7,11 @@ use crate::quorum_store::quorum_store::{QuorumStoreCommand, QuorumStoreError};
 use crate::quorum_store::quorum_store_db::BatchIdDB;
 use crate::quorum_store::types::BatchId;
 use crate::quorum_store::utils::{BatchBuilder, MempoolProxy, RoundExpirations};
+use aptos_consensus_types::common::{Round, TransactionSummary};
+use aptos_consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
+use aptos_consensus_types::request_response::CleanCommand;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use consensus_types::common::{Round, TransactionSummary};
-use consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -245,7 +246,7 @@ impl BatchGenerator {
                 // Handle batch_id
 
                 counters::LOCAL_POS_COUNT.inc();
-            }
+            },
             Err(QuorumStoreError::Timeout(batch_id)) => {
                 // Quorum store measurements
                 counters::TIMEOUT_BATCHES_COUNT.inc();
@@ -272,7 +273,7 @@ impl BatchGenerator {
                 );
                 // Not able to gather the proof, allow transactions to be polled again.
                 self.batches_in_progress.remove(&batch_id);
-            }
+            },
         }
     }
 

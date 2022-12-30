@@ -4,15 +4,15 @@
 use crate::quorum_store::counters;
 use crate::quorum_store::utils::ProofQueue;
 use crate::round_manager::VerifiedEvent;
+use aptos_channels::aptos_channel;
+use aptos_consensus_types::common::{Payload, PayloadFilter, ProofWithData};
+use aptos_consensus_types::proof_of_store::LogicalTime;
+use aptos_consensus_types::request_response::{
+    BlockProposalCommand, CleanCommand, ConsensusResponse,
+};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
-use channel::aptos_channel;
-use consensus_types::common::{Payload, PayloadFilter};
-use consensus_types::proof_of_store::LogicalTime;
-use consensus_types::request_response::{
-    BlockProposalCommand, CleanCommand, ConsensusResponse, WrapperCommand,
-};
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
 use std::collections::HashSet;
@@ -47,7 +47,7 @@ impl ProofManager {
                 );
                 self.latest_logical_time = logical_time;
                 self.proofs_for_consensus.mark_committed(digests);
-            }
+            },
         }
     }
 
@@ -60,7 +60,7 @@ impl ProofManager {
                     PayloadFilter::Empty => HashSet::new(),
                     PayloadFilter::DirectMempool(_) => {
                         unreachable!()
-                    }
+                    },
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
@@ -73,20 +73,20 @@ impl ProofManager {
                 self.remaining_proof_num = remaining_proof_num;
 
                 let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
-                    Payload::empty()
+                    Payload::empty(true)
                 } else {
                     debug!(
                         "QS: GetBlockRequest excluded len {}, block len {}",
                         excluded_proofs.len(),
                         proof_block.len()
                     );
-                    Payload::InQuorumStore(proof_block)
+                    Payload::InQuorumStore(ProofWithData::new(proof_block))
                 });
                 match callback.send(Ok(res)) {
                     Ok(_) => (),
                     Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),
                 }
-            }
+            },
         }
     }
 
@@ -109,7 +109,7 @@ impl ProofManager {
                     self.handle_clean_request(msg)
                 }
                 Some(msg) = network_msg_rx.next() => {
-                   if let VerifiedEvent::ProofOfStoreBroadcast(proof) = msg{
+                   if let VerifiedEvent::ProofOfStoreMsg(proof) = msg{
                         debug!("QS: got proof from peer");
 
                         counters::REMOTE_POS_COUNT.inc();
