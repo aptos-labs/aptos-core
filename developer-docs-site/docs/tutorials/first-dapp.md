@@ -5,17 +5,18 @@ slug: "your-first-dapp"
 
 # Your First Dapp
 
-In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application) on the Aptos blockchain. A dapp usually consists of a graphical user interface, which interacts with one or more Move modules.
+In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application)
+on the Aptos blockchain. A dapp usually consists of a graphical user interface, which interacts with one or more Move
+modules.  This dapp will let users publish and share snippets of text on the Aptos blockchain.
 
-For this tutorial, we will use the Move module [`HelloBlockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain) described in [Your First Move Module](first-move-module.md) and focus on building the user interface.
+For this tutorial, we will use the Move module [`HelloBlockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain)
+described in [Your First Move Module](first-move-module.md) and focus on building the user interface around the module.
 
 We will use the:
 
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Petra Wallet](../guides/install-petra-wallet-extension)
 * [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
-
-The end result is a dapp that lets users publish and share snippets of text on the Aptos blockchain.
 
 :::tip Full source code
 
@@ -26,13 +27,15 @@ The full source code for this tutorial is being updated. Meanwhile, the older on
 
 ### Aptos Wallet
 
-Before starting this tutorial, install the [Petra extension](../guides/install-petra-wallet-extension).
+Before starting this tutorial, install the [Petra wallet extension](../guides/install-petra-wallet-extension).
 
 After you install it:
 
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.
 2. Copy the private key. You will need it to set up the Aptos CLI in the next section.
 3. See the [user instructions](https://petra.app/docs/use) on petra.app for help.
+4. Switch to the Devnet network by clicking, settings, network, and selecting **devnet**.
+5. Click the faucet button to ensure you can receive test tokens.
 
 :::tip
 Ensure your account has sufficient funds to perform transactions by clicking the **Faucet** button.
