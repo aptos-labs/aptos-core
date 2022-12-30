@@ -48,13 +48,16 @@ Ensure your account has sufficient funds to perform transactions by clicking the
 
 ### Aptos CLI
 
+We will also be installing the Aptos CLI so that we can publish 
+
 1. Install the [Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md).
 
-2. Run `aptos init`.
+2. Run `aptos init --profile my-first-nft`.
 
-3. Select your network as you did in the [Move module](first-move-module.md#step-2-create-an-account-and-fund-it) tutorial.
+3. Select the network `devnet`
 
-4. When prompted for your private key, paste the private key from the Aptos Wallet that you copied earlier and press **Return**.
+4. When prompted for your private key, paste the private key from the Petra Wallet and press **Return**. 
+   1. You can find the private key by going to settings, manage account, show the private key, and copy that field.
 
 You will see output resembling:
 
@@ -62,14 +65,14 @@ You will see output resembling:
 Account <account-number> has been already found onchain
 
 ---
-Aptos CLI is now set up for account <account-number> as profile default!  Run `aptos --help` for more information about commands
+Aptos CLI is now set up for account <account-number> as profile my-first-nft!  Run `aptos --help` for more information about commands
 {
   "Result": "Success"
 }
 ```
 This initializes the Aptos CLI to use the same account as used by the Aptos Wallet.
 
-3. Run `aptos account list` to verify that it is working. You should see your account address listed in the `addr` field for all events.
+5. Run `aptos account list --profile my-first-nft` to verify that it is working. You should see your account address listed in the `addr` field for all events.
 
 ## Step 1: Set up a single page app
 
@@ -262,13 +265,13 @@ We will use the Aptos CLI to compile and publish the `HelloBlockchain` module.
 2. Next, use the `aptos move publish` command (replacing `/path/to/hello_blockchain/` and `<address>`):
 
 ```bash
-aptos move publish --package-dir /path/to/hello_blockchain/ --named-addresses HelloBlockchain=<address>
+aptos move publish --profile my-first-nft --package-dir /path/to/hello_blockchain/ --named-addresses HelloBlockchain=<address>
 ```
 
 For example:
 
 ```bash
-aptos move publish --package-dir ~/code/aptos-core/aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481
+aptos move publish --profile my-first-nft --package-dir ~/code/aptos-core/aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481
 ```
 
 The `--named-addresses` replaces the named address `HelloBlockchain` in `HelloBlockchain.move` with the specified address. For example, if we specify `--named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`, then the following:
