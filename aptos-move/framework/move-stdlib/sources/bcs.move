@@ -13,5 +13,14 @@ module std::bcs {
     spec module {
         /// Native function which is defined in the prover's prelude.
         native fun serialize<MoveValue>(v: &MoveValue): vector<u8>;
+
+        fun spec_to_bytes<MoveValue>(v: MoveValue): vector<u8>;
+    }
+
+
+    spec to_bytes<MoveValue>(v: &MoveValue): vector<u8> {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_to_bytes(v);
     }
 }
