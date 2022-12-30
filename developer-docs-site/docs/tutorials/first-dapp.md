@@ -27,15 +27,20 @@ The full source code for this tutorial is being updated. Meanwhile, the older on
 
 ### Aptos Wallet
 
-Before starting this tutorial, install the [Petra wallet extension](../guides/install-petra-wallet-extension).
+Before starting this tutorial, you'll need a chrome extension wallet to interact with the dapp. You can first install
+the [Petra wallet extension](../guides/install-petra-wallet-extension) for use in this tutorial.
 
-After you install it:
-
+If you haven't installed the Petra wallet extension before:
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.
 2. Copy the private key. You will need it to set up the Aptos CLI in the next section.
 3. See the [user instructions](https://petra.app/docs/use) on petra.app for help.
 4. Switch to the Devnet network by clicking, settings, network, and selecting **devnet**.
 5. Click the faucet button to ensure you can receive test tokens.
+
+If you already have the Petra wallet installed, we suggest you create a new wallet for purposes of this tutorial.
+1. In the extension, go to settings, switch account, add account, create new account to create a new account.
+2. Switch to the Devnet network by clicking, settings, network, and selecting **devnet**.
+3. Click the faucet button to ensure you can receive test tokens.
 
 :::tip
 Ensure your account has sufficient funds to perform transactions by clicking the **Faucet** button.
