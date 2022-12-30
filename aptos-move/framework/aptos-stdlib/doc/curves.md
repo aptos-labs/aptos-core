@@ -18,13 +18,13 @@
 -  [Function `scalar_mul`](#0x1_curves_scalar_mul)
 -  [Function `scalar_inv`](#0x1_curves_scalar_inv)
 -  [Function `scalar_eq`](#0x1_curves_scalar_eq)
--  [Function `scalar_from_bytes`](#0x1_curves_scalar_from_bytes)
 -  [Function `identity`](#0x1_curves_identity)
 -  [Function `generator`](#0x1_curves_generator)
 -  [Function `element_neg`](#0x1_curves_element_neg)
 -  [Function `element_add`](#0x1_curves_element_add)
 -  [Function `element_mul`](#0x1_curves_element_mul)
 -  [Function `simul_point_mul`](#0x1_curves_simul_point_mul)
+-  [Function `scalar_from_bytes`](#0x1_curves_scalar_from_bytes)
 -  [Function `scalar_to_bytes`](#0x1_curves_scalar_to_bytes)
 -  [Function `serialize_element_uncompressed`](#0x1_curves_serialize_element_uncompressed)
 -  [Function `serialize_element_compressed`](#0x1_curves_serialize_element_compressed)
@@ -63,8 +63,37 @@
 
 ## Struct `BLS12_381_G1`
 
-This is a phantom type that represents the 1st pairing input group <code>G1</code> in BLS12-381 pairing:
-TODO: describe the encoding.
+A phantom type that represents the 1st pairing input group <code>G1</code> in BLS12-381 pairing.
+
+In BLS12-381, a finite field <code>Fq</code> is used.
+q equals to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
+A curve <code>E(Fq)</code> is defined as <code>y^2=x^3+4</code> over <code>Fq</code>.
+<code>G1</code> is formed by a subset of points on <code>E(Fq)</code>.
+<code>G1</code> has a prime order <code>r</code> with value 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+
+A <code><a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> is an integer between 0 and <code>r-1</code>.
+
+Function <code><a href="curves.md#0x1_curves_scalar_from_bytes">scalar_from_bytes</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> and <code><a href="curves.md#0x1_curves_scalar_to_bytes">scalar_to_bytes</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>
+assumes a 32-byte little-endian encoding of a <code><a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>.
+
+An <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> is an element in <code>G1</code>.
+
+Function <code><a href="curves.md#0x1_curves_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> and <code><a href="curves.md#0x1_curves_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>
+assumes a 96-byte encoding <code>[b_0, ..., b_95]</code> of an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>, with the following rules.
+- <code>b_95 & 0x40</code> is the infinity flag.
+- The infinity flag is 1 if and only if the element is the point at infinity.
+- The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve, with the following rules.
+- <code>[b_0, ..., b_47 & 0x3f]</code> is a 48-byte little-endian encoding of <code>x</code>.
+- <code>[b_48, ..., b_95 & 0x3f]</code> is a 48-byte little-endian encoding of 'y'.
+
+Function <code><a href="curves.md#0x1_curves_serialize_element_compressed">serialize_element_compressed</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> and <code><a href="curves.md#0x1_curves_deserialize_element_compressed">deserialize_element_compressed</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>
+assumes a 48-byte encoding <code>[b_0, ..., b_47]</code> of an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> with the following rules.
+- <code>b_47 & 0x40</code> is the infinity flag.
+- The infinity flag is 1 if and only if the element is the point at infinity.
+- The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve, with the following rules.
+- <code>[b_0, ..., b_47 & 0x3f]</code> is a 48-byte little-endian encoding of <code>x</code>.
+- <code>b_47 & 0x80</code> is the positiveness flag.
+- The positiveness flag is 1 if and only if <code>y &gt; -y</code>.
 
 
 <pre><code><b>struct</b> <a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>
@@ -429,38 +458,6 @@ Perform a bilinear mapping.
 
 </details>
 
-<a name="0x1_curves_scalar_from_bytes"></a>
-
-## Function `scalar_from_bytes`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_bytes">scalar_from_bytes</a>&lt;G&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_bytes">scalar_from_bytes</a>&lt;G&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;&gt; {
-    <b>let</b> (succeeded, handle) = <a href="curves.md#0x1_curves_scalar_from_bytes_internal">scalar_from_bytes_internal</a>&lt;G&gt;(*bytes);
-    <b>if</b> (succeeded) {
-        <b>let</b> scalar = <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
-            handle
-        };
-        std::option::some(scalar)
-    } <b>else</b> {
-        std::option::none()
-    }
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_curves_identity"></a>
 
 ## Function `identity`
@@ -627,10 +624,46 @@ Perform a bilinear mapping.
 
 </details>
 
+<a name="0x1_curves_scalar_from_bytes"></a>
+
+## Function `scalar_from_bytes`
+
+Decode a <code><a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;</code> from a byte array.
+See the comments on the actual type <code>G</code> for the format details.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_bytes">scalar_from_bytes</a>&lt;G&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_bytes">scalar_from_bytes</a>&lt;G&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;&gt; {
+    <b>let</b> (succeeded, handle) = <a href="curves.md#0x1_curves_scalar_from_bytes_internal">scalar_from_bytes_internal</a>&lt;G&gt;(*bytes);
+    <b>if</b> (succeeded) {
+        <b>let</b> scalar = <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
+            handle
+        };
+        std::option::some(scalar)
+    } <b>else</b> {
+        std::option::none()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_curves_scalar_to_bytes"></a>
 
 ## Function `scalar_to_bytes`
 
+Encode a <code><a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;</code> to a byte array.
+See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_to_bytes">scalar_to_bytes</a>&lt;G&gt;(scalar: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -655,6 +688,8 @@ Perform a bilinear mapping.
 
 ## Function `serialize_element_uncompressed`
 
+Encode an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;</code> to a byte array with an uncompressed format.
+See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -679,6 +714,8 @@ Perform a bilinear mapping.
 
 ## Function `serialize_element_compressed`
 
+Encode an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;</code> to a byte array with a compressed format.
+See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed">serialize_element_compressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -703,6 +740,8 @@ Perform a bilinear mapping.
 
 ## Function `deserialize_element_uncompressed`
 
+Decode an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;</code> from a byte array with an uncompressed format.
+See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;&gt;
@@ -732,6 +771,8 @@ Perform a bilinear mapping.
 
 ## Function `deserialize_element_compressed`
 
+Decode an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;</code> from a byte array with a compressed format.
+See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_deserialize_element_compressed">deserialize_element_compressed</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;&gt;

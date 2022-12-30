@@ -1,8 +1,37 @@
 module aptos_std::curves {
     use std::option::Option;
 
-    /// This is a phantom type that represents the 1st pairing input group `G1` in BLS12-381 pairing:
-    /// TODO: describe the encoding.
+    /// A phantom type that represents the 1st pairing input group `G1` in BLS12-381 pairing.
+    ///
+    /// In BLS12-381, a finite field `Fq` is used.
+    /// q equals to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
+    /// A curve `E(Fq)` is defined as `y^2=x^3+4` over `Fq`.
+    /// `G1` is formed by a subset of points on `E(Fq)`.
+    /// `G1` has a prime order `r` with value 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    ///
+    /// A `Scalar<BLS12_381_G1>` is an integer between 0 and `r-1`.
+    ///
+    /// Function `scalar_from_bytes<BLS12_381_G1>` and `scalar_to_bytes<BLS12_381_G1>`
+    /// assumes a 32-byte little-endian encoding of a `Scalar<BLS12_381_G1>`.
+    ///
+    /// An `Element<BLS12_381_G1>` is an element in `G1`.
+    ///
+    /// Function `serialize_element_uncompressed<BLS12_381_G1>` and `deserialize_element_uncompressed<BLS12_381_G1>`
+    /// assumes a 96-byte encoding `[b_0, ..., b_95]` of an `Element<BLS12_381_G1>`, with the following rules.
+    /// - `b_95 & 0x40` is the infinity flag.
+    /// - The infinity flag is 1 if and only if the element is the point at infinity.
+    /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve, with the following rules.
+    ///     - `[b_0, ..., b_47 & 0x3f]` is a 48-byte little-endian encoding of `x`.
+    ///     - `[b_48, ..., b_95 & 0x3f]` is a 48-byte little-endian encoding of 'y'.
+    ///
+    /// Function `serialize_element_compressed<BLS12_381_G1>` and `deserialize_element_compressed<BLS12_381_G1>`
+    /// assumes a 48-byte encoding `[b_0, ..., b_47]` of an `Element<BLS12_381_G1>` with the following rules.
+    /// - `b_47 & 0x40` is the infinity flag.
+    /// - The infinity flag is 1 if and only if the element is the point at infinity.
+    /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve, with the following rules.
+    ///     - `[b_0, ..., b_47 & 0x3f]` is a 48-byte little-endian encoding of `x`.
+    ///     - `b_47 & 0x80` is the positiveness flag.
+    ///     - The positiveness flag is 1 if and only if `y > -y`.
     struct BLS12_381_G1 {}
 
     /// This is a phantom type that represents the 2nd pairing input group `G2` in BLS12-381 pairing.
@@ -17,7 +46,6 @@ module aptos_std::curves {
     /// where `r` is the prime order of a group, where the group is determined by the type argument `G`.
     /// See the comments on the specific `G` for more details about `Scalar<G>`.
     struct Scalar<phantom G> has copy, drop {
-        //TODO: handle as u8 temporarily. Upgrade to u64.
         handle: u64
     }
 
@@ -91,18 +119,6 @@ module aptos_std::curves {
         scalar_eq_internal<G>(scalar_1.handle, scalar_2.handle)
     }
 
-    public fun scalar_from_bytes<G>(bytes: &vector<u8>): Option<Scalar<G>> {
-        let (succeeded, handle) = scalar_from_bytes_internal<G>(*bytes);
-        if (succeeded) {
-            let scalar = Scalar<G> {
-                handle
-            };
-            std::option::some(scalar)
-        } else {
-            std::option::none()
-        }
-    }
-
     // Point basics.
     public fun identity<G>(): Element<G> {
         Element<G> {
@@ -150,18 +166,40 @@ module aptos_std::curves {
         result
     }
 
+    /// Decode a `Scalar<G>` from a byte array.
+    /// See the comments on the actual type `G` for the format details.
+    public fun scalar_from_bytes<G>(bytes: &vector<u8>): Option<Scalar<G>> {
+        let (succeeded, handle) = scalar_from_bytes_internal<G>(*bytes);
+        if (succeeded) {
+            let scalar = Scalar<G> {
+                handle
+            };
+            std::option::some(scalar)
+        } else {
+            std::option::none()
+        }
+    }
+
+    /// Encode a `Scalar<G>` to a byte array.
+    /// See the comments on the actual type `G` for the format details.
     public fun scalar_to_bytes<G>(scalar: &Scalar<G>): vector<u8> {
         scalar_to_bytes_internal<G>(scalar.handle)
     }
 
+    /// Encode an `Element<G>` to a byte array with an uncompressed format.
+    /// See the comments on the actual type `G` for the format details.
     public fun serialize_element_uncompressed<G>(point: &Element<G>): vector<u8> {
         serialize_element_uncompressed_internal<G>(point.handle)
     }
 
+    /// Encode an `Element<G>` to a byte array with a compressed format.
+    /// See the comments on the actual type `G` for the format details.
     public fun serialize_element_compressed<G>(point: &Element<G>): vector<u8> {
         serialize_element_compressed_internal<G>(point.handle)
     }
 
+    /// Decode an `Element<G>` from a byte array with an uncompressed format.
+    /// See the comments on the actual type `G` for the format details.
     public fun deserialize_element_uncompressed<G>(bytes: vector<u8>): Option<Element<G>> {
         let (succ, handle) = deserialize_element_uncompressed_internal<G>(bytes);
         if (succ) {
@@ -171,6 +209,8 @@ module aptos_std::curves {
         }
     }
 
+    /// Decode an `Element<G>` from a byte array with a compressed format.
+    /// See the comments on the actual type `G` for the format details.
     public fun deserialize_element_compressed<G>(bytes: vector<u8>): Option<Element<G>> {
         let (succ, handle) = deserialize_element_compressed_internal<G>(bytes);
         if (succ) {
