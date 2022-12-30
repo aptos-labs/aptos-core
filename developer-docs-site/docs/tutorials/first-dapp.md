@@ -9,7 +9,7 @@ In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/
 on the Aptos blockchain. A dapp usually consists of a graphical user interface, which interacts with one or more Move
 modules.  This dapp will let users publish and share snippets of text on the Aptos blockchain.
 
-For this tutorial, we will use the Move module [`HelloBlockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain)
+For this tutorial, we will use the Move module [`hello_blockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain)
 described in [Your First Move Module](first-move-module.md) and focus on building the user interface around the module.
 
 We will use the:
@@ -175,7 +175,7 @@ function App() {
 
   return (
     <div className="App">
-      <p><code>{ address }</code></p>
+      <p>Account Address: <code>{ address }</code></p>
     </div>
   );
 }
@@ -241,8 +241,8 @@ function App() {
 
   return (
     <div className="App">
-      <p><code>{ address }</code></p>
-      <p><code>{ account?.sequence_number }</code></p>
+      <p>Account Address: <code>{ address }</code></p>
+      <p>Sequence Number: <code>{ account?.sequence_number }</code></p>
     </div>
   );
 }
@@ -250,34 +250,39 @@ function App() {
 
 Now, in addition to displaying the account address, the app will also display the account's `sequence_number`. This `sequence_number` represents the next transaction sequence number to prevent replay attacks of transactions. You will see this number increasing as you make transactions with the account.
 
+:::tip
+If the account you're using for this application doesn't exist on-chain, you will not see a sequence number.  You'll need
+to create the account first via a faucet.
+:::
+
 ## Step 4: Publish a Move module
 
 Our dapp is now set up to read from the blockchain. The next step is to write to the blockchain. To do so, we will publish a Move module to our account.
 
-The Move module provides a location for this data to be stored. Specifically, we will use the `HelloBlockchain` module from [Your First Move Module](first-move-module.md), which provides a resource called `MessageHolder` that holds a string (called `message`).
+The Move module provides a location for this data to be stored. Specifically, we will use the `hello_blockchain` module from [Your First Move Module](first-move-module.md), which provides a resource called `MessageHolder` that holds a string (called `message`).
 
-### Publish the `HelloBlockchain` module with the Aptos CLI
+### Publish the `hello_blockchain` module with the Aptos CLI
 
-We will use the Aptos CLI to compile and publish the `HelloBlockchain` module.
+We will use the Aptos CLI to compile and publish the `hello_blockchain` module.
 
 1. Download [the `hello_blockchain` package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain).
 
 2. Next, use the `aptos move publish` command (replacing `/path/to/hello_blockchain/` and `<address>`):
 
 ```bash
-aptos move publish --profile my-first-nft --package-dir /path/to/hello_blockchain/ --named-addresses HelloBlockchain=<address>
+aptos move publish --profile my-first-nft --package-dir /path/to/hello_blockchain/ --named-addresses hello_blockchain=<address>
 ```
 
 For example:
 
 ```bash
-aptos move publish --profile my-first-nft --package-dir ~/code/aptos-core/aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481
+aptos move publish --profile my-first-nft --package-dir ~/code/aptos-core/aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481
 ```
 
-The `--named-addresses` replaces the named address `HelloBlockchain` in `HelloBlockchain.move` with the specified address. For example, if we specify `--named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`, then the following:
+The `--named-addresses` replaces the named address `hello_blockchain` in `hello_blockchain.move` with the specified address. For example, if we specify `--named-addresses hello_blockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`, then the following:
 
 ```rust
-module HelloBlockchain::message {
+module hello_blockchain::message {
 ```
 
 becomes:
@@ -288,7 +293,7 @@ module 0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::messa
 
 This makes it possible to publish the module for the given account (in this case our wallet account, `0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`).
 
-Assuming that your account has enough funds to execute the transaction, you can now publish the `HelloBlockchain` module in your account. If you refresh the app, you will see that the account sequence number has increased from 0 to 1.
+Assuming that your account has enough funds to execute the transaction, you can now publish the `hello_blockchain` module in your account. If you refresh the app, you will see that the account sequence number has increased from 0 to 1.
 
 You can also verify that the module was published by going to the [Aptos Explorer](https://explorer.aptoslabs.com/) and looking up your account. If you scroll down to the Account Modules section, you should see something like the following:
 
@@ -387,7 +392,7 @@ function App() {
       Run this command to publish the module:
       <br />
       aptos move publish --package-dir /path/to/hello_blockchain/
-      --named-addresses HelloBlockchain={address}
+      --named-addresses hello_blockchain={address}
     </pre>
   );
 
