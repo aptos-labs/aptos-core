@@ -1,6 +1,6 @@
 ---
 title: "Node Health Checker"
-slug: "index"
+slug: "node-health-checker"
 ---
 
 # Node Health Checker
