@@ -14,9 +14,10 @@ lint:
 	- poetry run flake8 aptos_sdk examples setup.py
 
 examples:
-	- poetry run python -m examples.transfer-coin
+	- poetry run python -m examples.read-aggregator
 	- poetry run python -m examples.simple-nft
-	- poetry run python -m examples.transfer-two-by-two
 	- poetry run python -m examples.simulate-transfer-coin
+	- poetry run python -m examples.transfer-coin
+	- poetry run python -m examples.transfer-two-by-two
 
 .PHONY: test fmt examples
