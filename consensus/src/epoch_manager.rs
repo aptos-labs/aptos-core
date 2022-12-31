@@ -7,7 +7,7 @@ use crate::quorum_store::quorum_store_builder::{
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
-        BlockReader, BlockStore,
+        BlockStore,
     },
     counters,
     error::{error_kind, DbError},
@@ -34,15 +34,7 @@ use crate::{
     network::{IncomingBlockRetrievalRequest, NetworkReceivers, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkSender},
     payload_client::QuorumStoreClient,
-    payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    quorum_store::{
-        batch_reader::BatchReader,
-        direct_mempool_quorum_store::DirectMempoolQuorumStore,
-        quorum_store::{QuorumStore, QuorumStoreCommand},
-        quorum_store_db::QuorumStoreDB,
-        quorum_store_wrapper::QuorumStoreWrapper,
-    },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     state_replication::StateComputer,
@@ -54,16 +46,13 @@ use aptos_config::config::{ConsensusConfig, NodeConfig, QuorumStoreConfig};
 use aptos_consensus_types::{
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
-    request_response::PayloadRequest,
 };
 use aptos_event_notifications::ReconfigNotificationListener;
-use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::protocols::network::{ApplicationNetworkSender, Event};
 use aptos_safety_rules::SafetyRulesManager;
-use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
@@ -72,14 +61,13 @@ use aptos_types::{
         LeaderReputationType, OnChainConfigPayload, OnChainConsensusConfig, ProposerElectionType,
         ValidatorSet,
     },
-    validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
 use fail::fail_point;
 use futures::{
     channel::{
         mpsc,
-        mpsc::{unbounded, Receiver, Sender, UnboundedSender},
+        mpsc::{unbounded, Sender, UnboundedSender},
         oneshot,
     },
     SinkExt, StreamExt,
@@ -88,7 +76,6 @@ use itertools::Itertools;
 use std::{
     cmp::Ordering,
     collections::HashMap,
-    convert::TryInto,
     mem::{discriminant, Discriminant},
     path::PathBuf,
     sync::Arc,
