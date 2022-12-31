@@ -12,7 +12,7 @@ use crate::quorum_store::quorum_store_wrapper::QuorumStoreWrapper;
 use crate::round_manager::VerifiedEvent;
 use aptos_channels::aptos_channel;
 use aptos_channels::message_queues::QueueStyle;
-use aptos_config::config::{ConsensusConfig, QuorumStoreConfig, SecureBackend};
+use aptos_config::config::{QuorumStoreConfig, SecureBackend};
 use aptos_consensus_types::common::Author;
 use aptos_consensus_types::request_response::PayloadRequest;
 use aptos_global_constants::CONSENSUS_KEY;
@@ -49,7 +49,7 @@ impl QuorumStoreBuilder {
     }
 
     pub fn start(
-        mut self,
+        self,
         block_store: Arc<BlockStore>,
     ) -> Option<(
         aptos_channel::Sender<AccountAddress, VerifiedEvent>,
@@ -93,7 +93,7 @@ impl DirectMempoolInnerBuilder {
         (Arc::from(PayloadManager::DirectMempool), Vec::new())
     }
 
-    fn start(mut self) {
+    fn start(self) {
         let quorum_store = DirectMempoolQuorumStore::new(
             self.consensus_to_quorum_store_receiver,
             self.quorum_store_to_mempool_sender,
@@ -245,7 +245,7 @@ impl InnerBuilder {
     }
 
     fn spawn_quorum_store_wrapper(
-        mut self,
+        self,
         block_store: Arc<dyn BlockReader + Send + Sync>,
     ) -> (
         aptos_channel::Sender<AccountAddress, VerifiedEvent>,
@@ -339,7 +339,7 @@ impl InnerBuilder {
     }
 
     fn start(
-        mut self,
+        self,
         block_store: Arc<BlockStore>,
     ) -> (
         aptos_channel::Sender<AccountAddress, VerifiedEvent>,
