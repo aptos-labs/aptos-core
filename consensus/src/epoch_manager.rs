@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::quorum_store::quorum_store_builder::{
+    DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder,
+};
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -455,177 +458,6 @@ impl EpochManager {
         Ok(())
     }
 
-    fn spawn_direct_mempool_quorum_store(
-        &mut self,
-        consensus_to_quorum_store_receiver: Receiver<PayloadRequest>,
-    ) {
-        let quorum_store = DirectMempoolQuorumStore::new(
-            consensus_to_quorum_store_receiver,
-            self.quorum_store_to_mempool_sender.clone(),
-            self.config.mempool_txn_pull_timeout_ms,
-        );
-        spawn_named!("Quorum Store", quorum_store.start()).unwrap();
-    }
-
-    fn spawn_quorum_store(
-        &mut self,
-        config: QuorumStoreConfig,
-        network_sender: NetworkSender,
-        verifier: ValidatorVerifier,
-        wrapper_command_rx: tokio::sync::mpsc::Receiver<QuorumStoreCommand>,
-        quorum_store_storage: Arc<QuorumStoreDB>,
-    ) -> Arc<BatchReader> {
-        let backend = &self.config.safety_rules.backend;
-        let storage: Storage = backend.try_into().expect("Unable to initialize storage");
-        if let Err(error) = storage.available() {
-            panic!("Storage is not available: {:?}", error);
-        }
-        let private_key = storage
-            .get(CONSENSUS_KEY)
-            .map(|v| v.value)
-            .expect("Unable to get private key");
-        let signer = ValidatorSigner::new(self.author, private_key);
-
-        let mut quorum_store_msg_rx_vec = Vec::new();
-        self.quorum_store_msg_tx_vec.clear();
-        for _ in 0..self.num_network_workers_for_fragment + 2 {
-            let (quorum_store_msg_tx, quorum_store_msg_rx) =
-                aptos_channel::new::<AccountAddress, VerifiedEvent>(
-                    QueueStyle::FIFO,
-                    self.config.channel_size,
-                    None,
-                );
-            self.quorum_store_msg_tx_vec.push(quorum_store_msg_tx);
-            quorum_store_msg_rx_vec.push(quorum_store_msg_rx);
-        }
-
-        let reader_db = self.storage.aptos_db();
-        let latest_ledger_info_with_sigs = reader_db
-            .get_latest_ledger_info()
-            .expect("could not get latest ledger info");
-        let last_committed_round = if latest_ledger_info_with_sigs
-            .ledger_info()
-            .commit_info()
-            .epoch()
-            == self.epoch()
-        {
-            latest_ledger_info_with_sigs
-                .ledger_info()
-                .commit_info()
-                .round()
-        } else {
-            0
-        };
-
-        let (quorum_store, batch_reader) = QuorumStore::new(
-            self.epoch(),
-            last_committed_round,
-            self.author,
-            quorum_store_storage,
-            quorum_store_msg_rx_vec,
-            self.quorum_store_msg_tx_vec.clone(),
-            network_sender,
-            config,
-            verifier,
-            signer,
-            wrapper_command_rx,
-        );
-
-        let metrics_monitor = tokio_metrics::TaskMonitor::new();
-        {
-            let metrics_monitor = metrics_monitor.clone();
-            tokio::spawn(async move {
-                for interval in metrics_monitor.intervals() {
-                    println!("QuorumStore:{:?}", interval);
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                }
-            });
-        }
-        tokio::spawn(quorum_store.start());
-
-        // if let Err(e) = spawn_named!(
-        //     &("QuorumStore epoch ".to_owned() + &self.epoch().to_string()),
-        //     metrics_monitor.instrument(quorum_store.start())
-        // ) {
-        //     debug!("QS: spawn_named QuorumStore error {:?}", e);
-        // }
-        batch_reader
-    }
-
-    fn spawn_quorum_store_wrapper(
-        &mut self,
-        network_sender: NetworkSender,
-        consensus_to_quorum_store_rx: Receiver<PayloadRequest>,
-        wrapper_to_quorum_store_tx: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
-        qs_config: &QuorumStoreConfig,
-        num_validators: usize,
-        block_store: Arc<dyn BlockReader + Send + Sync>,
-        quorum_store_storage: Arc<QuorumStoreDB>,
-    ) {
-        // TODO: make this not use a ConsensusRequest
-        let (wrapper_quorum_store_msg_tx, wrapper_quorum_store_msg_rx) =
-            aptos_channel::new::<AccountAddress, VerifiedEvent>(
-                QueueStyle::FIFO,
-                self.config.channel_size,
-                None,
-            );
-
-        let (wrapper_shutdown_tx, wrapper_shutdown_rx) = mpsc::channel(0);
-
-        self.wrapper_quorum_store_tx = Some((wrapper_quorum_store_msg_tx, wrapper_shutdown_tx));
-
-        let quorum_store_wrapper = QuorumStoreWrapper::new(
-            self.epoch(),
-            quorum_store_storage,
-            self.quorum_store_to_mempool_sender.clone(),
-            wrapper_to_quorum_store_tx,
-            self.config.mempool_txn_pull_timeout_ms,
-            qs_config.mempool_txn_pull_max_count,
-            qs_config.mempool_txn_pull_max_bytes,
-            qs_config.max_batch_counts,
-            qs_config.max_batch_bytes,
-            qs_config.batch_expiry_round_gap_when_init,
-            qs_config.batch_expiry_round_gap_behind_latest_certified,
-            qs_config.batch_expiry_round_gap_beyond_latest_certified,
-            qs_config.end_batch_ms,
-            qs_config.back_pressure_factor * num_validators,
-            block_store,
-        );
-        let metrics_monitor = tokio_metrics::TaskMonitor::new();
-        {
-            let metrics_monitor = metrics_monitor.clone();
-            tokio::spawn(async move {
-                for interval in metrics_monitor.intervals() {
-                    println!("QuorumStoreWrapper:{:?}", interval);
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                }
-            });
-        }
-
-        // TODO: parameter? bring back back-off?
-        let interval = tokio::time::interval(Duration::from_millis(
-            qs_config.mempool_pulling_interval as u64,
-        ));
-
-        tokio::spawn(quorum_store_wrapper.start(
-            network_sender,
-            consensus_to_quorum_store_rx,
-            wrapper_shutdown_rx,
-            wrapper_quorum_store_msg_rx,
-            interval,
-        ));
-
-        // _ = spawn_named!(
-        //     &("QuorumStoreWrapper epoch ".to_owned() + &self.epoch().to_string()),
-        //     metrics_monitor.instrument(quorum_store_wrapper.start(
-        //         network_sender,
-        //         consensus_to_quorum_store_rx,
-        //         wrapper_shutdown_rx,
-        //         wrapper_quorum_store_msg_rx,
-        //     ))
-        // );
-    }
-
     fn spawn_block_retrieval_task(&mut self, epoch: u64, block_store: Arc<BlockStore>) {
         let (request_tx, mut request_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -818,40 +650,34 @@ impl EpochManager {
         // LANDING QS TODO: move to config file
         let config = QuorumStoreConfig::default();
 
-        // TODO: clean this up
-        let (wrapper_quorum_store_tx, wrapper_quorum_store_rx) =
-            tokio::sync::mpsc::channel(config.channel_size);
-
-        let quorum_store_storage = if self.quorum_store_enabled {
-            Some(Arc::new(QuorumStoreDB::new(
-                self.quorum_store_storage_path.clone(),
-            )))
-        } else {
-            None
-        };
-
-        let payload_manager = if self.quorum_store_enabled {
-            // update the number of network_listener workers when start a new round_manager
-            self.num_network_workers_for_fragment = usize::max(
-                1,
-                epoch_state.verifier.len() / config.num_nodes_per_worker_handles,
-            );
-
-            let data_reader = self.spawn_quorum_store(
-                config.clone(),
+        let mut quorum_store_builder = if self.quorum_store_enabled {
+            QuorumStoreBuilder::InQuorumStore(InnerBuilder::new(
+                self.epoch(),
+                self.author,
+                config,
+                // TODO: remove after splitting out clean requests
+                consensus_to_quorum_store_tx.clone(),
+                consensus_to_quorum_store_rx,
+                self.quorum_store_to_mempool_sender.clone(),
+                self.config.mempool_txn_pull_timeout_ms,
+                self.storage.aptos_db().clone(),
                 network_sender.clone(),
                 epoch_state.verifier.clone(),
-                wrapper_quorum_store_rx,
-                quorum_store_storage.clone().unwrap(),
-            );
-
-            Arc::from(PayloadManager::InQuorumStore(
-                data_reader,
-                Mutex::new(consensus_to_quorum_store_tx.clone()),
+                self.config.safety_rules.backend.clone(),
+                self.quorum_store_storage_path.clone(),
+                self.num_network_workers_for_fragment,
             ))
         } else {
-            Arc::from(PayloadManager::DirectMempool)
+            QuorumStoreBuilder::DirectMempool(DirectMempoolInnerBuilder::new(
+                consensus_to_quorum_store_rx,
+                self.quorum_store_to_mempool_sender.clone(),
+                self.config.mempool_txn_pull_timeout_ms,
+            ))
         };
+
+        let (payload_manager, quorum_store_msg_tx_vec) =
+            quorum_store_builder.init_payload_manager();
+        self.quorum_store_msg_tx_vec = quorum_store_msg_tx_vec;
 
         let payload_client = QuorumStoreClient::new(
             consensus_to_quorum_store_tx,
@@ -881,21 +707,7 @@ impl EpochManager {
             payload_manager.clone(),
         ));
 
-        // TODO: cleanup
-        if self.quorum_store_enabled {
-            self.spawn_quorum_store_wrapper(
-                network_sender.clone(),
-                consensus_to_quorum_store_rx,
-                wrapper_quorum_store_tx,
-                &config,
-                epoch_state.verifier.len(),
-                block_store.clone(),
-                quorum_store_storage.clone().unwrap(),
-            );
-        } else {
-            info!(epoch = epoch, "Start DirectMempoolQuorumStore");
-            self.spawn_direct_mempool_quorum_store(consensus_to_quorum_store_rx);
-        }
+        self.wrapper_quorum_store_tx = quorum_store_builder.start(block_store.clone());
 
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)
