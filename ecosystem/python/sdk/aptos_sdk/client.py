@@ -97,14 +97,20 @@ class RestClient:
         return response.json()
 
     def aggregator_value(
-            self, account_address: AccountAddress, resource_type: str, aggregator_path: List[str]) -> int:
+        self,
+        account_address: AccountAddress,
+        resource_type: str,
+        aggregator_path: List[str],
+    ) -> int:
         source_data = self.account_resource(account_address, resource_type)["data"]
         data = source_data
 
         while len(aggregator_path) > 0:
             key = aggregator_path.pop()
             if key not in data:
-                raise ApiError(f"aggregator path not found in data: {source_data}", source_data)
+                raise ApiError(
+                    f"aggregator path not found in data: {source_data}", source_data
+                )
             data = data[key]
 
         if "vec" not in data:
@@ -238,7 +244,9 @@ class RestClient:
 
         count = 0
         while self.transaction_pending(txn_hash):
-            assert count < self.client_config.transaction_wait_in_seconds, f"transaction {txn_hash} timed out"
+            assert (
+                count < self.client_config.transaction_wait_in_seconds
+            ), f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
         response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
