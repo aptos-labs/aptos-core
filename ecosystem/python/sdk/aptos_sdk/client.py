@@ -76,7 +76,7 @@ class RestClient:
             f"{self.base_url}/accounts/{account_address}/resource/{resource_type}"
         )
         if response.status_code == 404:
-            return None
+            None
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
@@ -95,6 +95,40 @@ class RestClient:
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
         return response.json()
+
+    def aggregator_value(
+            self, account_address: AccountAddress, resource_type: str, aggregator_path: List[str]) -> int:
+        source_data = self.account_resource(account_address, resource_type)["data"]
+        data = source_data
+
+        while len(aggregator_path) > 0:
+            key = aggregator_path.pop()
+            if key not in data:
+                raise ApiError(f"aggregator path not found in data: {source_data}", source_data)
+            data = data[key]
+
+        if "vec" not in data:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        data = data["vec"]
+        if len(data) != 1:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        data = data[0]
+        if "aggregator" not in data:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        data = data["aggregator"]
+        if "vec" not in data:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        data = data["vec"]
+        if len(data) != 1:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        data = data[0]
+        if "handle" not in data:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        if "key" not in data:
+            raise ApiError(f"aggregator not found in data: {source_data}", source_data)
+        handle = data["handle"]
+        key = data["key"]
+        return int(self.get_table_item(handle, "address", "u128", key))
 
     #
     # Ledger accessors
