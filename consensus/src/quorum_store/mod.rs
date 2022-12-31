@@ -12,6 +12,7 @@ pub(crate) mod batch_store;
 pub(crate) mod network_listener;
 pub(crate) mod proof_builder;
 pub(crate) mod quorum_store;
+pub(crate) mod quorum_store_builder;
 pub(crate) mod quorum_store_db;
 pub(crate) mod quorum_store_wrapper;
 // TODO: remove allow(dead_code) when quorum store implementation is added
