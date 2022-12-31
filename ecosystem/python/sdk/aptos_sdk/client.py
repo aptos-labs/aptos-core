@@ -76,7 +76,7 @@ class RestClient:
             f"{self.base_url}/accounts/{account_address}/resource/{resource_type}"
         )
         if response.status_code == 404:
-            None
+            raise ResourceNotFound(resource_type, resource_type)
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
@@ -660,9 +660,18 @@ class FaucetClient:
 
 
 class ApiError(Exception):
-    """Error thrown when the API returns >= 400"""
+    """The API returned a non-success status code, e.g., >= 400"""
 
-    def __init__(self, message, status_code):
+    def __init__(self, message: str, status_code: int):
         # Call the base class constructor with the parameters it needs
         super().__init__(message)
         self.status_code = status_code
+
+
+class ResourceNotFound(Exception):
+    """The underlying resource was not found"""
+
+    def __init__(self, message: str, resource: str):
+        # Call the base class constructor with the parameters it needs
+        super().__init__(message)
+        self.resource = resource
