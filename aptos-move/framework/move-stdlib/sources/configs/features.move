@@ -69,6 +69,18 @@ module std::features {
         is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
     }
 
+    const GENERIC_CURVES: u64 = 5;
+    public fun get_generic_curves_feature(): u64 { GENERIC_CURVES }
+    public fun generic_curves_enabled(): bool acquires Features {
+        is_enabled(GENERIC_CURVES)
+    }
+
+    const GROTH16: u64 = 6;
+    public fun get_groth16_feature(): u64 { GROTH16 }
+    public fun groth16_enabled(): bool acquires Features {
+        is_enabled(GROTH16)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

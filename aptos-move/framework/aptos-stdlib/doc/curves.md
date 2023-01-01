@@ -10,6 +10,7 @@
 -  [Struct `BLS12_381_Gt`](#0x1_curves_BLS12_381_Gt)
 -  [Struct `Scalar`](#0x1_curves_Scalar)
 -  [Struct `Element`](#0x1_curves_Element)
+-  [Constants](#@Constants_0)
 -  [Function `pairing`](#0x1_curves_pairing)
 -  [Function `multi_pairing`](#0x1_curves_multi_pairing)
 -  [Function `scalar_from_u64`](#0x1_curves_scalar_from_u64)
@@ -31,6 +32,7 @@
 -  [Function `deserialize_element_uncompressed`](#0x1_curves_deserialize_element_uncompressed)
 -  [Function `deserialize_element_compressed`](#0x1_curves_deserialize_element_compressed)
 -  [Function `element_eq`](#0x1_curves_element_eq)
+-  [Function `abort_if_feature_disabled`](#0x1_curves_abort_if_feature_disabled)
 -  [Function `deserialize_element_uncompressed_internal`](#0x1_curves_deserialize_element_uncompressed_internal)
 -  [Function `deserialize_element_compressed_internal`](#0x1_curves_deserialize_element_compressed_internal)
 -  [Function `scalar_from_u64_internal`](#0x1_curves_scalar_from_u64_internal)
@@ -54,6 +56,7 @@
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 </code></pre>
 
@@ -235,6 +238,20 @@ See the comments on the specific <code>G</code> for more details about <code><a 
 
 </details>
 
+<a name="@Constants_0"></a>
+
+## Constants
+
+
+<a name="0x1_curves_E_NATIVE_FUN_NOT_AVAILABLE"></a>
+
+
+
+<pre><code><b>const</b> <a href="curves.md#0x1_curves_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>: u64 = 1;
+</code></pre>
+
+
+
 <a name="0x1_curves_pairing"></a>
 
 ## Function `pairing`
@@ -252,6 +269,10 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing">pairing</a>&lt;G1,G2,Gt&gt;(point_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G1&gt;, point_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G2&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
+    <b>if</b> (!std::features::generic_curves_enabled()) {
+        <b>abort</b>(std::error::invalid_state(1))
+    };
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
         handle: <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>&lt;G1,G2,Gt&gt;(point_1.handle, point_2.handle)
     }
@@ -266,6 +287,7 @@ Perform a bilinear mapping.
 
 ## Function `multi_pairing`
 
+Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_multi_pairing">multi_pairing</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;Gt&gt;
@@ -278,6 +300,7 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_multi_pairing">multi_pairing</a>&lt;G1,G2,Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">Element</a>&lt;G2&gt;&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <b>let</b> num_g1 = std::vector::length(g1_elements);
     <b>let</b> num_g2 = std::vector::length(g2_elements);
     <b>assert</b>!(num_g1 == num_g2, std::error::invalid_argument(1));
@@ -316,6 +339,10 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_u64">scalar_from_u64</a>&lt;G&gt;(value: u64): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
+    <b>if</b> (!std::features::generic_curves_enabled()) {
+        <b>abort</b>(std::error::invalid_state(1))
+    };
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_scalar_from_u64_internal">scalar_from_u64_internal</a>&lt;G&gt;(value)
     }
@@ -342,6 +369,10 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_neg">scalar_neg</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
+    <b>if</b> (!std::features::generic_curves_enabled()) {
+        <b>abort</b>(std::error::invalid_state(1))
+    };
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>&lt;G&gt;(scalar_1.handle)
     }
@@ -368,6 +399,10 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_add">scalar_add</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;, scalar_2: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
+    <b>if</b> (!std::features::generic_curves_enabled()) {
+        <b>abort</b>(std::error::invalid_state(1))
+    };
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_scalar_add_internal">scalar_add_internal</a>&lt;G&gt;(scalar_1.handle, scalar_2.handle)
     }
@@ -394,6 +429,7 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_mul">scalar_mul</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;, scalar_2: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_scalar_mul_internal">scalar_mul_internal</a>&lt;G&gt;(scalar_1.handle, scalar_2.handle)
     }
@@ -420,6 +456,7 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_inv">scalar_inv</a>&lt;G&gt;(scalar: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): Option&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <b>let</b> (succeeded, handle) = <a href="curves.md#0x1_curves_scalar_inv_internal">scalar_inv_internal</a>&lt;G&gt;(scalar.handle);
     <b>if</b> (succeeded) {
         <b>let</b> scalar = <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; { handle };
@@ -450,6 +487,7 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_eq">scalar_eq</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;, scalar_2: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): bool {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_scalar_eq_internal">scalar_eq_internal</a>&lt;G&gt;(scalar_1.handle, scalar_2.handle)
 }
 </code></pre>
@@ -474,6 +512,7 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_identity">identity</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_identity_internal">identity_internal</a>&lt;G&gt;()
     }
@@ -500,6 +539,7 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_generator">generator</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_generator_internal">generator_internal</a>&lt;G&gt;()
     }
@@ -526,6 +566,7 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_neg">element_neg</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_element_neg_internal">element_neg_internal</a>&lt;G&gt;(point.handle)
     }
@@ -552,6 +593,7 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_add">element_add</a>&lt;G&gt;(point_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;, point_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_element_add_internal">element_add_internal</a>&lt;G&gt;(point_1.handle, point_2.handle)
     }
@@ -578,6 +620,7 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_mul">element_mul</a>&lt;G&gt;(_scalar: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;, _point: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_element_mul_internal">element_mul_internal</a>&lt;G&gt;(_scalar.handle, _point.handle)
     }
@@ -604,6 +647,7 @@ Perform a bilinear mapping.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_simul_point_mul">simul_point_mul</a>&lt;G&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;&gt;, points: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     //TODO: replace the naive implementation.
     <b>let</b> result = <a href="curves.md#0x1_curves_identity">identity</a>&lt;G&gt;();
     <b>let</b> num_points = std::vector::length(points);
@@ -642,6 +686,7 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_bytes">scalar_from_bytes</a>&lt;G&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <b>let</b> (succeeded, handle) = <a href="curves.md#0x1_curves_scalar_from_bytes_internal">scalar_from_bytes_internal</a>&lt;G&gt;(*bytes);
     <b>if</b> (succeeded) {
         <b>let</b> scalar = <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
@@ -676,6 +721,7 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_to_bytes">scalar_to_bytes</a>&lt;G&gt;(scalar: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_scalar_to_bytes_internal">scalar_to_bytes_internal</a>&lt;G&gt;(scalar.handle)
 }
 </code></pre>
@@ -702,6 +748,7 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_serialize_element_uncompressed_internal">serialize_element_uncompressed_internal</a>&lt;G&gt;(point.handle)
 }
 </code></pre>
@@ -728,6 +775,7 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed">serialize_element_compressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_serialize_element_compressed_internal">serialize_element_compressed_internal</a>&lt;G&gt;(point.handle)
 }
 </code></pre>
@@ -754,6 +802,7 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <b>let</b> (succ, handle) = <a href="curves.md#0x1_curves_deserialize_element_uncompressed_internal">deserialize_element_uncompressed_internal</a>&lt;G&gt;(bytes);
     <b>if</b> (succ) {
         std::option::some(<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; { handle })
@@ -785,6 +834,7 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_deserialize_element_compressed">deserialize_element_compressed</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <b>let</b> (succ, handle) = <a href="curves.md#0x1_curves_deserialize_element_compressed_internal">deserialize_element_compressed_internal</a>&lt;G&gt;(bytes);
     <b>if</b> (succ) {
         std::option::some(<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; { handle })
@@ -814,7 +864,34 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_eq">element_eq</a>&lt;G&gt;(point_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;, point_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): bool {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_element_eq_internal">element_eq_internal</a>&lt;G&gt;(point_1.handle, point_2.handle)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_abort_if_feature_disabled"></a>
+
+## Function `abort_if_feature_disabled`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>() {
+    <b>if</b> (!std::features::generic_curves_enabled()) {
+        <b>abort</b>(std::error::invalid_state(<a href="curves.md#0x1_curves_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
+    };
 }
 </code></pre>
 

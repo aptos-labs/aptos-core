@@ -1,6 +1,9 @@
 module aptos_std::curves {
     use std::option::Option;
 
+    // Error codes
+    const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 1;
+
     /// A phantom type that represents the 1st pairing input group `G1` in BLS12-381 pairing.
     ///
     /// In BLS12-381, a finite field `Fq` is used.
@@ -58,12 +61,18 @@ module aptos_std::curves {
 
     /// Perform a bilinear mapping.
     public fun pairing<G1,G2,Gt>(point_1: &Element<G1>, point_2: &Element<G2>): Element<Gt> {
+        abort_if_feature_disabled();
+        if (!std::features::generic_curves_enabled()) {
+            abort(std::error::invalid_state(1))
+        };
         Element<Gt> {
             handle: pairing_internal<G1,G2,Gt>(point_1.handle, point_2.handle)
         }
     }
 
+    /// Compute the product of multiple pairing: `e(p1_1,p2_1) * ... * e(p1_n,p2_n)`.
     public fun multi_pairing<G1,G2,Gt>(g1_elements: &vector<Element<G1>>, g2_elements: &vector<Element<G2>>): Element<Gt> {
+        abort_if_feature_disabled();
         let num_g1 = std::vector::length(g1_elements);
         let num_g2 = std::vector::length(g2_elements);
         assert!(num_g1 == num_g2, std::error::invalid_argument(1));
@@ -82,30 +91,44 @@ module aptos_std::curves {
     }
 
     public fun scalar_from_u64<G>(value: u64): Scalar<G> {
+        abort_if_feature_disabled();
+        if (!std::features::generic_curves_enabled()) {
+            abort(std::error::invalid_state(1))
+        };
         Scalar<G> {
             handle: scalar_from_u64_internal<G>(value)
         }
     }
 
     public fun scalar_neg<G>(scalar_1: &Scalar<G>): Scalar<G> {
+        abort_if_feature_disabled();
+        if (!std::features::generic_curves_enabled()) {
+            abort(std::error::invalid_state(1))
+        };
         Scalar<G> {
             handle: scalar_neg_internal<G>(scalar_1.handle)
         }
     }
 
     public fun scalar_add<G>(scalar_1: &Scalar<G>, scalar_2: &Scalar<G>): Scalar<G> {
+        abort_if_feature_disabled();
+        if (!std::features::generic_curves_enabled()) {
+            abort(std::error::invalid_state(1))
+        };
         Scalar<G> {
             handle: scalar_add_internal<G>(scalar_1.handle, scalar_2.handle)
         }
     }
 
     public fun scalar_mul<G>(scalar_1: &Scalar<G>, scalar_2: &Scalar<G>): Scalar<G> {
+        abort_if_feature_disabled();
         Scalar<G> {
             handle: scalar_mul_internal<G>(scalar_1.handle, scalar_2.handle)
         }
     }
 
     public fun scalar_inv<G>(scalar: &Scalar<G>): Option<Scalar<G>> {
+        abort_if_feature_disabled();
         let (succeeded, handle) = scalar_inv_internal<G>(scalar.handle);
         if (succeeded) {
             let scalar = Scalar<G> { handle };
@@ -116,41 +139,48 @@ module aptos_std::curves {
     }
 
     public fun scalar_eq<G>(scalar_1: &Scalar<G>, scalar_2: &Scalar<G>): bool {
+        abort_if_feature_disabled();
         scalar_eq_internal<G>(scalar_1.handle, scalar_2.handle)
     }
 
     // Point basics.
     public fun identity<G>(): Element<G> {
+        abort_if_feature_disabled();
         Element<G> {
             handle: identity_internal<G>()
         }
     }
 
     public fun generator<G>(): Element<G> {
+        abort_if_feature_disabled();
         Element<G> {
             handle: generator_internal<G>()
         }
     }
 
     public fun element_neg<G>(point: &Element<G>): Element<G> {
+        abort_if_feature_disabled();
         Element<G> {
             handle: element_neg_internal<G>(point.handle)
         }
     }
 
     public fun element_add<G>(point_1: &Element<G>, point_2: &Element<G>): Element<G> {
+        abort_if_feature_disabled();
         Element<G> {
             handle: element_add_internal<G>(point_1.handle, point_2.handle)
         }
     }
 
     public fun element_mul<G>(_scalar: &Scalar<G>, _point: &Element<G>): Element<G> {
+        abort_if_feature_disabled();
         Element<G> {
             handle: element_mul_internal<G>(_scalar.handle, _point.handle)
         }
     }
 
     public fun simul_point_mul<G>(scalars: &vector<Scalar<G>>, points: &vector<Element<G>>): Element<G> {
+        abort_if_feature_disabled();
         //TODO: replace the naive implementation.
         let result = identity<G>();
         let num_points = std::vector::length(points);
@@ -169,6 +199,7 @@ module aptos_std::curves {
     /// Decode a `Scalar<G>` from a byte array.
     /// See the comments on the actual type `G` for the format details.
     public fun scalar_from_bytes<G>(bytes: &vector<u8>): Option<Scalar<G>> {
+        abort_if_feature_disabled();
         let (succeeded, handle) = scalar_from_bytes_internal<G>(*bytes);
         if (succeeded) {
             let scalar = Scalar<G> {
@@ -183,24 +214,28 @@ module aptos_std::curves {
     /// Encode a `Scalar<G>` to a byte array.
     /// See the comments on the actual type `G` for the format details.
     public fun scalar_to_bytes<G>(scalar: &Scalar<G>): vector<u8> {
+        abort_if_feature_disabled();
         scalar_to_bytes_internal<G>(scalar.handle)
     }
 
     /// Encode an `Element<G>` to a byte array with an uncompressed format.
     /// See the comments on the actual type `G` for the format details.
     public fun serialize_element_uncompressed<G>(point: &Element<G>): vector<u8> {
+        abort_if_feature_disabled();
         serialize_element_uncompressed_internal<G>(point.handle)
     }
 
     /// Encode an `Element<G>` to a byte array with a compressed format.
     /// See the comments on the actual type `G` for the format details.
     public fun serialize_element_compressed<G>(point: &Element<G>): vector<u8> {
+        abort_if_feature_disabled();
         serialize_element_compressed_internal<G>(point.handle)
     }
 
     /// Decode an `Element<G>` from a byte array with an uncompressed format.
     /// See the comments on the actual type `G` for the format details.
     public fun deserialize_element_uncompressed<G>(bytes: vector<u8>): Option<Element<G>> {
+        abort_if_feature_disabled();
         let (succ, handle) = deserialize_element_uncompressed_internal<G>(bytes);
         if (succ) {
             std::option::some(Element<G> { handle })
@@ -212,6 +247,7 @@ module aptos_std::curves {
     /// Decode an `Element<G>` from a byte array with a compressed format.
     /// See the comments on the actual type `G` for the format details.
     public fun deserialize_element_compressed<G>(bytes: vector<u8>): Option<Element<G>> {
+        abort_if_feature_disabled();
         let (succ, handle) = deserialize_element_compressed_internal<G>(bytes);
         if (succ) {
             std::option::some(Element<G> { handle })
@@ -221,9 +257,15 @@ module aptos_std::curves {
     }
 
     public fun element_eq<G>(point_1: &Element<G>, point_2: &Element<G>): bool {
+        abort_if_feature_disabled();
         element_eq_internal<G>(point_1.handle, point_2.handle)
     }
 
+    fun abort_if_feature_disabled() {
+        if (!std::features::generic_curves_enabled()) {
+            abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
+        };
+    }
     // Native functions.
     native fun deserialize_element_uncompressed_internal<G>(bytes: vector<u8>): (bool, u64);
     native fun deserialize_element_compressed_internal<G>(bytes: vector<u8>): (bool, u64);
@@ -247,8 +289,9 @@ module aptos_std::curves {
     ///TODO: Remove `g1_handle_count` and `g2_handle_count` once working with `vector<u64>` in rust is well supported.
     native fun multi_pairing_internal<G1,G2,Gt>(g1_handle_count: u64, g1_handles: vector<u64>, g2_handle_count: u64, g2_handles: vector<u64>): u64;
 
-    #[test]
-    fun test_bls12_381_g1() {
+    #[test(fx = @std)]
+    fun test_bls12_381_g1(fx: signer) {
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
         // Scalar encoding/decoding.
         let scalar_7 = scalar_from_u64<BLS12_381_G1>(7);
         let scalar_7_another = std::option::extract(&mut scalar_from_bytes<BLS12_381_G1>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
@@ -326,18 +369,21 @@ module aptos_std::curves {
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
     }
 
-    #[test]
-    fun test_bls12_381_g2() {
+    #[test(fx = @std)]
+    fun test_bls12_381_g2(fx: signer) {
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
         //TODO
     }
 
-    #[test]
-    fun test_bls12_381_gt() {
+    #[test(fx = @std)]
+    fun test_bls12_381_gt(fx: signer) {
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
         //TODO
     }
 
-    #[test]
-    fun test_bilinear() {
+    #[test(fx = @std)]
+    fun test_bls12381_pairing(fx: signer) {
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
         let gt_point_1 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
             &element_mul(&scalar_from_u64(5), &generator<BLS12_381_G1>()),
             &element_mul(&scalar_from_u64(7), &generator<BLS12_381_G2>()),
@@ -354,8 +400,9 @@ module aptos_std::curves {
         assert!(element_eq(&gt_point_1, &gt_point_3), 1);
     }
 
-    #[test]
-    fun test_multi_pairing() {
+    #[test(fx = @std)]
+    fun test_bls12381_multi_pairing(fx: signer) {
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
         let g1_point_1 = generator<BLS12_381_G1>();
         let g2_point_1 = generator<BLS12_381_G2>();
         let g1_point_2 = element_mul(&scalar_from_u64<BLS12_381_G1>(5), &g1_point_1);
