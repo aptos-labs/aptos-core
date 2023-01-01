@@ -167,11 +167,9 @@ mod tests {
 
     #[test]
     fn test_parse_timestamp() {
-        let current_year = chrono::offset::Utc::now().year();
-
         let ts = parse_timestamp(1649560602763949, 1);
         assert_eq!(ts.timestamp(), 1649560602);
-        assert_eq!(ts.year(), current_year);
+        assert_eq!(ts.year(), 2022);
 
         let ts2 = parse_timestamp_secs(600000000000000, 2);
         assert_eq!(ts2.year(), 9999);
