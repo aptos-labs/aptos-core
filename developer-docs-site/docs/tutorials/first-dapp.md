@@ -261,8 +261,8 @@ Our dapp is now set up to read from the blockchain. The next step is to write to
 
 The Move module provides a location for this data to be stored. Specifically, we will use the `hello_blockchain` module from [Your First Move Module](first-move-module.md), which provides a resource called `MessageHolder` that holds a string (called `message`).
 
-### Publish the `hello_blockchain` module with the Aptos CLI
-
+<details>
+<summary>Publish the `hello_blockchain` module with the Aptos CLI</summary>
 We will use the Aptos CLI to compile and publish the `hello_blockchain` module.
 
 1. Download [the `hello_blockchain` package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain).
@@ -368,6 +368,217 @@ You can also verify that the module was published by going to the [Aptos Explore
 ```
 
 Make a note of `"name": "message"`, we will use it in the next section.
+</details>
+
+<details>
+<summary>Publish the `hello_blockchain` module with the TS SDK</summary>
+We will use the Aptos CLI to compile the `hello_blockchain` module and use the TS SDK to publish the module.
+
+1. Download [the `hello_blockchain` package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain).
+
+2. Next, use the `aptos move compile --save-metadata` command (replacing `/path/to/hello_blockchain/` and `<address>`):
+
+```bash
+aptos move compile --save-metadata --package-dir /path/to/hello_blockchain/ --named-addresses hello_blockchain=<address>
+```
+
+For example:
+
+```bash
+aptos move compile --save-metadata --package-dir ~/code/aptos-core/aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481
+```
+
+The `--named-addresses` replaces the named address `hello_blockchain` in `hello_blockchain.move` with the specified address. For example, if we specify `--named-addresses hello_blockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`, then the following:
+
+```rust
+module hello_blockchain::message {
+```
+
+becomes:
+
+```rust
+module 0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::message {
+```
+
+This makes it possible to publish the module for the given account (in this case our wallet account, `0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`).
+
+The `--save-metadata` saves the package metadata in the package's build directory. If set, package metadata should be generated and stored in the package's build directory. This metadata can be used to construct a transaction to publish a package.
+
+At this point, we should have a `build` folder in the same directory of our `hello_blockchain` folder. Next step would be to publish the module to the chain. 
+The TS SDK provides us a `publishPackage()` function where it expects to get both package metadata and the move module as `Uint8Array`. We can do it by converting both `package-metadata.bcs` file and the `bytecode_modules/message.mv` module into hex strings (using a command), and then to `Uint8Array` (using the SDK).
+
+Convert `package-metadata.bcs` file and the `bytecode_modules/message.mv` module into hex strings
+
+`cd` into the `hello_blockchain/build/Example` directory
+```bash
+cd hello_blockchain/build/Example
+```
+
+Convert `package-metadata.bcs` to a hex string. On Mac and Linux we can use the command
+```bash
+cat package-metadata.bcs | od -v -t x1 -A n | tr -d ' \n'
+```
+That will output a hex string we can later use.
+
+Convert `message.mv` to a hex string. On Mac and Linux we can use the command
+```bash
+cat bytecode_modules/message.mv | od -v -t x1 -A n | tr -d ' \n'
+```
+That will output a hex string we can later use.
+
+Keep both of the hex strings so later we can use them!
+
+Back to our react app, let's add a button to click on to publish the module, use the `publishPackage` function TS SDK provides us and display a link to get the account's resources where we can see the published module.
+
+We would need our account's private key (you can get the private key from the Petra Wallet by going to settings, manage account, show the private key, and copy that field) to initialize an `AptosAccount` to publish the module with. Since a private key is a VERY sensitive data, we dont want to expose it in the code, but to hold it in an `.env` file and use it from there.
+
+1. Create a new `.env` file on the `root` of the project and add to the file
+```bash
+REACT_APP_ACCOUNT_PK=<account-private-key>
+```
+Make sure to restart the local server so the app will load the new `.env` file.
+
+2. Add the following to `src/App.tsx`, where 
+- `process.env.REACT_APP_ACCOUNT_PK` holds the account private key. 
+- `<package-metadata.bcs hex string>` is the `package-metadata.bcs` hex string output we get from the previous step
+- `<message.mv hex string>` is the `message.mv` hex string output we get from the previous step
+
+```typescript
+import { Types, AptosClient, AptosAccount, HexString, TxnBuilderTypes} from "aptos";
+  // ...
+
+function App() {
+  // ...
+
+  // Publish the module using the TS SDK
+  const [publishPackageTxnHash, setPublishPackageTxnHash] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const onPublishModule = async () => {
+    if (!process.env.REACT_APP_ACCOUNT_PK) return;
+    setIsPublishing(true);
+    const aptosAccount = new AptosAccount(
+      new HexString(process.env.REACT_APP_ACCOUNT_PK).toUint8Array()
+    );
+    const txnHash = await client.publishPackage(
+      aptosAccount,
+      new HexString(
+        // package-metadata
+        "<package-metadata.bcs hex string>"
+      ).toUint8Array(),
+      [
+        new TxnBuilderTypes.Module(
+          new HexString(
+            // modules
+            "<message.mv hex string>"
+          ).toUint8Array()
+        ),
+      ]
+    );
+
+    await client.waitForTransaction(txnHash);
+    setIsPublishing(false);
+    setPublishPackageTxnHash(txnHash);
+  };
+
+  return (
+    <div className="App">
+      // ...
+      <div>
+        <button onClick={onPublishModule} disabled={isPublishing}>
+          Publish Package
+        </button>
+        {publishPackageTxnHash && (
+          <div>
+            <p>
+              <a
+                href={`https://fullnode.devnet.aptoslabs.com/v1/accounts/${address}/modules`}
+                target="_blank"
+              >
+                Account modules
+              </a>
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+Click on the "Publish Package" button, once the module has published we should see a `Account modules` link and by clicking it we should see something like the following
+
+```json
+{
+  "address": "0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481",
+  "name": "message",
+  "friends": [],
+  "exposedFunctions": [
+    {
+      "name": "get_message",
+      "visibility": "public",
+      "genericTypeParams": [],
+      "params": [
+        "address"
+      ],
+      "_return": [
+        "0x1::string::String"
+      ]
+    },
+    {
+      "name": "set_message",
+      "visibility": "script",
+      "genericTypeParams": [],
+      "params": [
+        "signer",
+        "vector"
+      ],
+      "_return": []
+    }
+  ],
+  "structs": [
+    {
+      "name": "MessageChangeEvent",
+      "isNative": false,
+      "abilities": [
+        "drop",
+        "store"
+      ],
+      "genericTypeParams": [],
+      "fields": [
+        {
+          "name": "from_message",
+          "type": "0x1::string::String"
+        },
+        {
+          "name": "to_message",
+          "type": "0x1::string::String"
+        }
+      ]
+    },
+    {
+      "name": "MessageHolder",
+      "isNative": false,
+      "abilities": [
+        "key"
+      ],
+      "genericTypeParams": [],
+      "fields": [
+        {
+          "name": "message",
+          "type": "0x1::string::String"
+        },
+        {
+          "name": "message_change_events",
+          "type": "0x1::event::EventHandle<0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::message::MessageChangeEvent>"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Make a note of `"name": "message"`, we will use it in the next section.
+</details>
 
 ### Add module publishing instructions to the dapp
 
@@ -398,6 +609,7 @@ function App() {
 
   return (
     <div className="App">
+      // ...
       {!hasModule && publishInstructions}
     </div>
   );
@@ -405,6 +617,24 @@ function App() {
 ```
 
 New users will be able to use this command to create a page for their account.
+
+In this step, we can also hide the `Publish Package` button when the module does exist.
+Update the `button` on the `src/App.tsx` with
+
+```typescript
+function App() {
+  // ...
+
+  return (
+    <div className="App">
+      // ...
+      {!hasModule && <button onClick={onPublishModule} disabled={isPublishing}>
+          Publish Package
+        </button>}
+    </div>
+  );
+}
+```
 
 ## Step 5: Write a message on the blockchain
 
@@ -532,7 +762,7 @@ function App() {
 
   return (
     // ...
-          <textarea ref={ref} defaultValue={message} />
+          <textarea defaultValue={message} />
     // ...
   );
 }
