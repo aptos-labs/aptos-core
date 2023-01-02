@@ -49,7 +49,6 @@ use arc_swap::ArcSwapOption;
 use dashmap::DashMap;
 use itertools::zip_eq;
 use move_core_types::move_resource::MoveStructType;
-use rayon::prelude::*;
 use std::{collections::HashMap, mem::swap, sync::Arc};
 
 #[derive(Debug)]
@@ -140,8 +139,8 @@ pub struct FakeAptosDB {
     txn_info_by_version: Arc<DashMap<Version, TransactionInfo>>,
     // A map of Position to transaction HashValue
     txn_hash_by_position: Arc<DashMap<Position, HashValue>>,
-    // A map of state values
-    state_values_map: Arc<DashMap<(StateKey, Version), StateValue>>,
+    // // A map of state values
+    // state_values_map: Arc<DashMap<(StateKey, Version), StateValue>>,
     // Max version and transaction
     latest_txn_info: ArcSwapOption<(Version, TransactionInfo)>,
     // A map of account address to the highest executed sequence number
@@ -158,7 +157,7 @@ impl FakeAptosDB {
             txn_version_by_hash: Arc::new(DashMap::new()),
             txn_info_by_version: Arc::new(DashMap::new()),
             txn_hash_by_position: Arc::new(DashMap::new()),
-            state_values_map: Arc::new(DashMap::new()),
+            // state_values_map: Arc::new(DashMap::new()),
             latest_txn_info: ArcSwapOption::from(None),
             account_seq_num: Arc::new(DashMap::new()),
             ledger_commit_lock: std::sync::Mutex::new(()),
