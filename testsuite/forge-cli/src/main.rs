@@ -791,7 +791,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
                 .with_network_tests(vec![&LoadVsPerfBenchmark {
                     test: &PerformanceBenchmark,
-                    tps: &[120000, 160000],
+                    tps: &[120000, 160000, 200000],
                 }])
                 .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                     // no epoch change.
@@ -835,7 +835,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 .with_emit_job(
                     EmitJobRequest::default()
                         .mode(EmitJobMode::MaxLoad {
-                            mempool_backlog: 20000,
+                            mempool_backlog: 30000,
                         })
                         .txn_expiration_time_secs(5 * 60),
                 )
