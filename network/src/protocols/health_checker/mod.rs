@@ -194,7 +194,6 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                             self.network_context,
                             self.round
                         );
-                        println!("IT'S EMPTY!");
                         continue
                     }
 
