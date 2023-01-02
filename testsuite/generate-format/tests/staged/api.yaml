@@ -160,6 +160,25 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+Multisig:
+  STRUCT:
+    - multisig_address:
+        TYPENAME: AccountAddress
+    - transaction_id: U64
+    - transaction_payload:
+        OPTION:
+          TYPENAME: MultisigTransactionPayload
+MultisigTransactionPayload:
+  STRUCT:
+    - module:
+        TYPENAME: ModuleId
+    - function:
+        TYPENAME: Identifier
+    - ty_args:
+        SEQ:
+          TYPENAME: TypeTag
+    - args:
+        SEQ: BYTES
 Path:
   ENUM:
     0:
@@ -362,13 +381,17 @@ TransactionPayload:
         NEWTYPE:
           TYPENAME: Script
     1:
-      ModuleBundle:
-        NEWTYPE:
-          TYPENAME: ModuleBundle
-    2:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+    2:
+      Multisig:
+        NEWTYPE:
+          TYPENAME: Multisig
+    3:
+      ModuleBundle:
+        NEWTYPE:
+          TYPENAME: ModuleBundle
 TypeTag:
   ENUM:
     0:

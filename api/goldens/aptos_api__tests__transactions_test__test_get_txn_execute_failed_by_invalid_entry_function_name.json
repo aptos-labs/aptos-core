@@ -69,7 +69,7 @@
   },
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x8cb329fa0625c715699f157ec91aff0ecce120ba62b9c16fcabbbc6d8d95fc7ca51c11ccefca3f20e1923eccb7062884007171a2f41220793ebc3c64ab7af40c",
+    "signature": "0xd18d5a0b13a9736a390887e0776f38390563067bbaf4a9c90aac810ec82e3ca1ffca73b210d3b6af5e8d8bf12c2f6785a6021350269c769f913ba89b0e961d02",
     "type": "ed25519_signature"
   },
   "events": [],

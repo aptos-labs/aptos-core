@@ -897,6 +897,43 @@ impl TransactionsApi {
                                 })?;
                         }
                     },
+                    TransactionPayload::Multisig(multisig) => {
+                        if let Some(payload) = &multisig.transaction_payload {
+                            verify_module_identifier(payload.module().name().as_str())
+                                .context("Transaction entry function module invalid")
+                                .map_err(|err| {
+                                    SubmitTransactionError::bad_request_with_code(
+                                        err,
+                                        AptosErrorCode::InvalidInput,
+                                        ledger_info,
+                                    )
+                                })?;
+
+                            verify_function_identifier(payload.function().as_str())
+                                .context("Transaction entry function name invalid")
+                                .map_err(|err| {
+                                    SubmitTransactionError::bad_request_with_code(
+                                        err,
+                                        AptosErrorCode::InvalidInput,
+                                        ledger_info,
+                                    )
+                                })?;
+                            for arg in payload.ty_args() {
+                                let arg: MoveType = arg.into();
+                                arg.verify(0)
+                                    .context("Transaction entry function type arg invalid")
+                                    .map_err(|err| {
+                                        SubmitTransactionError::bad_request_with_code(
+                                            err,
+                                            AptosErrorCode::InvalidInput,
+                                            ledger_info,
+                                        )
+                                    })?;
+                            }
+                        }
+                    },
+
+                    // Deprecated. Will be removed in the future.
                     TransactionPayload::ModuleBundle(_) => {},
                 }
                 // TODO: Verify script args?

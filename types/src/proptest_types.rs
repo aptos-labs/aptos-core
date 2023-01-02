@@ -387,6 +387,15 @@ fn new_raw_transaction(
             expiration_time_secs,
             chain_id,
         ),
+        TransactionPayload::Multisig(multisig) => RawTransaction::new_multisig(
+            sender,
+            sequence_number,
+            multisig,
+            max_gas_amount,
+            gas_unit_price,
+            expiration_time_secs,
+            chain_id,
+        ),
     }
 }
 

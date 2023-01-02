@@ -583,7 +583,9 @@ pub enum GenesisPayload {
 pub enum TransactionPayload {
     EntryFunctionPayload(EntryFunctionPayload),
     ScriptPayload(ScriptPayload),
+    // Delegated. Will be removed in the future.
     ModuleBundlePayload(ModuleBundlePayload),
+    MultisigPayload(MultisigPayload),
 }
 
 impl VerifyInput for TransactionPayload {
@@ -591,6 +593,8 @@ impl VerifyInput for TransactionPayload {
         match self {
             TransactionPayload::EntryFunctionPayload(inner) => inner.verify(),
             TransactionPayload::ScriptPayload(inner) => inner.verify(),
+            TransactionPayload::MultisigPayload(inner) => inner.verify(),
+            // Delegated. Will be removed in the future.
             TransactionPayload::ModuleBundlePayload(inner) => inner.verify(),
         }
     }
@@ -663,6 +667,39 @@ impl TryFrom<Script> for ScriptPayload {
                 .map(|arg| MoveValue::from(arg).json())
                 .collect::<anyhow::Result<_>>()?,
         })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Object)]
+pub struct MultisigTransactionPayload {
+    pub function: EntryFunctionId,
+    /// Type arguments of the function
+    pub type_arguments: Vec<MoveType>,
+    /// Arguments of the function
+    pub arguments: Vec<serde_json::Value>,
+}
+
+/// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
+/// transaction as the multisig account.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct MultisigPayload {
+    pub multisig_address: Address,
+
+    // Transaction payload is optional if already stored on chain.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transaction_payload: Option<MultisigTransactionPayload>,
+}
+
+impl VerifyInput for MultisigPayload {
+    fn verify(&self) -> anyhow::Result<()> {
+        if let Some(payload) = &self.transaction_payload {
+            payload.function.verify()?;
+            for type_arg in payload.type_arguments.iter() {
+                type_arg.verify(0)?;
+            }
+        }
+
+        Ok(())
     }
 }
 
