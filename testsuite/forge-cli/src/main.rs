@@ -561,13 +561,11 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     .mode(EmitJobMode::MaxLoad {
                         mempool_backlog: 30000,
                     })
-                    .transaction_type(
-                        if test_name == "account_creation" {
-                            TransactionType::AccountGeneration
-                        } else {
-                            TransactionType::NftMintAndTransfer
-                        },
-                    ),
+                    .transaction_type(if test_name == "account_creation" {
+                        TransactionType::AccountGeneration
+                    } else {
+                        TransactionType::NftMintAndTransfer
+                    }),
             )
             .with_success_criteria(
                 SuccessCriteria::new(4000)
@@ -647,16 +645,22 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
         // reusing changing_working_quorum_test just for invariants/asserts, but with max_down_nodes = 0.
-        "consensus_stress_test" => {
-            changing_working_quorum_test(10, 60, 100, 80, true, false, &ChangingWorkingQuorumTest {
+        "consensus_stress_test" => changing_working_quorum_test(
+            10,
+            60,
+            100,
+            80,
+            true,
+            false,
+            &ChangingWorkingQuorumTest {
                 min_tps: 50,
                 always_healthy_nodes: 10,
                 max_down_nodes: 0,
                 num_large_validators: 0,
                 add_execution_delay: false,
                 check_period_s: 27,
-            })
-        },
+            },
+        ),
         "changing_working_quorum_test" => changing_working_quorum_test(
             20,
             120,
@@ -830,7 +834,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
                 .with_emit_job(
                     EmitJobRequest::default()
-                        .mode(EmitJobMode::ConstTps { tps: 5000 })
+                        .mode(EmitJobMode::MaxLoad {
+                            mempool_backlog: 20000,
+                        })
                         .txn_expiration_time_secs(5 * 60),
                 )
                 .with_network_tests(vec![&ThreeRegionSimulationTest {
@@ -841,11 +847,11 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
                 }))
                 .with_node_helm_config_fn(Arc::new(|helm_values| {
-                    // helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
-                    // helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
-                    //     (3 as u64 * 1024 * 1024 * 1024).into();
-                    // helm_values["validator"]["config"]["mempool"]["capacity_per_user"] =
-                    //     100_000.into();
+                    helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
+                    helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
+                        (3 as u64 * 1024 * 1024 * 1024).into();
+                    helm_values["validator"]["config"]["mempool"]["capacity_per_user"] =
+                        100_000.into();
                     helm_values["validator"]["config"]["mempool"]
                         ["system_transaction_timeout_secs"] = (5 * 60 * 60).into();
                     helm_values["validator"]["config"]["mempool"]
@@ -861,7 +867,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
                         ["continuous_syncing_mode"] = "ExecuteTransactions".into();
                 }))
-                // TODO(rustielin): tune these success critiera after we have a better idea of the test behavior
                 .with_success_criteria(
                     SuccessCriteria::new(3000)
                         .add_no_restarts()
@@ -999,13 +1004,11 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(
-                if duration.as_secs() > 1200 {
-                    5000
-                } else {
-                    5500
-                },
-            )
+            SuccessCriteria::new(if duration.as_secs() > 1200 {
+                5000
+            } else {
+                5500
+            })
             .add_no_restarts()
             .add_wait_for_catchup_s(
                 // Give at least 60s for catchup, give 10% of the run for longer durations.
@@ -1041,13 +1044,11 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
             &NetworkLossTest,
         ])
         .with_success_criteria(
-            SuccessCriteria::new(
-                if duration > Duration::from_secs(1200) {
-                    100
-                } else {
-                    1000
-                },
-            )
+            SuccessCriteria::new(if duration > Duration::from_secs(1200) {
+                100
+            } else {
+                1000
+            })
             .add_no_restarts()
             .add_system_metrics_threshold(SystemMetricsThreshold::new(
                 // Check that we don't use more than 12 CPU cores for 30% of the time.
@@ -1071,13 +1072,11 @@ fn changing_working_quorum_test(
     let num_large_validators = test.num_large_validators;
     config
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(
-            if test.max_down_nodes == 0 {
-                0
-            } else {
-                std::cmp::max(2, target_tps / 1000)
-            },
-        )
+        .with_initial_fullnode_count(if test.max_down_nodes == 0 {
+            0
+        } else {
+            std::cmp::max(2, target_tps / 1000)
+        })
         .with_network_tests(vec![test])
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration.into();
