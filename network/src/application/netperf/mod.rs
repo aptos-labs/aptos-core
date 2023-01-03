@@ -10,7 +10,7 @@
 use crate::application::storage::PeerMetadataStorage;
 use crate::transport::ConnectionMetadata;
 use crate::{
-    application::netperf::interface::{NetPerfMsg::*, NetPerfNetworkEvents, NetPerfNetworkSender},
+    application::netperf::interface::{NetPerfMsg::*, NetPerfNetworkEvents, NetPerfNetworkSender, NetPerfPayload},
     constants::NETWORK_CHANNEL_SIZE,
     counters,
     error::NetworkError,
@@ -46,6 +46,7 @@ use std::fs::OpenOptions;
 use std::{sync::Arc, time::Duration};
 use tokio::spawn;
 use tokio::sync::mpsc::{Receiver, Sender};
+use crate::application::netperf::interface::NetPerfMsg;
 
 pub mod builder;
 mod interface;
@@ -250,13 +251,15 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
             opt_cmd = rx.recv() => {
                 match opt_cmd {
                     Some(cmd) => {
+                        let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(64 * 1024));
+
                         for peer in state.peer_list.iter() {
                             //TODO(AlexM): Yet another Alloc + Copy OPs.
                             // Best use Refs - Just ARC
                             rpc_handlers.push(state.sender.send_rpc(
                                 peer.key().to_owned(),
                                 ProtocolId::NetPerfRpcCompressed,
-                                BlockOfBytes64K,
+                                msg.clone(),
                                 Duration::from_secs(5),
                             ));
                         }

@@ -20,8 +20,20 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct NetPerfPayload {
+    byte: Vec<u8>,
+}
+
+impl NetPerfPayload {
+    pub fn new(len :usize) -> Self {
+        let v = Vec::with_capacity(len);
+        NetPerfPayload { byte: v }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum NetPerfMsg {
-    BlockOfBytes64K,
+    BlockOfBytes(NetPerfPayload),
 }
 /// The interface from Network to NetPerf layer.
 ///
