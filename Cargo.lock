@@ -1176,6 +1176,7 @@ dependencies = [
  "siphasher",
  "smallvec",
  "tempfile",
+ "thiserror",
  "tiny-keccak",
 ]
 
@@ -4441,6 +4442,7 @@ dependencies = [
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "hex",
  "itertools",
+ "move-binary-format",
  "move-core-types",
  "move-package",
  "move-symbol-pool",
