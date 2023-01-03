@@ -24,7 +24,6 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::tcp::TCPBufferCfg;
 use aptos_network::application::netperf::builder::NetPerfBuilder;
-use aptos_network::protocols::wire::handshake::v1::ProtocolId::NetPerfDirectSendCompressed;
 use aptos_network::{
     application::netperf::NetPerf,
     application::storage::PeerMetadataStorage,
@@ -447,7 +446,7 @@ impl NetworkBuilder {
 
     /// Add a Aptos NetPerf to the network.
     fn add_network_perf(&mut self, netperf_port: u16) -> &mut Self {
-        let (netperf_tx, netperf_rx) = self.add_p2p_service(&NetPerf::network_endpoint_config());
+        let (netperf_tx, netperf_rx) = self.add_client_and_service(&NetPerf::network_endpoint_config());
         self.netperf_builder = Some(NetPerfBuilder::new(
             self.network_context(),
             self.peer_metadata_storage.clone(),

@@ -2,20 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 use crate::{
-    application::interface::NetworkInterface,
-    constants::NETWORK_CHANNEL_SIZE,
-    counters,
-    error::NetworkError,
-    logging::NetworkSchema,
-    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network::{
-            AppConfig, ApplicationNetworkSender, Event, NetworkEvents, NetworkSender,
-            NewNetworkSender,
+            NetworkEvents, NetworkSender,
         },
-        rpc::error::RpcError,
     },
-    ProtocolId,
 };
 use serde::{Deserialize, Serialize};
 
