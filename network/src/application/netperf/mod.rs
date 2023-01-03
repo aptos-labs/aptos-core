@@ -210,14 +210,12 @@ async fn usage_handler() -> &'static str {
 
 #[derive(Serialize)]
 struct PeerList {
-    len: usize,
     peers: Vec<PeerId>,
 }
 
 impl PeerList {
     pub fn new(len: usize) -> Self {
         PeerList {
-            len,
             peers: Vec::with_capacity(len),
         }
     }
