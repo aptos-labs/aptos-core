@@ -9,6 +9,9 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+/// The minimal file format version from which the V1 metadata is supported
+pub const METADATA_V1_MIN_FILE_FORMAT_VERSION: u32 = 6;
+
 /// The keys used to identify the metadata in the metadata section of the module bytecode.
 /// This is more or less arbitrary, besides we should use some unique key to identify
 /// Aptos specific metadata (`aptos::` here).
@@ -100,6 +103,14 @@ impl RuntimeModuleMetadata {
         RuntimeModuleMetadataV1 {
             error_map: self.error_map,
             ..RuntimeModuleMetadataV1::default()
+        }
+    }
+}
+
+impl RuntimeModuleMetadataV1 {
+    pub fn downgrade(self) -> RuntimeModuleMetadata {
+        RuntimeModuleMetadata {
+            error_map: self.error_map,
         }
     }
 }
