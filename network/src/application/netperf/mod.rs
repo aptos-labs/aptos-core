@@ -7,16 +7,18 @@
 //! and simplify network-related performance profiling and debugging
 //!
 
-use crate::application::netperf::interface::NetPerfMsg;
-use crate::application::storage::PeerMetadataStorage;
-use crate::protocols::network::NetworkApplicationConfig;
-use crate::transport::ConnectionMetadata;
 use crate::{
-    application::netperf::interface::{NetPerfNetworkEvents, NetPerfNetworkSender, NetPerfPayload},
+    application::{
+        netperf::interface::{
+            NetPerfMsg, NetPerfNetworkEvents, NetPerfNetworkSender, NetPerfPayload,
+        },
+        storage::PeerMetadataStorage,
+    },
     constants::NETWORK_CHANNEL_SIZE,
     counters,
     logging::NetworkSchema,
-    protocols::network::Event,
+    protocols::network::{Event, NetworkApplicationConfig},
+    transport::ConnectionMetadata,
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -34,14 +36,19 @@ use dashmap::DashMap;
 use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 use serde::Serialize;
-use std::fs::OpenOptions;
-use std::{sync::Arc, time::Duration};
+use std::{
+    fs::OpenOptions,
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
+};
 use tokio::sync::mpsc::{Receiver, Sender};
 
 pub mod builder;
 mod interface;
 
 const NETPERF_COMMAND_CHANNEL_SIZE: usize = 1024;
+const NETPERF_DEFAULT_MSG_SIZE: usize = 64 * 1024;
+const NETPERF_DEFAULT_DURTAION_SEC: u64 = 10;
 
 pub struct NetPerf {
     network_context: NetworkContext,
@@ -189,7 +196,7 @@ fn preferred_axum_port(netperf_port: u16) -> u16 {
             .create(true)
             .open(format!("/tmp/{}.tmp", netperf_port));
     }
-    return netperf_port;
+    netperf_port
 }
 
 async fn start_axum(state: NetPerfState, netperf_port: u16) {
@@ -243,7 +250,14 @@ async fn parse_query(
     Extension(state): Extension<NetPerfState>,
     Query(_params): Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
-    spawn_named!("[NetPerf] Brodcast Task", netperf_broadcast(state.clone()));
+    //TODO(AlexM): Extract size and duration from _params
+    let size = NETPERF_DEFAULT_MSG_SIZE;
+    let duration = Duration::from_secs(NETPERF_DEFAULT_DURTAION_SEC);
+
+    spawn_named!(
+        "[NetPerf] Brodcast Task",
+        netperf_broadcast(state, size, duration)
+    );
 
     StatusCode::OK
 }
@@ -277,9 +291,16 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
     }
 }
 
-async fn netperf_broadcast(state: NetPerfState) {
+async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration) {
     let mut should_yield = false;
-    let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(64 * 1024));
+    let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(size));
+    let done = Arc::new(AtomicBool::new(false));
+    let stop = done.clone();
+
+    tokio::spawn(async move {
+        tokio::time::sleep(duration).await;
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    });
 
     loop {
         /* TODO(AlexM):
@@ -292,15 +313,19 @@ async fn netperf_broadcast(state: NetPerfState) {
             ProtocolId::NetPerfDirectSendCompressed,
             msg.clone(),
         );
-        if let Err(_) = rc {
+        if rc.is_err() {
             should_yield = true
         } //else update peer counters
           /* maybe add dedicated counters? but network_application_{out/in}bound_traffic
            * seems to have us coverred
            * */
 
-        if should_yield == true {
+        if done.load(std::sync::atomic::Ordering::Relaxed) {
             break;
+        }
+        if should_yield {
+            tokio::task::yield_now().await;
+            should_yield = false;
         }
     }
     info!("Broadcast Op Finished");

@@ -10,10 +10,11 @@ pub struct NetPerfPayload {
 }
 
 impl NetPerfPayload {
-    pub fn new(len: usize) -> Self {
+    pub fn new(mut len: usize) -> Self {
         let mut v = Vec::with_capacity(len);
-        unsafe {
-            v.set_len(len);
+        while len > 0 {
+            v.push(0);
+            len -= 1;
         }
         NetPerfPayload { byte: v }
     }
@@ -30,16 +31,7 @@ pub enum NetPerfMsg {
 /// `NetPerfMsg` types. `NetPerfNetworkEvents` is a thin wrapper
 /// around an `channel::Receiver<PeerManagerNotification>`.
 pub type NetPerfNetworkEvents = NetworkEvents<NetPerfMsg>;
-/*
-impl Stream for HealthCheckNetworkInterface {
-    type Item = Event<HealthCheckerMsg>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.get_mut().receiver).poll_next(cx)
-    }
-}
-
- */
 /// The interface from NetPerf to Networking layer.
 ///
 /// This is a thin wrapper around a `NetworkSender<NetPerfMsg>`, so it is
