@@ -118,7 +118,8 @@ impl NetPerf {
 
     async fn start(mut self) {
         let port = preferred_axum_port(self.netperf_port);
-        let (tx, rx) = tokio::sync::mpsc::channel::<NetPerfCommands>(NETPERF_COMMAND_CHANNEL_SIZE);
+        let (tx, mut rx) =
+            tokio::sync::mpsc::channel::<NetPerfCommands>(NETPERF_COMMAND_CHANNEL_SIZE);
 
         info!(
             NetworkSchema::new(&self.network_context),
@@ -286,7 +287,7 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
                     None => break,
                 }
             }
-            _res = rpc_handlers.select_next_some() => {}
+            _res = rpc_handlers.select_next_some() => {break}
         }
     }
 }
