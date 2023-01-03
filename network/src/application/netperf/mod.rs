@@ -192,7 +192,7 @@ fn preferred_axum_port(netperf_port: u16) -> u16 {
             .create(true)
             .open(format!("/tmp/{}.tmp", netperf_port));
     }
-    return netperf_port;
+    netperf_port
 }
 
 async fn start_axum(state: NetPerfState, netperf_port: u16) {
@@ -252,7 +252,7 @@ async fn parse_query(
 
     spawn_named!(
         "[NetPerf] Brodcast Task",
-        netperf_broadcast(state.clone(), size, duration)
+        netperf_broadcast(state, size, duration)
     );
 
     StatusCode::OK
@@ -309,7 +309,7 @@ async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration)
             ProtocolId::NetPerfDirectSendCompressed,
             msg.clone(),
         );
-        if let Err(_) = rc {
+        if rc.is_err() {
             should_yield = true
         } //else update peer counters
           /* maybe add dedicated counters? but network_application_{out/in}bound_traffic
@@ -319,7 +319,7 @@ async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration)
         if done.load(std::sync::atomic::Ordering::Relaxed) {
             break;
         }
-        if should_yield == true {
+        if should_yield {
             tokio::task::yield_now().await;
             should_yield = false;
         }
