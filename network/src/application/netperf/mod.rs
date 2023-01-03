@@ -268,13 +268,25 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
 }
 
 async fn netperf_broadcast(state: NetPerfState) {
+    let mut should_yield = false;
     let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(64 * 1024));
 
-    for peer in state.peer_list.iter() {
-        let _rc = state.sender.send_to(
-            peer.key().to_owned(),
-            ProtocolId::NetPerfDirectSendCompressed,
-            msg.clone(),
-        );
+    loop {
+        for peer in state.peer_list.iter() {
+            /* TODO(AlexM): This current implementation has a redundant Copy
+            consider Bytes*/
+            let rc = state.sender.send_to(
+                peer.key().to_owned(),
+                ProtocolId::NetPerfDirectSendCompressed,
+                msg.clone(),
+            );
+            if let Err(_) = rc {
+                should_yield = true
+            }//else update peer counters
+        }
+        if should_yield == true {
+            break;
+        }
     }
+    info!("Broadcast Op Finished");
 }
