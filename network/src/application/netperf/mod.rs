@@ -99,7 +99,7 @@ impl NetPerf {
     /// Configuration for the network endpoints to support NetPerf.
     pub fn network_endpoint_config() -> AppConfig {
         AppConfig::p2p(
-            [ProtocolId::NetPerfRpcCompressed],
+            [ProtocolId::NetPerfDirectSendCompressed, ProtocolId::NetPerfRpcCompressed],
             aptos_channel::Config::new(NETWORK_CHANNEL_SIZE).queue_style(QueueStyle::FIFO),
         )
     }
@@ -273,7 +273,13 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
 }
 
 async fn netperf_broadcast(state: NetPerfState) {
-    loop {
-        let _ = state.tx.send(NetPerfCommands::Broadcast).await;
+    let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(64 * 1024));
+
+    for peer in state.peer_list.iter() {
+        state.sender.send_to(
+            peer.key().to_owned(),
+            ProtocolId::NetPerfDirectSendCompressed,
+            msg.clone(),
+        );
     }
 }
