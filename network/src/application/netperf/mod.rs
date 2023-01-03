@@ -35,6 +35,7 @@ use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 use serde::Serialize;
 use std::fs::OpenOptions;
+use std::sync::atomic::AtomicBool;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -42,6 +43,8 @@ pub mod builder;
 mod interface;
 
 const NETPERF_COMMAND_CHANNEL_SIZE: usize = 1024;
+const NETPERF_DEFAULT_MSG_SIZE: usize = 64 * 1024;
+const NETPERF_DEFAULT_DURTAION_SEC: u64 = 10;
 
 pub struct NetPerf {
     network_context: NetworkContext,
@@ -243,7 +246,14 @@ async fn parse_query(
     Extension(state): Extension<NetPerfState>,
     Query(_params): Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
-    spawn_named!("[NetPerf] Brodcast Task", netperf_broadcast(state.clone()));
+    //TODO(AlexM): Extract size and duration from _params
+    let size = NETPERF_DEFAULT_MSG_SIZE;
+    let duration = Duration::from_secs(NETPERF_DEFAULT_DURTAION_SEC);
+
+    spawn_named!(
+        "[NetPerf] Brodcast Task",
+        netperf_broadcast(state.clone(), size, duration)
+    );
 
     StatusCode::OK
 }
@@ -277,9 +287,16 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
     }
 }
 
-async fn netperf_broadcast(state: NetPerfState) {
+async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration) {
     let mut should_yield = false;
-    let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(64 * 1024));
+    let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(size));
+    let done = Arc::new(AtomicBool::new(false));
+    let stop = done.clone();
+
+    tokio::spawn(async move {
+        tokio::time::sleep(duration).await;
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    });
 
     loop {
         /* TODO(AlexM):
@@ -299,8 +316,12 @@ async fn netperf_broadcast(state: NetPerfState) {
            * seems to have us coverred
            * */
 
-        if should_yield == true {
+        if done.load(std::sync::atomic::Ordering::Relaxed) {
             break;
+        }
+        if should_yield == true {
+            tokio::task::yield_now().await;
+            should_yield = false;
         }
     }
     info!("Broadcast Op Finished");
