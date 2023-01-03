@@ -239,7 +239,7 @@ async fn parse_query(
     Extension(state): Extension<NetPerfState>,
     Query(_params): Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
-    spawn_named!("[NetPerf] Broadcast Task", netperf_broadcast(state.clone()));
+    spawn_named!("[NetPerf] Brodcast Task", netperf_broadcast(state.clone()));
 
     StatusCode::OK
 }
@@ -278,18 +278,17 @@ async fn netperf_broadcast(state: NetPerfState) {
     let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(64 * 1024));
 
     loop {
-        for peer in state.peer_list.iter() {
-            /* TODO(AlexM): This current implementation has a redundant Copy
-            consider Bytes*/
-            let rc = state.sender.send_to(
-                peer.key().to_owned(),
-                ProtocolId::NetPerfDirectSendCompressed,
-                msg.clone(),
-            );
-            if let Err(_) = rc {
-                should_yield = true
-            } //else update peer counters
-        }
+        /* TODO(AlexM): Better Fine grained controll with send_to.
+         * Its interesting to see which of the validr queus gets full.
+         * */
+        let rc = state.sender.send_to_many(
+            state.peer_list.iter().map(|entry| entry.key().to_owned()),
+            ProtocolId::NetPerfDirectSendCompressed,
+            msg.clone(),
+        );
+        if let Err(_) = rc {
+            should_yield = true
+        } //else update peer counters
         if should_yield == true {
             break;
         }
