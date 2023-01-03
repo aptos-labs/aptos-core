@@ -10,10 +10,11 @@ pub struct NetPerfPayload {
 }
 
 impl NetPerfPayload {
-    pub fn new(len: usize) -> Self {
+    pub fn new(mut len: usize) -> Self {
         let mut v = Vec::with_capacity(len);
-        unsafe {
-            v.set_len(len);
+        while len > 0 {
+            v.push(0);
+            len -= 1;
         }
         NetPerfPayload { byte: v }
     }

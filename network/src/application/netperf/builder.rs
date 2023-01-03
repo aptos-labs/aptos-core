@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    application::netperf::{
+use crate::application::{
+    netperf::{
         interface::{NetPerfNetworkEvents, NetPerfNetworkSender},
         NetPerf,
     },
-    application::storage::PeerMetadataStorage,
+    storage::PeerMetadataStorage,
 };
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;

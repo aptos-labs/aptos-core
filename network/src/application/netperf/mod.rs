@@ -7,16 +7,18 @@
 //! and simplify network-related performance profiling and debugging
 //!
 
-use crate::application::netperf::interface::NetPerfMsg;
-use crate::application::storage::PeerMetadataStorage;
-use crate::protocols::network::NetworkApplicationConfig;
-use crate::transport::ConnectionMetadata;
 use crate::{
-    application::netperf::interface::{NetPerfNetworkEvents, NetPerfNetworkSender, NetPerfPayload},
+    application::{
+        netperf::interface::{
+            NetPerfMsg, NetPerfNetworkEvents, NetPerfNetworkSender, NetPerfPayload,
+        },
+        storage::PeerMetadataStorage,
+    },
     constants::NETWORK_CHANNEL_SIZE,
     counters,
     logging::NetworkSchema,
-    protocols::network::Event,
+    protocols::network::{Event, NetworkApplicationConfig},
+    transport::ConnectionMetadata,
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -34,9 +36,11 @@ use dashmap::DashMap;
 use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 use serde::Serialize;
-use std::fs::OpenOptions;
-use std::sync::atomic::AtomicBool;
-use std::{sync::Arc, time::Duration};
+use std::{
+    fs::OpenOptions,
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
+};
 use tokio::sync::mpsc::{Receiver, Sender};
 
 pub mod builder;

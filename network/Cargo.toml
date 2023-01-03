@@ -36,7 +36,7 @@ async-trait = { workspace = true }
 axum = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
-dashmap = {worksapce = true }
+dashmap = { worksapce = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
 hex = { workspace = true }
