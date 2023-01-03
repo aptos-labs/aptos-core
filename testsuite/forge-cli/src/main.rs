@@ -504,11 +504,10 @@ fn run_consensus_only_three_region_simulation(config: ForgeConfig) -> ForgeConfi
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
         }))
         .with_node_helm_config_fn(Arc::new(|helm_values| {
-            // helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
-            // helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
-            //     (3 as u64 * 1024 * 1024 * 1024).into();
-            // helm_values["validator"]["config"]["mempool"]["capacity_per_user"] =
-            //     100_000.into();
+            helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
+            helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
+                (3_u64 * 1024 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["mempool"]["capacity_per_user"] = 100_000.into();
             helm_values["validator"]["config"]["mempool"]["system_transaction_timeout_secs"] =
                 (5 * 60 * 60).into();
             helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
