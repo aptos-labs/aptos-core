@@ -9,6 +9,7 @@ module aptos_framework::delegation_pool {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration::{last_reconfiguration_time};
     use aptos_framework::stake;
+    use aptos_framework::staking_config;
 
     friend aptos_framework::delegate;
 
@@ -241,6 +242,34 @@ module aptos_framework::delegation_pool {
                 amount_withdrawn,
             },
         );
+    }
+
+    public fun charge_add_stake_fee(pool_address: address, coins_amount: u64): u64 acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        let active_shares = &borrow_global<DelegationPool>(pool_address).active_shares;
+
+        // if the underlying stake pool earns rewards this epoch, charge delegator
+        // the maximum amount it would earn from new added stake in `pending_active` state
+        if (stake::is_current_epoch_validator(pool_address)) {
+            let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(&staking_config::get());
+            let max_epoch_active_rewards = if (rewards_rate_denominator > 0) {
+                let (active, _, _, _) = stake::get_stake(pool_address);
+                pool_u64::multiply_then_divide(active_shares, active, rewards_rate, rewards_rate_denominator)
+            } else {
+                0
+            };
+            // 1. calculate shares received if buying in active pool with its pending epoch rewards added
+            // 2. calculate coins required to buy this amount of shares in current active pool
+            // (((coins_amount * total_shares) / (total_coins + max_epoch_active_rewards)) * total_coins) / total_shares
+            pool_u64::multiply_then_divide(
+                active_shares,
+                coins_amount,
+                pool_u64::total_coins(active_shares),
+                pool_u64::total_coins(active_shares) + max_epoch_active_rewards
+            )
+        } else {
+            coins_amount
+        }
     }
 
     /// Buy shares into active pool on behalf of delegator `shareholder` who
