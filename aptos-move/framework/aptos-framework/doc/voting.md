@@ -1383,6 +1383,7 @@ Return true if the voting period of the given proposal has already ended.
 </code></pre>
 
 
+The same as spec of <code><a href="voting.md#0x1_voting_create_proposal_v2">create_proposal_v2</a>()</code>.
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
@@ -1399,10 +1400,6 @@ Return true if the voting period of the given proposal has already ended.
 </code></pre>
 
 
-The min_vote_threshold lower thanearly_resolution_vote_threshold.
-Make sure the execution script's hash is not empty.
-VotingForum<ProposalType> existed under the voting_forum_address.
-The next_proposal_id in VotingForum is up to MAX_U64.
 CurrentTimeMicroseconds existed under the @aptos_framework.
 
 

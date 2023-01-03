@@ -20,6 +20,7 @@ spec aptos_framework::voting {
         ensures exists<VotingForum<ProposalType>>(addr);
     }
 
+    /// The same as spec of `create_proposal_v2()`.
     spec create_proposal<ProposalType: store>(
         proposer: address,
         voting_forum_address: address,
@@ -33,10 +34,6 @@ spec aptos_framework::voting {
         pragma verify = false;
     }
 
-    /// The min_vote_threshold lower thanearly_resolution_vote_threshold.
-    /// Make sure the execution script's hash is not empty.
-    /// VotingForum<ProposalType> existed under the voting_forum_address.
-    /// The next_proposal_id in VotingForum is up to MAX_U64.
     /// CurrentTimeMicroseconds existed under the @aptos_framework.
     spec create_proposal_v2<ProposalType: store>(
         proposer: address,
@@ -52,14 +49,18 @@ spec aptos_framework::voting {
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal_id = voting_forum.next_proposal_id;
 
+        // VotingForum<ProposalType> exists under the voting_forum_address.
         aborts_if !exists<VotingForum<ProposalType>>(voting_forum_address);
         aborts_if table::spec_contains(voting_forum.proposals,proposal_id);
+        // min_vote_threshold should not be greater than early_resolution_vote_threshold.
         aborts_if len(early_resolution_vote_threshold.vec) != 0 && min_vote_threshold > early_resolution_vote_threshold.vec[0];
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
+        // Make sure the execution script's hash is not empty.
         aborts_if len(execution_hash) <= 0;
         let execution_key = std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
         aborts_if simple_map::spec_contains_key(metadata,execution_key);
+        // The next_proposal_id in VotingForum is up to MAX_U64.
         aborts_if voting_forum.next_proposal_id + 1 > MAX_U64;
         let is_multi_step_in_execution_key = std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         aborts_if is_multi_step_proposal && simple_map::spec_contains_key(metadata,is_multi_step_in_execution_key);
@@ -98,7 +99,7 @@ spec aptos_framework::voting {
     ) {
         // This function aborts when the proposal is not resolvable.
 
-        // TODO: Find a way to specify when it will abort. The opaque with spec fun doesn't work.
+        // TODO: Find a way to specify when it will abort. The opaque pragma with spec fun doesn't work.
         pragma aborts_if_is_partial;
         // pragma opaque;
         // aborts_if [abstract] spec_is_proposal_resolvable(voting_forum_address, proposal_id);
