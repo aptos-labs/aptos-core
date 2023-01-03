@@ -60,8 +60,8 @@ sha3 = { workspace = true }
 siphasher = { workspace = true }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
-tiny-keccak = { workspace = true }
 thiserror = { workspace = true }
+tiny-keccak = { workspace = true }
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }

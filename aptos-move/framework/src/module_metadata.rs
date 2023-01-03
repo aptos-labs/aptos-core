@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::transaction::AbortInfo;
-use move_binary_format::CompiledModule;
-use move_core_types::{errmap::ErrorDescription, language_storage::ModuleId, metadata::Metadata};
+use move_binary_format::{normalized::Function, CompiledModule};
+use move_core_types::{
+    errmap::ErrorDescription, identifier::Identifier, language_storage::ModuleId,
+    metadata::Metadata,
+};
 use move_vm_runtime::move_vm::MoveVM;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -64,14 +67,6 @@ impl KnownAttribute {
     pub fn is_view_function(&self) -> bool {
         self.kind == (KnownAttributeKind::ViewFunction as u16)
     }
-
-    pub fn is_valid_function_attribute(&self) -> bool {
-        self.is_view_function()
-    }
-
-    pub fn is_valid_struct_attribute(&self) -> bool {
-        false
-    }
 }
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
@@ -107,25 +102,54 @@ pub struct MetadataValidationError {
     pub attribute: u16,
 }
 
-pub fn verify_metadata(metadata: &RuntimeModuleMetadataV1) -> Result<(), MetadataValidationError> {
-    for (struct_, attrs) in &metadata.struct_attributes {
-        for attr in attrs {
-            if !attr.is_valid_function_attribute() {
-                return Err(MetadataValidationError {
-                    key: struct_.clone(),
-                    attribute: attr.kind,
-                });
+pub fn is_valid_view_function(
+    functions: &BTreeMap<Identifier, Function>,
+    fun: &str,
+) -> Result<(), MetadataValidationError> {
+    if let Ok(ident_fun) = Identifier::new(fun) {
+        if let Some(mod_fun) = functions.get(&ident_fun) {
+            if !mod_fun.return_.is_empty() {
+                return Ok(());
             }
         }
     }
-    for (fun, attrs) in &metadata.struct_attributes {
+
+    Err(MetadataValidationError {
+        key: fun.to_string(),
+        attribute: KnownAttributeKind::ViewFunction as u16,
+    })
+}
+
+pub fn verify_module_metadata(module: &CompiledModule) -> Result<(), MetadataValidationError> {
+    let metadata = if let Some(metadata) = get_module_metadata(module) {
+        metadata
+    } else {
+        return Ok(());
+    };
+
+    let functions = module
+        .function_defs
+        .iter()
+        .map(|func_def| Function::new(module, func_def))
+        .collect::<BTreeMap<_, _>>();
+    for (fun, attrs) in &metadata.fun_attributes {
         for attr in attrs {
-            if !attr.is_valid_struct_attribute() {
+            if attr.is_view_function() {
+                is_valid_view_function(&functions, fun)?
+            } else {
                 return Err(MetadataValidationError {
                     key: fun.clone(),
                     attribute: attr.kind,
                 });
             }
+        }
+    }
+    for (struct_, attrs) in &metadata.struct_attributes {
+        if let Some(attr) = attrs.iter().next() {
+            return Err(MetadataValidationError {
+                key: struct_.clone(),
+                attribute: attr.kind,
+            });
         }
     }
     Ok(())
