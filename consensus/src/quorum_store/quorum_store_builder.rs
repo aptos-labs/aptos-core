@@ -53,13 +53,7 @@ impl QuorumStoreBuilder {
         }
     }
 
-    pub fn start(
-        self,
-        block_store: Arc<BlockStore>,
-    ) -> Option<(
-        aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-        Sender<CoordinatorCommand>,
-    )> {
+    pub fn start(self, block_store: Arc<BlockStore>) -> Option<Sender<CoordinatorCommand>> {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => {
                 inner.start();
@@ -120,8 +114,6 @@ pub struct InnerBuilder {
     network_sender: NetworkSender,
     verifier: ValidatorVerifier,
     backend: SecureBackend,
-    verified_event_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-    verified_event_rx: Option<aptos_channel::Receiver<AccountAddress, VerifiedEvent>>,
     coordinator_tx: Sender<CoordinatorCommand>,
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
@@ -158,12 +150,6 @@ impl InnerBuilder {
         quorum_store_storage_path: PathBuf,
         num_network_workers_for_fragment: usize,
     ) -> Self {
-        let (verified_event_tx, verified_event_rx) = aptos_channel::new::<
-            AccountAddress,
-            VerifiedEvent,
-        >(
-            QueueStyle::FIFO, config.channel_size, None
-        );
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
             tokio::sync::mpsc::channel(config.channel_size);
@@ -189,8 +175,6 @@ impl InnerBuilder {
             network_sender,
             verifier,
             backend,
-            verified_event_tx,
-            verified_event_rx: Some(verified_event_rx),
             coordinator_tx,
             coordinator_rx: Some(coordinator_rx),
             batch_generator_cmd_tx,
@@ -225,8 +209,9 @@ impl InnerBuilder {
             .expect("Unable to get private key");
         let signer = ValidatorSigner::new(self.author, private_key);
 
-        let mut quorum_store_msg_rx_vec = Vec::new();
+        // TODO: probably don't need to clear?
         self.quorum_store_msg_tx_vec.clear();
+        self.quorum_store_msg_rx_vec.clear();
         for _ in 0..self.num_network_workers_for_fragment + 2 {
             let (quorum_store_msg_tx, quorum_store_msg_rx) =
                 aptos_channel::new::<AccountAddress, VerifiedEvent>(
@@ -235,7 +220,7 @@ impl InnerBuilder {
                     None,
                 );
             self.quorum_store_msg_tx_vec.push(quorum_store_msg_tx);
-            quorum_store_msg_rx_vec.push(quorum_store_msg_rx);
+            self.quorum_store_msg_rx_vec.push(quorum_store_msg_rx);
         }
 
         let latest_ledger_info_with_sigs = self
@@ -287,10 +272,7 @@ impl InnerBuilder {
     fn spawn_quorum_store_wrapper(
         mut self,
         block_store: Arc<dyn BlockReader + Send + Sync>,
-    ) -> (
-        aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-        Sender<CoordinatorCommand>,
-    ) {
+    ) -> Sender<CoordinatorCommand> {
         let quorum_store_storage = self.quorum_store_storage.as_ref().unwrap().clone();
 
         // TODO: parameter? bring back back-off?
@@ -380,7 +362,7 @@ impl InnerBuilder {
             tokio::spawn(net.start());
         }
 
-        (self.verified_event_tx, self.coordinator_tx)
+        self.coordinator_tx
     }
 
     fn init_payload_manager(
@@ -405,13 +387,7 @@ impl InnerBuilder {
         )
     }
 
-    fn start(
-        self,
-        block_store: Arc<BlockStore>,
-    ) -> (
-        aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-        Sender<CoordinatorCommand>,
-    ) {
+    fn start(self, block_store: Arc<BlockStore>) -> Sender<CoordinatorCommand> {
         self.spawn_quorum_store_wrapper(block_store)
     }
 }

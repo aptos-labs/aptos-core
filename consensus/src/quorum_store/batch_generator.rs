@@ -39,7 +39,7 @@ pub enum ProofError {
 pub struct BatchGenerator {
     db: Arc<dyn BatchIdDB>,
     mempool_proxy: MempoolProxy,
-    quorum_store_sender: TokioSender<BatchCoordinatorCommand>,
+    batch_coordinator_tx: TokioSender<BatchCoordinatorCommand>,
     batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
     batch_expirations: RoundExpirations<BatchId>,
     batch_builder: BatchBuilder,
@@ -62,7 +62,7 @@ impl BatchGenerator {
         epoch: u64,
         db: Arc<dyn BatchIdDB>,
         mempool_tx: Sender<QuorumStoreRequest>,
-        quorum_store_sender: TokioSender<BatchCoordinatorCommand>,
+        batch_coordinator_tx: TokioSender<BatchCoordinatorCommand>,
         mempool_txn_pull_timeout_ms: u64,
         mempool_txn_pull_max_count: u64,
         mempool_txn_pull_max_bytes: u64,
@@ -87,7 +87,7 @@ impl BatchGenerator {
         Self {
             db,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
-            quorum_store_sender,
+            batch_coordinator_tx,
             batches_in_progress: HashMap::new(),
             batch_expirations: RoundExpirations::new(),
             batch_builder: BatchBuilder::new(batch_id, max_batch_counts, max_batch_bytes),
@@ -170,7 +170,7 @@ impl BatchGenerator {
         let batch_id = self.batch_builder.batch_id();
         if !end_batch {
             if !serialized_txns.is_empty() {
-                self.quorum_store_sender
+                self.batch_coordinator_tx
                     .send(BatchCoordinatorCommand::AppendToBatch(
                         serialized_txns,
                         batch_id,
@@ -210,7 +210,7 @@ impl BatchGenerator {
                 self.latest_logical_time.round() + self.batch_expiry_round_gap_when_init;
             let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
 
-            self.quorum_store_sender
+            self.batch_coordinator_tx
                 .send(BatchCoordinatorCommand::EndBatch(
                     serialized_txns,
                     batch_id,

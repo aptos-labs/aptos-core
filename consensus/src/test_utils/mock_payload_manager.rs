@@ -5,10 +5,10 @@ use crate::{
     error::QuorumStoreError, payload_client::QuorumStoreClient, state_replication::PayloadClient,
 };
 use anyhow::Result;
+use aptos_consensus_types::request_response::BlockProposalCommand;
 use aptos_consensus_types::{
     block::block_test_utils::random_payload,
     common::{Payload, PayloadFilter, Round},
-    request_response::PayloadRequest,
 };
 use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
@@ -24,7 +24,9 @@ pub struct MockPayloadManager {
 }
 
 impl MockPayloadManager {
-    pub fn new(consensus_to_quorum_store_sender: Option<mpsc::Sender<PayloadRequest>>) -> Self {
+    pub fn new(
+        consensus_to_quorum_store_sender: Option<mpsc::Sender<BlockProposalCommand>>,
+    ) -> Self {
         let quorum_store_client =
             consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1));
         Self {

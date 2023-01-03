@@ -24,6 +24,7 @@ pub enum ProofManagerCommand {
     LocalProof(ProofOfStore),
     RemoteProof(ProofOfStore),
     CommitNotification(LogicalTime, Vec<HashValue>),
+    Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
 pub struct ProofManager {
@@ -41,35 +42,36 @@ impl ProofManager {
         }
     }
 
-    pub(crate) async fn handle_proof(
+    pub(crate) async fn handle_local_proof(
         &mut self,
-        msg: ProofManagerCommand,
+        proof: ProofOfStore,
         network_sender: &mut NetworkSender,
     ) {
-        match msg {
-            ProofManagerCommand::LocalProof(proof) => {
-                self.proofs_for_consensus.push(proof.clone());
-                network_sender.broadcast_proof_of_store(proof).await;
-            },
-            ProofManagerCommand::RemoteProof(proof) => {
-                // TODO: is this all we need to do?
-                self.proofs_for_consensus.push(proof.clone());
-            },
-            ProofManagerCommand::CommitNotification(logical_time, digests) => {
-                debug!("QS: got clean request from execution");
-                assert_eq!(
-                    self.latest_logical_time.epoch(),
-                    logical_time.epoch(),
-                    "Wrong epoch"
-                );
-                assert!(
-                    self.latest_logical_time <= logical_time,
-                    "Decreasing logical time"
-                );
-                self.latest_logical_time = logical_time;
-                self.proofs_for_consensus.mark_committed(digests);
-            },
-        }
+        self.proofs_for_consensus.push(proof.clone());
+        network_sender.broadcast_proof_of_store(proof).await;
+    }
+
+    pub(crate) fn handle_remote_proof(&mut self, proof: ProofOfStore) {
+        self.proofs_for_consensus.push(proof.clone());
+    }
+
+    pub(crate) fn handle_commit_notification(
+        &mut self,
+        logical_time: LogicalTime,
+        digests: Vec<HashValue>,
+    ) {
+        debug!("QS: got clean request from execution");
+        assert_eq!(
+            self.latest_logical_time.epoch(),
+            logical_time.epoch(),
+            "Wrong epoch"
+        );
+        assert!(
+            self.latest_logical_time <= logical_time,
+            "Decreasing logical time"
+        );
+        self.latest_logical_time = logical_time;
+        self.proofs_for_consensus.mark_committed(digests);
     }
 
     pub(crate) fn handle_proposal_request(&mut self, msg: BlockProposalCommand) {
@@ -126,7 +128,23 @@ impl ProofManager {
                     self.handle_proposal_request(msg);
                 },
                 Some(msg) = proof_rx.recv() => {
-                    self.handle_proof(msg, &mut network_sender).await;
+                    match msg {
+                        ProofManagerCommand::Shutdown(ack_tx) => {
+                            ack_tx
+                                .send(())
+                                .expect("Failed to send shutdown ack to QuorumStore");
+                            break;
+                        },
+                        ProofManagerCommand::LocalProof(proof) => {
+                            self.handle_local_proof(proof, &mut network_sender).await;
+                        },
+                        ProofManagerCommand::RemoteProof(proof) => {
+                            self.handle_remote_proof(proof);
+                        },
+                        ProofManagerCommand::CommitNotification(logical_time, digests) => {
+                            self.handle_commit_notification(logical_time, digests);
+                        },
+                    }
                 },
             }
         }
