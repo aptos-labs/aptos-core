@@ -8,6 +8,7 @@ use move_vm_runtime::move_vm::MoveVM;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use thiserror::Error;
 
 /// The keys used to identify the metadata in the metadata section of the module bytecode.
 /// This is more or less arbitrary, besides we should use some unique key to identify
@@ -63,6 +64,14 @@ impl KnownAttribute {
     pub fn is_view_function(&self) -> bool {
         self.kind == (KnownAttributeKind::ViewFunction as u16)
     }
+
+    pub fn is_valid_function_attribute(&self) -> bool {
+        self.is_view_function()
+    }
+
+    pub fn is_valid_struct_attribute(&self) -> bool {
+        false
+    }
 }
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
@@ -89,6 +98,37 @@ pub fn get_module_metadata(module: &CompiledModule) -> Option<RuntimeModuleMetad
     } else {
         None
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[error("Unknown attribute ({}) for key: {}", self.attribute, self.key)]
+pub struct MetadataValidationError {
+    pub key: String,
+    pub attribute: u16,
+}
+
+pub fn verify_metadata(metadata: &RuntimeModuleMetadataV1) -> Result<(), MetadataValidationError> {
+    for (struct_, attrs) in &metadata.struct_attributes {
+        for attr in attrs {
+            if !attr.is_valid_function_attribute() {
+                return Err(MetadataValidationError {
+                    key: struct_.clone(),
+                    attribute: attr.kind,
+                });
+            }
+        }
+    }
+    for (fun, attrs) in &metadata.struct_attributes {
+        for attr in attrs {
+            if !attr.is_valid_struct_attribute() {
+                return Err(MetadataValidationError {
+                    key: fun.clone(),
+                    attribute: attr.kind,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 fn find_metadata<'a>(module: &'a CompiledModule, key: &[u8]) -> Option<&'a Metadata> {
