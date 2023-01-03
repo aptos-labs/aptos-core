@@ -39,10 +39,10 @@ pub struct RuntimeModuleMetadataV1 {
     pub fun_attributes: BTreeMap<String, Vec<KnownAttribute>>,
 }
 
-/// Enumeration of known attributes
+/// Enumeration of potentially known attributes
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct KnownAttribute {
-    kind: KnownAttributeKind,
+    kind: u16,
     args: Vec<String>,
 }
 
@@ -55,13 +55,13 @@ pub enum KnownAttributeKind {
 impl KnownAttribute {
     pub fn view_function() -> Self {
         Self {
-            kind: KnownAttributeKind::ViewFunction,
+            kind: KnownAttributeKind::ViewFunction as u16,
             args: vec![],
         }
     }
 
     pub fn is_view_function(&self) -> bool {
-        self.kind == KnownAttributeKind::ViewFunction
+        self.kind == (KnownAttributeKind::ViewFunction as u16)
     }
 }
 
