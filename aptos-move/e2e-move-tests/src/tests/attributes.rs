@@ -189,7 +189,7 @@ fn test_bad_view_attribute_in_compiled_module() {
         ),
     );
 
-    assert_success!(result);
+    assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }
 
 // We need this because we cannot produce a KnownAttribute directly.
