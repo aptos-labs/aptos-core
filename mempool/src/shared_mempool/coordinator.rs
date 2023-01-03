@@ -22,7 +22,7 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
-use aptos_network::protocols::network::Event;
+use aptos_network::{application::interface::NetworkClientInterface, protocols::network::Event};
 use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
@@ -38,8 +38,8 @@ use tokio::{runtime::Handle, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
 /// Coordinator that handles inbound network events and outbound txn broadcasts.
-pub(crate) async fn coordinator<V>(
-    mut smp: SharedMempool<V>,
+pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
+    mut smp: SharedMempool<NetworkClient, TransactionValidator>,
     executor: Handle,
     network_events: Vec<(NetworkId, MempoolNetworkEvents)>,
     mut client_events: MempoolEventsReceiver,
@@ -47,7 +47,8 @@ pub(crate) async fn coordinator<V>(
     mut mempool_listener: MempoolNotificationListener,
     mut mempool_reconfig_events: ReconfigNotificationListener,
 ) where
-    V: TransactionValidation,
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    TransactionValidator: TransactionValidation + 'static,
 {
     info!(LogSchema::event_log(
         LogEntry::CoordinatorRuntime,
@@ -108,12 +109,13 @@ pub(crate) async fn coordinator<V>(
 }
 
 /// Spawn a task for processing `MempoolClientRequest`s from a client such as API service
-async fn handle_client_request<V>(
-    smp: &mut SharedMempool<V>,
+async fn handle_client_request<NetworkClient, TransactionValidator>(
+    smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     bounded_executor: &BoundedExecutor,
     request: MempoolClientRequest,
 ) where
-    V: TransactionValidation,
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    TransactionValidator: TransactionValidation + 'static,
 {
     match request {
         MempoolClientRequest::SubmitTransaction(txn, callback) => {
@@ -163,12 +165,13 @@ async fn handle_client_request<V>(
 
 /// Handle removing committed transactions from local mempool immediately.  This should be done
 /// immediately to ensure broadcasts of committed transactions stop as soon as possible.
-fn handle_commit_notification<V>(
-    smp: &mut SharedMempool<V>,
+fn handle_commit_notification<NetworkClient, TransactionValidator>(
+    smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     msg: MempoolCommitNotification,
     mempool_listener: &mut MempoolNotificationListener,
 ) where
-    V: TransactionValidation,
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation,
 {
     debug!(
         block_timestamp_usecs = msg.block_timestamp_usecs,
@@ -208,12 +211,13 @@ fn handle_commit_notification<V>(
 }
 
 /// Spawn a task to restart the transaction validator with the new reconfig data.
-async fn handle_mempool_reconfig_event<V>(
-    smp: &mut SharedMempool<V>,
+async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator>(
+    smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     bounded_executor: &BoundedExecutor,
     config_update: OnChainConfigPayload,
 ) where
-    V: TransactionValidation,
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    TransactionValidator: TransactionValidation + 'static,
 {
     info!(LogSchema::event_log(
         LogEntry::ReconfigUpdate,
@@ -236,15 +240,16 @@ async fn handle_mempool_reconfig_event<V>(
 /// - LostPeer events disable the upstream peer, which will cancel ongoing broadcasts.
 /// - Network messages follow a simple Request/Response framework to accept new transactions
 /// TODO: Move to RPC off of DirectSend
-async fn handle_network_event<V>(
+async fn handle_network_event<NetworkClient, TransactionValidator>(
     executor: &Handle,
     bounded_executor: &BoundedExecutor,
     scheduled_broadcasts: &mut FuturesUnordered<ScheduledBroadcast>,
-    smp: &mut SharedMempool<V>,
+    smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     network_id: NetworkId,
     event: Event<MempoolSyncMsg>,
 ) where
-    V: TransactionValidation,
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    TransactionValidator: TransactionValidation + 'static,
 {
     match event {
         Event::NewPeer(metadata) => {

@@ -28,6 +28,7 @@ aptos-types = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 futures = { workspace = true }
+maplit = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }

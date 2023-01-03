@@ -5,17 +5,18 @@ slug: "your-first-dapp"
 
 # Your First Dapp
 
-In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application) on the Aptos blockchain. A dapp usually consists of a graphical user interface, which interacts with one or more Move modules.
+In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application)
+on the Aptos blockchain. A dapp usually consists of a graphical user interface, which interacts with one or more Move
+modules.  This dapp will let users publish and share snippets of text on the Aptos blockchain.
 
-For this tutorial, we will use the Move module [`HelloBlockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain) described in [Your First Move Module](first-move-module.md) and focus on building the user interface.
+For this tutorial, we will use the Move module [`hello_blockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain)
+described in [Your First Move Module](first-move-module.md) and focus on building the user interface around the module.
 
 We will use the:
 
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Petra Wallet](../guides/install-petra-wallet-extension)
 * [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
-
-The end result is a dapp that lets users publish and share snippets of text on the Aptos blockchain.
 
 :::tip Full source code
 
@@ -26,13 +27,20 @@ The full source code for this tutorial is being updated. Meanwhile, the older on
 
 ### Aptos Wallet
 
-Before starting this tutorial, install the [Petra extension](../guides/install-petra-wallet-extension).
+Before starting this tutorial, you'll need a chrome extension wallet to interact with the dapp. You can first install
+the [Petra wallet extension](../guides/install-petra-wallet-extension) for use in this tutorial.
 
-After you install it:
-
+If you haven't installed the Petra wallet extension before:
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.
 2. Copy the private key. You will need it to set up the Aptos CLI in the next section.
 3. See the [user instructions](https://petra.app/docs/use) on petra.app for help.
+4. Switch to the Devnet network by clicking, settings, network, and selecting **devnet**.
+5. Click the faucet button to ensure you can receive test tokens.
+
+If you already have the Petra wallet installed, we suggest you create a new wallet for purposes of this tutorial.
+1. In the extension, go to settings, switch account, add account, create new account to create a new account.
+2. Switch to the Devnet network by clicking, settings, network, and selecting **devnet**.
+3. Click the faucet button to ensure you can receive test tokens.
 
 :::tip
 Ensure your account has sufficient funds to perform transactions by clicking the **Faucet** button.
@@ -40,13 +48,16 @@ Ensure your account has sufficient funds to perform transactions by clicking the
 
 ### Aptos CLI
 
+We will also be installing the Aptos CLI so that we can publish 
+
 1. Install the [Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md).
 
-2. Run `aptos init`.
+2. Run `aptos init --profile my-first-nft`.
 
-3. Select your network as you did in the [Move module](first-move-module.md#step-2-create-an-account-and-fund-it) tutorial.
+3. Select the network `devnet`
 
-4. When prompted for your private key, paste the private key from the Aptos Wallet that you copied earlier and press **Return**.
+4. When prompted for your private key, paste the private key from the Petra Wallet and press **Return**. 
+   1. You can find the private key by going to settings, manage account, show the private key, and copy that field.
 
 You will see output resembling:
 
@@ -54,14 +65,14 @@ You will see output resembling:
 Account <account-number> has been already found onchain
 
 ---
-Aptos CLI is now set up for account <account-number> as profile default!  Run `aptos --help` for more information about commands
+Aptos CLI is now set up for account <account-number> as profile my-first-nft!  Run `aptos --help` for more information about commands
 {
   "Result": "Success"
 }
 ```
 This initializes the Aptos CLI to use the same account as used by the Aptos Wallet.
 
-3. Run `aptos account list` to verify that it is working. You should see your account address listed in the `addr` field for all events.
+5. Run `aptos account list --profile my-first-nft` to verify that it is working. You should see your account address listed in the `addr` field for all events.
 
 ## Step 1: Set up a single page app
 
@@ -164,7 +175,7 @@ function App() {
 
   return (
     <div className="App">
-      <p><code>{ address }</code></p>
+      <p>Account Address: <code>{ address }</code></p>
     </div>
   );
 }
@@ -230,8 +241,8 @@ function App() {
 
   return (
     <div className="App">
-      <p><code>{ address }</code></p>
-      <p><code>{ account?.sequence_number }</code></p>
+      <p>Account Address: <code>{ address }</code></p>
+      <p>Sequence Number: <code>{ account?.sequence_number }</code></p>
     </div>
   );
 }
@@ -239,34 +250,39 @@ function App() {
 
 Now, in addition to displaying the account address, the app will also display the account's `sequence_number`. This `sequence_number` represents the next transaction sequence number to prevent replay attacks of transactions. You will see this number increasing as you make transactions with the account.
 
+:::tip
+If the account you're using for this application doesn't exist on-chain, you will not see a sequence number.  You'll need
+to create the account first via a faucet.
+:::
+
 ## Step 4: Publish a Move module
 
 Our dapp is now set up to read from the blockchain. The next step is to write to the blockchain. To do so, we will publish a Move module to our account.
 
-The Move module provides a location for this data to be stored. Specifically, we will use the `HelloBlockchain` module from [Your First Move Module](first-move-module.md), which provides a resource called `MessageHolder` that holds a string (called `message`).
+The Move module provides a location for this data to be stored. Specifically, we will use the `hello_blockchain` module from [Your First Move Module](first-move-module.md), which provides a resource called `MessageHolder` that holds a string (called `message`).
 
-### Publish the `HelloBlockchain` module with the Aptos CLI
+### Publish the `hello_blockchain` module with the Aptos CLI
 
-We will use the Aptos CLI to compile and publish the `HelloBlockchain` module.
+We will use the Aptos CLI to compile and publish the `hello_blockchain` module.
 
 1. Download [the `hello_blockchain` package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain).
 
 2. Next, use the `aptos move publish` command (replacing `/path/to/hello_blockchain/` and `<address>`):
 
 ```bash
-aptos move publish --package-dir /path/to/hello_blockchain/ --named-addresses HelloBlockchain=<address>
+aptos move publish --profile my-first-nft --package-dir /path/to/hello_blockchain/ --named-addresses hello_blockchain=<address>
 ```
 
 For example:
 
 ```bash
-aptos move publish --package-dir ~/code/aptos-core/aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481
+aptos move publish --profile my-first-nft --package-dir ~/code/aptos-core/aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481
 ```
 
-The `--named-addresses` replaces the named address `HelloBlockchain` in `HelloBlockchain.move` with the specified address. For example, if we specify `--named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`, then the following:
+The `--named-addresses` replaces the named address `hello_blockchain` in `hello_blockchain.move` with the specified address. For example, if we specify `--named-addresses hello_blockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`, then the following:
 
 ```rust
-module HelloBlockchain::message {
+module hello_blockchain::message {
 ```
 
 becomes:
@@ -277,7 +293,7 @@ module 0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::messa
 
 This makes it possible to publish the module for the given account (in this case our wallet account, `0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`).
 
-Assuming that your account has enough funds to execute the transaction, you can now publish the `HelloBlockchain` module in your account. If you refresh the app, you will see that the account sequence number has increased from 0 to 1.
+Assuming that your account has enough funds to execute the transaction, you can now publish the `hello_blockchain` module in your account. If you refresh the app, you will see that the account sequence number has increased from 0 to 1.
 
 You can also verify that the module was published by going to the [Aptos Explorer](https://explorer.aptoslabs.com/) and looking up your account. If you scroll down to the Account Modules section, you should see something like the following:
 
@@ -376,7 +392,7 @@ function App() {
       Run this command to publish the module:
       <br />
       aptos move publish --package-dir /path/to/hello_blockchain/
-      --named-addresses HelloBlockchain={address}
+      --named-addresses hello_blockchain={address}
     </pre>
   );
 
@@ -408,36 +424,14 @@ To call this function, we need to use the `window.aptos` API provided by the wal
 {
   type: "entry_function_payload",
   function: "<address>::message::set_message",
-  arguments: ["<hex encoded utf-8 message>"],
+  arguments: ["Message to store"],
   type_arguments: []
 }
 ```
 
 There is no need to provide the `account: signer` argument. Aptos provides it automatically.
 
-However, we do need to specify the `message_bytes` argument: this is the `"<hex encoded utf-8 message>"` in the transaction. We need a way to convert a JS string to this format. We can do so by using `TextEncoder` to convert to utf-8 bytes and then a one-liner to hex encode the bytes.
-
-Add this function to `src/App.tsx`:
-
-```typescript
-/** Convert string to hex-encoded utf-8 bytes. */
-function stringToHex(text: string) {
-  const encoder = new TextEncoder();
-  const encoded = encoder.encode(text);
-  return Array.from(encoded, (i) => i.toString(16).padStart(2, "0")).join("");
-}
-```
-
-Using this function, our transaction payload becomes:
-
-```javascript
-{
-  type: "entry_function_payload",
-  function: "<address>::message::set_message",
-  arguments: [stringToHex(message)],
-  type_arguments: []
-}
-```
+However, we do need to specify the `message` argument: this is the `"Message to store"` in the transaction.
 
 ### Use the `window.aptos` API to submit the `set_message` transaction
 
@@ -465,7 +459,7 @@ function App() {
     const transaction = {
       type: "entry_function_payload",
       function: `${address}::message::set_message`,
-      arguments: [stringToHex(message)],
+      arguments: [message],
       type_arguments: [],
     };
 
@@ -481,6 +475,7 @@ function App() {
     <div className="App">
       {hasModule ? (
         <form onSubmit={handleSubmit}>
+          <p>On-chain message</p>
           <textarea ref={ref} />
           <input disabled={isSaving} type="submit" />
         </form>
@@ -582,6 +577,7 @@ function App() {
     <div className="App">
       {hasModule ? (
         <form onSubmit={handleSubmit}>
+          <p>On-chain message</p>
           <textarea ref={ref} defaultValue={message} readOnly={!isEditable} />
           {isEditable && (<input disabled={isSaving} type="submit" />)}
           {isEditable && (<a href={address!}>Get public URL</a>)}

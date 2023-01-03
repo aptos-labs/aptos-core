@@ -1797,7 +1797,7 @@ impl MockClient {
             Arc::new(db_reader.unwrap_or_else(create_mock_db_reader)),
         );
 
-        let queue_cfg = crate::network::network_endpoint_config(storage_config)
+        let queue_cfg = crate::network::storage_service_network_config(storage_config)
             .inbound_queue
             .unwrap();
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) = queue_cfg.build();
