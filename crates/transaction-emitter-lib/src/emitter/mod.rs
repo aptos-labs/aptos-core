@@ -6,7 +6,6 @@ pub mod stats;
 pub mod submission_worker;
 
 use crate::{
-    args::TransactionType,
     emitter::{
         account_minter::AccountMinter,
         stats::{DynamicStatsTracking, TxnStats},
@@ -14,10 +13,11 @@ use crate::{
     },
     transaction_generator::{
         account_generator::AccountGeneratorCreator,
-        publish_modules::PublishPackageCreator,
         nft_mint_and_transfer::NFTMintAndTransferGeneratorCreator,
         p2p_transaction_generator::P2PTransactionGeneratorCreator,
-        transaction_mix_generator::TxnMixGeneratorCreator, TransactionGeneratorCreator,
+        publish_modules::{CallDifferentModulesCreator, PublishPackageCreator},
+        transaction_mix_generator::TxnMixGeneratorCreator,
+        EntryPoints, TransactionExecutor, TransactionGeneratorCreator,
     },
 };
 use again::RetryPolicy;
@@ -31,7 +31,8 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use futures::future::{try_join_all, FutureExt};
+use async_trait::async_trait;
+use futures::future::{join_all, try_join_all, FutureExt};
 use itertools::zip;
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, seq::IteratorRandom};
@@ -61,6 +62,58 @@ pub static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
         .with_max_retries(6)
         .with_jitter(true)
 });
+
+#[derive(Debug, Copy, Clone)]
+pub enum TransactionType {
+    CoinTransfer {
+        invalid_transaction_ratio: usize,
+    },
+    AccountGeneration {
+        add_created_accounts_to_pool: bool,
+        max_account_working_set: usize,
+    },
+    NftMintAndTransfer,
+    PublishPackage,
+    CallDifferentModules {
+        entry_point: EntryPoints,
+        num_modules: usize,
+    },
+}
+
+impl TransactionType {
+    pub fn default_coin_transfer() -> Self {
+        Self::CoinTransfer {
+            invalid_transaction_ratio: 0,
+        }
+    }
+
+    pub fn default_account_generation() -> Self {
+        Self::AccountGeneration {
+            add_created_accounts_to_pool: true,
+            max_account_working_set: 1_000_000,
+        }
+    }
+
+    pub fn default_call_custom_module() -> Self {
+        Self::CallDifferentModules {
+            entry_point: EntryPoints::Nop,
+            num_modules: 1,
+        }
+    }
+
+    pub fn default_call_different_modules() -> Self {
+        Self::CallDifferentModules {
+            entry_point: EntryPoints::Nop,
+            num_modules: 100,
+        }
+    }
+}
+
+impl Default for TransactionType {
+    fn default() -> Self {
+        Self::default_coin_transfer()
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct EmitModeParams {
@@ -111,14 +164,10 @@ pub struct EmitJobRequest {
     mode: EmitJobMode,
 
     gas_price: u64,
-    invalid_transaction_ratio: usize,
     reuse_accounts: bool,
     mint_to_root: bool,
 
     transaction_mix: Vec<(TransactionType, usize)>,
-
-    add_created_accounts_to_pool: bool,
-    max_account_working_set: usize,
 
     txn_expiration_time_secs: u64,
     expected_max_txns: u64,
@@ -134,12 +183,9 @@ impl Default for EmitJobRequest {
                 mempool_backlog: 3000,
             },
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,
-            invalid_transaction_ratio: 0,
             reuse_accounts: false,
             mint_to_root: false,
-            transaction_mix: vec![(TransactionType::P2P, 1)],
-            add_created_accounts_to_pool: true,
-            max_account_working_set: 1_000_000,
+            transaction_mix: vec![(TransactionType::default(), 1)],
             txn_expiration_time_secs: 60,
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
@@ -178,11 +224,6 @@ impl EmitJobRequest {
         self
     }
 
-    pub fn invalid_transaction_ratio(mut self, invalid_transaction_ratio: usize) -> Self {
-        self.invalid_transaction_ratio = invalid_transaction_ratio;
-        self
-    }
-
     pub fn transaction_type(mut self, transaction_type: TransactionType) -> Self {
         self.transaction_mix = vec![(transaction_type, 1)];
         self
@@ -200,16 +241,6 @@ impl EmitJobRequest {
 
     pub fn reuse_accounts(mut self) -> Self {
         self.reuse_accounts = true;
-        self
-    }
-
-    pub fn add_created_accounts_to_pool(mut self, add_created_accounts_to_pool: bool) -> Self {
-        self.add_created_accounts_to_pool = add_created_accounts_to_pool;
-        self
-    }
-
-    pub fn max_account_working_set(mut self, max_account_working_set: usize) -> Self {
-        self.max_account_working_set = max_account_working_set;
         self
     }
 
@@ -360,7 +391,6 @@ impl EmitJob {
 
 #[derive(Debug)]
 pub struct TxnEmitter {
-    accounts: Vec<LocalAccount>,
     txn_factory: TransactionFactory,
     rng: StdRng,
 }
@@ -368,18 +398,9 @@ pub struct TxnEmitter {
 impl TxnEmitter {
     pub fn new(transaction_factory: TransactionFactory, rng: StdRng) -> Self {
         Self {
-            accounts: vec![],
             txn_factory: transaction_factory,
             rng,
         }
-    }
-
-    pub fn take_account(&mut self) -> LocalAccount {
-        self.accounts.remove(0)
-    }
-
-    pub fn clear(&mut self) {
-        self.accounts.clear();
     }
 
     pub fn rng(&mut self) -> &mut StdRng {
@@ -415,36 +436,43 @@ impl TxnEmitter {
 
         let mut account_minter =
             AccountMinter::new(root_account, txn_factory.clone(), self.rng.clone());
-        let mut new_accounts = account_minter
+        let mut all_accounts = account_minter
             .create_accounts(&req, &mode_params, num_accounts)
             .await?;
-        self.accounts.append(&mut new_accounts);
-        let all_accounts = self.accounts.split_off(self.accounts.len() - num_accounts);
         let all_addresses: Vec<_> = all_accounts.iter().map(|d| d.address()).collect();
         let all_addresses = Arc::new(RwLock::new(all_addresses));
-        let mut all_accounts = all_accounts.into_iter();
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
+
+        let txn_executor = RestApiTransactionExecutor {
+            rest_client: req.rest_clients[0].clone(),
+        };
+        // mode_params.max_submit_batch_size
 
         let mut txn_generator_creator_mix: Vec<(Box<dyn TransactionGeneratorCreator>, usize)> =
             Vec::new();
         for (transaction_type, weight) in req.transaction_mix {
             let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
             {
-                TransactionType::P2P => Box::new(P2PTransactionGeneratorCreator::new(
+                TransactionType::CoinTransfer {
+                    invalid_transaction_ratio,
+                } => Box::new(P2PTransactionGeneratorCreator::new(
                     self.from_rng(),
                     txn_factory.clone(),
                     SEND_AMOUNT,
                     all_addresses.clone(),
-                    req.invalid_transaction_ratio,
+                    invalid_transaction_ratio,
                     req.gas_price,
                 )),
-                TransactionType::AccountGeneration => Box::new(AccountGeneratorCreator::new(
+                TransactionType::AccountGeneration {
+                    add_created_accounts_to_pool,
+                    max_account_working_set,
+                } => Box::new(AccountGeneratorCreator::new(
                     txn_factory.clone(),
                     all_addresses.clone(),
-                    req.add_created_accounts_to_pool,
-                    req.max_account_working_set,
+                    add_created_accounts_to_pool,
+                    max_account_working_set,
                     req.gas_price,
                 )),
                 TransactionType::NftMintAndTransfer => Box::new(
@@ -452,7 +480,8 @@ impl TxnEmitter {
                         self.from_rng(),
                         txn_factory.clone(),
                         root_account,
-                        req.rest_clients[0].clone(),
+                        &txn_executor,
+                        num_workers,
                     )
                     .await,
                 ),
@@ -461,10 +490,24 @@ impl TxnEmitter {
                     txn_factory.clone(),
                     req.gas_price,
                 )),
+                TransactionType::CallDifferentModules {
+                    entry_point,
+                    num_modules,
+                } => Box::new(
+                    CallDifferentModulesCreator::new(
+                        self.from_rng(),
+                        txn_factory.clone(),
+                        &mut all_accounts,
+                        &txn_executor,
+                        entry_point,
+                        num_modules,
+                    )
+                    .await,
+                ),
             };
             txn_generator_creator_mix.push((txn_generator_creator, weight));
         }
-        let txn_generator_creator: Box<dyn TransactionGeneratorCreator> =
+        let mut txn_generator_creator: Box<dyn TransactionGeneratorCreator> =
             if txn_generator_creator_mix.len() > 1 {
                 Box::new(TxnMixGeneratorCreator::new(txn_generator_creator_mix))
             } else {
@@ -488,10 +531,11 @@ impl TxnEmitter {
             total_workers
         );
 
+        let mut all_accounts_iter = all_accounts.into_iter();
         let mut workers = vec![];
         for _ in 0..workers_per_endpoint {
             for client in &req.rest_clients {
-                let accounts = (&mut all_accounts)
+                let accounts = (&mut all_accounts_iter)
                     .take(mode_params.accounts_per_worker)
                     .collect::<Vec<_>>();
                 let stop = stop.clone();
@@ -521,14 +565,13 @@ impl TxnEmitter {
         })
     }
 
-    pub async fn stop_job(&mut self, job: EmitJob) -> Vec<TxnStats> {
+    pub async fn stop_job(self, job: EmitJob) -> Vec<TxnStats> {
         job.stop.store(true, Ordering::Relaxed);
         for worker in job.workers {
-            let mut accounts = worker
+            let _accounts = worker
                 .join_handle
                 .await
                 .expect("TxnEmitter worker thread failed");
-            self.accounts.append(&mut accounts);
         }
 
         job.stats.accumulate()
@@ -558,7 +601,7 @@ impl TxnEmitter {
     }
 
     pub async fn emit_txn_for(
-        &mut self,
+        mut self,
         source_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
@@ -573,7 +616,7 @@ impl TxnEmitter {
     }
 
     pub async fn emit_txn_for_with_stats(
-        &mut self,
+        mut self,
         source_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
@@ -599,6 +642,64 @@ impl TxnEmitter {
         client.submit(&txn).await?;
         let deadline = Instant::now() + Duration::from_secs(txn.expiration_timestamp_secs() + 30);
         Ok(deadline)
+    }
+}
+
+pub struct RestApiTransactionExecutor {
+    rest_client: RestClient,
+    // max_submit_batch_size: usize,
+}
+
+#[async_trait]
+impl TransactionExecutor for RestApiTransactionExecutor {
+    async fn execute_transactions(&self, txns: &[SignedTransaction]) {
+        join_all(txns.iter().map(|txn| async move {
+            let submit_result = RETRY_POLICY
+                .retry(move || self.rest_client.submit_bcs(txn))
+                .await;
+            if let Err(e) = submit_result {
+                warn!("Failed submitting transaction {:?} with {:?}", txn, e);
+            }
+        }))
+        .await;
+
+        // join_all(
+        //     txns
+        //         .chunks(max_submit_batch_size)
+        //         .map(|reqs| async {
+        //             match client.submit_batch_bcs(reqs).await {
+        //                 Err(e) => {
+        //                     error!(
+        //                         "[{:?}] CallDifferentModulesCreator: Failed to submit batch request: {:?}",
+        //                         client.path_prefix_string(),
+        //                         e
+        //                     );
+        //                 }
+        //                 Ok(v) => {
+        //                     let failures = v.into_inner().transaction_failures;
+        //                     if !failures.is_empty() {
+        //                         error!(
+        //                             "[{:?}] CallDifferentModulesCreator: Failed to submit part of the batch request: {:?}",
+        //                             client.path_prefix_string(),
+        //                             failures
+        //                         );
+        //                     }
+        //                 }
+        //             }
+        //         }),
+        // )
+        // .await;
+
+        // if submission timeouts, it might still get committed:
+        join_all(
+            txns.iter()
+                .map(|req| self.rest_client.wait_for_signed_transaction_bcs(req)),
+        )
+        .await
+        .into_iter()
+        .for_each(|v| {
+            v.unwrap();
+        });
     }
 }
 

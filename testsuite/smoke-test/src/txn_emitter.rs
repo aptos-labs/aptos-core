@@ -4,7 +4,8 @@
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 use anyhow::ensure;
 use aptos_forge::{
-    EmitJobMode, EmitJobRequest, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats,
+    EmitJobMode, EmitJobRequest, EntryPoints, NodeExt, Result, Swarm, TransactionType, TxnEmitter,
+    TxnStats,
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use rand::{rngs::OsRng, SeedableRng};
@@ -30,18 +31,29 @@ pub async fn generate_traffic(
     let mut emit_job_request = EmitJobRequest::default();
     let chain_info = swarm.chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
-    let mut emitter = TxnEmitter::new(transaction_factory, rng);
+    let emitter = TxnEmitter::new(transaction_factory, rng);
 
     emit_job_request = emit_job_request
         .rest_clients(validator_clients)
         .gas_price(gas_price)
         .transaction_mix(vec![
-            (TransactionType::P2P, 60),
-            (TransactionType::AccountGeneration, 20),
-            // commenting this out given it consistently fails smoke test
-            // and it seems to be called only from `test_txn_emmitter`
-            // (TransactionType::NftMintAndTransfer, 10),
-            (TransactionType::PublishPackage, 30),
+            (TransactionType::default_coin_transfer(), 20),
+            (TransactionType::default_account_generation(), 20),
+            // // commenting this out given it consistently fails smoke test
+            // // and it seems to be called only from `test_txn_emmitter`
+            // (TransactionType::NftMintAndTransfer, 20),
+            (TransactionType::PublishPackage, 20),
+            (TransactionType::default_call_different_modules(), 20),
+            (
+                TransactionType::CallDifferentModules {
+                    entry_point: EntryPoints::MakeOrChange {
+                        string_length: Some(0),
+                        data_length: Some(100),
+                    },
+                    num_modules: 10,
+                },
+                20,
+            ),
         ])
         .mode(EmitJobMode::ConstTps { tps: 20 });
     emitter

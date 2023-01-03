@@ -203,6 +203,12 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let suite_name = if suite_name == "compat" {
+        "module_loading"
+    } else {
+        "write_resource"
+    };
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -462,7 +468,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "single_vfn_perf" => single_vfn_perf(config),
         "validator_reboot_stress_test" => validator_reboot_stress_test(config),
         "fullnode_reboot_stress_test" => fullnode_reboot_stress_test(config),
-        "account_creation" | "nft_mint" => account_creation_or_nft_mint(test_name.into(), config),
+        "account_creation" | "nft_mint" | "publishing" | "module_loading" | "write_resource" => {
+            account_creation_or_nft_mint(test_name.into(), config)
+        },
         "graceful_overload" => graceful_overload(config),
         // not scheduled on continuous
         "load_vs_perf_benchmark" => load_vs_perf_benchmark(config),
@@ -705,18 +713,32 @@ fn account_creation_or_nft_mint(test_name: String, config: ForgeConfig) -> Forge
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["validator"]["config"]["execution"]
+                ["processed_transactions_detailed_counters"] = true.into();
+        }))
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
                     mempool_backlog: 30000,
                 })
-                .transaction_type(
-                    if test_name == "account_creation" {
-                        TransactionType::AccountGeneration
-                    } else {
-                        TransactionType::NftMintAndTransfer
+                .transaction_type(match test_name.as_str() {
+                    "account_creation" => TransactionType::default_account_generation(),
+                    "nft_mint" => TransactionType::NftMintAndTransfer,
+                    "publishing" => TransactionType::PublishPackage,
+                    "module_loading" => TransactionType::CallDifferentModules {
+                        entry_point: EntryPoints::Nop,
+                        num_modules: 1000,
                     },
-                ),
+                    "write_resource" => TransactionType::CallDifferentModules {
+                        entry_point: EntryPoints::MakeOrChange {
+                            string_length: Some(0),
+                            data_length: Some(100),
+                        },
+                        num_modules: 1,
+                    },
+                    _ => unreachable!("{}", test_name),
+                }),
         )
         .with_success_criteria(
             SuccessCriteria::new(4000)
@@ -916,7 +938,7 @@ fn state_sync_perf_fullnodes_fast_sync(forge_config: ForgeConfig<'static>) -> Fo
                 .mode(EmitJobMode::MaxLoad {
                     mempool_backlog: 30000,
                 })
-                .transaction_type(TransactionType::AccountGeneration), // Create many state values
+                .transaction_type(TransactionType::default_account_generation()), // Create many state values
         )
         .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
@@ -1113,8 +1135,8 @@ fn changing_working_quorum_test_helper(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionType::P2P, 80),
-                    (TransactionType::AccountGeneration, 20),
+                    (TransactionType::default_coin_transfer(), 80),
+                    (TransactionType::default_account_generation(), 20),
                 ]),
         )
         .with_success_criteria(
@@ -1164,8 +1186,8 @@ fn large_db_test(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionType::P2P, 75),
-                    (TransactionType::AccountGeneration, 20),
+                    (TransactionType::default_coin_transfer(), 75),
+                    (TransactionType::default_account_generation(), 20),
                     (TransactionType::NftMintAndTransfer, 5),
                 ]),
         )

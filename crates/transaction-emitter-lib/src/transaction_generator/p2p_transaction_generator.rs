@@ -221,7 +221,7 @@ impl P2PTransactionGeneratorCreator {
 
 #[async_trait]
 impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
-    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         Box::new(P2PTransactionGenerator::new(
             self.rng.clone(),
             self.amount,

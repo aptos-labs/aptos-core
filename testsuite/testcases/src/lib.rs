@@ -91,7 +91,7 @@ pub fn generate_traffic(
 ) -> Result<TxnStats> {
     let emit_job_request = ctx.emit_job.clone();
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
-    let (mut emitter, emit_job_request) =
+    let (emitter, emit_job_request) =
         create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng)?;
 
     let rt = traffic_emitter_runtime()?;

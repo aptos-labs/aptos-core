@@ -10,6 +10,7 @@ pub mod p2p_transaction_generator;
 pub mod publish_modules;
 mod publishing;
 pub mod transaction_mix_generator;
+pub use publishing::module_simple::EntryPoints;
 
 pub trait TransactionGenerator: Sync + Send {
     fn generate_transactions(
@@ -21,5 +22,10 @@ pub trait TransactionGenerator: Sync + Send {
 
 #[async_trait]
 pub trait TransactionGeneratorCreator: Sync + Send {
-    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator>;
+    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator>;
+}
+
+#[async_trait]
+pub trait TransactionExecutor: Sync + Send {
+    async fn execute_transactions(&self, txns: &[SignedTransaction]);
 }

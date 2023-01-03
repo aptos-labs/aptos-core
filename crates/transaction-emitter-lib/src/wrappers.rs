@@ -6,6 +6,7 @@ use crate::{
     cluster::Cluster,
     emitter::{stats::TxnStats, EmitJobMode, EmitJobRequest, TxnEmitter},
     instance::Instance,
+    TransactionType, TransactionTypeArg,
 };
 use anyhow::{Context, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
@@ -36,22 +37,38 @@ pub async fn emit_transactions_with_cluster(
     let duration = Duration::from_secs(args.duration);
     let client = cluster.random_instance().rest_client();
     let mut coin_source_account = cluster.load_coin_source_account(&client).await?;
-    let mut emitter = TxnEmitter::new(
+    let emitter = TxnEmitter::new(
         TransactionFactory::new(cluster.chain_id)
             .with_transaction_expiration_time(args.txn_expiration_time_secs)
             .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
         StdRng::from_seed(OsRng.gen()),
     );
 
+    let arg_transaction_type = args
+        .transaction_type
+        .iter()
+        .map(|t| match t {
+            TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
+                invalid_transaction_ratio: args.invalid_tx,
+            },
+            TransactionTypeArg::AccountGeneration => TransactionType::default_account_generation(),
+            TransactionTypeArg::NftMintAndTransfer => TransactionType::NftMintAndTransfer,
+            TransactionTypeArg::PublishPackage => TransactionType::PublishPackage,
+            TransactionTypeArg::CallDifferentModules => {
+                TransactionType::default_call_different_modules()
+            },
+        })
+        .collect::<Vec<_>>();
+
     let transaction_mix = if args.transaction_type_weights.is_empty() {
-        args.transaction_type.iter().map(|t| (*t, 1)).collect()
+        arg_transaction_type.iter().map(|t| (*t, 1)).collect()
     } else {
         assert_eq!(
             args.transaction_type_weights.len(),
-            args.transaction_type.len(),
+            arg_transaction_type.len(),
             "Transaction types and weights need to be the same length"
         );
-        args.transaction_type
+        arg_transaction_type
             .iter()
             .cloned()
             .zip(args.transaction_type_weights.iter().cloned())
@@ -61,7 +78,6 @@ pub async fn emit_transactions_with_cluster(
     let mut emit_job_request =
         EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
             .mode(emitter_mode)
-            .invalid_transaction_ratio(args.invalid_tx)
             .transaction_mix(transaction_mix)
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
             .gas_price(aptos_global_constants::GAS_UNIT_PRICE);
