@@ -1111,7 +1111,6 @@ impl VMAdapter for AptosVM {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let txn_data = TransactionMetadata::new(transaction);
-        //let account_blob = session.data_cache.get_resource
         self.run_prologue_with_payload(
             session,
             storage,
