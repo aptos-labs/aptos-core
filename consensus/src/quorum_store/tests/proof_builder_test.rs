@@ -21,7 +21,9 @@ async fn test_proof_builder_basic() {
         signers.clone().into_iter().map(|s| Arc::new(s)).collect();
     let proof_builder = ProofCoordinator::new(100, signers[0].author());
     let (proof_builder_tx, proof_builder_rx) = channel(100);
-    tokio::spawn(proof_builder.start(proof_builder_rx, verifier.clone()));
+    // TODO: check proof_manager_rx
+    let (proof_manager_tx, _proof_manager_rx) = channel(100);
+    tokio::spawn(proof_builder.start(proof_builder_rx, proof_manager_tx, verifier.clone()));
 
     let digest = compute_digest_from_signed_transaction(create_vec_signed_transactions(100));
     let signed_digest_info = SignedDigestInfo::new(digest, LogicalTime::new(1, 20), 1, 1);
