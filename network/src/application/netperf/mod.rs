@@ -7,21 +7,19 @@
 //! and simplify network-related performance profiling and debugging
 //!
 
+use crate::application::netperf::interface::NetPerfMsg;
 use crate::application::storage::PeerMetadataStorage;
+use crate::protocols::network::NetworkApplicationConfig;
 use crate::transport::ConnectionMetadata;
 use crate::{
     application::netperf::interface::{NetPerfNetworkEvents, NetPerfNetworkSender, NetPerfPayload},
     constants::NETWORK_CHANNEL_SIZE,
     logging::NetworkSchema,
-    protocols::{
-        network::{
-            Event,
-        },
-    },
+    protocols::network::Event,
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkContext};
+use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
 use axum::{
@@ -38,8 +36,6 @@ use serde::Serialize;
 use std::fs::OpenOptions;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::{Receiver, Sender};
-use crate::application::netperf::interface::NetPerfMsg;
-use crate::protocols::network::NetworkApplicationConfig;
 
 pub mod builder;
 mod interface;
@@ -93,7 +89,10 @@ impl NetPerf {
     /// Configuration for the network endpoints to support NetPerf.
     pub fn network_endpoint_config() -> NetworkApplicationConfig {
         NetworkApplicationConfig::client_and_service(
-            [ProtocolId::NetPerfDirectSendCompressed, ProtocolId::NetPerfRpcCompressed],
+            [
+                ProtocolId::NetPerfDirectSendCompressed,
+                ProtocolId::NetPerfRpcCompressed,
+            ],
             aptos_channel::Config::new(NETWORK_CHANNEL_SIZE).queue_style(QueueStyle::FIFO),
         )
     }
@@ -109,8 +108,7 @@ impl NetPerf {
 
     async fn start(mut self) {
         let port = preferred_axum_port(self.netperf_port);
-        let (tx,  rx) =
-            tokio::sync::mpsc::channel::<NetPerfCommands>(NETPERF_COMMAND_CHANNEL_SIZE);
+        let (tx, rx) = tokio::sync::mpsc::channel::<NetPerfCommands>(NETPERF_COMMAND_CHANNEL_SIZE);
 
         info!(
             NetworkSchema::new(&self.network_context),
@@ -147,6 +145,14 @@ impl NetPerf {
                             self.peer_list.remove(
                                 &metadata.remote_peer_id
                             );
+                        }
+                        Event::Message(peer_id, msg) =>  {
+                            match msg {
+                                NetPerfMsg::BlockOfBytes(bytes) => {}
+                                _ => {}
+
+                            }
+
                         }
                         _ => {/* Currently ignore all*/}
                     }
@@ -204,14 +210,12 @@ async fn usage_handler() -> &'static str {
 
 #[derive(Serialize)]
 struct PeerList {
-    len: usize,
     peers: Vec<PeerId>,
 }
 
 impl PeerList {
     pub fn new(len: usize) -> Self {
         PeerList {
-            len,
             peers: Vec::with_capacity(len),
         }
     }
@@ -233,7 +237,7 @@ async fn parse_query(
     Extension(state): Extension<NetPerfState>,
     Query(_params): Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
-    spawn_named!("[NetPerf] Broadcast Task", netperf_broadcast(state.clone()));
+    spawn_named!("[NetPerf] Brodcast Task", netperf_broadcast(state.clone()));
 
     StatusCode::OK
 }
@@ -268,13 +272,24 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
 }
 
 async fn netperf_broadcast(state: NetPerfState) {
+    let mut should_yield = false;
     let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(64 * 1024));
 
-    for peer in state.peer_list.iter() {
-        let _rc = state.sender.send_to(
-            peer.key().to_owned(),
+    loop {
+        /* TODO(AlexM): Better Fine grained controll with send_to.
+         * Its interesting to see which of the validr queus gets full.
+         * */
+        let rc = state.sender.send_to_many(
+            state.peer_list.iter().map(|entry| entry.key().to_owned()),
             ProtocolId::NetPerfDirectSendCompressed,
             msg.clone(),
         );
+        if let Err(_) = rc {
+            should_yield = true
+        } //else update peer counters
+        if should_yield == true {
+            break;
+        }
     }
+    info!("Broadcast Op Finished");
 }
