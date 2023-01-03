@@ -831,11 +831,11 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         },
         "consensus_only_three_region_simulation" => {
             config
-                .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+                .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
                 .with_emit_job(
                     EmitJobRequest::default()
                         .mode(EmitJobMode::MaxLoad {
-                            mempool_backlog: 30000,
+                            mempool_backlog: 50000,
                         })
                         .txn_expiration_time_secs(5 * 60),
                 )
@@ -857,7 +857,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     helm_values["validator"]["config"]["mempool"]
                         ["system_transaction_gc_interval_ms"] = (5 * 60 * 60_000).into();
                     helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
-                        5000.into();
+                        10000.into();
                     helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
                         30000.into();
                     helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
