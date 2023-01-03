@@ -124,6 +124,7 @@ class U8Tag:
     def serialize(self, serializer: Serializer):
         serializer.u8(self.value)
 
+
 class U16Tag:
     value: int
 
@@ -148,6 +149,7 @@ class U16Tag:
     def serialize(self, serializer: Serializer):
         serializer.u16(self.value)
 
+
 class U32Tag:
     value: int
 
@@ -171,6 +173,7 @@ class U32Tag:
 
     def serialize(self, serializer: Serializer):
         serializer.u32(self.value)
+
 
 class U64Tag:
     value: int
@@ -221,6 +224,7 @@ class U128Tag:
     def serialize(self, serializer: Serializer):
         serializer.u128(self.value)
 
+
 class U256Tag:
     value: int
 
@@ -244,6 +248,7 @@ class U256Tag:
 
     def serialize(self, serializer: Serializer):
         serializer.u256(self.value)
+
 
 class AccountAddressTag:
     value: AccountAddress

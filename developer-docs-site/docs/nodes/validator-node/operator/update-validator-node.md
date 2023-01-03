@@ -33,4 +33,4 @@ To replace the validator node:
 1. Observe that before DNS changes take effect that only outbound connections will form.
 1. Either reuse the former validator node or create anew to backfill the validator fullnode.
 1. Start the validator fullnode.
-1. Use [Node Health Checker](../../node-health-checker/index.md) and follow [Node Liveness Criteria](node-liveness-criteria.md) to ensure the validator node is functioning properly.
+1. Use [Node Health Checker](../../measure/node-health-checker.md) and follow [Node Liveness Criteria](node-liveness-criteria.md) to ensure the validator node is functioning properly.

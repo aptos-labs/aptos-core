@@ -10,7 +10,7 @@ use crate::{
         conn_notifs_channel, ConnectionRequest, ConnectionRequestSender, PeerManager,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::{network::AppConfig, wire::handshake::v1::ProtocolIdSet},
+    protocols::{network::NetworkApplicationConfig, wire::handshake::v1::ProtocolIdSet},
     transport::{self, AptosNetTransport, Connection, APTOS_TCP_TRANSPORT},
     ProtocolId,
 };
@@ -422,26 +422,11 @@ impl PeerManagerBuilder {
             .tcp_buffer_cfg
     }
 
-    /// Register a peer-to-peer service (i.e., both client and service) for given
-    /// protocols.
-    pub fn add_p2p_service(
-        &mut self,
-        config: &AppConfig,
-    ) -> (
-        (PeerManagerRequestSender, ConnectionRequestSender),
-        (
-            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-            conn_notifs_channel::Receiver,
-        ),
-    ) {
-        (self.add_client(config), self.add_service(config))
-    }
-
     /// Register a client that's interested in some set of protocols and return
     /// the outbound channels into network.
     pub fn add_client(
         &mut self,
-        config: &AppConfig,
+        config: &NetworkApplicationConfig,
     ) -> (PeerManagerRequestSender, ConnectionRequestSender) {
         self.transport_context().add_protocols(&config.protocols);
         let pm_context = self.peer_manager_context();
@@ -454,7 +439,7 @@ impl PeerManagerBuilder {
     /// Register a service for handling some protocols.
     pub fn add_service(
         &mut self,
-        config: &AppConfig,
+        config: &NetworkApplicationConfig,
     ) -> (
         aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         conn_notifs_channel::Receiver,

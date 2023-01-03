@@ -211,12 +211,6 @@ enum WriteState {
     Init,
     /// Buffer provided data
     BufferData { offset: usize },
-    /// Write frame length to the wire
-    WriteFrameLen {
-        frame_len: u16,
-        buf: [u8; 2],
-        offset: usize,
-    },
     /// Write encrypted frame to the wire
     WriteEncryptedFrame { frame_len: u16, offset: usize },
     /// Flush the underlying socket
@@ -281,9 +275,8 @@ where
                                 let frame_len = frame_len
                                     .try_into()
                                     .expect("offset should be able to fit in u16");
-                                self.write_state = WriteState::WriteFrameLen {
+                                self.write_state = WriteState::WriteEncryptedFrame {
                                     frame_len,
-                                    buf: u16::to_be_bytes(frame_len),
                                     offset: 0,
                                 };
                             },
@@ -303,39 +296,21 @@ where
                         return Poll::Ready(Ok(Some(bytes_buffered)));
                     }
                 },
-                WriteState::WriteFrameLen {
-                    frame_len,
-                    ref buf,
-                    ref mut offset,
-                } => {
-                    match ready!(poll_write_all(
-                        context,
-                        Pin::new(&mut self.socket),
-                        buf,
-                        offset
-                    )) {
-                        Ok(()) => {
-                            self.write_state = WriteState::WriteEncryptedFrame {
-                                frame_len,
-                                offset: 0,
-                            };
-                        },
-                        Err(e) => {
-                            if e.kind() == io::ErrorKind::WriteZero {
-                                self.write_state = WriteState::Eof;
-                            }
-                            return Poll::Ready(Err(e));
-                        },
-                    }
-                },
                 WriteState::WriteEncryptedFrame {
                     frame_len,
                     ref mut offset,
                 } => {
+                    // TODO: avoid the memory copy
+                    // Create a buffer with the message len prepended to the message data
+                    let frame_len_bytes = &u16::to_be_bytes(frame_len);
+                    let message_bytes = &self.buffers.write_buffer[..(frame_len as usize)];
+                    let message_and_len_bytes = [frame_len_bytes, message_bytes].concat();
+
+                    // Write all the data to the socket
                     match ready!(poll_write_all(
                         context,
                         Pin::new(&mut self.socket),
-                        &self.buffers.write_buffer[..(frame_len as usize)],
+                        &message_and_len_bytes,
                         offset
                     )) {
                         Ok(()) => {

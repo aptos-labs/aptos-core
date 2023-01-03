@@ -45,6 +45,7 @@ aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-storage-service-client = { workspace = true }
 aptos-storage-service-server = { workspace = true }
+aptos-storage-service-types = { workspace = true }
 aptos-telemetry = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-time-service = { workspace = true }
@@ -55,6 +56,7 @@ clap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+maplit = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 tokio = { workspace = true }
