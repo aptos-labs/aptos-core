@@ -108,7 +108,9 @@ spec aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): ProposalType {
-        pragma verify = false;
+        pragma aborts_if_is_partial;
+        include ContainsProposalID<ProposalType>;
+        aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
     }
 
     spec resolve_proposal_v2<ProposalType: store>(
@@ -116,7 +118,10 @@ spec aptos_framework::voting {
         proposal_id: u64,
         next_execution_hash: vector<u8>,
     ) {
-        pragma verify = false;
+        pragma aborts_if_is_partial;
+        include ContainsProposalID<ProposalType>;
+        aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
+        aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
     }
 
     spec is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool {
