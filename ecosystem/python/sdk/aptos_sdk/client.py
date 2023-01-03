@@ -50,35 +50,48 @@ class RestClient:
     # Account accessors
     #
 
-    def account(self, account_address: AccountAddress, ledger_version: int=None) -> Dict[str, str]:
+    def account(
+        self, account_address: AccountAddress, ledger_version: int = None
+    ) -> Dict[str, str]:
         """Returns the sequence number and authentication key for an account"""
 
         if not ledger_version:
-            request =f"{self.base_url}/accounts/{account_address}"
+            request = f"{self.base_url}/accounts/{account_address}"
         else:
-            request =f"{self.base_url}/accounts/{account_address}?ledger_version={ledger_version}"
+            request = f"{self.base_url}/accounts/{account_address}?ledger_version={ledger_version}"
 
         response = self.client.get(request)
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
-    def account_balance(self, account_address: AccountAddress, ledger_version: int=None) -> int:
+    def account_balance(
+        self, account_address: AccountAddress, ledger_version: int = None
+    ) -> int:
         """Returns the test coin balance associated with the account"""
         resource = self.account_resource(
-            account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>", ledger_version
+            account_address,
+            "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+            ledger_version,
         )
         return resource["data"]["coin"]["value"]
 
-    def account_sequence_number(self, account_address: AccountAddress, ledger_version: int=None) -> int:
+    def account_sequence_number(
+        self, account_address: AccountAddress, ledger_version: int = None
+    ) -> int:
         account_res = self.account(account_address, ledger_version)
         return int(account_res["sequence_number"])
 
     def account_resource(
-        self, account_address: AccountAddress, resource_type: str, ledger_version: int=None
+        self,
+        account_address: AccountAddress,
+        resource_type: str,
+        ledger_version: int = None,
     ) -> Dict[str, Any]:
         if not ledger_version:
-            request = f"{self.base_url}/accounts/{account_address}/resource/{resource_type}"
+            request = (
+                f"{self.base_url}/accounts/{account_address}/resource/{resource_type}"
+            )
         else:
             request = f"{self.base_url}/accounts/{account_address}/resource/{resource_type}?ledger_version={ledger_version}"
 
@@ -90,12 +103,19 @@ class RestClient:
         return response.json()
 
     def get_table_item(
-        self, handle: str, key_type: str, value_type: str, key: Any, ledger_version: int=None
+        self,
+        handle: str,
+        key_type: str,
+        value_type: str,
+        key: Any,
+        ledger_version: int = None,
     ) -> Any:
         if not ledger_version:
             request = f"{self.base_url}/tables/{handle}/item"
         else:
-            request = f"{self.base_url}/tables/{handle}/item?ledger_version={ledger_version}"
+            request = (
+                f"{self.base_url}/tables/{handle}/item?ledger_version={ledger_version}"
+            )
         response = self.client.post(
             request,
             json={
