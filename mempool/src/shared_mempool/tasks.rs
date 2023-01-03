@@ -21,7 +21,7 @@ use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::HistogramTimer;
-use aptos_network::application::interface::NetworkInterface;
+use aptos_network::application::interface::NetworkClientInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
 use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
@@ -45,18 +45,19 @@ use tokio::runtime::Handle;
 // ============================== //
 
 /// Attempts broadcast to `peer` and schedules the next broadcast.
-pub(crate) async fn execute_broadcast<V>(
+pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
     peer: PeerNetworkId,
     backoff: bool,
-    smp: &mut SharedMempool<V>,
+    smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     scheduled_broadcasts: &mut FuturesUnordered<ScheduledBroadcast>,
     executor: Handle,
 ) where
-    V: TransactionValidation,
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation,
 {
     let network_interface = &smp.network_interface.clone();
     // If there's no connection, don't bother to broadcast
-    if network_interface.app_data().read(&peer).is_some() {
+    if network_interface.sync_states_exists(&peer) {
         if let Err(err) = network_interface
             .execute_broadcast(peer, backoff, smp)
             .await
@@ -98,13 +99,14 @@ pub(crate) async fn execute_broadcast<V>(
 // =============================== //
 
 /// Processes transactions directly submitted by client.
-pub(crate) async fn process_client_transaction_submission<V>(
-    smp: SharedMempool<V>,
+pub(crate) async fn process_client_transaction_submission<NetworkClient, TransactionValidator>(
+    smp: SharedMempool<NetworkClient, TransactionValidator>,
     transaction: SignedTransaction,
     callback: oneshot::Sender<Result<SubmissionStatus>>,
     timer: HistogramTimer,
 ) where
-    V: TransactionValidation,
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation + 'static,
 {
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer_client();
@@ -130,13 +132,14 @@ pub(crate) async fn process_client_transaction_submission<V>(
 }
 
 /// Processes get transaction by hash request by client.
-pub(crate) async fn process_client_get_transaction<V>(
-    smp: SharedMempool<V>,
+pub(crate) async fn process_client_get_transaction<NetworkClient, TransactionValidator>(
+    smp: SharedMempool<NetworkClient, TransactionValidator>,
     hash: HashValue,
     callback: oneshot::Sender<Option<SignedTransaction>>,
     timer: HistogramTimer,
 ) where
-    V: TransactionValidation,
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation,
 {
     timer.stop_and_record();
     let _timer = counters::process_get_txn_latency_timer_client();
@@ -152,15 +155,16 @@ pub(crate) async fn process_client_get_transaction<V>(
 }
 
 /// Processes transactions from other nodes.
-pub(crate) async fn process_transaction_broadcast<V>(
-    smp: SharedMempool<V>,
+pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionValidator>(
+    smp: SharedMempool<NetworkClient, TransactionValidator>,
     transactions: Vec<SignedTransaction>,
     request_id: MultiBatchId,
     timeline_state: TimelineState,
     peer: PeerNetworkId,
     timer: HistogramTimer,
 ) where
-    V: TransactionValidation,
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation,
 {
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer(peer.network_id());
@@ -168,12 +172,14 @@ pub(crate) async fn process_transaction_broadcast<V>(
     log_txn_process_results(&results, Some(peer));
 
     let ack_response = gen_ack_response(request_id, results, &peer);
-    let network_sender = smp.network_interface.sender();
 
     // Respond to the peer with an ack. Note: ack response messages should be
     // small enough that they always fit within the maximum network message
     // size, so there's no need to check them here.
-    if let Err(e) = network_sender.send_to(peer, ack_response) {
+    if let Err(e) = smp
+        .network_interface
+        .send_message_to_peer(peer, ack_response)
+    {
         counters::network_send_fail_inc(counters::ACK_TXNS);
         warn!(
             LogSchema::event_log(LogEntry::BroadcastACK, LogEvent::NetworkSendFail)
@@ -236,13 +242,14 @@ pub(crate) fn update_ack_counter(
 
 /// Submits a list of SignedTransaction to the local mempool
 /// and returns a vector containing AdmissionControlStatus.
-pub(crate) fn process_incoming_transactions<V>(
-    smp: &SharedMempool<V>,
+pub(crate) fn process_incoming_transactions<NetworkClient, TransactionValidator>(
+    smp: &SharedMempool<NetworkClient, TransactionValidator>,
     transactions: Vec<SignedTransaction>,
     timeline_state: TimelineState,
 ) -> Vec<SubmissionStatusBundle>
 where
-    V: TransactionValidation,
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation,
 {
     let mut statuses = vec![];
 
@@ -388,10 +395,13 @@ fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<Pe
 
 /// Only applies to Validators. Either provides transactions to consensus [`GetBlockRequest`] or
 /// handles rejecting transactions [`RejectNotification`]
-pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
-    smp: &SharedMempool<V>,
+pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
+    smp: &SharedMempool<NetworkClient, TransactionValidator>,
     req: QuorumStoreRequest,
-) {
+) where
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation,
+{
     // Start latency timer
     let start_time = Instant::now();
     debug!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
