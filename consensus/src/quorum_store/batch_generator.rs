@@ -22,8 +22,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::{sync::mpsc::Sender as TokioSender, time::Interval};
 
-type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), ProofError>>;
-// TODO: change to type ProofCompletedChannel = oneshot::Receiver<Result<BatchId, QuorumStoreError>>;
+type ProofCompletedChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), ProofError>>;
 
 #[derive(Debug)]
 pub enum BatchGeneratorCommand {
@@ -118,7 +117,7 @@ impl BatchGenerator {
     async fn handle_scheduled_pull(
         &mut self,
         end_batch_when_back_pressure: bool,
-    ) -> Option<ProofReceiveChannel> {
+    ) -> Option<ProofCompletedChannel> {
         // TODO: as an optimization, we could filter out the txns that have expired
 
         let mut exclude_txns: Vec<_> = self
