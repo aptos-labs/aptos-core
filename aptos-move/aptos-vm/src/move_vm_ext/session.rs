@@ -114,7 +114,88 @@ where
 
     pub fn finish(self) -> VMResult<SessionOutput> {
         let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
+        let change_set = Self::merge_resource_groups(&self.remote, change_set)?;
 
+        let table_context: NativeTableContext = extensions.remove();
+        let table_change_set = table_context
+            .into_change_set()
+            .map_err(|e| e.finish(Location::Undefined))?;
+
+        let aggregator_context: NativeAggregatorContext = extensions.remove();
+        let aggregator_change_set = aggregator_context.into_change_set();
+
+        Ok(SessionOutput {
+            change_set,
+            events,
+            table_change_set,
+            aggregator_change_set,
+        })
+    }
+
+    pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
+        let ctx = self.get_native_extensions().get_mut::<NativeCodeContext>();
+        ctx.requested_module_bundle.take()
+    }
+
+    pub fn validate_resource_groups(&self, modules: &[CompiledModule]) -> VMResult<()> {
+        for module in modules {
+            let metadata = if let Some(metadata) = aptos_framework::get_module_metadata(module) {
+                metadata
+            } else {
+                continue;
+            };
+
+            for attrs in metadata.struct_attributes.values() {
+                let attr =
+                    if let Some(attr) = attrs.iter().find(|attr| attr.is_resource_group_member()) {
+                        attr
+                    } else {
+                        continue;
+                    };
+
+                // This should be validated during loading of data.
+                let group = attr.get_resource_group_member().ok_or_else(|| {
+                    PartialVMError::new(StatusCode::UNREACHABLE).finish(Location::Undefined)
+                })?;
+
+                // Make sure the type is in the module metadata is cached.
+                self.load_type(&TypeTag::Struct(Box::new(group.clone())))?;
+                // This might not exist, in which case, it is a failure.
+                let group_module_metadata = self
+                    .remote
+                    .get_module_metadata(group.module_id())
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::LINKER_ERROR).finish(Location::Undefined)
+                    })?;
+
+                // This might not exist, in which case, it is a failure.
+                let scope = group_module_metadata
+                    .struct_attributes
+                    .get(group.name.as_str())
+                    .and_then(|container_metadata| {
+                        container_metadata
+                            .iter()
+                            .find(|attr| attr.is_resource_group())
+                    })
+                    .and_then(|container| container.get_resource_group())
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::LINKER_ERROR).finish(Location::Undefined)
+                    })?;
+
+                if !scope.are_equal_module_ids(&module.self_id(), &group.module_id()) {
+                    return Err(
+                        PartialVMError::new(StatusCode::LINKER_ERROR).finish(Location::Undefined)
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn merge_resource_groups(
+        remote: &MoveResolverWithVMMetadata<S>,
+        change_set: MoveChangeSet,
+    ) -> VMResult<MoveChangeSet> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = PartialVMError::new(StatusCode::UNREACHABLE).finish(Location::Undefined);
@@ -143,8 +224,7 @@ where
             //   * If elements remain, Modify
             //   * Otherwise delete
             for (struct_tag, blob_op) in resources {
-                let resource_group = self
-                    .remote
+                let resource_group = remote
                     .get_resource_group(&struct_tag)
                     .map_err(|_| common_error.clone())?;
                 if let Some(resource_group) = resource_group {
@@ -161,8 +241,7 @@ where
             }
 
             for (resource_tag, resources) in resource_groups {
-                let source_data = self
-                    .remote
+                let source_data = remote
                     .get_resource_group_data(&addr, &resource_tag)
                     .map_err(|_| common_error.clone())?;
                 let (mut source_data, create) = if let Some(source_data) = source_data {
@@ -222,79 +301,7 @@ where
                 .map_err(|_| common_error.clone())?;
         }
 
-        let table_context: NativeTableContext = extensions.remove();
-        let table_change_set = table_context
-            .into_change_set()
-            .map_err(|e| e.finish(Location::Undefined))?;
-
-        let aggregator_context: NativeAggregatorContext = extensions.remove();
-        let aggregator_change_set = aggregator_context.into_change_set();
-
-        Ok(SessionOutput {
-            change_set: change_set_grouped,
-            events,
-            table_change_set,
-            aggregator_change_set,
-        })
-    }
-
-    pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
-        let ctx = self.get_native_extensions().get_mut::<NativeCodeContext>();
-        ctx.requested_module_bundle.take()
-    }
-
-    pub fn validate_resource_groups(&self, modules: &[CompiledModule]) -> VMResult<()> {
-        for module in modules {
-            let metadata = if let Some(metadata) = aptos_framework::get_module_metadata(module) {
-                metadata
-            } else {
-                continue;
-            };
-
-            for attrs in metadata.struct_attributes.values() {
-                let attr = if let Some(attr) = attrs.iter().find(|attr| attr.is_resource_group_member()) {
-                    attr
-                } else {
-                    continue;
-                };
-
-                // This should be validated during loading of data.
-                let group = attr.get_resource_group_member().ok_or_else(|| {
-                    PartialVMError::new(StatusCode::UNREACHABLE).finish(Location::Undefined)
-                })?;
-
-                // Make sure the type is in the module metadata is cached.
-                self.load_type(&TypeTag::Struct(Box::new(group.clone())))?;
-                // This might not exist, in which case, it is a failure.
-                let group_module_metadata = self
-                    .remote
-                    .get_module_metadata(group.module_id())
-                    .ok_or_else(|| {
-                        PartialVMError::new(StatusCode::LINKER_ERROR).finish(Location::Undefined)
-                    })?;
-
-                // This might not exist, in which case, it is a failure.
-                let scope = group_module_metadata
-                    .struct_attributes
-                    .get(group.name.as_str())
-                    .and_then(|container_metadata| {
-                        container_metadata
-                            .iter()
-                            .find(|attr| attr.is_resource_group())
-                    })
-                    .and_then(|container| container.get_resource_group())
-                    .ok_or_else(|| {
-                        PartialVMError::new(StatusCode::LINKER_ERROR).finish(Location::Undefined)
-                    })?;
-
-                if !scope.are_equal_module_ids(&module.self_id(), &group.module_id()) {
-                    return Err(
-                        PartialVMError::new(StatusCode::LINKER_ERROR).finish(Location::Undefined)
-                    );
-                }
-            }
-        }
-        Ok(())
+        Ok(change_set_grouped)
     }
 }
 

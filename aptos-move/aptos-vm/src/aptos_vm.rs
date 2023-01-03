@@ -663,7 +663,7 @@ impl AptosVM {
                     }
                 }
             }
-            aptos_framework::verify_module_metadata(m)
+            aptos_framework::verify_module_metadata(m, self.0.get_features())
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?
         }
         if !expected_modules.is_empty() {
