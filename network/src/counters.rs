@@ -156,13 +156,11 @@ pub static APTOS_NETWORK_DISCOVERY_NOTES: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 pub static APTOS_NETWORK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!("aptos_network_rpc_messages", "Number of RPC messages", &[
-        "role_type",
-        "network_id",
-        "peer_id",
-        "type",
-        "state"
-    ])
+    register_int_counter_vec!(
+        "aptos_network_rpc_messages",
+        "Number of RPC messages",
+        &["role_type", "network_id", "peer_id", "type", "state"]
+    )
     .unwrap()
 });
 
@@ -321,6 +319,16 @@ pub static PENDING_NETWORK_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_network_pending_requests",
         "Number of pending outbound network requests by state",
+        &["state"]
+    )
+    .unwrap()
+});
+
+/// Counter of pending network events to Health Checker.
+pub static PENDING_NET_PERF_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_pending_netperf_events",
+        "Number of pending netperf events by state",
         &["state"]
     )
     .unwrap()
