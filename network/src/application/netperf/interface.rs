@@ -1,13 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 //
-use crate::{
-    protocols::{
-        network::{
-            NetworkEvents, NetworkSender,
-        },
-    },
-};
+use crate::protocols::network::{NetworkEvents, NetworkSender};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -16,8 +10,11 @@ pub struct NetPerfPayload {
 }
 
 impl NetPerfPayload {
-    pub fn new(len :usize) -> Self {
-        let v = Vec::with_capacity(len);
+    pub fn new(len: usize) -> Self {
+        let mut v = Vec::with_capacity(len);
+        unsafe {
+            v.set_len(len);
+        }
         NetPerfPayload { byte: v }
     }
 }
