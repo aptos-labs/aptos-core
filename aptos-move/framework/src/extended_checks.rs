@@ -306,19 +306,15 @@ impl<'a> ExtendedChecker<'a> {
             let name = self.name_string(struct_.get_fields().next().unwrap().get_name());
             // TODO: check that the type is bool
             if *name != "dummy_field" {
-                self.env.error(
-                    &struct_.get_loc(),
-                    "resource_group should not have fields",
-                );
+                self.env
+                    .error(&struct_.get_loc(), "resource_group should not have fields");
                 return None;
             };
         }
 
         if struct_.get_field_count() > 1 {
-            self.env.error(
-                &struct_.get_loc(),
-                "resource_group should not have fields",
-            );
+            self.env
+                .error(&struct_.get_loc(), "resource_group should not have fields");
             return None;
         }
 

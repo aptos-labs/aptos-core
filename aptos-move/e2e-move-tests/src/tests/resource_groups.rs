@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_core_types::{identifier::Identifier, language_storage::StructTag};
 use serde::Deserialize;
 
@@ -18,7 +18,7 @@ struct Secondary {
 
 #[test]
 fn test_resource_groups() {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::RESOURCE_GROUPS], vec![]);
 
     let primary_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let primary_account = h.new_account_at(primary_addr);
@@ -217,4 +217,24 @@ fn test_resource_groups() {
     assert!(h.read_resource_raw(&user_addr, group_tag).is_none());
     assert!(h.read_resource_raw(&user_addr, primary_tag).is_none());
     assert!(h.read_resource_raw(&user_addr, secondary_tag).is_none());
+}
+
+#[test]
+fn test_resource_groups_container_not_enabled() {
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::RESOURCE_GROUPS], vec![]);
+
+    let primary_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
+    let primary_account = h.new_account_at(primary_addr);
+
+    let mut build_options = aptos_framework::BuildOptions::default();
+    build_options
+        .named_addresses
+        .insert("resource_groups_primary".to_string(), primary_addr);
+
+    let result = h.publish_package_with_options(
+        &primary_account,
+        &common::test_dir_path("../../../move-examples/resource_groups/primary"),
+        build_options.clone(),
+    );
+    assert_success!(result);
 }

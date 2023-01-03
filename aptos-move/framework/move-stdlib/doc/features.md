@@ -23,6 +23,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `multi_ed25519_pk_validate_v2_enabled`](#0x1_features_multi_ed25519_pk_validate_v2_enabled)
 -  [Function `get_blake2b_256_feature`](#0x1_features_get_blake2b_256_feature)
 -  [Function `blake2b_256_enabled`](#0x1_features_blake2b_256_enabled)
+-  [Function `get_resource_groups_feature`](#0x1_features_get_resource_groups_feature)
+-  [Function `resource_groups_enabled`](#0x1_features_resource_groups_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -139,6 +141,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_MULTI_ED25519_PK_VALIDATE_V2_NATIVES">MULTI_ED25519_PK_VALIDATE_V2_NATIVES</a>: u64 = 7;
+</code></pre>
+
+
+
+<a name="0x1_features_RESOURCE_GROUPS"></a>
+
+Whether resource groups are enabled.
+This is needed because of new attributes for structs and a change in storage representation.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS">RESOURCE_GROUPS</a>: u64 = 9;
 </code></pre>
 
 
@@ -495,6 +508,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_blake2b_256_enabled">blake2b_256_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLAKE2B_256_NATIVE">BLAKE2B_256_NATIVE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_resource_groups_feature"></a>
+
+## Function `get_resource_groups_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_resource_groups_feature">get_resource_groups_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_resource_groups_feature">get_resource_groups_feature</a>(): u64 { <a href="features.md#0x1_features_RESOURCE_GROUPS">RESOURCE_GROUPS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_resource_groups_enabled"></a>
+
+## Function `resource_groups_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_resource_groups_enabled">resource_groups_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_resource_groups_enabled">resource_groups_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RESOURCE_GROUPS">RESOURCE_GROUPS</a>)
 }
 </code></pre>
 

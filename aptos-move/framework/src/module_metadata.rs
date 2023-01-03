@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::extended_checks::ResourceGroupScope;
-use aptos_types::transaction::AbortInfo;
+use aptos_types::{on_chain_config::Features, transaction::AbortInfo};
 use move_binary_format::{normalized::Function, CompiledModule};
 use move_core_types::{
     errmap::ErrorDescription,
@@ -176,7 +176,10 @@ pub fn is_valid_view_function(
     })
 }
 
-pub fn verify_module_metadata(module: &CompiledModule) -> Result<(), MetadataValidationError> {
+pub fn verify_module_metadata(
+    module: &CompiledModule,
+    features: &Features,
+) -> Result<(), MetadataValidationError> {
     let metadata = if let Some(metadata) = get_module_metadata(module) {
         metadata
     } else {
@@ -204,8 +207,11 @@ pub fn verify_module_metadata(module: &CompiledModule) -> Result<(), MetadataVal
 
     for (struct_, attrs) in &metadata.struct_attributes {
         for attr in attrs {
-            if (attr.is_resource_group() && attr.get_resource_group().is_some()) ||
-                (attr.is_resource_group_member() && attr.get_resource_group_member().is_some()) {
+            if features.are_resource_groups_enabled()
+                && ((attr.is_resource_group() && attr.get_resource_group().is_some())
+                    || (attr.is_resource_group_member()
+                        && attr.get_resource_group_member().is_some()))
+            {
                 continue;
             } else {
                 return Err(MetadataValidationError {
