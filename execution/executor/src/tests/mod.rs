@@ -145,31 +145,42 @@ fn test_executor_status() {
         .execute_block((block_id, block(vec![txn0, txn1, txn2])), parent_block_id)
         .unwrap();
 
-    #[cfg(not(feature = "consensus-only-perf-test"))]
-    {
-        assert_eq!(
-            &vec![
-                KEEP_STATUS.clone(),
-                KEEP_STATUS.clone(),
-                DISCARD_STATUS.clone(),
-                KEEP_STATUS.clone(),
-            ],
-            output.compute_status()
-        );
-    }
-    // Since execution is disabled, all the transactions should be kept.
-    #[cfg(feature = "consensus-only-perf-test")]
-    {
-        assert_eq!(
-            &vec![
-                KEEP_STATUS.clone(),
-                KEEP_STATUS.clone(),
-                KEEP_STATUS.clone(),
-                KEEP_STATUS.clone(),
-            ],
-            output.compute_status()
-        );
-    }
+    assert_eq!(
+        &vec![
+            KEEP_STATUS.clone(),
+            KEEP_STATUS.clone(),
+            DISCARD_STATUS.clone(),
+            KEEP_STATUS.clone(),
+        ],
+        output.compute_status()
+    );
+}
+
+#[cfg(feature = "consensus-only-perf-test")]
+#[test]
+fn test_executor_status_consensus_only() {
+    let executor = TestExecutor::new();
+    let parent_block_id = executor.committed_block_id();
+    let block_id = gen_block_id(1);
+
+    let txn0 = encode_mint_transaction(gen_address(0), 100);
+    let txn1 = encode_mint_transaction(gen_address(1), 100);
+    let txn2 = encode_transfer_transaction(gen_address(0), gen_address(1), 500);
+
+    let output = executor
+        .execute_block((block_id, block(vec![txn0, txn1, txn2])), parent_block_id)
+        .unwrap();
+
+    // We should not discard any transactions because we don't actually execute them.
+    assert_eq!(
+        &vec![
+            KEEP_STATUS.clone(),
+            KEEP_STATUS.clone(),
+            KEEP_STATUS.clone(),
+            KEEP_STATUS.clone(),
+        ],
+        output.compute_status()
+    );
 }
 
 #[test]
@@ -204,6 +215,7 @@ fn test_executor_multiple_blocks() {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_executor_two_blocks_with_failed_txns() {
     let executor = TestExecutor::new();
     let parent_block_id = executor.committed_block_id();
@@ -230,20 +242,7 @@ fn test_executor_two_blocks_with_failed_txns() {
         .execute_block((block2_id, block(block2_txns)), block1_id)
         .unwrap();
 
-    #[cfg(not(feature = "consensus-only-perf-test"))]
-    let expected_ledger_info_version: u64 = 77;
-
-    // Trasnsaction do not fail in consensus-only-perf-test mode since
-    // they are not executed
-    #[cfg(feature = "consensus-only-perf-test")]
-    let expected_ledger_info_version: u64 = 102;
-
-    let ledger_info = gen_ledger_info(
-        expected_ledger_info_version,
-        output2.root_hash(),
-        block2_id,
-        1,
-    );
+    let ledger_info = gen_ledger_info(77, output2.root_hash(), block2_id, 1);
     executor
         .commit_blocks(vec![block1_id, block2_id], ledger_info)
         .unwrap();
@@ -467,10 +466,10 @@ fn test_deleted_key_from_state_store() {
     .freeze()
     .unwrap();
 
-    apply_transaction_by_writeset(db, vec![
-        (transaction1, write_set1),
-        (transaction2, write_set2),
-    ]);
+    apply_transaction_by_writeset(
+        db,
+        vec![(transaction1, write_set1), (transaction2, write_set2)],
+    );
 
     let state_value1_from_db = db
         .reader
@@ -556,19 +555,12 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
     let db = &executor.db;
     let mut ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
-    #[cfg(not(feature = "consensus-only-perf-test"))]
-    let state_view_id = StateViewId::Miscellaneous;
-    #[cfg(feature = "consensus-only-perf-test")]
-    let state_view_id = StateViewId::BlockExecution {
-        block_id: HashValue::zero(),
-    };
-
     for txn in transactions {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
             vec![txn],
             ledger_view
                 .verified_state_view(
-                    state_view_id,
+                    StateViewId::Miscellaneous,
                     Arc::clone(&db.reader),
                     Arc::new(SyncProofFetcher::new(db.reader.clone())),
                 )
@@ -595,6 +587,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
+    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
     fn test_executor_two_branches(
         a_size in 0..30u64,
         b_size in 0..30u64,
@@ -709,6 +702,7 @@ proptest! {
         }
 
     #[test]
+    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
     fn test_executor_restart(a_size in 1..30u64, b_size in 1..30u64, amount in any::<u32>()) {
         let block_a = TestBlock::new(a_size, amount, gen_block_id(1));
         let block_b = TestBlock::new(b_size, amount, gen_block_id(2));

@@ -7,7 +7,7 @@ use std::time::Duration;
 
 #[ignore]
 #[tokio::test]
-// Assumes that the
+// Assumes that the consensus-only-perf-test feature is enabled.
 async fn test_consensus_only_with_txn_emitter() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 

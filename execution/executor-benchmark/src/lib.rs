@@ -191,7 +191,6 @@ mod tests {
     use aptos_temppath::TempPath;
 
     #[test]
-    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
     fn test_benchmark() {
         let storage_dir = TempPath::new();
         let checkpoint_dir = TempPath::new();

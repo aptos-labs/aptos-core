@@ -340,6 +340,7 @@ fn verify_chunk(
     ),
     anyhow::Error,
 > {
+    // no-op: we do not verify the proof in consensus-only mode
     Ok((
         txn_list_with_proof.proof,
         0,

@@ -51,6 +51,9 @@ use itertools::zip_eq;
 use move_core_types::move_resource::MoveStructType;
 use std::{collections::HashMap, mem::swap, sync::Arc};
 
+/// Alternate implementation of [crate::state_store::buffered_state::BufferedState] for use with consensus-only-perf-test feature.
+/// It stores the [StateDelta]s in memory similar to [crate::state_store::buffered_state::BufferedState] except that it does not
+/// commit it to persistant storage.
 #[derive(Debug)]
 pub struct FakeBufferedState {
     // state until the latest checkpoint.
@@ -128,7 +131,11 @@ impl FakeBufferedState {
     }
 }
 
-/// Provides a "fake" AptosDB.
+/// Alternate implementation of [AptosDB] for use with consensus-only-perf-test feature.
+/// It stores and serves data from in-memory data structures as opposed to [AptosDB],
+/// which uses RocksDB. Note that FakeAptosDB re-implements only a subset of the
+/// features of [AptosDB] while passing through remaining features to the wrapped inner
+/// [AptosDB].
 pub struct FakeAptosDB {
     inner: AptosDB,
     // A map of transaction hash to transaction version
@@ -139,8 +146,6 @@ pub struct FakeAptosDB {
     txn_info_by_version: Arc<DashMap<Version, TransactionInfo>>,
     // A map of Position to transaction HashValue
     txn_hash_by_position: Arc<DashMap<Position, HashValue>>,
-    // // A map of state values
-    // state_values_map: Arc<DashMap<(StateKey, Version), StateValue>>,
     // Max version and transaction
     latest_txn_info: ArcSwapOption<(Version, TransactionInfo)>,
     // A map of account address to the highest executed sequence number
@@ -157,7 +162,6 @@ impl FakeAptosDB {
             txn_version_by_hash: Arc::new(DashMap::new()),
             txn_info_by_version: Arc::new(DashMap::new()),
             txn_hash_by_position: Arc::new(DashMap::new()),
-            // state_values_map: Arc::new(DashMap::new()),
             latest_txn_info: ArcSwapOption::from(None),
             account_seq_num: Arc::new(DashMap::new()),
             ledger_commit_lock: std::sync::Mutex::new(()),
@@ -183,6 +187,7 @@ impl FakeAptosDB {
                 first_version, /* num_existing_leaves */
                 &txn_hashes,
             )?;
+        // Store the transaction hash by position to serve [DbReader::get_latest_executed_trees] calls
         writes.iter().for_each(|(pos, hash)| {
             self.txn_hash_by_position.insert(*pos, *hash);
         });
@@ -239,25 +244,6 @@ impl DbWriter for FakeAptosDB {
             // code in genesis is necessary for benchmark execution. Note that only the genesis
             // transaction is executed on the VM when consensus-only-perf-test feature is enabled.
             if first_version == 0 {
-                // let value_state_sets = txns_to_commit
-                //     .iter()
-                //     .map(|txn_to_commit| txn_to_commit.state_updates())
-                //     .collect::<Vec<_>>();
-
-                // value_state_sets
-                //     .par_iter()
-                //     .enumerate()
-                //     .flat_map_iter(|(i, kvs)| {
-                //         let version = first_version + i as Version;
-                //         kvs.iter().map(move |(k, v)| {
-                //             v.as_ref().map(|v| {
-                //                 self.state_values_map
-                //                     .insert((k.clone(), version), v.clone())
-                //             });
-                //         })
-                //     })
-                //     .collect();
-
                 self.inner.save_transactions(
                     txns_to_commit,
                     first_version,
@@ -444,6 +430,8 @@ impl DbReader for FakeAptosDB {
                 .into_iter()
                 .unzip();
 
+            // None of the consumers check the proof in consensus-only-perf-test mode, so it is fine to
+            // return an empty proof.
             Ok(TransactionListWithProof::new(
                 txn_list,
                 None,
@@ -702,16 +690,7 @@ impl DbReader for FakeAptosDB {
         // Since the genesis write set is persisted with AptosDB, we call
         // it to serve state values targetting the framework account
         // (to access AptosCoin, for example).
-        // The in-memory data structures only handle "normal user" accounts.
-
-        // if account_address == AccountAddress::ONE {
-        //     Ok(self
-        //         .state_values_map
-        //         .get(&(state_key.clone(), version))
-        //         .as_deref()
-        //         .cloned())
-        // } else
-
+        // The in-memory data structures only handles "normal user" accounts.
         if account_address != AccountAddress::ONE
             && struct_tag.is_some()
             && struct_tag.unwrap() == AccountResource::struct_tag()
@@ -757,6 +736,10 @@ impl DbReader for FakeAptosDB {
     }
 
     fn get_latest_executed_trees(&self) -> Result<ExecutedTrees> {
+        // If the genesis is not executed yet, we need to get the executed trees from the inner AptosDB
+        // This is because when we call save_transactions for the genesis block, we call [AptosDB::save_transactions]
+        // where there is an expectation that the root of the SMTs are the same pointers. Here,
+        // we get from the inner AptosDB which ensures that the pointers match when save_transactions is called.
         if self.get_latest_version().unwrap_or_default() == 0 {
             return self.inner.get_latest_executed_trees();
         }
@@ -857,6 +840,8 @@ impl DbReader for FakeAptosDB {
     }
 }
 
+/// This is necessary for constructing the [ExecutedTrees] to serve [DbReader::get_latest_executed_trees]
+/// requests.
 impl HashReader for FakeAptosDB {
     fn get(&self, position: Position) -> Result<HashValue> {
         self.txn_hash_by_position
