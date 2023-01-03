@@ -61,7 +61,7 @@ jobs:
       - uses: snok/install-poetry@v1
         with:
           version: 1.2.2
-      - run: cd ./ecosystem/python/sdk && poetry install && make fmt && git status --porcelain
+      - run: cd ./ecosystem/python/sdk && poetry install && make fmt && [[ -z $(git status --porcelain --untracked-files=no) ]]
 
   docs-lint:
     runs-on: ubuntu-latest

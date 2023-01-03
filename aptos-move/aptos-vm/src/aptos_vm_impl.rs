@@ -563,22 +563,6 @@ impl<'a> AptosVMInternals<'a> {
     pub fn version(self) -> Result<Version, VMStatus> {
         self.0.get_version()
     }
-
-    /// Executes the given code within the context of a transaction.
-    ///
-    /// The `TransactionDataCache` can be used as a `ChainState`.
-    ///
-    /// If you don't care about the transaction metadata, use `TransactionMetadata::default()`.
-    pub fn with_txn_data_cache<T, S: StateView>(
-        self,
-        state_view: &S,
-        f: impl for<'txn, 'r> FnOnce(SessionExt<'txn, 'r, StorageAdapter<S>>) -> T,
-        session_id: SessionId,
-    ) -> T {
-        let remote_storage = StorageAdapter::new(state_view);
-        let session = self.move_vm().new_session(&remote_storage, session_id);
-        f(session)
-    }
 }
 
 pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(

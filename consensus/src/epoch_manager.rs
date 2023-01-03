@@ -33,7 +33,7 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
     network::{IncomingBlockRetrievalRequest, NetworkReceivers, NetworkSender},
-    network_interface::{ConsensusMsg, ConsensusNetworkSender},
+    network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::QuorumStoreClient,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     recovery_manager::RecoveryManager,
@@ -52,7 +52,7 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_network::protocols::network::{ApplicationNetworkSender, Event};
+use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_safety_rules::SafetyRulesManager;
 use aptos_types::{
     account_address::AccountAddress,
@@ -103,7 +103,7 @@ pub struct EpochManager {
     config: ConsensusConfig,
     time_service: Arc<dyn TimeService>,
     self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
-    network_sender: ConsensusNetworkSender,
+    network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     timeout_sender: aptos_channels::Sender<Round>,
     quorum_store_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
@@ -137,7 +137,7 @@ impl EpochManager {
         node_config: &NodeConfig,
         time_service: Arc<dyn TimeService>,
         self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
-        network_sender: ConsensusNetworkSender,
+        network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         timeout_sender: aptos_channels::Sender<Round>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         commit_state_computer: Arc<dyn StateComputer>,

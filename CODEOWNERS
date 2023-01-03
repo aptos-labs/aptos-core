@@ -81,8 +81,8 @@
 # Owners for mempool.
 /mempool/ @bchocho
 
-# Owners for the `Network Stack`
-/networking @markuze
+# Owners for the network and all its subdirectories.
+/network/ @markuze @joshlind
 
 # Owners for the `/state-sync` directory and all its subdirectories.
 /state-sync/ @joshlind
