@@ -1,26 +1,26 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::offer_rotation_capability::{
-    offer_rotation_capability_v2, revoke_rotation_capability,
+use crate::{
+    assert_abort, assert_success,
+    tests::offer_rotation_capability::{offer_rotation_capability_v2, revoke_rotation_capability},
+    MoveHarness,
 };
-use crate::{assert_abort, assert_success, MoveHarness};
 use aptos::common::types::RotationProofChallenge;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
     Signature, SigningKey, Uniform, ValidCryptoMaterial,
 };
 use aptos_language_e2e_tests::account::Account;
-use aptos_types::transaction::TransactionStatus;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CORE_CODE_ADDRESS},
     state_store::{state_key::StateKey, table::TableHandle},
-    transaction::authenticator::AuthenticationKey,
+    transaction::{authenticator::AuthenticationKey, TransactionStatus},
 };
 use move_core_types::parser::parse_struct_tag;
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 
 #[test]
 fn rotate_auth_key_ed25519_to_ed25519() {
@@ -155,7 +155,7 @@ fn run_rotate_auth_key_with_rotation_capability(
         struct_name: String::from("RotationProofChallenge"),
         sequence_number: 0,
         originator: *offerer_account.address(),
-        current_auth_key: AccountAddress::from_bytes(&offerer_account.auth_key()).unwrap(),
+        current_auth_key: AccountAddress::from_bytes(offerer_account.auth_key()).unwrap(),
         new_public_key: new_public_key.to_bytes().to_vec(),
     };
 

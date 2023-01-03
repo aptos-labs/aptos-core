@@ -36,7 +36,7 @@ type Bytes = Vec<u8>;
 pub enum EntryFunctionCall {
     /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its rotation capability to only one other address at one time. If the account
-    /// has an existing rotation capability offer, calling this function will update the rotation capabilituy offer with
+    /// has an existing rotation capability offer, calling this function will update the rotation capability offer with
     /// the new `recipient_address`.
     /// Here, `rotation_capability_sig_bytes` signature indicates that this key rotation is authorized by the account owner,
     /// and prevents the classic "time-of-check time-of-use" attack.
@@ -49,10 +49,8 @@ pub enum EntryFunctionCall {
     /// @param rotation_capability_sig_bytes is the signature by the account owner's key on `RotationCapabilityOfferProofChallengeV2`.
     /// @param account_scheme is the scheme of the account (ed25519 or multi_ed25519).
     /// @param account_public_key_bytes is the public key of the account owner.
-    /// @param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing
-    /// @param recipient_address in the account owner's `RotationCapabilityOffer`, calling this function will replace the
-    /// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
-    /// to the account owner's rotation capability).
+    /// @param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing rotation capability
+    /// offer, calling this function will replace the previous `recipient_address` upon successful verification.
     AccountOfferRotationCapability {
         rotation_capability_sig_bytes: Vec<u8>,
         account_scheme: u8,
@@ -75,6 +73,12 @@ pub enum EntryFunctionCall {
         account_public_key_bytes: Vec<u8>,
         recipient_address: AccountAddress,
     },
+
+    /// Revoke any rotation capability offer in the specified account.
+    AccountRevokeAnyRotationCapability {},
+
+    /// Revoke any signer capability offer in the specified account.
+    AccountRevokeAnySignerCapability {},
 
     /// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
     AccountRevokeRotationCapability {
@@ -583,6 +587,8 @@ impl EntryFunctionCall {
                 account_public_key_bytes,
                 recipient_address,
             ),
+            AccountRevokeAnyRotationCapability {} => account_revoke_any_rotation_capability(),
+            AccountRevokeAnySignerCapability {} => account_revoke_any_signer_capability(),
             AccountRevokeRotationCapability {
                 to_be_revoked_address,
             } => account_revoke_rotation_capability(to_be_revoked_address),
@@ -892,7 +898,7 @@ impl EntryFunctionCall {
 
 /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
 /// An account can delegate its rotation capability to only one other address at one time. If the account
-/// has an existing rotation capability offer, calling this function will update the rotation capabilituy offer with
+/// has an existing rotation capability offer, calling this function will update the rotation capability offer with
 /// the new `recipient_address`.
 /// Here, `rotation_capability_sig_bytes` signature indicates that this key rotation is authorized by the account owner,
 /// and prevents the classic "time-of-check time-of-use" attack.
@@ -905,10 +911,8 @@ impl EntryFunctionCall {
 /// @param rotation_capability_sig_bytes is the signature by the account owner's key on `RotationCapabilityOfferProofChallengeV2`.
 /// @param account_scheme is the scheme of the account (ed25519 or multi_ed25519).
 /// @param account_public_key_bytes is the public key of the account owner.
-/// @param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing
-/// @param recipient_address in the account owner's `RotationCapabilityOffer`, calling this function will replace the
-/// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
-/// to the account owner's rotation capability).
+/// @param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing rotation capability
+/// offer, calling this function will replace the previous `recipient_address` upon successful verification.
 pub fn account_offer_rotation_capability(
     rotation_capability_sig_bytes: Vec<u8>,
     account_scheme: u8,
@@ -965,6 +969,38 @@ pub fn account_offer_signer_capability(
             bcs::to_bytes(&account_public_key_bytes).unwrap(),
             bcs::to_bytes(&recipient_address).unwrap(),
         ],
+    ))
+}
+
+/// Revoke any rotation capability offer in the specified account.
+pub fn account_revoke_any_rotation_capability() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("revoke_any_rotation_capability").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Revoke any signer capability offer in the specified account.
+pub fn account_revoke_any_signer_capability() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("revoke_any_signer_capability").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -2490,6 +2526,26 @@ mod decoder {
         }
     }
 
+    pub fn account_revoke_any_rotation_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountRevokeAnyRotationCapability {})
+        } else {
+            None
+        }
+    }
+
+    pub fn account_revoke_any_signer_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountRevokeAnySignerCapability {})
+        } else {
+            None
+        }
+    }
+
     pub fn account_revoke_rotation_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -3376,6 +3432,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_offer_signer_capability".to_string(),
             Box::new(decoder::account_offer_signer_capability),
+        );
+        map.insert(
+            "account_revoke_any_rotation_capability".to_string(),
+            Box::new(decoder::account_revoke_any_rotation_capability),
+        );
+        map.insert(
+            "account_revoke_any_signer_capability".to_string(),
+            Box::new(decoder::account_revoke_any_signer_capability),
         );
         map.insert(
             "account_revoke_rotation_capability".to_string(),

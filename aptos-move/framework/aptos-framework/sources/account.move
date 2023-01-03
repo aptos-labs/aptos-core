@@ -47,6 +47,17 @@ module aptos_framework::account {
 
     struct SignerCapability has drop, store { account: address }
 
+    /// It is easy to fetch the authentication key of an address by simply reading it from the `Account` struct at that address.
+    /// The table in this struct makes it possible to do a reverse lookup: it maps an authentication key, to the address of the account which has that authentication key set.
+    ///
+    /// This mapping is needed when recovering wallets for accounts whose authentication key has been rotated.
+    ///
+    /// For example, imagine a freshly-created wallet with address `a` and thus also with authentication key `a`, derived from a PK `pk_a` with corresponding SK `sk_a`.
+    /// It is easy to recover such a wallet given just the secret key `sk_a`, since the PK can be derived from the SK, the authentication key can then be derived from the PK, and the address equals the authentication key (since there was no key rotation).
+    ///
+    /// However, if such a wallet rotates its authentication key to `b` derived from a different PK `pk_b` with SK `sk_b`, how would account recovery work?
+    /// The recovered address would no longer be 'a'; it would be `b`, which is incorrect.
+    /// This struct solves this problem by mapping the new authentication key `b` to the original address `a` and thus helping the wallet software during recovery find the correct address.
     struct OriginatingAddress has key {
         address_map: Table<address, address>,
     }
@@ -57,12 +68,10 @@ module aptos_framework::account {
     /// knowledge of this new public key's associated secret key. These two signatures cannot be replayed in another
     /// context because they include the TXN's unique sequence number.
     struct RotationProofChallenge has copy, drop {
-        sequence_number: u64,
-        originator: address,
-        // originating address
-        current_auth_key: address,
-        // current auth key
-        new_public_key: vector<u8>,
+        sequence_number: u64, // the sequence number of the account whose key is being rotated
+        originator: address, // the address of the account whose key is being rotated
+        current_auth_key: address, // the current authentication key of the account whose key is being rotated
+        new_public_key: vector<u8>, // the new public key that the account owner wants to rotate to
     }
 
     /// Deprecated struct - newest version is `RotationCapabilityOfferProofChallengeV2`
@@ -238,6 +247,8 @@ module aptos_framework::account {
         *&borrow_global<Account>(addr).authentication_key
     }
 
+    /// This function is used to rotate a resource account's authentication key to 0, so that no private key can control
+    /// the resource account.
     public(friend) fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
@@ -247,22 +258,6 @@ module aptos_framework::account {
         );
         let account_resource = borrow_global_mut<Account>(addr);
         account_resource.authentication_key = new_auth_key;
-    }
-
-    fun assert_valid_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
-        if (scheme == ED25519_SCHEME) {
-            let pk = ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
-            let sig = ed25519::new_signature_from_bytes(signature);
-            assert!(ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-            ed25519::unvalidated_public_key_to_authentication_key(&pk)
-        } else if (scheme == MULTI_ED25519_SCHEME) {
-            let pk = multi_ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
-            let sig = multi_ed25519::new_signature_from_bytes(signature);
-            assert!(multi_ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-            multi_ed25519::unvalidated_public_key_to_authentication_key(&pk)
-        } else {
-            abort error::invalid_argument(EINVALID_SCHEME)
-        }
     }
 
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
@@ -329,35 +324,11 @@ module aptos_framework::account {
         };
 
         // Assert the challenges signed by the current and new keys are valid
-        let curr_auth_key = assert_valid_signature_and_get_auth_key(from_scheme, from_public_key_bytes, cap_rotate_key, &challenge);
-        let new_auth_key = assert_valid_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, &challenge);
+        assert_valid_rotation_proof_signature_and_get_auth_key(from_scheme, from_public_key_bytes, cap_rotate_key, &challenge);
+        let new_auth_key = assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, &challenge);
 
-        // Update the `OriginatingAddress` table, so that we can find the originating address using the latest address
-        // in the event of key recovery
-        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
-        let new_auth_key_as_address = from_bcs::to_address(new_auth_key);
-        if (table::contains(address_map, curr_auth_key_as_address)) {
-            // Assert that we're calling from the account with the originating address.
-            // For example, if we have already rotated from keypair_a to keypair_b, and are trying to rotate from
-            // keypair_b to keypair_c, we could call `rotate_authentication_key` from address_a or address_b.
-            // Here, we wanted to enforce the standard that we expect the call to come from the signer with address a.
-            // If a signer with address b calls this function with two valid signatures, it will abort at this step,
-            // because address b is not the account's originating address.
-            // This means that after key rotation, the account's address should be the same, but their public key
-            // and private key should be updated to the new ones.
-            assert!(addr == table::remove(address_map, curr_auth_key_as_address), error::not_found(EINVALID_ORIGINATING_ADDRESS));
-        };
-        table::add(address_map, new_auth_key_as_address, addr);
-
-        event::emit_event<KeyRotationEvent>(
-            &mut account_resource.key_rotation_events,
-            KeyRotationEvent {
-                old_authentication_key: curr_auth_key,
-                new_authentication_key: new_auth_key,
-            }
-        );
-
-        account_resource.authentication_key = new_auth_key;
+        // Update the `OriginatingAddress` table.
+        update_auth_key_and_originating_address_table(addr, account_resource, new_auth_key);
     }
 
     public entry fun rotate_authentication_key_with_rotation_capability(
@@ -369,47 +340,30 @@ module aptos_framework::account {
     ) acquires Account, OriginatingAddress {
         assert!(exists_at(rotation_cap_offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST));
 
-        // check that there exists a rotation capability offer at the offerer's account resource for the delegate
-        let offerer_account_resource = borrow_global<Account>(rotation_cap_offerer_address);
+        // Check that there exists a rotation capability offer at the offerer's account resource for the delegate.
         let delegate_address = signer::address_of(delegate_signer);
+        let offerer_account_resource = borrow_global<Account>(rotation_cap_offerer_address);
         assert!(option::contains(&offerer_account_resource.rotation_capability_offer.for, &delegate_address), error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER));
 
-        let delegate_account_resource = borrow_global<Account>(delegate_address);
         let curr_auth_key = from_bcs::to_address(offerer_account_resource.authentication_key);
         let challenge = RotationProofChallenge {
-            sequence_number: delegate_account_resource.sequence_number,
+            sequence_number: get_sequence_number(delegate_address),
             originator: rotation_cap_offerer_address,
             current_auth_key: curr_auth_key,
             new_public_key: new_public_key_bytes,
         };
 
-        // verify that `cap_update_table` has the correct `RotationProofChallenge` and is signed by the new private key
-        let new_auth_key = assert_valid_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, &challenge);
+        // Verifies that the `RotationProofChallenge` from above is signed under the new public key that we are rotating to.        l
+        let new_auth_key = assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, &challenge);
 
-        // update the `OriginatingAddress` table, so we can find the originating address using the new address
-        let new_address = from_bcs::to_address(new_auth_key);
-        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
-        if (table::contains(address_map, curr_auth_key)) {
-            assert!(rotation_cap_offerer_address == table::remove(address_map, curr_auth_key), error::not_found(EINVALID_ORIGINATING_ADDRESS));
-        };
-        table::add(address_map, new_address, rotation_cap_offerer_address);
-
-        // update the authentication key of the offerer's account
+        // Update the `OriginatingAddress` table, so we can find the originating address using the new address.
         let offerer_account_resource = borrow_global_mut<Account>(rotation_cap_offerer_address);
-        event::emit_event<KeyRotationEvent>(
-            &mut offerer_account_resource.key_rotation_events,
-            KeyRotationEvent {
-                old_authentication_key: offerer_account_resource.authentication_key,
-                new_authentication_key: new_auth_key,
-            }
-        );
-
-        offerer_account_resource.authentication_key = new_auth_key;
+        update_auth_key_and_originating_address_table(rotation_cap_offerer_address, offerer_account_resource, new_auth_key);
     }
 
     /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its rotation capability to only one other address at one time. If the account
-    /// has an existing rotation capability offer, calling this function will update the rotation capabilituy offer with
+    /// has an existing rotation capability offer, calling this function will update the rotation capability offer with
     /// the new `recipient_address`.
     /// Here, `rotation_capability_sig_bytes` signature indicates that this key rotation is authorized by the account owner,
     /// and prevents the classic "time-of-check time-of-use" attack.
@@ -422,10 +376,8 @@ module aptos_framework::account {
     /// @param rotation_capability_sig_bytes is the signature by the account owner's key on `RotationCapabilityOfferProofChallengeV2`.
     /// @param account_scheme is the scheme of the account (ed25519 or multi_ed25519).
     /// @param account_public_key_bytes is the public key of the account owner.
-    /// @param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing
-    /// @param recipient_address in the account owner's `RotationCapabilityOffer`, calling this function will replace the
-    /// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
-    /// to the account owner's rotation capability).
+    /// @param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing rotation capability
+    /// offer, calling this function will replace the previous `recipient_address` upon successful verification.
     public entry fun offer_rotation_capability(
         account: &signer,
         rotation_capability_sig_bytes: vector<u8>,
@@ -474,6 +426,12 @@ module aptos_framework::account {
         let addr = signer::address_of(account);
         let account_resource = borrow_global_mut<Account>(addr);
         assert!(option::contains(&account_resource.rotation_capability_offer.for, &to_be_revoked_address), error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER));
+        revoke_any_rotation_capability(account);
+    }
+
+    /// Revoke any rotation capability offer in the specified account.
+    public entry fun revoke_any_rotation_capability(account: &signer) acquires Account {
+        let account_resource = borrow_global_mut<Account>(signer::address_of(account));
         option::extract(&mut account_resource.rotation_capability_offer.for);
     }
 
@@ -535,6 +493,12 @@ module aptos_framework::account {
         let addr = signer::address_of(account);
         let account_resource = borrow_global_mut<Account>(addr);
         assert!(option::contains(&account_resource.signer_capability_offer.for, &to_be_revoked_address), error::not_found(ENO_SUCH_SIGNER_CAPABILITY));
+        revoke_any_signer_capability(account);
+    }
+
+    /// Revoke any signer capability offer in the specified account.
+    public entry fun revoke_any_signer_capability(account: &signer) acquires Account {
+        let account_resource = borrow_global_mut<Account>(signer::address_of(account));
         option::extract(&mut account_resource.signer_capability_offer.for);
     }
 
@@ -549,6 +513,67 @@ module aptos_framework::account {
         assert!(option::contains(&account_resource.signer_capability_offer.for, &addr), error::not_found(ENO_SUCH_SIGNER_CAPABILITY));
 
         create_signer(offerer_address)
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// Helper functions for authentication key rotation.
+    ///////////////////////////////////////////////////////////////////////////
+    fun assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
+        if (scheme == ED25519_SCHEME) {
+            let pk = ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
+            let sig = ed25519::new_signature_from_bytes(signature);
+            assert!(ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+            ed25519::unvalidated_public_key_to_authentication_key(&pk)
+        } else if (scheme == MULTI_ED25519_SCHEME) {
+            let pk = multi_ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
+            let sig = multi_ed25519::new_signature_from_bytes(signature);
+            assert!(multi_ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+            multi_ed25519::unvalidated_public_key_to_authentication_key(&pk)
+        } else {
+            abort error::invalid_argument(EINVALID_SCHEME)
+        }
+    }
+
+    /// Update the `OriginatingAddress` table, so that we can find the originating address using the latest address
+    /// in the event of key recovery.
+    fun update_auth_key_and_originating_address_table(
+        originating_addr: address,
+        account_resource: &mut Account,
+        new_auth_key_vector: vector<u8>,
+    ) acquires OriginatingAddress {
+        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
+        let curr_auth_key = from_bcs::to_address(account_resource.authentication_key);
+
+        // Checks `OriginatingAddress[curr_auth_key]` is either unmapped, or mapped to `originating_address`.
+        // If it's mapped to the originating address, removes that mapping.
+        // Otherwise, abort if it's mapped to a different address.
+        if (table::contains(address_map, curr_auth_key)) {
+            // If account_a with address_a is rotating its keypair from keypair_a to keypair_b, we expect
+            // the address of the account to stay the same, while its keypair updates to keypair_b.
+            // Here, by asserting that we're calling from the account with the originating address, we enforce
+            // the standard of keeping the same address and updating the keypair at the contract level.
+            // Without this assertion, the dapps could also update the account's address to address_b (the address that
+            // is programmatically related to keypaier_b) and update the keypair to keypair_b. This causes problems
+            // for interoperability because different dapps can implement this in different ways.
+            // If the account with address b calls this function with two valid signatures, it will abort at this step,
+            // because address b is not the account's originating address.
+            assert!(originating_addr == table::remove(address_map, curr_auth_key), error::not_found(EINVALID_ORIGINATING_ADDRESS));
+        };
+
+        // Set `OriginatingAddress[new_auth_key] = originating_address`.
+        let new_auth_key = from_bcs::to_address(new_auth_key_vector);
+        table::add(address_map, new_auth_key, originating_addr);
+
+        event::emit_event<KeyRotationEvent>(
+            &mut account_resource.key_rotation_events,
+            KeyRotationEvent {
+                old_authentication_key: account_resource.authentication_key,
+                new_authentication_key: new_auth_key_vector,
+            }
+        );
+
+        // Update the account resource's authentication key.
+        account_resource.authentication_key = new_auth_key_vector;
     }
 
     ///////////////////////////////////////////////////////////////////////////
