@@ -18,6 +18,7 @@ use tokio::sync::oneshot;
 
 /// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
+#[allow(dead_code)]
 pub enum PayloadManager {
     DirectMempool,
     InQuorumStore(BatchReader, Mutex<Sender<PayloadRequest>>),

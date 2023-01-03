@@ -37,10 +37,12 @@ type NotificationType = (
     Vec<ContractEvent>,
 );
 
+#[allow(dead_code)]
 type CommitType = (u64, Round, Vec<Payload>);
 
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
+#[allow(dead_code)]
 pub struct ExecutionProxy {
     executor: Arc<dyn BlockExecutorTrait>,
     txn_notifier: Arc<dyn TxnNotifier>,
