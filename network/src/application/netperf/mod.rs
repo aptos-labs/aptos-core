@@ -10,26 +10,19 @@
 use crate::application::storage::PeerMetadataStorage;
 use crate::transport::ConnectionMetadata;
 use crate::{
-    application::netperf::interface::{NetPerfMsg::*, NetPerfNetworkEvents, NetPerfNetworkSender, NetPerfPayload},
+    application::netperf::interface::{NetPerfNetworkEvents, NetPerfNetworkSender, NetPerfPayload},
     constants::NETWORK_CHANNEL_SIZE,
-    counters,
-    error::NetworkError,
     logging::NetworkSchema,
-    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network::{
-            AppConfig, ApplicationNetworkSender, Event, NetworkEvents, NetworkSender,
-            NewNetworkSender,
+            Event,
         },
-        rpc::error::RpcError,
     },
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkContext, PeerNetworkId};
+use aptos_config::network_id::{NetworkContext};
 use aptos_logger::prelude::*;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::network_address::ParseError::NetworkLayerMissing;
 use aptos_types::PeerId;
 use axum::{
     extract::Query,
@@ -44,9 +37,9 @@ use futures_util::stream::FuturesUnordered;
 use serde::Serialize;
 use std::fs::OpenOptions;
 use std::{sync::Arc, time::Duration};
-use tokio::spawn;
 use tokio::sync::mpsc::{Receiver, Sender};
 use crate::application::netperf::interface::NetPerfMsg;
+use crate::protocols::network::NetworkApplicationConfig;
 
 pub mod builder;
 mod interface;
@@ -70,6 +63,7 @@ impl PeerNetPerfStat {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 struct NetPerfState {
     peers: Arc<PeerMetadataStorage>, //TODO: DO I need this?
@@ -97,8 +91,8 @@ impl NetPerf {
     }
 
     /// Configuration for the network endpoints to support NetPerf.
-    pub fn network_endpoint_config() -> AppConfig {
-        AppConfig::p2p(
+    pub fn network_endpoint_config() -> NetworkApplicationConfig {
+        NetworkApplicationConfig::client_and_service(
             [ProtocolId::NetPerfDirectSendCompressed, ProtocolId::NetPerfRpcCompressed],
             aptos_channel::Config::new(NETWORK_CHANNEL_SIZE).queue_style(QueueStyle::FIFO),
         )
@@ -115,7 +109,7 @@ impl NetPerf {
 
     async fn start(mut self) {
         let port = preferred_axum_port(self.netperf_port);
-        let (tx, mut rx) =
+        let (tx,  rx) =
             tokio::sync::mpsc::channel::<NetPerfCommands>(NETPERF_COMMAND_CHANNEL_SIZE);
 
         info!(
@@ -165,6 +159,7 @@ impl NetPerf {
         );
     }
 }
+#[allow(dead_code)]
 #[derive(Clone)]
 enum NetPerfCommands {
     Broadcast,
@@ -236,7 +231,7 @@ async fn get_peers(Extension(state): Extension<NetPerfState>) -> Json<PeerList> 
 
 async fn parse_query(
     Extension(state): Extension<NetPerfState>,
-    Query(params): Query<std::collections::HashMap<String, String>>,
+    Query(_params): Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
     spawn_named!("[NetPerf] Broadcast Task", netperf_broadcast(state.clone()));
 
@@ -250,7 +245,7 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
         tokio::select! {
             opt_cmd = rx.recv() => {
                 match opt_cmd {
-                    Some(cmd) => {
+                    Some(_cmd) => {
                         let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(64 * 1024));
 
                         for peer in state.peer_list.iter() {
@@ -267,7 +262,7 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
                     None => break,
                 }
             }
-            res = rpc_handlers.select_next_some() => {}
+            _res = rpc_handlers.select_next_some() => {}
         }
     }
 }
@@ -276,7 +271,7 @@ async fn netperf_broadcast(state: NetPerfState) {
     let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(64 * 1024));
 
     for peer in state.peer_list.iter() {
-        state.sender.send_to(
+        let _rc = state.sender.send_to(
             peer.key().to_owned(),
             ProtocolId::NetPerfDirectSendCompressed,
             msg.clone(),
