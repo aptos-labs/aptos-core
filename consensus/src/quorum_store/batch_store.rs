@@ -6,7 +6,7 @@ use crate::{
     quorum_store::{
         batch_reader::{BatchReader, BatchReaderCommand},
         counters,
-        proof_builder::ProofBuilderCommand,
+        proof_coordinator::ProofCoordinatorCommand,
         quorum_store_db::QuorumStoreDB,
         types::{Batch, PersistedValue},
     },
@@ -210,7 +210,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     pub async fn start(
         self,
         mut batch_store_rx: Receiver<BatchStoreCommand>,
-        proof_builder_tx: Sender<ProofBuilderCommand>,
+        proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
     ) {
         debug!(
             "[QS worker] BatchStore worker for epoch {} starting",
@@ -230,8 +230,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     let author = persist_request.value.author;
                     if let Some(signed_digest) = self.store(persist_request) {
                         if self.my_peer_id == author {
-                            proof_builder_tx
-                                .send(ProofBuilderCommand::AppendSignature(signed_digest))
+                            proof_coordinator_tx
+                                .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
                                 .await
                                 .expect("Failed to send to ProofBuilder");
                             debug!("QS: sent signed digest to ProofBuilder");

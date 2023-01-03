@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::block_storage::BlockReader;
+use crate::quorum_store::batch_coordinator::BatchCoordinatorCommand;
 use crate::quorum_store::counters;
-use crate::quorum_store::quorum_store::{QuorumStoreCommand, QuorumStoreError};
 use crate::quorum_store::quorum_store_db::BatchIdDB;
 use crate::quorum_store::types::BatchId;
 use crate::quorum_store::utils::{BatchBuilder, MempoolProxy, RoundExpirations};
@@ -22,13 +22,24 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::{sync::mpsc::Sender as TokioSender, time::Interval};
 
-type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
+type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), ProofError>>;
 // TODO: change to type ProofCompletedChannel = oneshot::Receiver<Result<BatchId, QuorumStoreError>>;
+
+#[derive(Debug)]
+pub enum BatchGeneratorCommand {
+    CommitNotification(LogicalTime),
+    Shutdown(tokio::sync::oneshot::Sender<()>),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ProofError {
+    Timeout(BatchId),
+}
 
 pub struct BatchGenerator {
     db: Arc<dyn BatchIdDB>,
     mempool_proxy: MempoolProxy,
-    quorum_store_sender: TokioSender<QuorumStoreCommand>,
+    quorum_store_sender: TokioSender<BatchCoordinatorCommand>,
     batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
     batch_expirations: RoundExpirations<BatchId>,
     batch_builder: BatchBuilder,
@@ -51,7 +62,7 @@ impl BatchGenerator {
         epoch: u64,
         db: Arc<dyn BatchIdDB>,
         mempool_tx: Sender<QuorumStoreRequest>,
-        quorum_store_sender: TokioSender<QuorumStoreCommand>,
+        quorum_store_sender: TokioSender<BatchCoordinatorCommand>,
         mempool_txn_pull_timeout_ms: u64,
         mempool_txn_pull_max_count: u64,
         mempool_txn_pull_max_bytes: u64,
@@ -160,7 +171,10 @@ impl BatchGenerator {
         if !end_batch {
             if !serialized_txns.is_empty() {
                 self.quorum_store_sender
-                    .send(QuorumStoreCommand::AppendToBatch(serialized_txns, batch_id))
+                    .send(BatchCoordinatorCommand::AppendToBatch(
+                        serialized_txns,
+                        batch_id,
+                    ))
                     .await
                     .expect("could not send to QuorumStore");
             }
@@ -197,7 +211,7 @@ impl BatchGenerator {
             let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
 
             self.quorum_store_sender
-                .send(QuorumStoreCommand::EndBatch(
+                .send(BatchCoordinatorCommand::EndBatch(
                     serialized_txns,
                     batch_id,
                     logical_time.clone(),
@@ -218,7 +232,7 @@ impl BatchGenerator {
 
     pub(crate) async fn handle_completed_proof(
         &mut self,
-        msg: Result<(ProofOfStore, BatchId), QuorumStoreError>,
+        msg: Result<(ProofOfStore, BatchId), ProofError>,
     ) {
         match msg {
             Ok((proof, batch_id)) => {
@@ -247,7 +261,7 @@ impl BatchGenerator {
 
                 counters::LOCAL_POS_COUNT.inc();
             },
-            Err(QuorumStoreError::Timeout(batch_id)) => {
+            Err(ProofError::Timeout(batch_id)) => {
                 // Quorum store measurements
                 counters::TIMEOUT_BATCHES_COUNT.inc();
 
@@ -277,7 +291,11 @@ impl BatchGenerator {
         }
     }
 
-    pub async fn start(mut self, mut clean_rx: Receiver<CleanCommand>, mut interval: Interval) {
+    pub async fn start(
+        mut self,
+        mut cmd_rx: tokio::sync::mpsc::Receiver<BatchGeneratorCommand>,
+        mut interval: Interval,
+    ) {
         // debug!(
         //     "[QS worker] QuorumStoreWrapper worker for epoch {} starting",
         //     self.latest_logical_time.epoch(),
@@ -318,7 +336,40 @@ impl BatchGenerator {
                         }
                     }
                 },
-                // TODO: get commit notifications and cleanup batches_in_progress
+                Some(cmd) = cmd_rx.recv() => {
+                    match cmd {
+                        BatchGeneratorCommand::CommitNotification(logical_time) => {
+                            debug!("QS: got clean request from execution");
+                            assert_eq!(
+                                self.latest_logical_time.epoch(),
+                                logical_time.epoch(),
+                                "Wrong epoch"
+                            );
+                            assert!(
+                                self.latest_logical_time <= logical_time,
+                                "Decreasing logical time"
+                            );
+                            self.latest_logical_time = logical_time;
+                            // Cleans up all batches that expire in rounds <= logical_time.round(). This is
+                            // safe since clean request must occur only after execution result is certified.
+                            for batch_id in self.batch_expirations.expire(logical_time.round()) {
+                                if self.batches_in_progress.remove(&batch_id).is_some() {
+                                    debug!(
+                                        "QS: expired batch w. id {} from batches_in_progress, new size {}",
+                                        batch_id,
+                                        self.batches_in_progress.len(),
+                                    );
+                                }
+                            }
+                        },
+                        BatchGeneratorCommand::Shutdown(ack_tx) => {
+                            ack_tx
+                                .send(())
+                                .expect("Failed to send shutdown ack");
+                            break;
+                        },
+                    }
+                },
             }
         }
     }

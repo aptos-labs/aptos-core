@@ -1,12 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::network::{NetworkSender, QuorumStoreSender};
 use crate::quorum_store::counters;
+use crate::quorum_store::types::BatchId;
 use crate::quorum_store::utils::ProofQueue;
 use crate::round_manager::VerifiedEvent;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Payload, PayloadFilter, ProofWithData};
-use aptos_consensus_types::proof_of_store::LogicalTime;
+use aptos_consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
 use aptos_consensus_types::request_response::{
     BlockProposalCommand, CleanCommand, ConsensusResponse,
 };
@@ -16,6 +18,13 @@ use aptos_types::PeerId;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
 use std::collections::HashSet;
+
+#[derive(Debug)]
+pub enum ProofManagerCommand {
+    LocalProof(ProofOfStore),
+    RemoteProof(ProofOfStore),
+    CommitNotification(LogicalTime, Vec<HashValue>),
+}
 
 pub struct ProofManager {
     proofs_for_consensus: ProofQueue,
@@ -32,9 +41,21 @@ impl ProofManager {
         }
     }
 
-    pub(crate) fn handle_clean_request(&mut self, msg: CleanCommand) {
+    pub(crate) async fn handle_proof(
+        &mut self,
+        msg: ProofManagerCommand,
+        network_sender: &mut NetworkSender,
+    ) {
         match msg {
-            CleanCommand::CleanRequest(logical_time, digests) => {
+            ProofManagerCommand::LocalProof(proof) => {
+                self.proofs_for_consensus.push(proof.clone());
+                network_sender.broadcast_proof_of_store(proof).await;
+            },
+            ProofManagerCommand::RemoteProof(proof) => {
+                // TODO: is this all we need to do?
+                self.proofs_for_consensus.push(proof.clone());
+            },
+            ProofManagerCommand::CommitNotification(logical_time, digests) => {
                 debug!("QS: got clean request from execution");
                 assert_eq!(
                     self.latest_logical_time.epoch(),
@@ -92,10 +113,9 @@ impl ProofManager {
 
     pub async fn start(
         mut self,
+        mut network_sender: NetworkSender,
         mut proposal_rx: Receiver<BlockProposalCommand>,
-        mut clean_rx: Receiver<CleanCommand>,
-        mut network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
-        // TODO: receive proofs from proof coordinator
+        mut proof_rx: tokio::sync::mpsc::Receiver<ProofManagerCommand>,
     ) {
         loop {
             // TODO: additional main loop counter
@@ -103,18 +123,10 @@ impl ProofManager {
 
             tokio::select! {
                 Some(msg) = proposal_rx.next() => {
-                    self.handle_proposal_request(msg)
+                    self.handle_proposal_request(msg);
                 },
-                Some(msg) = clean_rx.next() => {
-                    self.handle_clean_request(msg)
-                }
-                Some(msg) = network_msg_rx.next() => {
-                   if let VerifiedEvent::ProofOfStoreMsg(proof) = msg{
-                        debug!("QS: got proof from peer");
-
-                        counters::REMOTE_POS_COUNT.inc();
-                        self.proofs_for_consensus.push(*proof);
-                    }
+                Some(msg) = proof_rx.recv() => {
+                    self.handle_proof(msg, &mut network_sender).await;
                 },
             }
         }

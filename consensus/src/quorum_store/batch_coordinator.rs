@@ -5,23 +5,41 @@ use crate::network::{NetworkSender, QuorumStoreSender};
 use crate::quorum_store::batch_aggregator::BatchAggregator;
 use crate::quorum_store::batch_store::{BatchStoreCommand, PersistRequest};
 use crate::quorum_store::counters;
-use crate::quorum_store::proof_builder::{ProofBuilderCommand, ProofReturnChannel};
-use crate::quorum_store::quorum_store::QuorumStoreCommand;
+use crate::quorum_store::proof_coordinator::{ProofCoordinatorCommand, ProofReturnChannel};
 use crate::quorum_store::types::{BatchId, Fragment, SerializedTransaction};
 use aptos_consensus_types::proof_of_store::{LogicalTime, SignedDigestInfo};
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
+use std::collections::HashMap;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::oneshot;
+
+#[derive(Debug)]
+pub enum BatchCoordinatorCommand {
+    AppendToBatch(Vec<SerializedTransaction>, BatchId),
+    EndBatch(
+        Vec<SerializedTransaction>,
+        BatchId,
+        LogicalTime,
+        ProofReturnChannel,
+    ),
+    Shutdown(oneshot::Sender<()>),
+    RemoteFragment(Box<Fragment>),
+}
 
 pub struct BatchCoordinator {
     epoch: u64,
     my_peer_id: PeerId,
     network_sender: NetworkSender,
-    command_rx: Receiver<QuorumStoreCommand>,
-    batch_aggregator: BatchAggregator,
+    command_rx: Receiver<BatchCoordinatorCommand>,
     batch_store_tx: Sender<BatchStoreCommand>,
-    proof_builder_tx: Sender<ProofBuilderCommand>,
+    proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
+    max_batch_bytes: usize,
+    // Local
+    batch_aggregator: BatchAggregator,
     fragment_id: usize,
+    // Remote
+    batch_aggregators: HashMap<PeerId, BatchAggregator>,
 }
 
 impl BatchCoordinator {
@@ -29,21 +47,22 @@ impl BatchCoordinator {
         epoch: u64, //TODO: pass the epoch config
         my_peer_id: PeerId,
         network_sender: NetworkSender,
-        wrapper_command_rx: Receiver<QuorumStoreCommand>,
-        // TODO: probably build here
-        batch_aggregator: BatchAggregator,
+        wrapper_command_rx: Receiver<BatchCoordinatorCommand>,
         batch_store_tx: Sender<BatchStoreCommand>,
-        proof_builder_tx: Sender<ProofBuilderCommand>,
+        proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
+        max_batch_bytes: usize,
     ) -> Self {
         Self {
             epoch,
             my_peer_id,
             network_sender,
             command_rx: wrapper_command_rx,
-            batch_aggregator,
             batch_store_tx,
-            proof_builder_tx,
+            proof_coordinator_tx,
+            max_batch_bytes,
+            batch_aggregator: BatchAggregator::new(max_batch_bytes),
             fragment_id: 0,
+            batch_aggregators: HashMap::new(),
         }
     }
 
@@ -97,8 +116,8 @@ impl BatchCoordinator {
                     self.my_peer_id,
                 );
 
-                self.proof_builder_tx
-                    .send(ProofBuilderCommand::InitProof(
+                self.proof_coordinator_tx
+                    .send(ProofCoordinatorCommand::InitProof(
                         SignedDigestInfo::new(
                             digest,
                             expiration,
@@ -129,25 +148,85 @@ impl BatchCoordinator {
         }
     }
 
+    async fn handle_fragment(&mut self, fragment: Fragment) {
+        let source = fragment.source();
+        let entry = self
+            .batch_aggregators
+            .entry(source)
+            .or_insert(BatchAggregator::new(self.max_batch_bytes));
+        if let Some(expiration) = fragment.maybe_expiration() {
+            counters::DELIVERED_END_BATCH_COUNT.inc();
+            // end batch message
+            debug!(
+                "QS: got end batch message from {:?} batch_id {}, fragment_id {}",
+                source,
+                fragment.batch_id(),
+                fragment.fragment_id(),
+            );
+            if expiration.epoch() == self.epoch {
+                match entry.end_batch(
+                    fragment.batch_id(),
+                    fragment.fragment_id(),
+                    fragment.into_transactions(),
+                ) {
+                    Ok((num_bytes, payload, digest)) => {
+                        let persist_cmd = BatchStoreCommand::Persist(PersistRequest::new(
+                            source, payload, digest, num_bytes, expiration,
+                        ));
+                        self.batch_store_tx
+                            .send(persist_cmd)
+                            .await
+                            .expect("BatchStore receiver not available");
+                    },
+                    Err(e) => {
+                        debug!("Could not append batch from {:?}, error {:?}", source, e);
+                    },
+                }
+            }
+            // Malformed request with an inconsistent expiry epoch.
+            else {
+                debug!(
+                    "QS: got end batch message epoch {} {}",
+                    expiration.epoch(),
+                    self.epoch
+                );
+            }
+        } else {
+            debug!("QS: fragment no expiration");
+            // debug!(
+            //     "QS: got append_batch message from {:?} batch_id {}, fragment_id {}",
+            //     source,
+            //     fragment.fragment_info.batch_id(),
+            //     fragment.fragment_info.fragment_id()
+            // );
+            if let Err(e) = entry.append_transactions(
+                fragment.batch_id(),
+                fragment.fragment_id(),
+                fragment.into_transactions(),
+            ) {
+                debug!("Could not append batch from {:?}, error {:?}", source, e);
+            }
+        }
+    }
+
     pub(crate) async fn start(mut self) {
         while let Some(command) = self.command_rx.recv().await {
             match command {
-                QuorumStoreCommand::Shutdown(ack_tx) => {
+                BatchCoordinatorCommand::Shutdown(ack_tx) => {
                     // TODO: make sure this works
                     ack_tx
                         .send(())
                         .expect("Failed to send shutdown ack to QuorumStoreCoordinator");
                     break;
                 },
-                QuorumStoreCommand::AppendToBatch(fragment_payload, batch_id) => {
+                BatchCoordinatorCommand::AppendToBatch(fragment_payload, batch_id) => {
                     debug!("QS: end batch cmd received, batch id {}", batch_id);
                     let msg = self.handle_append_to_batch(fragment_payload, batch_id);
                     self.network_sender.broadcast_fragment(msg).await;
 
                     self.fragment_id = self.fragment_id + 1;
                 },
-
-                QuorumStoreCommand::EndBatch(
+                BatchCoordinatorCommand::EndBatch(
                     fragment_payload,
                     batch_id,
                     logical_time,
@@ -168,6 +247,9 @@ impl BatchCoordinator {
                     counters::NUM_FRAGMENT_PER_BATCH.observe(self.fragment_id as f64);
 
                     self.fragment_id = 0;
+                },
+                BatchCoordinatorCommand::RemoteFragment(fragment) => {
+                    self.handle_fragment(*fragment).await;
                 },
             }
         }

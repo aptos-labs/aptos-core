@@ -4,6 +4,7 @@
 use crate::quorum_store::quorum_store_builder::{
     DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder,
 };
+use crate::quorum_store::quorum_store_coordinator::CoordinatorCommand;
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -128,9 +129,9 @@ pub struct EpochManager {
     // vector of network_listener channels to handle QS messages, including Batch, SignedDigest, Fragment
     // vec[0] for Batch, vec[1] for SignedDigest, vec[2],...,vec[num_network_workers_for_fragment+1] for Fragment
     quorum_store_msg_tx_vec: Vec<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
-    wrapper_quorum_store_tx: Option<(
+    quorum_store_tx: Option<(
         aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-        Sender<oneshot::Sender<()>>,
+        Sender<CoordinatorCommand>,
     )>,
 }
 
@@ -173,7 +174,7 @@ impl EpochManager {
             quorum_store_storage_path: node_config.storage.dir(),
             num_network_workers_for_fragment: 2,
             quorum_store_msg_tx_vec: Vec::new(),
-            wrapper_quorum_store_tx: None,
+            quorum_store_tx: None,
         }
     }
 
@@ -527,13 +528,13 @@ impl EpochManager {
         }
         self.round_manager_tx = None;
 
-        if let Some((_, mut wrapper_shutdown_tx)) = self.wrapper_quorum_store_tx.take() {
+        if let Some((_, mut quorum_store_coordinator_tx)) = self.quorum_store_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
-            wrapper_shutdown_tx
-                .send(ack_tx)
+            quorum_store_coordinator_tx
+                .send(CoordinatorCommand::Shutdown(ack_tx))
                 .await
-                .expect("Could not send shutdown indicator to QuorumStoreWrapper");
-            ack_rx.await.expect("Failed to stop QuorumStoreWrapper");
+                .expect("Could not send shutdown indicator to QuorumStore");
+            ack_rx.await.expect("Failed to stop QuorumStore");
         }
 
         // Shutdown the previous buffer manager, to release the SafetyRule client
@@ -632,6 +633,9 @@ impl EpochManager {
         // Start QuorumStore
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
+        // TODO: connect
+        // let (commit_tx, commit_rx) = mpsc::channel(self.config.intra_consensus_channel_buffer_size);
+
         // TODO: grab config.
         // TODO: think about these numbers
         // LANDING QS TODO: move to config file
@@ -642,8 +646,6 @@ impl EpochManager {
                 self.epoch(),
                 self.author,
                 config,
-                // TODO: remove after splitting out clean requests
-                consensus_to_quorum_store_tx.clone(),
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
@@ -694,7 +696,7 @@ impl EpochManager {
             payload_manager.clone(),
         ));
 
-        self.wrapper_quorum_store_tx = quorum_store_builder.start(block_store.clone());
+        self.quorum_store_tx = quorum_store_builder.start(block_store.clone());
 
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)
@@ -925,7 +927,7 @@ impl EpochManager {
         }
         match event {
             wrapper_quorum_store_event @ VerifiedEvent::ProofOfStoreMsg(_) => {
-                if let Some((wrapper_net_sender, _)) = &mut self.wrapper_quorum_store_tx {
+                if let Some((wrapper_net_sender, _)) = &mut self.quorum_store_tx {
                     wrapper_net_sender.push(peer_id, wrapper_quorum_store_event)?;
                 } else {
                     bail!("QuorumStore wrapper not started but received QuorumStore Message");

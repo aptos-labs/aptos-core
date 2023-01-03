@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::quorum_store::batch_generator::ProofError;
 use crate::quorum_store::{
-    proof_builder::{ProofBuilder, ProofBuilderCommand},
-    quorum_store::QuorumStoreError,
+    proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
     tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
 };
 use aptos_consensus_types::proof_of_store::{LogicalTime, SignedDigest, SignedDigestInfo};
@@ -19,7 +19,7 @@ async fn test_proof_builder_basic() {
     let (signers, verifier) = random_validator_verifier(4, None, true);
     let arc_signers: Vec<Arc<ValidatorSigner>> =
         signers.clone().into_iter().map(|s| Arc::new(s)).collect();
-    let proof_builder = ProofBuilder::new(100, signers[0].author());
+    let proof_builder = ProofCoordinator::new(100, signers[0].author());
     let (proof_builder_tx, proof_builder_rx) = channel(100);
     tokio::spawn(proof_builder.start(proof_builder_rx, verifier.clone()));
 
@@ -28,7 +28,7 @@ async fn test_proof_builder_basic() {
     let (proof_tx, proof_rx) = oneshot::channel();
 
     assert!(proof_builder_tx
-        .send(ProofBuilderCommand::InitProof(
+        .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info.clone(),
             0,
             proof_tx
@@ -46,7 +46,7 @@ async fn test_proof_builder_basic() {
         )
         .unwrap();
         assert!(proof_builder_tx
-            .send(ProofBuilderCommand::AppendSignature(signed_digest))
+            .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
             .await
             .is_ok());
     }
@@ -60,7 +60,7 @@ async fn test_proof_builder_basic() {
     // check that error path
     let (proof_tx, proof_rx) = oneshot::channel();
     assert!(proof_builder_tx
-        .send(ProofBuilderCommand::InitProof(
+        .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info.clone(),
             4,
             proof_tx
@@ -69,13 +69,13 @@ async fn test_proof_builder_basic() {
         .is_ok());
     assert_eq!(
         proof_rx.await.expect("channel dropped"),
-        Err(QuorumStoreError::Timeout(4))
+        Err(ProofError::Timeout(4))
     );
 
     // check same digest after expiration
     let (proof_tx, proof_rx) = oneshot::channel();
     assert!(proof_builder_tx
-        .send(ProofBuilderCommand::InitProof(
+        .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info.clone(),
             4,
             proof_tx
@@ -93,7 +93,7 @@ async fn test_proof_builder_basic() {
         )
         .unwrap();
         assert!(proof_builder_tx
-            .send(ProofBuilderCommand::AppendSignature(signed_digest))
+            .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
             .await
             .is_ok());
     }
@@ -105,7 +105,7 @@ async fn test_proof_builder_basic() {
     // check wrong signatures
     let (proof_tx, proof_rx) = oneshot::channel();
     assert!(proof_builder_tx
-        .send(ProofBuilderCommand::InitProof(
+        .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info,
             10,
             proof_tx
@@ -123,12 +123,12 @@ async fn test_proof_builder_basic() {
         )
         .unwrap();
         assert!(proof_builder_tx
-            .send(ProofBuilderCommand::AppendSignature(signed_digest))
+            .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
             .await
             .is_ok());
     }
     assert_eq!(
         proof_rx.await.expect("channel dropped"),
-        Err(QuorumStoreError::Timeout(10))
+        Err(ProofError::Timeout(10))
     );
 }

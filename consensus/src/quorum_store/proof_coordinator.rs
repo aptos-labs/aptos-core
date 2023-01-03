@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    counters, quorum_store::QuorumStoreError, types::BatchId, utils::DigestTimeouts,
-};
+use crate::quorum_store::batch_generator::ProofError;
+use crate::quorum_store::proof_manager::ProofManagerCommand;
+use crate::quorum_store::{counters, types::BatchId, utils::DigestTimeouts};
 use aptos_consensus_types::proof_of_store::{
     ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
 };
@@ -17,20 +17,20 @@ use std::{
     collections::{BTreeMap, HashMap},
     time::Duration,
 };
+use tokio::sync::mpsc::Sender;
 use tokio::{
     sync::{mpsc::Receiver, oneshot as TokioOneshot},
     time,
 };
 
 #[derive(Debug)]
-pub(crate) enum ProofBuilderCommand {
+pub(crate) enum ProofCoordinatorCommand {
     InitProof(SignedDigestInfo, BatchId, ProofReturnChannel),
     AppendSignature(SignedDigest),
     Shutdown(TokioOneshot::Sender<()>),
 }
 
-pub(crate) type ProofReturnChannel =
-    oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
+pub(crate) type ProofReturnChannel = oneshot::Sender<Result<(ProofOfStore, BatchId), ProofError>>;
 
 struct IncrementalProofState {
     info: SignedDigestInfo,
@@ -88,12 +88,12 @@ impl IncrementalProofState {
 
     fn send_timeout(self) {
         self.ret_tx
-            .send(Err(QuorumStoreError::Timeout(self.batch_id)))
+            .send(Err(ProofError::Timeout(self.batch_id)))
             .expect("Unable to send the timeout a proof of store");
     }
 }
 
-pub(crate) struct ProofBuilder {
+pub(crate) struct ProofCoordinator {
     peer_id: PeerId,
     proof_timeout_ms: usize,
     digest_to_proof: HashMap<HashValue, IncrementalProofState>,
@@ -103,7 +103,7 @@ pub(crate) struct ProofBuilder {
 }
 
 //PoQS builder object - gather signed digest to form PoQS
-impl ProofBuilder {
+impl ProofCoordinator {
     pub fn new(proof_timeout_ms: usize, peer_id: PeerId) -> Self {
         Self {
             peer_id,
@@ -135,21 +135,21 @@ impl ProofBuilder {
         &mut self,
         signed_digest: SignedDigest,
         validator_verifier: &ValidatorVerifier,
-    ) -> Result<(), SignedDigestError> {
+    ) -> Result<Option<ProofOfStore>, SignedDigestError> {
         if !self.digest_to_proof.contains_key(&signed_digest.digest()) {
             return Err(SignedDigestError::WrongInfo);
         }
         let mut ret = Ok(());
-        let mut ready = false;
+        let mut proof_changed_to_completed = false;
         let digest = signed_digest.digest().clone();
         let my_id = self.peer_id;
         self.digest_to_proof.entry(digest).and_modify(|state| {
             ret = state.add_signature(signed_digest);
             if ret.is_ok() {
-                ready = state.ready(validator_verifier, my_id);
+                proof_changed_to_completed = state.ready(validator_verifier, my_id);
             }
         });
-        if ready {
+        if proof_changed_to_completed {
             let (proof, batch_id, tx) = self
                 .digest_to_proof
                 .remove(&digest)
@@ -164,10 +164,14 @@ impl ProofBuilder {
                     .expect("Batch created without recording the time!");
             counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
 
-            tx.send(Ok((proof, batch_id)))
+            // TODO: just send back an ack
+            tx.send(Ok((proof.clone(), batch_id)))
                 .expect("Unable to send the proof of store");
+
+            Ok(Some(proof))
+        } else {
+            Ok(None)
         }
-        ret
     }
 
     fn expire(&mut self) {
@@ -180,37 +184,44 @@ impl ProofBuilder {
 
     pub async fn start(
         mut self,
-        mut rx: Receiver<ProofBuilderCommand>,
+        mut rx: Receiver<ProofCoordinatorCommand>,
+        mut tx: Sender<ProofManagerCommand>,
         validator_verifier: ValidatorVerifier,
     ) {
         let mut interval = time::interval(Duration::from_millis(100));
         loop {
             tokio::select! {
-             Some(command) = rx.recv() => {
-                match command {
-                        ProofBuilderCommand::Shutdown(ack_tx) => {
-                    ack_tx
-                        .send(())
-                        .expect("Failed to send shutdown ack to QuorumStore");
-                    break;
-                }
-                    ProofBuilderCommand::InitProof(info, batch_id, tx) => {
-                        self.init_proof(info, batch_id, tx)
-                            .expect("Error initializing proof of store");
-                    }
-                    ProofBuilderCommand::AppendSignature(signed_digest) => {
+                Some(command) = rx.recv() => {
+                    match command {
+                        ProofCoordinatorCommand::Shutdown(ack_tx) => {
+                            ack_tx
+                                .send(())
+                                .expect("Failed to send shutdown ack to QuorumStore");
+                            break;
+                        },
+                        ProofCoordinatorCommand::InitProof(info, batch_id, tx) => {
+                            self.init_proof(info, batch_id, tx)
+                                .expect("Error initializing proof of store");
+                        },
+                        ProofCoordinatorCommand::AppendSignature(signed_digest) => {
                             let peer_id = signed_digest.peer_id();
-                        if let Err(e) = self.add_signature(signed_digest, &validator_verifier) {
-                            // Can happen if we already garbage collected
-                            if peer_id == self.peer_id {
-                                info!("QS: could not add signature from self, err = {:?}", e);
-                                }
-                        } else {
-                            debug!("QS: added signature to proof");
-                        }
+                            match self.add_signature(signed_digest, &validator_verifier) {
+                                Ok(result) => {
+                                    if let Some(proof) = result {
+                                        debug!("QS: added signature to proof");
+                                        tx.send(ProofManagerCommand::LocalProof(proof)).await.unwrap();
+                                    }
+                                },
+                                Err(e) => {
+                                    // TODO: better error messages
+                                    // Can happen if we already garbage collected
+                                    if peer_id == self.peer_id {
+                                        info!("QS: could not add signature from self, err = {:?}", e);
+                                    }
+                                },
+                            }
+                        },
                     }
-                }
-
                 }
                 _ = interval.tick() => {
                     self.expire();
