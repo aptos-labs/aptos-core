@@ -788,10 +788,10 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "consensus_only_perf_benchmark" => {
             let emit_job = config.get_emit_job().clone();
             config
-                .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+                .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
                 .with_network_tests(vec![&LoadVsPerfBenchmark {
                     test: &PerformanceBenchmark,
-                    tps: &[120000, 160000, 200000],
+                    tps: &[120000, 160000],
                 }])
                 .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                     // no epoch change.
