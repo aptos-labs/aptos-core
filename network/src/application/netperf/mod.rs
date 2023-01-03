@@ -14,6 +14,7 @@ use crate::transport::ConnectionMetadata;
 use crate::{
     application::netperf::interface::{NetPerfNetworkEvents, NetPerfNetworkSender, NetPerfPayload},
     constants::NETWORK_CHANNEL_SIZE,
+    counters,
     logging::NetworkSchema,
     protocols::network::Event,
     ProtocolId,
@@ -62,7 +63,7 @@ impl PeerNetPerfStat {
 #[allow(dead_code)]
 #[derive(Clone)]
 struct NetPerfState {
-    peers: Arc<PeerMetadataStorage>, //TODO: DO I need this?
+    peers: Arc<PeerMetadataStorage>,
     peer_list: Arc<DashMap<PeerId, PeerNetPerfStat>>, //with capacity and hasher
     sender: Arc<NetPerfNetworkSender>,
     tx: Sender<NetPerfCommands>,
@@ -93,7 +94,9 @@ impl NetPerf {
                 ProtocolId::NetPerfDirectSendCompressed,
                 ProtocolId::NetPerfRpcCompressed,
             ],
-            aptos_channel::Config::new(NETWORK_CHANNEL_SIZE).queue_style(QueueStyle::FIFO),
+            aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
+                .queue_style(QueueStyle::FIFO)
+                .counters(&counters::PENDING_NET_PERF_NETWORK_EVENTS),
         )
     }
 
