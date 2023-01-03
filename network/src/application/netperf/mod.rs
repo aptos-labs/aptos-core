@@ -146,10 +146,13 @@ impl NetPerf {
                                 &metadata.remote_peer_id
                             );
                         }
-                        Event::Message(peer_id, msg) =>  {
+                        Event::Message(_peer_id, msg) =>  {
                             match msg {
-                                NetPerfMsg::BlockOfBytes(bytes) => {}
-                                _ => {}
+                                NetPerfMsg::BlockOfBytes(_bytes) => {
+                                    /* maybe add dedicated counters? but network_application_{out/in}bound_traffic
+                                     * seems to have us coverred
+                                     * */
+                                }
 
                             }
 
@@ -276,8 +279,10 @@ async fn netperf_broadcast(state: NetPerfState) {
     let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(64 * 1024));
 
     loop {
-        /* TODO(AlexM): Better Fine grained controll with send_to.
-         * Its interesting to see which of the validr queus gets full.
+        /* TODO(AlexM):
+         * 1. Fine grained controll with send_to.
+         *    Its interesting to see which of the validator queus gets filled.
+         * 2. msg.clone() is a disaster
          * */
         let rc = state.sender.send_to_many(
             state.peer_list.iter().map(|entry| entry.key().to_owned()),
@@ -287,6 +292,10 @@ async fn netperf_broadcast(state: NetPerfState) {
         if let Err(_) = rc {
             should_yield = true
         } //else update peer counters
+          /* maybe add dedicated counters? but network_application_{out/in}bound_traffic
+           * seems to have us coverred
+           * */
+
         if should_yield == true {
             break;
         }
