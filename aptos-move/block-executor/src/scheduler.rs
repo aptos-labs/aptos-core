@@ -133,7 +133,7 @@ pub struct Scheduler {
     /// The index is reduced as necessary when transactions require validation, in particular,
     /// after aborts and executions that write outside of the write set of the same transaction's
     /// previous incarnation. This also creates a new wave of validations, identified by the
-    /// monotonically increasing index stored in the first 32 bits.  
+    /// monotonically increasing index stored in the first 32 bits.
     validation_idx: AtomicU64,
     /// Next transaction to commit, and sweeping lower bound on the wave of a validation that must
     /// be successful in order to commit the next transaction.
@@ -176,6 +176,10 @@ impl Scheduler {
     pub fn try_commit(&self) -> Option<TxnIndex> {
         let mut commit_state = self.commit_state.lock();
         let idx = commit_state.0;
+        if idx == self.num_txns {
+            self.done_marker.store(true, Ordering::SeqCst);
+            return None;
+        }
 
         if let Ok(validation_status) = self.txn_status[idx].1.try_lock() {
             // Acquired the validation status lock, now try the status lock.
@@ -191,7 +195,6 @@ impl Scheduler {
                                 // Can commit.
                                 *status = ExecutionStatus::Committed(incarnation);
                                 commit_state.0 += 1;
-
                                 return Some(idx);
                             }
                         }
@@ -236,6 +239,10 @@ impl Scheduler {
             let (idx_to_validate, _) =
                 Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
+
+            if idx_to_execute >= self.num_txns && idx_to_validate >= self.num_txns {
+                return SchedulerTask::NoTask;
+            }
 
             if idx_to_validate < idx_to_execute {
                 if let Some((version_to_validate, wave)) = self.try_validate_next_version() {
@@ -411,7 +418,7 @@ impl Scheduler {
                     let (txn_idx, wave) = Self::unpack_validation_idx(val_idx);
                     if txn_idx > target_idx {
                         // Pack into validation index.
-                        Some((target_idx as u64) & ((wave as u64 + 1) << 32))
+                        Some((target_idx as u64) | ((wave as u64 + 1) << 32))
                     } else {
                         None
                     }
