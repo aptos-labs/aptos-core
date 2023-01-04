@@ -11,10 +11,7 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(
-    table_handle,
-    key_hash
-))]
+#[diesel(primary_key(table_handle, key_hash))]
 #[diesel(table_name = current_table_items)]
 pub struct CurrentTableItem {
     pub table_handle: String,
@@ -22,7 +19,7 @@ pub struct CurrentTableItem {
     pub key: String,
     pub decoded_key: serde_json::Value,
     pub decoded_value: Option<serde_json::Value>,
-    pub latest_transaction_version: i64,
+    pub last_transaction_version: i64,
     pub is_deleted: bool,
 }
 
@@ -76,7 +73,7 @@ impl TableItem {
                 key: write_table_item.key.to_string(),
                 decoded_key: write_table_item.data.as_ref().unwrap().key.clone(),
                 decoded_value: Some(write_table_item.data.as_ref().unwrap().value.clone()),
-                latest_transaction_version: transaction_version,
+                last_transaction_version: transaction_version,
                 is_deleted: false,
             },
         )
@@ -116,8 +113,8 @@ impl TableItem {
                 key: delete_table_item.key.to_string(),
                 decoded_key,
                 decoded_value: None,
-                latest_transaction_version: transaction_version,
-                is_deleted: false,
+                last_transaction_version: transaction_version,
+                is_deleted: true,
             },
         )
     }

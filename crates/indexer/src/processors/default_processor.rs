@@ -24,7 +24,7 @@ use crate::{
 };
 use aptos_api_types::Transaction;
 use async_trait::async_trait;
-use diesel::{result::Error, PgConnection};
+use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 
@@ -64,11 +64,13 @@ fn insert_to_db_impl(
         &[MoveModule],
         &[MoveResource],
         &[TableItem],
+        &[CurrentTableItem],
         &[TableMetadata],
     ),
 ) -> Result<(), diesel::result::Error> {
     let (user_transactions, signatures, block_metadata_transactions) = txn_details;
-    let (move_modules, move_resources, table_items, table_metadata) = wsc_details;
+    let (move_modules, move_resources, table_items, current_table_items, table_metadata) =
+        wsc_details;
     insert_transactions(conn, txns)?;
     insert_user_transactions(conn, user_transactions)?;
     insert_signatures(conn, signatures)?;
@@ -78,6 +80,7 @@ fn insert_to_db_impl(
     insert_move_modules(conn, move_modules)?;
     insert_move_resources(conn, move_resources)?;
     insert_table_items(conn, table_items)?;
+    insert_current_table_items(conn, current_table_items)?;
     insert_table_metadata(conn, table_metadata)?;
     Ok(())
 }
@@ -99,6 +102,7 @@ fn insert_to_db(
         Vec<MoveModule>,
         Vec<MoveResource>,
         Vec<TableItem>,
+        Vec<CurrentTableItem>,
         Vec<TableMetadata>,
     ),
 ) -> Result<(), diesel::result::Error> {
@@ -109,7 +113,8 @@ fn insert_to_db(
         "Inserting to db",
     );
     let (user_transactions, signatures, block_metadata_transactions) = txn_details;
-    let (move_modules, move_resources, table_items, table_metadata) = wsc_details;
+    let (move_modules, move_resources, table_items, current_table_items, table_metadata) =
+        wsc_details;
     match conn
         .build_transaction()
         .read_write()
@@ -128,6 +133,7 @@ fn insert_to_db(
                     &move_modules,
                     &move_resources,
                     &table_items,
+                    &current_table_items,
                     &table_metadata,
                 ),
             )
@@ -143,6 +149,7 @@ fn insert_to_db(
             let move_modules = clean_data_for_db(move_modules, true);
             let move_resources = clean_data_for_db(move_resources, true);
             let table_items = clean_data_for_db(table_items, true);
+            let current_table_items = clean_data_for_db(current_table_items, true);
             let table_metadata = clean_data_for_db(table_metadata, true);
 
             conn.build_transaction()
@@ -162,6 +169,7 @@ fn insert_to_db(
                             &move_modules,
                             &move_resources,
                             &table_items,
+                            &current_table_items,
                             &table_metadata,
                         ),
                     )
@@ -266,7 +274,11 @@ fn insert_events(
             diesel::insert_into(schema::events::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((account_address, creation_number, sequence_number))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    event_index.eq(excluded(event_index)),
+                )),
             None,
         )?;
     }
@@ -344,6 +356,33 @@ fn insert_table_items(
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
+        )?;
+    }
+    Ok(())
+}
+
+fn insert_current_table_items(
+    conn: &mut PgConnection,
+    items_to_insert: &[CurrentTableItem],
+) -> Result<(), diesel::result::Error> {
+    use schema::current_table_items::dsl::*;
+    let chunks = get_chunks(items_to_insert.len(), CurrentTableItem::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::current_table_items::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict((table_handle, key_hash))
+                .do_update()
+                .set((
+                    key.eq(excluded(key)),
+                    decoded_key.eq(excluded(decoded_key)),
+                    decoded_value.eq(excluded(decoded_value)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+                Some(" WHERE current_table_items.last_transaction_version <= excluded.last_transaction_version "),
         )?;
     }
     Ok(())
@@ -441,7 +480,13 @@ impl TransactionProcessor for DefaultTransactionProcessor {
             (user_transactions, signatures, block_metadata_transactions),
             events,
             write_set_changes,
-            (move_modules, move_resources, table_items, table_metadata),
+            (
+                move_modules,
+                move_resources,
+                table_items,
+                current_table_items,
+                table_metadata,
+            ),
         );
         match tx_result {
             Ok(_) => Ok(ProcessingResult::new(

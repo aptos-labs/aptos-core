@@ -7,7 +7,7 @@ CREATE TABLE current_table_items (
   decoded_key jsonb NOT NULL,
   decoded_value jsonb,
   is_deleted BOOLEAN NOT NULL,
-  latest_transaction_version BIGINT NOT NULL,
+  last_transaction_version BIGINT NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (
@@ -24,7 +24,7 @@ SELECT "key",
   decoded_key#>>'{}' AS json_decoded_key,
   decoded_value#>>'{}' AS json_decoded_value,
   is_deleted,
-  latest_transaction_version,
+  last_transaction_version,
   inserted_at
 FROM current_table_items;
 ALTER TABLE events

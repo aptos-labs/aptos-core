@@ -157,7 +157,7 @@ diesel::table! {
         decoded_key -> Jsonb,
         decoded_value -> Nullable<Jsonb>,
         is_deleted -> Bool,
-        latest_transaction_version -> Int8,
+        last_transaction_version -> Int8,
         inserted_at -> Timestamp,
     }
 }
