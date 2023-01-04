@@ -312,23 +312,23 @@ RUN ln -sf /usr/bin/perf_* /usr/bin/perf
 RUN echo "deb http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
 RUN echo "deb-src http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
 
-RUN apt-get update && apt-get install -y \
-		arping bison clang-format cmake dh-python \
-		dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
-		libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
-		libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
-		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
-    && apt-get clean && rm -r /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -y \
+# 		arping bison clang-format cmake dh-python \
+# 		dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
+# 		libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
+# 		libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
+# 		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
+#     && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN git clone https://github.com/aptos-labs/bcc.git
-RUN mkdir bcc/build
-WORKDIR bcc/
-RUN git checkout 5258d14cb35ba08a8757a68386bebc9ea05f00c9
-WORKDIR build/
-RUN cmake ..
-RUN make
-RUN make install
-WORKDIR ..
+# RUN git clone https://github.com/aptos-labs/bcc.git
+# RUN mkdir bcc/build
+# WORKDIR bcc/
+# RUN git checkout 5258d14cb35ba08a8757a68386bebc9ea05f00c9
+# WORKDIR build/
+# RUN cmake ..
+# RUN make
+# RUN make install
+# WORKDIR ..
 
 ### Validator Image ###
 # We will build a base testing image with the necessary packages and 
