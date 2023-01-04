@@ -1005,7 +1005,8 @@ async fn test_join_and_leave_validator() {
     gas_used += get_gas(
         cli.withdraw_stake(validator_cli_index, withdraw_stake)
             .await
-            .unwrap(),
+            .unwrap()
+            .remove(0),
     );
 
     cli.assert_account_balance_now(
