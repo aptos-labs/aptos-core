@@ -127,6 +127,7 @@ module aptos_framework::multisig_account {
 
     /// Contains information about execution failure.
     struct ExecutionError has copy, drop, store {
+        // The module where the error occurs.
         abort_location: String,
         // There are 3 error types, stored as strings:
         // 1. VMError. Indicates an error from the VM, e.g. out of gas, invalid auth key, etc.
@@ -134,6 +135,7 @@ module aptos_framework::multisig_account {
         // 3. MoveExecutionFailure. Indicates an error from Move code where the VM could not continue. For example,
         // arithmetic failures.
         error_type: String,
+        // The detailed error code explaining which error occurred.
         error_code: u64,
     }
 
@@ -297,14 +299,13 @@ module aptos_framework::multisig_account {
     /// In order to ensure a malicious module cannot obtain backdoor control over an existing account, a signed message
     /// with a valid signature from the account's auth key is required.
     public entry fun create_with_existing_account(
-        multisig_account: &signer,
+        multisig_address: address,
         owners: vector<address>,
         signatures_required: u64,
         account_scheme: u8,
         account_public_key: vector<u8>,
         create_multisig_account_signed_message: vector<u8>,
     ) acquires OwnedMultisigAccounts {
-        let multisig_address = address_of(multisig_account);
         // Verify that the `MultisigAccountCreationMessage` has the right information and is signed by the account
         // owner's key.
         let proof_challenge = MultisigAccountCreationMessage {
@@ -320,6 +321,10 @@ module aptos_framework::multisig_account {
             proof_challenge,
         );
 
+        // We create the signer for the multisig account here since this is required to add the MultisigAccount resource
+        // This should be safe and authorized because we have verified the signed message from the existing account
+        // that authorizes creating a multisig account with the specified owners and signature threshold.
+        let multisig_account = &account::create_signer(multisig_address);
         create_with_owners_internal(
             multisig_account,
             owners,

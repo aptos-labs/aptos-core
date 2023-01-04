@@ -9,6 +9,7 @@ use crate::{
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
+    system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
     transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::transaction::TransactionOutputExt;
@@ -26,7 +27,7 @@ use aptos_types::{
         ApprovedExecutionHashes, FeatureFlag, Features, GasSchedule, GasScheduleV2, OnChainConfig,
         StorageGasSchedule, Version,
     },
-    transaction::{AbortInfo, ExecutionStatus, TransactionOutput, TransactionStatus},
+    transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use fail::fail_point;
@@ -417,6 +418,39 @@ impl AptosVMImpl {
                     MoveValue::U8(chain_id.id()),
                 ]),
                 &mut gas_meter,
+            )
+            .map(|_return_vals| ())
+            .map_err(expect_no_verification_errors)
+            .or_else(|err| convert_prologue_error(transaction_validation, err, log_context))
+    }
+
+    /// Run the prologue for a multisig transaction. This needs to
+    pub(crate) fn run_multisig_prologue<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        txn_data: &TransactionMetadata,
+        payload: &Multisig,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        let transaction_validation = self.transaction_validation();
+        let provided_payload = if payload.transaction_payload.is_some() {
+            bcs::to_bytes(payload.transaction_payload.as_ref().unwrap()).unwrap()
+        } else {
+            // Default to empty bytes if payload is not provided.
+            bcs::to_bytes::<Vec<u8>>(&vec![]).unwrap()
+        };
+
+        session
+            .execute_function_bypass_visibility(
+                &MULTISIG_ACCOUNT_MODULE,
+                VALIDATE_MULTISIG_TRANSACTION,
+                vec![],
+                serialize_values(&vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::Address(payload.multisig_address),
+                    MoveValue::vector_u8(provided_payload),
+                ]),
+                &mut UnmeteredGasMeter,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)

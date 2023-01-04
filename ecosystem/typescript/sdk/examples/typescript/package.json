@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "bcs_transaction": "ts-node bcs_transaction.ts",
+    "multisig_account": "ts-node multisig_account.ts",
     "multisig_transaction": "ts-node multisig_transaction.ts",
     "simple_nft": "ts-node simple_nft.ts",
     "transfer_coin": "ts-node transfer_coin.ts",

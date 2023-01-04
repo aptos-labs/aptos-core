@@ -670,15 +670,6 @@ impl TryFrom<Script> for ScriptPayload {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Object)]
-pub struct MultisigTransactionPayload {
-    pub function: EntryFunctionId,
-    /// Type arguments of the function
-    pub type_arguments: Vec<MoveType>,
-    /// Arguments of the function
-    pub arguments: Vec<serde_json::Value>,
-}
-
 /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
 /// transaction as the multisig account.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
@@ -686,8 +677,7 @@ pub struct MultisigPayload {
     pub multisig_address: Address,
 
     // Transaction payload is optional if already stored on chain.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub transaction_payload: Option<MultisigTransactionPayload>,
+    pub transaction_payload: Option<EntryFunctionPayload>,
 }
 
 impl VerifyInput for MultisigPayload {
