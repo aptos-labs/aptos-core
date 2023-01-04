@@ -78,8 +78,29 @@ module aptos_std::curves {
     ///         - Here `a=(a_0+a_1*u)` is considered greater than `b=(b_0+b_1*u)` if `a_1>b_1 OR (a_1=b_1 AND a_0>b_0)`.
     struct BLS12_381_G2 {}
 
-    /// This is a phantom type that represents the pairing output group `Gt` in BLS12-381 pairing.
-    /// TODO: describe the encoding.
+    /// A phantom type that represents the 2nd pairing input group `G2` in BLS12-381 pairing.
+    ///
+    /// In BLS12-381, a finite field `Fq` is used, where
+    /// `q` equals to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
+    /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
+    /// `Fq6` is an extension field of `Fq2`, constructed as `Fq6=Fq2[v]/(v^2-u-1)`.
+    /// `Fq12` is an extension field of `Fq6`, constructed as `Fq12=Fq6[w]/(w^2-v)`.
+    /// `Gt` is the multiplicative subgroup of `Fq12`.
+    /// `Gt` has a prime order `r` with value 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    ///
+    /// A `Scalar<BLS12_381_G2>` is an integer between 0 and `r-1`.
+    ///
+    /// Function `scalar_from_bytes<BLS12_381_Gt>` and `scalar_to_bytes<BLS12_381_Gt>`
+    /// assumes a 32-byte little-endian encoding of a `Scalar<BLS12_381_Gt>`.
+    ///
+    /// An `Element<BLS12_381_Gt>` is an element in `Gt`.
+    ///
+    /// Function `serialize_element_uncompressed<BLS12_381_Gt>` and `deserialize_element_uncompressed<BLS12_381_Gt>`,
+    /// as well as `serialize_element_ompressed<BLS12_381_Gt>` and `deserialize_element_compressed<BLS12_381_Gt>`,
+    /// assume a 576-byte encoding `[b_0, ..., b_575]` of an `Element<BLS12_381_Gt>`, with the following rules.
+    ///     - Assume the given element is `e=c_0+c_1*w` where `c_i=c_i0+c_i1*v+c_i2*v^2 for i=0..1` and `c_ij=c_ij0+c_ij1*u for j=0..2`.
+    ///     - `[b_0, ..., b_575]` is a concatenation of 12 encoded `Fq` elements: `c_000, c_001, c_010, c_011, c_020, c_021, c_100, c_101, c_110, c_111, c_120, c_121`.
+    ///     - Every `c_ijk` uses a 48-byte little-endian encoding.
     struct BLS12_381_Gt {}
 
     /// This struct represents a scalar, usually an integer between 0 and `r-1`,

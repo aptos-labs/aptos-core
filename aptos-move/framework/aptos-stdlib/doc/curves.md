@@ -190,8 +190,29 @@ assumes a 96-byte encoding <code>[b_0, ..., b_95]</code> of an <code><a href="cu
 
 ## Struct `BLS12_381_Gt`
 
-This is a phantom type that represents the pairing output group <code>Gt</code> in BLS12-381 pairing.
-TODO: describe the encoding.
+A phantom type that represents the 2nd pairing input group <code>G2</code> in BLS12-381 pairing.
+
+In BLS12-381, a finite field <code>Fq</code> is used, where
+<code>q</code> equals to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
+<code>Fq2</code> is an extension field of <code>Fq</code>, constructed as <code>Fq2=Fq[u]/(u^2+1)</code>.
+<code>Fq6</code> is an extension field of <code>Fq2</code>, constructed as <code>Fq6=Fq2[v]/(v^2-u-1)</code>.
+<code>Fq12</code> is an extension field of <code>Fq6</code>, constructed as <code>Fq12=Fq6[w]/(w^2-v)</code>.
+<code>Gt</code> is the multiplicative subgroup of <code>Fq12</code>.
+<code>Gt</code> has a prime order <code>r</code> with value 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+
+A <code><a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> is an integer between 0 and <code>r-1</code>.
+
+Function <code><a href="curves.md#0x1_curves_scalar_from_bytes">scalar_from_bytes</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> and <code><a href="curves.md#0x1_curves_scalar_to_bytes">scalar_to_bytes</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>
+assumes a 32-byte little-endian encoding of a <code><a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>.
+
+An <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> is an element in <code>Gt</code>.
+
+Function <code><a href="curves.md#0x1_curves_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> and <code><a href="curves.md#0x1_curves_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>,
+as well as <code>serialize_element_ompressed&lt;<a href="curves.md#0x1_curves_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> and <code><a href="curves.md#0x1_curves_deserialize_element_compressed">deserialize_element_compressed</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>,
+assume a 576-byte encoding <code>[b_0, ..., b_575]</code> of an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>, with the following rules.
+- Assume the given element is <code>e=c_0+c_1*w</code> where <code>c_i=c_i0+c_i1*v+c_i2*v^2 for i=0..1</code> and <code>c_ij=c_ij0+c_ij1*u for j=0..2</code>.
+- <code>[b_0, ..., b_575]</code> is a concatenation of 12 encoded <code>Fq</code> elements: <code>c_000, c_001, c_010, c_011, c_020, c_021, c_100, c_101, c_110, c_111, c_120, c_121</code>.
+- Every <code>c_ijk</code> uses a 48-byte little-endian encoding.
 
 
 <pre><code><b>struct</b> <a href="curves.md#0x1_curves_BLS12_381_Gt">BLS12_381_Gt</a>
