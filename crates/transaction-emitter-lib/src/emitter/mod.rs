@@ -16,7 +16,7 @@ use crate::{
         nft_mint_and_transfer::NFTMintAndTransferGeneratorCreator,
         p2p_transaction_generator::P2PTransactionGeneratorCreator,
         publish_modules::{CallDifferentModulesCreator, PublishPackageCreator},
-        transaction_mix_generator::TxnMixGeneratorCreator,
+        transaction_mix_generator::{TxnMixPhasedGeneratorCreator},
         EntryPoints, TransactionExecutor, TransactionGeneratorCreator,
     },
 };
@@ -33,7 +33,6 @@ use aptos_sdk::{
 };
 use async_trait::async_trait;
 use futures::future::{join_all, try_join_all, FutureExt};
-use itertools::zip;
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, seq::IteratorRandom};
 use rand_core::SeedableRng;
@@ -77,6 +76,7 @@ pub enum TransactionType {
     CallDifferentModules {
         entry_point: EntryPoints,
         num_modules: usize,
+        use_account_pool: bool,
     },
 }
 
@@ -98,6 +98,7 @@ impl TransactionType {
         Self::CallDifferentModules {
             entry_point: EntryPoints::Nop,
             num_modules: 1,
+            use_account_pool: false,
         }
     }
 
@@ -105,6 +106,7 @@ impl TransactionType {
         Self::CallDifferentModules {
             entry_point: EntryPoints::Nop,
             num_modules: 100,
+            use_account_pool: false,
         }
     }
 }
@@ -167,7 +169,7 @@ pub struct EmitJobRequest {
     reuse_accounts: bool,
     mint_to_root: bool,
 
-    transaction_mix: Vec<(TransactionType, usize)>,
+    transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
 
     txn_expiration_time_secs: u64,
     expected_max_txns: u64,
@@ -185,7 +187,7 @@ impl Default for EmitJobRequest {
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             reuse_accounts: false,
             mint_to_root: false,
-            transaction_mix: vec![(TransactionType::default(), 1)],
+            transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
             txn_expiration_time_secs: 60,
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
@@ -225,13 +227,22 @@ impl EmitJobRequest {
     }
 
     pub fn transaction_type(mut self, transaction_type: TransactionType) -> Self {
-        self.transaction_mix = vec![(transaction_type, 1)];
+        self.transaction_mix_per_phase = vec![vec![(transaction_type, 1)]];
         self
     }
 
     pub fn transaction_mix(mut self, transaction_mix: Vec<(TransactionType, usize)>) -> Self {
-        self.transaction_mix = transaction_mix;
+        self.transaction_mix_per_phase = vec![transaction_mix];
         self
+    }
+
+    pub fn transaction_mix_per_phase(mut self, transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>) -> Self {
+        self.transaction_mix_per_phase = transaction_mix_per_phase;
+        self
+    }
+
+    pub fn get_num_phases(&self) -> usize {
+        self.transaction_mix_per_phase.len()
     }
 
     pub fn mode(mut self, mode: EmitJobMode) -> Self {
@@ -411,6 +422,82 @@ impl TxnEmitter {
         StdRng::from_rng(self.rng()).unwrap()
     }
 
+    async fn create_txn_generator_creator(
+        &mut self,
+        transaction_mix_per_phase: &[Vec<(TransactionType, usize)>],
+        num_workers: usize,
+        all_accounts: &mut [LocalAccount],
+        txn_executor: &RestApiTransactionExecutor,
+        txn_factory: &TransactionFactory,
+        stats: Arc<DynamicStatsTracking>,
+    ) -> Box<dyn TransactionGeneratorCreator> {
+        let all_addresses: Vec<_> = all_accounts.iter().map(|d| d.address()).collect();
+        let all_addresses = Arc::new(RwLock::new(all_addresses));
+        let accounts_pool = Arc::new(RwLock::new(Vec::new()));
+
+        let mut txn_generator_creator_mix_per_phase: Vec<Vec<(Box<dyn TransactionGeneratorCreator>, usize)>> =
+           Vec::new();
+
+        for transaction_mix in transaction_mix_per_phase {
+            let mut txn_generator_creator_mix: Vec<(Box<dyn TransactionGeneratorCreator>, usize)> =
+                Vec::new();
+            for (transaction_type, weight) in transaction_mix {
+                let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
+                {
+                    TransactionType::CoinTransfer {
+                        invalid_transaction_ratio,
+                    } => Box::new(P2PTransactionGeneratorCreator::new(
+                        txn_factory.clone(),
+                        SEND_AMOUNT,
+                        all_addresses.clone(),
+                        *invalid_transaction_ratio,
+                    )),
+                    TransactionType::AccountGeneration {
+                        add_created_accounts_to_pool,
+                        max_account_working_set,
+                    } => Box::new(AccountGeneratorCreator::new(
+                        txn_factory.clone(),
+                        all_addresses.clone(),
+                        accounts_pool.clone(),
+                        *add_created_accounts_to_pool,
+                        *max_account_working_set,
+                    )),
+                    TransactionType::NftMintAndTransfer => Box::new(
+                        NFTMintAndTransferGeneratorCreator::new(
+                            txn_factory.clone(),
+                            all_accounts.get_mut(0).unwrap(),
+                            txn_executor,
+                            num_workers,
+                        )
+                        .await,
+                    ),
+                    TransactionType::PublishPackage => Box::new(PublishPackageCreator::new(
+                        txn_factory.clone(),
+                    )),
+                    TransactionType::CallDifferentModules {
+                        entry_point,
+                        num_modules,
+                        use_account_pool,
+                    } => Box::new(
+                        CallDifferentModulesCreator::new(
+                            txn_factory.clone(),
+                            all_accounts,
+                            txn_executor,
+                            if *use_account_pool { Some(accounts_pool.clone()) } else { None },
+                            *entry_point,
+                            *num_modules,
+                        )
+                        .await,
+                    ),
+                };
+                txn_generator_creator_mix.push((txn_generator_creator, *weight));
+            }
+            txn_generator_creator_mix_per_phase.push(txn_generator_creator_mix)
+        }
+
+        Box::new(TxnMixPhasedGeneratorCreator::new(txn_generator_creator_mix_per_phase, stats))
+    }
+
     pub async fn start_job(
         &mut self,
         root_account: &mut LocalAccount,
@@ -439,8 +526,6 @@ impl TxnEmitter {
         let mut all_accounts = account_minter
             .create_accounts(&req, &mode_params, num_accounts)
             .await?;
-        let all_addresses: Vec<_> = all_accounts.iter().map(|d| d.address()).collect();
-        let all_addresses = Arc::new(RwLock::new(all_addresses));
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
@@ -450,69 +535,7 @@ impl TxnEmitter {
         };
         // mode_params.max_submit_batch_size
 
-        let mut txn_generator_creator_mix: Vec<(Box<dyn TransactionGeneratorCreator>, usize)> =
-            Vec::new();
-        for (transaction_type, weight) in req.transaction_mix {
-            let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
-            {
-                TransactionType::CoinTransfer {
-                    invalid_transaction_ratio,
-                } => Box::new(P2PTransactionGeneratorCreator::new(
-                    self.from_rng(),
-                    txn_factory.clone(),
-                    SEND_AMOUNT,
-                    all_addresses.clone(),
-                    invalid_transaction_ratio,
-                    req.gas_price,
-                )),
-                TransactionType::AccountGeneration {
-                    add_created_accounts_to_pool,
-                    max_account_working_set,
-                } => Box::new(AccountGeneratorCreator::new(
-                    txn_factory.clone(),
-                    all_addresses.clone(),
-                    add_created_accounts_to_pool,
-                    max_account_working_set,
-                    req.gas_price,
-                )),
-                TransactionType::NftMintAndTransfer => Box::new(
-                    NFTMintAndTransferGeneratorCreator::new(
-                        self.from_rng(),
-                        txn_factory.clone(),
-                        root_account,
-                        &txn_executor,
-                        num_workers,
-                    )
-                    .await,
-                ),
-                TransactionType::PublishPackage => Box::new(PublishPackageCreator::new(
-                    self.from_rng(),
-                    txn_factory.clone(),
-                    req.gas_price,
-                )),
-                TransactionType::CallDifferentModules {
-                    entry_point,
-                    num_modules,
-                } => Box::new(
-                    CallDifferentModulesCreator::new(
-                        self.from_rng(),
-                        txn_factory.clone(),
-                        &mut all_accounts,
-                        &txn_executor,
-                        entry_point,
-                        num_modules,
-                    )
-                    .await,
-                ),
-            };
-            txn_generator_creator_mix.push((txn_generator_creator, weight));
-        }
-        let mut txn_generator_creator: Box<dyn TransactionGeneratorCreator> =
-            if txn_generator_creator_mix.len() > 1 {
-                Box::new(TxnMixGeneratorCreator::new(txn_generator_creator_mix))
-            } else {
-                txn_generator_creator_mix.into_iter().next().unwrap().0
-            };
+        let mut txn_generator_creator = self.create_txn_generator_creator(&req.transaction_mix_per_phase, num_workers, &mut all_accounts, &txn_executor, &txn_factory, stats.clone()).await;
 
         let total_workers = req.rest_clients.len() * workers_per_endpoint;
 
@@ -600,35 +623,53 @@ impl TxnEmitter {
         }
     }
 
-    pub async fn emit_txn_for(
+    async fn emit_txn_for_impl(
         mut self,
         source_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
+        print_stats_interval: Option<u64>,
     ) -> Result<TxnStats> {
-        let job = self.start_job(source_account, emit_job_request, 1).await?;
+        let phases = emit_job_request.transaction_mix_per_phase.len();
+
+        let job = self.start_job(source_account, emit_job_request, phases).await?;
         info!("Starting emitting txns for {} secs", duration.as_secs());
-        time::sleep(duration).await;
+
+        let per_phase_duration = duration.checked_div(phases as u32).unwrap();
+        for phase in 0 .. phases {
+            if phase > 0 {
+                info!("Starting next phase");
+                job.start_next_phase();
+            }
+            if let Some(interval_secs) = print_stats_interval {
+                self.periodic_stat(&job, per_phase_duration, interval_secs).await;
+            } else {
+                time::sleep(per_phase_duration).await;
+            }
+        }
         info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
         info!("Stopped job");
         Ok(stats.into_iter().next().unwrap())
     }
 
+    pub async fn emit_txn_for(
+        self,
+        source_account: &mut LocalAccount,
+        emit_job_request: EmitJobRequest,
+        duration: Duration,
+    ) -> Result<TxnStats> {
+        self.emit_txn_for_impl(source_account, emit_job_request, duration, None).await
+    }
+
     pub async fn emit_txn_for_with_stats(
-        mut self,
+        self,
         source_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         interval_secs: u64,
     ) -> Result<TxnStats> {
-        info!("Starting emitting txns for {} secs", duration.as_secs());
-        let job = self.start_job(source_account, emit_job_request, 1).await?;
-        self.periodic_stat(&job, duration, interval_secs).await;
-        info!("Ran for {} secs, stopping job...", duration.as_secs());
-        let stats = self.stop_job(job).await;
-        info!("Stopped job");
-        Ok(stats.into_iter().next().unwrap())
+        self.emit_txn_for_impl(source_account, emit_job_request, duration, Some(interval_secs)).await
     }
 
     pub async fn submit_single_transaction(
@@ -748,12 +789,11 @@ async fn wait_for_single_account_sequence(
 async fn wait_for_accounts_sequence(
     start_time: Instant,
     client: &RestClient,
-    accounts: &mut [LocalAccount],
-    transactions_per_account: usize,
+    account_seqs: &HashMap<AccountAddress, (u64, u64)>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
-) -> (usize, u128) {
-    let mut pending_addresses: HashSet<_> = accounts.iter().map(|d| d.address()).collect();
+) -> (HashMap<AccountAddress, u64>, u128) {
+    let mut pending_addresses: HashSet<_> = account_seqs.keys().copied().collect();
     let mut latest_fetched_counts = HashMap::new();
 
     let mut sum_of_completion_timestamps_millis = 0u128;
@@ -761,16 +801,18 @@ async fn wait_for_accounts_sequence(
         match query_sequence_numbers(client, pending_addresses.iter()).await {
             Ok((sequence_numbers, ledger_timestamp_secs)) => {
                 let millis_elapsed = start_time.elapsed().as_millis();
-                for (account, sequence_number) in zip(accounts.iter_mut(), &sequence_numbers) {
-                    let prev_sequence_number = latest_fetched_counts
-                        .insert(account.address(), *sequence_number)
-                        .unwrap_or(account.sequence_number() - transactions_per_account as u64);
-                    assert!(prev_sequence_number <= *sequence_number);
-                    sum_of_completion_timestamps_millis +=
-                        millis_elapsed * (*sequence_number - prev_sequence_number) as u128;
+                for (address, sequence_number) in sequence_numbers {
+                    let (start_seq_num, end_seq_num) = account_seqs.get(&address).unwrap();
 
-                    if account.sequence_number() == *sequence_number {
-                        pending_addresses.remove(&account.address());
+                    let prev_sequence_number = latest_fetched_counts
+                        .insert(address, sequence_number)
+                        .unwrap_or(*start_seq_num);
+                    assert!(prev_sequence_number <= sequence_number);
+                    sum_of_completion_timestamps_millis +=
+                        millis_elapsed * (sequence_number - prev_sequence_number) as u128;
+
+                    if *end_seq_num == sequence_number {
+                        pending_addresses.remove(&address);
                     }
                 }
 
@@ -786,10 +828,7 @@ async fn wait_for_accounts_sequence(
                             client.path_prefix_string(),
                             ledger_timestamp_secs,
                             txn_expiration_ts_secs,
-                            accounts
-                                .iter()
-                                .map(|a| a.address().to_hex_literal())
-                                .collect::<Vec<_>>(),
+                            pending_addresses,
                         )
                     );
                     break;
@@ -824,80 +863,92 @@ async fn wait_for_accounts_sequence(
     }
 
     (
-        update_seq_num_and_get_num_expired(
-            accounts,
-            transactions_per_account,
-            latest_fetched_counts,
-        ),
+        latest_fetched_counts,
         sum_of_completion_timestamps_millis,
     )
 }
 
 fn update_seq_num_and_get_num_expired(
     accounts: &mut [LocalAccount],
-    transactions_per_account: usize,
+    account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
     latest_fetched_counts: HashMap<AccountAddress, u64>,
-) -> usize {
+) -> (usize, usize) {
     accounts
         .iter_mut()
-        .filter_map(
-            |account| match latest_fetched_counts.get(&account.address()) {
-                Some(count) => {
-                    if *count != account.sequence_number() {
-                        assert!(account.sequence_number() > *count);
-                        assert!(
-                            account.sequence_number() <= count + transactions_per_account as u64
-                        );
-                        let diff = (account.sequence_number() - count) as usize;
+        .for_each(
+            |account| {
+                let (start_seq_num, end_seq_num) = if let Some(pair) = account_to_start_and_end_seq_num.get(&account.address()) {
+                    pair
+                } else {
+                    return;
+                };
+                assert!(account.sequence_number() == *end_seq_num);
+
+                match latest_fetched_counts.get(&account.address()) {
+                    Some(count) => {
+                        if *count != account.sequence_number() {
+                            assert!(account.sequence_number() > *count);
+                            debug!(
+                                "Stale sequence_number for {}, expected {}, setting to {}",
+                                account.address(),
+                                account.sequence_number(),
+                                count
+                            );
+                            *account.sequence_number_mut() = *count;
+                        }
+                    },
+                    None => {
                         debug!(
-                            "Stale sequence_number for {}, expected {}, setting to {}",
+                            "Couldn't fetch sequence_number for {}, expected {}, setting to {}",
                             account.address(),
                             account.sequence_number(),
-                            count
+                            start_seq_num
                         );
-                        *account.sequence_number_mut() = *count;
-                        Some(diff)
-                    } else {
-                        None
-                    }
-                },
-                None => {
-                    debug!(
-                        "Couldn't fetch sequence_number for {}, expected {}, setting to {}",
-                        account.address(),
-                        account.sequence_number(),
-                        account.sequence_number() - transactions_per_account as u64
-                    );
-                    *account.sequence_number_mut() -= transactions_per_account as u64;
-                    Some(transactions_per_account)
-                },
+                        *account.sequence_number_mut() = *start_seq_num;
+                    },
+                }
+            }
+        );
+
+    account_to_start_and_end_seq_num.iter().map(|(address, (start_seq_num, end_seq_num))|
+        match latest_fetched_counts.get(address) {
+            Some(count) => {
+                assert!(*count <= *end_seq_num);
+                assert!(*count >= *start_seq_num);
+                ((*count - *start_seq_num) as usize, (*end_seq_num - *count) as usize)
             },
-        )
-        .sum()
+            None => {
+                (0, (end_seq_num - start_seq_num) as usize)
+            },
+        }
+    ).fold((0, 0), |(committed, expired), (cur_committed, cur_expired)| (committed + cur_committed, expired + cur_expired))
 }
 
 pub async fn query_sequence_number(client: &RestClient, address: AccountAddress) -> Result<u64> {
-    Ok(query_sequence_numbers(client, [address].iter()).await?.0[0])
+    Ok(query_sequence_numbers(client, [address].iter()).await?.0[0].1)
 }
 
 // Return a pair of (list of sequence numbers, ledger timestamp)
 pub async fn query_sequence_numbers<'a, I>(
     client: &RestClient,
     addresses: I,
-) -> Result<(Vec<u64>, u64)>
+) -> Result<(Vec<(AccountAddress, u64)>, u64)>
 where
     I: Iterator<Item = &'a AccountAddress>,
 {
+    let (addresses, futures): (Vec<_>, Vec<_>) = addresses.map(|address| (*address, RETRY_POLICY.retry(move || client.get_account_bcs(*address)))).unzip();
+
     let (seq_nums, timestamps): (Vec<_>, Vec<_>) = try_join_all(
-        addresses.map(|address| RETRY_POLICY.retry(move || client.get_account_bcs(*address))),
+        futures
     )
     .await
     .map_err(|e| format_err!("Get accounts failed: {:?}", e))?
     .into_iter()
-    .map(|resp| {
+    .zip(addresses.iter())
+    .map(|(resp, address)| {
         let (account, state) = resp.into_parts();
         (
-            account.sequence_number(),
+            (*address, account.sequence_number()),
             Duration::from_micros(state.timestamp_usecs).as_secs(),
         )
     })
