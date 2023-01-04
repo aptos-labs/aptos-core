@@ -37,5 +37,5 @@ tracing-subscriber = { workspace = true }
 pretty_assertions = { workspace = true }
 
 [features]
-default = []
+default = ["aptos-console"]
 aptos-console = ["console-subscriber"]

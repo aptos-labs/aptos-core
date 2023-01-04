@@ -7,7 +7,7 @@ use crate::{
     logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
-    quorum_store::types::{Batch, Fragment},
+    quorum_store::types::{Batch, BatchRequest, Fragment},
 };
 use anyhow::{anyhow, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -68,6 +68,8 @@ pub struct NetworkReceivers {
 
 #[async_trait::async_trait]
 pub(crate) trait QuorumStoreSender {
+    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>);
+
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
     async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>);
@@ -265,6 +267,15 @@ impl NetworkSender {
         self.send(msg, recipients).await
     }
 
+    /// Sends the given sync info to the given author.
+    /// The future is fulfilled as soon as the message is added to the internal network channel
+    /// (does not indicate whether the message is delivered or sent out).
+    pub async fn _send_sync_info(&self, sync_info: SyncInfo, recipient: Author) {
+        fail_point!("consensus::send_sync_info", |_| ());
+        let msg = ConsensusMsg::SyncInfo(Box::new(sync_info));
+        self.send(msg, vec![recipient]).await
+    }
+
     #[cfg(feature = "failpoints")]
     pub async fn send_proposal(&self, proposal_msg: ProposalMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send::proposal", |_| ());
@@ -300,6 +311,12 @@ impl NetworkSender {
 
 #[async_trait::async_trait]
 impl QuorumStoreSender for NetworkSender {
+    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>) {
+        fail_point!("consensus::send_batch_request", |_| ());
+        let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
+        self.send(msg, recipients).await
+    }
+
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
         fail_point!("consensus::send_batch", |_| ());
         let msg = ConsensusMsg::BatchMsg(Box::new(batch));

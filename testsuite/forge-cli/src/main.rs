@@ -200,7 +200,8 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    // let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = Duration::from_secs(15 * 60);
     let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
@@ -1088,9 +1089,12 @@ fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<
 
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
-        .with_network_tests(vec![&PerformanceBenchmarkWithFN])
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+        .with_initial_fullnode_count(100)
+        // .with_network_tests(vec![&PerformanceBenchmarkWithFN])
+        .with_network_tests(vec![&ThreeRegionSimulationTest {
+            add_execution_delay: None,
+        }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
