@@ -491,10 +491,10 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
 
 fn run_consensus_only_three_region_simulation(config: ForgeConfig) -> ForgeConfig {
     config
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 30000 })
+                .mode(EmitJobMode::ConstTps { tps: 100000 })
                 .txn_expiration_time_secs(5 * 60),
         )
         .with_network_tests(vec![&ThreeRegionSimulationTest {
@@ -507,15 +507,16 @@ fn run_consensus_only_three_region_simulation(config: ForgeConfig) -> ForgeConfi
         .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
             helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
-                (3_u64 * 1024 * 1024 * 1024).into();
+                (3 as u64 * 1024 * 1024 * 1024).into();
             helm_values["validator"]["config"]["mempool"]["capacity_per_user"] = 100_000.into();
             helm_values["validator"]["config"]["mempool"]["system_transaction_timeout_secs"] =
                 (5 * 60 * 60).into();
             helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
                 (5 * 60 * 60_000).into();
-            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] = 5000.into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                100000.into();
             helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                30000.into();
+                300000.into();
             helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
                 (3 * 1024 * 1024).into();
             helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
