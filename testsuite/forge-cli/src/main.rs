@@ -834,9 +834,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
                 .with_emit_job(
                     EmitJobRequest::default()
-                        .mode(EmitJobMode::MaxLoad {
-                            mempool_backlog: 50000,
-                        })
+                        .mode(EmitJobMode::ConstTps { tps: 100000 })
                         .txn_expiration_time_secs(5 * 60),
                 )
                 .with_network_tests(vec![&ThreeRegionSimulationTest {
@@ -857,9 +855,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     helm_values["validator"]["config"]["mempool"]
                         ["system_transaction_gc_interval_ms"] = (5 * 60 * 60_000).into();
                     helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
-                        10000.into();
+                        100000.into();
                     helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                        30000.into();
+                        300000.into();
                     helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
                         (3 * 1024 * 1024).into();
                     helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
