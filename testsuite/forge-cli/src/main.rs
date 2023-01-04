@@ -834,7 +834,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
                 .with_emit_job(
                     EmitJobRequest::default()
-                        .mode(EmitJobMode::ConstTps { tps: 100000 })
+                        .mode(EmitJobMode::ConstTps { tps: 200000 })
                         .txn_expiration_time_secs(5 * 60),
                 )
                 .with_network_tests(vec![&ThreeRegionSimulationTest {
