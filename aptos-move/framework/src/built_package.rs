@@ -5,7 +5,8 @@ use crate::{
     docgen::DocgenOptions,
     extended_checks,
     natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
-    zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY_V1,
+    zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
+    APTOS_METADATA_KEY_V1, METADATA_V1_MIN_FILE_FORMAT_VERSION,
 };
 use anyhow::bail;
 use aptos_types::{account_address::AccountAddress, transaction::EntryABI};
@@ -350,12 +351,24 @@ fn inject_runtime_metadata(
             CompiledUnit::Module(named_module) => {
                 if let Some(module_metadata) = metadata.get(&named_module.module.self_id()) {
                     if !module_metadata.is_empty() {
-                        let serialized_metadata =
-                            bcs::to_bytes(&module_metadata).expect("BCS for RuntimeModuleMetadata");
-                        named_module.module.metadata.push(Metadata {
-                            key: APTOS_METADATA_KEY_V1.clone(),
-                            value: serialized_metadata,
-                        });
+                        if bytecode_version.unwrap_or(METADATA_V1_MIN_FILE_FORMAT_VERSION)
+                            >= METADATA_V1_MIN_FILE_FORMAT_VERSION
+                        {
+                            let serialized_metadata = bcs::to_bytes(&module_metadata)
+                                .expect("BCS for RuntimeModuleMetadata");
+                            named_module.module.metadata.push(Metadata {
+                                key: APTOS_METADATA_KEY_V1.clone(),
+                                value: serialized_metadata,
+                            });
+                        } else {
+                            let serialized_metadata =
+                                bcs::to_bytes(&module_metadata.clone().downgrade())
+                                    .expect("BCS for RuntimeModuleMetadata");
+                            named_module.module.metadata.push(Metadata {
+                                key: APTOS_METADATA_KEY.clone(),
+                                value: serialized_metadata,
+                            });
+                        }
 
                         // Also need to update the .mv file on disk.
                         let path = package_path
