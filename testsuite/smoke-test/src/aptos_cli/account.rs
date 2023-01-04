@@ -56,6 +56,7 @@ async fn test_account_flow() {
             Some(GasOptions {
                 gas_unit_price: Some(2),
                 max_gas: None,
+                expiration_secs: 30,
             }),
         )
         .await
@@ -77,6 +78,7 @@ async fn test_account_flow() {
             // NOTE(Gas): This should be equal to the min gas amount allowed.
             //            Read the comment above to understand why.
             max_gas: Some(150),
+            expiration_secs: 30,
         }),
     )
     .await
