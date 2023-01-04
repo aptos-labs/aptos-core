@@ -55,7 +55,7 @@ pub const INBOUND_TCP_TX_BUFFER_SIZE: u32 = 512 * 1024; // 1MB use a bigger spoo
 pub const OUTBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 500ms latency
 pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB use a bigger spoon
 pub const ENABLE_APTOS_NETPERF_CLIENT: bool = true;
-pub const DEFAULT_APTOS_NETPERF_CLIENT_PORT: u16 = 9107;
+pub const DEFAULT_APTOS_NETPERF_CLIENT_PORT: u16 = 9105;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
