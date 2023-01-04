@@ -6,8 +6,8 @@ module aptos_std::curves {
 
     /// A phantom type that represents the 1st pairing input group `G1` in BLS12-381 pairing.
     ///
-    /// In BLS12-381, a finite field `Fq` is used.
-    /// q equals to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
+    /// In BLS12-381, a finite field `Fq` is used, where
+    /// `q` equals to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
     /// A curve `E(Fq)` is defined as `y^2=x^3+4` over `Fq`.
     /// `G1` is formed by a subset of points on `E(Fq)`.
     /// `G1` has a prime order `r` with value 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
@@ -23,7 +23,7 @@ module aptos_std::curves {
     /// assumes a 96-byte encoding `[b_0, ..., b_95]` of an `Element<BLS12_381_G1>`, with the following rules.
     /// - `b_95 & 0x40` is the infinity flag.
     /// - The infinity flag is 1 if and only if the element is the point at infinity.
-    /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve, with the following rules.
+    /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq)`, with the following rules.
     ///     - `[b_0, ..., b_47 & 0x3f]` is a 48-byte little-endian encoding of `x`.
     ///     - `[b_48, ..., b_95 & 0x3f]` is a 48-byte little-endian encoding of 'y'.
     ///
@@ -37,8 +37,45 @@ module aptos_std::curves {
     ///     - The positiveness flag is 1 if and only if `y > -y`.
     struct BLS12_381_G1 {}
 
-    /// This is a phantom type that represents the 2nd pairing input group `G2` in BLS12-381 pairing.
-    /// TODO: describe the encoding.
+    /// A phantom type that represents the 2nd pairing input group `G2` in BLS12-381 pairing.
+    ///
+    /// In BLS12-381, a finite field `Fq` is used, where
+    /// `q` equals to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
+    /// `Fq2=Fq[u]/(u^2+1)` is a quadratic extension of `Fq`.
+    /// A curve `E(Fq2)` is defined as `y^2=x^3+4(u+1)` over `Fq2`.
+    /// `G2` is formed by a subset of points on `E(Fq2)`.
+    /// `G2` has a prime order `r` with value 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    ///
+    /// A `Scalar<BLS12_381_G2>` is an integer between 0 and `r-1`.
+    ///
+    /// Function `scalar_from_bytes<BLS12_381_G2>` and `scalar_to_bytes<BLS12_381_G2>`
+    /// assumes a 32-byte little-endian encoding of a `Scalar<BLS12_381_G2>`.
+    ///
+    /// An `Element<BLS12_381_G2>` is an element in `G2`.
+    ///
+    /// Function `serialize_element_uncompressed<BLS12_381_G2>` and `deserialize_element_uncompressed<BLS12_381_G2>`
+    /// assumes a 192-byte encoding `[b_0, ..., b_191]` of an `Element<BLS12_381_G2>`, with the following rules.
+    /// - `b_191 & 0x40` is the infinity flag.
+    /// - The infinity flag is 1 if and only if the element is the point at infinity.
+    /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq2)`, with the following rules.
+    ///     - `[b_0, ..., b_95]` is a 96-byte encoding of `x=(x_0+x_1*u)`.
+    ///         - `[b_0, ..., b_47]` is a 48-byte little-endian encoding of `x_0`.
+    ///         - `[b_48, ..., b_95]` is a 48-byte little-endian encoding of `x_1`.
+    ///     - `[b_96, ..., b_191 & 0x3f]` is a 96-byte encoding of 'y=(y_0+y_1*u)'.
+    ///         - `[b_96, ..., b_143]` is a 48-byte little-endian encoding of `y_0`.
+    ///         - `[b_144, ..., b_191 & 0x3f]` is a 48-byte little-endian encoding of `y_1`.
+    ///
+    /// Function `serialize_element_compressed<BLS12_381_G2>` and `deserialize_element_compressed<BLS12_381_G2>`
+    /// assumes a 96-byte encoding `[b_0, ..., b_95]` of an `Element<BLS12_381_G2>` with the following rules.
+    /// - `b_95 & 0x40` is the infinity flag.
+    /// - The infinity flag is 1 if and only if the element is the point at infinity.
+    /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq2)`, with the following rules.
+    ///     - `[b_0, ..., b_95 & 0x3f]` is a 96-byte little-endian encoding of `x=(x_0+x_1*u)`.
+    ///         - `[b_0, ..., b_47]` is a 48-byte little-endian encoding of `x_0`.
+    ///         - `[b_48, ..., b_95 & 0x3f]` is a 48-byte little-endian encoding of `x_1`.
+    ///     - `b_95 & 0x80` is the positiveness flag.
+    ///     - The positiveness flag is 1 if and only if `y > -y`.
+    ///         - Here `a=(a_0+a_1*u)` is considered greater than `b=(b_0+b_1*u)` if `a_1>b_1 OR (a_1=b_1 AND a_0>b_0)`.
     struct BLS12_381_G2 {}
 
     /// This is a phantom type that represents the pairing output group `Gt` in BLS12-381 pairing.

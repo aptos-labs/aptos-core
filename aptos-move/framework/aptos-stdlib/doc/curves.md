@@ -68,8 +68,8 @@
 
 A phantom type that represents the 1st pairing input group <code>G1</code> in BLS12-381 pairing.
 
-In BLS12-381, a finite field <code>Fq</code> is used.
-q equals to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
+In BLS12-381, a finite field <code>Fq</code> is used, where
+<code>q</code> equals to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
 A curve <code>E(Fq)</code> is defined as <code>y^2=x^3+4</code> over <code>Fq</code>.
 <code>G1</code> is formed by a subset of points on <code>E(Fq)</code>.
 <code>G1</code> has a prime order <code>r</code> with value 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
@@ -85,7 +85,7 @@ Function <code><a href="curves.md#0x1_curves_serialize_element_uncompressed">ser
 assumes a 96-byte encoding <code>[b_0, ..., b_95]</code> of an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>, with the following rules.
 - <code>b_95 & 0x40</code> is the infinity flag.
 - The infinity flag is 1 if and only if the element is the point at infinity.
-- The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve, with the following rules.
+- The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq)</code>, with the following rules.
 - <code>[b_0, ..., b_47 & 0x3f]</code> is a 48-byte little-endian encoding of <code>x</code>.
 - <code>[b_48, ..., b_95 & 0x3f]</code> is a 48-byte little-endian encoding of 'y'.
 
@@ -124,8 +124,45 @@ assumes a 48-byte encoding <code>[b_0, ..., b_47]</code> of an <code><a href="cu
 
 ## Struct `BLS12_381_G2`
 
-This is a phantom type that represents the 2nd pairing input group <code>G2</code> in BLS12-381 pairing.
-TODO: describe the encoding.
+A phantom type that represents the 2nd pairing input group <code>G2</code> in BLS12-381 pairing.
+
+In BLS12-381, a finite field <code>Fq</code> is used, where
+<code>q</code> equals to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
+<code>Fq2=Fq[u]/(u^2+1)</code> is a quadratic extension of <code>Fq</code>.
+A curve <code>E(Fq2)</code> is defined as <code>y^2=x^3+4(u+1)</code> over <code>Fq2</code>.
+<code>G2</code> is formed by a subset of points on <code>E(Fq2)</code>.
+<code>G2</code> has a prime order <code>r</code> with value 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+
+A <code><a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> is an integer between 0 and <code>r-1</code>.
+
+Function <code><a href="curves.md#0x1_curves_scalar_from_bytes">scalar_from_bytes</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> and <code><a href="curves.md#0x1_curves_scalar_to_bytes">scalar_to_bytes</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>
+assumes a 32-byte little-endian encoding of a <code><a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>.
+
+An <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> is an element in <code>G2</code>.
+
+Function <code><a href="curves.md#0x1_curves_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> and <code><a href="curves.md#0x1_curves_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>
+assumes a 192-byte encoding <code>[b_0, ..., b_191]</code> of an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>, with the following rules.
+- <code>b_191 & 0x40</code> is the infinity flag.
+- The infinity flag is 1 if and only if the element is the point at infinity.
+- The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq2)</code>, with the following rules.
+- <code>[b_0, ..., b_95]</code> is a 96-byte encoding of <code>x=(x_0+x_1*u)</code>.
+- <code>[b_0, ..., b_47]</code> is a 48-byte little-endian encoding of <code>x_0</code>.
+- <code>[b_48, ..., b_95]</code> is a 48-byte little-endian encoding of <code>x_1</code>.
+- <code>[b_96, ..., b_191 & 0x3f]</code> is a 96-byte encoding of 'y=(y_0+y_1*u)'.
+- <code>[b_96, ..., b_143]</code> is a 48-byte little-endian encoding of <code>y_0</code>.
+- <code>[b_144, ..., b_191 & 0x3f]</code> is a 48-byte little-endian encoding of <code>y_1</code>.
+
+Function <code><a href="curves.md#0x1_curves_serialize_element_compressed">serialize_element_compressed</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> and <code><a href="curves.md#0x1_curves_deserialize_element_compressed">deserialize_element_compressed</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>
+assumes a 96-byte encoding <code>[b_0, ..., b_95]</code> of an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;<a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> with the following rules.
+- <code>b_95 & 0x40</code> is the infinity flag.
+- The infinity flag is 1 if and only if the element is the point at infinity.
+- The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq2)</code>, with the following rules.
+- <code>[b_0, ..., b_95 & 0x3f]</code> is a 96-byte little-endian encoding of <code>x=(x_0+x_1*u)</code>.
+- <code>[b_0, ..., b_47]</code> is a 48-byte little-endian encoding of <code>x_0</code>.
+- <code>[b_48, ..., b_95 & 0x3f]</code> is a 48-byte little-endian encoding of <code>x_1</code>.
+- <code>b_95 & 0x80</code> is the positiveness flag.
+- The positiveness flag is 1 if and only if <code>y &gt; -y</code>.
+- Here <code>a=(a_0+a_1*u)</code> is considered greater than <code>b=(b_0+b_1*u)</code> if <code>a_1&gt;b_1 OR (a_1=b_1 AND a_0&gt;b_0)</code>.
 
 
 <pre><code><b>struct</b> <a href="curves.md#0x1_curves_BLS12_381_G2">BLS12_381_G2</a>
