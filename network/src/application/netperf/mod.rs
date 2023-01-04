@@ -118,7 +118,7 @@ impl NetPerf {
 
     async fn start(mut self) {
         let port = preferred_axum_port(self.netperf_port);
-        let (tx, rx) = tokio::sync::mpsc::channel::<NetPerfCommands>(NETPERF_COMMAND_CHANNEL_SIZE);
+        let (tx, _rx) = tokio::sync::mpsc::channel::<NetPerfCommands>(NETPERF_COMMAND_CHANNEL_SIZE);
 
         info!(
             NetworkSchema::new(&self.network_context),
@@ -128,10 +128,6 @@ impl NetPerf {
         spawn_named!(
             "NetPerf Axum",
             start_axum(self.net_perf_state(tx.clone()), port)
-        );
-        spawn_named!(
-            "NetPerf EventHandler",
-            netperf_comp_handler(self.net_perf_state(tx.clone()), rx)
         );
 
         loop {
@@ -262,6 +258,7 @@ async fn parse_query(
     StatusCode::OK
 }
 
+#[allow(dead_code)]
 async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfCommands>) {
     let mut rpc_handlers = FuturesUnordered::new();
 

@@ -24,7 +24,7 @@ use std::{
 
 #[ignore]
 #[tokio::test]
-async fn test_netperfclient() {
+async fn test_netperf_client() {
     let mut swarm = new_local_swarm_with_aptos(5).await;
     let version = swarm.versions().max().unwrap();
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
