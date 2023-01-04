@@ -12,7 +12,8 @@ use aptos_sdk::{
     types::{account_address::AccountAddress, transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
-use rand::{rngs::StdRng, thread_rng};
+use rand::{rngs::StdRng, thread_rng, SeedableRng, Rng};
+use rand_core::OsRng;
 use std::collections::HashMap;
 
 const INITIAL_NFT_BALANCE: u64 = 50_000;
@@ -223,12 +224,12 @@ pub struct NFTMintAndTransferGeneratorCreator {
 
 impl NFTMintAndTransferGeneratorCreator {
     pub async fn new(
-        mut rng: StdRng,
         txn_factory: TransactionFactory,
         root_account: &mut LocalAccount,
         txn_executor: &dyn TransactionExecutor,
         num_workers: usize,
     ) -> Self {
+        let mut rng = StdRng::from_seed(OsRng.gen());
         let mut creator_account = LocalAccount::generate(&mut rng);
         let creator_address = creator_account.address();
         let collection_name = "collection name".to_owned().into_bytes();

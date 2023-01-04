@@ -36,24 +36,36 @@ pub async fn generate_traffic(
     emit_job_request = emit_job_request
         .rest_clients(validator_clients)
         .gas_price(gas_price)
-        .transaction_mix(vec![
-            (TransactionType::default_coin_transfer(), 20),
-            (TransactionType::default_account_generation(), 20),
-            // // commenting this out given it consistently fails smoke test
-            // // and it seems to be called only from `test_txn_emmitter`
-            // (TransactionType::NftMintAndTransfer, 20),
-            (TransactionType::PublishPackage, 20),
-            (TransactionType::default_call_different_modules(), 20),
-            (
-                TransactionType::CallDifferentModules {
-                    entry_point: EntryPoints::MakeOrChange {
-                        string_length: Some(0),
-                        data_length: Some(100),
+        .transaction_mix_per_phase(vec![
+            vec![(
+                TransactionType::AccountGeneration {
+                    add_created_accounts_to_pool: true,
+                    max_account_working_set: 1_000_000,
+                    creation_balance: 1_000_000,
+                }, 
+                20
+            )],
+            vec![
+                (TransactionType::default_coin_transfer(), 20),
+                // // commenting this out given it consistently fails smoke test
+                // // and it seems to be called only from `test_txn_emmitter`
+                // (TransactionType::NftMintAndTransfer, 20),
+                (TransactionType::PublishPackage, 20),
+            ],
+            vec![
+                (TransactionType::default_call_different_modules(), 20),
+                (
+                    TransactionType::CallDifferentModules {
+                        entry_point: EntryPoints::MakeOrChange {
+                            string_length: Some(0),
+                            data_length: Some(64),
+                        },
+                        num_modules: 1,
+                        use_account_pool: true,
                     },
-                    num_modules: 10,
-                },
-                20,
-            ),
+                    20,
+                ),
+            ],
         ])
         .mode(EmitJobMode::ConstTps { tps: 20 });
     emitter
@@ -68,7 +80,7 @@ async fn test_txn_emmitter() {
 
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
-    let txn_stat = generate_traffic(&mut swarm, &all_validators, Duration::from_secs(10), 1)
+    let txn_stat = generate_traffic(&mut swarm, &all_validators, Duration::from_secs(20), 1)
         .await
         .unwrap();
     println!("{:?}", txn_stat.rate(Duration::from_secs(10)));

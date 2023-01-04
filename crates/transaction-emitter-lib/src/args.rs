@@ -77,9 +77,11 @@ pub struct ClusterArgs {
 pub enum TransactionTypeArg {
     CoinTransfer,
     AccountGeneration,
+    AccountGenerationLargePool,
     NftMintAndTransfer,
     PublishPackage,
-    CallDifferentModules,
+    CustomFunctionLargeModuleWorkingSet,
+    CreateNewResource,
 }
 
 impl Default for TransactionTypeArg {
@@ -126,7 +128,10 @@ pub struct EmitArgs {
     pub transaction_type: Vec<TransactionTypeArg>,
 
     #[clap(long, min_values = 0)]
-    pub transaction_type_weights: Vec<usize>,
+    pub transaction_weights: Vec<usize>,
+
+    #[clap(long, min_values = 0)]
+    pub transaction_phases: Vec<usize>,
 
     #[clap(long)]
     pub expected_max_txns: Option<u64>,

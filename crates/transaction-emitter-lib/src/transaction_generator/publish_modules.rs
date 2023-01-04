@@ -9,7 +9,8 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
-use rand::{rngs::StdRng, seq::SliceRandom};
+use rand::{prelude::StdRng, Rng, seq::SliceRandom};
+use rand_core::{OsRng, SeedableRng};
 use std::sync::Arc;
 
 #[allow(dead_code)]
@@ -17,7 +18,6 @@ pub struct PublishPackageGenerator {
     rng: StdRng,
     package_handler: Arc<RwLock<PackageHandler>>,
     txn_factory: TransactionFactory,
-    gas_price: u64,
 }
 
 impl PublishPackageGenerator {
@@ -25,13 +25,11 @@ impl PublishPackageGenerator {
         rng: StdRng,
         package_handler: Arc<RwLock<PackageHandler>>,
         txn_factory: TransactionFactory,
-        gas_price: u64,
     ) -> Self {
         Self {
             rng,
             package_handler,
             txn_factory,
-            gas_price,
         }
     }
 }
@@ -59,7 +57,6 @@ impl TransactionGenerator for PublishPackageGenerator {
                     &mut self.rng,
                     account,
                     &self.txn_factory,
-                    self.gas_price,
                 );
                 requests.push(request);
             }
@@ -76,19 +73,15 @@ impl TransactionGenerator for PublishPackageGenerator {
 }
 
 pub struct PublishPackageCreator {
-    rng: StdRng,
     txn_factory: TransactionFactory,
     package_handler: Arc<RwLock<PackageHandler>>,
-    gas_price: u64,
 }
 
 impl PublishPackageCreator {
-    pub fn new(rng: StdRng, txn_factory: TransactionFactory, gas_price: u64) -> Self {
+    pub fn new(txn_factory: TransactionFactory) -> Self {
         Self {
-            rng,
             txn_factory,
             package_handler: Arc::new(RwLock::new(PackageHandler::new())),
-            gas_price,
         }
     }
 }
@@ -97,10 +90,9 @@ impl PublishPackageCreator {
 impl TransactionGeneratorCreator for PublishPackageCreator {
     async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         Box::new(PublishPackageGenerator::new(
-            self.rng.clone(),
+            StdRng::from_seed(OsRng.gen()),
             self.package_handler.clone(),
             self.txn_factory.clone(),
-            self.gas_price,
         ))
     }
 }
@@ -118,6 +110,7 @@ pub struct CallDifferentModulesGenerator {
     rng: StdRng,
     txn_factory: TransactionFactory,
     packages: Arc<Vec<Package>>,
+    accounts_pool: Option<Arc<RwLock<Vec<LocalAccount>>>>,
     entry_point: EntryPoints,
 }
 
@@ -126,12 +119,14 @@ impl CallDifferentModulesGenerator {
         rng: StdRng,
         txn_factory: TransactionFactory,
         packages: Arc<Vec<Package>>,
+        accounts_pool: Option<Arc<RwLock<Vec<LocalAccount>>>>,
         entry_point: EntryPoints,
     ) -> Self {
         Self {
             rng,
             txn_factory,
             packages,
+            accounts_pool,
             entry_point,
         }
     }
@@ -144,16 +139,27 @@ impl TransactionGenerator for CallDifferentModulesGenerator {
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,
     ) -> Vec<SignedTransaction> {
-        let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
+        let needed = accounts.len() * transactions_per_account;
+        let mut requests = Vec::with_capacity(needed);
+
+        let mut accounts_to_burn = if let Some(accounts_pool_lock) = &self.accounts_pool {
+            let mut accounts_pool = accounts_pool_lock.write();
+            let num_in_pool = accounts_pool.len();
+            accounts_pool.drain((num_in_pool - needed)..).collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+
         for account in accounts {
             for _ in 0..transactions_per_account {
+                let mut next_to_burn = accounts_to_burn.pop();
                 let request = self
                     .packages
                     .choose(&mut self.rng)
                     .unwrap()
                     .use_specific_transaction(
                         self.entry_point,
-                        account,
+                        next_to_burn.as_mut().unwrap_or(account),
                         &self.txn_factory,
                         Some(&mut self.rng),
                         None,
@@ -166,21 +172,22 @@ impl TransactionGenerator for CallDifferentModulesGenerator {
 }
 
 pub struct CallDifferentModulesCreator {
-    rng: StdRng,
     txn_factory: TransactionFactory,
     packages: Arc<Vec<Package>>,
+    accounts_pool: Option<Arc<RwLock<Vec<LocalAccount>>>>,
     entry_point: EntryPoints,
 }
 
 impl CallDifferentModulesCreator {
     pub async fn new(
-        mut rng: StdRng,
         txn_factory: TransactionFactory,
         accounts: &mut [LocalAccount],
         txn_executor: &dyn TransactionExecutor,
+        accounts_pool: Option<Arc<RwLock<Vec<LocalAccount>>>>,
         entry_point: EntryPoints,
         num_modules: usize,
     ) -> Self {
+        let mut rng = StdRng::from_seed(OsRng.gen());
         assert!(accounts.len() >= num_modules);
         let mut requests = Vec::with_capacity(accounts.len());
         let mut package_handler = PackageHandler::new();
@@ -196,9 +203,9 @@ impl CallDifferentModulesCreator {
         info!("Done publishing {} packages", requests.len());
 
         Self {
-            rng,
             txn_factory,
             packages: Arc::new(packages),
+            accounts_pool,
             entry_point,
         }
     }
@@ -208,9 +215,10 @@ impl CallDifferentModulesCreator {
 impl TransactionGeneratorCreator for CallDifferentModulesCreator {
     async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         Box::new(CallDifferentModulesGenerator::new(
-            self.rng.clone(),
+            StdRng::from_seed(OsRng.gen()),
             self.txn_factory.clone(),
             self.packages.clone(),
+            self.accounts_pool.clone(),
             self.entry_point,
         ))
     }

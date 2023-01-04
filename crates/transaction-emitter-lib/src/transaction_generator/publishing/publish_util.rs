@@ -152,7 +152,6 @@ impl Package {
         rng: &mut StdRng,
         account: &mut LocalAccount,
         txn_factory: &TransactionFactory,
-        gas_price: u64,
     ) -> SignedTransaction {
         match self {
             Self::Simple(modules, _) => {
@@ -160,7 +159,7 @@ impl Package {
                 // let payload = module_simple::rand_gen_function(rng, module_id);
                 let payload = module_simple::rand_simple_function(rng, module_id);
                 account.sign_with_transaction_builder(
-                    txn_factory.payload(payload).gas_unit_price(gas_price),
+                    txn_factory.payload(payload),
                 )
             },
         }
