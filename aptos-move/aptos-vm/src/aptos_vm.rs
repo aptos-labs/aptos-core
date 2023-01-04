@@ -661,6 +661,8 @@ impl AptosVM {
                     }
                 }
             }
+            aptos_framework::verify_module_metadata(m)
+                .map_err(|err| Self::metadata_validation_error(&err.to_string()))?
         }
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
