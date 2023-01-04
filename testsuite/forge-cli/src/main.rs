@@ -491,10 +491,12 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
 
 fn run_consensus_only_three_region_simulation(config: ForgeConfig) -> ForgeConfig {
     config
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 5000 })
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 50000,
+                })
                 .txn_expiration_time_secs(5 * 60),
         )
         .with_network_tests(vec![&ThreeRegionSimulationTest {
@@ -513,7 +515,8 @@ fn run_consensus_only_three_region_simulation(config: ForgeConfig) -> ForgeConfi
                 (5 * 60 * 60).into();
             helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
                 (5 * 60 * 60_000).into();
-            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] = 5000.into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                10000.into();
             helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
                 30000.into();
             helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
