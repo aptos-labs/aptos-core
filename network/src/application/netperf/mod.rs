@@ -195,22 +195,28 @@ fn preferred_axum_port(netperf_port: u16) -> u16 {
     netperf_port
 }
 
-async fn start_axum(state: NetPerfState, netperf_port: u16) {
-    let app = Router::new()
-        .route("/", get(usage_handler))
-        .route("/peers", get(get_peers).layer(Extension(state.clone())))
-        .route(
-            "/command",
-            post(parse_query).layer(Extension(state.clone())),
-        );
+async fn start_axum(state: NetPerfState, mut netperf_port: u16) {
+    loop {
+        let app = Router::new()
+            .route("/", get(usage_handler))
+            .route("/peers", get(get_peers).layer(Extension(state.clone())))
+            .route(
+                "/command",
+                post(parse_query).layer(Extension(state.clone())),
+            );
 
-    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], netperf_port));
+        let addr = std::net::SocketAddr::from(([0, 0, 0, 0], netperf_port));
 
-    // run it with hyper on netperf_port
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+        // run it with hyper on netperf_port
+        let res = axum::Server::try_bind(&addr);
+        if let Ok(handler) = res {
+            let _ = handler.serve(app.into_make_service()).await;
+            break;
+        } else {
+            netperf_port += 1;
+        }
+    }
+    preferred_axum_port(netperf_port);
 }
 
 async fn usage_handler() -> &'static str {
