@@ -177,21 +177,30 @@ impl Scheduler {
         let mut commit_state = self.commit_state.lock();
         let idx = commit_state.0;
         if idx == self.num_txns {
+            println!("committed");
             self.done_marker.store(true, Ordering::SeqCst);
             return None;
         }
+        println!("idx {}", idx);
 
         if let Ok(validation_status) = self.txn_status[idx].1.try_lock() {
+            println!("debug1");
             // Acquired the validation status lock, now try the status lock.
             match self.txn_status[idx].0.try_lock() {
                 Ok(mut status) => {
+                    println!("debug2 {:?}", *status);
+
                     if let ExecutionStatus::Executed(incarnation) = *status {
+                        println!("debug3");
+
                         // Status is executed and we are holding the lock.
                         commit_state.1 = max(commit_state.1, validation_status.max_triggered_wave);
                         if let Some(validated_wave) = validation_status.max_validated_wave {
                             if validated_wave
                                 >= max(commit_state.1, validation_status.required_wave)
                             {
+                                println!("debug4");
+
                                 // Can commit.
                                 *status = ExecutionStatus::Committed(incarnation);
                                 commit_state.0 += 1;
@@ -241,6 +250,9 @@ impl Scheduler {
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
             if idx_to_execute >= self.num_txns && idx_to_validate >= self.num_txns {
+                // if self.done() {
+                //     println!("thread id {} done {}", rayon::current_thread_index().unwrap(), self.done());
+                // }
                 return SchedulerTask::NoTask;
             }
 
