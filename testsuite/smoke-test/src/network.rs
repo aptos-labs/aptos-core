@@ -22,9 +22,88 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[ignore]
+#[tokio::test]
+async fn test_netperfclient() {
+    let mut swarm = new_local_swarm_with_aptos(5).await;
+    let version = swarm.versions().max().unwrap();
+    let validator_peer_id = swarm.validators().next().unwrap().peer_id();
+
+    // Only allow file based discovery, disallow other nodes
+    let cli = CliTestFramework::local_new(0);
+    let host = HostAndPort::local(swarm.validators().next().unwrap().port()).unwrap();
+    let (private_key, peer_set) =
+        generate_private_key_and_peer(&cli, host.clone(), [1u8; 32]).await;
+    let discovery_file = create_discovery_file(peer_set.clone());
+    let mut full_node_config = NodeConfig::default_for_validator_full_node();
+    modify_network_config(&mut full_node_config, &NetworkId::Public, |network| {
+        network.discovery_method = DiscoveryMethod::None;
+        network.discovery_methods = vec![
+            DiscoveryMethod::Onchain,
+            DiscoveryMethod::File(FileDiscovery {
+                path: discovery_file.path().to_path_buf(),
+                interval_secs: 1,
+            }),
+        ];
+        network.max_inbound_connections = 0;
+    });
+
+    let vfn_peer_id = swarm
+        .add_validator_fullnode(&version, full_node_config, validator_peer_id)
+        .unwrap();
+
+    // Wait till nodes are healthy
+    swarm
+        .fullnode_mut(vfn_peer_id)
+        .unwrap()
+        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .await
+        .unwrap();
+
+    // This node should be able to connect
+    let pfn_peer_id = swarm
+        .add_full_node(
+            &version,
+            add_identity_to_config(
+                NodeConfig::default_for_public_full_node(),
+                &NetworkId::Public,
+                private_key,
+                peer_set,
+            ),
+        )
+        .unwrap();
+    swarm
+        .fullnode_mut(pfn_peer_id)
+        .unwrap()
+        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .await
+        .unwrap();
+    // This node should connect
+    FullNode::wait_for_connectivity(
+        swarm.fullnode(pfn_peer_id).unwrap(),
+        Instant::now() + Duration::from_secs(10),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        1,
+        swarm
+            .fullnode(vfn_peer_id)
+            .unwrap()
+            .get_connected_peers(NetworkId::Public, Some("inbound"))
+            .await
+            .unwrap()
+            .unwrap_or(0)
+    );
+
+    while std::path::Path::new("/tmp/9107.tmp").exists() {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+}
+
 #[tokio::test]
 async fn test_connection_limiting() {
-    let mut swarm = new_local_swarm_with_aptos(5).await;
+    let mut swarm = new_local_swarm_with_aptos(1).await;
     let version = swarm.versions().max().unwrap();
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
 
@@ -130,9 +209,6 @@ async fn test_connection_limiting() {
             .unwrap()
             .unwrap_or(0)
     );
-    while std::path::Path::new("/tmp/9107.tmp").exists() {
-        tokio::time::sleep(Duration::from_secs(1)).await;
-    }
 }
 
 #[tokio::test]
