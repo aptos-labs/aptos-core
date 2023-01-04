@@ -17,7 +17,7 @@ module aptos_framework::delegation_pool {
     use aptos_framework::staking_config;
     use aptos_framework::timestamp;
 
-    const SALT: vector<u8> = b"aptos_framework::delegate";
+    const MODULE_SALT: vector<u8> = b"aptos_framework::delegation_pool";
 
     const VALIDATOR_STATUS_INACTIVE: u64 = 4;
 
@@ -38,7 +38,7 @@ module aptos_framework::delegation_pool {
     /// Conversion factor between seconds and microseconds
     const MICRO_CONVERSION_FACTOR: u64 = 1000000;
 
-    /// Capability that represents ownership over not-shared operations of underlying stake pool.
+    /// Capability that represents ownership over privileged operations on the underlying stake pool.
     struct DelegationPoolOwnership has key, store {
         /// equal to address of the resource account owning the stake pool
         pool_address: address,
@@ -97,7 +97,7 @@ module aptos_framework::delegation_pool {
         // generate a seed to be used to create the resource account hosting the delegation pool
         let seed = bcs::to_bytes(&owner_address);
         // include a salt to avoid conflicts with any other modules creating resource accounts
-        vector::append(&mut seed, SALT);
+        vector::append(&mut seed, MODULE_SALT);
         // include an additional salt in case the same resource account has already been created.
         vector::append(&mut seed, delegation_pool_creation_seed);
 
@@ -138,13 +138,6 @@ module aptos_framework::delegation_pool {
         borrow_global<DelegationPoolOwnership>(owner).pool_address
     }
 
-    fun get_stake_pool_signer(pool_address: address): signer acquires DelegationPool {
-        assert_delegation_pool_exists(pool_address);
-        // refresh total coins on share pools and attempt to advance lockup epoch at each user operation
-        commit_epoch_rewards(pool_address);
-        account::create_signer_with_capability(&borrow_global<DelegationPool>(pool_address).stake_pool_signer_cap)
-    }
-
     public fun delegation_pool_exists(addr: address): bool {
         exists<DelegationPool>(addr)
     }
@@ -154,81 +147,118 @@ module aptos_framework::delegation_pool {
         assert!(delegation_pool_exists(pool_address), error::invalid_argument(EDELEGATION_POOL_DOES_NOT_EXIST));
     }
 
+    fun retrieve_stake_pool_signer(pool_address: address): signer acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
+
+        // refresh total coins on share pools and attempt to advance lockup epoch
+        synchronize_delegation_pool(pool, pool_address);
+
+        account::create_signer_with_capability(&pool.stake_pool_signer_cap)
+    }
+
     public fun current_lockup_epoch(pool_address: address): u64 acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         current_lockup_epoch_internal(borrow_global<DelegationPool>(pool_address))
     }
 
-    /// Return the index of the current lockup epoch(cycle) on the delegation `pool`.
+    /// Return the index of current lockup epoch(cycle) on delegation pool `pool`.
+    /// This represents the share pool of currently `pending_inactive` stake.
     fun current_lockup_epoch_internal(pool: &DelegationPool): u64 {
         vector::length(&pool.inactive_shares) - 1
     }
 
     public entry fun set_operator(owner: &signer, new_operator: address) acquires DelegationPoolOwnership, DelegationPool {
         stake::set_operator(
-            &get_stake_pool_signer(get_owned_pool_address(signer::address_of(owner))),
+            &retrieve_stake_pool_signer(get_owned_pool_address(signer::address_of(owner))),
             new_operator
         );
     }
 
     public entry fun set_delegated_voter(owner: &signer, new_voter: address) acquires DelegationPoolOwnership, DelegationPool {
         stake::set_delegated_voter(
-            &get_stake_pool_signer(get_owned_pool_address(signer::address_of(owner))),
+            &retrieve_stake_pool_signer(get_owned_pool_address(signer::address_of(owner))),
             new_voter
         );
     }
 
     public entry fun add_stake(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
-        let stake_pool_signer = get_stake_pool_signer(pool_address);
+        let stake_pool_signer = retrieve_stake_pool_signer(pool_address);
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
         let delegator_address = signer::address_of(delegator);
 
         coin::transfer<AptosCoin>(delegator, signer::address_of(&stake_pool_signer), amount);
         stake::add_stake(&stake_pool_signer, amount);
 
-        amount = charge_add_stake_fee(pool_address, amount);
-        buy_in_active_shares(pool_address, delegator_address, amount);
+        amount = charge_add_stake_fee(pool, pool_address, amount);
+        buy_in_active_shares(pool, delegator_address, amount);
 
-        emit_add_stake_event(pool_address, delegator_address, amount);
+        event::emit_event(
+            &mut pool.add_stake_events,
+            AddStakeEvent {
+                pool_address,
+                delegator_address,
+                amount_added: amount,
+            },
+        );
     }
 
     public entry fun unlock(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
         // execute pending withdrawal if existing before creating a new one
         withdraw(delegator, pool_address, MAX_U64);
 
-        let stake_pool_signer = get_stake_pool_signer(pool_address);
+        let stake_pool_signer = retrieve_stake_pool_signer(pool_address);
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
         let delegator_address = signer::address_of(delegator);
 
         // ensure there is enough active stake on stake pool to unlock
         let (active, _, _, _) = stake::get_stake(pool_address);
         let amount = min(amount, active);
 
-        amount = redeem_active_shares(pool_address, delegator_address, amount);
+        amount = redeem_active_shares(pool, delegator_address, amount);
         stake::unlock(&stake_pool_signer, amount);
-        buy_in_inactive_shares(pool_address, delegator_address, amount);
+        buy_in_inactive_shares(pool, delegator_address, amount);
 
-        emit_unlock_stake_event(pool_address, delegator_address, amount);
+        event::emit_event(
+            &mut pool.unlock_stake_events,
+            UnlockStakeEvent {
+                pool_address,
+                delegator_address,
+                amount_unlocked: amount,
+            },
+        );
     }
 
     public entry fun reactivate_stake(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
-        let stake_pool_signer = get_stake_pool_signer(pool_address);
+        let stake_pool_signer = retrieve_stake_pool_signer(pool_address);
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
         let delegator_address = signer::address_of(delegator);
 
-        let amount = redeem_inactive_shares(pool_address, delegator_address, amount, current_lockup_epoch(pool_address));
+        let current_lockup_epoch = current_lockup_epoch_internal(pool);
+        let amount = redeem_inactive_shares(pool, delegator_address, amount, current_lockup_epoch);
         stake::reactivate_stake(&stake_pool_signer, amount);
-        buy_in_active_shares(pool_address, delegator_address, amount);
+        buy_in_active_shares(pool, delegator_address, amount);
 
-        emit_reactivate_stake_event(pool_address, delegator_address, amount);
+        event::emit_event(
+            &mut pool.reactivate_stake_events,
+            ReactivateStakeEvent {
+                pool_address,
+                delegator_address,
+                amount,
+            },
+        );
     }
 
     public entry fun withdraw(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
-        let stake_pool_signer = get_stake_pool_signer(pool_address);
+        let stake_pool_signer = retrieve_stake_pool_signer(pool_address);
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
         let delegator_address = signer::address_of(delegator);
 
-        let (withdrawal_exists, withdrawal_lockup_epoch) = pending_withdrawal_exists(pool_address, delegator_address);
+        let (withdrawal_exists, withdrawal_lockup_epoch) = pending_withdrawal_exists(pool, delegator_address);
         if (!(
             withdrawal_exists &&
             (
-                withdrawal_lockup_epoch < current_lockup_epoch(pool_address) ||
+                withdrawal_lockup_epoch < current_lockup_epoch_internal(pool) ||
                 (
                     stake::get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE &&
                     timestamp::now_seconds() >= stake::get_lockup_secs(pool_address)
@@ -236,24 +266,33 @@ module aptos_framework::delegation_pool {
             )
         )) { return };
 
-        let amount = redeem_inactive_shares(pool_address, delegator_address, amount, withdrawal_lockup_epoch);
+        let amount = redeem_inactive_shares(pool, delegator_address, amount, withdrawal_lockup_epoch);
         stake::withdraw(&stake_pool_signer, amount);
         coin::transfer<AptosCoin>(&stake_pool_signer, delegator_address, amount);
 
-        emit_withdraw_stake_event(pool_address, delegator_address, amount);
+        event::emit_event(
+            &mut pool.withdraw_stake_events,
+            WithdrawStakeEvent {
+                pool_address,
+                delegator_address,
+                amount_withdrawn: amount,
+            },
+        );
     }
 
     public fun get_stake(pool_address: address, delegator_address: address): (u64, u64, u64) acquires DelegationPool {
-        let (active, inactive, pending_active, pending_inactive) = stake::get_stake(pool_address);
-        let (withdrawal_exists, withdrawal_lockup_epoch) = pending_withdrawal_exists(pool_address, delegator_address);
-
+        assert_delegation_pool_exists(pool_address);
         let pool = borrow_global<DelegationPool>(pool_address);
+
+        let (active, inactive, pending_active, pending_inactive) = stake::get_stake(pool_address);
+
         active = pool_u64::shares_to_amount_with_total_coins(
             &pool.active_shares,
             pool_u64::shares(&pool.active_shares, delegator_address),
             active + pending_active
         );
 
+        let (withdrawal_exists, withdrawal_lockup_epoch) = pending_withdrawal_exists(pool, delegator_address);
         (inactive, pending_inactive) = if (withdrawal_exists) {
             let current_lockup_epoch = current_lockup_epoch_internal(pool);
             if (withdrawal_lockup_epoch < current_lockup_epoch) {
@@ -298,15 +337,10 @@ module aptos_framework::delegation_pool {
         vector::borrow_mut(&mut pool.inactive_shares, current_lockup_epoch)
     }
 
-    /// Return the unique lockup epoch where delegator `delegator_address` has
-    /// unlocking (or already unlocked) stake to be withdrawn from delegation pool `pool_address`.
+    /// Return the unique lockup epoch where delegator `delegator_address` owns
+    /// unlocking (or already unlocked) stake to be withdrawn from delegation pool `pool`.
     /// A bool is returned to signal if a pending withdrawal exists at all.
-    public fun pending_withdrawal_exists(
-        pool_address: address,
-        delegator_address: address,
-    ): (bool, u64) acquires DelegationPool {
-        assert_delegation_pool_exists(pool_address);
-        let pool = borrow_global<DelegationPool>(pool_address);
+    fun pending_withdrawal_exists(pool: &DelegationPool, delegator_address: address): (bool, u64) {
         if (table::contains(&pool.pending_withdrawal, delegator_address)) {
             (true, *table::borrow(&pool.pending_withdrawal, delegator_address))
         } else {
@@ -314,77 +348,12 @@ module aptos_framework::delegation_pool {
         }
     }
 
-    fun emit_add_stake_event(
-        pool_address: address,
-        delegator_address: address,
-        amount_added: u64,
-    ) acquires DelegationPool {
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
-        event::emit_event(
-            &mut pool.add_stake_events,
-            AddStakeEvent {
-                pool_address,
-                delegator_address,
-                amount_added,
-            },
-        );
-    }
-
-    fun emit_reactivate_stake_event(
-        pool_address: address,
-        delegator_address: address,
-        amount: u64,
-    ) acquires DelegationPool {
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
-        event::emit_event(
-            &mut pool.reactivate_stake_events,
-            ReactivateStakeEvent {
-                pool_address,
-                delegator_address,
-                amount,
-            },
-        );
-    }
-
-    fun emit_unlock_stake_event(
-        pool_address: address,
-        delegator_address: address,
-        amount_unlocked: u64,
-    ) acquires DelegationPool {
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
-        event::emit_event(
-            &mut pool.unlock_stake_events,
-            UnlockStakeEvent {
-                pool_address,
-                delegator_address,
-                amount_unlocked,
-            },
-        );
-    }
-
-    fun emit_withdraw_stake_event(
-        pool_address: address,
-        delegator_address: address,
-        amount_withdrawn: u64,
-    ) acquires DelegationPool {
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
-        event::emit_event(
-            &mut pool.withdraw_stake_events,
-            WithdrawStakeEvent {
-                pool_address,
-                delegator_address,
-                amount_withdrawn,
-            },
-        );
-    }
-
-    fun charge_add_stake_fee(pool_address: address, coins_amount: u64): u64 acquires DelegationPool {
-        assert_delegation_pool_exists(pool_address);
-        let active_shares = &borrow_global<DelegationPool>(pool_address).active_shares;
-
+    fun charge_add_stake_fee(pool: &DelegationPool, pool_address: address, coins_amount: u64): u64 {
         // if the underlying stake pool earns rewards this epoch, charge delegator
         // the maximum amount it would earn from new added stake in `pending_active` state
         if (stake::is_current_epoch_validator(pool_address)) {
+            let active_shares = &pool.active_shares;
+
             let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(&staking_config::get());
             let max_epoch_active_rewards = if (rewards_rate_denominator > 0) {
                 let (active, _, _, _) = stake::get_stake(pool_address);
@@ -392,6 +361,7 @@ module aptos_framework::delegation_pool {
             } else {
                 0
             };
+
             // 1. calculate shares received if buying in active pool with its pending epoch rewards added
             // 2. calculate coins required to buy this amount of shares in current active pool
             // (((coins_amount * total_shares) / (total_coins + max_epoch_active_rewards)) * total_coins) / total_shares
@@ -409,13 +379,11 @@ module aptos_framework::delegation_pool {
     /// Buy shares into active pool on behalf of delegator `shareholder` who
     /// delegated `coins_amount` stake or reactivated(redeemed) it from pending-inactive pool.
     fun buy_in_active_shares(
-        pool_address: address,
+        pool: &mut DelegationPool,
         shareholder: address,
         coins_amount: u64,
-    ): u64 acquires DelegationPool {
+    ): u64 {
         if (coins_amount == 0) return 0;
-        assert_delegation_pool_exists(pool_address);
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
 
         pool_u64::buy_in(&mut pool.active_shares, shareholder, coins_amount)
     }
@@ -424,13 +392,11 @@ module aptos_framework::delegation_pool {
     /// redeemed `coins_amount` from active pool to schedule it for unlocking.
     /// If there is a pending withdrawal from a past epoch, fail the operation.
     fun buy_in_inactive_shares(
-        pool_address: address,
+        pool: &mut DelegationPool,
         shareholder: address,
         coins_amount: u64,
-    ): u64 acquires DelegationPool {
+    ): u64 {
         if (coins_amount == 0) return 0;
-        assert_delegation_pool_exists(pool_address);
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
 
         // save lockup epoch for new pending withdrawal if no existing previous one
         let current_lockup_epoch = current_lockup_epoch_internal(pool);
@@ -466,13 +432,11 @@ module aptos_framework::delegation_pool {
     /// Extracted coins will be used to buy shares into the pending-inactive pool and
     /// be available for redeeming when this lockup epoch ends.
     fun redeem_active_shares(
-        pool_address: address,
+        pool: &mut DelegationPool,
         shareholder: address,
         coins_amount: u64,
-    ): u64 acquires DelegationPool {
+    ): u64 {
         if (coins_amount == 0) return 0;
-        assert_delegation_pool_exists(pool_address);
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
 
         let shares_to_redeem = amount_to_shares_to_redeem(&pool.active_shares, shareholder, coins_amount);
         pool_u64::redeem_shares(&mut pool.active_shares, shareholder, shares_to_redeem)
@@ -485,14 +449,12 @@ module aptos_framework::delegation_pool {
     /// For latter case, extracted coins will be used to buy shares into the active pool and
     /// escape inactivation when current lockup ends.
     fun redeem_inactive_shares(
-        pool_address: address,
+        pool: &mut DelegationPool,
         shareholder: address,
         coins_amount: u64,
         lockup_epoch: u64,
-    ): u64 acquires DelegationPool {
+    ): u64 {
         if (coins_amount == 0) return 0;
-        assert_delegation_pool_exists(pool_address);
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
 
         let current_lockup_epoch = current_lockup_epoch_internal(pool);
         let inactive_shares = vector::borrow_mut(&mut pool.inactive_shares, lockup_epoch);
@@ -519,8 +481,7 @@ module aptos_framework::delegation_pool {
         redeemed_coins
     }
 
-    fun commit_epoch_rewards(pool_address: address) acquires DelegationPool {
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
+    fun synchronize_delegation_pool(pool: &mut DelegationPool, pool_address: address) {
         let (active, inactive, pending_active, pending_inactive) = stake::get_stake(pool_address);
 
         // update total coins accumulated by `active` + `pending_active` shares
