@@ -1,26 +1,20 @@
-module aptos_framework::delegate {
+module aptos_framework::delegation_pool {
     use std::bcs;
     use std::error;
     use std::signer;
     use std::vector;
 
     use aptos_std::math64::min;
-
-    use aptos_framework::delegation_pool::{
-    Self,
-    get_stake_pool_signer,
-    current_lockup_epoch,
-    buy_in_active_shares,
-    buy_in_inactive_shares,
-    redeem_active_shares,
-    redeem_inactive_shares,
-    pending_withdrawal_exists,
-    };
+    use aptos_std::pool_u64_unbound as pool_u64;
+    use aptos_std::table::{Self, Table};
 
     use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
+    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::reconfiguration::{last_reconfiguration_time};
     use aptos_framework::stake;
+    use aptos_framework::staking_config;
     use aptos_framework::timestamp;
 
     const SALT: vector<u8> = b"aptos_framework::delegate";
@@ -59,7 +53,7 @@ module aptos_framework::delegate {
         let pool_address = signer::address_of(&stake_pool_signer);
         stake::initialize_stake_owner(&stake_pool_signer, 0, owner_address, owner_address);
 
-        delegation_pool::initialize(&stake_pool_signer, stake_pool_signer_cap);
+        initialize(&stake_pool_signer, stake_pool_signer_cap);
 
         // save resource-account address (inner pool address) + outer pool ownership on `owner`
         move_to(owner, DelegationPoolOwnership { pool_address });
@@ -78,34 +72,34 @@ module aptos_framework::delegate {
         borrow_global<DelegationPoolOwnership>(owner).pool_address
     }
 
-    public entry fun set_operator(owner: &signer, new_operator: address) acquires DelegationPoolOwnership {
+    public entry fun set_operator(owner: &signer, new_operator: address) acquires DelegationPoolOwnership, DelegationPool {
         stake::set_operator(
             &get_stake_pool_signer(get_owned_pool_address(signer::address_of(owner))),
             new_operator
         );
     }
 
-    public entry fun set_delegated_voter(owner: &signer, new_voter: address) acquires DelegationPoolOwnership {
+    public entry fun set_delegated_voter(owner: &signer, new_voter: address) acquires DelegationPoolOwnership, DelegationPool {
         stake::set_delegated_voter(
             &get_stake_pool_signer(get_owned_pool_address(signer::address_of(owner))),
             new_voter
         );
     }
 
-    public entry fun add_stake(delegator: &signer, pool_address: address, amount: u64) {
+    public entry fun add_stake(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
         let stake_pool_signer = get_stake_pool_signer(pool_address);
         let delegator_address = signer::address_of(delegator);
 
         coin::transfer<AptosCoin>(delegator, signer::address_of(&stake_pool_signer), amount);
         stake::add_stake(&stake_pool_signer, amount);
 
-        amount = delegation_pool::charge_add_stake_fee(pool_address, amount);
+        amount = charge_add_stake_fee(pool_address, amount);
         buy_in_active_shares(pool_address, delegator_address, amount);
 
-        delegation_pool::emit_add_stake_event(pool_address, delegator_address, amount);
+        emit_add_stake_event(pool_address, delegator_address, amount);
     }
 
-    public entry fun unlock(delegator: &signer, pool_address: address, amount: u64) {
+    public entry fun unlock(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
         // execute pending withdrawal if existing before creating a new one
         withdraw(delegator, pool_address, MAX_U64);
 
@@ -120,10 +114,10 @@ module aptos_framework::delegate {
         stake::unlock(&stake_pool_signer, amount);
         buy_in_inactive_shares(pool_address, delegator_address, amount);
 
-        delegation_pool::emit_unlock_stake_event(pool_address, delegator_address, amount);
+        emit_unlock_stake_event(pool_address, delegator_address, amount);
     }
 
-    public entry fun reactivate_stake(delegator: &signer, pool_address: address, amount: u64) {
+    public entry fun reactivate_stake(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
         let stake_pool_signer = get_stake_pool_signer(pool_address);
         let delegator_address = signer::address_of(delegator);
 
@@ -131,10 +125,10 @@ module aptos_framework::delegate {
         stake::reactivate_stake(&stake_pool_signer, amount);
         buy_in_active_shares(pool_address, delegator_address, amount);
 
-        delegation_pool::emit_reactivate_stake_event(pool_address, delegator_address, amount);
+        emit_reactivate_stake_event(pool_address, delegator_address, amount);
     }
 
-    public entry fun withdraw(delegator: &signer, pool_address: address, amount: u64) {
+    public entry fun withdraw(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
         let stake_pool_signer = get_stake_pool_signer(pool_address);
         let delegator_address = signer::address_of(delegator);
 
@@ -154,7 +148,7 @@ module aptos_framework::delegate {
         stake::withdraw(&stake_pool_signer, amount);
         coin::transfer<AptosCoin>(&stake_pool_signer, delegator_address, amount);
 
-        delegation_pool::emit_withdraw_stake_event(pool_address, delegator_address, amount);
+        emit_withdraw_stake_event(pool_address, delegator_address, amount);
     }
 
     #[test_only]
@@ -219,7 +213,7 @@ module aptos_framework::delegate {
         amount: u64,
         should_join_validator_set: bool,
         should_end_epoch: bool,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         let validator_address = signer::address_of(validator);
         if (!account::exists_at(validator_address)) {
             account::create_account_for_test(validator_address);
@@ -249,7 +243,7 @@ module aptos_framework::delegate {
     public entry fun test_set_operator_and_delegated_voter(
         aptos_framework: &signer,
         validator: &signer,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
 
         let validator_address = signer::address_of(validator);
@@ -271,7 +265,7 @@ module aptos_framework::delegate {
     public entry fun test_cannot_set_operator(
         aptos_framework: &signer,
         validator: &signer,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
         // account does not own any delegation pool
         set_operator(validator, @0x111);
@@ -282,7 +276,7 @@ module aptos_framework::delegate {
     public entry fun test_cannot_set_delegated_voter(
         aptos_framework: &signer,
         validator: &signer,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
         // account does not own any delegation pool
         set_delegated_voter(validator, @0x112);
@@ -303,7 +297,7 @@ module aptos_framework::delegate {
     public entry fun test_initialize_delegation_pool(
         aptos_framework: &signer,
         validator: &signer,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
 
         let validator_address = signer::address_of(validator);
@@ -314,7 +308,7 @@ module aptos_framework::delegate {
         assert!(stake::get_operator(pool_address) == validator_address, 2);
         assert!(stake::get_delegated_voter(pool_address) == validator_address, 3);
 
-        delegation_pool::assert_delegation_pool_exists(pool_address);
+        assert_delegation_pool_exists(pool_address);
         assert_owner_cap_exists(validator_address);
         assert!(borrow_global<DelegationPoolOwnership>(validator_address).pool_address == pool_address, 4);
 
@@ -323,7 +317,7 @@ module aptos_framework::delegate {
         assert!(network_addresses == vector::empty<u8>(), 8);
         assert!(fullnode_addresses == vector::empty<u8>(), 9);
 
-        assert!(delegation_pool::current_lockup_epoch(pool_address) == 0, 10);
+        assert!(current_lockup_epoch(pool_address) == 0, 10);
         stake::assert_stake_pool(pool_address, 0, 0, 0, 0);
     }
 
@@ -331,7 +325,7 @@ module aptos_framework::delegate {
     public entry fun test_add_stake_single(
         aptos_framework: &signer,
         validator: &signer,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
         initialize_test_validator(validator, 1000, false, false);
 
@@ -387,7 +381,7 @@ module aptos_framework::delegate {
         aptos_framework: &signer,
         validator: &signer,
         delegator: &signer,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
         initialize_test_validator(validator, 1000, true, true);
         let validator_address = signer::address_of(validator);
@@ -443,7 +437,7 @@ module aptos_framework::delegate {
         aptos_framework: &signer,
         validator: &signer,
         delegator: &signer,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
         initialize_test_validator(validator, 100, true, true);
 
@@ -513,7 +507,7 @@ module aptos_framework::delegate {
     public entry fun test_reactivate_stake_single(
         aptos_framework: &signer,
         validator: &signer,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
         initialize_test_validator(validator, 200, true, true);
 
@@ -561,7 +555,7 @@ module aptos_framework::delegate {
     public entry fun test_active_stake_rewards(
         aptos_framework: &signer,
         validator: &signer,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
         initialize_test_validator(validator, 1000, true, true);
         let validator_address = signer::address_of(validator);
@@ -629,7 +623,7 @@ module aptos_framework::delegate {
         aptos_framework: &signer,
         validator: &signer,
         delegator: &signer,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
         initialize_test_validator(validator, 200, true, true);
         let validator_address = signer::address_of(validator);
@@ -690,7 +684,7 @@ module aptos_framework::delegate {
     public entry fun test_pending_inactive_stake_rewards(
         aptos_framework: &signer,
         validator: &signer,
-    ) acquires DelegationPoolOwnership {
+    ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
         initialize_test_validator(validator, 1000, true, true);
         let validator_address = signer::address_of(validator);
@@ -731,27 +725,12 @@ module aptos_framework::delegate {
         active_stake: u64,
         inactive_stake: u64,
         pending_inactive_stake: u64,
-    ) {
-        let (actual_active, actual_inactive, actual_pending_inactive) = delegation_pool::get_stake(pool_address, delegator_address);
+    ) acquires DelegationPool {
+        let (actual_active, actual_inactive, actual_pending_inactive) = get_stake(pool_address, delegator_address);
         assert!(actual_active == active_stake, actual_active);
         assert!(actual_inactive == inactive_stake, actual_inactive);
         assert!(actual_pending_inactive == pending_inactive_stake, actual_pending_inactive);
     }
-}
-module aptos_framework::delegation_pool {
-    use std::error;
-    use std::vector;
-
-    use aptos_std::pool_u64_unbound as pool_u64;
-    use aptos_std::table::{Self, Table};
-
-    use aptos_framework::account;
-    use aptos_framework::event::{Self, EventHandle};
-    use aptos_framework::reconfiguration::{last_reconfiguration_time};
-    use aptos_framework::stake;
-    use aptos_framework::staking_config;
-
-    friend aptos_framework::delegate;
 
     /// Delegation pool does not exist at the provided pool address.
     const EDELEGATION_POOL_DOES_NOT_EXIST: u64 = 1;
@@ -808,7 +787,7 @@ module aptos_framework::delegation_pool {
         amount_withdrawn: u64,
     }
 
-    public(friend) fun initialize(stake_pool_signer: &signer, stake_pool_signer_cap: account::SignerCapability) {
+    fun initialize(stake_pool_signer: &signer, stake_pool_signer_cap: account::SignerCapability) {
         move_to(stake_pool_signer, DelegationPool {
             active_shares: pool_u64::create(),
             inactive_shares: vector::singleton(pool_u64::create()),
@@ -823,7 +802,7 @@ module aptos_framework::delegation_pool {
         });
     }
 
-    public(friend) fun get_stake_pool_signer(pool_address: address): signer acquires DelegationPool {
+    fun get_stake_pool_signer(pool_address: address): signer acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         // refresh total coins on share pools and attempt to advance lockup epoch at each user operation
         commit_epoch_rewards(pool_address);
@@ -920,7 +899,7 @@ module aptos_framework::delegation_pool {
         }
     }
 
-    public(friend) fun emit_add_stake_event(
+    fun emit_add_stake_event(
         pool_address: address,
         delegator_address: address,
         amount_added: u64,
@@ -936,7 +915,7 @@ module aptos_framework::delegation_pool {
         );
     }
 
-    public(friend) fun emit_reactivate_stake_event(
+    fun emit_reactivate_stake_event(
         pool_address: address,
         delegator_address: address,
         amount: u64,
@@ -952,7 +931,7 @@ module aptos_framework::delegation_pool {
         );
     }
 
-    public(friend) fun emit_unlock_stake_event(
+    fun emit_unlock_stake_event(
         pool_address: address,
         delegator_address: address,
         amount_unlocked: u64,
@@ -968,7 +947,7 @@ module aptos_framework::delegation_pool {
         );
     }
 
-    public(friend) fun emit_withdraw_stake_event(
+    fun emit_withdraw_stake_event(
         pool_address: address,
         delegator_address: address,
         amount_withdrawn: u64,
@@ -1014,7 +993,7 @@ module aptos_framework::delegation_pool {
 
     /// Buy shares into active pool on behalf of delegator `shareholder` who
     /// delegated `coins_amount` stake or reactivated(redeemed) it from pending-inactive pool.
-    public(friend) fun buy_in_active_shares(
+    fun buy_in_active_shares(
         pool_address: address,
         shareholder: address,
         coins_amount: u64,
@@ -1029,7 +1008,7 @@ module aptos_framework::delegation_pool {
     /// Buy shares into pending-inactive pool on behalf of delegator `shareholder` who 
     /// redeemed `coins_amount` from active pool to schedule it for unlocking.
     /// If there is a pending withdrawal from a past epoch, fail the operation.
-    public(friend) fun buy_in_inactive_shares(
+    fun buy_in_inactive_shares(
         pool_address: address,
         shareholder: address,
         coins_amount: u64,
@@ -1071,7 +1050,7 @@ module aptos_framework::delegation_pool {
     /// wants to unlock `coins_amount` of its active stake.
     /// Extracted coins will be used to buy shares into the pending-inactive pool and
     /// be available for redeeming when this lockup epoch ends.
-    public(friend) fun redeem_active_shares(
+    fun redeem_active_shares(
         pool_address: address,
         shareholder: address,
         coins_amount: u64,
@@ -1090,7 +1069,7 @@ module aptos_framework::delegation_pool {
     /// delegator `shareholder` who wants to reactivate `coins_amount` of its unlocking stake.
     /// For latter case, extracted coins will be used to buy shares into the active pool and
     /// escape inactivation when current lockup ends.
-    public(friend) fun redeem_inactive_shares(
+    fun redeem_inactive_shares(
         pool_address: address,
         shareholder: address,
         coins_amount: u64,
