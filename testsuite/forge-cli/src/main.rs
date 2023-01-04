@@ -203,11 +203,10 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
-    let duration = Duration::from_secs(1200);
     let suite_name = if suite_name == "compat" {
-        "module_loading"
+        panic!();
     } else {
-        "write_new_resource"
+        "module_loading"
     };
 
     let runtime = Runtime::new()?;
