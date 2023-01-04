@@ -459,7 +459,8 @@ function App() {
     const aptosAccount = new AptosAccount(
       new HexString(process.env.REACT_APP_ACCOUNT_PK).toUint8Array()
     );
-    const txnHash = await client.publishPackage(
+    try{
+      const txnHash = await client.publishPackage(
       aptosAccount,
       new HexString(
         // package-metadata
@@ -474,10 +475,13 @@ function App() {
         ),
       ]
     );
-
-    await client.waitForTransaction(txnHash);
-    setIsPublishing(false);
-    setPublishPackageTxnHash(txnHash);
+      await client.waitForTransaction(txnHash);
+      setPublishPackageTxnHash(txnHash);
+    }catch(error: any){
+      console.log("publish error", error)
+    }finally{
+      setIsPublishing(false);
+    }
   };
 
   return (
@@ -504,6 +508,20 @@ function App() {
   );
 }
 ```
+We wrap our publishing attempt in a `try / catch` block to catch any potential errors coming from `await client.waitForTransaction(txnHash);`.
+
+`waitForTransaction(txnHash)` waits for a transaction (given a transaction hash) to move past pending state and can end up in one of the 4 states:
+
+- processed and successfully committed to the blockchain
+- rejected and is not committed to the blockchain
+- committed but execution failed
+- not processed within the specified timeout
+
+`setIsPublishing()` is an internal state to know if our app is currently publishing, if it is we want to disable the "Publish Package" button. When it is done publishing, we want to enable the "Publish Package" button. We set it to`true` when we start publishing the package and to `false` inside the `finally` block whether it succeed or not.
+
+`setPublishPackageTxnHash()` is an internal state for us to keep the transaction hash we just published to know if we should display the `Account modules` link
+
+#### Publish the package
 
 Click on the "Publish Package" button, once the module has published we should see a `Account modules` link and by clicking it we should see something like the following
 
