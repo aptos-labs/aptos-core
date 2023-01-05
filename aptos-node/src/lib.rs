@@ -134,7 +134,7 @@ impl AptosNodeArgs {
 /// Runtime handle to ensure that all inner runtimes stay in scope
 pub struct AptosHandle {
     _api_runtime: Option<Runtime>,
-    _backup_runtime: Runtime,
+    _backup_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
     _network_runtimes: Vec<Runtime>,
