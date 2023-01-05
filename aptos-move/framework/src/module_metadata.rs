@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::extended_checks::ResourceGroupScope;
 use aptos_types::transaction::AbortInfo;
 use move_binary_format::{normalized::Function, CompiledModule};
 use move_core_types::{
@@ -75,15 +76,23 @@ impl KnownAttribute {
         self.kind == (KnownAttributeKind::ViewFunction as u16)
     }
 
-    pub fn resource_group() -> Self {
+    pub fn resource_group(scope: ResourceGroupScope) -> Self {
         Self {
             kind: KnownAttributeKind::ResourceGroup as u16,
-            args: vec![],
+            args: vec![scope.as_str().to_string()],
         }
     }
 
     pub fn is_resource_group(&self) -> bool {
         self.kind == KnownAttributeKind::ResourceGroup as u16
+    }
+
+    pub fn get_resource_group(&self) -> Option<ResourceGroupScope> {
+        if self.kind == KnownAttributeKind::ResourceGroup as u16 {
+            self.args.get(0).and_then(|scope| str::parse(scope).ok())
+        } else {
+            None
+        }
     }
 
     pub fn resource_group_member(container: String) -> Self {
@@ -195,7 +204,8 @@ pub fn verify_module_metadata(module: &CompiledModule) -> Result<(), MetadataVal
 
     for (struct_, attrs) in &metadata.struct_attributes {
         for attr in attrs {
-            if attr.is_resource_group() || attr.is_resource_group_member() {
+            if (attr.is_resource_group() && attr.get_resource_group().is_some()) ||
+                (attr.is_resource_group_member() && attr.get_resource_group_member().is_some()) {
                 continue;
             } else {
                 return Err(MetadataValidationError {

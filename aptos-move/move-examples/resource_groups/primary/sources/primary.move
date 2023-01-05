@@ -3,7 +3,7 @@
 module resource_groups_primary::primary {
     use std::signer;
 
-    #[resource_group]
+    #[resource_group(scope = global)]
     struct ResourceGroupContainer { }
 
     #[resource_group_member(group = resource_groups_primary::primary::ResourceGroupContainer)]

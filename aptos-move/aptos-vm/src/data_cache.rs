@@ -5,7 +5,7 @@
 use crate::move_vm_ext::MoveResolverExt;
 #[allow(unused_imports)]
 use anyhow::Error;
-use aptos_framework::natives::state_storage::StateStorageUsageResolver;
+use aptos_framework::{natives::state_storage::StateStorageUsageResolver, RuntimeModuleMetadataV1};
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -41,6 +41,10 @@ impl<'a, 'm, S: MoveResolverExt> MoveResolverWithVMMetadata<'a, 'm, S> {
 }
 
 impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<'a, 'm, S> {
+    fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
+        aptos_framework::get_vm_metadata(self.move_vm, module_id)
+    }
+
     fn get_resource_from_group(
         &self,
         address: &AccountAddress,
@@ -49,11 +53,6 @@ impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<
     ) -> Result<Option<Vec<u8>>, VMError> {
         self.move_resolver
             .get_resource_from_group(address, struct_tag, resource_group)
-    }
-
-    fn get_resource_group(&self, struct_tag: &StructTag) -> Result<Option<StructTag>, VMError> {
-        let metadata = aptos_framework::get_vm_metadata(self.move_vm, struct_tag.module_id());
-        Ok(Self::get_resource_group_from_metadata(struct_tag, metadata))
     }
 
     fn get_resource_group_data(
@@ -129,6 +128,12 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
+    fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
+        let module_bytes = self.get_module(&module_id).ok()??;
+        let module = CompiledModule::deserialize(&module_bytes).ok()?;
+        aptos_framework::get_module_metadata(&module)
+    }
+
     fn get_resource_from_group(
         &self,
         address: &AccountAddress,
@@ -145,23 +150,6 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
         } else {
             Ok(None)
         }
-    }
-
-    fn get_resource_group(&self, struct_tag: &StructTag) -> Result<Option<StructTag>, VMError> {
-        let module_bytes = if let Some(module_bytes) = self.get_module(&struct_tag.module_id())? {
-            module_bytes
-        } else {
-            return Ok(None);
-        };
-
-        let module = if let Ok(module) = CompiledModule::deserialize(&module_bytes) {
-            module
-        } else {
-            return Ok(None);
-        };
-
-        let metadata = aptos_framework::get_module_metadata(&module);
-        Ok(Self::get_resource_group_from_metadata(struct_tag, metadata))
     }
 
     fn get_resource_group_data(
@@ -274,6 +262,10 @@ impl<S: StateView> ModuleResolver for StorageAdapterOwned<S> {
 }
 
 impl<S: StateView> MoveResolverExt for StorageAdapterOwned<S> {
+    fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
+        self.as_move_resolver().get_module_metadata(module_id)
+    }
+
     fn get_resource_from_group(
         &self,
         address: &AccountAddress,
@@ -282,10 +274,6 @@ impl<S: StateView> MoveResolverExt for StorageAdapterOwned<S> {
     ) -> Result<Option<Vec<u8>>, VMError> {
         self.as_move_resolver()
             .get_resource_from_group(address, struct_tag, resource_group)
-    }
-
-    fn get_resource_group(&self, struct_tag: &StructTag) -> Result<Option<StructTag>, VMError> {
-        self.as_move_resolver().get_resource_group(struct_tag)
     }
 
     fn get_resource_group_data(

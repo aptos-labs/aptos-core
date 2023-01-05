@@ -18,7 +18,8 @@ use move_model::{
     symbol::Symbol,
     ty::{PrimitiveType, Type},
 };
-use std::{collections::BTreeMap, rc::Rc};
+use std::{collections::BTreeMap, rc::Rc, str::FromStr};
+use thiserror::Error;
 
 const INIT_MODULE_FUN: &str = "init_module";
 const LEGAC_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
@@ -26,6 +27,7 @@ const ERROR_PREFIX: &str = "E";
 const RESOURCE_GROUP: &str = "resource_group";
 const RESOURCE_GROUP_MEMBER: &str = "resource_group_member";
 const RESOURCE_GROUP_NAME: &str = "group";
+const RESOURCE_GROUP_SCOPE: &str = "scope";
 const VIEW_FUN_ATTRIBUTE: &str = "view";
 
 /// Run the extended context checker on target modules in the environment and returns a map
@@ -237,7 +239,13 @@ impl<'a> ExtendedChecker<'a> {
                     continue;
                 };
 
-                if self.check_resource_group(&container) {
+                if let Some(scope) = self.get_resource_group(&container) {
+                    if !scope.are_equal_envs(struct_, &container) {
+                        self.env
+                            .error(&struct_.get_loc(), "resource_group scope mismatch");
+                        continue;
+                    }
+
                     self.output
                         .entry(module_id.clone())
                         .or_default()
@@ -253,8 +261,10 @@ impl<'a> ExtendedChecker<'a> {
                             container.get_full_name_with_address(),
                         ));
                 } else {
-                    self.env
-                        .error(&struct_.get_loc(), "container is not a resource_group");
+                    self.env.error(
+                        &struct_.get_loc(),
+                        "container is not a resource_group_container",
+                    );
                 }
             }
         }
@@ -265,7 +275,7 @@ impl<'a> ExtendedChecker<'a> {
         let module_id = self.get_runtime_module_id(module);
 
         for ref struct_ in module.get_structs() {
-            if self.check_resource_group(struct_) {
+            if let Some(scope) = self.get_resource_group(struct_) {
                 self.output
                     .entry(module_id.clone())
                     .or_default()
@@ -277,23 +287,19 @@ impl<'a> ExtendedChecker<'a> {
                             .to_string(),
                     )
                     .or_default()
-                    .push(KnownAttribute::resource_group());
+                    .push(KnownAttribute::resource_group(scope));
             }
         }
     }
 
-    fn check_resource_group(&mut self, struct_: &StructEnv) -> bool {
-        let found = struct_.get_attributes().iter().any(|attr| {
+    fn get_resource_group(&mut self, struct_: &StructEnv) -> Option<ResourceGroupScope> {
+        let container = struct_.get_attributes().iter().find(|attr| {
             if let Attribute::Apply(_, name, _) = attr {
-                self.env.symbol_pool().string(*name).as_str() == RESOURCE_GROUP
+                self.name_string(*name).as_ref() == RESOURCE_GROUP
             } else {
                 false
             }
-        });
-
-        if !found {
-            return false;
-        }
+        })?;
 
         // Every struct contains the "dummy_field".
         if struct_.get_field_count() == 1 {
@@ -303,29 +309,82 @@ impl<'a> ExtendedChecker<'a> {
                 self.env.error(
                     &struct_.get_loc(),
                     "resource_group should not have fields",
-                )
-            }
+                );
+                return None;
+            };
         }
+
         if struct_.get_field_count() > 1 {
             self.env.error(
                 &struct_.get_loc(),
                 "resource_group should not have fields",
-            )
+            );
+            return None;
         }
+
         if struct_.get_abilities() != AbilitySet::EMPTY {
             self.env.error(
                 &struct_.get_loc(),
                 "resource_group should not have abilities",
-            )
+            );
+            return None;
         }
+
         if !struct_.get_type_parameters().is_empty() {
             self.env.error(
                 &struct_.get_loc(),
                 "resource_group should not have type parameters",
-            )
+            );
+            return None;
         }
 
-        true
+        if let Attribute::Apply(_, _, attributes) = container {
+            if attributes.len() != 1 {
+                self.env.error(
+                    &struct_.get_loc(),
+                    "resource_group_container must contain 1 parameters",
+                );
+                return None;
+            }
+
+            let value = if let Attribute::Assign(_, name, value) = &attributes[0] {
+                if self.name_string(*name).as_str() != RESOURCE_GROUP_SCOPE {
+                    self.env.error(
+                        &struct_.get_loc(),
+                        "resource_group_container lacks 'scope' parameter",
+                    );
+                }
+                value
+            } else {
+                self.env.error(
+                    &struct_.get_loc(),
+                    "resource_group_container lacks 'scope' parameter",
+                );
+                return None;
+            };
+
+            if let AttributeValue::Name(_, _, name) = value {
+                let result = str::parse(&self.name_string(*name));
+                if result.is_err() {
+                    self.env.error(
+                        &struct_.get_loc(),
+                        &format!(
+                            "resource_group_container invalid 'scope': {}",
+                            self.name_string(*name)
+                        ),
+                    );
+                }
+                result.ok()
+            } else {
+                self.env.error(
+                    &struct_.get_loc(),
+                    "resource_group lacks 'container' parameter",
+                );
+                None
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -424,3 +483,59 @@ impl<'a> ExtendedChecker<'a> {
         self.env.symbol_pool().string(symbol)
     }
 }
+
+// ----------------------------------------------------------------------------------
+// Resource Group Container Scope
+
+pub enum ResourceGroupScope {
+    Global,
+    Address,
+    Module,
+}
+
+impl ResourceGroupScope {
+    pub fn are_equal_envs(self, resource: &StructEnv, group: &StructEnv) -> bool {
+        match self {
+            ResourceGroupScope::Global => true,
+            ResourceGroupScope::Address => {
+                resource.module_env.get_name().addr() == group.module_env.get_name().addr()
+            },
+            ResourceGroupScope::Module => {
+                resource.module_env.get_name() == group.module_env.get_name()
+            },
+        }
+    }
+
+    pub fn are_equal_module_ids(self, resource: &ModuleId, group: &ModuleId) -> bool {
+        match self {
+            ResourceGroupScope::Global => true,
+            ResourceGroupScope::Address => resource.address() == group.address(),
+            ResourceGroupScope::Module => resource == group,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ResourceGroupScope::Global => "global",
+            ResourceGroupScope::Address => "address",
+            ResourceGroupScope::Module => "module",
+        }
+    }
+}
+
+impl FromStr for ResourceGroupScope {
+    type Err = ResourceGroupScopeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "global" => Ok(ResourceGroupScope::Global),
+            "address" => Ok(ResourceGroupScope::Address),
+            "module" => Ok(ResourceGroupScope::Module),
+            _ => Err(ResourceGroupScopeError(s.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("Invalid resource group scope: {0}")]
+pub struct ResourceGroupScopeError(String);
