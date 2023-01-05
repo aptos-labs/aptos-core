@@ -11,7 +11,7 @@ This page shows the key updates to the developer documentation on this site.
 
 - Added [Node Inspection Service](nodes/measure/node-inspection-service.md) document that explains how to access node metrics for validators and fullnodes and highlights key metrics for monitoring.
 
-- Added instructions for [running archival nodes](guides/state-sync.md#running-archival-nodes), specifically avoiding fast synching and ledger pruning. 
+- Added instructions for [running archival nodes](guides/state-sync.md#running-archival-nodes), specifically avoiding fast syncing and ledger pruning. 
 
 ## 26 December 2022
 
