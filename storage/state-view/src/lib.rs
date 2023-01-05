@@ -21,7 +21,7 @@ pub mod account_with_state_view;
 /// `StateView` is a trait that defines a read-only snapshot of the global state. It is passed to
 /// the VM for transaction execution, during which the VM is guaranteed to read anything at the
 /// given state.
-pub trait TStateView: Sync {
+pub trait TStateView {
     type Key;
 
     /// For logging and debugging purpose, identifies what this view is for.
@@ -58,7 +58,7 @@ pub enum StateViewId {
 
 impl<R, S, K> TStateView for R
 where
-    R: Deref<Target = S> + Sync,
+    R: Deref<Target = S>,
     S: TStateView<Key = K>,
 {
     type Key = K;
