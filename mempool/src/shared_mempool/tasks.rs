@@ -24,10 +24,11 @@ use aptos_metrics_core::HistogramTimer;
 use aptos_network::application::interface::NetworkInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
 use aptos_types::{
+    account_config::AccountSequenceInfo,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::OnChainConfigPayload,
     transaction::SignedTransaction,
-    vm_status::DiscardedVMStatus,
+    vm_status::{DiscardedVMStatus, StatusCode},
 };
 use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
 use futures::{channel::oneshot, stream::FuturesUnordered};
@@ -301,6 +302,23 @@ where
         })
         .collect();
 
+    validate_and_add_transactions(transactions, smp, timeline_state, &mut statuses);
+    notify_subscribers(SharedMempoolNotification::NewTransactions, &smp.subscribers);
+    statuses
+}
+
+/// Perfoms VM validation on the transactions and inserts those that passes
+/// validation into the mempool.
+#[cfg(not(feature = "consensus-only-perf-test"))]
+fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
+    transactions: Vec<(SignedTransaction, AccountSequenceInfo)>,
+    smp: &SharedMempool<NetworkClient, TransactionValidator>,
+    timeline_state: TimelineState,
+    statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
+) where
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation,
+{
     // Track latency: VM validation
     let vm_validation_timer = counters::PROCESS_TXN_BREAKDOWN_LATENCY
         .with_label_values(&[counters::VM_VALIDATION_LABEL])
@@ -346,8 +364,30 @@ where
             }
         }
     }
-    notify_subscribers(SharedMempoolNotification::NewTransactions, &smp.subscribers);
-    statuses
+}
+
+/// In consensus-only mode, insert transactions into the mempool directly
+/// without any VM validation.
+///
+/// We want to populate transactions as fast as and
+/// as much as possible into the mempool, and the VM validator would interfere with
+/// this because validation has some overhead and the validator bounds the number of
+/// outstanding sequence numbers.
+#[cfg(feature = "consensus-only-perf-test")]
+fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
+    transactions: Vec<(SignedTransaction, AccountSequenceInfo)>,
+    smp: &SharedMempool<NetworkClient, TransactionValidator>,
+    timeline_state: TimelineState,
+    statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
+) where
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation,
+{
+    let mut mempool = smp.mempool.lock();
+    for (transaction, sequence_info) in transactions.into_iter() {
+        let mempool_status = mempool.add_txn(transaction.clone(), 0, sequence_info, timeline_state);
+        statuses.push((transaction, (mempool_status, None)));
+    }
 }
 
 fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<PeerNetworkId>) {

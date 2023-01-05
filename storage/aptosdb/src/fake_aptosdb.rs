@@ -702,7 +702,7 @@ impl DbReader for FakeAptosDB {
                     self.account_seq_num
                         .insert(account_address, initial_seq_num);
                     initial_seq_num
-                },
+                }
             };
             let account = AccountResource::new(
                 seq_num,
