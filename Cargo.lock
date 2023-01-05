@@ -758,6 +758,7 @@ dependencies = [
  "arr_macro",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "byteorder",
+ "dashmap",
  "itertools",
  "lru",
  "move-core-types",
