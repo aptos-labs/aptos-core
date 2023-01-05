@@ -12,8 +12,9 @@ use rand::{
     distributions::{Distribution, Standard},
     prelude::{SliceRandom, StdRng},
     Rng,
+    RngCore,
 };
-use rand_core::RngCore;
+use rand_core::{OsRng, SeedableRng};
 use std::{cmp::max, sync::Arc};
 
 pub struct P2PTransactionGenerator {
@@ -22,7 +23,6 @@ pub struct P2PTransactionGenerator {
     txn_factory: TransactionFactory,
     all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
     invalid_transaction_ratio: usize,
-    gas_price: u64,
 }
 
 impl P2PTransactionGenerator {
@@ -32,7 +32,6 @@ impl P2PTransactionGenerator {
         txn_factory: TransactionFactory,
         all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
         invalid_transaction_ratio: usize,
-        gas_price: u64,
     ) -> Self {
         Self {
             rng,
@@ -40,7 +39,6 @@ impl P2PTransactionGenerator {
             txn_factory,
             all_addresses,
             invalid_transaction_ratio,
-            gas_price,
         }
     }
 
@@ -50,12 +48,10 @@ impl P2PTransactionGenerator {
         to: &AccountAddress,
         num_coins: u64,
         txn_factory: &TransactionFactory,
-        gas_price: u64,
     ) -> SignedTransaction {
         from.sign_with_transaction_builder(
             txn_factory
-                .payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins))
-                .gas_unit_price(gas_price),
+                .payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins)),
         )
     }
 
@@ -76,7 +72,6 @@ impl P2PTransactionGenerator {
                     receiver,
                     self.send_amount,
                     txn_factory,
-                    self.gas_price,
                 )
             },
             InvalidTransactionType::Sender => self.gen_single_txn(
@@ -84,14 +79,12 @@ impl P2PTransactionGenerator {
                 receiver,
                 self.send_amount,
                 &self.txn_factory,
-                self.gas_price,
             ),
             InvalidTransactionType::Receiver => self.gen_single_txn(
                 sender,
                 &invalid_address,
                 self.send_amount,
                 &self.txn_factory,
-                self.gas_price,
             ),
             InvalidTransactionType::Duplication => {
                 // if this is the first tx, default to generate invalid tx with wrong chain id
@@ -103,7 +96,6 @@ impl P2PTransactionGenerator {
                         receiver,
                         self.send_amount,
                         txn_factory,
-                        self.gas_price,
                     )
                 } else {
                     let random_index = rng.gen_range(0, reqs.len());
@@ -173,7 +165,6 @@ impl TransactionGenerator for P2PTransactionGenerator {
                         receiver,
                         self.send_amount,
                         &self.txn_factory,
-                        self.gas_price,
                     )
                 } else {
                     self.generate_invalid_transaction(
@@ -191,44 +182,37 @@ impl TransactionGenerator for P2PTransactionGenerator {
 }
 
 pub struct P2PTransactionGeneratorCreator {
-    rng: StdRng,
     txn_factory: TransactionFactory,
     amount: u64,
     all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
     invalid_transaction_ratio: usize,
-    gas_price: u64,
 }
 
 impl P2PTransactionGeneratorCreator {
     pub fn new(
-        rng: StdRng,
         txn_factory: TransactionFactory,
         amount: u64,
         all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
         invalid_transaction_ratio: usize,
-        gas_price: u64,
     ) -> Self {
         Self {
-            rng,
             txn_factory,
             amount,
             all_addresses,
             invalid_transaction_ratio,
-            gas_price,
         }
     }
 }
 
 #[async_trait]
 impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
-    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         Box::new(P2PTransactionGenerator::new(
-            self.rng.clone(),
+            StdRng::from_seed(OsRng.gen()),
             self.amount,
             self.txn_factory.clone(),
             self.all_addresses.clone(),
             self.invalid_transaction_ratio,
-            self.gas_price,
         ))
     }
 }

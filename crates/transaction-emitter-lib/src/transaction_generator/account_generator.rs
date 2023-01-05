@@ -129,7 +129,7 @@ impl AccountGeneratorCreator {
 
 #[async_trait]
 impl TransactionGeneratorCreator for AccountGeneratorCreator {
-    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         Box::new(AccountGenerator::new(
             StdRng::from_seed(OsRng.gen()),
             self.txn_factory.clone(),
