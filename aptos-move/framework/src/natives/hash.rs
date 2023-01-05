@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::util::make_native_from_func;
-
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
-use ripemd::Digest as OtherDigest;
+use ripemd::Digest as RipemdDigest;
 use sha2::Digest;
 use smallvec::smallvec;
 use std::{collections::VecDeque, hash::Hasher};
@@ -129,6 +128,32 @@ fn native_sha3_512(
 }
 
 #[derive(Debug, Clone)]
+pub struct Blake2B256HashGasParameters {
+    pub base: InternalGas,
+    pub per_byte: InternalGasPerByte,
+}
+
+fn native_blake2b_256(
+    gas_params: &Blake2B256HashGasParameters,
+    _context: &mut NativeContext,
+    mut _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(args.len() == 1);
+
+    let bytes = pop_arg!(args, Vec<u8>);
+
+    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+
+    let output = blake2_rfc::blake2b::blake2b(32, &[], &bytes)
+        .as_bytes()
+        .to_vec();
+
+    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(output)]))
+}
+
+#[derive(Debug, Clone)]
 pub struct Ripemd160HashGasParameters {
     pub base: InternalGas,
     pub per_byte: InternalGasPerByte,
@@ -165,6 +190,7 @@ pub struct GasParameters {
     pub sha2_512: Sha2_512HashGasParameters,
     pub sha3_512: Sha3_512HashGasParameters,
     pub ripemd160: Ripemd160HashGasParameters,
+    pub blake2b_256: Blake2B256HashGasParameters,
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
@@ -188,6 +214,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "ripemd160_internal",
             make_native_from_func(gas_params.ripemd160, native_ripemd160),
+        ),
+        (
+            "blake2b_256_internal",
+            make_native_from_func(gas_params.blake2b_256, native_blake2b_256),
         ),
     ];
 

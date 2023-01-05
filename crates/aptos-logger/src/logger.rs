@@ -4,7 +4,6 @@
 //! Global logger definition and functions
 
 use crate::{counters::STRUCT_LOG_COUNT, error, Event, Metadata};
-
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
 use tracing_subscriber::prelude::*;

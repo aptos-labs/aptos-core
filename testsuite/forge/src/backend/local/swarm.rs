@@ -43,12 +43,12 @@ pub enum SwarmDirectory {
 impl SwarmDirectory {
     pub fn persist(&mut self) {
         match self {
-            SwarmDirectory::Persistent(_) => {}
+            SwarmDirectory::Persistent(_) => {},
             SwarmDirectory::Temporary(_) => {
                 let mut temp = SwarmDirectory::Persistent(PathBuf::new());
                 mem::swap(self, &mut temp);
                 let _ = mem::replace(self, temp.into_persistent());
-            }
+            },
         }
     }
 
@@ -142,6 +142,10 @@ impl LocalSwarm {
                     if number_of_validators.get() == 1 {
                         // this delays empty block by (30-1) * 30ms
                         config.consensus.quorum_store_poll_count = 30;
+                        config
+                            .state_sync
+                            .state_sync_driver
+                            .enable_auto_bootstrapping = true;
                         config
                             .state_sync
                             .state_sync_driver
@@ -284,18 +288,18 @@ impl LocalSwarm {
                             node.name(),
                             e
                         ));
-                    }
+                    },
                     Err(HealthCheckError::NotRunning(error)) => {
                         return Err(anyhow!(
                             "Node '{}' is not running! Error: {:?}",
                             node.name(),
                             error
                         ));
-                    }
+                    },
                     Err(HealthCheckError::Failure(e)) => {
                         warn!("health check failure: {}", e);
                         break;
-                    }
+                    },
                 }
             }
 

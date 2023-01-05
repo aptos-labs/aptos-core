@@ -22,6 +22,7 @@ pub enum BootstrappingMode {
     ApplyTransactionOutputsFromGenesis, // Applies transaction outputs (starting at genesis)
     DownloadLatestStates, // Downloads the state keys and values (at the latest version)
     ExecuteTransactionsFromGenesis, // Executes transactions (starting at genesis)
+    ExecuteOrApplyFromGenesis, // Executes transactions or applies outputs from genesis (whichever is faster)
 }
 
 impl BootstrappingMode {
@@ -29,11 +30,12 @@ impl BootstrappingMode {
         match self {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 "apply_transaction_outputs_from_genesis"
-            }
+            },
             BootstrappingMode::DownloadLatestStates => "download_latest_states",
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 "execute_transactions_from_genesis"
-            }
+            },
+            BootstrappingMode::ExecuteOrApplyFromGenesis => "execute_or_apply_from_genesis",
         }
     }
 }
@@ -45,6 +47,7 @@ impl BootstrappingMode {
 pub enum ContinuousSyncingMode {
     ApplyTransactionOutputs, // Applies transaction outputs to stay up-to-date
     ExecuteTransactions,     // Executes transactions to stay up-to-date
+    ExecuteTransactionsOrApplyOutputs, // Executes transactions or applies outputs to stay up-to-date (whichever is faster)
 }
 
 impl ContinuousSyncingMode {
@@ -52,6 +55,9 @@ impl ContinuousSyncingMode {
         match self {
             ContinuousSyncingMode::ApplyTransactionOutputs => "apply_transaction_outputs",
             ContinuousSyncingMode::ExecuteTransactions => "execute_transactions",
+            ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs => {
+                "execute_transactions_or_apply_outputs"
+            },
         }
     }
 }
@@ -62,8 +68,10 @@ pub struct StateSyncDriverConfig {
     pub bootstrapping_mode: BootstrappingMode, // The mode by which to bootstrap
     pub commit_notification_timeout_ms: u64, // The max time taken to process a commit notification
     pub continuous_syncing_mode: ContinuousSyncingMode, // The mode by which to sync after bootstrapping
+    pub enable_auto_bootstrapping: bool, // Enable auto-bootstrapping if no peers are found after `max_connection_deadline_secs`
+    pub fallback_to_output_syncing_secs: u64, // The duration to fallback to output syncing after an execution failure
     pub progress_check_interval_ms: u64, // The interval (ms) at which to check state sync progress
-    pub max_connection_deadline_secs: u64, // The max time (secs) to wait for connections from peers
+    pub max_connection_deadline_secs: u64, // The max time (secs) to wait for connections from peers before auto-bootstrapping
     pub max_consecutive_stream_notifications: u64, // The max number of notifications to process per driver loop
     pub max_num_stream_timeouts: u64, // The max number of stream timeouts allowed before termination
     pub max_pending_data_chunks: u64, // The max number of data chunks pending execution or commit
@@ -79,6 +87,8 @@ impl Default for StateSyncDriverConfig {
             bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
             commit_notification_timeout_ms: 5000,
             continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
+            enable_auto_bootstrapping: false,
+            fallback_to_output_syncing_secs: 180, // 3 minutes
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
@@ -109,14 +119,14 @@ impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
             max_concurrent_requests: 4000,
-            max_epoch_chunk_size: 100,
+            max_epoch_chunk_size: 200,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
-            max_state_chunk_size: 2000,
+            max_state_chunk_size: 4000,
             max_subscription_period_ms: 5000,
             max_transaction_chunk_size: 2000,
-            max_transaction_output_chunk_size: 2000,
+            max_transaction_output_chunk_size: 1000,
             storage_summary_refresh_interval_ms: 50,
         }
     }
@@ -183,7 +193,7 @@ impl Default for AptosDataClientConfig {
         Self {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
-            max_num_output_reductions: 2,
+            max_num_output_reductions: 0,
             max_response_timeout_ms: 60000, // 60 seconds
             response_timeout_ms: 10000,     // 10 seconds
             subscription_timeout_ms: 5000,  // 5 seconds

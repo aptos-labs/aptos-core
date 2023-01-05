@@ -18,16 +18,14 @@ use aptos_gas::{
 };
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
-use aptos_types::chain_id::ChainId;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
+    chain_id::ChainId,
     on_chain_config::{
-        ApprovedExecutionHashes, GasSchedule, GasScheduleV2, OnChainConfig, StorageGasSchedule,
-        Version,
+        ApprovedExecutionHashes, FeatureFlag, Features, GasSchedule, GasScheduleV2, OnChainConfig,
+        StorageGasSchedule, Version,
     },
-    transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
+    transaction::{AbortInfo, ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use fail::fail_point;
@@ -68,15 +66,15 @@ impl AptosVMImpl {
                     let feature_version = gas_schedule.feature_version;
                     let map = gas_schedule.to_btree_map();
                     (
-                        AptosGasParameters::from_on_chain_gas_schedule(&map),
+                        AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
                         feature_version,
                     )
-                }
+                },
                 None => match GasSchedule::fetch_config(&storage) {
                     Some(gas_schedule) => {
                         let map = gas_schedule.to_btree_map();
-                        (AptosGasParameters::from_on_chain_gas_schedule(&map), 0)
-                    }
+                        (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
+                    },
                     None => (None, 0),
                 },
             };
@@ -564,22 +562,6 @@ impl<'a> AptosVMInternals<'a> {
     /// Returns the version of Move Runtime.
     pub fn version(self) -> Result<Version, VMStatus> {
         self.0.get_version()
-    }
-
-    /// Executes the given code within the context of a transaction.
-    ///
-    /// The `TransactionDataCache` can be used as a `ChainState`.
-    ///
-    /// If you don't care about the transaction metadata, use `TransactionMetadata::default()`.
-    pub fn with_txn_data_cache<T, S: StateView>(
-        self,
-        state_view: &S,
-        f: impl for<'txn, 'r> FnOnce(SessionExt<'txn, 'r, StorageAdapter<S>>) -> T,
-        session_id: SessionId,
-    ) -> T {
-        let remote_storage = StorageAdapter::new(state_view);
-        let session = self.move_vm().new_session(&remote_storage, session_id);
-        f(session)
     }
 }
 

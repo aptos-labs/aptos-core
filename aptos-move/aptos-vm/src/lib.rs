@@ -123,7 +123,6 @@ pub mod transaction_metadata;
 mod verifier;
 
 pub use crate::aptos_vm::AptosVM;
-
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,

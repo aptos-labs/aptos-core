@@ -81,8 +81,21 @@ spec aptos_framework::account {
     }
 
     spec assert_valid_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
-        // TODO: complex aborts conditions.
-        pragma aborts_if_is_partial;
+        include scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: public_key_bytes };
+        include scheme == ED25519_SCHEME ==> ed25519::NewSignatureFromBytesAbortsIf { bytes: signature };
+        aborts_if scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
+            ed25519::Signature { bytes: signature },
+            ed25519::UnvalidatedPublicKey { bytes: public_key_bytes },
+            challenge
+        );
+
+        include scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: public_key_bytes };
+        include scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: signature };
+        aborts_if scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
+            multi_ed25519::Signature { bytes: signature },
+            multi_ed25519::UnvalidatedPublicKey { bytes: public_key_bytes },
+            challenge
+        );
         aborts_if scheme != ED25519_SCHEME && scheme != MULTI_ED25519_SCHEME;
     }
 
@@ -116,11 +129,43 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address
     ) {
-        // TODO: complex aborts conditions.
-        pragma aborts_if_is_partial;
         let source_address = signer::address_of(account);
+        let account_resource = global<Account>(source_address);
+        let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: account_resource.sequence_number,
+            source_address,
+            recipient_address,
+        };
+
         aborts_if !exists<Account>(recipient_address);
+        aborts_if !exists<Account>(source_address);
+
+        include account_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
+        aborts_if account_scheme == ED25519_SCHEME && ({
+            let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
+            account_resource.authentication_key != expected_auth_key
+        });
+        include account_scheme == ED25519_SCHEME ==> ed25519::NewSignatureFromBytesAbortsIf { bytes: signer_capability_sig_bytes };
+        aborts_if account_scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
+            ed25519::Signature { bytes: signer_capability_sig_bytes },
+            ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
+            proof_challenge
+        );
+
+        include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
+        aborts_if account_scheme == MULTI_ED25519_SCHEME && ({
+            let expected_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
+            account_resource.authentication_key != expected_auth_key
+        });
+        include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: signer_capability_sig_bytes };
+        aborts_if account_scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
+            multi_ed25519::Signature { bytes: signer_capability_sig_bytes },
+            multi_ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
+            proof_challenge
+        );
+
         aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
+
         modifies global<Account>(source_address);
     }
 
@@ -160,8 +205,14 @@ spec aptos_framework::account {
     /// The Account existed under the signer
     /// The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address
     spec create_resource_address(source: &address, seed: vector<u8>): address {
-        pragma verify = false;
+        pragma opaque;
+        pragma aborts_if_is_strict = false;
+        // This function should not abort assuming the result of `sha3_256` is deserializable into an address.
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_create_resource_address(source, seed);
     }
+
+    spec fun spec_create_resource_address(source: address, seed: vector<u8>): address;
 
     spec create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
         pragma verify = false;
@@ -210,9 +261,8 @@ spec aptos_framework::account {
     }
 
     spec register_coin<CoinType>(account_addr: address) {
-        // TODO: Add the abort condition about `type_info::type_of`
-        pragma aborts_if_is_partial;
         aborts_if !exists<Account>(account_addr);
+        aborts_if !type_info::spec_is_struct<CoinType>();
         modifies global<Account>(account_addr);
     }
 

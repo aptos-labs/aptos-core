@@ -59,15 +59,10 @@ impl<Framework: TestFramework<Node>, Node: TestNode> TestFrameworkBuilder<Framew
             .expect("Validator must have a validator network")
             .peer_id();
 
-        self.add_node(
-            owner,
-            NodeType::Validator,
-            config,
-            &[
-                PeerNetworkId::new(NetworkId::Validator, peer_id),
-                PeerNetworkId::new(NetworkId::Vfn, peer_id),
-            ],
-        )
+        self.add_node(owner, NodeType::Validator, config, &[
+            PeerNetworkId::new(NetworkId::Validator, peer_id),
+            PeerNetworkId::new(NetworkId::Vfn, peer_id),
+        ])
     }
 
     /// Adds a [`TestNode`] of [`NodeType::ValidatorFullNode`]
@@ -84,15 +79,10 @@ impl<Framework: TestFramework<Node>, Node: TestNode> TestFrameworkBuilder<Framew
             .expect("Vfn must have a public network")
             .peer_id();
 
-        self.add_node(
-            owner,
-            NodeType::ValidatorFullNode,
-            config,
-            &[
-                PeerNetworkId::new(NetworkId::Vfn, peer_id),
-                PeerNetworkId::new(NetworkId::Public, peer_id),
-            ],
-        )
+        self.add_node(owner, NodeType::ValidatorFullNode, config, &[
+            PeerNetworkId::new(NetworkId::Vfn, peer_id),
+            PeerNetworkId::new(NetworkId::Public, peer_id),
+        ])
     }
 
     /// Adds a [`TestNode`] of [`NodeType::PublicFullNode`]
@@ -109,12 +99,9 @@ impl<Framework: TestFramework<Node>, Node: TestNode> TestFrameworkBuilder<Framew
             .expect("Pfn must have a public network")
             .peer_id();
 
-        self.add_node(
-            owner,
-            NodeType::PublicFullNode,
-            config,
-            &[PeerNetworkId::new(NetworkId::Public, peer_id)],
-        )
+        self.add_node(owner, NodeType::PublicFullNode, config, &[
+            PeerNetworkId::new(NetworkId::Public, peer_id),
+        ])
     }
 
     /// Add a node to the network, ensuring that it doesn't already exist

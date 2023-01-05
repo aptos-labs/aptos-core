@@ -23,6 +23,7 @@ aptos-types = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
 better_any = { workspace = true }
+blake2-rfc = { workspace = true }
 clap = { workspace = true }
 codespan-reporting = { workspace = true }
 curve25519-dalek = { workspace = true }
@@ -59,6 +60,7 @@ sha3 = { workspace = true }
 siphasher = { workspace = true }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
+thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
 
 [dev-dependencies]

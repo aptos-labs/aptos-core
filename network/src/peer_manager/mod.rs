@@ -308,7 +308,7 @@ where
                                 conn.metadata
                             )
                         }
-                    }
+                    },
                     ConnectionOrigin::Inbound => {
                         // Everything below here is meant for unknown peers only, role comes from
                         // Noise handshake and if it's not `Unknown` it is trusted
@@ -352,7 +352,7 @@ where
                                 return;
                             }
                         }
-                    }
+                    },
                 }
 
                 // Add new peer, updating counters and all
@@ -363,7 +363,7 @@ where
                 );
                 self.add_peer(conn);
                 self.update_connected_peers_metrics();
-            }
+            },
             TransportNotification::Disconnected(lost_conn_metadata, reason) => {
                 // See: https://github.com/aptos-labs/aptos-core/issues/3128#issuecomment-605351504 for
                 // detailed reasoning on `Disconnected` events should be handled correctly.
@@ -429,7 +429,7 @@ where
                 self.inbound_rate_limiters.try_garbage_collect_key(&ip_addr);
                 self.outbound_rate_limiters
                     .try_garbage_collect_key(&ip_addr);
-            }
+            },
         }
     }
 
@@ -470,7 +470,7 @@ where
                     let request = TransportRequest::DialPeer(requested_peer_id, addr, response_tx);
                     self.transport_reqs_tx.send(request).await.unwrap();
                 };
-            }
+            },
             ConnectionRequest::DisconnectPeer(peer_id, resp_tx) => {
                 // Send a CloseConnection request to Peer and drop the send end of the
                 // PeerRequest channel.
@@ -502,7 +502,7 @@ where
                         );
                     }
                 }
-            }
+            },
         }
     }
 
@@ -519,10 +519,10 @@ where
         let (peer_id, protocol_id, peer_request) = match request {
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                 (peer_id, msg.protocol_id(), PeerRequest::SendDirectSend(msg))
-            }
+            },
             PeerManagerRequest::SendRpc(peer_id, req) => {
                 (peer_id, req.protocol_id(), PeerRequest::SendRpc(req))
-            }
+            },
         };
 
         if let Some((conn_metadata, sender)) = self.active_peers.get_mut(&peer_id) {

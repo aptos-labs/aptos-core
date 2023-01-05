@@ -6,8 +6,6 @@ use super::*;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, schema::state_value::StateValueSchema,
 };
-use aptos_types::ledger_info::generate_ledger_info_with_sig;
-
 use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
 use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
@@ -15,12 +13,11 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_temppath::TempPath;
 use aptos_types::{
     contract_event::ContractEvent,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::InMemoryAccumulator,
     proptest_types::{AccountInfoUniverse, BlockGen},
 };
-use proptest::sample::Index;
-use proptest::{collection::vec, prelude::*};
+use proptest::{collection::vec, prelude::*, sample::Index};
 
 prop_compose! {
     pub fn arb_state_kv_sets(
@@ -64,13 +61,13 @@ pub(crate) fn update_store(
                 version.checked_sub(1),
             )
             .unwrap();
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         store
             .put_value_sets(
                 vec![&value_state_set],
                 version,
                 StateStorageUsage::new_untracked(),
-                &mut batch,
+                &batch,
             )
             .unwrap();
         store.ledger_db.write_schemas(batch).unwrap();
@@ -769,9 +766,9 @@ pub fn verify_committed_transactions(
 }
 
 pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &TransactionInfo) {
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     db.ledger_store
-        .put_transaction_infos(version, &[txn_info.clone()], &mut batch)
+        .put_transaction_infos(version, &[txn_info.clone()], &batch)
         .unwrap();
     db.ledger_db.write_schemas(batch).unwrap();
 }

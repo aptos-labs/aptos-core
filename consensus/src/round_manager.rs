@@ -21,6 +21,7 @@ use crate::{
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
+    quorum_store::types::{Batch, BatchRequest, Fragment},
 };
 use anyhow::{bail, ensure, Context, Result};
 use aptos_channels::aptos_channel;
@@ -29,6 +30,7 @@ use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
@@ -43,7 +45,7 @@ use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
-    validator_verifier::ValidatorVerifier,
+    validator_verifier::ValidatorVerifier, PeerId,
 };
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
@@ -62,6 +64,11 @@ pub enum UnverifiedEvent {
     SyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
+    FragmentMsg(Box<Fragment>),
+    BatchRequestMsg(Box<BatchRequest>),
+    BatchMsg(Box<Batch>),
+    SignedDigestMsg(Box<SignedDigest>),
+    ProofOfStoreMsg(Box<ProofOfStore>),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -69,6 +76,7 @@ pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
 impl UnverifiedEvent {
     pub fn verify(
         self,
+        peer_id: PeerId,
         validator: &ValidatorVerifier,
         quorum_store_enabled: bool,
     ) -> Result<VerifiedEvent, VerifyError> {
@@ -76,21 +84,42 @@ impl UnverifiedEvent {
             UnverifiedEvent::ProposalMsg(p) => {
                 p.verify(validator, quorum_store_enabled)?;
                 VerifiedEvent::ProposalMsg(p)
-            }
+            },
             UnverifiedEvent::VoteMsg(v) => {
                 v.verify(validator)?;
                 VerifiedEvent::VoteMsg(v)
-            }
+            },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::CommitVote(cv) => {
                 cv.verify(validator)?;
                 VerifiedEvent::CommitVote(cv)
-            }
+            },
             UnverifiedEvent::CommitDecision(cd) => {
                 cd.verify(validator)?;
                 VerifiedEvent::CommitDecision(cd)
-            }
+            },
+            UnverifiedEvent::FragmentMsg(f) => {
+                f.verify(peer_id)?;
+                VerifiedEvent::FragmentMsg(f)
+            },
+            UnverifiedEvent::BatchRequestMsg(br) => {
+                br.verify(peer_id)?;
+                VerifiedEvent::BatchRequestMsg(br)
+            },
+            // Only sender is verified. Remaining verification is on-demand (when it's used).
+            UnverifiedEvent::BatchMsg(b) => {
+                b.verify(peer_id)?;
+                VerifiedEvent::UnverifiedBatchMsg(b)
+            },
+            UnverifiedEvent::SignedDigestMsg(sd) => {
+                sd.verify(validator)?;
+                VerifiedEvent::SignedDigestMsg(sd)
+            },
+            UnverifiedEvent::ProofOfStoreMsg(p) => {
+                p.verify(validator)?;
+                VerifiedEvent::ProofOfStoreMsg(p)
+            },
         })
     }
 
@@ -101,6 +130,11 @@ impl UnverifiedEvent {
             UnverifiedEvent::SyncInfo(s) => s.epoch(),
             UnverifiedEvent::CommitVote(cv) => cv.epoch(),
             UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
+            UnverifiedEvent::FragmentMsg(f) => f.epoch(),
+            UnverifiedEvent::BatchRequestMsg(br) => br.epoch(),
+            UnverifiedEvent::BatchMsg(b) => b.epoch(),
+            UnverifiedEvent::SignedDigestMsg(sd) => sd.epoch(),
+            UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
         }
     }
 }
@@ -113,6 +147,11 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
             ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
+            ConsensusMsg::FragmentMsg(m) => UnverifiedEvent::FragmentMsg(m),
+            ConsensusMsg::BatchRequestMsg(m) => UnverifiedEvent::BatchRequestMsg(m),
+            ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
+            ConsensusMsg::SignedDigestMsg(m) => UnverifiedEvent::SignedDigestMsg(m),
+            ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
             _ => unreachable!("Unexpected conversion"),
         }
     }
@@ -127,6 +166,11 @@ pub enum VerifiedEvent {
     UnverifiedSyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
+    FragmentMsg(Box<Fragment>),
+    BatchRequestMsg(Box<BatchRequest>),
+    UnverifiedBatchMsg(Box<Batch>),
+    SignedDigestMsg(Box<SignedDigest>),
+    ProofOfStoreMsg(Box<ProofOfStore>),
     // local messages
     LocalTimeout(Round),
 }
@@ -236,10 +280,10 @@ impl RoundManager {
         match new_round_event.reason {
             NewRoundReason::QCReady => {
                 counters::QC_ROUNDS_COUNT.inc();
-            }
+            },
             NewRoundReason::Timeout => {
                 counters::TIMEOUT_ROUNDS_COUNT.inc();
-            }
+            },
         };
         info!(
             self.new_log(LogEvent::NewRound),
@@ -527,7 +571,7 @@ impl RoundManager {
         let (is_nil_vote, mut timeout_vote) = match self.round_state.vote_sent() {
             Some(vote) if vote.vote_data().proposed().round() == round => {
                 (vote.vote_data().is_for_nil(), vote)
-            }
+            },
             _ => {
                 // Didn't vote in this round yet, generate a backup vote
                 let nil_block = self
@@ -540,7 +584,7 @@ impl RoundManager {
                 counters::VOTE_NIL_COUNT.inc();
                 let nil_vote = self.execute_and_vote(nil_block).await?;
                 (true, nil_vote)
-            }
+            },
         };
 
         if !timeout_vote.is_timeout() {
@@ -823,13 +867,13 @@ impl RoundManager {
                     );
                 }
                 self.new_qc_aggregated(qc, vote.author()).await
-            }
+            },
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
-            }
+            },
             VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_vote_timeout() => {
                 self.process_local_timeout(round).await
-            }
+            },
             VoteReceptionResult::VoteAdded(_)
             | VoteReceptionResult::EchoTimeout(_)
             | VoteReceptionResult::DuplicateVote => Ok(()),

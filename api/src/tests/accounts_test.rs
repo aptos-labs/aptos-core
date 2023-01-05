@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::str::FromStr;
-
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, find_value};
 use aptos_api_types::{MoveModuleBytecode, MoveResource, StateKeyWrapper};
 use serde_json::json;
+use std::str::FromStr;
 
 /* TODO: reactivate once cause of failure for `"8"` vs `8` in the JSON output is known.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

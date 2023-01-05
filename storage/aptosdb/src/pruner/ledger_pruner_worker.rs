@@ -1,17 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-use crate::pruner::db_pruner::DBPruner;
-use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
+use crate::pruner::{db_pruner::DBPruner, ledger_store::ledger_store_pruner::LedgerPruner};
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_logger::{
     error,
     prelude::{sample, SampleRate},
 };
 use aptos_types::transaction::Version;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::thread::sleep;
-use std::time::Duration;
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread::sleep,
+    time::Duration,
+};
 
 /// Maintains the ledger pruner and periodically calls the db_pruner's prune method to prune the DB.
 /// This also exposes API to report the progress to the parent thread.

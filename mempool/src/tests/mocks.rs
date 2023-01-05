@@ -3,7 +3,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::{MempoolNetworkEvents, MempoolNetworkSender},
+    network::MempoolNetworkEvents,
     shared_mempool::start_shared_mempool,
     MempoolClientSender, QuorumStoreRequest,
 };
@@ -19,20 +19,21 @@ use aptos_mempool_notifications::{self, MempoolNotifier};
 use aptos_network::{
     application::storage::PeerMetadataStorage,
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{NewNetworkEvents, NewNetworkSender},
+    protocols::network::{NetworkSender, NewNetworkEvents, NewNetworkSender},
 };
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
-use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_types::{
     account_config::AccountSequenceInfo, mempool_status::MempoolStatusCode,
-    transaction::SignedTransaction,
+    on_chain_config::OnChainConfigPayload, transaction::SignedTransaction,
 };
 use aptos_vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
 };
 use futures::channel::mpsc;
-use std::collections::HashMap;
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use tokio::runtime::{Builder, Handle, Runtime};
 
 /// Mock of a running instance of shared mempool.
@@ -108,7 +109,7 @@ impl MockSharedMempool {
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_, conn_notifs_rx) = conn_notifs_channel::new();
-        let network_sender = MempoolNetworkSender::new(
+        let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
@@ -122,13 +123,10 @@ impl MockSharedMempool {
             notification_receiver: reconfig_events,
         };
         reconfig_sender
-            .push(
-                (),
-                ReconfigNotification {
-                    version: 1,
-                    on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
-                },
-            )
+            .push((), ReconfigNotification {
+                version: 1,
+                on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+            })
             .unwrap();
         let network_handles = vec![(NetworkId::Validator, network_sender, network_events)];
         let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);

@@ -12,11 +12,13 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_schemadb::{SchemaBatch, DB};
-use aptos_types::proof::position::Position;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
-    proof::{definition::LeafCount, position::FrozenSubTreeIterator},
+    proof::{
+        definition::LeafCount,
+        position::{FrozenSubTreeIterator, Position},
+    },
     transaction::{Transaction, TransactionInfo, TransactionOutput, Version},
 };
 use std::sync::Arc;

@@ -11,16 +11,16 @@ use crate::{
     VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
-use anyhow::{bail, format_err};
+use anyhow::{anyhow, bail, format_err};
 use aptos_logger::info;
 use aptos_sdk::types::PeerId;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
     batch::{v1::Job, v1beta1::CronJob},
-    core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod},
+    core::v1::{ConfigMap, Namespace, PersistentVolume, PersistentVolumeClaim, Pod},
 };
 use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, PostParams},
+    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, Patch, PatchParams, PostParams},
     client::Client as K8sClient,
     Config, Error as KubeError,
 };
@@ -75,7 +75,7 @@ async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &s
                         ])
                         .status()
                         .expect("Failed to tail genesis logs");
-                }
+                },
                 None => info!("Genesis completed running"),
             }
             info!("Genesis status: {:?}", status);
@@ -83,7 +83,7 @@ async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &s
                 Some(_) => {
                     info!("Genesis done");
                     Ok(())
-                }
+                },
                 None => bail!("Genesis did not succeed"),
             }
         })
@@ -119,11 +119,11 @@ async fn wait_node_haproxy(
                         }
                         info!("Deployment {} has no status", deployment_name);
                         bail!("Deployment not ready");
-                    }
+                    },
                     Err(e) => {
                         info!("Failed to get deployment: {}", e);
                         bail!("Failed to get deployment: {}", e);
-                    }
+                    },
                 }
             }
             Ok(())
@@ -173,10 +173,10 @@ async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
         either::Left(list) => {
             let names: Vec<_> = list.iter().map(Meta::name).collect();
             info!("Deleting collection of {}: {:?}", name, names);
-        }
+        },
         either::Right(status) => {
             info!("Deleted collection of {}: status={:?}", name, status);
-        }
+        },
     }
 
     Ok(())
@@ -267,11 +267,11 @@ async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
                     } else {
                         bail!(api_err);
                     }
-                }
+                },
                 Err(e) => bail!(e),
             };
             delete_k8s_resources(client, "default").await?;
-        }
+        },
         s if s.starts_with("forge") => {
             let namespaces: Api<Namespace> = Api::all(client);
             namespaces
@@ -279,13 +279,13 @@ async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
                 .await?
                 .map_left(|namespace| info!("Deleting namespace {}: {:?}", s, namespace.status))
                 .map_right(|status| info!("Deleted namespace {}: {:?}", s, status));
-        }
+        },
         _ => {
             bail!(
                 "Invalid kubernetes namespace provided: {}. Use forge-*",
                 kube_namespace
             );
-        }
+        },
     }
 
     Ok(())
@@ -406,6 +406,85 @@ fn get_node_default_helm_path() -> String {
     } else {
         "/aptos/terraform/aptos-node-default-values.yaml".to_string()
     }
+}
+
+pub async fn reset_persistent_volumes(kube_client: &K8sClient) -> Result<()> {
+    let pv_api: Api<PersistentVolume> = Api::all(kube_client.clone());
+    let pvs = pv_api
+        .list(&ListParams::default())
+        .await?
+        .items
+        .into_iter()
+        .filter(|pv| {
+            if let Some(status) = &pv.status {
+                if let Some(phase) = &status.phase {
+                    if phase == "Released" {
+                        return true;
+                    }
+                }
+            }
+            false
+        })
+        .collect::<Vec<PersistentVolume>>();
+
+    for pv in &pvs {
+        let name = pv.metadata.name.clone().expect("Must have name!");
+        info!("Changing pv {} from Released to Available.", name);
+        let patch = serde_json::json!({
+            "spec": {
+                "claimRef": null
+            }
+        });
+        pv_api
+            .patch(&name, &PatchParams::default(), &Patch::Merge(&patch))
+            .await?;
+    }
+
+    Ok(())
+}
+
+pub async fn check_persistent_volumes(
+    kube_client: K8sClient,
+    num_requested_pvs: usize,
+    existing_db_tag: String,
+) -> Result<()> {
+    info!("Trying to get {} PVs.", num_requested_pvs);
+    let pv_api: Api<PersistentVolume> = Api::all(kube_client.clone());
+    let list_params = ListParams::default();
+    let pvs = pv_api
+        .list(&list_params)
+        .await?
+        .items
+        .into_iter()
+        .filter(|pv| {
+            if let Some(labels) = &pv.metadata.labels {
+                if let Some(tag) = labels.get(&"tag".to_string()) {
+                    if tag == &existing_db_tag {
+                        if let Some(status) = &pv.status {
+                            if let Some(phase) = &status.phase {
+                                if phase == "Available" {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        })
+        .collect::<Vec<PersistentVolume>>();
+
+    if pvs.len() < num_requested_pvs {
+        return Err(anyhow!(
+            "Could not find enough PVs, requested: {}, available: {}.",
+            num_requested_pvs,
+            pvs.len()
+        ));
+    }
+
+    info!("Found enough PVs.");
+
+    Ok(())
 }
 
 pub async fn install_testnet_resources(
@@ -953,7 +1032,7 @@ mod tests {
         let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(401));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
         match result {
-            Err(ApiError::FinalError(_)) => {}
+            Err(ApiError::FinalError(_)) => {},
             _ => panic!("Expected final error"),
         }
     }
@@ -1026,7 +1105,7 @@ labels:
         let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(403));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
         match result {
-            Err(ApiError::RetryableError(_)) => {}
+            Err(ApiError::RetryableError(_)) => {},
             _ => panic!("Expected retryable error"),
         }
     }

@@ -21,6 +21,7 @@ aptos-event-notifications = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-network = { workspace = true }
+aptos-rest-client = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-time-service = { workspace = true }
@@ -30,6 +31,7 @@ futures = { workspace = true }
 once_cell = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true, features = ["testing"] }

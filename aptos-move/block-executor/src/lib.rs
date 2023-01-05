@@ -146,3 +146,4 @@ pub mod task;
 mod txn_last_input_output;
 #[cfg(test)]
 mod unit_tests;
+pub mod view;

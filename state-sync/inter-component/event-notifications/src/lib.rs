@@ -132,10 +132,10 @@ impl EventSubscriptionService {
             .subscription_id_to_event_subscription
             .insert(subscription_id, event_subscription)
         {
-            panic!(
+            return Err(Error::UnexpectedErrorEncountered(format!(
                 "Duplicate event subscription found! This should not occur! ID: {}, subscription: {:?}",
                 subscription_id, old_subscription
-            );
+            )));
         }
 
         // Update the event key subscriptions to include the new subscription
@@ -174,10 +174,10 @@ impl EventSubscriptionService {
             .reconfig_subscriptions
             .insert(subscription_id, reconfig_subscription)
         {
-            panic!(
+            return Err(Error::UnexpectedErrorEncountered(format!(
                 "Duplicate reconfiguration subscription found! This should not occur! ID: {}, subscription: {:?}",
                 subscription_id, old_subscription
-            );
+            )));
         }
 
         Ok(ReconfigNotificationListener {
@@ -273,10 +273,9 @@ impl EventSubscriptionService {
                 .fetch_config_by_version(*config_id, version)
             {
                 if let Some(old_entry) = config_id_to_config.insert(*config_id, config.clone()) {
-                    panic!(
+                    return Err(Error::UnexpectedErrorEncountered(format!(
                         "Unexpected config values for duplicate config id found! Key: {}, Value: {:?}!",
-                        config_id, old_entry
-                    );
+                        config_id, old_entry)));
                 }
             }
         }

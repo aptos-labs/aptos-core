@@ -1,13 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::view::ResolvedData;
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_mvhashmap::{EntryCell, MVHashMap};
 use aptos_types::write_set::{TransactionWrite, WriteOp};
 use std::{hash::Hash, thread::spawn};
-
-/// Resolved and serialized data for WriteOps, None means deletion.
-pub type ResolvedData = Option<Vec<u8>>;
 
 pub struct OutputDeltaResolver<K, V> {
     versioned_outputs: MVHashMap<K, V>,
@@ -48,7 +46,7 @@ impl<K: Hash + Clone + Eq + Send + 'static, V: TransactionWrite + Send + Sync + 
                 match &entry.cell {
                     EntryCell::Write(_, data) => {
                         latest_value = data.extract_raw_bytes().map(|bytes| deserialize(&bytes))
-                    }
+                    },
                     EntryCell::Delta(delta) => {
                         // Apply to the latest value and store in outputs.
                         let aggregator_value = delta
@@ -63,7 +61,7 @@ impl<K: Hash + Clone + Eq + Send + 'static, V: TransactionWrite + Send + Sync + 
                             WriteOp::Modification(serialize(&aggregator_value)),
                         ));
                         latest_value = Some(aggregator_value);
-                    }
+                    },
                 }
             }
         }

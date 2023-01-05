@@ -3,14 +3,6 @@
 
 //! Support for running the VM to execute and verify transactions.
 
-use serde::Serialize;
-use std::{
-    env,
-    fs::{self, OpenOptions},
-    io::Write,
-    path::{Path, PathBuf},
-};
-
 use crate::{
     account::{Account, AccountData},
     data_store::{
@@ -27,9 +19,7 @@ use aptos_gas::{
     LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_keygen::KeyGen;
-use aptos_state_view::StateView;
-use aptos_types::chain_id::ChainId;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -37,7 +27,8 @@ use aptos_types::{
         CORE_CODE_ADDRESS,
     },
     block_metadata::BlockMetadata,
-    on_chain_config::{OnChainConfig, ValidatorSet, Version},
+    chain_id::ChainId,
+    on_chain_config::{FeatureFlag, Features, OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
@@ -61,6 +52,13 @@ use move_core_types::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
+use serde::Serialize;
+use std::{
+    env,
+    fs::{self, OpenOptions},
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -291,7 +289,7 @@ impl FakeExecutor {
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
         let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()));
-        let data_blob = StateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
+        let data_blob = TStateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
             .expect("account must exist in data store")
             .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
         bcs::from_bytes(data_blob.as_slice()).ok()
@@ -324,7 +322,7 @@ impl FakeExecutor {
                         .read_state_value(&state_key)
                         .expect("aggregator value must exist in data store");
                     bcs::from_bytes(&value_bytes).unwrap()
-                }
+                },
                 None => o.integer.as_ref().unwrap().value,
             })
     }
@@ -375,7 +373,7 @@ impl FakeExecutor {
                     status
                 );
                 output
-            }
+            },
             TransactionStatus::Discard(status) => panic!("transaction discarded with {:?}", status),
             TransactionStatus::Retry => panic!("transaction status is retry"),
         }
@@ -424,7 +422,7 @@ impl FakeExecutor {
                         let output_seq = Self::trace(trace_output_dir.as_path(), res);
                         trace_map.2.push(output_seq);
                     }
-                }
+                },
                 Err(e) => {
                     let mut error_file = OpenOptions::new()
                         .write(true)
@@ -432,7 +430,7 @@ impl FakeExecutor {
                         .open(trace_dir.join(TRACE_FILE_ERROR))
                         .unwrap();
                     error_file.write_all(e.to_string().as_bytes()).unwrap();
-                }
+                },
             }
             let trace_meta_dir = trace_dir.join(TRACE_DIR_META);
             Self::trace(trace_meta_dir.as_path(), &trace_map);
@@ -467,7 +465,7 @@ impl FakeExecutor {
 
     /// Get the blob for the associated AccessPath
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
-        StateView::get_state_value(&self.data_store, state_key).unwrap()
+        TStateView::get_state_value(&self.data_store, state_key).unwrap()
     }
 
     /// Set the blob for the associated AccessPath

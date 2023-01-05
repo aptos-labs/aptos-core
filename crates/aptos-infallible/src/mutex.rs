@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::sync::Mutex as StdMutex;
-
 pub use std::sync::MutexGuard;
 
 /// A simple wrapper around the lock() function of a std::sync::Mutex

@@ -70,7 +70,7 @@ impl TokenActivity {
                         txn_version,
                         parse_timestamp(user_txn.timestamp.0, txn_version),
                     )),
-                    None => {}
+                    None => {},
                 };
             }
         }

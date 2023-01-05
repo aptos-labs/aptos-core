@@ -13,15 +13,13 @@ use crate::{
         Processor,
     },
 };
-
 use aptos_api::context::Context;
 use aptos_config::config::{IndexerConfig, NodeConfig};
 use aptos_logger::{error, info};
 use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 use tokio::runtime::{Builder, Runtime};
 
 pub struct MovingAverage {
@@ -58,7 +56,7 @@ impl MovingAverage {
                     } else {
                         break;
                     }
-                }
+                },
             }
         }
         self.avg()
@@ -134,7 +132,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     let processor: Arc<dyn TransactionProcessor> = match processor_enum {
         Processor::DefaultProcessor => {
             Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
-        }
+        },
         Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
             conn_pool.clone(),
             config.ans_contract_address,
@@ -240,7 +238,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
                         "Error in '{}' while processing batch: {:?}",
                         processor_name, err
                     );
-                }
+                },
             };
             batch_start_version =
                 std::cmp::min(batch_start_version, processed_result.start_version);

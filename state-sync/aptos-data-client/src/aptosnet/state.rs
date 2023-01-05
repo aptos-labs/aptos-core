@@ -12,8 +12,9 @@ use aptos_config::{
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::application::storage::PeerMetadataStorage;
-use aptos_storage_service_types::requests::StorageServiceRequest;
-use aptos_storage_service_types::responses::StorageServerSummary;
+use aptos_storage_service_types::{
+    requests::StorageServiceRequest, responses::StorageServerSummary,
+};
 use itertools::Itertools;
 use std::{
     cmp::min,
@@ -48,7 +49,7 @@ impl From<ResponseError> for ErrorType {
         match error {
             ResponseError::InvalidData | ResponseError::InvalidPayloadDataType => {
                 ErrorType::NotUseful
-            }
+            },
             ResponseError::ProofVerificationError => ErrorType::Malicious,
         }
     }

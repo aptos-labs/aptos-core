@@ -9,4 +9,4 @@ AptosToken = { local = "../../framework/aptos-token" }
 DataStructure = { local = "../data_structures" }
 
 [addresses]
-source_addr = "0xcafe"
+source_addr = "_"

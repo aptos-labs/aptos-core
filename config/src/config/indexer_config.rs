@@ -102,7 +102,7 @@ pub fn default_if_zero(value: Option<u64>, default: u64) -> Option<u64> {
             } else {
                 Some(value)
             }
-        }
+        },
     }
 }
 

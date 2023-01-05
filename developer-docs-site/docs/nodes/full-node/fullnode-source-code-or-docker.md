@@ -1,10 +1,10 @@
 ---
-title: "Fullnode Using Aptos Source or Docker"
+title: "Start Fullnode with Source or Docker"
 slug: "fullnode-source-code-or-docker"
 sidebar_position: 10
 ---
 
-# Public Fullnode Using Aptos Source or Docker
+# Start Public Fullnode with Aptos Source or Docker
 
 You can run your own [public fullnode](/concepts/fullnodes) to synchronize with the state of the Aptos blockchain and stay up-to-date. Public fullnodes replicate the entire state of the blockchain by querying other Aptos fullnodes (public fullnodes or validator fullnodes) or validators.
 

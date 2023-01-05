@@ -32,6 +32,7 @@ aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
+move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-package = { workspace = true }
 move-symbol-pool = { workspace = true }

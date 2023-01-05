@@ -18,6 +18,9 @@
 -  [Function `verify_type_of`](#0x1_type_info_verify_type_of)
 -  [Function `verify_type_of_generic`](#0x1_type_info_verify_type_of_generic)
 -  [Specification](#@Specification_1)
+    -  [Function `chain_id`](#@Specification_1_chain_id)
+    -  [Function `type_of`](#@Specification_1_type_of)
+    -  [Function `type_name`](#@Specification_1_type_name)
     -  [Function `chain_id_internal`](#@Specification_1_chain_id_internal)
     -  [Function `verify_type_of_generic`](#@Specification_1_verify_type_of_generic)
 
@@ -353,6 +356,44 @@ analysis of vector size dynamism.
 ## Specification
 
 
+<a name="@Specification_1_chain_id"></a>
+
+### Function `chain_id`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id">chain_id</a>(): u8
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>();
+</code></pre>
+
+
+
+<a name="@Specification_1_type_of"></a>
+
+### Function `type_of`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;(): <a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>
+</code></pre>
+
+
+
+
+<a name="@Specification_1_type_name"></a>
+
+### Function `type_name`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+</code></pre>
+
+
+
+
 <a name="@Specification_1_chain_id_internal"></a>
 
 ### Function `chain_id_internal`
@@ -367,6 +408,15 @@ analysis of vector size dynamism.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>();
+</code></pre>
+
+
+
+
+<a name="0x1_type_info_spec_chain_id_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>(): u8;
 </code></pre>
 
 
@@ -392,15 +442,6 @@ analysis of vector size dynamism.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_spec_is_struct">spec_is_struct</a>&lt;T&gt;(): bool;
-</code></pre>
-
-
-
-
-<a name="0x1_type_info_spec_chain_id_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>(): u8;
 </code></pre>
 
 

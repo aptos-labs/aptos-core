@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::SwarmBuilder;
 use crate::{
+    smoke_test_environment::SwarmBuilder,
     test_utils::{
         assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
         transfer_and_reconfig, transfer_coins,

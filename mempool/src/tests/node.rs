@@ -4,9 +4,7 @@
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     network::{MempoolNetworkEvents, MempoolSyncMsg},
-    shared_mempool::{
-        network::MempoolNetworkSender, start_shared_mempool, types::SharedMempoolNotification,
-    },
+    shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
     tests::common::TestTransaction,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -24,13 +22,14 @@ use aptos_network::{
         conn_notifs_channel, ConnectionNotification, ConnectionRequestSender,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::network::{NetworkEvents, NewNetworkEvents, NewNetworkSender},
+    protocols::network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
     transport::ConnectionMetadata,
     ProtocolId,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::on_chain_config::OnChainConfigPayload;
-use aptos_types::{account_config::AccountSequenceInfo, PeerId};
+use aptos_types::{
+    account_config::AccountSequenceInfo, on_chain_config::OnChainConfigPayload, PeerId,
+};
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use enum_dispatch::enum_dispatch;
 use futures::{
@@ -46,7 +45,7 @@ use tokio::runtime::{Builder, Runtime};
 
 type MempoolNetworkHandle = (
     NetworkId,
-    MempoolNetworkSender,
+    NetworkSender<MempoolSyncMsg>,
     NetworkEvents<MempoolSyncMsg>,
 );
 
@@ -540,7 +539,7 @@ fn setup_node_network_interface(
     let (network_notifs_tx, network_notifs_rx) =
         aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
     let (network_conn_event_notifs_tx, conn_status_rx) = conn_notifs_channel::new();
-    let network_sender = MempoolNetworkSender::new(
+    let network_sender = NetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
@@ -577,13 +576,10 @@ fn start_node_mempool(
         notification_receiver: reconfig_events,
     };
     reconfig_sender
-        .push(
-            (),
-            ReconfigNotification {
-                version: 1,
-                on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
-            },
-        )
+        .push((), ReconfigNotification {
+            version: 1,
+            on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+        })
         .unwrap();
     let runtime = Builder::new_multi_thread()
         .thread_name("shared-mem")

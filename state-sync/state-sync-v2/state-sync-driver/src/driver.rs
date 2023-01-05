@@ -17,7 +17,7 @@ use crate::{
     },
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
-    utils::PENDING_DATA_LOG_FREQ_SECS,
+    utils::{OutputFallbackHandler, PENDING_DATA_LOG_FREQ_SECS},
 };
 use aptos_config::config::{RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{
@@ -32,11 +32,14 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReader;
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::waypoint::Waypoint;
 use futures::StreamExt;
-use std::{sync::Arc, time::SystemTime};
-use tokio::task::yield_now;
-use tokio::time::{interval, Duration};
+use std::{sync::Arc, time::Instant};
+use tokio::{
+    task::yield_now,
+    time::{interval, Duration},
+};
 use tokio_stream::wrappers::IntervalStream;
 
 // Useful constants for the driver
@@ -104,13 +107,16 @@ pub struct StateSyncDriver<
     mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
 
     // The timestamp at which the driver started executing
-    start_time: Option<SystemTime>,
+    start_time: Option<Instant>,
 
     // The interface to read from storage
     storage: Arc<dyn DbReader>,
 
     // The storage synchronizer used to update local storage
     storage_synchronizer: StorageSyncer,
+
+    // The time service
+    time_service: TimeService,
 }
 
 impl<
@@ -135,10 +141,14 @@ impl<
         aptos_data_client: DataClient,
         streaming_client: StreamingClient,
         storage: Arc<dyn DbReader>,
+        time_service: TimeService,
     ) -> Self {
+        let output_fallback_handler =
+            OutputFallbackHandler::new(driver_configuration.clone(), time_service.clone());
         let bootstrapper = Bootstrapper::new(
             driver_configuration.clone(),
             metadata_storage,
+            output_fallback_handler.clone(),
             streaming_client.clone(),
             storage.clone(),
             storage_synchronizer.clone(),
@@ -146,6 +156,7 @@ impl<
         let continuous_syncer = ContinuousSyncer::new(
             driver_configuration.clone(),
             streaming_client,
+            output_fallback_handler,
             storage.clone(),
             storage_synchronizer.clone(),
         );
@@ -164,6 +175,7 @@ impl<
             start_time: None,
             storage,
             storage_synchronizer,
+            time_service,
         }
     }
 
@@ -176,7 +188,7 @@ impl<
 
         // Start the driver
         info!(LogSchema::new(LogEntry::Driver).message("Started the state sync v2 driver!"));
-        self.start_time = Some(SystemTime::now());
+        self.start_time = Some(self.time_service.now());
         loop {
             ::futures::select! {
                 notification = self.client_notification_listener.select_next_some() => {
@@ -224,13 +236,13 @@ impl<
                         .consensus_notification_handler
                         .respond_to_commit_notification(commit_notification, Err(error.clone()))
                         .await;
-                }
+                },
                 ConsensusNotification::SyncToTarget(sync_notification) => {
                     let _ = self
                         .consensus_notification_handler
                         .respond_to_sync_notification(sync_notification, Err(error.clone()))
                         .await;
-                }
+                },
             }
             warn!(LogSchema::new(LogEntry::ConsensusNotification)
                 .error(&error)
@@ -243,11 +255,11 @@ impl<
             ConsensusNotification::NotifyCommit(commit_notification) => {
                 self.handle_consensus_commit_notification(commit_notification)
                     .await
-            }
+            },
             ConsensusNotification::SyncToTarget(sync_notification) => {
                 self.handle_consensus_sync_notification(sync_notification)
                     .await
-            }
+            },
         };
 
         // Log any errors from notification handling
@@ -415,28 +427,31 @@ impl<
         if self.bootstrapper.is_bootstrapped() {
             if let Err(error) = self
                 .continuous_syncer
-                .reset_active_stream(Some(NotificationAndFeedback::new(
+                .handle_storage_synchronizer_error(NotificationAndFeedback::new(
                     notification_id,
                     notification_feedback,
-                )))
+                ))
                 .await
             {
-                panic!(
-                    "Failed to terminate the active stream for the continuous syncer! Error: {:?}",
-                    error
-                );
+                error!(LogSchema::new(LogEntry::SynchronizerNotification)
+                    .message(&format!(
+                        "Failed to terminate the active stream for the continuous syncer! Error: {:?}",
+                        error
+                    )));
             }
         } else if let Err(error) = self
             .bootstrapper
-            .reset_active_stream(Some(NotificationAndFeedback::new(
+            .handle_storage_synchronizer_error(NotificationAndFeedback::new(
                 notification_id,
                 notification_feedback,
-            )))
+            ))
             .await
         {
-            panic!(
-                "Failed to terminate the active stream for the bootstrapper! Error: {:?}",
-                error
+            error!(
+                LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
+                    "Failed to terminate the active stream for the bootstrapper! Error: {:?}",
+                    error
+                ))
             );
         };
     }
@@ -452,7 +467,11 @@ impl<
         let sync_target_version = sync_request
             .lock()
             .as_ref()
-            .expect("We've already verified there is an active sync request!")
+            .ok_or_else(|| {
+                Error::UnexpectedError(
+                    "We've already verified there is an active sync request!".into(),
+                )
+            })?
             .get_sync_target_version();
         let latest_synced_ledger_info =
             utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
@@ -510,6 +529,7 @@ impl<
     async fn check_auto_bootstrapping(&mut self) {
         if !self.bootstrapper.is_bootstrapped()
             && self.is_validator()
+            && self.driver_configuration.config.enable_auto_bootstrapping
             && self.driver_configuration.waypoint.version() == 0
         {
             if let Some(start_time) = self.start_time {
@@ -518,10 +538,7 @@ impl<
                         .config
                         .max_connection_deadline_secs,
                 )) {
-                    if SystemTime::now()
-                        .duration_since(connection_deadline)
-                        .is_ok()
-                    {
+                    if self.time_service.now() >= connection_deadline {
                         info!(LogSchema::new(LogEntry::AutoBootstrapping).message(
                             "Passed the connection deadline! Auto-bootstrapping the validator!"
                         ));

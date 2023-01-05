@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{corpus_from_strategy, fuzz_data_to_value, FuzzTargetImpl};
-use aptos_proptest_helpers::ValueGenerator;
-
 //
 // Noise wrapper
 //
-
 use aptos_network::noise::fuzzing::{
     fuzz_initiator, fuzz_post_handshake, fuzz_responder, generate_corpus,
 };
+use aptos_proptest_helpers::ValueGenerator;
 
 #[derive(Clone, Debug, Default)]
 pub struct NetworkNoiseInitiator;

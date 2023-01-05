@@ -291,6 +291,8 @@ bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594
 better_any = "0.1.1"
 bigdecimal = { version = "0.3.0", features = ["serde"] }
 bitvec = "0.19.4"
+blake2 = "0.10.4"
+blake2-rfc = "0.2.18"
 blst = "0.3.7"
 byteorder = "1.4.3"
 bytes = "1.1.0"
@@ -380,7 +382,8 @@ proc-macro2 = "1.0.38"
 project-root = "0.2.2"
 prometheus = { version = "0.13.0", default-features = false }
 prometheus-http-query = "0.5.2"
-prometheus-parse = "0.2.2"
+# Necessary until this lands: https://github.com/ccakes/prometheus-parse-rs/pull/6.
+prometheus-parse = { git = "https://github.com/banool/prometheus-parse-rs", rev = "b65a1f20c5c604a9d2d1e545f70ca51ea8da2354" }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 prost = "0.11.3"

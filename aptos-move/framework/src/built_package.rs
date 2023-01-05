@@ -1,36 +1,37 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::docgen::DocgenOptions;
-use crate::natives::code::{
-    ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
-};
 use crate::{
-    extended_checks, zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY_V1,
+    docgen::DocgenOptions,
+    extended_checks,
+    natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
+    zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
+    APTOS_METADATA_KEY_V1, METADATA_V1_MIN_FILE_FORMAT_VERSION,
 };
 use anyhow::bail;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::EntryABI;
+use aptos_types::{account_address::AccountAddress, transaction::EntryABI};
 use clap::Parser;
-use codespan_reporting::diagnostic::Severity;
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use itertools::Itertools;
 use move_binary_format::CompiledModule;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_core_types::language_storage::ModuleId;
-use move_core_types::metadata::Metadata;
+use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::model::GlobalEnv;
-use move_package::compilation::compiled_package::CompiledPackage;
-use move_package::compilation::package_layout::CompiledPackageLayout;
-use move_package::source_package::manifest_parser::{
-    parse_move_manifest_string, parse_source_manifest,
+use move_package::{
+    compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
+    source_package::manifest_parser::{parse_move_manifest_string, parse_source_manifest},
+    BuildConfig, ModelConfig,
 };
-use move_package::{BuildConfig, ModelConfig};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
-use std::io::stderr;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    io::stderr,
+    path::{Path, PathBuf},
+};
 
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
 pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
@@ -57,6 +58,8 @@ pub struct BuildOptions {
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
+    #[clap(long)]
+    pub bytecode_version: Option<u32>,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -75,6 +78,7 @@ impl Default for BuildOptions {
             // This is false by default, because it could accidentally pull new dependencies
             // while in a test (and cause some havoc)
             skip_fetch_latest_git_deps: false,
+            bytecode_version: None,
         }
     }
 }
@@ -104,13 +108,10 @@ pub(crate) fn build_model(
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
     };
-    build_config.move_model_for_package(
-        package_path,
-        ModelConfig {
-            target_filter,
-            all_files_as_targets: false,
-        },
-    )
+    build_config.move_model_for_package(package_path, ModelConfig {
+        target_filter,
+        all_files_as_targets: false,
+    })
 }
 
 impl BuiltPackage {
@@ -155,6 +156,7 @@ impl BuiltPackage {
                 .join(package.compiled_package_info.package_name.as_str()),
             &mut package,
             runtime_metadata,
+            options.bytecode_version,
         )?;
 
         // If enabled generate docs.
@@ -208,7 +210,11 @@ impl BuiltPackage {
     pub fn extract_code(&self) -> Vec<Vec<u8>> {
         self.package
             .root_modules()
-            .map(|unit_with_source| unit_with_source.unit.serialize(None))
+            .map(|unit_with_source| {
+                unit_with_source
+                    .unit
+                    .serialize(self.options.bytecode_version)
+            })
             .collect()
     }
 
@@ -240,7 +246,11 @@ impl BuiltPackage {
     pub fn extract_script_code(&self) -> Vec<Vec<u8>> {
         self.package
             .scripts()
-            .map(|unit_with_source| unit_with_source.unit.serialize(None))
+            .map(|unit_with_source| {
+                unit_with_source
+                    .unit
+                    .serialize(self.options.bytecode_version)
+            })
             .collect()
     }
 
@@ -334,18 +344,31 @@ fn inject_runtime_metadata(
     package_path: PathBuf,
     pack: &mut CompiledPackage,
     metadata: BTreeMap<ModuleId, RuntimeModuleMetadataV1>,
+    bytecode_version: Option<u32>,
 ) -> anyhow::Result<()> {
     for unit_with_source in pack.root_compiled_units.iter_mut() {
         match &mut unit_with_source.unit {
             CompiledUnit::Module(named_module) => {
                 if let Some(module_metadata) = metadata.get(&named_module.module.self_id()) {
                     if !module_metadata.is_empty() {
-                        let serialized_metadata =
-                            bcs::to_bytes(&module_metadata).expect("BCS for RuntimeModuleMetadata");
-                        named_module.module.metadata.push(Metadata {
-                            key: APTOS_METADATA_KEY_V1.clone(),
-                            value: serialized_metadata,
-                        });
+                        if bytecode_version.unwrap_or(METADATA_V1_MIN_FILE_FORMAT_VERSION)
+                            >= METADATA_V1_MIN_FILE_FORMAT_VERSION
+                        {
+                            let serialized_metadata = bcs::to_bytes(&module_metadata)
+                                .expect("BCS for RuntimeModuleMetadata");
+                            named_module.module.metadata.push(Metadata {
+                                key: APTOS_METADATA_KEY_V1.clone(),
+                                value: serialized_metadata,
+                            });
+                        } else {
+                            let serialized_metadata =
+                                bcs::to_bytes(&module_metadata.clone().downgrade())
+                                    .expect("BCS for RuntimeModuleMetadata");
+                            named_module.module.metadata.push(Metadata {
+                                key: APTOS_METADATA_KEY.clone(),
+                                value: serialized_metadata,
+                            });
+                        }
 
                         // Also need to update the .mv file on disk.
                         let path = package_path
@@ -353,13 +376,13 @@ fn inject_runtime_metadata(
                             .join(named_module.name.as_str())
                             .with_extension(MOVE_COMPILED_EXTENSION);
                         if path.is_file() {
-                            let bytes = unit_with_source.unit.serialize(None);
+                            let bytes = unit_with_source.unit.serialize(bytecode_version);
                             std::fs::write(path, &bytes)?;
                         }
                     }
                 }
-            }
-            CompiledUnit::Script(_) => {}
+            },
+            CompiledUnit::Script(_) => {},
         }
     }
     Ok(())

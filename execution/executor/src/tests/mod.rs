@@ -1,10 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeSet, iter::once, sync::Arc};
-
-use proptest::prelude::*;
-
+use crate::{
+    block_executor::BlockExecutor,
+    chunk_executor::ChunkExecutor,
+    components::chunk_output::ChunkOutput,
+    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
+    mock_vm::{
+        encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
+        MockVM, DISCARD_STATUS, KEEP_STATUS,
+    },
+};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
@@ -12,9 +18,9 @@ use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees,
 };
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -28,17 +34,8 @@ use aptos_types::{
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-
-use crate::{
-    block_executor::BlockExecutor,
-    chunk_executor::ChunkExecutor,
-    components::chunk_output::ChunkOutput,
-    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-    mock_vm::{
-        encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
-        MockVM, DISCARD_STATUS, KEEP_STATUS,
-    },
-};
+use proptest::prelude::*;
+use std::{collections::BTreeSet, iter::once, sync::Arc};
 
 mod chunk_executor_tests;
 
@@ -439,10 +436,10 @@ fn test_deleted_key_from_state_store() {
     .freeze()
     .unwrap();
 
-    apply_transaction_by_writeset(
-        db,
-        vec![(transaction1, write_set1), (transaction2, write_set2)],
-    );
+    apply_transaction_by_writeset(db, vec![
+        (transaction1, write_set1),
+        (transaction2, write_set2),
+    ]);
 
     let state_value1_from_db = db
         .reader
