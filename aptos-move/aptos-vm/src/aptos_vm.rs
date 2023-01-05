@@ -615,6 +615,7 @@ impl AptosVM {
                             .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
                     ),
                 )
+                .and_then(|_| session.validate_resource_groups(&modules))
                 .and_then(|_| {
                     self.execute_module_initialization(session, gas_meter, &modules, exists, &[
                         destination,
