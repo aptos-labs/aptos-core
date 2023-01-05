@@ -88,3 +88,13 @@ Fix formatting issues by running:
 ```
 pnpm fmt
 ```
+
+## Re-generate contributors
+
+The src/contributors.json file (which powers the list of Authors at the bottom of doc pages) needs to be manually generated. Run the following command:
+
+```
+pnpm contributors
+```
+
+And then create a PR with the updated src/contributors.json.

@@ -1,3 +1,9 @@
+#!/usr/bin/env node
+
+const fs = require("fs/promises");
+const path = require("path");
+const shell = require("shelljs");
+
 // TODO: Generate this automatically.
 const EMAIL_TO_USERNAME = Object.freeze({
   "raj@aptoslabs.com": "rajkaramchedu",
@@ -62,33 +68,52 @@ const resolveContributors = (contributors) => {
   return result;
 };
 
-module.exports = function plugin() {
-  return async (root, vfile) => {
-    const shell = (await import("shelljs")).default;
-    const path = await import("path");
-    const shortlog = shell.exec(`git shortlog -sne -- "${path.basename(vfile.path)}" < /dev/tty`, {
-      cwd: path.dirname(vfile.path),
-      silent: true,
-    });
-    if (shortlog.code !== 0) {
-      return;
+async function contributorsForFile(filePath) {
+  const shortlog = shell.exec(`git shortlog -sne -- "${path.basename(filePath)}" < /dev/tty`, {
+    cwd: path.dirname(filePath),
+    silent: true,
+  });
+
+  if (shortlog.code !== 0) {
+    return;
+  }
+
+  return resolveContributors(
+    shortlog.stdout
+      .trim()
+      .split("\n")
+      .map((line) => {
+        line = line.trim();
+        line = line.substring(line.indexOf("\t") + 1);
+        [name, email] = line.split(" <");
+        email = email.substring(0, email.length - 1);
+        const username = emailToUsername(email);
+        return { name, email, username };
+      }),
+  );
+}
+
+async function* docPaths(rootDir) {
+  const files = await fs.readdir(rootDir, { withFileTypes: true });
+
+  for (const file of files) {
+    const filePath = path.join(rootDir, file.name);
+    if (file.isDirectory()) {
+      yield* docPaths(filePath);
+    } else if (file.name.endsWith(".md")) {
+      yield filePath;
     }
-    const contributors = resolveContributors(
-      shortlog.stdout
-        .trim()
-        .split("\n")
-        .map((line) => {
-          line = line.trim();
-          line = line.substring(line.indexOf("\t") + 1);
-          [name, email] = line.split(" <");
-          email = email.substring(0, email.length - 1);
-          const username = emailToUsername(email);
-          return { name, email, username };
-        }),
-    );
-    root.children.push({
-      type: "jsx",
-      value: "<template id='aptos-doc-contributors'>{`" + JSON.stringify(contributors) + "`}</template>",
-    });
-  };
-};
+  }
+}
+
+(async function () {
+  const result = {};
+  const docRoot = path.join(__dirname, "../docs");
+  for await (const docPath of docPaths(docRoot)) {
+    const relativePath = path.relative(docRoot, docPath);
+    const urlPath = "/" + relativePath.substring(0, relativePath.length - 3);
+    result[urlPath] = await contributorsForFile(docPath);
+  }
+  const json = JSON.stringify(result, null, 2);
+  await fs.writeFile(path.join(__dirname, "../src/contributors.json"), json);
+})();
