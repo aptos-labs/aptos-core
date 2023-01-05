@@ -3,9 +3,7 @@
 use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 use async_trait::async_trait;
-use futures::future::join_all;
-use rand::{prelude::StdRng, Rng};
-use rand_core::{OsRng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 pub struct TxnMixGenerator {
     rng: StdRng,
@@ -56,21 +54,15 @@ impl TxnMixGeneratorCreator {
 
 #[async_trait]
 impl TransactionGeneratorCreator for TxnMixGeneratorCreator {
-    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
-        Box::new(TxnMixGenerator::new(
-            StdRng::from_seed(OsRng.gen()),
-            join_all(
-                self.txn_mix_creators
-                    .iter()
-                    .map(|(generator_creator, weight)| async {
-                        (
-                            generator_creator.create_transaction_generator().await,
-                            *weight,
-                        )
-                    })
-                    .collect::<Vec<_>>(),
-            )
-            .await,
-        ))
+    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+        let mut txn_mix = Vec::<(Box<dyn TransactionGenerator>, usize)>::new();
+        for (generator_creator, weight) in self.txn_mix_creators.iter_mut() {
+            txn_mix.push((
+                generator_creator.create_transaction_generator().await,
+                *weight,
+            ));
+        }
+
+        Box::new(TxnMixGenerator::new(StdRng::from_entropy(), txn_mix))
     }
 }
