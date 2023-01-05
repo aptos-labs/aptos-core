@@ -606,8 +606,8 @@ pub fn construct_node_helm_values(
     value["imageTag"] = image_tag.clone().into();
     value["chain"]["era"] = era.into();
     value["haproxy"]["enabled"] = enable_haproxy.into();
-    value["labels"]["forge-namespace"] = kube_namespace.into();
-    value["labels"]["forge-image-tag"] = image_tag.into();
+    value["labels"]["forge-namespace"] = make_k8s_label(kube_namespace).into();
+    value["labels"]["forge-image-tag"] = make_k8s_label(image_tag).into();
     if let Some(config_fn) = node_helm_config_fn {
         (config_fn)(&mut value);
     }
@@ -640,8 +640,8 @@ pub fn construct_genesis_helm_values(
     value["genesis"]["validator"]["internal_host_suffix"] = validator_internal_host_suffix.into();
     value["genesis"]["validator"]["key_seed"] = FORGE_KEY_SEED.into();
     value["genesis"]["fullnode"]["internal_host_suffix"] = fullnode_internal_host_suffix.into();
-    value["labels"]["forge-namespace"] = kube_namespace.into();
-    value["labels"]["forge-image-tag"] = genesis_image_tag.into();
+    value["labels"]["forge-namespace"] = make_k8s_label(kube_namespace).into();
+    value["labels"]["forge-image-tag"] = make_k8s_label(genesis_image_tag).into();
 
     if let Some(config_fn) = genesis_helm_config_fn {
         (config_fn)(&mut value);
@@ -991,6 +991,12 @@ fn check_namespace_for_cleanup(
         }
     }
     false
+}
+
+/// Ensures that the label is at most 64 characters to meet k8s
+/// label length requirements.
+pub fn make_k8s_label(value: String) -> String {
+    value.get(..63).unwrap_or(&value).to_string()
 }
 
 #[cfg(test)]
