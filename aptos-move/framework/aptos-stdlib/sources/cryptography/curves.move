@@ -120,9 +120,6 @@ module aptos_std::curves {
     /// Perform a bilinear mapping.
     public fun pairing<G1,G2,Gt>(point_1: &Element<G1>, point_2: &Element<G2>): Element<Gt> {
         abort_if_feature_disabled();
-        if (!std::features::generic_curves_enabled()) {
-            abort(std::error::invalid_state(1))
-        };
         Element<Gt> {
             handle: pairing_internal<G1,G2,Gt>(point_1.handle, point_2.handle)
         }
@@ -150,9 +147,6 @@ module aptos_std::curves {
 
     public fun scalar_from_u64<G>(value: u64): Scalar<G> {
         abort_if_feature_disabled();
-        if (!std::features::generic_curves_enabled()) {
-            abort(std::error::invalid_state(1))
-        };
         Scalar<G> {
             handle: scalar_from_u64_internal<G>(value)
         }
@@ -160,9 +154,6 @@ module aptos_std::curves {
 
     public fun scalar_neg<G>(scalar_1: &Scalar<G>): Scalar<G> {
         abort_if_feature_disabled();
-        if (!std::features::generic_curves_enabled()) {
-            abort(std::error::invalid_state(1))
-        };
         Scalar<G> {
             handle: scalar_neg_internal<G>(scalar_1.handle)
         }
@@ -170,9 +161,6 @@ module aptos_std::curves {
 
     public fun scalar_add<G>(scalar_1: &Scalar<G>, scalar_2: &Scalar<G>): Scalar<G> {
         abort_if_feature_disabled();
-        if (!std::features::generic_curves_enabled()) {
-            abort(std::error::invalid_state(1))
-        };
         Scalar<G> {
             handle: scalar_add_internal<G>(scalar_1.handle, scalar_2.handle)
         }
