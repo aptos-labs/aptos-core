@@ -98,7 +98,7 @@ impl DirectMempoolInnerBuilder {
             self.quorum_store_to_mempool_sender,
             self.mempool_txn_pull_timeout_ms,
         );
-        spawn_named!("Quorum Store", quorum_store.start()).unwrap();
+        spawn_named!("DirectMempoolQuorumStore", quorum_store.start()).unwrap();
     }
 }
 
@@ -263,8 +263,11 @@ impl InnerBuilder {
             self.config.memory_quota,
             self.config.db_quota,
         );
-        // TODO: batch_reader.start()?
-        tokio::spawn(batch_store.start(batch_store_cmd_rx, self.proof_coordinator_cmd_tx.clone()));
+        spawn_named!(
+            "batch_store",
+            batch_store.start(batch_store_cmd_rx, self.proof_coordinator_cmd_tx.clone())
+        )
+        .unwrap();
 
         batch_reader
     }
@@ -290,7 +293,11 @@ impl InnerBuilder {
             self.batch_store_cmd_tx.clone(),
             self.quorum_store_msg_tx_vec.clone(),
         );
-        tokio::spawn(quorum_store_coordinator.start(coordinator_rx));
+        spawn_named!(
+            "quorum_store_coordinator",
+            quorum_store_coordinator.start(coordinator_rx)
+        )
+        .unwrap();
 
         let batch_generator_cmd_rx = self.batch_generator_cmd_rx.take().unwrap();
         let batch_generator = BatchGenerator::new(
@@ -308,7 +315,11 @@ impl InnerBuilder {
             self.config.back_pressure_factor * self.verifier.len(),
             block_store,
         );
-        tokio::spawn(batch_generator.start(batch_generator_cmd_rx, interval));
+        spawn_named!(
+            "batch_generator",
+            batch_generator.start(batch_generator_cmd_rx, interval)
+        )
+        .unwrap();
 
         let batch_coordinator_cmd_rx = self.batch_coordinator_cmd_rx.take().unwrap();
         let batch_coordinator = BatchCoordinator::new(
@@ -320,35 +331,45 @@ impl InnerBuilder {
             self.proof_coordinator_cmd_tx.clone(),
             self.config.max_batch_bytes,
         );
-        tokio::spawn(batch_coordinator.start());
+        spawn_named!("batch_coordinator", batch_coordinator.start()).unwrap();
 
         let proof_coordinator_cmd_rx = self.proof_coordinator_cmd_rx.take().unwrap();
         let proof_coordinator = ProofCoordinator::new(self.config.proof_timeout_ms, self.author);
-        tokio::spawn(proof_coordinator.start(
-            proof_coordinator_cmd_rx,
-            self.proof_manager_cmd_tx.clone(),
-            self.verifier.clone(),
-        ));
+        spawn_named!(
+            "proof_coordinator",
+            proof_coordinator.start(
+                proof_coordinator_cmd_rx,
+                self.proof_manager_cmd_tx.clone(),
+                self.verifier.clone(),
+            )
+        )
+        .unwrap();
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
         let proof_manager = ProofManager::new(self.epoch);
-        tokio::spawn(proof_manager.start(
-            self.network_sender.clone(),
-            self.consensus_to_quorum_store_receiver,
-            proof_manager_cmd_rx,
-        ));
+        spawn_named!(
+            "proof_manager",
+            proof_manager.start(
+                self.network_sender.clone(),
+                self.consensus_to_quorum_store_receiver,
+                proof_manager_cmd_rx,
+            )
+        )
+        .unwrap();
 
         let metrics_monitor = tokio_metrics::TaskMonitor::new();
         {
             let metrics_monitor = metrics_monitor.clone();
-            tokio::spawn(async move {
+            spawn_named!("quorum_store_metrics_monitor", async move {
                 for interval in metrics_monitor.intervals() {
                     println!("QuorumStoreWrapper:{:?}", interval);
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
-            });
+            })
+            .unwrap();
         }
 
+        let mut i = 0;
         for network_msg_rx in self.quorum_store_msg_rx_vec.into_iter() {
             let net = NetworkListener::new(
                 self.epoch,
@@ -359,7 +380,8 @@ impl InnerBuilder {
                 self.proof_manager_cmd_tx.clone(),
                 self.config.max_batch_bytes,
             );
-            tokio::spawn(net.start());
+            i += 1;
+            spawn_named!(&format!("network_listener-{}", i), net.start()).unwrap();
         }
 
         self.coordinator_tx
