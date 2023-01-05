@@ -166,8 +166,8 @@ impl AptosNodeArgs {
 
 /// Runtime handle to ensure that all inner runtimes stay in scope
 pub struct AptosHandle {
-    _api: Option<Runtime>,
-    _backup: Runtime,
+    _api_runtime: Option<Runtime>,
+    _backup_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
@@ -910,8 +910,8 @@ pub fn setup_environment(
     }
 
     Ok(AptosHandle {
-        _api: api_runtime,
-        _backup: backup_service,
+        _api_runtime: api_runtime,
+        _backup_runtime: Some(backup_service),
         _consensus_runtime: consensus_runtime,
         _mempool: mempool,
         _network_runtimes: network_runtimes,
