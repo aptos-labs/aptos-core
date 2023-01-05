@@ -11,7 +11,7 @@ information can be queried or exported via an inspection service that runs on ea
 
 You can configure various aspects of the node inspection service. This document describes how to expose and see the metrics locally, on the respective node. You may also view these metrics remotely by making the port publicly accessible via firewall rules. Generally, validator nodes don't expose these metrics for security, yet fullnodes do so the [health checker](node-health-checker.md) can verify them.
 
-If you do make the port publicly accessible, we recommend disabling that access when not in use.
+If you do make the inspection service port publicly accessible on your validator node, we recommend disabling that access when not in use.
 
 ## Examining node metrics
 
