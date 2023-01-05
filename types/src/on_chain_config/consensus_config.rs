@@ -40,7 +40,7 @@ impl OnChainConsensusConfig {
     /// 2. how much gaps can be between the root and the remote sync info ledger.
     pub fn back_pressure_limit(&self) -> u64 {
         if !self.decoupled_execution() {
-            return 80;
+            return 50;
         }
         match &self {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
@@ -114,7 +114,7 @@ impl Default for ConsensusConfigV1 {
     fn default() -> Self {
         Self {
             decoupled_execution: true,
-            back_pressure_limit: 80,
+            back_pressure_limit: 50,
             exclude_round: 20,
             max_failed_authors_to_store: 10,
             proposer_election_type: ProposerElectionType::LeaderReputation(
