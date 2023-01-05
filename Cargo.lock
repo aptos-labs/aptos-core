@@ -230,6 +230,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
+ "aptos-runtimes",
  "aptos-sdk",
  "aptos-state-view",
  "aptos-storage-interface",
@@ -381,6 +382,7 @@ dependencies = [
  "aptos-db",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-runtimes",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
@@ -536,6 +538,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-metrics-core",
  "aptos-network",
+ "aptos-runtimes",
  "aptos-safety-rules",
  "aptos-schemadb",
  "aptos-secure-storage",
@@ -576,6 +579,7 @@ name = "aptos-consensus-notifications"
 version = "0.1.0"
 dependencies = [
  "aptos-crypto",
+ "aptos-runtimes",
  "aptos-types",
  "async-trait",
  "claims",
@@ -1314,6 +1318,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-runtimes",
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
@@ -1353,6 +1358,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-runtimes",
  "aptos-telemetry",
  "assert_approx_eq",
  "futures",
@@ -1487,6 +1493,7 @@ dependencies = [
  "aptos-netcore",
  "aptos-network",
  "aptos-proptest-helpers",
+ "aptos-runtimes",
  "aptos-short-hex-str",
  "aptos-storage-interface",
  "aptos-types",
@@ -1513,6 +1520,7 @@ name = "aptos-mempool-notifications"
 version = "0.1.0"
 dependencies = [
  "aptos-crypto",
+ "aptos-runtimes",
  "aptos-types",
  "async-trait",
  "claims",
@@ -1733,6 +1741,7 @@ dependencies = [
  "aptos-mempool-notifications",
  "aptos-network",
  "aptos-network-builder",
+ "aptos-runtimes",
  "aptos-secure-storage",
  "aptos-state-sync-driver",
  "aptos-state-view",
@@ -2019,6 +2028,7 @@ dependencies = [
  "aptos-logger",
  "aptos-node",
  "aptos-rest-client",
+ "aptos-runtimes",
  "aptos-sdk",
  "aptos-types",
  "aptos-warp-webserver",
@@ -2053,6 +2063,13 @@ dependencies = [
  "serde_json",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "aptos-runtimes"
+version = "0.1.0"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]
@@ -2230,6 +2247,7 @@ dependencies = [
  "aptos-mempool-notifications",
  "aptos-metrics-core",
  "aptos-network",
+ "aptos-runtimes",
  "aptos-schemadb",
  "aptos-scratchpad",
  "aptos-storage-interface",
@@ -2367,6 +2385,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-network",
  "aptos-node-resource-metrics",
+ "aptos-runtimes",
  "aptos-state-sync-driver",
  "aptos-telemetry-service",
  "aptos-types",
@@ -2454,6 +2473,7 @@ dependencies = [
  "aptos-logger",
  "aptos-move-examples",
  "aptos-rest-client",
+ "aptos-runtimes",
  "aptos-sdk",
  "aptos-types",
  "futures",
