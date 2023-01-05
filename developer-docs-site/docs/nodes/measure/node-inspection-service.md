@@ -9,6 +9,10 @@ Aptos nodes collect metrics and system information while running. These metrics 
 monitor and inspect the health and performance of the node dynamically, at runtime. Node metrics and system
 information can be queried or exported via an inspection service that runs on each node.
 
+You can configure various aspects of the node inspection service. This document describes how to expose and see the metrics locally, on the respective node. You may also view these metrics remotely by making the port publicly accessible via firewall rules. Generally, validator nodes don't expose these metrics for security, yet fullnodes do so the [health checker](node-health-checker.md) can verify them.
+
+If you do make the port publicly accessible, we recommend disabling that access when not in use.
+
 ## Examining node metrics
 
 If you'd like to examine the metrics of your node (validator or fullnode), start running a
@@ -28,13 +32,13 @@ http://localhost:9101/json_metrics
 ```
 
 :::tip Inspection service configuration
-The inspection service should run on all nodes by default, at port `9101`. See additional configuration
+See additional configuration
 details below.
 :::
 
-## Configure the inspection service
+## Change inspection service port
 
-You can configure various aspects of the node inspection service. For example, to change
+The inspection service should run on all nodes by default, at port `9101`. To change
 the port the inspection service listens on (e.g., to `1000`), add the following to your node
 configuration file:
 
@@ -43,7 +47,7 @@ configuration file:
      port: 1000
 ```
 
-## Examine system information
+## Expose system configuration
 
 The inspection service also provides a way to examine the configuration of your node
 at runtime (i.e., the configuration settings that your node started with).
@@ -66,6 +70,8 @@ And visit the configuration URL:
 ```
 http://localhost:9101/configuration
 ```
+
+## Expose system information
 
 Likewise, the inspection service also provides a way to examine the system information of your node
 at runtime (i.e., build and hardware information). Simply visit the following url:
