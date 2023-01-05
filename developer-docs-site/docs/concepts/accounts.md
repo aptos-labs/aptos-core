@@ -158,7 +158,7 @@ system integrators who are used to using a mnemonic to represent both a private 
 To simplify this for the system integrators, Aptos provides an on-chain mapping via aptos account lookup-address.
 The on-chain data maps an effective account address as defined by the current mnemonic to the actual account address.
 
-For more information, see [`account.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/account.move#L251).
+For more information, see [`account.move`](https://github.com/aptos-labs/aptos-core/blob/d4a859bb0987f8e35e7471469c3bcd4ae4b49855/aptos-move/framework/aptos-framework/sources/account.move#L251).
 
 ## Access control with signer
 
