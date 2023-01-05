@@ -1,4 +1,4 @@
-module dao_platform::nft_dao_events {
+module dao_platform::ft_dao_events {
     use aptos_framework::event::EventHandle;
     use std::string::String;
     use aptos_token::property_map::PropertyMap;

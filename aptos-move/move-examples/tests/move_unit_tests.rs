@@ -145,7 +145,7 @@ fn test_nft_dao_test() {
         AccountAddress::from_hex_literal("0xcafe").unwrap(),
 
     )]);
-    run_tests_for_pkg("dao/nft_dao", named_address);
+    run_tests_for_pkg("dao/ft_dao", named_address);
 
 
 }
