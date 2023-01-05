@@ -34,7 +34,7 @@ details below.
 
 ## Configure the inspection service
 
-You can configure the node inspection service in various different ways. For example, to change
+You can configure various aspects of the node inspection service. For example, to change
 the port the inspection service listens on (e.g., to `1000`), add the following to your node
 configuration file:
 
@@ -119,7 +119,7 @@ a few times per second as long as the node is participating in consensus. When t
 increasing, it means the node is not participating in consensus, and has likely fallen back to state
 synchronization (e.g., because it fell behind the rest of the validators and needs to catch up).
 
-### State Sync
+### State sync
 
 If you are running a fullnode (or a validator that still needs to synchronize to the latest blockchain
 state), the following [state sync](../../guides/state-sync.md) metrics are important:
