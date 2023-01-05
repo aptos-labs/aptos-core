@@ -17,7 +17,7 @@ use crate::{
         nft_mint_and_transfer::NFTMintAndTransferGeneratorCreator,
         p2p_transaction_generator::P2PTransactionGeneratorCreator,
         publish_modules::PublishPackageCreator, transaction_mix_generator::TxnMixGeneratorCreator,
-        TransactionGeneratorCreator,
+        TransactionExecutor, TransactionGeneratorCreator,
     },
 };
 use again::RetryPolicy;
@@ -25,13 +25,14 @@ use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use futures::future::{try_join_all, FutureExt};
+use async_trait::async_trait;
+use futures::future::{join_all, try_join_all, FutureExt};
 use itertools::zip;
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, seq::IteratorRandom};
@@ -426,19 +427,19 @@ impl TxnEmitter {
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
-
+        let txn_executor = RestApiTransactionExecutor {
+            rest_client: req.rest_clients[0].clone(),
+        };
         let mut txn_generator_creator_mix: Vec<(Box<dyn TransactionGeneratorCreator>, usize)> =
             Vec::new();
         for (transaction_type, weight) in req.transaction_mix {
             let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
             {
                 TransactionType::P2P => Box::new(P2PTransactionGeneratorCreator::new(
-                    self.from_rng(),
                     txn_factory.clone(),
                     SEND_AMOUNT,
                     all_addresses.clone(),
                     req.invalid_transaction_ratio,
-                    req.gas_price,
                 )),
                 TransactionType::AccountGeneration => Box::new(AccountGeneratorCreator::new(
                     txn_factory.clone(),
@@ -449,22 +450,20 @@ impl TxnEmitter {
                 )),
                 TransactionType::NftMintAndTransfer => Box::new(
                     NFTMintAndTransferGeneratorCreator::new(
-                        self.from_rng(),
                         txn_factory.clone(),
                         root_account,
-                        req.rest_clients[0].clone(),
+                        &txn_executor,
+                        num_workers,
                     )
                     .await,
                 ),
-                TransactionType::PublishPackage => Box::new(PublishPackageCreator::new(
-                    self.from_rng(),
-                    txn_factory.clone(),
-                    req.gas_price,
-                )),
+                TransactionType::PublishPackage => {
+                    Box::new(PublishPackageCreator::new(txn_factory.clone()))
+                },
             };
             txn_generator_creator_mix.push((txn_generator_creator, weight));
         }
-        let txn_generator_creator: Box<dyn TransactionGeneratorCreator> =
+        let mut txn_generator_creator: Box<dyn TransactionGeneratorCreator> =
             if txn_generator_creator_mix.len() > 1 {
                 Box::new(TxnMixGeneratorCreator::new(txn_generator_creator_mix))
             } else {
@@ -599,6 +598,37 @@ impl TxnEmitter {
         client.submit(&txn).await?;
         let deadline = Instant::now() + Duration::from_secs(txn.expiration_timestamp_secs() + 30);
         Ok(deadline)
+    }
+}
+
+pub struct RestApiTransactionExecutor {
+    rest_client: RestClient,
+}
+
+#[async_trait]
+impl TransactionExecutor for RestApiTransactionExecutor {
+    async fn execute_transactions(&self, txns: &[SignedTransaction]) -> Result<()> {
+        join_all(txns.iter().map(|txn| async move {
+            let submit_result = RETRY_POLICY
+                .retry(move || self.rest_client.submit_bcs(txn))
+                .await;
+            if let Err(e) = submit_result {
+                warn!("Failed submitting transaction {:?} with {:?}", txn, e);
+            }
+        }))
+        .await;
+
+        // if submission timeouts, it might still get committed:
+        join_all(
+            txns.iter()
+                .map(|req| self.rest_client.wait_for_signed_transaction_bcs(req)),
+        )
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, RestError>>()
+        .map_err(|e| format_err!("Failed to commit transactions: {:?}", e))?;
+
+        Ok(())
     }
 }
 
