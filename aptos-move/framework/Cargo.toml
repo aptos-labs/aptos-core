@@ -25,6 +25,7 @@ ark-bls12-381 = "0.3.0"
 ark-ec = "0.3.0"
 ark-ff = "0.3.0"
 ark-serialize = "0.3.0"
+ark-std = "0.3.0"
 base64 = { workspace = true }
 bcs = { workspace = true }
 bellman = "0.13.1"
@@ -70,6 +71,8 @@ siphasher = { workspace = true }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
 tiny-keccak = { workspace = true }
+criterion = "0.4.0"
+rand.workspace = true
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }
@@ -87,3 +90,7 @@ testing = []
 
 [lib]
 doctest = false
+
+[[bench]]
+name = "bls12_381"
+harness = false

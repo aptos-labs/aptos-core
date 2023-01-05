@@ -40,8 +40,53 @@ pub mod abort_codes {
 }
 
 #[derive(Debug, Clone)]
+pub struct Bls12381GasParameters {
+    pub fr_serialize: InternalGas,
+    pub fr_deserialize: InternalGas,
+    pub fr_from_u64: InternalGas,
+    pub fr_neg: InternalGas,
+    pub fr_add: InternalGas,
+    pub fr_mul: InternalGas,
+    pub fr_inv: InternalGas,
+    pub fr_eq: InternalGas,
+    pub g1_deserialize_point_uncompressed: InternalGas,
+    pub g1_deserialize_point_compressed: InternalGas,
+    pub g1_serialize_point_uncompressed: InternalGas,
+    pub g1_serialize_point_compressed: InternalGas,
+    pub g1_point_add: InternalGas,
+    pub g1_point_eq: InternalGas,
+    pub g1_identity: InternalGas,
+    pub g1_generator: InternalGas,
+    pub g1_point_mul: InternalGas,
+    pub g1_point_neg: InternalGas,
+    pub g2_deserialize_point_uncompressed: InternalGas,
+    pub g2_deserialize_point_compressed: InternalGas,
+    pub g2_serialize_point_uncompressed: InternalGas,
+    pub g2_serialize_point_compressed: InternalGas,
+    pub g2_point_add: InternalGas,
+    pub g2_point_eq: InternalGas,
+    pub g2_identity: InternalGas,
+    pub g2_generator: InternalGas,
+    pub g2_point_mul: InternalGas,
+    pub g2_point_neg: InternalGas,
+    pub gt_deserialize_point_uncompressed: InternalGas,
+    pub gt_deserialize_point_compressed: InternalGas,
+    pub gt_serialize_point_uncompressed: InternalGas,
+    pub gt_serialize_point_compressed: InternalGas,
+    pub gt_point_add: InternalGas,
+    pub gt_point_eq: InternalGas,
+    pub gt_identity: InternalGas,
+    pub gt_generator: InternalGas,
+    pub gt_point_mul: InternalGas,
+    pub gt_point_neg: InternalGas,
+    pub pairing_product_base: InternalGas,
+    pub pairing_product_per_pair: InternalGas,
+}
+
+#[derive(Debug, Clone)]
 pub struct GasParameters {
     pub base: InternalGas,
+    pub bls12_381_g1: Bls12381GasParameters,
 }
 
 #[derive(Tid)]

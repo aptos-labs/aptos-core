@@ -20,6 +20,7 @@ use aggregator_natives::{aggregator, aggregator_factory};
 use aptos_gas_algebra_ext::AbstractValueSize;
 use cryptography::ed25519;
 
+use crate::natives::cryptography::curves::Bls12381GasParameters;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
 use move_vm_types::values::Value;
@@ -73,7 +74,51 @@ impl GasParameters {
                 per_msg_hashing: 0.into(),
                 per_byte_hashing: 0.into(),
             },
-            curves: curves::GasParameters { base: 0.into() },
+            curves: curves::GasParameters {
+                base: 0.into(),
+                bls12_381_g1: Bls12381GasParameters {
+                    fr_serialize: 0.into(),
+                    fr_deserialize: 0.into(),
+                    fr_from_u64: 0.into(),
+                    fr_neg: 0.into(),
+                    fr_add: 0.into(),
+                    fr_mul: 0.into(),
+                    fr_inv: 0.into(),
+                    fr_eq: 0.into(),
+                    g1_deserialize_point_uncompressed: 0.into(),
+                    g1_deserialize_point_compressed: 0.into(),
+                    g1_serialize_point_uncompressed: 0.into(),
+                    g1_serialize_point_compressed: 0.into(),
+                    g1_point_add: 0.into(),
+                    g1_point_eq: 0.into(),
+                    g1_identity: 0.into(),
+                    g1_generator: 0.into(),
+                    g1_point_mul: 0.into(),
+                    g1_point_neg: 0.into(),
+                    g2_deserialize_point_uncompressed: 0.into(),
+                    g2_deserialize_point_compressed: 0.into(),
+                    g2_serialize_point_uncompressed: 0.into(),
+                    g2_serialize_point_compressed: 0.into(),
+                    g2_point_add: 0.into(),
+                    g2_point_eq: 0.into(),
+                    g2_identity: 0.into(),
+                    g2_generator: 0.into(),
+                    g2_point_mul: 0.into(),
+                    g2_point_neg: 0.into(),
+                    gt_deserialize_point_uncompressed: 0.into(),
+                    gt_deserialize_point_compressed: 0.into(),
+                    gt_serialize_point_uncompressed: 0.into(),
+                    gt_serialize_point_compressed: 0.into(),
+                    gt_point_add: 0.into(),
+                    gt_point_eq: 0.into(),
+                    gt_identity: 0.into(),
+                    gt_generator: 0.into(),
+                    gt_point_mul: 0.into(),
+                    gt_point_neg: 0.into(),
+                    pairing_product_base: 0.into(),
+                    pairing_product_per_pair: 0.into(),
+                },
+            },
             groth16: groth16::GasParameters { base: 0.into() },
             groth16_bls12381_bellman: groth16_bls12381_bellman::GasParameters { base: 0.into() },
             ed25519: ed25519::GasParameters {
