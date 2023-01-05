@@ -90,6 +90,7 @@ impl PartialEq for ExecutionStatus {
     }
 }
 
+#[derive(Debug)]
 struct ValidationStatus {
     // Maximum wave that was triggered at the transaction index corresponding to the status.
     max_triggered_wave: Wave,
@@ -181,10 +182,10 @@ impl Scheduler {
             self.done_marker.store(true, Ordering::SeqCst);
             return None;
         }
-        println!("idx {}", idx);
+        println!("idx {}, val_bound {}", idx, commit_state.1);
 
         if let Ok(validation_status) = self.txn_status[idx].1.try_lock() {
-            println!("debug1");
+            println!("debug {:?} val status", validation_status);
             // Acquired the validation status lock, now try the status lock.
             match self.txn_status[idx].0.try_lock() {
                 Ok(mut status) => {
@@ -288,7 +289,7 @@ impl Scheduler {
         let mut stored_deps = self.txn_dependency[dep_txn_idx].lock();
 
         {
-            if self.is_executed(dep_txn_idx).is_some() {
+            if self.is_executed(dep_txn_idx, true).is_some() {
                 // Current status of dep_txn_idx is 'executed', so the dependency got resolved.
                 // To avoid zombie dependency (and losing liveness), must return here and
                 // not add a (stale) dependency.
@@ -300,6 +301,7 @@ impl Scheduler {
                 return None;
             }
 
+            // println!("Suspending {} due to dep_txn_idx {}", txn_idx, dep_txn_idx);
             self.suspend(txn_idx, dep_condvar.clone());
 
             // Safe to add dependency here (still holding the lock) - finish_execution of txn
@@ -331,6 +333,8 @@ impl Scheduler {
     ) -> SchedulerTask {
         let mut validation_status = self.txn_status[txn_idx].1.lock();
         self.set_executed_status(txn_idx, incarnation);
+
+        // println!("Finish txn idx {}, inc {}", txn_idx, incarnation);
 
         let txn_deps: Vec<TxnIndex> = {
             let mut stored_deps = self.txn_dependency[txn_idx].lock();
@@ -464,18 +468,28 @@ impl Scheduler {
     }
 
     /// If the status of transaction is Executed(incarnation), returns Some(incarnation),
-    /// otherwise returns None. Useful to determine when a transaction can be validated,
-    /// and to avoid a race in dependency resolution.
-    fn is_executed(&self, txn_idx: TxnIndex) -> Option<Incarnation> {
+    /// Useful to determine when a transaction can be validated, and to avoid a race in
+    /// dependency resolution.
+    /// If allow_committed is true, then committed transaction is also considered executed
+    /// (for dependency resolution purposes). If allow_committed is false, then we are
+    /// checking if a transaction may be validated, and a committed (in between) txn does
+    /// not need to be scheduled for validation - so can return None.
+    fn is_executed(&self, txn_idx: TxnIndex, allow_committed: bool) -> Option<Incarnation> {
         if txn_idx >= self.txn_status.len() {
             return None;
         }
 
         let status = self.txn_status[txn_idx].0.lock();
-        if let ExecutionStatus::Executed(incarnation) = *status {
-            Some(incarnation)
-        } else {
-            None
+        match *status {
+            ExecutionStatus::Executed(incarnation) => Some(incarnation),
+            ExecutionStatus::Committed(incarnation) => {
+                if allow_committed {
+                    Some(incarnation)
+                } else {
+                    None
+                }
+            },
+            _ => None,
         }
     }
 
@@ -491,7 +505,7 @@ impl Scheduler {
 
         // If incarnation was last executed, and thus ready for validation,
         // return version and wave for validation task, otherwise None.
-        self.is_executed(idx_to_validate)
+        self.is_executed(idx_to_validate, false)
             .map(|incarnation| ((idx_to_validate, incarnation), wave))
     }
 
@@ -515,8 +529,10 @@ impl Scheduler {
     /// used to wake it up after the dependency is resolved.
     fn suspend(&self, txn_idx: TxnIndex, dep_condvar: DependencyCondvar) {
         let mut status = self.txn_status[txn_idx].0.lock();
+        // println!("Suspend {} w. lock", txn_idx);
 
         if let ExecutionStatus::Executing(incarnation) = *status {
+            // println!("Suspended Txn {}", txn_idx);
             *status = ExecutionStatus::Suspended(incarnation, dep_condvar);
         } else {
             unreachable!();
@@ -528,7 +544,10 @@ impl Scheduler {
     /// The caller must ensure that the transaction is in the Suspended state.
     fn resume(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx].0.lock();
+        // println!("Resume {} w. lock", txn_idx);
+
         if let ExecutionStatus::Suspended(incarnation, dep_condvar) = &*status {
+            // println!("ResumeD Txn {}", txn_idx);
             *status = ExecutionStatus::ReadyToExecute(*incarnation, Some(dep_condvar.clone()));
         } else {
             unreachable!();
