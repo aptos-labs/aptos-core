@@ -132,6 +132,7 @@ fn gen_ledger_info(
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_executor_status() {
     let executor = TestExecutor::new();
     let parent_block_id = executor.committed_block_id();
@@ -150,6 +151,33 @@ fn test_executor_status() {
             KEEP_STATUS.clone(),
             KEEP_STATUS.clone(),
             DISCARD_STATUS.clone(),
+            KEEP_STATUS.clone(),
+        ],
+        output.compute_status()
+    );
+}
+
+#[cfg(feature = "consensus-only-perf-test")]
+#[test]
+fn test_executor_status_consensus_only() {
+    let executor = TestExecutor::new();
+    let parent_block_id = executor.committed_block_id();
+    let block_id = gen_block_id(1);
+
+    let txn0 = encode_mint_transaction(gen_address(0), 100);
+    let txn1 = encode_mint_transaction(gen_address(1), 100);
+    let txn2 = encode_transfer_transaction(gen_address(0), gen_address(1), 500);
+
+    let output = executor
+        .execute_block((block_id, block(vec![txn0, txn1, txn2])), parent_block_id)
+        .unwrap();
+
+    // We should not discard any transactions because we don't actually execute them.
+    assert_eq!(
+        &vec![
+            KEEP_STATUS.clone(),
+            KEEP_STATUS.clone(),
+            KEEP_STATUS.clone(),
             KEEP_STATUS.clone(),
         ],
         output.compute_status()
@@ -188,6 +216,7 @@ fn test_executor_multiple_blocks() {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_executor_two_blocks_with_failed_txns() {
     let executor = TestExecutor::new();
     let parent_block_id = executor.committed_block_id();
@@ -213,6 +242,7 @@ fn test_executor_two_blocks_with_failed_txns() {
     let output2 = executor
         .execute_block((block2_id, block(block2_txns)), block1_id)
         .unwrap();
+
     let ledger_info = gen_ledger_info(77, output2.root_hash(), block2_id, 1);
     executor
         .commit_blocks(vec![block1_id, block2_id], ledger_info)
@@ -317,6 +347,7 @@ fn create_transaction_chunks(
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_noop_block_after_reconfiguration() {
     let executor = TestExecutor::new();
     let mut parent_block_id = executor.committed_block_id();
@@ -557,6 +588,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
+    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
     fn test_executor_two_branches(
         a_size in 0..30u64,
         b_size in 0..30u64,
@@ -608,6 +640,7 @@ proptest! {
     }
 
     #[test]
+    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
     fn test_reconfiguration_with_retry_transaction_status(
         (num_user_txns, reconfig_txn_index) in (10..100u64).prop_flat_map(|num_user_txns| {
             (
@@ -670,6 +703,7 @@ proptest! {
         }
 
     #[test]
+    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
     fn test_executor_restart(a_size in 1..30u64, b_size in 1..30u64, amount in any::<u32>()) {
         let block_a = TestBlock::new(a_size, amount, gen_block_id(1));
         let block_b = TestBlock::new(b_size, amount, gen_block_id(2));
