@@ -1,5 +1,14 @@
 ### Generate ANS module for testing
 
+#### Why doing it this way?
+
+While running tests we spin up a local testnet to test against it. For framework modules (0x1,0x2,0x3) it is easier to test as it is part of the local testnet. For packages in custom addresses, we need to compile and publish the package on a given address and then test against it. ANS is one example for this kind of packages.
+Until we have a better tool/solution to compile a move package in TS, we need to compile the package locally using CLI, and then we can publish it using the ts sdk during tests.
+
+ANS compiled branch = main
+Latest ANS compiled version = 1.0.0
+Latest ANS compiled commit = 143bdb52281ba5bc4b4f0a12b84dd0f3f06c7b9b
+
 1. cd into `core` in [this](https://github.com/aptos-labs/aptos-names-contracts) repo
 2. Create a new account so you have access to the account's private key, can generate an account with
 
