@@ -511,8 +511,8 @@ module aptos_framework::delegation_pool {
         // update total coins accumulated by `active` + `pending_active` shares
         pool_u64::update_total_coins(&mut pool.active_shares, active + pending_active);
 
-        // advance lockup epoch on delegation pool if it already passed on the stake one
-        if (last_reconfiguration_time() / MICRO_CONVERSION_FACTOR >= pool.locked_until_secs) {
+        // advance lockup epoch on delegation pool if it already passed on the stake one (AND stake explicitly inactivated)
+        if (last_reconfiguration_time() / MICRO_CONVERSION_FACTOR >= pool.locked_until_secs && pending_inactive == 0) {
             pool.locked_until_secs = stake::get_lockup_secs(pool_address);
 
             // `inactive` on stake pool == remaining inactive coins over ended lockup epochs +
