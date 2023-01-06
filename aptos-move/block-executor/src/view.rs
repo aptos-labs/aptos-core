@@ -9,7 +9,6 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
-use aptos_infallible::Mutex;
 use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
@@ -18,7 +17,7 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use move_binary_format::errors::Location;
-use std::{collections::BTreeMap, hash::Hash, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
 
 /// Resolved and serialized data for WriteOps, None means deletion.
 pub type ResolvedData = Option<Vec<u8>>;
@@ -33,7 +32,7 @@ pub type ResolvedData = Option<Vec<u8>>;
 pub(crate) struct MVHashMapView<'a, K, V> {
     versioned_map: &'a MVHashMap<K, V>,
     scheduler: &'a Scheduler,
-    captured_reads: Mutex<Vec<ReadDescriptor<K>>>,
+    captured_reads: RefCell<Vec<ReadDescriptor<K>>>,
 }
 
 /// A struct which describes the result of the read from the proxy. The client
@@ -60,14 +59,13 @@ impl<
         Self {
             versioned_map,
             scheduler,
-            captured_reads: Mutex::new(Vec::new()),
+            captured_reads: RefCell::new(Vec::new()),
         }
     }
 
     /// Drains the captured reads.
     pub(crate) fn take_reads(&self) -> Vec<ReadDescriptor<K>> {
-        let mut reads = self.captured_reads.lock();
-        std::mem::take(&mut reads)
+        self.captured_reads.take()
     }
 
     /// Captures a read from the VM execution.
@@ -80,25 +78,25 @@ impl<
                 Ok(Version(version, v)) => {
                     let (idx, incarnation) = version;
                     self.captured_reads
-                        .lock()
+                        .borrow_mut()
                         .push(ReadDescriptor::from_version(key.clone(), idx, incarnation));
                     return ReadResult::Value(v);
                 },
                 Ok(Resolved(value)) => {
                     self.captured_reads
-                        .lock()
+                        .borrow_mut()
                         .push(ReadDescriptor::from_resolved(key.clone(), value));
                     return ReadResult::U128(value);
                 },
                 Err(NotFound) => {
                     self.captured_reads
-                        .lock()
+                        .borrow_mut()
                         .push(ReadDescriptor::from_storage(key.clone()));
                     return ReadResult::None;
                 },
                 Err(Unresolved(delta)) => {
                     self.captured_reads
-                        .lock()
+                        .borrow_mut()
                         .push(ReadDescriptor::from_unresolved(key.clone(), delta));
                     return ReadResult::Unresolved(delta);
                 },
@@ -135,7 +133,7 @@ impl<
                     // happened because of speculation and return 0 to the Move-VM. Validation will
                     // ensure the transaction re-executes if 0 wasn't the right number.
                     self.captured_reads
-                        .lock()
+                        .borrow_mut()
                         .push(ReadDescriptor::from_delta_application_failure(key.clone()));
                     return ReadResult::U128(0);
                 },

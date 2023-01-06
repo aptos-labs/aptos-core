@@ -133,6 +133,7 @@ use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ResourceKey, StructTag},
 };
+use std::marker::Sync;
 
 /// This trait describes the VM's validation interfaces.
 pub trait VMValidator {
@@ -154,7 +155,7 @@ pub trait VMExecutor: Send + Sync {
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &impl StateView,
+        state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }
 

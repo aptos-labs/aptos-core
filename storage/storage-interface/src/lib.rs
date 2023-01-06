@@ -7,7 +7,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
-    contract_event::EventWithVersion,
+    contract_event::{ContractEvent, EventWithVersion},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     event::EventKey,
@@ -16,7 +16,7 @@ use aptos_types::{
     on_chain_config::{access_path_for_config, ConfigID},
     proof::{
         AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleProofExt,
-        SparseMerkleRangeProof, TransactionAccumulatorSummary,
+        SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
     },
     state_proof::StateProof,
     state_store::{
@@ -27,9 +27,10 @@ use aptos_types::{
         table::{TableHandle, TableInfo},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
+        AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
         TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
+    write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
@@ -202,6 +203,47 @@ pub trait DbReader: Send + Sync {
         limit: u64,
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
+        unimplemented!()
+    }
+
+    fn get_transaction_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<Transaction>> + '_>> {
+        unimplemented!()
+    }
+
+    fn get_transaction_info_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<TransactionInfo>> + '_>> {
+        unimplemented!()
+    }
+
+    fn get_events_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<Vec<ContractEvent>>> + '_>> {
+        unimplemented!()
+    }
+
+    fn get_write_set_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<WriteSet>> + '_>> {
+        unimplemented!()
+    }
+
+    fn get_transaction_accumulator_range_proof(
+        &self,
+        start_version: Version,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<TransactionAccumulatorRangeProof> {
         unimplemented!()
     }
 
