@@ -34,7 +34,9 @@ const Contributors = ({ contributors }) => {
 
 export default function FooterWrapper(props) {
   const location = useLocation();
-  const contributors = CONTRIBUTORS[location.pathname];
+  let urlPath = location.pathname;
+  if (urlPath.endsWith("/")) urlPath = urlPath.substring(0, urlPath.length - 1);
+  const contributors = CONTRIBUTORS[urlPath];
   return (
     <>
       <Footer {...props} />
