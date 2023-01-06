@@ -653,7 +653,7 @@ proptest! {
             // get txn_infos from db
             let db = executor.db.reader.clone();
             prop_assert_eq!(db.get_latest_version().unwrap(), num_txns as Version);
-            let txn_list = db.get_transactions(1 /* start version */, num_txns as u64, num_txns as Version /* ledger version */, false /* fetch events */).unwrap();
+            let txn_list = db.get_transactions(1 /* start version */, num_txns, num_txns as Version /* ledger version */, false /* fetch events */).unwrap();
             prop_assert_eq!(&block.txns, &txn_list.transactions);
             let txn_infos = txn_list.proof.transaction_infos;
 

@@ -144,10 +144,9 @@ impl MultiEd25519PublicKey {
 
         // Checks that the threshold is correctly encoded in the last bytes of the PK, and that the
         // # of sub-PKs is > 0 and <= MAX_NUM_OF_KEYS.
-        match check_and_get_threshold(bytes, ED25519_PUBLIC_KEY_LENGTH) {
-            Err(_) => return (false, num_deserializations, num_small_order_checks),
-            _ => {},
-        };
+        if check_and_get_threshold(bytes, ED25519_PUBLIC_KEY_LENGTH).is_err() {
+            return (false, num_deserializations, num_small_order_checks);
+        }
 
         for chunk in bytes.chunks_exact(ED25519_PUBLIC_KEY_LENGTH) {
             // Parse as a slice
@@ -377,7 +376,7 @@ impl VerifyingKey for MultiEd25519PublicKey {
 
 impl fmt::Display for MultiEd25519PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }
 
@@ -588,7 +587,7 @@ impl Signature for MultiEd25519Signature {
             while !bitmap_get_bit(self.bitmap, bitmap_index) {
                 bitmap_index += 1;
             }
-            sig.verify_arbitrary_msg(message, &public_key.public_keys[bitmap_index as usize])?;
+            sig.verify_arbitrary_msg(message, &public_key.public_keys[bitmap_index])?;
             bitmap_index += 1;
         }
         Ok(())

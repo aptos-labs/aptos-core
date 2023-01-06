@@ -528,7 +528,7 @@ async fn test_signing_message_with_payload(
         format!(
             "0x{}",
             hex::encode(
-                &txn.clone()
+                txn.clone()
                     .into_raw_transaction()
                     .signing_message()
                     .unwrap()

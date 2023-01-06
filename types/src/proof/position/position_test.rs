@@ -128,49 +128,49 @@ fn test_root_level_from_leaf_count() {
 #[test]
 fn test_is_freezable() {
     let mut position = Position::from_inorder_index(5);
-    assert_eq!(position.is_freezable(2), false);
-    assert_eq!(position.is_freezable(3), true);
-    assert_eq!(position.is_freezable(4), true);
+    assert!(!position.is_freezable(2));
+    assert!(position.is_freezable(3));
+    assert!(position.is_freezable(4));
 
     position = Position::from_inorder_index(0);
-    assert_eq!(position.is_freezable(0), true);
-    assert_eq!(position.is_freezable(3), true);
-    assert_eq!(position.is_freezable(4), true);
+    assert!(position.is_freezable(0));
+    assert!(position.is_freezable(3));
+    assert!(position.is_freezable(4));
 
     // Testing a root
     position = Position::from_inorder_index(7);
-    assert_eq!(position.is_freezable(6), false);
-    assert_eq!(position.is_freezable(7), true);
-    assert_eq!(position.is_freezable(8), true);
+    assert!(!position.is_freezable(6));
+    assert!(position.is_freezable(7));
+    assert!(position.is_freezable(8));
 
     // Testing a leaf
     position = Position::from_inorder_index(10);
-    assert_eq!(position.is_freezable(5), true);
+    assert!(position.is_freezable(5));
 }
 
 #[test]
 fn test_is_freezable_out_of_boundary() {
     // Testing out of boundary
     let position = Position::from_inorder_index(10);
-    assert_eq!(position.is_freezable(2), false);
+    assert!(!position.is_freezable(2));
 }
 
 #[test]
 fn test_is_placeholder() {
-    assert_eq!(Position::from_inorder_index(5).is_placeholder(0), true);
-    assert_eq!(Position::from_inorder_index(5).is_placeholder(1), true);
-    assert_eq!(Position::from_inorder_index(5).is_placeholder(2), false);
-    assert_eq!(Position::from_inorder_index(5).is_placeholder(3), false);
-    assert_eq!(Position::from_inorder_index(13).is_placeholder(5), true);
-    assert_eq!(Position::from_inorder_index(13).is_placeholder(6), false);
+    assert!(Position::from_inorder_index(5).is_placeholder(0));
+    assert!(Position::from_inorder_index(5).is_placeholder(1));
+    assert!(!Position::from_inorder_index(5).is_placeholder(2));
+    assert!(!Position::from_inorder_index(5).is_placeholder(3));
+    assert!(Position::from_inorder_index(13).is_placeholder(5));
+    assert!(!Position::from_inorder_index(13).is_placeholder(6));
 }
 
 #[test]
 fn test_is_placeholder_out_of_boundary() {
     // Testing out of boundary
-    assert_eq!(Position::from_inorder_index(7).is_placeholder(2), false);
-    assert_eq!(Position::from_inorder_index(11).is_placeholder(2), true);
-    assert_eq!(Position::from_inorder_index(14).is_placeholder(2), true);
+    assert!(!Position::from_inorder_index(7).is_placeholder(2));
+    assert!(Position::from_inorder_index(11).is_placeholder(2));
+    assert!(Position::from_inorder_index(14).is_placeholder(2));
 }
 
 #[test]

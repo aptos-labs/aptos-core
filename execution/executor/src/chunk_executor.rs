@@ -198,7 +198,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             first_version_in_request,
         )?;
         let mut transactions = txn_list_with_proof.transactions;
-        transactions.drain(..txns_to_skip as usize);
+        transactions.drain(..txns_to_skip);
         if txns_to_skip == num_txns {
             info!(
                 "Skipping all transactions in the given chunk! Num transactions: {:?}",
@@ -257,7 +257,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             first_version_in_request,
         )?;
         let mut txns_and_outputs = txn_output_list_with_proof.transactions_and_outputs;
-        txns_and_outputs.drain(..txns_to_skip as usize);
+        txns_and_outputs.drain(..txns_to_skip);
 
         // Apply transaction outputs.
         let state_view = self.state_view(&latest_view)?;

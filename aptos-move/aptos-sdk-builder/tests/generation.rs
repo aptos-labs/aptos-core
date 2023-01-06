@@ -29,7 +29,7 @@ fn test_rust(abis: &[EntryABI], demo_file: &str, expected_output: &str) {
     let stdlib_dir_path = dir.path().join("framework");
     std::fs::create_dir_all(stdlib_dir_path.clone()).unwrap();
 
-    let mut cargo = std::fs::File::create(&stdlib_dir_path.join("Cargo.toml")).unwrap();
+    let mut cargo = std::fs::File::create(stdlib_dir_path.join("Cargo.toml")).unwrap();
     write!(
         cargo,
         r#"[package]
@@ -53,7 +53,7 @@ test = false
     .unwrap();
     std::fs::create_dir(stdlib_dir_path.join("src")).unwrap();
     let source_path = stdlib_dir_path.join("src/lib.rs");
-    let mut source = std::fs::File::create(&source_path).unwrap();
+    let mut source = std::fs::File::create(source_path).unwrap();
     buildgen::rust::output(&mut source, abis, /* local types */ false).unwrap();
 
     std::fs::copy(demo_file, stdlib_dir_path.join("src/stdlib_demo.rs")).unwrap();

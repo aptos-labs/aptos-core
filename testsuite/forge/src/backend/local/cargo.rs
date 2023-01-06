@@ -104,7 +104,7 @@ fn git_rev_parse<R: AsRef<str>>(metadata: &Metadata, rev: R) -> Result<String> {
 // Determine if the worktree is dirty
 fn git_is_worktree_dirty() -> Result<bool> {
     Command::new("git")
-        .args(&["diff-index", "--name-only", "HEAD", "--"])
+        .args(["diff-index", "--name-only", "HEAD", "--"])
         .output()
         .context("Failed to determine if the worktree is dirty")
         .map(|output| !output.stdout.is_empty())
@@ -217,7 +217,7 @@ fn checkout_revision(metadata: &Metadata, revision: &str, to: &Path) -> Result<(
         .arg("--format=tar")
         .arg("--output")
         .arg(&archive_file)
-        .arg(&revision)
+        .arg(revision)
         .output()
         .context("Failed to run git archive")?;
     if !output.status.success() {
