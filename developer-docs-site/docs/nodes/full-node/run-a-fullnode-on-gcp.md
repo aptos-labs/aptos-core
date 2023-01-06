@@ -93,9 +93,9 @@ You can deploy a public fullnode on GCP by using the Aptos fullnode Terraform mo
   touch main.tf
   ```
 
-4. Modify `main.tf` file to configure Terraform, and create public fullnode from Terraform module.
+4. Modify the `main.tf` file to configure Terraform and create a public fullnode from the Terraform module.
 
-**Note:** If you are using a different version of Terraform, you will need to use the tfenv command to change the required version. 
+**Note:** If you are using a different version of Terraform, you will need to use the `tfenv` command to change the required version. 
 
 You can find the Docker image tag at https://hub.docker.com/r/aptoslabs/validator/tags?page=1&ordering=last_updated&name=devnet
 
@@ -103,7 +103,7 @@ Example content for `main.tf`:
 
   ```rust
   terraform {
-    required_version = "~> 1.2.0" 
+    required_version = "~> 1.2.0"
     backend "gcs" {
       bucket = "BUCKET_NAME" # bucket name created in step 2
       prefix = "state/fullnode"
@@ -115,7 +115,7 @@ Example content for `main.tf`:
     source        = "github.com/aptos-labs/aptos-core.git//terraform/fullnode/gcp?ref=main"
     region        = "us-central1"  # Specify the region
     zone          = "c"            # Specify the zone suffix
-    project       = "gcp-fullnode" # Specify your GCP project id
+    project       = "gcp-fullnode" # Specify your GCP project ID
     fullnode_name = "BUCKET_NAME" #bucket name created in step 2
     era           = 1              # bump era number to wipe the chain
     image_tag     = "devnet" # Specify the docker image tag 
