@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
 use aptos_config::{
     config::{NodeConfig, StateSyncConfig, StorageServiceConfig},
     network_id::NetworkId,
@@ -34,14 +33,8 @@ use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
 use aptos_types::{on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint};
 use aptos_vm::AptosVM;
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
-use tokio::runtime::{Builder, Runtime};
+use std::{collections::HashMap, sync::Arc};
+use tokio::runtime::Runtime;
 
 /// Creates the event subscription service and two reconfiguration
 /// notification listeners (for mempool and consensus, respectively).
@@ -172,16 +165,7 @@ fn setup_data_streaming_service(
     );
 
     // Start the data streaming service
-    let streaming_service_runtime = Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("stream-serv-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .map_err(|err| anyhow!("Failed to create data streaming service {}", err))?;
+    let streaming_service_runtime = aptos_runtimes::spawn_named_runtime("stream-serv".into(), None);
     streaming_service_runtime.spawn(data_streaming_service.start_service());
 
     Ok((streaming_service_client, streaming_service_runtime))
@@ -203,16 +187,7 @@ fn setup_aptos_data_client(
     let network_client = StorageServiceClient::new(network_client);
 
     // Create a new runtime for the data client
-    let aptos_data_client_runtime = Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("data-client-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .map_err(|err| anyhow!("Failed to create aptos data client {}", err))?;
+    let aptos_data_client_runtime = aptos_runtimes::spawn_named_runtime("data-client".into(), None);
 
     // Create the data client and spawn the data poller
     let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
@@ -235,16 +210,7 @@ fn setup_state_sync_storage_service(
     db_rw: &DbReaderWriter,
 ) -> anyhow::Result<Runtime> {
     // Create a new state sync storage service runtime
-    let storage_service_runtime = Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("stor-server-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .map_err(|err| anyhow!("Failed to start state sync storage service {}", err))?;
+    let storage_service_runtime = aptos_runtimes::spawn_named_runtime("stor-server".into(), None);
 
     // Spawn all state sync storage service servers on the same runtime
     let storage_reader = StorageReader::new(config, Arc::clone(&db_rw.reader));

@@ -199,11 +199,7 @@ pub fn consensus_runtime() -> runtime::Runtime {
         ::aptos_logger::Logger::new().level(Level::Debug).init();
     }
 
-    runtime::Builder::new_multi_thread()
-        .enable_all()
-        .disable_lifo_slot()
-        .build()
-        .expect("Failed to create Tokio runtime!")
+    aptos_runtimes::spawn_named_runtime("consensus".into(), None)
 }
 
 pub fn timed_block_on<F>(runtime: &runtime::Runtime, f: F) -> <F as Future>::Output

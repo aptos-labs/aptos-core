@@ -24,14 +24,8 @@ use aptos_network::{
 use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
 use futures::channel::mpsc;
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
-use tokio::runtime::{self, Runtime};
+use std::{collections::HashMap, sync::Arc};
+use tokio::runtime::Runtime;
 
 /// Helper function to start consensus based on configuration and return the runtime
 pub fn start_consensus(
@@ -44,16 +38,7 @@ pub fn start_consensus(
     reconfig_events: ReconfigNotificationListener,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> Runtime {
-    let runtime = runtime::Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("consensus-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("Failed to create Tokio runtime!");
+    let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let txn_notifier = Arc::new(MempoolNotifier::new(
         consensus_to_mempool_sender.clone(),

@@ -25,14 +25,9 @@ use std::{
     collections::BTreeMap,
     env,
     future::Future,
-    sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tokio::{
-    runtime::{Builder, Runtime},
-    task::JoinHandle,
-    time,
-};
+use tokio::{runtime::Runtime, task::JoinHandle, time};
 use uuid::Uuid;
 
 // The chain ID key
@@ -119,17 +114,7 @@ pub fn start_telemetry_service(
     }
 
     // Create the telemetry runtime
-    let telemetry_runtime = Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("telemetry-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("Failed to create the Aptos Telemetry runtime!");
-
+    let telemetry_runtime = aptos_runtimes::spawn_named_runtime("telemetry".into(), None);
     telemetry_runtime.handle().spawn(spawn_telemetry_service(
         node_config,
         chain_id,

@@ -6,29 +6,14 @@ mod handlers;
 use crate::handlers::get_routes;
 use aptos_db::AptosDB;
 use aptos_logger::prelude::*;
-use std::{
-    net::SocketAddr,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
-use tokio::runtime::{Builder, Runtime};
+use std::{net::SocketAddr, sync::Arc};
+use tokio::runtime::Runtime;
 
 pub fn start_backup_service(address: SocketAddr, db: Arc<AptosDB>) -> Runtime {
     let backup_handler = db.get_backup_handler();
     let routes = get_routes(backup_handler);
 
-    let runtime = Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("backup-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[backup] failed to create runtime");
+    let runtime = aptos_runtimes::spawn_named_runtime("backup".into(), None);
 
     // Ensure that we actually bind to the socket first before spawning the
     // server tasks. This helps in tests to prevent races where a client attempts
