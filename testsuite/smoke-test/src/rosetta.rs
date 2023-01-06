@@ -926,6 +926,7 @@ async fn test_block() {
         Some(account_id_2),
         Some(account_id_2),
         Some(100000000000000),
+        Some(5),
         Duration::from_secs(5),
         None,
         None,
@@ -1604,6 +1605,18 @@ async fn parse_operations(
                             .unwrap()
                             .0;
                         assert_eq!(actual_stake_amount, stake);
+
+                        let commission_percentage = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .commission_percentage
+                            .as_ref()
+                            .unwrap()
+                            .0;
+                        let actual_commission: u64 =
+                            bcs::from_bytes(payload.args().get(3).unwrap()).unwrap();
+                        assert_eq!(actual_commission, commission_percentage);
                     } else {
                         panic!("Not an entry function");
                     }
@@ -2034,6 +2047,7 @@ async fn create_stake_pool_and_wait(
     operator: Option<AccountAddress>,
     voter: Option<AccountAddress>,
     stake_amount: Option<u64>,
+    commission_percentage: Option<u64>,
     txn_expiry_duration: Duration,
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
@@ -2047,6 +2061,7 @@ async fn create_stake_pool_and_wait(
             operator,
             voter,
             stake_amount,
+            commission_percentage,
             expiry_time.as_secs(),
             sequence_number,
             max_gas,
