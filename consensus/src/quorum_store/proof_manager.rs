@@ -3,18 +3,12 @@
 
 use crate::network::{NetworkSender, QuorumStoreSender};
 use crate::quorum_store::counters;
-use crate::quorum_store::types::BatchId;
 use crate::quorum_store::utils::ProofQueue;
-use crate::round_manager::VerifiedEvent;
-use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Payload, PayloadFilter, ProofWithData};
 use aptos_consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
-use aptos_consensus_types::request_response::{
-    BlockProposalCommand, CleanCommand, ConsensusResponse,
-};
+use aptos_consensus_types::request_response::{BlockProposalCommand, ConsensusResponse};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_types::PeerId;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
 use std::collections::HashSet;

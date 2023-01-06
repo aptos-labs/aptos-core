@@ -7,7 +7,6 @@ use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload},
     proof_of_store::{LogicalTime, ProofOfStore},
-    request_response::CleanCommand,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{Error::DataNotFound, *};

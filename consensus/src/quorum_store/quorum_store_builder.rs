@@ -19,7 +19,7 @@ use aptos_channels::aptos_channel;
 use aptos_channels::message_queues::QueueStyle;
 use aptos_config::config::{QuorumStoreConfig, SecureBackend};
 use aptos_consensus_types::common::Author;
-use aptos_consensus_types::request_response::{BlockProposalCommand, CleanCommand, PayloadRequest};
+use aptos_consensus_types::request_response::BlockProposalCommand;
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
@@ -30,7 +30,6 @@ use aptos_types::account_address::AccountAddress;
 use aptos_types::validator_signer::ValidatorSigner;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use futures_channel::mpsc::{Receiver, Sender};
-use futures_channel::{mpsc, oneshot};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -372,13 +371,11 @@ impl InnerBuilder {
         let mut i = 0;
         for network_msg_rx in self.quorum_store_msg_rx_vec.into_iter() {
             let net = NetworkListener::new(
-                self.epoch,
                 network_msg_rx,
                 self.batch_reader_cmd_tx.clone(),
                 self.proof_coordinator_cmd_tx.clone(),
                 self.batch_coordinator_cmd_tx.clone(),
                 self.proof_manager_cmd_tx.clone(),
-                self.config.max_batch_bytes,
             );
             i += 1;
             spawn_named!(&format!("network_listener-{}", i), net.start()).unwrap();

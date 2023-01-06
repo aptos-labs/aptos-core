@@ -6,7 +6,7 @@ use anyhow::Result;
 use aptos_consensus_types::request_response::BlockProposalCommand;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, Round},
-    request_response::{ConsensusResponse, PayloadRequest},
+    request_response::ConsensusResponse,
 };
 use aptos_logger::prelude::*;
 use fail::fail_point;

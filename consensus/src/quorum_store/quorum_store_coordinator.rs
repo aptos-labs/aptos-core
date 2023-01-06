@@ -53,7 +53,7 @@ impl QuorumStoreCoordinator {
         }
     }
 
-    pub async fn start(mut self, mut rx: futures_channel::mpsc::Receiver<CoordinatorCommand>) {
+    pub async fn start(self, mut rx: futures_channel::mpsc::Receiver<CoordinatorCommand>) {
         while let Some(cmd) = rx.next().await {
             match cmd {
                 CoordinatorCommand::CommitNotification(logical_time, digests) => {

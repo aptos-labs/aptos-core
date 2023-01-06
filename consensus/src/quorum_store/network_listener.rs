@@ -5,12 +5,7 @@ use crate::quorum_store::batch_coordinator::BatchCoordinatorCommand;
 use crate::quorum_store::proof_manager::ProofManagerCommand;
 use crate::{
     quorum_store::{
-        batch_aggregator::BatchAggregator,
-        batch_reader::BatchReaderCommand,
-        batch_store::{BatchStoreCommand, PersistRequest},
-        counters,
-        proof_coordinator::ProofCoordinatorCommand,
-        types::Fragment,
+        batch_reader::BatchReaderCommand, counters, proof_coordinator::ProofCoordinatorCommand,
     },
     round_manager::VerifiedEvent,
 };
@@ -18,38 +13,30 @@ use aptos_channels::aptos_channel;
 use aptos_logger::debug;
 use aptos_types::PeerId;
 use futures::StreamExt;
-use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 
 pub(crate) struct NetworkListener {
-    // TODO: reconsider which fields are needed.
-    epoch: u64,
     network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
     batch_reader_tx: Sender<BatchReaderCommand>,
     proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
     batch_coordinator_tx: Sender<BatchCoordinatorCommand>,
     proof_manager_tx: Sender<ProofManagerCommand>,
-    max_batch_bytes: usize,
 }
 
 impl NetworkListener {
     pub(crate) fn new(
-        epoch: u64,
         network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         batch_reader_tx: Sender<BatchReaderCommand>,
         proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
         batch_coordinator_tx: Sender<BatchCoordinatorCommand>,
         proof_manager_tx: Sender<ProofManagerCommand>,
-        max_batch_bytes: usize,
     ) -> Self {
         Self {
-            epoch,
             network_msg_rx,
             batch_reader_tx,
             proof_coordinator_tx,
             batch_coordinator_tx,
             proof_manager_tx,
-            max_batch_bytes,
         }
     }
 
@@ -113,6 +100,7 @@ impl NetworkListener {
                         .expect("could not push Batch batch_reader");
                 },
                 VerifiedEvent::ProofOfStoreMsg(proof) => {
+                    counters::REMOTE_POS_COUNT.inc();
                     let cmd = ProofManagerCommand::RemoteProof(*proof);
                     self.proof_manager_tx
                         .send(cmd)

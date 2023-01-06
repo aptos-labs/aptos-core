@@ -185,7 +185,7 @@ impl ProofCoordinator {
     pub async fn start(
         mut self,
         mut rx: Receiver<ProofCoordinatorCommand>,
-        mut tx: Sender<ProofManagerCommand>,
+        tx: Sender<ProofManagerCommand>,
         validator_verifier: ValidatorVerifier,
     ) {
         let mut interval = time::interval(Duration::from_millis(100));

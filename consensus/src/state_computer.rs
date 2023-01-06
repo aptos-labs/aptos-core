@@ -13,10 +13,7 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
-    block::Block,
-    common::{Payload, Round},
-    executed_block::ExecutedBlock,
-    proof_of_store::LogicalTime,
+    block::Block, executed_block::ExecutedBlock, proof_of_store::LogicalTime,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
@@ -36,8 +33,6 @@ type NotificationType = (
     Vec<Transaction>,
     Vec<ContractEvent>,
 );
-
-type CommitType = (u64, Round, Vec<Payload>);
 
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
