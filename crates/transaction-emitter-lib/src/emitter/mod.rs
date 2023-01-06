@@ -67,6 +67,7 @@ pub static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
 #[derive(Debug, Copy, Clone)]
 pub enum TransactionType {
     CoinTransfer {
+        sender_use_account_pool: bool,
         invalid_transaction_ratio: usize,
     },
     AccountGeneration {
@@ -86,6 +87,7 @@ pub enum TransactionType {
 impl TransactionType {
     pub fn default_coin_transfer() -> Self {
         Self::CoinTransfer {
+            sender_use_account_pool: false,
             invalid_transaction_ratio: 0,
         }
     }
@@ -457,11 +459,13 @@ impl TxnEmitter {
                 let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
                 {
                     TransactionType::CoinTransfer {
+                        sender_use_account_pool,
                         invalid_transaction_ratio,
                     } => Box::new(P2PTransactionGeneratorCreator::new(
                         txn_factory.clone(),
                         SEND_AMOUNT,
                         all_addresses.clone(),
+                        if *sender_use_account_pool { Some(accounts_pool.clone()) } else { None },
                         *invalid_transaction_ratio,
                     )),
                     TransactionType::AccountGeneration {

@@ -22,6 +22,7 @@ pub struct P2PTransactionGenerator {
     send_amount: u64,
     txn_factory: TransactionFactory,
     all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+    accounts_pool: Option<Arc<RwLock<Vec<LocalAccount>>>>,
     invalid_transaction_ratio: usize,
 }
 
@@ -31,6 +32,7 @@ impl P2PTransactionGenerator {
         send_amount: u64,
         txn_factory: TransactionFactory,
         all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+        accounts_pool: Option<Arc<RwLock<Vec<LocalAccount>>>>,
         invalid_transaction_ratio: usize,
     ) -> Self {
         Self {
@@ -38,6 +40,7 @@ impl P2PTransactionGenerator {
             send_amount,
             txn_factory,
             all_addresses,
+            accounts_pool,
             invalid_transaction_ratio,
         }
     }
@@ -135,7 +138,18 @@ impl TransactionGenerator for P2PTransactionGenerator {
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,
     ) -> Vec<SignedTransaction> {
-        let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
+        let needed = accounts.len() * transactions_per_account;
+        let mut requests = Vec::with_capacity(needed);
+
+        let mut accounts_to_burn = if let Some(accounts_pool_lock) = &self.accounts_pool {
+            let mut accounts_pool = accounts_pool_lock.write();
+            let num_in_pool = accounts_pool.len();
+            assert!(num_in_pool > needed, "Left in pool {}, needed {}", num_in_pool, needed);
+            accounts_pool.drain((num_in_pool - needed)..).collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+
         let invalid_size = if self.invalid_transaction_ratio != 0 {
             // if enable mix invalid tx, at least 1 invalid tx per batch
             max(1, accounts.len() * self.invalid_transaction_ratio / 100)
@@ -157,11 +171,12 @@ impl TransactionGenerator for P2PTransactionGenerator {
                 transactions_per_account
             );
             for i in 0..transactions_per_account {
+                let mut next_to_burn = accounts_to_burn.pop();
                 let receiver = receivers.get(i).expect("all_addresses can't be empty");
                 let request = if num_valid_tx > 0 {
                     num_valid_tx -= 1;
                     self.gen_single_txn(
-                        sender,
+                        next_to_burn.as_mut().unwrap_or(sender),
                         receiver,
                         self.send_amount,
                         &self.txn_factory,
@@ -169,7 +184,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
                 } else {
                     self.generate_invalid_transaction(
                         &mut self.rng.clone(),
-                        sender,
+                        next_to_burn.as_mut().unwrap_or(sender),
                         receiver,
                         &requests,
                     )
@@ -185,6 +200,7 @@ pub struct P2PTransactionGeneratorCreator {
     txn_factory: TransactionFactory,
     amount: u64,
     all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+    accounts_pool: Option<Arc<RwLock<Vec<LocalAccount>>>>,
     invalid_transaction_ratio: usize,
 }
 
@@ -193,12 +209,14 @@ impl P2PTransactionGeneratorCreator {
         txn_factory: TransactionFactory,
         amount: u64,
         all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+        accounts_pool: Option<Arc<RwLock<Vec<LocalAccount>>>>,
         invalid_transaction_ratio: usize,
     ) -> Self {
         Self {
             txn_factory,
             amount,
             all_addresses,
+            accounts_pool,
             invalid_transaction_ratio,
         }
     }
@@ -212,6 +230,7 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
             self.amount,
             self.txn_factory.clone(),
             self.all_addresses.clone(),
+            self.accounts_pool.clone(),
             self.invalid_transaction_ratio,
         ))
     }

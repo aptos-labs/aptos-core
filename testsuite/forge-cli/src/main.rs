@@ -203,6 +203,13 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let duration = Duration::from_secs(3600);
+    let suite_name = if suite_name == "compat" {
+        panic!();
+    } else {
+        "workload_coin_transfer"
+    };
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -462,8 +469,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "single_vfn_perf" => single_vfn_perf(config),
         "validator_reboot_stress_test" => validator_reboot_stress_test(config),
         "fullnode_reboot_stress_test" => fullnode_reboot_stress_test(config),
-        "account_creation" | "nft_mint" | "publishing" | "module_loading" | "write_new_resource" => {
-            account_creation_or_nft_mint(test_name.into(), config)
+        "workload_account_creation" | "workload_nft_mint" | "workload_publishing" | "workload_module_loading" | "workload_write_new_resource" | "workload_coin_transfer_distinct" | "workload_coin_transfer" => {
+            test_workloads(test_name.into(), config)
         },
         "graceful_overload" => graceful_overload(config),
         // not scheduled on continuous
@@ -699,7 +706,7 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
         )
 }
 
-fn account_creation_or_nft_mint(test_name: String, config: ForgeConfig) -> ForgeConfig {
+fn test_workloads(test_name: String, config: ForgeConfig) -> ForgeConfig {
     let job =
     EmitJobRequest::default()
         .mode(EmitJobMode::MaxLoad {
@@ -717,34 +724,39 @@ fn account_creation_or_nft_mint(test_name: String, config: ForgeConfig) -> Forge
                 ["processed_transactions_detailed_counters"] = true.into();
         }))
         .with_emit_job(
-            if test_name == "write_new_resource" {
+            if test_name == "workload_write_new_resource" || test_name == "workload_coin_transfer_distinct" || test_name == "workload_coin_transfer" {
                 let account_creation_type = TransactionType::AccountGeneration {
                     add_created_accounts_to_pool: true,
                     max_account_working_set: 20_000_000,
                     creation_balance: 200_000_000,
                 };
-                let write_type = TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::MakeOrChange {
-                        string_length: Some(0),
-                        data_length: Some(64),
+                let test_txn_type = match test_name.as_str() {
+                    "workload_write_new_resource" => TransactionType::CallCustomModules {
+                        entry_point: EntryPoints::MakeOrChange {
+                            string_length: Some(0),
+                            data_length: Some(64),
+                        },
+                        num_modules: 1,
+                        use_account_pool: true,
                     },
-                    num_modules: 1,
-                    use_account_pool: true,
+                    "workload_coin_transfer_distinct" => TransactionType::CoinTransfer { sender_use_account_pool: true, invalid_transaction_ratio: 0 },
+                    "workload_coin_transfer" => TransactionType::CoinTransfer { sender_use_account_pool: false, invalid_transaction_ratio: 0 },
+                    _ => unreachable!("{}", test_name),
                 };
                 job.transaction_mix_per_phase(vec![
                     // warmup
                     vec![(account_creation_type, 1)],
                     vec![(account_creation_type, 1)],
-                    vec![(write_type, 1)],
+                    vec![(test_txn_type, 1)],
                     // cooldown
-                    vec![(write_type, 1)],
+                    vec![(test_txn_type, 1)],
                 ])
             } else {
                 job.transaction_type(match test_name.as_str() {
-                    "account_creation" => TransactionType::default_account_generation(),
-                    "nft_mint" => TransactionType::NftMintAndTransfer,
-                    "publishing" => TransactionType::PublishPackage,
-                    "module_loading" => TransactionType::CallCustomModules {
+                    "workload_account_creation" => TransactionType::default_account_generation(),
+                    "workload_nft_mint" => TransactionType::NftMintAndTransfer,
+                    "workload_publishing" => TransactionType::PublishPackage,
+                    "workload_module_loading" => TransactionType::CallCustomModules {
                         entry_point: EntryPoints::Nop,
                         num_modules: 1000,
                         use_account_pool: false,

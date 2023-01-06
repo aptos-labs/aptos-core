@@ -49,6 +49,7 @@ pub async fn emit_transactions_with_cluster(
         .iter()
         .map(|t| match t {
             TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
+                sender_use_account_pool: false,
                 invalid_transaction_ratio: args.invalid_tx,
             },
             TransactionTypeArg::AccountGeneration => TransactionType::default_account_generation(),

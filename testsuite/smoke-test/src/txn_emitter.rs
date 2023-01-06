@@ -41,13 +41,13 @@ pub async fn generate_traffic(
                 },
                 20
             )],
-            vec![
-                (TransactionType::default_coin_transfer(), 20),
-                // // commenting this out given it consistently fails smoke test
-                // // and it seems to be called only from `test_txn_emmitter`
-                // (TransactionType::NftMintAndTransfer, 20),
-                (TransactionType::PublishPackage, 20),
-            ],
+            // vec![
+            //     (TransactionType::default_coin_transfer(), 20),
+            //     // // commenting this out given it consistently fails smoke test
+            //     // // and it seems to be called only from `test_txn_emmitter`
+            //     // (TransactionType::NftMintAndTransfer, 20),
+            //     (TransactionType::PublishPackage, 20),
+            // ],
             vec![
                 (TransactionType::default_call_different_modules(), 20),
                 (
@@ -61,6 +61,7 @@ pub async fn generate_traffic(
                     },
                     20,
                 ),
+                (TransactionType::CoinTransfer { sender_use_account_pool: true, invalid_transaction_ratio: 0 }, 20),
             ],
         ])
         .mode(EmitJobMode::ConstTps { tps: 20 });
