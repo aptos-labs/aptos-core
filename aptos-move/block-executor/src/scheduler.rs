@@ -373,7 +373,7 @@ impl Scheduler {
 
     /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
     /// may return a re-execution task back to the caller (otherwise, NoTask).
-    pub fn finish_abort<'a>(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> SchedulerTask {
+    pub fn finish_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> SchedulerTask {
         let mut validation_status = self.txn_status[txn_idx].1.lock();
         self.set_aborted_status(txn_idx, incarnation);
 

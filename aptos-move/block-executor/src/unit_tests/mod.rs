@@ -438,10 +438,7 @@ fn scheduler_incarnation() {
     ));
     // execution index =  1
 
-    assert!(matches!(
-        s.finish_abort(4, 0),
-        SchedulerTask::NoTask
-    ));
+    assert!(matches!(s.finish_abort(4, 0), SchedulerTask::NoTask));
 
     assert!(matches!(
         s.next_task(),
