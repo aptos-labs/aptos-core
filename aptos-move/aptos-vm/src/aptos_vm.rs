@@ -63,6 +63,7 @@ use std::{
     cmp::min,
     collections::{BTreeMap, BTreeSet},
     convert::{AsMut, AsRef},
+    marker::Sync,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -273,7 +274,7 @@ impl AptosVM {
         let delta_write_set_mut = user_txn_change_set_ext
             .delta_change_set()
             .clone()
-            .try_into_write_set_mut(&storage)
+            .try_into_write_set_mut(storage)
             .expect("something terrible happened when applying aggregator deltas");
         let delta_write_set = delta_write_set_mut
             .freeze()
@@ -1036,7 +1037,7 @@ impl VMExecutor for AptosVM {
     /// transaction output.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &impl StateView,
+        state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::Error(
