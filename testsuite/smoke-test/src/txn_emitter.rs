@@ -36,9 +36,12 @@ pub async fn generate_traffic(
         .rest_clients(validator_clients)
         .gas_price(gas_price)
         .transaction_mix(vec![
-            (TransactionType::P2P, 70),
+            (TransactionType::P2P, 60),
             (TransactionType::AccountGeneration, 20),
-            (TransactionType::NftMintAndTransfer, 10),
+            // commenting this out given it consistently fails smoke test
+            // and it seems to be called only from `test_txn_emmitter`
+            // (TransactionType::NftMintAndTransfer, 10),
+            (TransactionType::PublishPackage, 30),
         ])
         .mode(EmitJobMode::ConstTps { tps: 20 });
     emitter

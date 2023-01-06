@@ -1176,6 +1176,7 @@ dependencies = [
  "siphasher",
  "smallvec",
  "tempfile",
+ "thiserror",
  "tiny-keccak",
 ]
 
@@ -2518,6 +2519,7 @@ dependencies = [
  "aptos",
  "aptos-config",
  "aptos-crypto",
+ "aptos-framework",
  "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",
@@ -2527,6 +2529,7 @@ dependencies = [
  "clap 3.2.17",
  "futures",
  "itertools",
+ "move-binary-format",
  "once_cell",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -4441,6 +4444,7 @@ dependencies = [
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "hex",
  "itertools",
+ "move-binary-format",
  "move-core-types",
  "move-package",
  "move-symbol-pool",
@@ -6269,6 +6273,17 @@ dependencies = [
  "proc-macro2 1.0.47",
  "quote 1.0.21",
  "syn 1.0.105",
+]
+
+[[package]]
+name = "module-publish"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "move-binary-format",
+ "structopt",
 ]
 
 [[package]]
