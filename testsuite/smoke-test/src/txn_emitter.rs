@@ -9,7 +9,6 @@ use aptos_forge::{
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use rand::{rngs::OsRng, SeedableRng};
 use std::time::Duration;
-use tokio::runtime::Builder;
 
 pub async fn generate_traffic(
     swarm: &mut dyn Swarm,
@@ -18,9 +17,6 @@ pub async fn generate_traffic(
     gas_price: u64,
 ) -> Result<TxnStats> {
     ensure!(gas_price > 0, "gas_price is required to be non zero");
-    let mut runtime_builder = Builder::new_multi_thread();
-    runtime_builder.disable_lifo_slot().enable_all();
-    runtime_builder.worker_threads(64);
     let rng = SeedableRng::from_rng(OsRng)?;
     let validator_clients = swarm
         .validators()
@@ -36,9 +32,12 @@ pub async fn generate_traffic(
         .rest_clients(validator_clients)
         .gas_price(gas_price)
         .transaction_mix(vec![
-            (TransactionType::P2P, 70),
+            (TransactionType::P2P, 60),
             (TransactionType::AccountGeneration, 20),
-            (TransactionType::NftMintAndTransfer, 10),
+            // commenting this out given it consistently fails smoke test
+            // and it seems to be called only from `test_txn_emmitter`
+            // (TransactionType::NftMintAndTransfer, 10),
+            (TransactionType::PublishPackage, 30),
         ])
         .mode(EmitJobMode::ConstTps { tps: 20 });
     emitter

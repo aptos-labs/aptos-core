@@ -7,6 +7,16 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 30 December 2022
+
+- Added [Node Inspection Service](nodes/measure/node-inspection-service.md) document that explains how to access node metrics for validators and fullnodes and highlights key metrics for monitoring.
+
+- Added instructions for [running archival nodes](guides/state-sync.md#running-archival-nodes), specifically avoiding fast syncing and ledger pruning. 
+
+## 29 December 2022
+
+- Improved [Update Aptos Validator Node](nodes/validator-node/operator/update-validator-node.md) with a section on securely running multiple validator fullnodes (VFNs) plus links to [Bootstrap Fullnode from Snapshot](nodes/full-node/bootstrap-fullnode.md) and [state synchronization](guides/state-sync.md).
+
 ## 26 December 2022
 
 - Restored and refined [Bootstrap Fullnode from Snapshot](nodes/full-node/bootstrap-fullnode.md) to simplify and expedite Aptos fullnode starts in devnet and testnet environments.
