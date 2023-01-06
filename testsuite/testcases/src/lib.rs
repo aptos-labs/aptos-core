@@ -87,7 +87,7 @@ pub fn generate_traffic(
 ) -> Result<TxnStats> {
     let emit_job_request = ctx.emit_job.clone();
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
-    let (mut emitter, emit_job_request) =
+    let (emitter, emit_job_request) =
         create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng)?;
 
     let rt = traffic_emitter_runtime()?;
@@ -211,13 +211,24 @@ impl dyn NetworkLoadTest {
             .swarm()
             .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
 
+        let mut stats_tracking_phases = emit_job_request.get_num_phases();
+        assert!(stats_tracking_phases > 0 && stats_tracking_phases != 2);
+        if stats_tracking_phases == 1 {
+            stats_tracking_phases = 3;
+        }
+
         let job = rt
-            .block_on(emitter.start_job(ctx.swarm().chain_info().root_account, emit_job_request, 3))
+            .block_on(emitter.start_job(
+                ctx.swarm().chain_info().root_account,
+                emit_job_request,
+                stats_tracking_phases,
+            ))
             .context("start emitter job")?;
 
         let warmup_duration = duration.mul_f32(warmup_duration_fraction);
         let cooldown_duration = duration.mul_f32(cooldown_duration_fraction);
         let test_duration = duration - warmup_duration - cooldown_duration;
+        let phase_duration = test_duration.div_f32((stats_tracking_phases - 2) as f32);
         info!("Starting emitting txns for {}s", duration.as_secs());
 
         std::thread::sleep(warmup_duration);
@@ -233,11 +244,24 @@ impl dyn NetworkLoadTest {
             .map(|s| s.version - 2 * s.block_height)
             .max();
 
-        job.start_next_phase();
-
+        let mut actual_phase_durations = Vec::new();
         let test_start = Instant::now();
-        self.test(ctx.swarm(), test_duration)
-            .context("test NetworkLoadTest")?;
+        for i in 0..stats_tracking_phases - 2 {
+            job.start_next_phase();
+
+            if i > 0 {
+                info!(
+                    "Starting test phase {} out of {}",
+                    i,
+                    stats_tracking_phases - 2,
+                );
+            }
+            let phase_start = Instant::now();
+
+            self.test(ctx.swarm(), phase_duration)
+                .context("test NetworkLoadTest")?;
+            actual_phase_durations.push(phase_start.elapsed());
+        }
         let actual_test_duration = test_start.elapsed();
         info!(
             "{}s test finished after {}s",
@@ -271,8 +295,25 @@ impl dyn NetworkLoadTest {
 
         info!("Stopped job");
         info!("Warmup stats: {}", txn_stats[0].rate(warmup_duration));
-        info!("Test stats: {}", txn_stats[1].rate(actual_test_duration));
-        info!("Cooldown stats: {}", txn_stats[2].rate(cooldown_duration));
+
+        let mut stats: Option<TxnStats> = None;
+        for i in 0..stats_tracking_phases - 2 {
+            let cur = &txn_stats[1 + i];
+            info!(
+                "Test stats [test phase {}]: {}",
+                i,
+                cur.rate(actual_phase_durations[i])
+            );
+            stats = if let Some(previous) = stats {
+                Some(&previous + cur)
+            } else {
+                Some(cur.clone())
+            };
+        }
+        info!(
+            "Cooldown stats: {}",
+            txn_stats.last().unwrap().rate(cooldown_duration)
+        );
 
         let ledger_transactions = if let Some(end_t) = max_end_ledger_transactions {
             if let Some(start_t) = max_start_ledger_transactions {
@@ -283,10 +324,6 @@ impl dyn NetworkLoadTest {
         } else {
             0
         };
-        Ok((
-            txn_stats.into_iter().nth(1).unwrap(),
-            actual_test_duration,
-            ledger_transactions,
-        ))
+        Ok((stats.unwrap(), actual_test_duration, ledger_transactions))
     }
 }

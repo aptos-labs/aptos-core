@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    emitter::{MINT_GAS_FEE_MULTIPLIER, SEND_AMOUNT},
-    transaction_generator::TransactionExecutor,
+    emitter::MINT_GAS_FEE_MULTIPLIER,
+    transaction_generator::{TransactionExecutor, SEND_AMOUNT},
     EmitJobRequest, EmitModeParams,
 };
 use anyhow::{anyhow, format_err, Context, Result};
