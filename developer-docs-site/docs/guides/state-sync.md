@@ -124,7 +124,7 @@ To operate an archival node, which is a fullnode that contains all blockchain da
 since the start of the blockchain's history (that is, genesis), you should:
 1. Run a fullnode and configure it to execute all transactions, or apply all transaction outputs (see above).
 Do not select fast syncing, as the fullnode will not contain all data since genesis.
-2. Disable the ledger pruner, as described in the [Data Pruning document](../../guides/data-pruning.md#disabling-the-ledger-pruner).
+2. Disable the ledger pruner, as described in the [Data Pruning document](../guides/data-pruning.md#disabling-the-ledger-pruner).
 This will ensure that no data is pruned and the fullnode contains all blockchain data.
 
 :::caution Proceed with caution
