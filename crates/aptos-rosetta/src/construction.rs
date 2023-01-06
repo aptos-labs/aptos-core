@@ -790,6 +790,7 @@ pub fn parse_create_stake_pool_operation(
     let operator = parse_function_arg("create_stake_pool", args, 0)?;
     let voter = parse_function_arg("create_stake_pool", args, 1)?;
     let amount: u64 = parse_function_arg("create_stake_pool", args, 2)?;
+    let commission_percentage: u64 = parse_function_arg("create_stake_pool", args, 3)?;
     Ok(vec![Operation::create_stake_pool(
         0,
         None,
@@ -797,6 +798,7 @@ pub fn parse_create_stake_pool_operation(
         Some(operator),
         Some(voter),
         Some(amount),
+        Some(commission_percentage),
     )])
 }
 
