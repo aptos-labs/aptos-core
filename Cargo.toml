@@ -123,6 +123,7 @@ members = [
     "testsuite/forge",
     "testsuite/forge-cli",
     "testsuite/generate-format",
+    "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
     "types",

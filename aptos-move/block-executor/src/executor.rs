@@ -35,7 +35,7 @@ impl<T, E, S> BlockExecutor<T, E, S>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
-    S: TStateView<Key = T::Key>,
+    S: TStateView<Key = T::Key> + Sync,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.

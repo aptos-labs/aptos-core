@@ -128,7 +128,7 @@ impl BlockAptosVM {
             .collect()
     }
 
-    pub fn execute_block<S: StateView>(
+    pub fn execute_block<S: StateView + Sync>(
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
