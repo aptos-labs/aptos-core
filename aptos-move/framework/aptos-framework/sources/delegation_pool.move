@@ -304,6 +304,8 @@ module aptos_framework::delegation_pool {
         );
     }
 
+    /// Return total stake owned by `delegator_address` within delegation pool `pool_address`
+    /// in each of its individual states.
     public fun get_stake(pool_address: address, delegator_address: address): (u64, u64, u64) acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         let pool = borrow_global<DelegationPool>(pool_address);
@@ -313,13 +315,17 @@ module aptos_framework::delegation_pool {
         active = pool_u64::shares_to_amount_with_total_coins(
             &pool.active_shares,
             pool_u64::shares(&pool.active_shares, delegator_address),
+            // use the most up-to-date total coins of the active share-pool
             active + pending_active
         );
 
+        // if no pending withdrawal, there is neither inactive nor pending_inactive stake
         let (withdrawal_exists, withdrawal_lockup_epoch) = pending_withdrawal_exists(pool, delegator_address);
         (inactive, pending_inactive) = if (withdrawal_exists) {
+            // delegator has either inactive or pending_inactive stake
             let current_lockup_epoch = current_lockup_epoch_internal(pool);
             if (withdrawal_lockup_epoch < current_lockup_epoch) {
+                // if withdrawal's lockup epoch has been explicitly ended then its stake is certainly inactive
                 (
                     pool_u64::balance(
                         vector::borrow(&pool.inactive_shares, withdrawal_lockup_epoch),
@@ -330,7 +336,9 @@ module aptos_framework::delegation_pool {
             } else {
                 let pending_or_inactive_pool = vector::borrow(&pool.inactive_shares, current_lockup_epoch);
                 let pending_or_inactive_shares = pool_u64::shares(pending_or_inactive_pool, delegator_address);
-                if (last_reconfiguration_time() / MICRO_CONVERSION_FACTOR >= pool.locked_until_secs) {
+                // if lockup already passed on the stake pool AND stake explicitly inactivated for validator,
+                // delegator's pending_inactive stake had also been inactivated on the delegation pool
+                if (last_reconfiguration_time() / MICRO_CONVERSION_FACTOR >= pool.locked_until_secs && pending_inactive == 0) {
                     (
                         pool_u64::shares_to_amount_with_total_coins(
                             pending_or_inactive_pool,

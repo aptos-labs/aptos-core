@@ -585,6 +585,14 @@ module aptos_framework::delegation_pool_integration_tests {
         // Fast forward enough so the lockup expires. Now the validator can just call withdraw directly to withdraw
         // pending_inactive stakes.
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+
+        // an epoch passes but validator is inactive and its pending_inactive stake is not explicitly inactivated
+        end_epoch();
+        // pending_inactive stake should not be inactivated
+        stake::assert_validator_state(validator_address, 52, 0, 0, 49, 1);
+        // delegator's stake should be in sync with states reported by stake pool
+        dp::assert_delegation(signer::address_of(validator), validator_address, 52, 0, 49);
+
         dp::withdraw(validator, validator_address, 50);
         stake::assert_validator_state(validator_address, 52, 0, 0, 0, 1);
     }
