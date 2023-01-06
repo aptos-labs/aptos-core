@@ -4,6 +4,7 @@
 pub mod account_minter;
 pub mod stats;
 pub mod submission_worker;
+pub mod transaction_executor;
 
 use crate::{
     args::TransactionType,
@@ -11,28 +12,28 @@ use crate::{
         account_minter::AccountMinter,
         stats::{DynamicStatsTracking, TxnStats},
         submission_worker::SubmissionWorker,
+        transaction_executor::RestApiTransactionExecutor,
     },
     transaction_generator::{
         account_generator::AccountGeneratorCreator,
         nft_mint_and_transfer::NFTMintAndTransferGeneratorCreator,
         p2p_transaction_generator::P2PTransactionGeneratorCreator,
         publish_modules::PublishPackageCreator, transaction_mix_generator::TxnMixGeneratorCreator,
-        TransactionExecutor, TransactionGeneratorCreator,
+        TransactionGeneratorCreator,
     },
 };
 use again::RetryPolicy;
-use anyhow::{anyhow, ensure, format_err, Result};
+use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
-use aptos_rest_client::{error::RestError, Client as RestClient};
+use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use async_trait::async_trait;
-use futures::future::{join_all, try_join_all, FutureExt};
+use futures::future::{try_join_all, FutureExt};
 use itertools::zip;
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, seq::IteratorRandom};
@@ -51,6 +52,7 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 // Max is 100k TPS for a full day.
 const MAX_TXNS: u64 = 100_000_000_000;
 const SEND_AMOUNT: u64 = 1;
+const MINT_GAS_FEE_MULTIPLIER: u64 = 10;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -122,9 +124,13 @@ pub struct EmitJobRequest {
     max_account_working_set: usize,
 
     txn_expiration_time_secs: u64,
+    max_transactions_per_account: usize,
+
     expected_max_txns: u64,
     expected_gas_per_txn: u64,
     prompt_before_spending: bool,
+
+    delay_after_minting: Duration,
 }
 
 impl Default for EmitJobRequest {
@@ -142,9 +148,11 @@ impl Default for EmitJobRequest {
             add_created_accounts_to_pool: true,
             max_account_working_set: 1_000_000,
             txn_expiration_time_secs: 60,
+            max_transactions_per_account: 20,
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             prompt_before_spending: false,
+            delay_after_minting: Duration::from_secs(0),
         }
     }
 }
@@ -219,6 +227,16 @@ impl EmitJobRequest {
         self
     }
 
+    pub fn max_transactions_per_account(mut self, max_transactions_per_account: usize) -> Self {
+        self.max_transactions_per_account = max_transactions_per_account;
+        self
+    }
+
+    pub fn delay_after_minting(mut self, delay_after_minting: Duration) -> Self {
+        self.delay_after_minting = delay_after_minting;
+        self
+    }
+
     pub fn calculate_mode_params(&self) -> EmitModeParams {
         let clients_count = self.rest_clients.len();
 
@@ -227,7 +245,7 @@ impl EmitJobRequest {
                 // The target mempool backlog is set to be 3x of the target TPS because of the on an average,
                 // we can ~3 blocks in consensus queue. As long as we have 3x the target TPS as backlog,
                 // it should be enough to produce the target TPS.
-                let transactions_per_account = 20;
+                let transactions_per_account = self.max_transactions_per_account;
                 let num_workers_per_endpoint = max(
                     mempool_backlog / (clients_count * transactions_per_account),
                     1,
@@ -277,7 +295,7 @@ impl EmitJobRequest {
                 // In case we set a very low TPS, we need to still be able to spread out
                 // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.
-                let transactions_per_account = min(20, tps);
+                let transactions_per_account = min(self.max_transactions_per_account, tps);
                 assert!(
                     transactions_per_account > 0,
                     "TPS ({}) needs to be larger than 0",
@@ -414,10 +432,26 @@ impl TxnEmitter {
             .with_transaction_expiration_time(mode_params.txn_expiration_time_secs)
             .with_gas_unit_price(req.gas_price);
 
-        let mut account_minter =
-            AccountMinter::new(root_account, txn_factory.clone(), self.rng.clone());
+        let mut account_minter = AccountMinter::new(
+            root_account,
+            txn_factory
+                .clone()
+                .with_gas_unit_price(req.gas_price * MINT_GAS_FEE_MULTIPLIER),
+            self.rng.clone(),
+        );
+        if !req.delay_after_minting.is_zero() {
+            info!(
+                "Sleeping after minting for {}s",
+                req.delay_after_minting.as_secs()
+            );
+            tokio::time::sleep(req.delay_after_minting).await;
+        }
+        let txn_executor = RestApiTransactionExecutor {
+            rest_clients: req.rest_clients.clone(),
+        };
+
         let mut new_accounts = account_minter
-            .create_accounts(&req, &mode_params, num_accounts)
+            .create_accounts(&txn_executor, &req, &mode_params, num_accounts)
             .await?;
         self.accounts.append(&mut new_accounts);
         let all_accounts = self.accounts.split_off(self.accounts.len() - num_accounts);
@@ -427,9 +461,7 @@ impl TxnEmitter {
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
-        let txn_executor = RestApiTransactionExecutor {
-            rest_client: req.rest_clients[0].clone(),
-        };
+
         let mut txn_generator_creator_mix: Vec<(Box<dyn TransactionGeneratorCreator>, usize)> =
             Vec::new();
         for (transaction_type, weight) in req.transaction_mix {
@@ -599,72 +631,6 @@ impl TxnEmitter {
         let deadline = Instant::now() + Duration::from_secs(txn.expiration_timestamp_secs() + 30);
         Ok(deadline)
     }
-}
-
-pub struct RestApiTransactionExecutor {
-    rest_client: RestClient,
-}
-
-#[async_trait]
-impl TransactionExecutor for RestApiTransactionExecutor {
-    async fn execute_transactions(&self, txns: &[SignedTransaction]) -> Result<()> {
-        join_all(txns.iter().map(|txn| async move {
-            let submit_result = RETRY_POLICY
-                .retry(move || self.rest_client.submit_bcs(txn))
-                .await;
-            if let Err(e) = submit_result {
-                warn!("Failed submitting transaction {:?} with {:?}", txn, e);
-            }
-        }))
-        .await;
-
-        // if submission timeouts, it might still get committed:
-        join_all(
-            txns.iter()
-                .map(|req| self.rest_client.wait_for_signed_transaction_bcs(req)),
-        )
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, RestError>>()
-        .map_err(|e| format_err!("Failed to commit transactions: {:?}", e))?;
-
-        Ok(())
-    }
-}
-
-/// Waits for a single account to catch up to the expected sequence number
-async fn wait_for_single_account_sequence(
-    client: &RestClient,
-    account: &LocalAccount,
-    wait_timeout: Duration,
-) -> Result<()> {
-    let deadline = Instant::now() + wait_timeout;
-    while Instant::now() <= deadline {
-        time::sleep(Duration::from_millis(1000)).await;
-        match query_sequence_number(client, account.address()).await {
-            Ok(sequence_number) => {
-                if sequence_number >= account.sequence_number() {
-                    return Ok(());
-                }
-            },
-            Err(e) => {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(60)),
-                    warn!(
-                        "Failed to query sequence number for account {:?} for instance {:?} : {:?}",
-                        account,
-                        client.path_prefix_string(),
-                        e
-                    )
-                );
-            },
-        }
-    }
-    Err(anyhow!(
-        "Timed out waiting for single account {:?} sequence number for instance {:?}",
-        account,
-        client.path_prefix_string()
-    ))
 }
 
 /// This function waits for the submitted transactions to be committed, up to

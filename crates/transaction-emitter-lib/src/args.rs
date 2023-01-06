@@ -132,6 +132,12 @@ pub struct EmitArgs {
 
     #[clap(long)]
     pub expected_gas_per_txn: Option<u64>,
+
+    #[clap(long)]
+    pub max_transactions_per_account: Option<usize>,
+
+    #[clap(long)]
+    pub delay_after_minting: Option<u64>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {
