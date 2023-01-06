@@ -105,4 +105,4 @@ Now you can add this smart contract to the Aptos network:
 
 1. Check out and review the [NFT Tutorial]([https://github.com/aptos-labs/nft-tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) source code.
 
-1. Explore the `mint_nft` function in [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move).
+1. Explore the `mint_event_ticket` function in [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move) within each of the folders.
