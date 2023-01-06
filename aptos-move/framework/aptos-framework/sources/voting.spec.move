@@ -20,7 +20,6 @@ spec aptos_framework::voting {
         ensures exists<VotingForum<ProposalType>>(addr);
     }
 
-    /// The same as spec of `create_proposal_v2()`.
     spec create_proposal<ProposalType: store>(
         proposer: address,
         voting_forum_address: address,
@@ -31,9 +30,13 @@ spec aptos_framework::voting {
         early_resolution_vote_threshold: Option<u128>,
         metadata: SimpleMap<String, vector<u8>>,
     ): u64 {
-        pragma verify = false;
+        include CreateProposal<ProposalType>{is_multi_step_proposal: false};
     }
 
+    /// The min_vote_threshold lower thanearly_resolution_vote_threshold.
+    /// Make sure the execution script's hash is not empty.
+    /// VotingForum<ProposalType> existed under the voting_forum_address.
+    /// The next_proposal_id in VotingForum is up to MAX_U64.
     /// CurrentTimeMicroseconds existed under the @aptos_framework.
     spec create_proposal_v2<ProposalType: store>(
         proposer: address,
@@ -46,21 +49,28 @@ spec aptos_framework::voting {
         metadata: SimpleMap<String, vector<u8>>,
         is_multi_step_proposal: bool,
     ): u64 {
+        include CreateProposal<ProposalType>;
+    }
+
+    spec schema CreateProposal<ProposalType> {
+        voting_forum_address: address;
+        execution_hash: vector<u8>;
+        min_vote_threshold: u128;
+        early_resolution_vote_threshold: Option<u128>;
+        metadata: SimpleMap<String, vector<u8>>;
+        is_multi_step_proposal: bool;
+
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal_id = voting_forum.next_proposal_id;
 
-        // VotingForum<ProposalType> exists under the voting_forum_address.
         aborts_if !exists<VotingForum<ProposalType>>(voting_forum_address);
         aborts_if table::spec_contains(voting_forum.proposals,proposal_id);
-        // min_vote_threshold should not be greater than early_resolution_vote_threshold.
         aborts_if len(early_resolution_vote_threshold.vec) != 0 && min_vote_threshold > early_resolution_vote_threshold.vec[0];
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
-        // Make sure the execution script's hash is not empty.
         aborts_if len(execution_hash) <= 0;
         let execution_key = std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
         aborts_if simple_map::spec_contains_key(metadata,execution_key);
-        // The next_proposal_id in VotingForum is up to MAX_U64.
         aborts_if voting_forum.next_proposal_id + 1 > MAX_U64;
         let is_multi_step_in_execution_key = std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         aborts_if is_multi_step_proposal && simple_map::spec_contains_key(metadata,is_multi_step_in_execution_key);
@@ -99,7 +109,7 @@ spec aptos_framework::voting {
     ) {
         // This function aborts when the proposal is not resolvable.
 
-        // TODO: Find a way to specify when it will abort. The opaque pragma with spec fun doesn't work.
+        // TODO: Find a way to specify when it will abort. The opaque with spec fun doesn't work.
         pragma aborts_if_is_partial;
         // pragma opaque;
         // aborts_if [abstract] spec_is_proposal_resolvable(voting_forum_address, proposal_id);
@@ -110,7 +120,7 @@ spec aptos_framework::voting {
         proposal_id: u64,
     ): ProposalType {
         pragma aborts_if_is_partial;
-        include ContainsProposalID<ProposalType>;
+        include AbortsIfNotContainProposalID<ProposalType>;
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
     }
 
@@ -120,13 +130,13 @@ spec aptos_framework::voting {
         next_execution_hash: vector<u8>,
     ) {
         pragma aborts_if_is_partial;
-        include ContainsProposalID<ProposalType>;
+        include AbortsIfNotContainProposalID<ProposalType>;
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
     }
 
     spec is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool {
-        include ContainsProposalID<ProposalType>;
+        include AbortsIfNotContainProposalID<ProposalType>;
     }
 
     spec can_be_resolved_early<ProposalType: store>(proposal: &Proposal<ProposalType>): bool {
@@ -139,7 +149,7 @@ spec aptos_framework::voting {
     ): u64 {
         // Addition of yes_votes and no_votes might overflow.
         pragma addition_overflow_unchecked;
-        include ContainsProposalID<ProposalType>;
+        include AbortsIfNotContainProposalID<ProposalType>;
         // Any way to specify the result?
     }
 
@@ -147,24 +157,24 @@ spec aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): u64 {
-        include ContainsProposalID<ProposalType>;
+        include AbortsIfNotContainProposalID<ProposalType>;
     }
 
     spec get_execution_hash<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
     ): vector<u8> {
-        include ContainsProposalID<ProposalType>;
+        include AbortsIfNotContainProposalID<ProposalType>;
     }
 
     spec is_resolved<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
     ): bool {
-        include ContainsProposalID<ProposalType>;
+        include AbortsIfNotContainProposalID<ProposalType>;
     }
 
-    spec schema ContainsProposalID<ProposalType> {
+    spec schema AbortsIfNotContainProposalID<ProposalType> {
         proposal_id: u64;
         voting_forum_address: address;
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
