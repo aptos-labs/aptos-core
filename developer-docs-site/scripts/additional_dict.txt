@@ -2,6 +2,8 @@ ABI
 ACK
 AIP
 AIT
+AN
+ANs
 API
 APIs
 APT
@@ -147,6 +149,7 @@ Ohlone
 OpenAPI
 OptionalAggregator
 PFN
+PFNs
 PID
 PNG
 Parallelization
@@ -204,6 +207,7 @@ VFNs
 VM
 VMs
 VN
+VNs
 ValidateTransaction
 Validator
 Validators
