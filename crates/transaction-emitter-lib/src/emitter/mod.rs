@@ -48,7 +48,7 @@ use std::{
 };
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
-const MAX_TRANSACTIONS_PER_ACCOUNT: usize = 20;
+const MAX_TRANSACTIONS_PER_ACCOUNT: usize = 100;
 // Max is 100k TPS for a full day.
 const MAX_TXNS: u64 = 100_000_000_000;
 const SEND_AMOUNT: u64 = 1;
