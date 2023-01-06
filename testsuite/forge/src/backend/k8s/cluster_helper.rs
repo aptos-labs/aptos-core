@@ -224,7 +224,7 @@ pub(crate) fn delete_all_chaos(kube_namespace: &str) -> Result<()> {
     info!("{:?}", delete_networkchaos);
     let delete_networkchaos_output = Command::new(KUBECTL_BIN)
         .stdout(Stdio::inherit())
-        .args(&delete_networkchaos)
+        .args(delete_networkchaos)
         .output()
         .expect("failed to delete all NetworkChaos");
     if !delete_networkchaos_output.status.success() {
@@ -721,7 +721,7 @@ fn get_helm_status(helm_release_name: &str) -> Result<Value> {
     ];
     info!("{:?}", status_args);
     let raw_helm_values = Command::new(HELM_BIN)
-        .args(&status_args)
+        .args(status_args)
         .output()
         .unwrap_or_else(|_| panic!("Failed to helm status {}", helm_release_name));
 

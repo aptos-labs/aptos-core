@@ -175,7 +175,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         starting_version_from_db = starting_version_from_db_short,
         "Setting starting version..."
     );
-    tailer.set_fetcher_version(start_version as u64).await;
+    tailer.set_fetcher_version(start_version).await;
 
     info!(processor_name = processor_name, "Starting fetcher...");
     tailer.transaction_fetcher.lock().await.start().await;
@@ -257,7 +257,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
         versions_processed += num_res;
         if emit_every != 0 {
-            let new_base: u64 = versions_processed / (emit_every as u64);
+            let new_base: u64 = versions_processed / emit_every;
             if base != new_base {
                 base = new_base;
                 info!(

@@ -393,6 +393,7 @@ where
 // Naive transaction executor implementation.
 ///////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
 pub struct Task<K, V>(PhantomData<(K, V)>);
 
 impl<K, V> Task<K, V> {
@@ -529,9 +530,9 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
 
                     // Determine the read-, delta- and write-sets of the latest
                     // incarnation during parallel execution to use for the baseline.
-                    let read_set = &reads[(incarnation - 1) as usize % reads.len()];
+                    let read_set = &reads[(incarnation - 1) % reads.len()];
                     let (write_set, delta_set) =
-                        &writes_and_deltas[(incarnation - 1) as usize % writes_and_deltas.len()];
+                        &writes_and_deltas[(incarnation - 1) % writes_and_deltas.len()];
 
                     let mut result = vec![];
                     for k in read_set.iter() {

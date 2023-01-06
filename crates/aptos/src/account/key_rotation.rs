@@ -113,7 +113,7 @@ impl CliCommand<RotateSummary> for RotateKey {
             struct_name: "RotationProofChallenge".to_string(),
             sequence_number,
             originator: sender_address,
-            current_auth_key: AccountAddress::from_bytes(&auth_key)
+            current_auth_key: AccountAddress::from_bytes(auth_key)
                 .map_err(|err| CliError::UnableToParse("auth_key", err.to_string()))?,
             new_public_key: new_private_key.public_key().to_bytes().to_vec(),
         };

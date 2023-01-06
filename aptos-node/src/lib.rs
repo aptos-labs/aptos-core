@@ -241,7 +241,7 @@ where
         // Build a waypoint file so that clients / docker can grab it easily
         let waypoint_file_path = test_dir.join("waypoint.txt");
         Write::write_all(
-            &mut fs::File::create(&waypoint_file_path)?,
+            &mut fs::File::create(waypoint_file_path)?,
             genesis_waypoint.to_string().as_bytes(),
         )?;
 

@@ -176,3 +176,9 @@ impl MockSharedMempool {
         pool.commit_transaction(&txn.sender(), txn.sequence_number())
     }
 }
+
+impl Default for MockSharedMempool {
+    fn default() -> Self {
+        Self::new()
+    }
+}

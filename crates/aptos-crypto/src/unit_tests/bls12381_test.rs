@@ -421,8 +421,8 @@ fn bls12381_sample_signature() {
     let message = b"Hello Aptos!";
     let signature = sk.sign_arbitrary_message(message);
 
-    println!("SK:        {}", hex::encode(&sk.to_bytes()));
-    println!("PK:        {}", hex::encode(&pk.to_bytes()));
+    println!("SK:        {}", hex::encode(sk.to_bytes()));
+    println!("PK:        {}", hex::encode(pk.to_bytes()));
     println!("Message:   {}", std::str::from_utf8(message).unwrap());
     println!("Signature: {}", hex::encode(signature.to_bytes()));
 }

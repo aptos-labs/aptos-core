@@ -97,7 +97,7 @@ impl TransactionBackupController {
                 chunk_first_ver = current_ver;
             }
 
-            chunk_bytes.extend(&(record_bytes.len() as u32).to_be_bytes());
+            chunk_bytes.extend((record_bytes.len() as u32).to_be_bytes());
             chunk_bytes.extend(&record_bytes);
             current_ver += 1;
         }

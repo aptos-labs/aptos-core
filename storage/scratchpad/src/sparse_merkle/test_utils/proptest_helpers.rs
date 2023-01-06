@@ -88,16 +88,15 @@ pub fn test_smt_correctness_impl(input: Vec<Action>) {
                 }
             },
             Action::Execute(block) => {
-                let updates = block
+                let updates_flat_batch = block
                     .iter()
-                    .map(|txn_updates| {
+                    .flat_map(|txn_updates| {
                         txn_updates
                             .iter()
                             .map(|(k, v)| (*k, v.as_ref()))
                             .collect::<Vec<_>>()
                     })
                     .collect::<Vec<_>>();
-                let updates_flat_batch = updates.into_iter().flatten().collect::<Vec<_>>();
 
                 let committed = naive_q.front_mut().unwrap();
                 let proofs = updates_flat_batch

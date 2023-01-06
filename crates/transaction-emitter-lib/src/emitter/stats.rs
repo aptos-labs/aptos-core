@@ -173,7 +173,7 @@ impl AtomicHistogramAccumulator {
 
     pub fn record_data_point(&self, data_value: u64, data_num: u64) {
         let bucket_num = self.get_bucket_num(data_value);
-        self.buckets[bucket_num].fetch_add(data_num as u64, Ordering::Relaxed);
+        self.buckets[bucket_num].fetch_add(data_num, Ordering::Relaxed);
     }
 }
 
