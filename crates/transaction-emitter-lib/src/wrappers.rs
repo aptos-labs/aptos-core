@@ -65,6 +65,9 @@ pub async fn emit_transactions_with_cluster(
     if reuse_accounts {
         emit_job_request = emit_job_request.reuse_accounts();
     }
+    if let Some(max_transactions_per_account) = args.max_transactions_per_account {
+        emit_job_request = emit_job_request.max_transactions_per_account(max_transactions_per_account);
+    }
     if let Some(expected_max_txns) = args.expected_max_txns {
         emit_job_request = emit_job_request.expected_max_txns(expected_max_txns);
     }
