@@ -174,9 +174,11 @@ impl Scheduler {
     }
 
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
+    /// The current implementation has one dedicated thread to try_commit.
     pub fn try_commit(&self) -> Option<TxnIndex> {
         let mut commit_state = self.commit_state.lock();
         let idx = commit_state.0;
+        // All txns have been committed, the parallel execution can finish.
         if idx == self.num_txns {
             self.done_marker.store(true, Ordering::SeqCst);
             return None;
@@ -188,6 +190,11 @@ impl Scheduler {
                 Ok(mut status) => {
                     if let ExecutionStatus::Executed(incarnation) = *status {
                         // Status is executed and we are holding the lock.
+
+                        // Note we update the wave inside commit_state only with max_triggered_wave,
+                        // since max_triggered_wave records the new wave when validation index is
+                        // decreased thus affecting all later txns as well,
+                        // while required_wave only records the new wave for one single txn.
                         commit_state.1 = max(commit_state.1, validation_status.max_triggered_wave);
                         if let Some(validated_wave) = validation_status.max_validated_wave {
                             if validated_wave
@@ -556,7 +563,7 @@ impl Scheduler {
         *status = ExecutionStatus::ReadyToExecute(incarnation + 1, None);
     }
 
-    /// Checks whether the done marker is set. The marker can only be set by 'check_done'.
+    /// Checks whether the done marker is set. The marker can only be set by 'try_commit'.
     fn done(&self) -> bool {
         self.done_marker.load(Ordering::Acquire)
     }

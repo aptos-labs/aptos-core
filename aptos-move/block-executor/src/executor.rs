@@ -195,7 +195,9 @@ where
 
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {
+            // Only one thread try_commit to avoid contention.
             if commits {
+                // Keep committing txns until there is no more that can be committed now.
                 loop {
                     if scheduler.try_commit().is_none() {
                         break;
