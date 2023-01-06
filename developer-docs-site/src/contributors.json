@@ -1,5 +1,5 @@
 {
-  "/aptos-white-paper/in-korean": [
+  "/aptos-white-paper/aptos-white-paper-in-korean": [
     {
       "name": "Luke Yang",
       "email": "53687976+lukeyang@users.noreply.github.com",
@@ -11,7 +11,7 @@
       "username": "davidiw"
     }
   ],
-  "/aptos-white-paper/index": [
+  "/aptos-white-paper/aptos-white-paper-index": [
     {
       "name": "David Wolinsky",
       "email": "isaac.wolinsky@gmail.com",
@@ -276,7 +276,7 @@
       "username": "davidiw"
     }
   ],
-  "/concepts/index": [
+  "/concepts/aptos-concepts": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -390,7 +390,7 @@
       "username": null
     }
   ],
-  "/guides/aptos-apis": [
+  "/guides/aptos-api": [
     {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
@@ -505,7 +505,7 @@
       "username": "0xbe1"
     }
   ],
-  "/guides/index": [
+  "/guides/aptos-guides": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -554,7 +554,7 @@
       "username": "geekflyer"
     }
   ],
-  "/guides/install-petra-wallet": [
+  "/guides/install-petra-wallet-extension": [
     {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
@@ -571,7 +571,7 @@
       "username": null
     }
   ],
-  "/guides/interacting-with-the-blockchain": [
+  "/guides/interacting-with-the-aptos-blockchain": [
     {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
@@ -637,7 +637,7 @@
       "username": "rajkaramchedu"
     }
   ],
-  "/guides/move-guides/index": [
+  "/guides/move-guides/aptos-move-guides": [
     {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
@@ -769,7 +769,7 @@
       "username": "banool"
     }
   ],
-  "/guides/sign-a-transaction": [
+  "/guides/creating-a-signed-transaction": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -918,7 +918,7 @@
       "username": null
     }
   ],
-  "/index": [
+  "//": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1072,7 +1072,7 @@
       "username": "nisilag"
     }
   ],
-  "/nodes/full-node/index": [
+  "/nodes/full-node/public-fullnode": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1133,7 +1133,7 @@
       "username": "sherry-x"
     }
   ],
-  "/nodes/full-node/update-fullnode-with-new-releases": [
+  "/nodes/full-node/update-fullnode-with-new-devnet-releases": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1201,7 +1201,7 @@
       "username": "michelle-aptos"
     }
   ],
-  "/nodes/local-testnet/index": [
+  "/nodes/local-testnet/local-testnet-index": [
     {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
@@ -1247,7 +1247,7 @@
       "username": "banool"
     }
   ],
-  "/nodes/measure/index": [
+  "/nodes/measure/measure-index": [
     {
       "name": "Josh Lind",
       "email": "josh.lind@hotmail.com",
@@ -1313,7 +1313,7 @@
       "username": "joshlind"
     }
   ],
-  "/nodes/validator-node/index": [
+  "/nodes/validator-node/validators": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1388,14 +1388,14 @@
       "username": "zekun000"
     }
   ],
-  "/nodes/validator-node/operator/running-validator-node/index": [
+  "/nodes/validator-node/operator/running-validator-node/running-validator-node": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
       "username": "rajkaramchedu"
     }
   ],
-  "/nodes/validator-node/operator/running-validator-node/using-aws": [
+  "/nodes/validator-node/operator/running-validator-node/run-validator-node-using-aws": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1407,7 +1407,7 @@
       "username": "sherry-x"
     }
   ],
-  "/nodes/validator-node/operator/running-validator-node/using-azure": [
+  "/nodes/validator-node/operator/running-validator-node/run-validator-node-using-azure": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1424,7 +1424,7 @@
       "username": "sherry-x"
     }
   ],
-  "/nodes/validator-node/operator/running-validator-node/using-docker": [
+  "/nodes/validator-node/operator/running-validator-node/run-validator-node-using-docker": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1441,7 +1441,7 @@
       "username": "sherry-x"
     }
   ],
-  "/nodes/validator-node/operator/running-validator-node/using-gcp": [
+  "/nodes/validator-node/operator/running-validator-node/run-validator-node-using-gcp": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1453,7 +1453,7 @@
       "username": "sherry-x"
     }
   ],
-  "/nodes/validator-node/operator/running-validator-node/using-source-code": [
+  "/nodes/validator-node/operator/running-validator-node/run-validator-node-using-source": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1574,7 +1574,7 @@
       "username": "movekevin"
     }
   ],
-  "/reference/index": [
+  "/reference/aptos-ref-docs": [
     {
       "name": "Clay Murphy",
       "email": "claymurphy@MacBook-Air.local",
@@ -1722,7 +1722,7 @@
       "username": null
     }
   ],
-  "/tutorials/first-coin": [
+  "/tutorials/your-first-coin": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1789,7 +1789,7 @@
       "username": null
     }
   ],
-  "/tutorials/first-dapp": [
+  "/tutorials/your-first-dapp": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1963,7 +1963,7 @@
       "username": null
     }
   ],
-  "/tutorials/first-transaction": [
+  "/tutorials/your-first-transaction": [
     {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
@@ -2025,7 +2025,7 @@
       "username": "pette1999"
     }
   ],
-  "/tutorials/index": [
+  "/tutorials/aptos-quickstarts": [
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",

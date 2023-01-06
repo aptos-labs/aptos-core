@@ -93,6 +93,19 @@ async function contributorsForFile(filePath) {
   );
 }
 
+async function urlPath(docRoot, docPath) {
+  const relativePath = path.relative(docRoot, docPath);
+  const urlRoot = relativePath.includes("/") ? "/" + path.dirname(relativePath) + "/" : "/";
+  const docContents = await fs.readFile(docPath, "utf8");
+  const slugMatch = docContents.match(/^slug:\s*["']?([^"']+)["']?$/im);
+  if (slugMatch) {
+    return urlRoot + slugMatch[1];
+  } else {
+    const filename = path.basename(relativePath);
+    return urlRoot + filename.substring(0, filename.length - 3); // Remove .md suffix
+  }
+}
+
 async function* docPaths(rootDir) {
   const files = await fs.readdir(rootDir, { withFileTypes: true });
 
@@ -110,9 +123,8 @@ async function* docPaths(rootDir) {
   const result = {};
   const docRoot = path.join(__dirname, "../docs");
   for await (const docPath of docPaths(docRoot)) {
-    const relativePath = path.relative(docRoot, docPath);
-    const urlPath = "/" + relativePath.substring(0, relativePath.length - 3);
-    result[urlPath] = await contributorsForFile(docPath);
+    const url = await urlPath(docRoot, docPath);
+    result[url] = await contributorsForFile(docPath);
   }
   const json = JSON.stringify(result, null, 2);
   await fs.writeFile(path.join(__dirname, "../src/contributors.json"), json);
