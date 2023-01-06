@@ -42,7 +42,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
         let nodes_to_send_load_to = LoadDestination::AllFullnodes.get_destination_nodes(swarm);
         let rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
 
-        let (mut emitter, emit_job_request) = create_emitter_and_request(
+        let (emitter, emit_job_request) = create_emitter_and_request(
             swarm,
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps {

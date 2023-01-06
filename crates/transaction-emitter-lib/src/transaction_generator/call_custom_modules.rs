@@ -58,6 +58,7 @@ impl TransactionGenerator for CallCustomModulesGenerator {
         let mut accounts_to_burn = if let Some(accounts_pool_lock) = &self.accounts_pool {
             let mut accounts_pool = accounts_pool_lock.write();
             let num_in_pool = accounts_pool.len();
+            assert!(num_in_pool > needed, "Left in pool {}, needed {}", num_in_pool, needed);
             accounts_pool.drain((num_in_pool - needed)..).collect::<Vec<_>>()
         } else {
             Vec::new()
