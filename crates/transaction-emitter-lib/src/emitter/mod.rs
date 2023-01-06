@@ -48,9 +48,11 @@ use std::{
 };
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
+const MAX_TRANSACTIONS_PER_ACCOUNT: usize = 20;
 // Max is 100k TPS for a full day.
 const MAX_TXNS: u64 = 100_000_000_000;
 const SEND_AMOUNT: u64 = 1;
+const MINT_GAS_FEE_MULTIPLIER: u64 = 10;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -227,7 +229,7 @@ impl EmitJobRequest {
                 // The target mempool backlog is set to be 3x of the target TPS because of the on an average,
                 // we can ~3 blocks in consensus queue. As long as we have 3x the target TPS as backlog,
                 // it should be enough to produce the target TPS.
-                let transactions_per_account = 20;
+                let transactions_per_account = MAX_TRANSACTIONS_PER_ACCOUNT;
                 let num_workers_per_endpoint = max(
                     mempool_backlog / (clients_count * transactions_per_account),
                     1,
@@ -277,7 +279,7 @@ impl EmitJobRequest {
                 // In case we set a very low TPS, we need to still be able to spread out
                 // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.
-                let transactions_per_account = min(20, tps);
+                let transactions_per_account = min(MAX_TRANSACTIONS_PER_ACCOUNT, tps);
                 assert!(
                     transactions_per_account > 0,
                     "TPS ({}) needs to be larger than 0",
@@ -415,7 +417,7 @@ impl TxnEmitter {
             .with_gas_unit_price(req.gas_price);
 
         let mut account_minter =
-            AccountMinter::new(root_account, txn_factory.clone(), self.rng.clone());
+            AccountMinter::new(root_account, txn_factory.clone().with_gas_unit_price(req.gas_price * MINT_GAS_FEE_MULTIPLIER), self.rng.clone());
         let mut new_accounts = account_minter
             .create_accounts(&req, &mode_params, num_accounts)
             .await?;
@@ -631,7 +633,7 @@ impl TransactionExecutor for RestApiTransactionExecutor {
         });
     }
 }
-    
+
 /// Waits for a single account to catch up to the expected sequence number
 async fn wait_for_single_account_sequence(
     client: &RestClient,
