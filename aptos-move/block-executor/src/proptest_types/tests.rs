@@ -33,7 +33,6 @@ fn run_transactions<K, V>(
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
     Vec<u8>: From<V>,
 {
-    println!("run_transactions {} times", num_repeat);
     let mut transactions: Vec<_> = transaction_gens
         .into_iter()
         .map(|txn_gen| txn_gen.materialize(key_universe, module_access))
@@ -51,8 +50,7 @@ fn run_transactions<K, V>(
         phantom: PhantomData,
     };
 
-    for i in 0..num_repeat {
-        println!("i {} num_repeat {} ", i, num_repeat);
+    for _ in 0..num_repeat {
 
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,

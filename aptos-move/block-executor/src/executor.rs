@@ -196,7 +196,11 @@ where
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {
             if commits {
-                scheduler.try_commit();
+                loop {
+                    if scheduler.try_commit().is_none() {
+                        break;
+                    }
+                }
             }
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(version_to_validate, wave) => self.validate(

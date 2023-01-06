@@ -241,7 +241,6 @@ fn early_skips() {
 #[test]
 fn scheduler_tasks() {
     let s = Scheduler::new(6);
-    let fake_counter = AtomicUsize::new(0);
 
     for i in 0..5 {
         // not calling finish execution, so validation tasks not dispatched.
@@ -301,7 +300,8 @@ fn scheduler_tasks() {
     assert!(s.try_abort(3, 0));
     assert!(matches!(
         s.finish_execution(1, 0, false),
-        SchedulerTask::ValidationTask((1, 0), _)
+        // wave is 2 since validation index is decreased twice
+        SchedulerTask::ValidationTask((1, 0), 2)
     ));
 
     // unsuccessful abort.
@@ -326,11 +326,11 @@ fn scheduler_tasks() {
     // Wrap up all outstanding tasks.
     assert!(matches!(
         s.finish_execution(4, 1, false),
-        SchedulerTask::ValidationTask((4, 1), _)
+        SchedulerTask::ValidationTask((4, 1), 3)
     ));
     assert!(matches!(
         s.finish_execution(3, 1, false),
-        SchedulerTask::ValidationTask((3, 1), _)
+        SchedulerTask::ValidationTask((3, 1), 3)
     ));
 
     assert!(matches!(
@@ -340,8 +340,16 @@ fn scheduler_tasks() {
 
     assert!(matches!(
         s.next_task(),
-        SchedulerTask::ValidationTask((5, 0), _)
+        SchedulerTask::ValidationTask((5, 0), 3)
     ));
+
+    s.finish_validation(0, 0);
+    s.finish_validation(1, 2);
+    for i in 2..6 {
+        s.finish_validation(i, 3)
+    }
+
+    while s.try_commit().is_some() {}
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
 }
@@ -349,7 +357,6 @@ fn scheduler_tasks() {
 #[test]
 fn scheduler_dependency() {
     let s = Scheduler::new(10);
-    let fake_counter = AtomicUsize::new(0);
 
     for i in 0..5 {
         // not calling finish execution, so validation tasks not dispatched.
@@ -385,7 +392,6 @@ fn scheduler_dependency() {
 #[test]
 fn scheduler_incarnation() {
     let s = Scheduler::new(5);
-    let fake_counter = AtomicUsize::new(0);
 
     for i in 0..5 {
         // not calling finish execution, so validation tasks not dispatched.
@@ -473,14 +479,11 @@ fn scheduler_incarnation() {
         s.next_task(),
         SchedulerTask::ValidationTask((4, 1), _)
     ));
-
-    assert!(matches!(s.next_task(), SchedulerTask::Done));
 }
 
 #[test]
 fn scheduler_stop_idx() {
     let s = Scheduler::new(3);
-    let fake_counter = AtomicUsize::new(0);
 
     for i in 0..2 {
         // not calling finish execution, so validation tasks not dispatched.
@@ -506,11 +509,11 @@ fn scheduler_stop_idx() {
     ));
     assert!(matches!(
         s.next_task(),
-        SchedulerTask::ValidationTask((0, 0), _)
+        SchedulerTask::ValidationTask((0, 0), 1)
     ));
     assert!(matches!(
         s.next_task(),
-        SchedulerTask::ValidationTask((1, 0), _)
+        SchedulerTask::ValidationTask((1, 0), 1)
     ));
     assert!(matches!(
         s.finish_execution(2, 0, true),
@@ -518,8 +521,14 @@ fn scheduler_stop_idx() {
     ));
     assert!(matches!(
         s.next_task(),
-        SchedulerTask::ValidationTask((2, 0), _)
+        SchedulerTask::ValidationTask((2, 0), 1)
     ));
+
+    for i in 0..3 {
+        s.finish_validation(i, 1)
+    }
+
+    while s.try_commit().is_some() {}
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
 }
@@ -527,7 +536,6 @@ fn scheduler_stop_idx() {
 #[test]
 fn scheduler_drain_idx() {
     let s = Scheduler::new(3);
-    let fake_counter = AtomicUsize::new(0);
 
     for i in 0..3 {
         // not calling finish execution, so validation tasks not dispatched.
@@ -548,11 +556,11 @@ fn scheduler_drain_idx() {
     ));
     assert!(matches!(
         s.next_task(),
-        SchedulerTask::ValidationTask((0, 0), _)
+        SchedulerTask::ValidationTask((0, 0), 1)
     ));
     assert!(matches!(
         s.next_task(),
-        SchedulerTask::ValidationTask((1, 0), _)
+        SchedulerTask::ValidationTask((1, 0), 1)
     ));
     assert!(matches!(
         s.finish_execution(2, 0, true),
@@ -560,8 +568,14 @@ fn scheduler_drain_idx() {
     ));
     assert!(matches!(
         s.next_task(),
-        SchedulerTask::ValidationTask((2, 0), _)
+        SchedulerTask::ValidationTask((2, 0), 1)
     ));
+
+    for i in 0..3 {
+        s.finish_validation(i, 1)
+    }
+
+    while s.try_commit().is_some() {}
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
 }
