@@ -150,7 +150,7 @@ Windows.  All dependencies must be manually installed.
 
 </details>
 
-## Optional: Check out release branch
+## Check out release branch
 
 Optionally, check out a release branch to install an Aptos node:
 
