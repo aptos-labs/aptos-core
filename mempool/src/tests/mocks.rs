@@ -3,7 +3,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::{MempoolNetworkEvents, MempoolNetworkSender},
+    network::MempoolNetworkEvents,
     shared_mempool::start_shared_mempool,
     MempoolClientSender, QuorumStoreRequest,
 };
@@ -19,7 +19,7 @@ use aptos_mempool_notifications::{self, MempoolNotifier};
 use aptos_network::{
     application::storage::PeerMetadataStorage,
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{NewNetworkEvents, NewNetworkSender},
+    protocols::network::{NetworkSender, NewNetworkEvents, NewNetworkSender},
 };
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use aptos_types::{
@@ -34,7 +34,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use tokio::runtime::{Builder, Handle, Runtime};
+use tokio::runtime::{Handle, Runtime};
 
 /// Mock of a running instance of shared mempool.
 pub struct MockSharedMempool {
@@ -51,12 +51,7 @@ impl MockSharedMempool {
     /// Returns the runtime on which the shared mempool is running
     /// and the channel through which shared mempool receives client events.
     pub fn new() -> Self {
-        let runtime = Builder::new_multi_thread()
-            .thread_name("mock-shared-mem")
-            .disable_lifo_slot()
-            .enable_all()
-            .build()
-            .expect("[mock shared mempool] failed to create runtime");
+        let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
         let (ac_client, mempool, quorum_store_sender, mempool_notifier) = Self::start(
             runtime.handle(),
             &DbReaderWriter::new(MockDbReaderWriter),
@@ -109,7 +104,7 @@ impl MockSharedMempool {
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_, conn_notifs_rx) = conn_notifs_channel::new();
-        let network_sender = MempoolNetworkSender::new(
+        let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );

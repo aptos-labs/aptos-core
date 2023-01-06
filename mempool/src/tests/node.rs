@@ -4,9 +4,7 @@
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     network::{MempoolNetworkEvents, MempoolSyncMsg},
-    shared_mempool::{
-        network::MempoolNetworkSender, start_shared_mempool, types::SharedMempoolNotification,
-    },
+    shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
     tests::common::TestTransaction,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -24,7 +22,7 @@ use aptos_network::{
         conn_notifs_channel, ConnectionNotification, ConnectionRequestSender,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::network::{NetworkEvents, NewNetworkEvents, NewNetworkSender},
+    protocols::network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
     transport::ConnectionMetadata,
     ProtocolId,
 };
@@ -43,11 +41,11 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 type MempoolNetworkHandle = (
     NetworkId,
-    MempoolNetworkSender,
+    NetworkSender<MempoolSyncMsg>,
     NetworkEvents<MempoolSyncMsg>,
 );
 
@@ -541,7 +539,7 @@ fn setup_node_network_interface(
     let (network_notifs_tx, network_notifs_rx) =
         aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
     let (network_conn_event_notifs_tx, conn_status_rx) = conn_notifs_channel::new();
-    let network_sender = MempoolNetworkSender::new(
+    let network_sender = NetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
@@ -583,12 +581,7 @@ fn start_node_mempool(
             on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
         })
         .unwrap();
-    let runtime = Builder::new_multi_thread()
-        .thread_name("shared-mem")
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[shared mempool] failed to create runtime");
+    let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     start_shared_mempool(
         runtime.handle(),
         &config,

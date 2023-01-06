@@ -8,7 +8,7 @@ use crate::{
 };
 use aptos_build_info::build_information;
 use aptos_logger::{debug, Level};
-use aptos_rest_client::{aptos_api_types::HashValue, Account, Client};
+use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, State};
 use aptos_telemetry::service::telemetry_is_disabled;
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use itertools::Itertools;
@@ -232,8 +232,19 @@ pub async fn get_account(
         .get_account(address)
         .await
         .map_err(|err| CliError::ApiError(err.to_string()))?;
-    let account = account_response.inner();
-    Ok(account.clone())
+    Ok(account_response.into_inner())
+}
+
+/// Retrieves account resource from the rest client
+pub async fn get_account_with_state(
+    client: &aptos_rest_client::Client,
+    address: AccountAddress,
+) -> CliTypedResult<(Account, State)> {
+    let account_response = client
+        .get_account(address)
+        .await
+        .map_err(|err| CliError::ApiError(err.to_string()))?;
+    Ok(account_response.into_parts())
 }
 
 /// Retrieves sequence number from the rest client

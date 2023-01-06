@@ -3,18 +3,20 @@
 
 //! Objects used by/related to shared mempool
 use crate::{
-    core_mempool::CoreMempool, network::MempoolNetworkInterface,
-    shared_mempool::network::MempoolNetworkSender,
+    core_mempool::CoreMempool,
+    network::{MempoolNetworkInterface, MempoolSyncMsg},
 };
 use anyhow::Result;
 use aptos_config::{
     config::{MempoolConfig, RoleType},
-    network_id::{NetworkId, PeerNetworkId},
+    network_id::PeerNetworkId,
 };
 use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
-use aptos_network::{application::storage::PeerMetadataStorage, transport::ConnectionMetadata};
+use aptos_network::{
+    application::interface::NetworkClientInterface, transport::ConnectionMetadata,
+};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
@@ -28,7 +30,7 @@ use futures::{
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     fmt,
     pin::Pin,
     sync::Arc,
@@ -39,36 +41,31 @@ use tokio::runtime::Handle;
 
 /// Struct that owns all dependencies required by shared mempool routines.
 #[derive(Clone)]
-pub(crate) struct SharedMempool<V>
-where
-    V: TransactionValidation + 'static,
-{
+pub(crate) struct SharedMempool<NetworkClient, TransactionValidator> {
     pub mempool: Arc<Mutex<CoreMempool>>,
     pub config: MempoolConfig,
-    pub(crate) network_interface: MempoolNetworkInterface,
+    pub network_interface: MempoolNetworkInterface<NetworkClient>,
     pub db: Arc<dyn DbReader>,
-    pub validator: Arc<RwLock<V>>,
+    pub validator: Arc<RwLock<TransactionValidator>>,
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
     pub broadcast_within_validator_network: Arc<RwLock<bool>>,
 }
 
-impl<V: TransactionValidation + 'static> SharedMempool<V> {
+impl<
+        NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+        TransactionValidator: TransactionValidation + 'static,
+    > SharedMempool<NetworkClient, TransactionValidator>
+{
     pub fn new(
         mempool: Arc<Mutex<CoreMempool>>,
         config: MempoolConfig,
-        network_senders: HashMap<NetworkId, MempoolNetworkSender>,
+        network_client: NetworkClient,
         db: Arc<dyn DbReader>,
-        validator: Arc<RwLock<V>>,
+        validator: Arc<RwLock<TransactionValidator>>,
         subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
         role: RoleType,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
     ) -> Self {
-        let network_interface = MempoolNetworkInterface::new(
-            peer_metadata_storage,
-            network_senders,
-            role,
-            config.clone(),
-        );
+        let network_interface = MempoolNetworkInterface::new(network_client, role, config.clone());
         SharedMempool {
             mempool,
             config,

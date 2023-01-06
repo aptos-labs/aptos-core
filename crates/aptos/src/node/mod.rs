@@ -1110,7 +1110,7 @@ impl CliCommand<()> for RunLocalTestnet {
         let config_path = self.config_path.clone();
         let test_dir_copy = test_dir.clone();
         let node_thread_handle = thread::spawn(move || {
-            let result = aptos_node::load_test_environment(
+            let result = aptos_node::setup_test_environment_and_start_node(
                 config_path,
                 Some(test_dir_copy),
                 false,
