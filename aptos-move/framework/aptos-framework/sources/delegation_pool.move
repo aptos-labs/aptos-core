@@ -364,6 +364,19 @@ module aptos_framework::delegation_pool {
         (active, inactive, pending_inactive)
     }
 
+    /// Return the unique lockup epoch where delegator `delegator_address` owns
+    /// unlocking (or already unlocked) stake to be withdrawn from delegation pool at address `pool_address`.
+    public fun get_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64) acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        pending_withdrawal_exists(borrow_global<DelegationPool>(pool_address), delegator_address)
+    }
+
+    /// Compute the fee paid out of `coins_amount` stake if adding it to delegation pool `pool_address` now.
+    public fun get_add_stake_fee(pool_address: address, coins_amount: u64): u64 acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        coins_amount - charge_add_stake_fee(borrow_global<DelegationPool>(pool_address), pool_address, coins_amount)
+    }
+
     /// Return a mutable reference to the share pool of `pending_inactive` stake on the
     /// delegation pool, always the last item in `inactive_shares`.
     fun pending_inactive_shares_pool(pool: &mut DelegationPool): &mut pool_u64::Pool {
@@ -715,6 +728,11 @@ module aptos_framework::delegation_pool {
         stake::assert_stake_pool(pool_address, 0, 0, 0, 0);
     }
 
+    #[test_only]
+    public fun add_stake_events_counter(pool_address: address): u64 acquires DelegationPool {
+        event::counter<AddStakeEvent>(&borrow_global<DelegationPool>(pool_address).add_stake_events)
+    }
+
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
     public entry fun test_add_stake_single(
         aptos_framework: &signer,
@@ -730,13 +748,27 @@ module aptos_framework::delegation_pool {
         stake::assert_stake_pool(pool_address, 1000, 0, 0, 0);
         assert_delegation(validator_address, pool_address, 1000, 0, 0);
 
-        // check `add_stake` increases delegator and stake pool active balances
         stake::mint(validator, 250);
+        assert!(coin::balance<AptosCoin>(validator_address) == 250, 0);
+        // zero `add_stake` fee as validator is not in the validator set
+        assert!(get_add_stake_fee(pool_address, 250) == 0, 0);
+
+        let add_stake_events = add_stake_events_counter(pool_address);
+        // check `add_stake` increases delegator and stake pool active balances
         add_stake(validator, pool_address, 250);
+        // check coins have been transferred out of delegator account
+        assert!(coin::balance<AptosCoin>(validator_address) == 0, 0);
+        // check a new `add_stake` event has been emitted
+        assert!(add_stake_events_counter(pool_address) == add_stake_events + 1, 0);
         // zero `add_stake` fee as pool will not produce rewards this epoch
         assert_delegation(validator_address, pool_address, 1250, 0, 0);
         // added stake is still activated directly on the stake pool
         stake::assert_stake_pool(pool_address, 1250, 0, 0, 0);
+
+        // check that no event is emitted if added stake is 0
+        add_stake_events = add_stake_events_counter(pool_address);
+        add_stake(validator, pool_address, 0);
+        assert!(add_stake_events_counter(pool_address) == add_stake_events, 0);
 
         // move validator to active state
         stake::join_validator_set(validator, pool_address);
@@ -744,11 +776,13 @@ module aptos_framework::delegation_pool {
 
         // add 250 coins being pending active until next epoch
         stake::mint(validator, 250);
+        // after `add_stake` fee: 250 * 1250 / (1250 + 1250 active * 1%) = 247
+        assert!(get_add_stake_fee(pool_address, 250) == 3, 0);
         add_stake(validator, pool_address, 250);
-        stake::assert_stake_pool(pool_address, 1250, 0, 250, 0);
         // zero `add_stake` fee as there is only one delegator which gets back the paid fee
         // as entire active stake is owned by itself
         assert_delegation(validator_address, pool_address, 1500, 0, 0);
+        stake::assert_stake_pool(pool_address, 1250, 0, 250, 0);
 
         // add 100 additional coins being pending active until next epoch
         stake::mint(validator, 100);
@@ -768,6 +802,16 @@ module aptos_framework::delegation_pool {
         end_aptos_epoch();
         // 1612 active stake (* 1% rewards) + 200 pending active stake
         assert_delegation(validator_address, pool_address, 1828, 0, 0);
+
+        // add 1 Aptos unit stake
+        stake::mint(validator, 1);
+        add_stake_events = add_stake_events_counter(pool_address);
+        add_stake(validator, pool_address, 1);
+
+        assert!(get_add_stake_fee(pool_address, 1) == 1, 0);
+        // event is emitted as initial added stake still reaches the stake pool
+        assert!(add_stake_events_counter(pool_address) == add_stake_events + 1, 0);
+        assert_delegation(validator_address, pool_address, 1829, 0, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator = @0x010)]
@@ -788,10 +832,11 @@ module aptos_framework::delegation_pool {
 
         // add 250 coins from another account
         stake::mint(delegator, 250);
-        add_stake(delegator, pool_address, 250);
-        stake::assert_stake_pool(pool_address, 1000, 0, 250, 0);
         // after `add_stake` fee: 250 * 1000 / (1000 + 1000 active * 1%) = 247
+        assert!(get_add_stake_fee(pool_address, 250) == 3, 0);
+        add_stake(delegator, pool_address, 250);
         assert_delegation(delegator_address, pool_address, 247, 0, 0);
+        stake::assert_stake_pool(pool_address, 1000, 0, 250, 0);
 
         end_aptos_epoch();
         // 1000 active stake * 1% rewards
@@ -804,16 +849,18 @@ module aptos_framework::delegation_pool {
         assert_delegation(validator_address, pool_address, 1010, 0, 0);
 
         stake::mint(validator, 250);
-        add_stake(validator, pool_address, 250);
         // after `add_stake` fee: 250 * 1260 / (1260 + 1260 active * 1%) = 247
+        assert!(get_add_stake_fee(pool_address, 250) == 3, 0);
+        add_stake(validator, pool_address, 250);
         // from 3 `add_stake` fee 2 distributed to `validator` and 1 to `delegator`
         assert_delegation(validator_address, pool_address, 1259, 0, 0);
         assert_delegation(delegator_address, pool_address, 250, 0, 0);
         stake::assert_stake_pool(pool_address, 1260, 0, 250, 0);
 
         stake::mint(delegator, 100);
-        add_stake(delegator, pool_address, 100);
         // after `add_stake` fee: 100 * 1510 / (1510 + 1260 active * 1%) = 99
+        assert!(get_add_stake_fee(pool_address, 100) == 1, 0);
+        add_stake(delegator, pool_address, 100);
         assert_delegation(delegator_address, pool_address, 348, 0, 0);
         assert_delegation(validator_address, pool_address, 1261, 0, 0);
         stake::assert_stake_pool(pool_address, 1260, 0, 350, 0);
