@@ -1252,7 +1252,7 @@ def test(
         cluster_names = config.get("enabled_clusters")
         forge_cluster_name = random.choice(cluster_names)
 
-    forge_cluster_name = "aptos-forge-big-east-0"
+    #forge_cluster_name = "aptos-forge-big-east-0"
 
     assert forge_cluster_name, "Forge cluster name is required"
 
