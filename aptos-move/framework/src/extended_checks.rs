@@ -132,10 +132,10 @@ impl<'a> ExtendedChecker<'a> {
         use Type::*;
         match ty {
             Primitive(_) | TypeParameter(_) => {
-                // Any primitive type allowed, any parameter expected to instantiate with primitive
+                // Any primitive type is allowed
             },
-            Reference(false, bt) if matches!(bt.as_ref(), Primitive(PrimitiveType::Signer)) => {
-                // Reference to signer allowed
+            Reference(false, bt) if matches!(bt.as_ref(), Primitive(_)) => {
+                // Any reference to a primitive is allowed
             },
             Vector(ety) => {
                 // Vectors are allowed if element type is allowed
