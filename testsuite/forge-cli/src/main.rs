@@ -724,9 +724,8 @@ fn account_creation_or_nft_mint(test_name: String, config: ForgeConfig) -> Forge
                     creation_balance: 200_000_000,
                 };
                 let write_type = TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::MakeOrChange {
-                        string_length: Some(0),
-                        data_length: Some(64),
+                    entry_point: EntryPoints::BytesMakeOrChange {
+                        data_length: Some(32),
                     },
                     num_modules: 1,
                     use_account_pool: true,

@@ -127,6 +127,9 @@ pub enum EntryPoints {
         string_length: Option<usize>,
         data_length: Option<usize>,
     },
+    BytesMakeOrChange {
+        data_length: Option<usize>,
+    }
 }
 
 impl EntryPoints {
@@ -176,6 +179,13 @@ impl EntryPoints {
                 let data_len = data_length.unwrap_or_else(|| rng.gen_range(0usize, 1000usize));
                 make_or_change(rng, module_id, str_len, data_len)
             },
+            EntryPoints::BytesMakeOrChange {
+                data_length,
+            } => {
+                let rng = rng.expect("Must provide RNG");
+                let data_len = data_length.unwrap_or_else(|| rng.gen_range(0usize, 1000usize));
+                bytes_make_or_change(rng, module_id, data_len)
+            },
         }
     }
 }
@@ -205,7 +215,7 @@ const SIMPLE_ENTRY_POINTS: &[EntryPoints; 9] = &[
     EntryPoints::GetFromConst { const_idx: None },
     EntryPoints::SetId,
 ];
-const GEN_ENTRY_POINTS: &[EntryPoints; 11] = &[
+const GEN_ENTRY_POINTS: &[EntryPoints; 12] = &[
     EntryPoints::Nop,
     EntryPoints::Step,
     EntryPoints::GetCounter,
@@ -218,6 +228,9 @@ const GEN_ENTRY_POINTS: &[EntryPoints; 11] = &[
     EntryPoints::SetName,
     EntryPoints::MakeOrChange {
         string_length: None,
+        data_length: None,
+    },
+    EntryPoints::BytesMakeOrChange {
         data_length: None,
     },
 ];
@@ -310,6 +323,18 @@ fn make_or_change(
     get_payload(module_id, ident_str!("make_or_change").to_owned(), vec![
         bcs::to_bytes(&id).unwrap(),
         bcs::to_bytes(&name).unwrap(),
+        bcs::to_bytes(&bytes).unwrap(),
+    ])
+}
+
+fn bytes_make_or_change(
+    rng: &mut StdRng,
+    module_id: ModuleId,
+    data_len: usize,
+) -> TransactionPayload {
+    let mut bytes = Vec::<u8>::with_capacity(data_len);
+    rng.fill_bytes(&mut bytes);
+    get_payload(module_id, ident_str!("bytes_make_or_change").to_owned(), vec![
         bcs::to_bytes(&bytes).unwrap(),
     ])
 }

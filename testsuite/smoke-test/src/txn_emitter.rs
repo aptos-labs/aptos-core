@@ -52,9 +52,8 @@ pub async fn generate_traffic(
                 (TransactionType::default_call_different_modules(), 20),
                 (
                     TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::MakeOrChange {
-                            string_length: Some(0),
-                            data_length: Some(64),
+                        entry_point: EntryPoints::BytesMakeOrChange {
+                            data_length: Some(32),
                         },
                         num_modules: 1,
                         use_account_pool: true,
