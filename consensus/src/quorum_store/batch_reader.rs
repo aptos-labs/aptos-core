@@ -372,11 +372,18 @@ impl BatchReader {
                     .expect("Failed to send to BatchStore");
             } else {
                 // Available in memory.
-                tx.send(Ok(value
-                    .maybe_payload
-                    .clone()
-                    .expect("BatchReader payload and storage kind mismatch")))
-                    .expect("Receiver of requested batch is not available");
+                if tx
+                    .send(Ok(value
+                        .maybe_payload
+                        .clone()
+                        .expect("BatchReader payload and storage kind mismatch")))
+                    .is_err()
+                {
+                    debug!(
+                        "Receiver of requested batch is not available for digest {}",
+                        proof.digest()
+                    );
+                }
             }
         } else {
             // Quorum store metrics

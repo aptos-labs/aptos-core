@@ -60,14 +60,20 @@ impl BatchRequesterState {
                 "QS: batch to oneshot, digest {}, tx {:?}",
                 digest, self.ret_tx
             );
-            self.ret_tx
-                .send(Ok(payload))
-                .expect("Receiver of requested batch not available");
+            if self.ret_tx.send(Ok(payload)).is_err() {
+                debug!(
+                    "Receiver of requested batch not available for digest {}",
+                    digest
+                )
+            };
         } else {
             counters::RECEIVED_BATCH_REQUEST_TIMEOUT_COUNT.inc();
             debug!("QS: batch timed out, digest {}", digest);
             if self.ret_tx.send(Err(Error::CouldNotGetData)).is_err() {
-                debug!("Receiver of requested batch not available");
+                debug!(
+                    "Receiver of requested batch not available for timed out digest {}",
+                    digest
+                );
             }
         }
     }

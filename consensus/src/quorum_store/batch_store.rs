@@ -265,9 +265,12 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                                         self.my_peer_id, peer_id,
                                         "Return channel must be to self"
                                     );
-                                    payload_tx
-                                        .send(Ok(payload))
-                                        .expect("Failed to send PersistedValue");
+                                    if payload_tx.send(Ok(payload)).is_err() {
+                                        debug!(
+                                            "Failed to send PersistedValue for digest {}",
+                                            digest
+                                        );
+                                    }
                                 },
                                 None => {
                                     assert_ne!(

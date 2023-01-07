@@ -72,7 +72,12 @@ impl QuorumStoreCoordinator {
                         .expect("Failed to send to BatchGenerator");
                 },
                 CoordinatorCommand::Shutdown(ack_tx) => {
-                    // TODO: shutdown front of pipeline -> back of pipeline?
+                    // Note: Shutdown is done from the back of the quorum store pipeline to the
+                    // front, so senders are always shutdown before receivers. This avoids sending
+                    // messages through closed channels during shutdown.
+                    // Oneshots that send data in the reverse order of the pipeline must assume that
+                    // the receiver could be unavailable during shutdown, and resolve this without
+                    // panicking.
 
                     for network_listener_tx in self.quorum_store_msg_tx_vec {
                         let (network_listener_shutdown_tx, network_listener_shutdown_rx) =
@@ -111,6 +116,15 @@ impl QuorumStoreCoordinator {
                         .await
                         .expect("Failed to stop BatchCoordinator");
 
+                    let (batch_store_shutdown_tx, batch_store_shutdown_rx) = oneshot::channel();
+                    self.batch_store_cmd_tx
+                        .send(BatchStoreCommand::Shutdown(batch_store_shutdown_tx))
+                        .await
+                        .expect("Failed to send to BatchStore");
+                    batch_store_shutdown_rx
+                        .await
+                        .expect("Failed to stop BatchStore");
+
                     let (proof_coordinator_shutdown_tx, proof_coordinator_shutdown_rx) =
                         oneshot::channel();
                     self.proof_coordinator_cmd_tx
@@ -131,15 +145,6 @@ impl QuorumStoreCoordinator {
                     proof_manager_shutdown_rx
                         .await
                         .expect("Failed to stop ProofManager");
-
-                    let (batch_store_shutdown_tx, batch_store_shutdown_rx) = oneshot::channel();
-                    self.batch_store_cmd_tx
-                        .send(BatchStoreCommand::Shutdown(batch_store_shutdown_tx))
-                        .await
-                        .expect("Failed to send to BatchStore");
-                    batch_store_shutdown_rx
-                        .await
-                        .expect("Failed to stop BatchStore");
 
                     ack_tx
                         .send(())
