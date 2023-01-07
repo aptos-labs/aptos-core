@@ -53,6 +53,7 @@ variable "FEATURES" {
 
 group "all" {
   targets = flatten([
+    "builder",
     "validator",
     "node-checker",
     "tools",
@@ -64,6 +65,32 @@ group "all" {
     ] : []
   ])
 }
+
+target "builder" {
+  dockerfile = "docker/rust-all.Dockerfile"
+  context    = "."
+  cache-from = flatten([
+    generate_cache_from("builder"),
+  ])
+  cache-to = generate_cache_to("builder")
+  tags     = generate_tags("builder")
+  labels = {
+    "org.label-schema.schema-version" = "1.0",
+    "org.label-schema.build-date"     = "${BUILD_DATE}"
+    "org.label-schema.git-sha"        = "${GIT_SHA}"
+  }
+  args = {
+    PROFILE            = "${PROFILE}"
+    FEATURES           = "${FEATURES}"
+    GIT_SHA            = "${GIT_SHA}"
+    GIT_BRANCH         = "${GIT_BRANCH}"
+    GIT_TAG            = "${GIT_TAG}"
+    GIT_CREDENTIALS    = "${GIT_CREDENTIALS}"
+    BUILD_DATE         = "${BUILD_DATE}"
+    BUILT_VIA_BUILDKIT = "true"
+  }
+}
+
 
 target "_common" {
   dockerfile = "docker/rust-all.Dockerfile"
@@ -102,6 +129,9 @@ target "validator" {
   target   = "validator"
   cache-to = generate_cache_to("validator")
   tags     = generate_tags("validator")
+  contexts = {
+    builder = "target:builder"
+  }
 }
 
 target "validator-testing" {
@@ -109,6 +139,9 @@ target "validator-testing" {
   target   = "validator-testing"
   cache-to = generate_cache_to("validator-testing")
   tags     = generate_tags("validator-testing")
+  contexts = {
+    builder = "target:builder"
+  }
 }
 
 target "node-checker" {
@@ -116,6 +149,9 @@ target "node-checker" {
   target   = "node-checker"
   cache-to = generate_cache_to("node-checker")
   tags     = generate_tags("node-checker")
+  contexts = {
+    builder = "target:builder"
+  }
 }
 
 target "tools" {
@@ -123,6 +159,9 @@ target "tools" {
   target   = "tools"
   cache-to = generate_cache_to("tools")
   tags     = generate_tags("tools")
+  contexts = {
+    builder = "target:builder"
+  }
 }
 
 target "faucet" {
@@ -130,6 +169,9 @@ target "faucet" {
   target   = "faucet"
   cache-to = generate_cache_to("faucet")
   tags     = generate_tags("faucet")
+  contexts = {
+    builder = "target:builder"
+  }
 }
 
 target "forge" {
@@ -137,6 +179,9 @@ target "forge" {
   target   = "forge"
   cache-to = generate_cache_to("forge")
   tags     = generate_tags("forge")
+  contexts = {
+    builder = "target:builder"
+  }
 }
 
 target "telemetry-service" {
@@ -144,6 +189,9 @@ target "telemetry-service" {
   target   = "telemetry-service"
   cache-to = generate_cache_to("telemetry-service")
   tags     = generate_tags("telemetry-service")
+  contexts = {
+    builder = "target:builder"
+  }
 }
 
 function "generate_cache_from" {
