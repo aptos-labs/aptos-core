@@ -177,6 +177,6 @@ podSecurityPolicy: true
 
 # -- Load test-data for starting a test network
 loadTestGenesis: false
-
+enablePrivilegedMode: true
 # Additional labels
 labels:

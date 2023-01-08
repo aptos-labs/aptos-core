@@ -1167,8 +1167,6 @@ def test(
     test_args: Optional[List[str]],
     test_suites: Tuple[str],
 ) -> None:
-    forge_enable_performance = "true"
-    forge_test_suite = "land_blocking"
     """Run a forge test"""
 
     ### XXX: hack these arguments to force Forge to run with overrides

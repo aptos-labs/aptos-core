@@ -34,3 +34,5 @@ service:
 
 # always assume we're spinning up a testnet and doing genesis rather than using the single validator test mode
 loadTestGenesis: false
+
+enablePrivilegedMode: ture
