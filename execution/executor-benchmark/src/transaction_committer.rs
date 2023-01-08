@@ -12,8 +12,8 @@ use aptos_executor::{
 };
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::prelude::*;
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::Version,

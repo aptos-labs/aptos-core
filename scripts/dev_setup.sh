@@ -407,6 +407,18 @@ function install_toolchain {
   fi
 }
 
+function install_rustup_components_and_nightly {
+    echo "Updating rustup and installing rustfmt & clippy"
+    rustup update
+    rustup component add rustfmt
+    rustup component add clippy
+
+    # We require nightly for strict rust formatting
+    echo "Installing the nightly toolchain and rustfmt nightly"
+    rustup toolchain install nightly
+    rustup component add rustfmt --toolchain nightly
+}
+
 function install_cargo_sort {
   if ! command -v cargo-sort &> /dev/null; then
     cargo install cargo-sort --locked
@@ -883,9 +895,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
 
   install_rustup "$BATCH_MODE"
   install_toolchain "$(cat ./rust-toolchain)"
-  # Add all the components that we need
-  rustup component add rustfmt
-  rustup component add clippy
+  install_rustup_components_and_nightly
 
   install_cargo_sort
   install_cargo_nextest

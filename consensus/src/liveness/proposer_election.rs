@@ -1,11 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::cmp::Ordering;
-
 use aptos_consensus_types::common::{Author, Round};
 use aptos_fallible::copy_from_slice::copy_slice_to_vec;
 use num_traits::CheckedAdd;
+use std::cmp::Ordering;
 
 /// ProposerElection incorporates the logic of choosing a leader among multiple candidates.
 pub trait ProposerElection {
@@ -75,8 +74,9 @@ fn test_bounds() {
     let mut selected = [0, 0];
     let weights = [u64::MAX as u128 * 1000, u64::MAX as u128 * 1000].to_vec();
     // 10 is enough to get one of each.
-    for i in 0..10 {
-        selected[choose_index(weights.clone(), (i as i32).to_le_bytes().to_vec())] += 1;
+    for i in 0i32..10 {
+        let state = i.to_le_bytes().to_vec();
+        selected[choose_index(weights.clone(), state)] += 1;
     }
 
     assert!(selected[0] >= 1);

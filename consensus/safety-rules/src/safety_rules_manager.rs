@@ -134,11 +134,11 @@ impl SafetyRulesManager {
         match &self.internal_safety_rules {
             SafetyRulesWrapper::Local(safety_rules) => {
                 Box::new(LocalClient::new(safety_rules.clone()))
-            }
+            },
             SafetyRulesWrapper::Process(process) => Box::new(process.client()),
             SafetyRulesWrapper::Serializer(serializer_service) => {
                 Box::new(SerializerClient::new(serializer_service.clone()))
-            }
+            },
             SafetyRulesWrapper::Thread(thread) => Box::new(thread.client()),
         }
     }

@@ -4,13 +4,12 @@
 #![forbid(unsafe_code)]
 
 // Re-export counter types from prometheus crate
+use aptos_logger::{error, info, warn};
 pub use aptos_metrics_core::{
     exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
     register_int_counter_vec, register_int_gauge, register_int_gauge_vec, Histogram,
     HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
-
-use aptos_logger::{error, info, warn};
 use aptos_metrics_core::{Encoder, TextEncoder};
 use std::{env, sync::mpsc, thread, thread::JoinHandle, time::Duration};
 
@@ -70,7 +69,7 @@ impl MetricsPusher {
             Err(_) => {
                 info!("PUSH_METRICS_ENDPOINT env var is not set. Skipping sending metrics.");
                 return None;
-            }
+            },
         };
         let push_metrics_frequency_secs = match env::var("PUSH_METRICS_FREQUENCY_SECS") {
             Ok(s) => match s.parse::<u64>() {
@@ -78,7 +77,7 @@ impl MetricsPusher {
                 Err(_) => {
                     error!("Invalid value for PUSH_METRICS_FREQUENCY_SECS: {}", s);
                     return None;
-                }
+                },
             },
             Err(_) => DEFAULT_PUSH_FREQUENCY_SECS,
         };

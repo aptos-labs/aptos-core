@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::*;
-use rand::{Rng, SeedableRng};
+// TODO going to remove random seed once cluster deployment supports re-run genesis
+use crate::{
+    success_criteria::SuccessCriteria,
+    system_metrics::{MetricsThreshold, SystemMetricsThreshold},
+};
+use aptos_framework::ReleaseBundle;
+use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::{
     fmt::{Display, Formatter},
     io::{self, Write},
@@ -14,13 +20,6 @@ use std::{
 use structopt::{clap::arg_enum, StructOpt};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
-// TODO going to remove random seed once cluster deployment supports re-run genesis
-use crate::{
-    success_criteria::SuccessCriteria,
-    system_metrics::{MetricsThreshold, SystemMetricsThreshold},
-};
-use aptos_framework::ReleaseBundle;
-use rand::rngs::OsRng;
 
 #[derive(Debug, StructOpt)]
 #[structopt(about = "Forged in Fire")]
@@ -107,7 +106,7 @@ pub fn forge_main<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Opti
         Err(e) => {
             eprintln!("Failed to run tests:\n{}", e);
             process::exit(101); // Exit with a non-zero exit code if tests failed
-        }
+        },
     }
 }
 
@@ -471,7 +470,7 @@ fn run_test<F: FnOnce() -> Result<()>>(f: F) -> TestResult {
                 println!("::error::{:?}", e);
             }
             TestResult::FailedWithMsg(format!("{:?}", e))
-        }
+        },
     }
 }
 
@@ -500,14 +499,14 @@ impl TestSummary {
             TestResult::Ok => {
                 self.passed += 1;
                 self.write_ok()?;
-            }
+            },
             TestResult::FailedWithMsg(msg) => {
                 self.failed.push(name);
                 self.write_failed()?;
                 writeln!(self.stdout)?;
 
                 write!(self.stdout, "Error: {}", msg)?;
-            }
+            },
         }
         writeln!(self.stdout)?;
         Ok(())

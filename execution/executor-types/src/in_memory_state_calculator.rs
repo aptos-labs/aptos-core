@@ -1,12 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
-
-use anyhow::{anyhow, bail, Result};
-use once_cell::sync::Lazy;
-
 use crate::{ParsedTransactionOutput, ProofReader};
+use anyhow::{anyhow, bail, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
 use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
@@ -23,6 +19,8 @@ use aptos_types::{
     transaction::{Transaction, Version},
     write_set::{WriteOp, WriteSet},
 };
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 
@@ -149,10 +147,10 @@ impl InMemoryStateCalculator {
             match txn {
                 Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
                     Ok((updated_state_kvs, None))
-                }
+                },
                 Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => {
                     Ok((updated_state_kvs, Some(self.make_checkpoint()?)))
-                }
+                },
             }
         }
     }
@@ -293,7 +291,7 @@ fn process_state_key_write_op(
             let value = StateValue::from(new_value);
             usage.add_item(key_size + value.size());
             Some(value)
-        }
+        },
         WriteOp::Deletion => None,
     };
     let cached = state_cache.insert(state_key.clone(), state_value.clone());
@@ -315,8 +313,8 @@ fn ensure_txn_valid_for_vacant_entry(transaction: &Transaction) -> Result<()> {
         Transaction::GenesisTransaction(_) => (),
         Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
             bail!("Write set should be a subset of read set.")
-        }
-        Transaction::StateCheckpoint(_) => {}
+        },
+        Transaction::StateCheckpoint(_) => {},
     }
     Ok(())
 }

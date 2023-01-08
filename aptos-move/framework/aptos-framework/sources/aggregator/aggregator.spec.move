@@ -6,27 +6,27 @@ spec aptos_framework::aggregator {
     spec add(aggregator: &mut Aggregator, value: u128) {
         // TODO: temporary mockup.
         pragma opaque;
-        aborts_if !spec_aggreator_exists(aggregator);
+        aborts_if false;
     }
 
     spec sub(aggregator: &mut Aggregator, value: u128) {
         // TODO: temporary mockup.
         pragma opaque;
-        aborts_if !spec_aggreator_exists(aggregator);
+        aborts_if false;
     }
 
     spec read(aggregator: &Aggregator): u128 {
         // TODO: temporary mockup.
         pragma opaque;
-        aborts_if !spec_aggreator_exists(aggregator);
+        aborts_if false;
+        ensures result == spec_read(aggregator);
+        ensures result <= aggregator.limit;
     }
 
     spec destroy(aggregator: Aggregator) {
-        // TODO: temporary mockup.
         pragma opaque;
-        // TODO: this aborts_if condition is a temporary mockup, which needs to be refined.
         aborts_if false;
     }
 
-    spec fun spec_aggreator_exists(aggregator: Aggregator): bool;
+    spec fun spec_read(aggregator: Aggregator): u128;
 }

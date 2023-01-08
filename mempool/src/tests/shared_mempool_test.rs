@@ -10,7 +10,6 @@ use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_types::transaction::Transaction;
 use futures::{channel::oneshot, executor::block_on, sink::SinkExt};
-use tokio::runtime::Builder;
 
 #[test]
 fn test_consensus_events_rejected_txns() {
@@ -56,11 +55,7 @@ fn test_consensus_events_rejected_txns() {
 #[test]
 fn test_mempool_notify_committed_txns() {
     // Create runtime for the mempool notifier and listener
-    let runtime = Builder::new_multi_thread()
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .unwrap();
+    let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     let _enter = runtime.enter();
 
     // Create a new mempool notifier, listener and shared mempool

@@ -106,7 +106,7 @@ proptest! {
                 actual,
                 txns
                     .into_iter()
-                    .take(total_num_txns as usize - 1)
+                    .take(total_num_txns - 1)
                     .collect::<Vec<_>>()
             );
         }

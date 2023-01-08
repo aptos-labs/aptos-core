@@ -3,15 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use std::{
-    cmp::max,
-    collections::{BTreeSet, HashMap},
-    sync::Arc,
-};
-
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
-
 use aptos_crypto::{
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
@@ -32,6 +24,12 @@ use aptos_types::{
 pub use error::Error;
 pub use executed_chunk::ExecutedChunk;
 pub use parsed_transaction_output::ParsedTransactionOutput;
+use serde::{Deserialize, Serialize};
+use std::{
+    cmp::max,
+    collections::{BTreeSet, HashMap},
+    sync::Arc,
+};
 
 mod error;
 mod executed_chunk;

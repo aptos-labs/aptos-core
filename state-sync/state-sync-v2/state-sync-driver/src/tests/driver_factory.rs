@@ -19,7 +19,7 @@ use aptos_executor_test_helpers::bootstrap_genesis;
 use aptos_genesis::test_utils::test_config;
 use aptos_infallible::RwLock;
 use aptos_mempool_notifications::new_mempool_notifier_listener_pair;
-use aptos_network::application::{interface::MultiNetworkSender, storage::PeerMetadataStorage};
+use aptos_network::application::{interface::NetworkClient, storage::PeerMetadataStorage};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_temppath::TempPath;
@@ -66,10 +66,12 @@ fn test_new_initialized_configs() {
     let (streaming_service_client, _) = new_streaming_service_client_listener_pair();
 
     // Create a test aptos data client
-    let network_client = StorageServiceClient::new(
-        MultiNetworkSender::new(HashMap::new()),
+    let network_client = StorageServiceClient::new(NetworkClient::new(
+        vec![],
+        vec![],
+        HashMap::new(),
         PeerMetadataStorage::new(&[]),
-    );
+    ));
     let (aptos_data_client, _) = AptosNetDataClient::new(
         node_config.state_sync.aptos_data_client,
         node_config.base.clone(),

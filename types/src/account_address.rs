@@ -1,17 +1,18 @@
-use anyhow::bail;
-use std::fmt::{Debug, Display, Formatter};
-use std::str::FromStr;
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction::authenticator::{AuthenticationKey, Scheme};
+use anyhow::bail;
 use aptos_crypto::{
     ed25519::Ed25519PublicKey,
     hash::{CryptoHasher, HashValue},
     x25519,
 };
-
 pub use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::{
+    fmt::{Debug, Display, Formatter},
+    str::FromStr,
+};
 
 const SALT: &[u8] = b"aptos_framework::staking_contract";
 const VESTING_POOL_SALT: &[u8] = b"aptos_framework::vesting";
@@ -195,7 +196,7 @@ pub fn create_resource_address(address: AccountAddress, seed: &[u8]) -> AccountA
     input.extend(seed);
     input.push(Scheme::DeriveResourceAccountAddress as u8);
     let hash = HashValue::sha3_256_of(&input);
-    AccountAddress::from_bytes(&hash.as_ref()).unwrap()
+    AccountAddress::from_bytes(hash.as_ref()).unwrap()
 }
 
 // Define the Hasher used for hashing AccountAddress types. In order to properly use the

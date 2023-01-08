@@ -5,7 +5,6 @@
 mod tests;
 
 use super::{BackupHandle, BackupHandleRef, FileHandle, FileHandleRef};
-
 use crate::{
     storage::{BackupStorage, ShellSafeName, TextLine},
     utils::{error_notes::ErrorNotes, path_exists, PathToString},

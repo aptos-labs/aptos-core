@@ -445,8 +445,8 @@ Returns true if the ratio is zero.
 <pre><code><b>schema</b> <a href="fixed_point32.md#0x1_fixed_point32_CreateFromRationalAbortsIf">CreateFromRationalAbortsIf</a> {
     numerator: u64;
     denominator: u64;
-    <b>let</b> scaled_numerator = numerator &lt;&lt; 64;
-    <b>let</b> scaled_denominator = denominator &lt;&lt; 32;
+    <b>let</b> scaled_numerator = (numerator <b>as</b> u128)&lt;&lt; 64;
+    <b>let</b> scaled_denominator = (denominator <b>as</b> u128) &lt;&lt; 32;
     <b>let</b> quotient = scaled_numerator / scaled_denominator;
     <b>aborts_if</b> scaled_denominator == 0 <b>with</b> <a href="fixed_point32.md#0x1_fixed_point32_EDENOMINATOR">EDENOMINATOR</a>;
     <b>aborts_if</b> quotient == 0 && scaled_numerator != 0 <b>with</b> <a href="fixed_point32.md#0x1_fixed_point32_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>;

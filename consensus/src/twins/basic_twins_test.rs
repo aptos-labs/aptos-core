@@ -154,10 +154,11 @@ fn twins_vote_dedup_test() {
     let n2_twin_id = nodes[2].id;
     let n3_twin_id = nodes[3].id;
 
-    assert!(playground.split_network(
-        vec![n1_twin_id, n3_twin_id],
-        vec![twin0_twin_id, n0_twin_id, n2_twin_id],
-    ));
+    assert!(playground.split_network(vec![n1_twin_id, n3_twin_id], vec![
+        twin0_twin_id,
+        n0_twin_id,
+        n2_twin_id
+    ],));
     runtime.spawn(playground.start());
 
     timed_block_on(&runtime, async {
@@ -228,13 +229,11 @@ fn twins_proposer_test() {
     let mut round_partitions: HashMap<u64, Vec<Vec<TwinId>>> = HashMap::new();
     // Round 1 to 10 partitions: [node0, node1, node2], [node3, twin0, twin1]
     for i in 1..10 {
-        round_partitions.insert(
-            i,
-            vec![
-                vec![n0_twin_id, n1_twin_id, n2_twin_id],
-                vec![n3_twin_id, twin0_twin_id, twin1_twin_id],
-            ],
-        );
+        round_partitions.insert(i, vec![vec![n0_twin_id, n1_twin_id, n2_twin_id], vec![
+            n3_twin_id,
+            twin0_twin_id,
+            twin1_twin_id,
+        ]]);
     }
     assert!(playground.split_network_round(&round_partitions));
     runtime.spawn(playground.start());
@@ -250,7 +249,7 @@ fn twins_proposer_test() {
                 // Proposal from both node0 and twin_node0 are going to
                 // get committed in their respective partitions
                 assert_ne!(node0_commit_id, twin0_commit_id);
-            }
+            },
             _ => panic!("[TwinsTest] Test failed due to no commit(s)"),
         }
     });
@@ -307,7 +306,7 @@ fn twins_commit_test() {
                 // Proposals from both node0 and twin_node0 are going to race,
                 // but only one of them will form a commit
                 assert_eq!(node0_commit_id, twin0_commit_id);
-            }
+            },
             _ => panic!("[TwinsTest] Test failed due to no commit(s)"),
         }
     });

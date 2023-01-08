@@ -48,7 +48,7 @@ jobs:
   run-python-examples:
     runs-on: ubuntu-latest
     env:
-      APTOS_NODE_URL: https://fullnode.devnet.aptoslabs.com
+      APTOS_NODE_URL: https://fullnode.devnet.aptoslabs.com/v1
       APTOS_FAUCET_URL: https://faucet.devnet.aptoslabs.com
       FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
     steps:

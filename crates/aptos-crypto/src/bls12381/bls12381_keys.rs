@@ -106,8 +106,8 @@ impl traits::PrivateKey for PrivateKey {
 }
 
 impl traits::SigningKey for PrivateKey {
-    type VerifyingKeyMaterial = PublicKey;
     type SignatureMaterial = bls12381::Signature;
+    type VerifyingKeyMaterial = PublicKey;
 
     fn sign<T: CryptoHash + Serialize>(
         &self,
@@ -204,8 +204,8 @@ impl traits::PublicKey for PublicKey {
 }
 
 impl VerifyingKey for PublicKey {
-    type SigningKeyMaterial = PrivateKey;
     type SignatureMaterial = bls12381::Signature;
+    type SigningKeyMaterial = PrivateKey;
 }
 
 impl ValidCryptoMaterial for PublicKey {
@@ -259,13 +259,13 @@ impl PartialEq for PublicKey {
 
 impl fmt::Debug for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }
 
 impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }
 

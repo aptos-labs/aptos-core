@@ -73,7 +73,6 @@ impl HashValue {
 #[cfg(test)]
 mod tests {
     use crate::hash::HashValue;
-
     use serde_json::{json, Value};
 
     #[test]

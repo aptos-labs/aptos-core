@@ -9,7 +9,6 @@ use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
 };
-
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
 

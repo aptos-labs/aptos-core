@@ -1,10 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters::{
-    BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL, E2E_LABEL, LOCAL_LABEL,
-};
-use crate::shared_mempool::types::MultiBucketTimelineIndexIds;
 use crate::{
     core_mempool::{
         index::{
@@ -14,7 +10,12 @@ use crate::{
         transaction::{MempoolTransaction, TimelineState},
     },
     counters,
+    counters::{
+        BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL, E2E_LABEL,
+        LOCAL_LABEL,
+    },
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
+    shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::MempoolConfig;
 use aptos_crypto::HashValue;
@@ -25,10 +26,10 @@ use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
 };
-use std::cmp::max;
-use std::mem::size_of;
 use std::{
+    cmp::max,
     collections::HashMap,
+    mem::size_of,
     ops::Bound,
     time::{Duration, SystemTime},
 };
@@ -438,17 +439,17 @@ impl TransactionStore {
                         self.parking_lot_index.remove(txn);
                         min_seq += 1;
                     }
-                }
+                },
             }
 
             let mut parking_lot_txns = 0;
             for (_, txn) in txns.range_mut((Bound::Excluded(min_seq), Bound::Unbounded)) {
                 match txn.timeline_state {
-                    TimelineState::Ready(_) => {}
+                    TimelineState::Ready(_) => {},
                     _ => {
                         self.parking_lot_index.insert(txn);
                         parking_lot_txns += 1;
-                    }
+                    },
                 }
             }
             trace!(

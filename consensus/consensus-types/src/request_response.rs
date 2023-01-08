@@ -1,8 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{Payload, PayloadFilter, Round};
-use crate::proof_of_store::LogicalTime;
+use crate::{
+    common::{Payload, PayloadFilter, Round},
+    proof_of_store::LogicalTime,
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use futures::channel::oneshot;
@@ -35,7 +37,7 @@ impl fmt::Display for PayloadRequest {
                     "GetBlockRequest [round: {}, max_txns: {}, max_bytes: {} excluded: {}]",
                     round, max_txns, max_bytes, excluded
                 )
-            }
+            },
             PayloadRequest::CleanRequest(logical_time, digests) => {
                 write!(
                     f,
@@ -44,7 +46,7 @@ impl fmt::Display for PayloadRequest {
                     logical_time.round(),
                     digests
                 )
-            }
+            },
         }
     }
 }

@@ -18,15 +18,14 @@
 // displays the example value correctly. See more here:
 // https://github.com/aptos-labs/aptos-core/pull/2703
 
-use aptos_openapi::{impl_poem_parameter, impl_poem_type};
-use serde_json::json;
-
 use crate::{
     move_types::{MoveAbility, MoveStructValue},
     Address, EntryFunctionId, HashValue, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
     MoveStructTag, MoveType, StateKeyWrapper, U128, U256, U64,
 };
+use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use indoc::indoc;
+use serde_json::json;
 
 impl_poem_type!(
     Address,

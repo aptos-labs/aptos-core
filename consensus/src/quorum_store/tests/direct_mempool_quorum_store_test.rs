@@ -65,7 +65,7 @@ async fn test_block_request_no_txns() {
     {
         ConsensusResponse::GetBlockResponse(payload) => {
             assert!(payload.is_empty());
-        }
+        },
     }
 
     std::mem::drop(consensus_to_quorum_store_sender);

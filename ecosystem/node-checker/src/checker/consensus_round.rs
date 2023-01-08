@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 use crate::{
     get_provider,
     provider::{
@@ -11,8 +12,6 @@ use crate::{
 use anyhow::Result;
 use prometheus_parse::Scrape;
 use serde::{Deserialize, Serialize};
-
-use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 
 // TODO: When we have it, switch to using a crate that unifies metric names.
 // As it is now, this metric name could change and we'd never catch it here
@@ -98,7 +97,7 @@ impl Checker for ConsensusRoundChecker {
                         e
                     ),
                 )])
-            }
+            },
         };
 
         tokio::time::sleep(target_metrics_provider.config.common.check_delay()).await;
@@ -114,7 +113,7 @@ impl Checker for ConsensusRoundChecker {
                         e
                     ),
                 )])
-            }
+            },
         };
 
         let mut check_results = vec![];

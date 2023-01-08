@@ -36,7 +36,6 @@ where
 {
     /// The number of accounts created by default.
     pub const DEFAULT_NUM_ACCOUNTS: usize = 100;
-
     /// The number of transactions created by default.
     pub const DEFAULT_NUM_TRANSACTIONS: usize = 1000;
 

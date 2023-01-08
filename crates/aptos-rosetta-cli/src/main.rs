@@ -46,6 +46,6 @@ async fn main() {
             };
             println!("{}", serde_json::to_string_pretty(&error).unwrap());
             exit(-1)
-        }
+        },
     }
 }

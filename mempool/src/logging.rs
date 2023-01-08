@@ -10,6 +10,7 @@ use aptos_types::{account_address::AccountAddress, on_chain_config::OnChainConfi
 use serde::Serialize;
 use std::{fmt, fmt::Write, time::SystemTime};
 
+#[derive(Default)]
 pub struct TxnsLog {
     txns: Vec<(AccountAddress, u64, Option<String>, Option<SystemTime>)>,
     len: usize,

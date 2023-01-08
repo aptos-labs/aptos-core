@@ -113,7 +113,7 @@ impl BlockLookupInner {
                     id,
                 );
                 Ok((existing, true, parent_block))
-            }
+            },
             Entry::Vacant(entry) => {
                 let block = Arc::new(Block {
                     id,
@@ -123,7 +123,7 @@ impl BlockLookupInner {
                 });
                 entry.insert(Arc::downgrade(&block));
                 Ok((block, false, parent_block))
-            }
+            },
         }
     }
 }

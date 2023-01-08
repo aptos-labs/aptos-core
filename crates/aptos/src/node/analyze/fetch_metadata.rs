@@ -83,7 +83,7 @@ impl FetchMetadata {
         while cursor < last {
             let limit = std::cmp::min(MAX_FETCH_BATCH_SIZE as u64, last - cursor) as u16;
             let mut current = client
-                .get_transactions(Some(cursor), Some(limit as u16))
+                .get_transactions(Some(cursor), Some(limit))
                 .await?
                 .into_inner();
             if current.is_empty() {

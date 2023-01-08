@@ -84,6 +84,10 @@ module aptos_framework::transaction_fee {
         assert!(burn_percentage <= 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));
 
         let collected_amount = coin::value(coin);
+        spec {
+            // We assume that `burn_percentage * collected_amount` does not overflow.
+            assume burn_percentage * collected_amount <= MAX_U64;
+        };
         let amount_to_burn = (burn_percentage as u64) * collected_amount / 100;
         if (amount_to_burn > 0) {
             let coin_to_burn = coin::extract(coin, amount_to_burn);

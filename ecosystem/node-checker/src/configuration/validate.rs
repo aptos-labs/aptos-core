@@ -1,9 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::checker::build_checkers;
-
 use super::{read_configuration_from_file, BaselineConfiguration};
+use crate::checker::build_checkers;
 use anyhow::{Context, Result};
 use aptos_logger::debug;
 use clap::Parser;

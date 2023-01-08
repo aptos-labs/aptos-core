@@ -15,8 +15,6 @@ spec aptos_std::any {
 
     spec unpack<T>(x: Any): T {
         use aptos_std::from_bcs;
-        // TODO: timeout without this.
-        pragma aborts_if_is_partial;
         aborts_if type_info::type_name<T>() != x.type_name;
         aborts_if !from_bcs::deserializable<T>(x.data);
         ensures result == from_bcs::deserialize<T>(x.data);

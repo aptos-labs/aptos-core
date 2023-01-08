@@ -44,17 +44,13 @@ fn test_two_to_two_transfer() {
     let david_start = read_coin(&h, david.address());
 
     let code = package.extract_script_code()[0].clone();
-    let script = Script::new(
-        code,
-        vec![],
-        vec![
-            TransactionArgument::U64(amount_alice),
-            TransactionArgument::U64(amount_bob),
-            TransactionArgument::Address(*carol.address()),
-            TransactionArgument::Address(*david.address()),
-            TransactionArgument::U64(amount_carol),
-        ],
-    );
+    let script = Script::new(code, vec![], vec![
+        TransactionArgument::U64(amount_alice),
+        TransactionArgument::U64(amount_bob),
+        TransactionArgument::Address(*carol.address()),
+        TransactionArgument::Address(*david.address()),
+        TransactionArgument::U64(amount_carol),
+    ]);
 
     let transaction = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob.clone()])
