@@ -45,9 +45,9 @@ resource "helm_release" "validator" {
       numFullnodeGroups = var.num_fullnode_groups
       imageTag          = var.image_tag
       chain = {
-        era        = var.era
-        chain_id   = var.chain_id
-        chain_name = var.chain_name
+        era      = var.era
+        chain_id = var.chain_id
+        name     = var.chain_name
       }
       validator = {
         name = var.validator_name

@@ -177,6 +177,19 @@ podSecurityPolicy: true
 
 # -- Load test-data for starting a test network
 loadTestGenesis: false
+<<<<<<< HEAD
 enablePrivilegedMode: true
+=======
+
+# -- TEST ONLY: Enable running as root for profiling
+enablePrivilegedMode: false
+
+pyroscope:
+  # -- Enable Pyroscope profiling
+  enabled: false
+  # -- Secret which contains the Pyroscope API key and other configuration
+  secretName: pyroscope
+
+>>>>>>> b5799c89e4 ([helm/docker] enable pyroscope profiling on forge (#6083))
 # Additional labels
 labels:
