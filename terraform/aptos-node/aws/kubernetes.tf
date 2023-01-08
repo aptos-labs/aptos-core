@@ -125,9 +125,9 @@ locals {
     numFullnodeGroups = var.num_fullnode_groups
     imageTag          = var.image_tag
     chain = {
-      era        = var.era
-      chain_id   = var.chain_id
-      chain_name = var.chain_name
+      era      = var.era
+      chain_id = var.chain_id
+      name     = var.chain_name
     }
     validator = {
       name = var.validator_name
@@ -184,11 +184,11 @@ resource "helm_release" "validator" {
   max_history = 5
   wait        = false
 
-  lifecycle {
-    ignore_changes = [
-      values,
-    ]
-  }
+  # lifecycle {
+  #   ignore_changes = [
+  #     values,
+  #   ]
+  # }
 
   values = [
     local.helm_values,

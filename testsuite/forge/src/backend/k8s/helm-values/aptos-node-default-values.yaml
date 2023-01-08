@@ -34,3 +34,8 @@ service:
 
 # always assume we're spinning up a testnet and doing genesis rather than using the single validator test mode
 loadTestGenesis: false
+# always run forge in privileged mode for extra testing capability
+enablePrivilegedMode: true
+# always run forge with profiling enabled
+pyroscope:
+  enabled: true
