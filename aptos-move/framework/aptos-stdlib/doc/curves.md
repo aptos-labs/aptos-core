@@ -328,9 +328,6 @@ Perform a bilinear mapping.
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing">pairing</a>&lt;G1,G2,Gt&gt;(point_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G1&gt;, point_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G2&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <b>if</b> (!std::features::generic_curves_enabled()) {
-        <b>abort</b>(std::error::invalid_state(1))
-    };
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
         handle: <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>&lt;G1,G2,Gt&gt;(point_1.handle, point_2.handle)
     }
@@ -398,9 +395,6 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_from_u64">scalar_from_u64</a>&lt;G&gt;(value: u64): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <b>if</b> (!std::features::generic_curves_enabled()) {
-        <b>abort</b>(std::error::invalid_state(1))
-    };
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_scalar_from_u64_internal">scalar_from_u64_internal</a>&lt;G&gt;(value)
     }
@@ -428,9 +422,6 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_neg">scalar_neg</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <b>if</b> (!std::features::generic_curves_enabled()) {
-        <b>abort</b>(std::error::invalid_state(1))
-    };
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_scalar_neg_internal">scalar_neg_internal</a>&lt;G&gt;(scalar_1.handle)
     }
@@ -458,9 +449,6 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_add">scalar_add</a>&lt;G&gt;(scalar_1: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;, scalar_2: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <b>if</b> (!std::features::generic_curves_enabled()) {
-        <b>abort</b>(std::error::invalid_state(1))
-    };
     <a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt; {
         handle: <a href="curves.md#0x1_curves_scalar_add_internal">scalar_add_internal</a>&lt;G&gt;(scalar_1.handle, scalar_2.handle)
     }

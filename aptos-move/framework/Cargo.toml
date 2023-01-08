@@ -94,3 +94,7 @@ doctest = false
 [[bench]]
 name = "bls12_381"
 harness = false
+
+[[bench]]
+name = "ristretto"
+harness = false
