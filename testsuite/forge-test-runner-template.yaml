@@ -20,10 +20,10 @@ spec:
       ulimit -n 1048576
       {FORGE_ARGS}
     resources:
-      requests:
+      limits:
         cpu: 15.5
         memory: 26Gi
-      limits:
+      requests:
         cpu: 15
         memory: 26Gi
     env:
