@@ -54,6 +54,7 @@ use std::{
     ops::Deref,
     sync::Arc,
 };
+use dashmap::DashMap;
 use lru::LruCache;
 
 pub(crate) mod buffered_state;
@@ -84,7 +85,7 @@ pub(crate) struct StateDb {
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
-    pub latest_state_values: Cache<StateKey, (Version, Option<StateValue>)>,
+    pub latest_state_values: DashMap<StateKey, (Version, Option<StateValue>)>,
     pub latest_state_value_lock: Arc<Mutex<bool>>,
     pub cache_hit: AtomicU64,
     pub cache_miss: AtomicU64,
@@ -142,7 +143,6 @@ impl DbReader for StateDb {
         state_key: &StateKey,
         latest_version: Version,
     ) -> Result<Option<StateValue>> {
-        let _ = self.latest_state_value_lock.lock();
         let cached_state_value_with_version =
                 self.latest_state_values.get(state_key);
         sample!(
@@ -158,7 +158,7 @@ impl DbReader for StateDb {
                 self.cache_miss.fetch_add(1, Ordering::Relaxed);
                 let state_value_with_version =
                     self.get_state_value_with_version_by_version(state_key, latest_version)?;
-                return match state_value_with_version {
+                match state_value_with_version {
                     None => {
                         Ok(None)
                     }
@@ -169,27 +169,24 @@ impl DbReader for StateDb {
                     }
                 }
             }
-            Some((cached_version, val)) => {
+            Some(entry) => {
+                let (cached_version, val) = entry.value();
                 self.cache_hit.fetch_add(1, Ordering::Relaxed);
-                let (version, value) =
-                    self.get_state_value_with_version_by_version(state_key, latest_version)?
-                        .map(|(version, val)| (Some(version), Some(val)))
-                        .unwrap_or((None, None));
-
-                if value != val {
-                    error!(
-                        "value mismatch, cached version {}, latest version {}, actual version {}",
-                        cached_version, latest_version, version.unwrap()
-                    );
-                }
-                if cached_version <= latest_version {
+                // let (version, value) =
+                //     self.get_state_value_with_version_by_version(state_key, latest_version)?
+                //         .map(|(version, val)| (Some(version), Some(val)))
+                //         .unwrap_or((None, None));
+                //
+                // if value != val {
+                //     error!(
+                //         "value mismatch, cached version {}, latest version {}, actual version {}",
+                //         cached_version, latest_version, version.unwrap()
+                //     );
+                // }
+                if *cached_version <= latest_version {
                     return Ok(val.clone());
                 }
-                panic!(
-                    
-                    "cached version is less {} than latest version {} ",
-                    cached_version, latest_version
-                );
+                // Trying to read older version than cached version
                 self.get_state_value_by_version(state_key, latest_version)
             }
         }
@@ -355,7 +352,7 @@ impl StateStore {
             state_merkle_db,
             max_nodes_per_lru_cache_shard,
         ));
-        let latest_state_values = Cache::new(5_000_000);
+        let latest_state_values = DashMap::new();
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
@@ -543,9 +540,9 @@ impl StateStore {
             .start_timer();
 
         value_state_sets
-            .par_iter()
+            .iter()
             .enumerate()
-            .flat_map_iter(|(i, kvs)| {
+            .flat_map(|(i, kvs)| {
                 let version = first_version + i as Version;
                 kvs.iter().map(move |(k, v)| {
                     batch.put::<StateValueSchema>(&(k.clone(), version), v)?;
@@ -560,11 +557,17 @@ impl StateStore {
         let _ = self.latest_state_value_lock.lock();
         let cached_state_value_with_version =
             self.latest_state_values.get(key);
-        if let Some((cached_version, _)) =  cached_state_value_with_version {
-            if cached_version < latest_version {
-                self.latest_state_values.insert(key.clone(), (latest_version, val.clone()));
+        if let Some(entry) =  cached_state_value_with_version.as_ref() {
+            let (cached_version, val) = entry.value();
+            if *cached_version < latest_version {
+                let latest_state_value = val.clone();
+                drop(cached_state_value_with_version);
+                self.latest_state_values.insert(key.clone(), (latest_version, latest_state_value));
             }
-        };
+        } else {
+            drop(cached_state_value_with_version);
+            self.latest_state_values.insert(key.clone(), (latest_version, val.clone()));
+        }
         Ok(())
     }
 
@@ -881,6 +884,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
 }
 
 fn add_kv_batch(batch: &SchemaBatch, kv_batch: &StateValueBatch) -> Result<()> {
+    panic!("fooo");
     kv_batch
         .par_iter()
         .map(|(k, v)| batch.put::<StateValueSchema>(k, v))
