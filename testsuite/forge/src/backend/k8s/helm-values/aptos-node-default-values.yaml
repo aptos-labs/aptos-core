@@ -34,13 +34,8 @@ service:
 
 # always assume we're spinning up a testnet and doing genesis rather than using the single validator test mode
 loadTestGenesis: false
-<<<<<<< HEAD
-
-enablePrivilegedMode: ture
-=======
 # always run forge in privileged mode for extra testing capability
 enablePrivilegedMode: true
 # always run forge with profiling enabled
 pyroscope:
   enabled: true
->>>>>>> b5799c89e4 ([helm/docker] enable pyroscope profiling on forge (#6083))
