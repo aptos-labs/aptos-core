@@ -136,7 +136,7 @@ impl ProofFetcher for AsyncProofFetcher {
         let _timer = TIMER
             .with_label_values(&["async_proof_fetcher_fetch"])
             .start_timer();
-        let value = self.reader.get_state_value_by_version(state_key, version)?;
+        let value = self.reader.get_latest_state_value(state_key, version)?;
         self.schedule_proof_read(
             state_key.clone(),
             version,

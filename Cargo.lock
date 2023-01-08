@@ -85,6 +85,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ahash"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf6ccdb167abbf410dcb915cabd428929d7f6a04980b54a11f26a39f1c7f7107"
+dependencies = [
+ "cfg-if",
+ "getrandom 0.2.7",
+ "once_cell",
+ "version_check",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -760,6 +772,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
+ "quick_cache",
  "rand 0.7.3",
  "rayon",
  "serde 1.0.149",
@@ -5096,7 +5109,7 @@ version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 dependencies = [
- "ahash",
+ "ahash 0.7.6",
 ]
 
 [[package]]
@@ -5568,7 +5581,7 @@ version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ab388864246d58a276e60e7569a833d9cc4cd75c66e5ca77c177dad38e59996"
 dependencies = [
- "ahash",
+ "ahash 0.7.6",
  "dashmap",
  "hashbrown",
  "once_cell",
@@ -8100,6 +8113,17 @@ name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
+
+[[package]]
+name = "quick_cache"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fa00568c65c6f8671e20ad5d154b48de44c832b5abbc5ece524ad0b0cf9a5ad"
+dependencies = [
+ "ahash 0.8.2",
+ "hashbrown",
+ "parking_lot 0.12.1",
+]
 
 [[package]]
 name = "quote"

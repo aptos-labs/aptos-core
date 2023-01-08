@@ -18,14 +18,17 @@ use crate::{
     StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{ensure, format_err, Result};
+use std::time::Duration;
+
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_executor_types::in_memory_state_calculator::InMemoryStateCalculator;
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
-use aptos_logger::info;
+use aptos_logger::{error, prelude::SampleRate};
+use aptos_logger::{info, sample, warn};
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
@@ -43,12 +46,15 @@ use aptos_types::{
     transaction::Version,
 };
 use once_cell::sync::Lazy;
+use quick_cache::sync::Cache;
 use rayon::prelude::*;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::{
     collections::{HashMap, HashSet},
     ops::Deref,
     sync::Arc,
 };
+use lru::LruCache;
 
 pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
@@ -78,6 +84,10 @@ pub(crate) struct StateDb {
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
+    pub latest_state_values: Cache<StateKey, (Version, Option<StateValue>)>,
+    pub latest_state_value_lock: Arc<Mutex<bool>>,
+    pub cache_hit: AtomicU64,
+    pub cache_miss: AtomicU64,
 }
 
 #[derive(Debug)]
@@ -125,6 +135,64 @@ impl DbReader for StateDb {
         Ok(self
             .get_state_value_with_version_by_version(state_key, version)?
             .map(|(_, value)| value))
+    }
+
+    fn get_latest_state_value(
+        &self,
+        state_key: &StateKey,
+        latest_version: Version,
+    ) -> Result<Option<StateValue>> {
+        let _ = self.latest_state_value_lock.lock();
+        let cached_state_value_with_version =
+                self.latest_state_values.get(state_key);
+        sample!(
+            SampleRate::Duration(Duration::from_secs(1)),
+            warn!(
+                "cache hit is {}, cache miss is {}",
+                self.cache_hit.load(Ordering::Relaxed),
+                self.cache_miss.load(Ordering::Relaxed)
+            )
+        );
+        match cached_state_value_with_version {
+            None => {
+                self.cache_miss.fetch_add(1, Ordering::Relaxed);
+                let state_value_with_version =
+                    self.get_state_value_with_version_by_version(state_key, latest_version)?;
+                return match state_value_with_version {
+                    None => {
+                        Ok(None)
+                    }
+                    Some((version, value)) => {
+                        // self.latest_state_values.insert(state_key.clone(),
+                        //                                 (version, Some(value.clone())));
+                        Ok(Some(value))
+                    }
+                }
+            }
+            Some((cached_version, val)) => {
+                self.cache_hit.fetch_add(1, Ordering::Relaxed);
+                let (version, value) =
+                    self.get_state_value_with_version_by_version(state_key, latest_version)?
+                        .map(|(version, val)| (Some(version), Some(val)))
+                        .unwrap_or((None, None));
+
+                if value != val {
+                    error!(
+                        "value mismatch, cached version {}, latest version {}, actual version {}",
+                        cached_version, latest_version, version.unwrap()
+                    );
+                }
+                if cached_version <= latest_version {
+                    return Ok(val.clone());
+                }
+                panic!(
+                    
+                    "cached version is less {} than latest version {} ",
+                    cached_version, latest_version
+                );
+                self.get_state_value_by_version(state_key, latest_version)
+            }
+        }
     }
 
     /// Returns the proof of the given state key and version.
@@ -224,6 +292,15 @@ impl DbReader for StateStore {
         self.deref().get_state_value_by_version(state_key, version)
     }
 
+    fn get_latest_state_value(
+        &self,
+        state_key: &StateKey,
+        latest_version: Version,
+    ) -> Result<Option<StateValue>> {
+        self.deref()
+            .get_latest_state_value(state_key, latest_version)
+    }
+
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
@@ -278,11 +355,16 @@ impl StateStore {
             state_merkle_db,
             max_nodes_per_lru_cache_shard,
         ));
+        let latest_state_values = Cache::new(5_000_000);
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
             state_pruner,
             epoch_snapshot_pruner,
+            latest_state_values,
+            latest_state_value_lock: Arc::new(Mutex::new(true)),
+            cache_miss: AtomicU64::new(0),
+            cache_hit: AtomicU64::new(0),
         });
         let buffered_state = Mutex::new(
             Self::create_buffered_state_from_latest_snapshot(
@@ -465,10 +547,25 @@ impl StateStore {
             .enumerate()
             .flat_map_iter(|(i, kvs)| {
                 let version = first_version + i as Version;
-                kvs.iter()
-                    .map(move |(k, v)| batch.put::<StateValueSchema>(&(k.clone(), version), v))
+                kvs.iter().map(move |(k, v)| {
+                    batch.put::<StateValueSchema>(&(k.clone(), version), v)?;
+                    self.update_latest_state_value(k, v, version)
+                })
+
             })
             .collect()
+    }
+
+    pub fn update_latest_state_value(&self, key: &StateKey, val: &Option<StateValue>, latest_version: Version) -> Result<()> {
+        let _ = self.latest_state_value_lock.lock();
+        let cached_state_value_with_version =
+            self.latest_state_values.get(key);
+        if let Some((cached_version, _)) =  cached_state_value_with_version {
+            if cached_version < latest_version {
+                self.latest_state_values.insert(key.clone(), (latest_version, val.clone()));
+            }
+        };
+        Ok(())
     }
 
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {

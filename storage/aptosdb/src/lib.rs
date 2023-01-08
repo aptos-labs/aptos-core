@@ -1209,9 +1209,19 @@ impl DbReader for AptosDB {
     ) -> Result<Option<StateValue>> {
         gauged_api("get_state_value_by_version", || {
             self.error_if_ledger_pruned("State", version)?;
-
             self.state_store
                 .get_state_value_by_version(state_store_key, version)
+        })
+    }
+
+    fn get_latest_state_value(
+        &self,
+        state_key: &StateKey,
+        latest_version: Version,
+    ) -> Result<Option<StateValue>> {
+        gauged_api("get_latest_state_value", || {
+            self.state_store
+                .get_latest_state_value(state_key, latest_version)
         })
     }
 
