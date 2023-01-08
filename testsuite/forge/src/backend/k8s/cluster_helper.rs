@@ -817,7 +817,7 @@ pub async fn create_pyroscope_secret(kube_namespace: String) -> Result<()> {
         Some(kube_namespace_name.to_string()),
     ));
     // load in the secret from namespace and copy it to the new namespace
-    if let secret = default_secrets_api.get("pyroscope").await? {
+    if let Ok(secret) = default_secrets_api.get("pyroscope").await {
         info!("Secret pyroscope exists, continuing with it");
         let pyroscope_secret_data = secret.data.clone();
         let namespaced_pyroscope_secret = Secret {
