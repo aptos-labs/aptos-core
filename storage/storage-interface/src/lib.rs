@@ -352,6 +352,14 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    fn get_latest_state_value(
+        &self,
+        state_key: &StateKey,
+        latest_version: Version,
+    ) -> Result<Option<StateValue>> {
+        unimplemented!()
+    }
+
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
