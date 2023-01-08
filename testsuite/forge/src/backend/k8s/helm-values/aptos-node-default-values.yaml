@@ -17,6 +17,36 @@ fullnode:
 # NodePort is required for ChaosMesh to function correctly: https://github.com/chaos-mesh/chaos-mesh/issues/3278#issuecomment-1134248492
 service:
   validator:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: cloud.google.com/machine-family
+                  operator: In
+                  values:
+                    - t2d
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/part-of
+                  operator: In
+                  values:
+                    - aptos-node
+            topologyKey: kubernetes.io/hostname
+    image:
+      repo: us-west1-docker.pkg.dev/aptos-global/aptos-internal/validator
+    resources:
+      limits:
+        cpu: "46"
+        memory: 64Gi
+      requests:
+        cpu: "46"
+        memory: 64Gi
+    storage:
+      class: ssd
+      size: 2500Gi
     external:
       type: "NodePort"
     internal:
