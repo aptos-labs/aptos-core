@@ -99,6 +99,7 @@ async fn test_netperf_client() {
     while std::path::Path::new("/tmp/9107.tmp").exists() {
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
+    panic!("Showme the logs\n");
 }
 
 #[tokio::test]

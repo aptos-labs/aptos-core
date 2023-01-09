@@ -20,6 +20,7 @@ pub enum CompressionClient {
     Consensus,
     Mempool,
     StateSync,
+    NetPerf,
 }
 
 impl CompressionClient {
@@ -29,6 +30,7 @@ impl CompressionClient {
             Self::Consensus => "consensus",
             Self::Mempool => "mempool",
             Self::StateSync => "state_sync",
+            Self::NetPerf => "netperf",
         }
     }
 }

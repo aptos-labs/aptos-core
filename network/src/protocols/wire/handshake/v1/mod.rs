@@ -133,6 +133,7 @@ impl ProtocolId {
                 CompressionClient::Consensus
             },
             ProtocolId::MempoolDirectSend => CompressionClient::Mempool,
+            ProtocolId::NetPerfDirectSendCompressed => CompressionClient::NetPerf,
             protocol_id => unreachable!(
                 "The given protocol ({:?}) should not be using compression!",
                 protocol_id
