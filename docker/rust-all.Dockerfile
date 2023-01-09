@@ -307,16 +307,6 @@ RUN apt-get update && apt-get install -y \
 		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN git clone https://github.com/aptos-labs/bcc.git
-RUN mkdir bcc/build
-WORKDIR bcc/
-RUN git checkout 5258d14cb35ba08a8757a68386bebc9ea05f00c9
-WORKDIR build/
-RUN cmake ..
-RUN make
-RUN make install
-WORKDIR ..
-
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1
 ENV RUST_LOG_FORMAT=json
