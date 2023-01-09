@@ -156,10 +156,26 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "aptos-validator.fullname" . }}-psp-privileged
+  name: {{ include "aptos-validator.fullname" . }}-psp-privileged-aws
 roleRef:
   kind: ClusterRole
   name: eks:podsecuritypolicy:privileged
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: {{ include "aptos-validator.fullname" . }}-validator
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: {{ include "aptos-validator.fullname" . }}-fullnode
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-psp-privileged-gcp
+roleRef:
+  kind: ClusterRole
+  name: gce:podsecuritypolicy:privileged
   apiGroup: rbac.authorization.k8s.io
 subjects:
 - kind: ServiceAccount
