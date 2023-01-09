@@ -90,7 +90,7 @@ impl RestoreCoordinator {
         // N.b.
         // The coordinator now focuses on doing one procedure, ignoring the combination of options
         // supported before:
-        //   1. a most recent state snapshot
+        //   1. a most recent state snapshot before --target-version
         //   2. a only transaction and its output, at the state snapshot version
         //   3. the epoch history from 0 up until the latest closed epoch preceding the state
         //      snapshot version.
