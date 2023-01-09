@@ -75,7 +75,7 @@ This document describes how to configure your public fullnode using both methods
 
 With your development environment ready, now you can start to setup your fullnode.
 
-5. Check out the `mainnet` branch using `git checkout --track origin/mainnet`.
+5. Check out the `mainnet` branch using `git checkout --track origin/mainnet`; remember, you may instead use `devnet` or `testnet`.
 
 6. Make sure your current working directory is `aptos-core`.
 
