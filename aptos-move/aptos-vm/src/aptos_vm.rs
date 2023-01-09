@@ -1096,7 +1096,7 @@ impl VMAdapter for AptosVM {
     }
 
     fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
-        txn.check_signature()
+        txn.dummy_check_signature()
     }
 
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {

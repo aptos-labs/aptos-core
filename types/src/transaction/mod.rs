@@ -575,6 +575,17 @@ impl SignedTransaction {
         Ok(SignatureCheckedTransaction(self))
     }
 
+    /// Used for perf testing
+    pub fn only_check_signature(&self) -> Result<()> {
+        self.authenticator.verify(&self.raw_txn)?;
+        Ok(())
+    }
+
+    /// Used for perf testing
+    pub fn dummy_check_signature(self) -> Result<SignatureCheckedTransaction> {
+        Ok(SignatureCheckedTransaction(self))
+    }
+
     /// Checks that the signature of given transaction inplace. Returns `Ok(())` if
     /// the signature is valid.
     pub fn signature_is_valid(&self) -> bool {

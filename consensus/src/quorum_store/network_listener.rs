@@ -72,13 +72,15 @@ impl NetworkListener {
                     fragment.into_transactions(),
                 ) {
                     Ok((num_bytes, payload, digest)) => {
-                        let persist_cmd = BatchStoreCommand::Persist(PersistRequest::new(
-                            source, payload, digest, num_bytes, expiration,
-                        ));
-                        self.batch_store_tx
-                            .send(persist_cmd)
-                            .await
-                            .expect("BatchStore receiver not available");
+                        if payload.iter().all(|txn| txn.only_check_signature().is_ok()) {
+                            let persist_cmd = BatchStoreCommand::Persist(PersistRequest::new(
+                                source, payload, digest, num_bytes, expiration,
+                            ));
+                            self.batch_store_tx
+                                .send(persist_cmd)
+                                .await
+                                .expect("BatchStore receiver not available");
+                        }
                     }
                     Err(e) => {
                         debug!("Could not append batch from {:?}, error {:?}", source, e);
