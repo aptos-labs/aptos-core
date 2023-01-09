@@ -118,7 +118,7 @@ fn gen_ledger_info(
 ) -> LedgerInfoWithSignatures {
     let ledger_info = LedgerInfo::new(
         BlockInfo::new(
-            1,
+            0,
             0,
             commit_block_id,
             root_hash,
