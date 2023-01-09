@@ -1,10 +1,10 @@
 # Homebrew Aptos
 
-This is an in-depth overview of homebrew and the aptos formula. In this guide we will go over each section of the homebrew formula as well as steps to implement changes in the future.
+The [Aptos command line interface (CLI)](https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli) may be installed via [Homebrew](https://brew.sh/) for simplicity. This is an in-depth overview of Homebrew and the Aptos formula. In this guide, we go over each section of the Homebrew formula and steps to implement changes in the future.
 
 ## Quick guide
 
-- [Formula in Homebrew Github](https://github.com/Homebrew/homebrew-core/blob/master/Formula/aptos.rb)
+- [Formula in Homebrew GitHub](https://github.com/Homebrew/homebrew-core/blob/master/Formula/aptos.rb)
 - [Aptos 1.0.3 New Formula PR for Github](https://github.com/Homebrew/homebrew-core/pull/119832)
 
 ### Getting started
