@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction::Version;
-use crate::{proof::SparseMerkleRangeProof, state_store::state_key::StateKey};
+use crate::{
+    proof::SparseMerkleRangeProof, state_store::state_key::StateKey, transaction::Version,
+};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -39,11 +40,11 @@ pub enum StateValueInner {
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for StateValue {
     type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         any::<Vec<u8>>().prop_map(StateValue::new).boxed()
     }
-
-    type Strategy = BoxedStrategy<Self>;
 }
 
 impl<'de> Deserialize<'de> for StateValue {

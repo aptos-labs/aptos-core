@@ -175,8 +175,10 @@ impl CoinActivity {
         }
         for event in events {
             let event_type = event.typ.to_string();
-            match CoinEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap() {
-                Some(parsed_event) => coin_activities.push(Self::from_parsed_event(
+            if let Some(parsed_event) =
+                CoinEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
+            {
+                coin_activities.push(Self::from_parsed_event(
                     &event_type,
                     event,
                     &parsed_event,
@@ -185,9 +187,8 @@ impl CoinActivity {
                     txn_info.block_height.unwrap().0 as i64,
                     &entry_function_id_str,
                     txn_timestamp,
-                )),
-                None => {}
-            };
+                ))
+            }
         }
         (
             coin_activities,
@@ -249,9 +250,8 @@ impl CoinActivity {
         entry_function_id_str: &Option<String>,
         transaction_timestamp: chrono::NaiveDateTime,
     ) -> Self {
-        let aptos_coin_burned = BigDecimal::from(
-            txn_info.gas_used.0 * user_transaction_request.gas_unit_price.0 as u64,
-        );
+        let aptos_coin_burned =
+            BigDecimal::from(txn_info.gas_used.0 * user_transaction_request.gas_unit_price.0);
 
         Self {
             transaction_version: txn_info.version.0 as i64,

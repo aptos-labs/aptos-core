@@ -190,8 +190,7 @@ Returns the type name of this Any
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
-<b>aborts_if</b> <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() != x.type_name;
+<pre><code><b>aborts_if</b> <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() != x.type_name;
 <b>aborts_if</b> !<a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(x.data);
 <b>ensures</b> result == <a href="from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;T&gt;(x.data);
 </code></pre>

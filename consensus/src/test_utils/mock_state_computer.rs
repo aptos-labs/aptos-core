@@ -175,6 +175,7 @@ impl RandomComputeResultStateComputer {
             random_compute_result_root_hash: HashValue::random(),
         }
     }
+
     pub fn get_root_hash(&self) -> HashValue {
         self.random_compute_result_root_hash
     }

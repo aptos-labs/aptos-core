@@ -20,9 +20,15 @@
 -  [Function `can_receive_direct_coin_transfers`](#0x1_aptos_account_can_receive_direct_coin_transfers)
 -  [Specification](#@Specification_1)
     -  [Function `create_account`](#@Specification_1_create_account)
+    -  [Function `batch_transfer`](#@Specification_1_batch_transfer)
     -  [Function `transfer`](#@Specification_1_transfer)
+    -  [Function `batch_transfer_coins`](#@Specification_1_batch_transfer_coins)
+    -  [Function `transfer_coins`](#@Specification_1_transfer_coins)
+    -  [Function `deposit_coins`](#@Specification_1_deposit_coins)
     -  [Function `assert_account_exists`](#@Specification_1_assert_account_exists)
     -  [Function `assert_account_is_registered_for_apt`](#@Specification_1_assert_account_is_registered_for_apt)
+    -  [Function `set_allow_direct_coin_transfers`](#@Specification_1_set_allow_direct_coin_transfers)
+    -  [Function `can_receive_direct_coin_transfers`](#@Specification_1_can_receive_direct_coin_transfers)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -496,7 +502,7 @@ The Account does not exist under the auth_key before creating the account.
 Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_toke.
 
 
-<pre><code><b>include</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccount">CreateAccount</a>;
+<pre><code><b>include</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a>;
 <b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(auth_key);
 </code></pre>
@@ -504,15 +510,14 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a name="0x1_aptos_account_CreateAccount"></a>
+<a name="0x1_aptos_account_CreateAccountAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccount">CreateAccount</a> {
+<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {
     auth_key: <b>address</b>;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
     <b>aborts_if</b> <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(auth_key);
     <b>aborts_if</b> auth_key == @vm_reserved || auth_key == @aptos_framework || auth_key == @aptos_token;
-    <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(auth_key);
 }
 </code></pre>
 
@@ -532,6 +537,22 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
+<a name="@Specification_1_batch_transfer"></a>
+
+### Function `batch_transfer`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_batch_transfer">batch_transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
 <a name="@Specification_1_transfer"></a>
 
 ### Function `transfer`
@@ -544,6 +565,54 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_batch_transfer_coins"></a>
+
+### Function `batch_transfer_coins`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_batch_transfer_coins">batch_transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_transfer_coins"></a>
+
+### Function `transfer_coins`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_deposit_coins"></a>
+
+### Function `deposit_coins`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(<b>to</b>: <b>address</b>, coins: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
 </code></pre>
 
 
@@ -579,6 +648,38 @@ Check if the AptosCoin under the address existed.
 
 <pre><code><b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(addr);
 <b>aborts_if</b> !<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(addr);
+</code></pre>
+
+
+
+<a name="@Specification_1_set_allow_direct_coin_transfers"></a>
+
+### Function `set_allow_direct_coin_transfers`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_set_allow_direct_coin_transfers">set_allow_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allow: bool)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_can_receive_direct_coin_transfers"></a>
+
+### Function `can_receive_direct_coin_transfers`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_can_receive_direct_coin_transfers">can_receive_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
 </code></pre>
 
 

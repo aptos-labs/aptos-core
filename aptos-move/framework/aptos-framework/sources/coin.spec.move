@@ -3,6 +3,10 @@ spec aptos_framework::coin {
         pragma verify = true;
     }
 
+    spec AggregatableCoin {
+        invariant value.limit == MAX_U64;
+    }
+
     spec mint {
         pragma opaque;
         let addr = type_info::type_of<CoinType>().account_address;
@@ -214,13 +218,11 @@ spec aptos_framework::coin {
     /// An account can only be registered once.
     /// Updating `Account.guid_creation_num` will not overflow.
     spec register<CoinType>(account: &signer) {
-        // TODO: Add the abort condition about `type_info::type_of`
-        pragma aborts_if_is_partial;
         let account_addr = signer::address_of(account);
         let acc = global<account::Account>(account_addr);
-        aborts_if acc.guid_creation_num + 2 > MAX_U64;
-        aborts_if exists<CoinStore<CoinType>>(account_addr);
-        aborts_if !exists<account::Account>(account_addr);
+        aborts_if !exists<CoinStore<CoinType>>(account_addr) && acc.guid_creation_num + 2 > MAX_U64;
+        aborts_if !exists<CoinStore<CoinType>>(account_addr) && !exists<account::Account>(account_addr);
+        aborts_if !exists<CoinStore<CoinType>>(account_addr) && !type_info::spec_is_struct<CoinType>();
         ensures exists<CoinStore<CoinType>>(account_addr);
     }
 
@@ -266,5 +268,25 @@ spec aptos_framework::coin {
         let post coin_post = global<CoinStore<CoinType>>(account_addr).coin.value;
         ensures coin_post == balance - amount;
         ensures result == Coin<CoinType>{value: amount};
+    }
+
+    spec initialize_aggregatable_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
+        // TODO: specify this.
+    }
+
+    spec is_aggregatable_coin_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
+        // TODO: specify this.
+    }
+
+    spec drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
+        aborts_if aggregator::spec_read(coin.value) > MAX_U64;
+    }
+
+    spec merge_aggregatable_coin<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
+        // TODO: specify this.
+    }
+
+    spec collect_into_aggregatable_coin<CoinType>(account_addr: address, amount: u64, dst_coin: &mut AggregatableCoin<CoinType>) {
+        // TODO: specify this.
     }
 }

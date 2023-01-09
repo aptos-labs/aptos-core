@@ -101,7 +101,7 @@ where
                     HandshakeAuthMode::mutual(trusted_peers.clone()),
                     trusted_peers,
                 )
-            }
+            },
             Auth::MaybeMutual => {
                 let listener_peer_id = aptos_types::account_address::from_identity_public_key(
                     listener_key.public_key(),
@@ -124,7 +124,7 @@ where
                     HandshakeAuthMode::maybe_mutual(trusted_peers.clone()),
                     trusted_peers,
                 )
-            }
+            },
             Auth::ServerOnly => {
                 let listener_peer_id = aptos_types::account_address::from_identity_public_key(
                     listener_key.public_key(),
@@ -140,7 +140,7 @@ where
                     HandshakeAuthMode::server_only(),
                     trusted_peers,
                 )
-            }
+            },
         };
 
     let supported_protocols =

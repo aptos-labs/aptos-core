@@ -91,16 +91,13 @@ impl FaucetCliArgs {
 
         // Iterate through accounts to mint the tokens
         for account in accounts {
-            let response = mint::process(
-                &service,
-                MintParams {
-                    amount: self.amount,
-                    auth_key: None,
-                    address: Some(account.to_hex_literal()),
-                    pub_key: None,
-                    return_txns: None,
-                },
-            )
+            let response = mint::process(&service, MintParams {
+                amount: self.amount,
+                auth_key: None,
+                address: Some(account.to_hex_literal()),
+                pub_key: None,
+                return_txns: None,
+            })
             .await;
             match response {
                 Ok(response) => println!(

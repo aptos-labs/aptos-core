@@ -4,9 +4,10 @@ spec aptos_framework::aggregator_factory {
         pragma aborts_if_is_strict;
     }
 
-    spec new_aggregator {
-        // TODO: temporary mockup.
+    spec new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator {
         pragma opaque;
+        aborts_if false;
+        ensures result.limit == limit;
     }
 
     /// Make sure the caller is @aptos_framework.

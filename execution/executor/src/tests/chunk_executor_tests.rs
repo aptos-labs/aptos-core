@@ -97,6 +97,7 @@ fn execute_and_commit_chunk(
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_executor_execute_or_apply_and_commit_chunk() {
     let first_batch_size = 30;
     let second_batch_size = 40;
@@ -240,6 +241,7 @@ fn test_executor_execute_and_commit_chunk_restart() {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
     let first_batch_size = 10;
     let second_batch_size = 10;
@@ -283,4 +285,51 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
     assert!(chunk_manager
         .execute_chunk(chunks[1].clone(), &ledger_info, None)
         .is_err());
+}
+
+#[cfg(feature = "consensus-only-perf-test")]
+#[test]
+fn test_executor_execute_and_commit_chunk_without_verify() {
+    let first_batch_size = 10;
+    let second_batch_size = 10;
+
+    let (chunks, ledger_info) = {
+        let first_batch_start = 1;
+        let second_batch_start = first_batch_start + first_batch_size;
+        tests::create_transaction_chunks(vec![
+            first_batch_start..first_batch_start + first_batch_size,
+            second_batch_start..second_batch_start + second_batch_size,
+        ])
+    };
+
+    let TestExecutor {
+        _path,
+        db,
+        executor: chunk_manager,
+    } = TestExecutor::new();
+
+    // commit 5 txns first.
+    {
+        let executor = BlockExecutor::<MockVM>::new(db);
+        let parent_block_id = executor.committed_block_id();
+        let block_id = tests::gen_block_id(1);
+
+        let mut rng = rand::thread_rng();
+        let txns = (0..5)
+            .map(|_| encode_mint_transaction(tests::gen_address(rng.gen::<u64>()), 100))
+            .collect::<Vec<_>>();
+        let output = executor
+            .execute_block((block_id, block(txns)), parent_block_id)
+            .unwrap();
+        let ledger_info = tests::gen_ledger_info(6, output.root_hash(), block_id, 1);
+        executor.commit_blocks(vec![block_id], ledger_info).unwrap();
+    }
+
+    // Fork starts. Should fail.
+    chunk_manager.finish();
+    chunk_manager.reset().unwrap();
+
+    assert!(chunk_manager
+        .execute_chunk(chunks[1].clone(), &ledger_info, None)
+        .is_ok());
 }

@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::SwarmBuilder;
 use crate::{
+    smoke_test_environment::SwarmBuilder,
     test_utils::{
         assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
         transfer_and_reconfig, transfer_coins,
@@ -33,6 +33,7 @@ async fn test_db_restore() {
     workspace_builder::get_bin("db-backup");
     workspace_builder::get_bin("db-restore");
     workspace_builder::get_bin("db-backup-verify");
+    workspace_builder::get_bin("replay-verify");
     info!("---------- 1. pre-building finished.");
 
     let mut swarm = SwarmBuilder::new_local(4).with_aptos().build().await;
@@ -187,7 +188,7 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     });
 
     let output = cmd
-        .args(&[
+        .args([
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
             "local-fs",
@@ -203,6 +204,43 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     info!("Backup verified in {} seconds.", now.elapsed().as_secs());
 }
 
+fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
+    let now = Instant::now();
+    let bin_path = workspace_builder::get_bin("replay-verify");
+    let metadata_cache_path = TempPath::new();
+    let target_db_dir = TempPath::new();
+
+    metadata_cache_path.create_as_dir().unwrap();
+
+    let mut cmd = Command::new(bin_path.as_path());
+
+    trusted_waypoints.iter().for_each(|w| {
+        cmd.arg("--trust-waypoint");
+        cmd.arg(&w.to_string());
+    });
+
+    let output = cmd
+        .args([
+            "--metadata-cache-dir",
+            metadata_cache_path.path().to_str().unwrap(),
+            "--target-db-dir",
+            target_db_dir.path().to_str().unwrap(),
+            "local-fs",
+            "--dir",
+            backup_path.to_str().unwrap(),
+        ])
+        .current_dir(workspace_root())
+        .output()
+        .unwrap();
+    if !output.status.success() {
+        panic!("replay-verify failed, output: {:?}", output);
+    }
+    info!(
+        "Backup replay-verified in {} seconds.",
+        now.elapsed().as_secs()
+    );
+}
+
 fn wait_for_backups(
     target_epoch: u64,
     target_version: u64,
@@ -215,14 +253,13 @@ fn wait_for_backups(
     for i in 0..120 {
         // the verify should always succeed.
         db_backup_verify(backup_path, trusted_waypoints);
-
         info!(
             "{}th wait for the backup to reach epoch {}, version {}.",
             i, target_epoch, target_version,
         );
         let output = Command::new(bin_path)
             .current_dir(workspace_root())
-            .args(&[
+            .args([
                 "one-shot",
                 "query",
                 "backup-storage-state",
@@ -279,7 +316,7 @@ pub(crate) fn db_backup(
     // spawn the backup coordinator
     let mut backup_coordinator = Command::new(bin_path.as_path())
         .current_dir(workspace_root())
-        .args(&[
+        .args([
             "coordinator",
             "run",
             "--backup-service-address",
@@ -309,6 +346,7 @@ pub(crate) fn db_backup(
     );
     backup_coordinator.kill().unwrap();
     wait_res.unwrap();
+    replay_verify(backup_path.path(), trusted_waypoints);
     backup_path
 }
 
@@ -326,7 +364,7 @@ pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: 
     });
 
     let output = cmd
-        .args(&[
+        .args([
             "--target-db-dir",
             db_path.to_str().unwrap(),
             "auto",

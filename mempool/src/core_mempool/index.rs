@@ -3,10 +3,10 @@
 
 /// This module provides various indexes used by Mempool.
 use crate::core_mempool::transaction::{MempoolTransaction, SequenceInfo, TimelineState};
-use crate::shared_mempool::types::MultiBucketTimelineIndexIds;
 use crate::{
     counters,
     logging::{LogEntry, LogSchema},
+    shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_logger::prelude::*;
 use aptos_types::account_address::AccountAddress;
@@ -87,15 +87,15 @@ impl PartialOrd for OrderedQueueKey {
 impl Ord for OrderedQueueKey {
     fn cmp(&self, other: &OrderedQueueKey) -> Ordering {
         match self.gas_ranking_score.cmp(&other.gas_ranking_score) {
-            Ordering::Equal => {}
+            Ordering::Equal => {},
             ordering => return ordering,
         }
         match self.expiration_time.cmp(&other.expiration_time).reverse() {
-            Ordering::Equal => {}
+            Ordering::Equal => {},
             ordering => return ordering,
         }
         match self.address.cmp(&other.address) {
-            Ordering::Equal => {}
+            Ordering::Equal => {},
             ordering => return ordering,
         }
         self.sequence_number
@@ -178,7 +178,7 @@ impl Ord for TTLOrderingKey {
         match self.expiration_time.cmp(&other.expiration_time) {
             Ordering::Equal => {
                 (&self.address, self.sequence_number).cmp(&(&other.address, other.sequence_number))
-            }
+            },
             ordering => ordering,
         }
     }
@@ -415,13 +415,13 @@ impl ParkingLotIndex {
                     );
                     return;
                 }
-            }
+            },
             None => {
                 let seq_nums = [sequence_number].iter().cloned().collect::<BTreeSet<_>>();
                 self.data.push((*sender, seq_nums));
                 self.account_indices.insert(*sender, self.data.len() - 1);
                 true
-            }
+            },
         };
         if is_new_entry {
             self.size += 1;

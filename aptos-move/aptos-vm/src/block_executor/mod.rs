@@ -128,7 +128,7 @@ impl BlockAptosVM {
             .collect()
     }
 
-    pub fn execute_block<S: StateView>(
+    pub fn execute_block<S: StateView + Sync>(
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
@@ -180,7 +180,7 @@ impl BlockAptosVM {
             Ok(outputs) => Ok(outputs),
             Err(Error::ModulePathReadWrite) => {
                 unreachable!("[Execution]: Must be handled by sequential fallback")
-            }
+            },
             Err(Error::UserError(err)) => Err(err),
         }
     }

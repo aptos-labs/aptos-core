@@ -117,7 +117,7 @@ fn main() {
             let item_count = commands::make_corpus(target, num_items, &corpus_dir, opt.debug)
                 .expect("Failed to create corpus");
             println!("Wrote {} items to corpus", item_count);
-        }
+        },
         Command::Fuzz {
             corpus_dir,
             artifact_dir,
@@ -129,7 +129,7 @@ fn main() {
                     // Don't generate the corpus here -- custom directory means the user knows
                     // what they're doing.
                     dir
-                }
+                },
                 None => {
                     let (dir, created) = default_corpus_dir(target);
                     if created {
@@ -138,13 +138,13 @@ fn main() {
                             .expect("Failed to create corpus");
                     }
                     dir
-                }
+                },
             };
             let artifact_dir = artifact_dir.unwrap_or_else(|| default_artifact_dir(target));
             commands::fuzz_target(target, corpus_dir, artifact_dir, args).unwrap();
-        }
+        },
         Command::List { no_desc } => {
             commands::list_targets(no_desc);
-        }
+        },
     }
 }

@@ -23,7 +23,7 @@ static MINTER_SCRIPT: &[u8] = include_bytes!("minter.mv");
 
 pub fn mint_routes(
     service: Arc<Service>,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     // POST /?amount=25&address=xxx
     // POST /mint?amount=25&address=xxx
     warp::path::end()
@@ -58,10 +58,10 @@ impl std::fmt::Display for Response {
         match self {
             Response::SubmittedTxns(value) => {
                 write!(f, "{}", hex::encode(bcs::to_bytes(&value).unwrap()))
-            }
+            },
             Response::SubmittedTxnsHashes(value) => {
                 write!(f, "{}", serde_json::to_string(&value).unwrap())
-            }
+            },
         }
     }
 }
@@ -187,14 +187,10 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
     let txn = {
         let mut faucet_account = service.faucet_account.lock().await;
         faucet_account.sign_with_transaction_builder(service.transaction_factory.script(
-            Script::new(
-                MINTER_SCRIPT.to_vec(),
-                vec![],
-                vec![
-                    TransactionArgument::Address(receiver_address),
-                    TransactionArgument::U64(amount),
-                ],
-            ),
+            Script::new(MINTER_SCRIPT.to_vec(), vec![], vec![
+                TransactionArgument::Address(receiver_address),
+                TransactionArgument::U64(amount),
+            ]),
         ))
     };
 

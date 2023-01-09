@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
 use super::{
     api_index::ApiIndexProvider, metrics::MetricsProvider, noise::NoiseProvider,
     system_information::SystemInformationProvider,
 };
+use std::sync::Arc;
 
 /// This struct is a container for all the different providers that we have.
 /// It is used to provide a single point of access to all Providers that can
@@ -26,7 +25,7 @@ use super::{
 /// for Providers that could be used between requests, such Providers created for
 /// querying the baseline node. Providers that are only used for a single request
 /// are not wrapped in an Arc since they're only used once.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ProviderCollection {
     /// Provider that returns the information from the / endpoint of the API.
     pub baseline_api_index_provider: Option<Arc<ApiIndexProvider>>,

@@ -35,8 +35,8 @@ const INVALID_ARGUMENT: u8 = 1;
 const LIMIT_EXCEEDED: u8 = 2;
 
 fn error_split(code: u64) -> (u8, u64) {
-    let reason = code & 0xffff;
-    let category = ((code >> 16) & 0xff) as u8;
+    let reason = code & 0xFFFF;
+    let category = ((code >> 16) & 0xFF) as u8;
     (category, reason)
 }
 
@@ -62,7 +62,7 @@ pub fn convert_prologue_error(
                 location, code, category, reason,
             );
             VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
-        }
+        },
         VMStatus::MoveAbort(location, code) => {
             let new_major_status = match error_split(code) {
                 // Invalid authentication key
@@ -74,18 +74,18 @@ pub fn convert_prologue_error(
                 // Sequence number too new
                 (INVALID_ARGUMENT, EACCOUNT_DOES_NOT_EXIST) => {
                     StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
-                }
+                },
                 // Can't pay for transaction gas deposit/fee
                 (INVALID_ARGUMENT, ECANT_PAY_GAS_DEPOSIT) => {
                     StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE
-                }
+                },
                 (INVALID_ARGUMENT, ETRANSACTION_EXPIRED) => StatusCode::TRANSACTION_EXPIRED,
                 (INVALID_ARGUMENT, EBAD_CHAIN_ID) => StatusCode::BAD_CHAIN_ID,
                 // Sequence number will overflow
                 (LIMIT_EXCEEDED, ESEQUENCE_NUMBER_TOO_BIG) => StatusCode::SEQUENCE_NUMBER_TOO_BIG,
                 (INVALID_ARGUMENT, ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH) => {
                     StatusCode::SECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH
-                }
+                },
                 (category, reason) => {
                     log_context.alert();
                     error!(
@@ -96,10 +96,10 @@ pub fn convert_prologue_error(
                     return Err(VMStatus::Error(
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                     ));
-                }
+                },
             };
             VMStatus::Error(new_major_status)
-        }
+        },
         status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error(_) => {
             log_context.alert();
             error!(
@@ -107,7 +107,7 @@ pub fn convert_prologue_error(
                 "[aptos_vm] Unexpected prologue error: {:?}", status
             );
             VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
-        }
+        },
     })
 }
 
@@ -133,7 +133,7 @@ pub fn convert_epilogue_error(
                 location, code, category, reason,
             );
             VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
-        }
+        },
 
         VMStatus::MoveAbort(location, code) => match error_split(code) {
             (LIMIT_EXCEEDED, ECANT_PAY_GAS_DEPOSIT) => VMStatus::MoveAbort(location, code),
@@ -145,7 +145,7 @@ pub fn convert_epilogue_error(
                     location, code, category, reason,
                 );
                 VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
-            }
+            },
         },
 
         status => {
@@ -155,7 +155,7 @@ pub fn convert_epilogue_error(
                 "[aptos_vm] Unexpected success epilogue error: {:?}", status,
             );
             VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
-        }
+        },
     })
 }
 
@@ -181,6 +181,6 @@ pub fn expect_only_successful_execution(
                 status,
             );
             VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
-        }
+        },
     })
 }

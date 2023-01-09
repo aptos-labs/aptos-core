@@ -16,13 +16,13 @@ use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, InitialGasSchedule,
     NativeGasParameters, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
-use aptos_types::account_config::aptos_test_root_address;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
-    account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
+    account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::ContractEvent,
-    on_chain_config::{GasScheduleV2, OnChainConsensusConfig, APTOS_MAX_KNOWN_VERSION},
+    on_chain_config::{
+        FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, APTOS_MAX_KNOWN_VERSION,
+    },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
@@ -578,19 +578,13 @@ fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePa
         });
 
     // Call the initialize function with the metadata.
-    exec_function(
-        session,
-        CODE_MODULE_NAME,
-        "initialize",
-        vec![],
-        vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS)
-                .simple_serialize()
-                .unwrap(),
-            MoveValue::Signer(addr).simple_serialize().unwrap(),
-            bcs::to_bytes(pack.package_metadata()).unwrap(),
-        ],
-    );
+    exec_function(session, CODE_MODULE_NAME, "initialize", vec![], vec![
+        MoveValue::Signer(CORE_CODE_ADDRESS)
+            .simple_serialize()
+            .unwrap(),
+        MoveValue::Signer(addr).simple_serialize().unwrap(),
+        bcs::to_bytes(pack.package_metadata()).unwrap(),
+    ]);
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
@@ -654,7 +648,7 @@ pub fn generate_genesis_change_set_for_testing_with_count(
         GenesisOptions::Mainnet => {
             // We don't yet have mainnet, so returning testnet here
             aptos_framework::testnet_release_bundle()
-        }
+        },
     };
 
     generate_test_genesis(framework, Some(count as usize)).0

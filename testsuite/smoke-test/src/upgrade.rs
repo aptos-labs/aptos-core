@@ -13,8 +13,7 @@ use aptos_release_builder::components::{
     gas::generate_gas_upgrade_proposal,
 };
 use aptos_temppath::TempPath;
-use std::fs;
-use std::process::Command;
+use std::{fs, process::Command};
 
 #[tokio::test]
 /// This test verifies the flow of aptos framework upgrade process.

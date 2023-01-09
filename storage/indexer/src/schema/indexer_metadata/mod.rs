@@ -4,8 +4,10 @@
 //! This module defines physical storage schema storing metadata for the internal indexer
 //!
 
-use crate::metadata::{MetadataKey, MetadataValue};
-use crate::schema::INDEXER_METADATA_CF_NAME;
+use crate::{
+    metadata::{MetadataKey, MetadataValue},
+    schema::INDEXER_METADATA_CF_NAME,
+};
 use anyhow::Result;
 use aptos_schemadb::{
     define_schema,

@@ -48,11 +48,9 @@ pub mod counters;
 pub mod network_interface;
 mod payload_manager;
 
+pub use consensusdb::create_checkpoint;
 /// Required by the smoke tests
 pub use consensusdb::CONSENSUS_DB_NAME;
-
-pub use consensusdb::create_checkpoint;
-
 #[cfg(feature = "fuzzing")]
 pub use round_manager::round_manager_fuzzing;
 
@@ -61,7 +59,7 @@ pub use round_manager::round_manager_fuzzing;
 /// It assumes a OpMetrics defined as OP_COUNTERS in crate::counters;
 #[macro_export]
 macro_rules! monitor {
-    ( $name:literal, $fn:expr ) => {{
+    ($name:literal, $fn:expr) => {{
         use $crate::counters::OP_COUNTERS;
         let _timer = OP_COUNTERS.timer($name);
         let gauge = OP_COUNTERS.gauge(concat!($name, "_running"));

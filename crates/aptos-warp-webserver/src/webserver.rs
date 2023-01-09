@@ -45,7 +45,7 @@ impl WebServer {
                     .key_path(self.tls_key_path.as_ref().unwrap())
                     .bind(self.address)
                     .await
-            }
+            },
         }
     }
 }

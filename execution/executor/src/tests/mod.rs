@@ -1,10 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeSet, iter::once, sync::Arc};
-
-use proptest::prelude::*;
-
+use crate::{
+    block_executor::BlockExecutor,
+    chunk_executor::ChunkExecutor,
+    components::chunk_output::ChunkOutput,
+    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
+    mock_vm::{
+        encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
+        MockVM, DISCARD_STATUS, KEEP_STATUS,
+    },
+};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
@@ -12,9 +18,9 @@ use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees,
 };
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -28,17 +34,8 @@ use aptos_types::{
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-
-use crate::{
-    block_executor::BlockExecutor,
-    chunk_executor::ChunkExecutor,
-    components::chunk_output::ChunkOutput,
-    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-    mock_vm::{
-        encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
-        MockVM, DISCARD_STATUS, KEEP_STATUS,
-    },
-};
+use proptest::prelude::*;
+use std::{collections::BTreeSet, iter::once, sync::Arc};
 
 mod chunk_executor_tests;
 
@@ -135,6 +132,7 @@ fn gen_ledger_info(
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_executor_status() {
     let executor = TestExecutor::new();
     let parent_block_id = executor.committed_block_id();
@@ -153,6 +151,33 @@ fn test_executor_status() {
             KEEP_STATUS.clone(),
             KEEP_STATUS.clone(),
             DISCARD_STATUS.clone(),
+            KEEP_STATUS.clone(),
+        ],
+        output.compute_status()
+    );
+}
+
+#[cfg(feature = "consensus-only-perf-test")]
+#[test]
+fn test_executor_status_consensus_only() {
+    let executor = TestExecutor::new();
+    let parent_block_id = executor.committed_block_id();
+    let block_id = gen_block_id(1);
+
+    let txn0 = encode_mint_transaction(gen_address(0), 100);
+    let txn1 = encode_mint_transaction(gen_address(1), 100);
+    let txn2 = encode_transfer_transaction(gen_address(0), gen_address(1), 500);
+
+    let output = executor
+        .execute_block((block_id, block(vec![txn0, txn1, txn2])), parent_block_id)
+        .unwrap();
+
+    // We should not discard any transactions because we don't actually execute them.
+    assert_eq!(
+        &vec![
+            KEEP_STATUS.clone(),
+            KEEP_STATUS.clone(),
+            KEEP_STATUS.clone(),
             KEEP_STATUS.clone(),
         ],
         output.compute_status()
@@ -191,6 +216,7 @@ fn test_executor_multiple_blocks() {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_executor_two_blocks_with_failed_txns() {
     let executor = TestExecutor::new();
     let parent_block_id = executor.committed_block_id();
@@ -216,6 +242,7 @@ fn test_executor_two_blocks_with_failed_txns() {
     let output2 = executor
         .execute_block((block2_id, block(block2_txns)), block1_id)
         .unwrap();
+
     let ledger_info = gen_ledger_info(77, output2.root_hash(), block2_id, 1);
     executor
         .commit_blocks(vec![block1_id, block2_id], ledger_info)
@@ -320,6 +347,7 @@ fn create_transaction_chunks(
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_noop_block_after_reconfiguration() {
     let executor = TestExecutor::new();
     let mut parent_block_id = executor.committed_block_id();
@@ -439,10 +467,10 @@ fn test_deleted_key_from_state_store() {
     .freeze()
     .unwrap();
 
-    apply_transaction_by_writeset(
-        db,
-        vec![(transaction1, write_set1), (transaction2, write_set2)],
-    );
+    apply_transaction_by_writeset(db, vec![
+        (transaction1, write_set1),
+        (transaction2, write_set2),
+    ]);
 
     let state_value1_from_db = db
         .reader
@@ -560,6 +588,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
+    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
     fn test_executor_two_branches(
         a_size in 0..30u64,
         b_size in 0..30u64,
@@ -611,6 +640,7 @@ proptest! {
     }
 
     #[test]
+    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
     fn test_reconfiguration_with_retry_transaction_status(
         (num_user_txns, reconfig_txn_index) in (10..100u64).prop_flat_map(|num_user_txns| {
             (
@@ -656,7 +686,7 @@ proptest! {
             // get txn_infos from db
             let db = executor.db.reader.clone();
             prop_assert_eq!(db.get_latest_version().unwrap(), num_txns as Version);
-            let txn_list = db.get_transactions(1 /* start version */, num_txns as u64, num_txns as Version /* ledger version */, false /* fetch events */).unwrap();
+            let txn_list = db.get_transactions(1 /* start version */, num_txns, num_txns as Version /* ledger version */, false /* fetch events */).unwrap();
             prop_assert_eq!(&block.txns, &txn_list.transactions);
             let txn_infos = txn_list.proof.transaction_infos;
 
@@ -673,6 +703,7 @@ proptest! {
         }
 
     #[test]
+    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
     fn test_executor_restart(a_size in 1..30u64, b_size in 1..30u64, amount in any::<u32>()) {
         let block_a = TestBlock::new(a_size, amount, gen_block_id(1));
         let block_b = TestBlock::new(b_size, amount, gen_block_id(2));

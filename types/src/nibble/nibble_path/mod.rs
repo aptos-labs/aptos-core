@@ -52,10 +52,11 @@ impl FromIterator<Nibble> for NibblePath {
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for NibblePath {
     type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         arb_nibble_path().boxed()
     }
-    type Strategy = BoxedStrategy<Self>;
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -199,6 +200,7 @@ impl<'a> Peekable for BitIterator<'a> {
 /// BitIterator spits out a boolean each time. True/false denotes 1/0.
 impl<'a> Iterator for BitIterator<'a> {
     type Item = bool;
+
     fn next(&mut self) -> Option<Self::Item> {
         self.pos.next().map(|i| self.nibble_path.get_bit(i))
     }
@@ -233,6 +235,7 @@ pub struct NibbleIterator<'a> {
 /// NibbleIterator spits out a byte each time. Each byte must be in range [0, 16).
 impl<'a> Iterator for NibbleIterator<'a> {
     type Item = Nibble;
+
     fn next(&mut self) -> Option<Self::Item> {
         self.pos.next().map(|i| self.nibble_path.get_nibble(i))
     }

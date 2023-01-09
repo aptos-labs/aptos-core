@@ -47,7 +47,7 @@ impl StorageSynchronizerOperations {
         match self {
             StorageSynchronizerOperations::AppliedTransactionOutputs => {
                 "applied_transaction_outputs"
-            }
+            },
             StorageSynchronizerOperations::ExecutedTransactions => "executed_transactions",
             StorageSynchronizerOperations::Synced => "synced",
             StorageSynchronizerOperations::SyncedEpoch => "synced_epoch",

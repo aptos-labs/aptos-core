@@ -29,7 +29,7 @@ where
                 } else {
                     return Err(err);
                 }
-            }
+            },
         }
     }
 }
@@ -51,7 +51,7 @@ where
                 } else {
                     return Err(err);
                 }
-            }
+            },
         }
     }
 }

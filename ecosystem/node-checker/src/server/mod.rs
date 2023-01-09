@@ -11,9 +11,8 @@ mod run;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use generate_openapi::{generate_openapi, GenerateOpenapi};
-use run::{run, Run};
-
 pub use node_information::NodeInformation;
+use run::{run, Run};
 
 #[derive(Clone, Debug, Parser)]
 pub struct Server {

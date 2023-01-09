@@ -5,14 +5,13 @@ use crate::proof_of_store::ProofOfStore;
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
 use aptos_infallible::Mutex;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
+use aptos_types::{
+    account_address::AccountAddress, transaction::SignedTransaction,
+    validator_verifier::ValidatorVerifier,
+};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::fmt;
-use std::fmt::Write;
-use std::sync::Arc;
+use std::{collections::HashSet, fmt, fmt::Write, sync::Arc};
 use tokio::sync::oneshot;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
@@ -142,7 +141,7 @@ impl Payload {
                     proof.verify(validator)?;
                 }
                 Ok(())
-            }
+            },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
                 quorum_store_enabled,
@@ -157,10 +156,10 @@ impl fmt::Display for Payload {
         match self {
             Payload::DirectMempool(txns) => {
                 write!(f, "InMemory txns: {}", txns.len())
-            }
+            },
             Payload::InQuorumStore(proof_with_status) => {
                 write!(f, "InMemory proofs: {}", proof_with_status.proofs.len())
-            }
+            },
         }
     }
 }
@@ -216,17 +215,17 @@ impl fmt::Display for PayloadFilter {
                     write!(txns_str, "{} ", tx)?;
                 }
                 write!(f, "{}", txns_str)
-            }
+            },
             PayloadFilter::InQuorumStore(excluded_proofs) => {
                 let mut proofs_str = "".to_string();
                 for proof in excluded_proofs.iter() {
                     write!(proofs_str, "{} ", proof)?;
                 }
                 write!(f, "{}", proofs_str)
-            }
+            },
             PayloadFilter::Empty => {
                 write!(f, "Empty filter")
-            }
+            },
         }
     }
 }

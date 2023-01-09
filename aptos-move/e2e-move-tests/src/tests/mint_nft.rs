@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
-use aptos_crypto::ed25519::Ed25519Signature;
-use aptos_crypto::SigningKey;
-use aptos_types::state_store::table::TableHandle;
+use aptos_crypto::{ed25519::Ed25519Signature, SigningKey};
 use aptos_types::{
-    account_address::create_resource_address, account_address::AccountAddress, event::EventHandle,
-    state_store::state_key::StateKey,
+    account_address::{create_resource_address, AccountAddress},
+    event::EventHandle,
+    state_store::{state_key::StateKey, table::TableHandle},
 };
 use move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};

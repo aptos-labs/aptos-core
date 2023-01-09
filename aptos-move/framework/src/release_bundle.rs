@@ -1,22 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::built_package::BuiltPackage;
-use crate::natives::code::PackageMetadata;
-use crate::path_in_crate;
+use crate::{built_package::BuiltPackage, natives::code::PackageMetadata, path_in_crate};
 use anyhow::Context;
 use aptos_types::account_address::AccountAddress;
-use move_binary_format::access::ModuleAccess;
-use move_binary_format::errors::PartialVMError;
-use move_binary_format::CompiledModule;
+use move_binary_format::{access::ModuleAccess, errors::PartialVMError, CompiledModule};
 use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION};
 use move_core_types::language_storage::ModuleId;
-use move_model::code_writer::CodeWriter;
-use move_model::model::Loc;
-use move_model::{emit, emitln};
+use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::{collections::BTreeMap, path::PathBuf};
 
 /// A release bundle consists of a list of release packages.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -157,7 +150,7 @@ impl ReleasePackage {
             .collect::<BTreeMap<_, _>>();
         let mut order = vec![];
         for id in map.keys() {
-            self.sort_by_deps(&map, &mut order, id.clone());
+            sort_by_deps(&map, &mut order, id.clone());
         }
         let mut result = vec![];
         for id in order {
@@ -165,27 +158,6 @@ impl ReleasePackage {
             result.push((code, module))
         }
         result
-    }
-
-    fn sort_by_deps(
-        &self,
-        map: &BTreeMap<ModuleId, (&[u8], CompiledModule)>,
-        order: &mut Vec<ModuleId>,
-        id: ModuleId,
-    ) {
-        if order.contains(&id) {
-            return;
-        }
-        let compiled = &map.get(&id).unwrap().1;
-        for dep in compiled.immediate_dependencies() {
-            // Only consider deps which are actually in this package. Deps for outside
-            // packages are considered fine because of package deployment order. Note
-            // that because of this detail, we can't use existing topsort from Move utils.
-            if map.contains_key(&dep) {
-                self.sort_by_deps(map, order, dep);
-            }
-        }
-        order.push(id)
     }
 
     pub fn generate_script_proposal(
@@ -271,7 +243,7 @@ impl ReleasePackage {
         // the result.
         let mut metadata = bcs::to_bytes(&self.metadata)?;
         let chunk_size = (u16::MAX / 2) as usize;
-        let num_of_chunks = (metadata.len() / chunk_size) as usize + 1;
+        let num_of_chunks = (metadata.len() / chunk_size) + 1;
 
         for i in 1..num_of_chunks + 1 {
             let to_drain = if i == num_of_chunks {
@@ -348,4 +320,24 @@ impl ReleasePackage {
             emitln!(writer, "};");
         }
     }
+}
+
+fn sort_by_deps(
+    map: &BTreeMap<ModuleId, (&[u8], CompiledModule)>,
+    order: &mut Vec<ModuleId>,
+    id: ModuleId,
+) {
+    if order.contains(&id) {
+        return;
+    }
+    let compiled = &map.get(&id).unwrap().1;
+    for dep in compiled.immediate_dependencies() {
+        // Only consider deps which are actually in this package. Deps for outside
+        // packages are considered fine because of package deployment order. Note
+        // that because of this detail, we can't use existing topsort from Move utils.
+        if map.contains_key(&dep) {
+            sort_by_deps(map, order, dep);
+        }
+    }
+    order.push(id)
 }

@@ -5,13 +5,13 @@
 //!
 //! [Spec](https://www.rosetta-api.org/docs/api_identifiers.html)
 
-use crate::common::BlockHash;
 use crate::{
-    common::{to_hex_lower, BLOCKCHAIN},
+    common::{to_hex_lower, BlockHash, BLOCKCHAIN},
     error::{ApiError, ApiResult},
 };
-use aptos_types::transaction::TransactionInfo;
-use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
+use aptos_types::{
+    account_address::AccountAddress, chain_id::ChainId, transaction::TransactionInfo,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::{TryFrom, TryInto},
@@ -63,6 +63,7 @@ impl AccountIdentifier {
     pub fn is_base_account(&self) -> bool {
         self.sub_account.is_none()
     }
+
     pub fn is_total_stake(&self) -> bool {
         if let Some(ref inner) = self.sub_account {
             inner.is_total_stake()

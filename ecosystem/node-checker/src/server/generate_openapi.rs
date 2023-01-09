@@ -1,7 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{build::BaselineConfigurationRunners, common::ServerArgs};
+use super::{
+    api::{build_openapi_service, Api},
+    build::BaselineConfigurationRunners,
+    common::ServerArgs,
+};
 use crate::{
     common::{OutputArgs, OutputFormat},
     runner::SyncRunner,
@@ -9,8 +13,6 @@ use crate::{
 use anyhow::Result;
 use clap::Parser;
 use std::collections::HashMap;
-
-use super::api::{build_openapi_service, Api};
 
 #[derive(Clone, Debug, Parser)]
 pub struct GenerateOpenapi {

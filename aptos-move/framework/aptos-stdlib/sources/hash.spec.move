@@ -22,6 +22,11 @@ spec aptos_std::aptos_hash {
         fun spec_ripemd160_internal(bytes: vector<u8>): vector<u8>;
         axiom forall b1: vector<u8>, b2: vector<u8>:
             (spec_ripemd160_internal(b1) == spec_ripemd160_internal(b2) ==> b1 == b2);
+
+        /// `spec_blake2b_256_internal` is an injective function.
+        fun spec_blake2b_256_internal(bytes: vector<u8>): vector<u8>;
+        axiom forall b1: vector<u8>, b2: vector<u8>:
+            (spec_blake2b_256_internal(b1) == spec_blake2b_256_internal(b2) ==> b1 == b2);
     }
 
     spec sip_hash(bytes: vector<u8>): u64 {
@@ -77,9 +82,16 @@ spec aptos_std::aptos_hash {
         ensures result == spec_ripemd160_internal(bytes);
     }
 
-    spec blake2b_256 {
-        // TODO: temporary mockup.
+    spec blake2b_256_internal(bytes: vector<u8>): vector<u8> {
         pragma opaque;
+        aborts_if false;
+        ensures result == spec_blake2b_256_internal(bytes);
+    }
+
+    spec blake2b_256(bytes: vector<u8>): vector<u8> {
+        pragma opaque;
+        aborts_if !features::spec_is_enabled(features::BLAKE2B_256_NATIVE);
+        ensures result == spec_blake2b_256_internal(bytes);
     }
 
 }

@@ -9,20 +9,19 @@ pub mod transaction_executor;
 pub mod transaction_generator;
 
 use crate::{
-    transaction_committer::TransactionCommitter, transaction_executor::TransactionExecutor,
-    transaction_generator::TransactionGenerator,
+    pipeline::Pipeline, transaction_committer::TransactionCommitter,
+    transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
 use aptos_config::config::{
     NodeConfig, PrunerConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::AptosDB;
+use aptos_executor::block_executor::BlockExecutor;
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
 
-use crate::pipeline::Pipeline;
-use aptos_executor::block_executor::BlockExecutor;
 use aptos_metrics_core::{exponential_buckets, histogram_opts, HistogramVec};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;

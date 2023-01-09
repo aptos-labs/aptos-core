@@ -81,6 +81,7 @@ There will be some APIs that certain wallets may add but there should be a few a
 
 - `connect()`, `disconnect()`, and `isConnected()`
 - `account()`
+- `network()`
 - `signAndSubmitTransaction(transaction: EntryFunctionPayload)`
 - `signMessage(payload: SignMessagePayload)`
 - Event listening (`onAccountChanged(listener)`, `onNetworkChanged(listener)`)
@@ -90,11 +91,17 @@ There will be some APIs that certain wallets may add but there should be a few a
 
 // For single-signer account, there is one publicKey and minKeysRequired is null.
 // For multi-signer account, there are multiple publicKeys and minKeysRequired value.
-interface PublicAccount {
+type AccountInfo {
     address: string;
     publicKey: string | string[];
     minKeysRequired?: number; // for multi-signer account
 }
+
+type NetworkInfo = {
+  name: string;
+  chainId: string;
+  url: string;
+};
 
 // The important thing to return here is the transaction hash the dApp can wait for it
 type [PendingTransaction](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/generated/models/PendingTransaction.ts)
@@ -108,7 +115,7 @@ type [EntryFunctionPayload](https://github.com/aptos-labs/aptos-core/blob/1bc5fd
 It is important that dApps, aren't allow to send requests to the wallet until the user acknowledges that they want to see these requests.
 
 - `connect()` will prompt the user 
-    - return `Promise<PublicAccount>`
+    - return `Promise<AccountInfo>`
 - `disconnect()` allows the user to stop giving access to a dApp and also helps the dApp with state management
     - return `Promise<void>`
 - `isConnected()` able to make requests to the wallet to get current state of connection
@@ -120,7 +127,14 @@ It is important that dApps, aren't allow to send requests to the wallet until th
 The dApp may want to query for the current connected account to get the address or public key.
 
 - `account()` no prompt to the user
-    - returns `Promise<PublicAccount>`
+    - returns `Promise<AccountInfo>`
+
+### network()
+**Needs to be connected**
+The dApp may want to query for the current connected network to get the network name, chain_id and url.
+
+- `network()` no prompt to the user
+    - returns `Promise<NetworkInfo>`
 
 ### signAndSubmitTransaction(transaction: EntryFunctionPayload)
 We will be generate a transaction from payload(simple JSON) using the [SDK](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/aptos_client.ts#L217-L221) and then sign and submit it to the wallet's node.

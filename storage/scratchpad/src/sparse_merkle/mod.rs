@@ -91,13 +91,14 @@ use aptos_crypto::{
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::nibble::{NIBBLE_SIZE_IN_BITS, ROOT_NIBBLE_HEIGHT};
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt};
-use std::sync::MutexGuard;
+use aptos_types::{
+    nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt,
+    state_store::state_storage_usage::StateStorageUsage,
+};
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, HashMap},
-    sync::{Arc, Weak},
+    sync::{Arc, MutexGuard, Weak},
 };
 use thiserror::Error;
 
@@ -567,7 +568,7 @@ where
                         node_hashes,
                     );
                     pos.pop();
-                }
+                },
                 NodeInner::Leaf(leaf_node) => {
                     let mut path =
                         NibblePath::new_from_bytes(leaf_node.key.as_slice(), ROOT_NIBBLE_HEIGHT);
@@ -575,7 +576,7 @@ where
                         path.truncate(pos.len() as usize / NIBBLE_SIZE_IN_BITS + 1);
                     }
                     node_hashes.insert(path, subtree.hash());
-                }
+                },
             }
         }
     }
@@ -646,7 +647,7 @@ where
                                     internal_node.left.weak()
                                 };
                                 continue;
-                            } // end NodeInner::Internal
+                            }, // end NodeInner::Internal
                             NodeInner::Leaf(leaf_node) => {
                                 return if leaf_node.key == key {
                                     match &leaf_node.value.data.get_if_in_mem() {
@@ -658,10 +659,10 @@ where
                                 } else {
                                     StateStoreStatus::DoesNotExist
                                 };
-                            } // end NodeInner::Leaf
+                            }, // end NodeInner::Leaf
                         }, // end Some(node) got from mem
                     }
-                } // end SubTree::NonEmpty
+                }, // end SubTree::NonEmpty
             }
         } // end loop
     }
