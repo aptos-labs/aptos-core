@@ -1,1 +1,0 @@
-../developer-docs-site/docs/reference/telemetry.md

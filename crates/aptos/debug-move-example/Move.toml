@@ -1,9 +1,0 @@
-[package]
-name = "DebugDemo"
-version = "0.0.0"
-
-[addresses]
-DebugDemo = "0x1"
-
-[dependencies]
-AptosFramework = { local = "../../../aptos-move/framework/aptos-framework" }
