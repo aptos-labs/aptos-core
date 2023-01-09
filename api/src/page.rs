@@ -64,8 +64,8 @@ impl Page {
     pub fn limit<E: BadRequestError>(&self, ledger_info: &LedgerInfo) -> Result<u16, E> {
         determine_limit(
             self.limit,
-            self.max_page_size,
             DEFAULT_PAGE_SIZE,
+            self.max_page_size,
             ledger_info,
         )
     }
