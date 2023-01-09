@@ -11,10 +11,7 @@ use anyhow::{Context, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use rand::{rngs::StdRng, Rng};
 use rand_core::{OsRng, SeedableRng};
-use std::{
-    cmp::{max, min},
-    time::Duration,
-};
+use std::time::Duration;
 
 pub async fn emit_transactions(
     cluster_args: &ClusterArgs,
@@ -82,7 +79,7 @@ pub async fn emit_transactions_with_cluster(
             &mut coin_source_account,
             emit_job_request,
             duration,
-            min(10, max(args.duration / 5, 1)),
+            (args.duration / 5).clamp(1, 10),
         )
         .await?;
     Ok(stats)

@@ -59,7 +59,7 @@ use warp::Filter;
 
 pub fn combine_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "combine")
         .and(warp::post())
         .and(warp::body::json())
@@ -69,7 +69,7 @@ pub fn combine_route(
 
 pub fn derive_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "derive")
         .and(warp::post())
         .and(warp::body::json())
@@ -79,7 +79,7 @@ pub fn derive_route(
 
 pub fn hash_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "hash")
         .and(warp::post())
         .and(warp::body::json())
@@ -89,7 +89,7 @@ pub fn hash_route(
 
 pub fn metadata_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "metadata")
         .and(warp::post())
         .and(warp::body::json())
@@ -99,7 +99,7 @@ pub fn metadata_route(
 
 pub fn parse_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "parse")
         .and(warp::post())
         .and(warp::body::json())
@@ -109,7 +109,7 @@ pub fn parse_route(
 
 pub fn payloads_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "payloads")
         .and(warp::post())
         .and(warp::body::json())
@@ -119,7 +119,7 @@ pub fn payloads_route(
 
 pub fn preprocess_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "preprocess")
         .and(warp::post())
         .and(warp::body::json())
@@ -129,7 +129,7 @@ pub fn preprocess_route(
 
 pub fn submit_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("construction" / "submit")
         .and(warp::post())
         .and(warp::body::json())
@@ -236,11 +236,7 @@ async fn fill_in_operator(
                     .await?
                     .into_inner();
                 if store.staking_contracts.len() != 1 {
-                    let operators: Vec<_> = store
-                        .staking_contracts
-                        .iter()
-                        .map(|(operator, _)| operator)
-                        .collect();
+                    let operators: Vec<_> = store.staking_contracts.keys().collect();
                     return Err(ApiError::InvalidInput(Some(format!(
                         "Account has more than one operator, operator must be specified from: {:?}",
                         operators
@@ -265,11 +261,7 @@ async fn fill_in_operator(
                     .await?
                     .into_inner();
                 if store.staking_contracts.len() != 1 {
-                    let operators: Vec<_> = store
-                        .staking_contracts
-                        .iter()
-                        .map(|(operator, _)| operator)
-                        .collect();
+                    let operators: Vec<_> = store.staking_contracts.keys().collect();
                     return Err(ApiError::InvalidInput(Some(format!(
                         "Account has more than one operator, operator must be specified from: {:?}",
                         operators

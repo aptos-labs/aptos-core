@@ -6,19 +6,9 @@ xclippy = [
   "--",
   "-Dwarnings",
   "-Wclippy::all",
-  "-Aclippy::unit_arg",
-  "-Aclippy::mixed_read_write_in_expression",
-  "-Aclippy::new-without-default",
-  "-Aclippy::rc_buffer",
   "-Aclippy::upper_case_acronyms",
-  "-Aclippy::len-without-is-empty",
-  "-Aclippy::from-iter-instead-of-collect",
-  "-Aclippy::while-let-on-iterator",
-  "-Aclippy::bool-assert-comparison",
-  "-Aclippy::needless-collect",
   "-Aclippy::enum-variant-names",
-  "-Aclippy::self-named-constructors",
-  "-Aclippy::single-match"
+  "-Aclippy::result-large-err",
 ]
 
 [build]

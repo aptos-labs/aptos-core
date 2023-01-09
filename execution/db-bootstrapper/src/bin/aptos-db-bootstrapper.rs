@@ -103,7 +103,7 @@ fn main() -> Result<()> {
 }
 
 fn load_genesis_txn(path: &Path) -> Result<Transaction> {
-    let mut file = File::open(&path)?;
+    let mut file = File::open(path)?;
     let mut buffer = vec![];
     file.read_to_end(&mut buffer)?;
 

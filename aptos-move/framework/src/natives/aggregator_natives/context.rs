@@ -167,7 +167,7 @@ mod test {
             .iter()
             .flat_map(|b| b.to_vec())
             .collect();
-        let key = AggregatorHandle(AccountAddress::from_bytes(&bytes).unwrap());
+        let key = AggregatorHandle(AccountAddress::from_bytes(bytes).unwrap());
         AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
     }
 

@@ -62,6 +62,7 @@ fn test_genesis() {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_reconfiguration() {
     // When executing a transaction emits a validator set change,
     // storage should propagate the new validator set
@@ -178,6 +179,7 @@ fn test_reconfiguration() {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_execution_with_storage() {
     test_execution_with_storage_impl();
 }

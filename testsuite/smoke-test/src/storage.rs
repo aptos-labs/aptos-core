@@ -188,7 +188,7 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     });
 
     let output = cmd
-        .args(&[
+        .args([
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
             "local-fs",
@@ -220,7 +220,7 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     });
 
     let output = cmd
-        .args(&[
+        .args([
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
             "--target-db-dir",
@@ -259,7 +259,7 @@ fn wait_for_backups(
         );
         let output = Command::new(bin_path)
             .current_dir(workspace_root())
-            .args(&[
+            .args([
                 "one-shot",
                 "query",
                 "backup-storage-state",
@@ -316,7 +316,7 @@ pub(crate) fn db_backup(
     // spawn the backup coordinator
     let mut backup_coordinator = Command::new(bin_path.as_path())
         .current_dir(workspace_root())
-        .args(&[
+        .args([
             "coordinator",
             "run",
             "--backup-service-address",
@@ -364,7 +364,7 @@ pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: 
     });
 
     let output = cmd
-        .args(&[
+        .args([
             "--target-db-dir",
             db_path.to_str().unwrap(),
             "auto",
