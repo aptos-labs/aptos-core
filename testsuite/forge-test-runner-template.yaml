@@ -20,12 +20,12 @@ spec:
       ulimit -n 1048576
       {FORGE_ARGS}
     resources:
-      requests:
-        cpu: 16
-        memory: 16Gi
       limits:
-        cpu: 16
-        memory: 16Gi
+        cpu: 15.5
+        memory: 26Gi
+      requests:
+        cpu: 15
+        memory: 26Gi
     env:
     - name: FORGE_TRIGGERED_BY
       value: {FORGE_TRIGGERED_BY}
