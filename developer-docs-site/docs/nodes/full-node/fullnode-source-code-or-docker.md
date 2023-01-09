@@ -97,8 +97,10 @@ With your development environment ready, now you can start to setup your fullnod
       curl -O https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt
       ```
   
-    :::tip
-    To connect to other networks, you can find genesis and waypoint here ➜ https://github.com/aptos-labs/aptos-networks
+    :::caution Don't want to connect to mainnet?
+    To connect to other networks (e.g., `devnet` and `testnet`), you can find genesis and waypoint here ➜ https://github.com/aptos-labs/aptos-networks.
+    Be sure to download the `genesis.blob` and `waypoint.txt` for those networks, instead of using the genesis
+    and waypoint pointed to by the `curl` commands above.
     :::
 
 8. Edit the `fullnode.yaml` file in your current working directory as follows.
