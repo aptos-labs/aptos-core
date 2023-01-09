@@ -178,6 +178,12 @@ resource "helm_release" "validator" {
   max_history = 5
   wait        = false
 
+  # lifecycle {
+  #   ignore_changes = [
+  #     values,
+  #   ]
+  # }
+
   values = [
     local.helm_values,
     var.helm_values_file != "" ? file(var.helm_values_file) : "{}",
