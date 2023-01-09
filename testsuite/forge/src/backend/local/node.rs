@@ -4,13 +4,13 @@
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
+use aptos_db::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use aptos_logger::{debug, info};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{account_address::AccountAddress, PeerId},
 };
-use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
-use state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
+use aptos_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use std::{
     env,
     fs::{self, OpenOptions},
@@ -29,13 +29,13 @@ impl Drop for Process {
         // check if the process has already been terminated
         match self.0.try_wait() {
             // The child process has already terminated, perhaps due to a crash
-            Ok(Some(_)) => {}
+            Ok(Some(_)) => {},
 
             // The process is still running so we need to attempt to kill it
             _ => {
                 self.0.kill().expect("Process wasn't running");
                 self.0.wait().unwrap();
-            }
+            },
         }
     }
 }
@@ -195,15 +195,15 @@ impl LocalNode {
                 Ok(Some(status)) => {
                     let error = format!("Node '{}' crashed with: {}", self.name, status);
                     return Err(HealthCheckError::NotRunning(error));
-                }
+                },
 
                 // This is the case where the node is still running
-                Ok(None) => {}
+                Ok(None) => {},
 
                 // Some other unknown error
                 Err(e) => {
                     return Err(HealthCheckError::Unknown(e.into()));
-                }
+                },
             }
         } else {
             let error = format!("Node '{}' is stopped", self.name);

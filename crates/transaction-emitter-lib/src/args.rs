@@ -1,16 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{convert::TryFrom, path::Path};
-
 use anyhow::{bail, format_err, Result};
 use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::chain_id::ChainId;
 use clap::{ArgEnum, ArgGroup, Parser};
-
 use serde::{Deserialize, Serialize};
+use std::{convert::TryFrom, path::Path};
 use url::Url;
 
 const DEFAULT_API_PORT: u16 = 8080;
@@ -34,28 +32,26 @@ pub struct CoinSourceArgs {
 
 impl CoinSourceArgs {
     pub fn get_private_key(&self) -> Result<(Ed25519PrivateKey, bool)> {
-        Ok(
-            match (
-                &self.mint_key,
-                &self.mint_file,
-                &self.coin_source_key,
-                &self.coin_source_file,
-            ) {
-                (Some(ref key), None, None, None) => (key.private_key(), true),
-                (None, Some(path), None, None) => (
-                    EncodingType::BCS
-                        .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,
-                    true,
-                ),
-                (None, None, Some(ref key), None) => (key.private_key(), false),
-                (None, None, None, Some(path)) => (
-                    EncodingType::BCS
-                        .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,
-                    false,
-                ),
-                _ => unreachable!(),
-            },
-        )
+        match (
+            &self.mint_key,
+            &self.mint_file,
+            &self.coin_source_key,
+            &self.coin_source_file,
+        ) {
+            (Some(ref key), None, None, None) => Ok((key.private_key(), true)),
+            (None, Some(path), None, None) => Ok((
+                EncodingType::BCS
+                    .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,
+                true,
+            )),
+            (None, None, Some(ref key), None) => Ok((key.private_key(), false)),
+            (None, None, None, Some(path)) => Ok((
+                EncodingType::BCS
+                    .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,
+                false,
+            )),
+            _ => Err(anyhow::anyhow!("Please provide exactly one of mint-key, mint-file, coin-source-key, or coin-source-file")),
+        }
     }
 }
 
@@ -82,6 +78,7 @@ pub enum TransactionType {
     P2P,
     AccountGeneration,
     NftMintAndTransfer,
+    PublishPackage,
 }
 
 impl Default for TransactionType {

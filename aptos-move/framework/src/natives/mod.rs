@@ -183,6 +183,10 @@ impl GasParameters {
                     base: 0.into(),
                     per_byte: 0.into(),
                 },
+                blake2b_256: hash::Blake2B256HashGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
             },
             type_info: type_info::GasParameters {
                 type_of: type_info::TypeOfGasParameters {
@@ -242,7 +246,7 @@ pub fn all_natives(
     let mut natives = vec![];
 
     macro_rules! add_natives_from_module {
-        ($module_name: expr, $natives: expr) => {
+        ($module_name:expr, $natives:expr) => {
             natives.extend(
                 $natives.map(|(func_name, func)| ($module_name.to_string(), func_name, func)),
             );

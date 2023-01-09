@@ -4,11 +4,10 @@
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     network::{MempoolNetworkEvents, MempoolSyncMsg},
-    shared_mempool::{
-        network::MempoolNetworkSender, start_shared_mempool, types::SharedMempoolNotification,
-    },
+    shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
     tests::common::TestTransaction,
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{Identity, NodeConfig, PeerRole, RoleType},
     network_id::{NetworkContext, NetworkId, PeerNetworkId},
@@ -16,37 +15,37 @@ use aptos_config::{
 use aptos_crypto::{x25519::PrivateKey, Uniform};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, MutexGuard, RwLock};
-use aptos_types::on_chain_config::OnChainConfigPayload;
-use aptos_types::{account_config::AccountSequenceInfo, PeerId};
-use channel::{aptos_channel, message_queues::QueueStyle};
-use enum_dispatch::enum_dispatch;
-use futures::{
-    channel::mpsc::{self, unbounded, UnboundedReceiver},
-    FutureExt, StreamExt,
-};
-use netcore::transport::ConnectionOrigin;
-use network::{
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::{
     application::storage::PeerMetadataStorage,
     peer_manager::{
         conn_notifs_channel, ConnectionNotification, ConnectionRequestSender,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::network::{NetworkEvents, NewNetworkEvents, NewNetworkSender},
+    protocols::network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
     transport::ConnectionMetadata,
     ProtocolId,
+};
+use aptos_storage_interface::mock::MockDbReaderWriter;
+use aptos_types::{
+    account_config::AccountSequenceInfo, on_chain_config::OnChainConfigPayload, PeerId,
+};
+use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use enum_dispatch::enum_dispatch;
+use futures::{
+    channel::mpsc::{self, unbounded, UnboundedReceiver},
+    FutureExt, StreamExt,
 };
 use rand::rngs::StdRng;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use storage_interface::mock::MockDbReaderWriter;
-use tokio::runtime::{Builder, Runtime};
-use vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use tokio::runtime::Runtime;
 
 type MempoolNetworkHandle = (
     NetworkId,
-    MempoolNetworkSender,
+    NetworkSender<MempoolSyncMsg>,
     NetworkEvents<MempoolSyncMsg>,
 );
 
@@ -540,7 +539,7 @@ fn setup_node_network_interface(
     let (network_notifs_tx, network_notifs_rx) =
         aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
     let (network_conn_event_notifs_tx, conn_status_rx) = conn_notifs_channel::new();
-    let network_sender = MempoolNetworkSender::new(
+    let network_sender = NetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
@@ -571,26 +570,18 @@ fn start_node_mempool(
     let (_ac_endpoint_sender, ac_endpoint_receiver) = mpsc::channel(1_024);
     let (_quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
     let (_mempool_notifier, mempool_listener) =
-        mempool_notifications::new_mempool_notifier_listener_pair();
+        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
     let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
     let reconfig_event_subscriber = ReconfigNotificationListener {
         notification_receiver: reconfig_events,
     };
     reconfig_sender
-        .push(
-            (),
-            ReconfigNotification {
-                version: 1,
-                on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
-            },
-        )
+        .push((), ReconfigNotification {
+            version: 1,
+            on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+        })
         .unwrap();
-    let runtime = Builder::new_multi_thread()
-        .thread_name("shared-mem")
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[shared mempool] failed to create runtime");
+    let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     start_shared_mempool(
         runtime.handle(),
         &config,

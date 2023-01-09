@@ -6,13 +6,13 @@
 #![allow(unused)]
 
 use super::AptosDB;
-use crate::utils::iterators::EventsByVersionIter;
 use crate::{
     errors::AptosDbError,
     schema::{
         event::EventSchema, event_accumulator::EventAccumulatorSchema,
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
     },
+    utils::iterators::EventsByVersionIter,
 };
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_accumulator::{HashReader, MerkleAccumulator};
@@ -20,6 +20,7 @@ use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
 };
+use aptos_schemadb::{iterator::SchemaIterator, schema::ValueCodec, ReadOptions, SchemaBatch, DB};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -28,8 +29,6 @@ use aptos_types::{
     proof::position::Position,
     transaction::Version,
 };
-use schemadb::iterator::SchemaIterator;
-use schemadb::{schema::ValueCodec, ReadOptions, SchemaBatch, DB};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     convert::{TryFrom, TryInto},
@@ -231,7 +230,7 @@ impl EventStore {
                 } else {
                     Ok(None)
                 }
-            }
+            },
         }
     }
 
@@ -259,7 +258,7 @@ impl EventStore {
                 } else {
                     Ok(None)
                 }
-            }
+            },
         }
     }
 
@@ -287,7 +286,7 @@ impl EventStore {
                 } else {
                     Ok(None)
                 }
-            }
+            },
         }
     }
 
@@ -307,7 +306,7 @@ impl EventStore {
         &self,
         version: u64,
         events: &[ContractEvent],
-        batch: &mut SchemaBatch,
+        batch: &SchemaBatch,
     ) -> Result<HashValue> {
         // Event table and indices updates
         events
@@ -343,7 +342,7 @@ impl EventStore {
         &self,
         first_version: u64,
         event_vecs: &[Vec<ContractEvent>],
-        batch: &mut SchemaBatch,
+        batch: &SchemaBatch,
     ) -> Result<Vec<HashValue>> {
         event_vecs
             .iter()
@@ -440,7 +439,7 @@ impl EventStore {
         &self,
         begin: Version,
         end: Version,
-        db_batch: &mut SchemaBatch,
+        db_batch: &SchemaBatch,
     ) -> anyhow::Result<()> {
         let mut iter = self.db.iter::<EventAccumulatorSchema>(Default::default())?;
         iter.seek(&(begin, Position::from_inorder_index(0)))?;
@@ -458,18 +457,18 @@ impl EventStore {
         &self,
         start: Version,
         end: Version,
-        db_batch: &mut SchemaBatch,
+        db_batch: &SchemaBatch,
     ) -> anyhow::Result<()> {
         let mut current_version = start;
         for events in self.get_events_by_version_iter(start, (end - start) as usize)? {
             for (current_index, event) in (events?).into_iter().enumerate() {
                 db_batch.delete::<EventByVersionSchema>(&(
                     *event.key(),
-                    current_version as u64,
+                    current_version,
                     event.sequence_number(),
                 ))?;
                 db_batch.delete::<EventByKeySchema>(&(*event.key(), event.sequence_number()))?;
-                db_batch.delete::<EventSchema>(&(current_version as u64, current_index as u64))?;
+                db_batch.delete::<EventSchema>(&(current_version, current_index as u64))?;
             }
             current_version += 1;
         }

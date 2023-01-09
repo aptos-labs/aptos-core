@@ -1,29 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
-use proptest::{prelude::*, proptest};
-use std::{collections::HashMap, sync::Arc};
-
-use aptos_crypto::HashValue;
-use aptos_temppath::TempPath;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::state_store::state_value::StaleStateValueIndex;
-use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::Version,
-};
-use schemadb::{ReadOptions, SchemaBatch, DB};
-use storage_interface::{jmt_update_refs, jmt_updates, DbReader};
-
-use crate::stale_state_value_index::StaleStateValueIndexSchema;
 use crate::{
     pruner::{state_pruner_worker::StatePrunerWorker, *},
     stale_node_index::StaleNodeIndexSchema,
+    stale_state_value_index::StaleStateValueIndexSchema,
     state_store::StateStore,
     test_helper::{arb_state_kv_sets, update_store},
     AptosDB, LedgerPrunerManager, PrunerManager, StatePrunerManager,
 };
+use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
+use aptos_crypto::HashValue;
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_storage_interface::{jmt_update_refs, jmt_updates, DbReader};
+use aptos_temppath::TempPath;
+use aptos_types::{
+    state_store::{
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StaleStateValueIndex, StateValue},
+    },
+    transaction::Version,
+};
+use proptest::{prelude::*, proptest};
+use std::{collections::HashMap, sync::Arc};
 
 fn put_value_set(
     db: &DB,
@@ -46,13 +46,13 @@ fn put_value_set(
         )
         .unwrap();
 
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     state_store
         .put_value_sets(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
-            &mut batch,
+            &batch,
         )
         .unwrap();
     db.write_schemas(batch).unwrap();
@@ -77,14 +77,11 @@ fn create_state_pruner_manager(
     state_merkle_db: &Arc<DB>,
     prune_batch_size: usize,
 ) -> StatePrunerManager<StaleNodeIndexSchema> {
-    StatePrunerManager::new(
-        Arc::clone(state_merkle_db),
-        StateMerklePrunerConfig {
-            enable: true,
-            prune_window: 0,
-            batch_size: prune_batch_size,
-        },
-    )
+    StatePrunerManager::new(Arc::clone(state_merkle_db), StateMerklePrunerConfig {
+        enable: true,
+        prune_window: 0,
+        batch_size: prune_batch_size,
+    })
 }
 
 #[test]
@@ -105,7 +102,7 @@ fn test_state_store_pruner() {
             &aptos_db.ledger_db,
             state_store,
             vec![(key.clone(), value.clone())],
-            i as u64, /* version */
+            i, /* version */
         ));
     }
 
@@ -252,8 +249,7 @@ fn test_state_store_pruner_partial_version() {
             .state_merkle_db
             .iter::<StaleNodeIndexSchema>(ReadOptions::default())
             .unwrap()
-            .collect::<Vec<_>>()
-            .len(),
+            .count(),
         0
     );
 }
@@ -276,7 +272,7 @@ fn test_state_store_pruner_disabled() {
             &aptos_db.ledger_db,
             state_store,
             vec![(key.clone(), value.clone())],
-            i as u64, /* version */
+            i, /* version */
         ));
     }
 
@@ -347,14 +343,11 @@ fn test_worker_quit_eagerly() {
         let state_pruner = pruner_utils::create_state_pruner::<StaleNodeIndexSchema>(Arc::clone(
             &aptos_db.state_merkle_db,
         ));
-        let worker = StatePrunerWorker::new(
-            state_pruner,
-            StateMerklePrunerConfig {
-                enable: true,
-                prune_window: 1,
-                batch_size: 100,
-            },
-        );
+        let worker = StatePrunerWorker::new(state_pruner, StateMerklePrunerConfig {
+            enable: true,
+            prune_window: 1,
+            batch_size: 100,
+        });
         worker.set_target_db_version(/*target_db_version=*/ 1);
         worker.set_target_db_version(/*target_db_version=*/ 2);
         // Worker quits immediately.
@@ -401,7 +394,7 @@ fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
                 current_state_values.insert(k.clone(), (version, v.clone()))
             {
                 pruner
-                    .wake_and_wait_pruner(version as u64 /* latest_version */)
+                    .wake_and_wait_pruner(version /* latest_version */)
                     .unwrap();
                 if version > 0 {
                     verify_state_value(

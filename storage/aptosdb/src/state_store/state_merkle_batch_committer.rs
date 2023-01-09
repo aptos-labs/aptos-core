@@ -14,10 +14,10 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace};
+use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::state_delta::StateDelta;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use schemadb::SchemaBatch;
 use std::sync::{mpsc::Receiver, Arc};
-use storage_interface::state_delta::StateDelta;
 
 pub struct StateMerkleBatch {
     pub batch: SchemaBatch,
@@ -89,11 +89,11 @@ impl StateMerkleBatchCommitter {
                         .maybe_set_pruner_target_db_version(current_version);
 
                     self.check_usage_consistency(&state_delta).unwrap();
-                }
+                },
                 CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
                 CommitMessage::Exit => {
                     break;
-                }
+                },
             }
         }
         trace!("State merkle batch committing thread exit.")

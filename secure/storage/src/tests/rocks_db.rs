@@ -1,12 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::rocks_db::database_schema::{SecureStorageKey, SecureStorageSchema, SecureStorageValue};
-use crate::rocks_db::RocksDbStorage;
-use crate::tests::suite;
-use crate::{GetResponse, Storage};
+use crate::{
+    rocks_db::{
+        database_schema::{SecureStorageKey, SecureStorageSchema, SecureStorageValue},
+        RocksDbStorage,
+    },
+    tests::suite,
+    GetResponse, Storage,
+};
+use aptos_schemadb::schema::fuzzing::assert_encode_decode;
 use aptos_temppath::TempPath;
-use schemadb::schema::fuzzing::assert_encode_decode;
 
 #[test]
 fn rocks_db() {

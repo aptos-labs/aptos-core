@@ -4,6 +4,10 @@
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
+use aptos_language_e2e_tests::{
+    assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
+    compile::compile_module, current_function_name, executor::FakeExecutor, transaction_status_eq,
+};
 use aptos_types::{
     account_address::AccountAddress,
     account_config,
@@ -11,10 +15,6 @@ use aptos_types::{
     test_helpers::transaction_test_helpers,
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     vm_status::StatusCode,
-};
-use language_e2e_tests::{
-    assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
-    compile::compile_module, current_function_name, executor::FakeExecutor, transaction_status_eq,
 };
 use move_binary_format::file_format::CompiledModule;
 use move_core_types::{
@@ -374,11 +374,9 @@ fn verify_simple_payment() {
     let txn = sender
         .account()
         .transaction()
-        .script(Script::new(
-            empty_script.clone(),
-            vec![],
-            vec![TransactionArgument::U8(42)],
-        ))
+        .script(Script::new(empty_script.clone(), vec![], vec![
+            TransactionArgument::U8(42),
+        ]))
         .sequence_number(10)
         .max_gas_amount(100_000)
         .gas_unit_price(1)
@@ -729,7 +727,7 @@ fn test_script_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }
@@ -765,7 +763,7 @@ fn test_module_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }
@@ -817,7 +815,7 @@ fn test_type_tag_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }
@@ -868,7 +866,7 @@ fn test_script_transitive_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }
@@ -929,7 +927,7 @@ fn test_module_transitive_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }
@@ -986,7 +984,7 @@ fn test_type_tag_transitive_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }

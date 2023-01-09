@@ -4,20 +4,12 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::network_id::PeerNetworkId;
-use aptos_types::PeerId;
-use async_trait::async_trait;
-use network::{
-    application::{
-        interface::{MultiNetworkSender, NetworkInterface},
-        storage::{LockingHashMap, PeerMetadataStorage},
-    },
-    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{
-        AppConfig, ApplicationNetworkSender, NetworkSender, NewNetworkSender, RpcError,
-    },
+use aptos_network::{
+    application::{interface::NetworkClientInterface, storage::PeerMetadataStorage},
+    protocols::network::{NetworkApplicationConfig, RpcError},
     ProtocolId,
 };
-use peer_monitoring_service_types::{
+use aptos_peer_monitoring_service_types::{
     PeerMonitoringServiceError, PeerMonitoringServiceMessage, PeerMonitoringServiceRequest,
     PeerMonitoringServiceResponse,
 };
@@ -26,6 +18,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Network error: {0}")]
+    NetworkError(String),
+
     #[error("Aptos network rpc error: {0}")]
     RpcError(#[from] RpcError),
 
@@ -36,20 +31,15 @@ pub enum Error {
 /// The interface for sending peer monitoring service requests and querying
 /// peer information.
 #[derive(Clone, Debug)]
-pub struct PeerMonitoringServiceClient {
-    network_sender: PeerMonitoringServiceMultiSender,
-    peer_metadata: Arc<PeerMetadataStorage>,
+pub struct PeerMonitoringServiceClient<NetworkClient> {
+    network_client: NetworkClient,
 }
 
-impl PeerMonitoringServiceClient {
-    pub fn new(
-        network_sender: PeerMonitoringServiceMultiSender,
-        peer_metadata: Arc<PeerMetadataStorage>,
-    ) -> Self {
-        Self {
-            network_sender,
-            peer_metadata,
-        }
+impl<NetworkClient: NetworkClientInterface<PeerMonitoringServiceMessage>>
+    PeerMonitoringServiceClient<NetworkClient>
+{
+    pub fn new(network_client: NetworkClient) -> Self {
+        Self { network_client }
     }
 
     pub async fn send_request(
@@ -58,86 +48,32 @@ impl PeerMonitoringServiceClient {
         request: PeerMonitoringServiceRequest,
         timeout: Duration,
     ) -> Result<PeerMonitoringServiceResponse, Error> {
-        let message = self
-            .network_sender
-            .send_rpc(
-                recipient,
+        let response = self
+            .network_client
+            .send_to_peer_rpc(
                 PeerMonitoringServiceMessage::Request(request),
                 timeout,
+                recipient,
             )
-            .await?;
-        match message {
+            .await
+            .map_err(|error| Error::NetworkError(error.to_string()))?;
+        match response {
             PeerMonitoringServiceMessage::Response(Ok(response)) => Ok(response),
             PeerMonitoringServiceMessage::Response(Err(err)) => {
                 Err(Error::PeerMonitoringServiceError(err))
-            }
+            },
             PeerMonitoringServiceMessage::Request(_) => {
                 Err(Error::RpcError(RpcError::InvalidRpcResponse))
-            }
+            },
         }
     }
-}
 
-#[async_trait]
-impl NetworkInterface<PeerMonitoringServiceMessage, PeerMonitoringServiceMultiSender>
-    for PeerMonitoringServiceClient
-{
-    type AppDataKey = ();
-    type AppData = ();
-
-    fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
-        &self.peer_metadata
-    }
-
-    fn sender(&self) -> PeerMonitoringServiceMultiSender {
-        unimplemented!("sender() is not required!")
-    }
-
-    fn app_data(&self) -> &LockingHashMap<Self::AppDataKey, Self::AppData> {
-        unimplemented!("app_data() is not required!")
+    pub fn get_peer_metadata_storage(&self) -> Arc<PeerMetadataStorage> {
+        self.network_client.get_peer_metadata_storage()
     }
 }
 
-/// A network sender that dispatches across multiple networks
-pub type PeerMonitoringServiceMultiSender =
-    MultiNetworkSender<PeerMonitoringServiceMessage, PeerMonitoringServiceNetworkSender>;
-
-pub fn network_endpoint_config() -> AppConfig {
-    AppConfig::client([ProtocolId::PeerMonitoringServiceRpc])
-}
-
-/// The peer monitoring service sender for a single network
-#[derive(Clone, Debug)]
-pub struct PeerMonitoringServiceNetworkSender {
-    inner: NetworkSender<PeerMonitoringServiceMessage>,
-}
-
-impl NewNetworkSender for PeerMonitoringServiceNetworkSender {
-    fn new(
-        peer_manager_request_sender: PeerManagerRequestSender,
-        connection_request_sender: ConnectionRequestSender,
-    ) -> Self {
-        Self {
-            inner: NetworkSender::new(peer_manager_request_sender, connection_request_sender),
-        }
-    }
-}
-
-#[async_trait]
-impl ApplicationNetworkSender<PeerMonitoringServiceMessage> for PeerMonitoringServiceNetworkSender {
-    async fn send_rpc(
-        &self,
-        recipient: PeerId,
-        message: PeerMonitoringServiceMessage,
-        timeout: Duration,
-    ) -> Result<PeerMonitoringServiceMessage, RpcError> {
-        self.inner
-            .send_rpc(
-                recipient,
-                ProtocolId::PeerMonitoringServiceRpc,
-                message,
-                timeout,
-            )
-            .await
-    }
+/// Returns a network application config for the peer monitoring client
+pub fn peer_monitoring_client_network_config() -> NetworkApplicationConfig {
+    NetworkApplicationConfig::client([ProtocolId::PeerMonitoringServiceRpc])
 }

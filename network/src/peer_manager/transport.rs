@@ -7,11 +7,13 @@ use crate::{
     transport::Connection,
 };
 use anyhow::format_err;
+use aptos_channels::{self};
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::{ConnectionOrigin, Transport};
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
-use channel::{self};
 use futures::{
     channel::oneshot,
     future::{BoxFuture, FutureExt},
@@ -19,8 +21,6 @@ use futures::{
     sink::SinkExt,
     stream::{Fuse, FuturesUnordered, StreamExt},
 };
-use netcore::transport::{ConnectionOrigin, Transport};
-use short_hex_str::AsShortHexStr;
 use std::time::Instant;
 
 #[derive(Debug)]
@@ -43,8 +43,8 @@ where
     /// [`Transport`] that is used to establish connections
     transport: TTransport,
     listener: Fuse<TTransport::Listener>,
-    transport_reqs_rx: channel::Receiver<TransportRequest>,
-    transport_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
+    transport_reqs_rx: aptos_channels::Receiver<TransportRequest>,
+    transport_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
 }
 
 impl<TTransport, TSocket> TransportHandler<TTransport, TSocket>
@@ -60,8 +60,8 @@ where
         time_service: TimeService,
         transport: TTransport,
         listen_addr: NetworkAddress,
-        transport_reqs_rx: channel::Receiver<TransportRequest>,
-        transport_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
+        transport_reqs_rx: aptos_channels::Receiver<TransportRequest>,
+        transport_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
     ) -> (Self, NetworkAddress) {
         let addr_string = format!("{}", listen_addr);
         let (listener, listen_addr) = transport
@@ -153,7 +153,7 @@ where
 
                 let start_time = self.time_service.now();
                 Some(upgrade.map(move |out| (out, addr, start_time)).boxed())
-            }
+            },
             Err(e) => {
                 info!(
                     NetworkSchema::new(&self.network_context),
@@ -163,7 +163,7 @@ where
                     e
                 );
                 None
-            }
+            },
         }
     }
 
@@ -199,7 +199,7 @@ where
                                 .map(move |out| (out, addr, peer_id, start_time, response_tx))
                                 .boxed(),
                         )
-                    }
+                    },
                     Err(error) => {
                         if let Err(send_err) =
                             response_tx.send(Err(PeerManagerError::from_transport_error(error)))
@@ -213,9 +213,9 @@ where
                             );
                         }
                         None
-                    }
+                    },
                 }
-            }
+            },
         }
     }
 
@@ -245,7 +245,7 @@ where
                         peer_id.short_str()
                     )))
                 }
-            }
+            },
             Err(err) => Err(PeerManagerError::from_transport_error(err)),
         };
 
@@ -254,7 +254,7 @@ where
                 self.send_connection_to_peer_manager(connection, &addr, elapsed_time)
                     .await;
                 Ok(())
-            }
+            },
             Err(err) => {
                 warn!(
                     NetworkSchema::new(&self.network_context)
@@ -276,7 +276,7 @@ where
                 .observe(elapsed_time);
 
                 Err(err)
-            }
+            },
         };
 
         if let Err(send_err) = response_tx.send(response) {
@@ -305,7 +305,7 @@ where
             Ok(connection) => {
                 self.send_connection_to_peer_manager(connection, &addr, elapsed_time)
                     .await;
-            }
+            },
             Err(err) => {
                 warn!(
                     NetworkSchema::new(&self.network_context)
@@ -324,7 +324,7 @@ where
                     FAILED_LABEL,
                 )
                 .observe(elapsed_time);
-            }
+            },
         }
     }
 

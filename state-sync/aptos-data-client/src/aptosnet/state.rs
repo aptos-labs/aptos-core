@@ -10,16 +10,17 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::application::storage::PeerMetadataStorage;
+use aptos_storage_service_types::{
+    requests::StorageServiceRequest, responses::StorageServerSummary,
+};
 use itertools::Itertools;
-use netcore::transport::ConnectionOrigin;
-use network::application::storage::PeerMetadataStorage;
 use std::{
     cmp::min,
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use storage_service_types::requests::StorageServiceRequest;
-use storage_service_types::responses::StorageServerSummary;
 
 /// Scores for peer rankings based on preferences and behavior.
 const MAX_SCORE: f64 = 100.0;
@@ -48,7 +49,7 @@ impl From<ResponseError> for ErrorType {
         match error {
             ResponseError::InvalidData | ResponseError::InvalidPayloadDataType => {
                 ErrorType::NotUseful
-            }
+            },
             ResponseError::ProofVerificationError => ErrorType::Malicious,
         }
     }

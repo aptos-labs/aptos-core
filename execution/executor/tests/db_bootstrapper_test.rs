@@ -5,6 +5,7 @@
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_db::AptosDB;
 use aptos_executor::{
     block_executor::BlockExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
@@ -13,8 +14,9 @@ use aptos_executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_gas::LATEST_GAS_FEATURE_VERSION;
+use aptos_gas::{ChangeSetConfigs, LATEST_GAS_FEATURE_VERSION};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath,
@@ -36,17 +38,15 @@ use aptos_types::{
     write_set::{WriteOp, WriteSetMut},
 };
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
 use move_core_types::{
     language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},
 };
 use rand::SeedableRng;
-use storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 
 #[test]
 fn test_empty_db() {
-    let genesis = vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis.0));
     let tmp_dir = TempPath::new();
     let db_rw = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
@@ -186,9 +186,10 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_new_genesis() {
-    let genesis = vm_genesis::test_genesis_change_set_and_validators(Some(1));
-    let genesis_key = &vm_genesis::GENESIS_KEYPAIR.0;
+    let genesis = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis_key = &aptos_vm_genesis::GENESIS_KEYPAIR.0;
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis.0));
     // Create bootstrapped DB.
     let tmp_dir = TempPath::new();
@@ -264,7 +265,7 @@ fn test_new_genesis() {
                     vec![],
                 ),
             ],
-            LATEST_GAS_FEATURE_VERSION,
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
         .unwrap(),
     ));

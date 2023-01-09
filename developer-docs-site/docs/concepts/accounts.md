@@ -12,7 +12,7 @@ However, a resource can also be used to represent other on-chain capabilities, i
 
 Each account on the Aptos blockchain is identified by a 32-byte account address. An account can store data, and the account stores
 this data in resources. The initial resource is the account data itself (authentication key and sequence number).
-Additional resources like currency or NFTs are added after creating the account.
+Additional resources like currency or NFTs are added after creating the account. And you may employ the [Aptos Name Service](https://www.aptosnames.com/) to secure .apt domains key accounts and make them memorable.
 
 Different from other blockchains where accounts and addresses are implicit, accounts on Aptos are explicit and need to be
 created before they can hold resources and modules. The account can be created explicitly or implicitly by transferring Aptos tokens (APT) there.
@@ -157,6 +157,8 @@ Refreshing the keys is generally regarded as good hygiene in the security field.
 system integrators who are used to using a mnemonic to represent both a private key and its associated account.
 To simplify this for the system integrators, Aptos provides an on-chain mapping via aptos account lookup-address.
 The on-chain data maps an effective account address as defined by the current mnemonic to the actual account address.
+
+For more information, see [`account.move`](https://github.com/aptos-labs/aptos-core/blob/d4a859bb0987f8e35e7471469c3bcd4ae4b49855/aptos-move/framework/aptos-framework/sources/account.move#L251).
 
 ## Access control with signer
 

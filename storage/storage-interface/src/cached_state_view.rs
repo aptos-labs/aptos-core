@@ -4,17 +4,18 @@
 use crate::{proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_state_view::{StateView, StateViewId};
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
+use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     proof::SparseMerkleProofExt,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::Version,
     write_set::WriteSet,
 };
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -169,10 +170,10 @@ impl CachedStateView {
                                 })?;
                         }
                         value
-                    }
+                    },
                     None => None,
                 }
-            }
+            },
         };
 
         Ok(state_value_option)
@@ -185,7 +186,9 @@ pub struct StateCache {
     pub proofs: HashMap<HashValue, SparseMerkleProofExt>,
 }
 
-impl StateView for CachedStateView {
+impl TStateView for CachedStateView {
+    type Key = StateKey;
+
     fn id(&self) -> StateViewId {
         self.id
     }
@@ -226,7 +229,9 @@ impl From<DbStateView> for CachedDbStateView {
     }
 }
 
-impl StateView for CachedDbStateView {
+impl TStateView for CachedDbStateView {
+    type Key = StateKey;
+
     fn id(&self) -> StateViewId {
         self.db_state_view.id()
     }

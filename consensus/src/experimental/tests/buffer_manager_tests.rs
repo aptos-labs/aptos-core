@@ -16,19 +16,30 @@ use crate::{
     },
     metrics_safety_rules::MetricsSafetyRules,
     network::NetworkSender,
-    network_interface::{ConsensusMsg, ConsensusNetworkSender},
+    network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     round_manager::{UnverifiedEvent, VerifiedEvent},
     test_utils::{
         consensus_runtime, timed_block_on, EmptyStateComputer, MockStorage,
         RandomComputeResultStateComputer,
     },
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis, executed_block::ExecutedBlock,
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
+use aptos_network::{
+    application::{interface::NetworkClient, storage::PeerMetadataStorage},
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
+    protocols::{
+        network,
+        network::{Event, NewNetworkSender},
+    },
+};
+use aptos_safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use aptos_secure_storage::Storage;
 use aptos_types::{
     account_address::AccountAddress,
@@ -37,14 +48,9 @@ use aptos_types::{
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
     waypoint::Waypoint,
 };
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{channel::oneshot, FutureExt, SinkExt, StreamExt};
 use itertools::enumerate;
-use network::{
-    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{Event, NewNetworkSender},
-};
-use safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
+use maplit::hashmap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -53,7 +59,7 @@ pub fn prepare_buffer_manager() -> (
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-    channel::Receiver<Event<ConsensusMsg>>,
+    aptos_channels::Receiver<Event<ConsensusMsg>>,
     PipelinePhase<ExecutionPhase>,
     PipelinePhase<SigningPhase>,
     PipelinePhase<PersistingPhase>,
@@ -89,14 +95,25 @@ pub fn prepare_buffer_manager() -> (
 
     let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-
-    let network_sender = ConsensusNetworkSender::new(
+    let network_sender = network::NetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
+    let network_client = NetworkClient::new(
+        DIRECT_SEND.into(),
+        RPC.into(),
+        hashmap! {NetworkId::Validator => network_sender},
+        PeerMetadataStorage::new(&[NetworkId::Validator]),
+    );
+    let consensus_network_client = ConsensusNetworkClient::new(network_client);
 
-    let (self_loop_tx, self_loop_rx) = channel::new_test(1000);
-    let network = NetworkSender::new(author, network_sender, self_loop_tx, validators.clone());
+    let (self_loop_tx, self_loop_rx) = aptos_channels::new_test(1000);
+    let network = NetworkSender::new(
+        author,
+        consensus_network_client,
+        self_loop_tx,
+        validators.clone(),
+    );
 
     let (msg_tx, msg_rx) =
         aptos_channel::new::<AccountAddress, VerifiedEvent>(QueueStyle::FIFO, channel_size, None);
@@ -153,7 +170,7 @@ pub fn launch_buffer_manager() -> (
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-    channel::Receiver<Event<ConsensusMsg>>,
+    aptos_channels::Receiver<Event<ConsensusMsg>>,
     HashValue,
     Runtime,
     Vec<ValidatorSigner>,
@@ -196,7 +213,7 @@ pub fn launch_buffer_manager() -> (
 }
 
 async fn loopback_commit_vote(
-    self_loop_rx: &mut channel::Receiver<Event<ConsensusMsg>>,
+    self_loop_rx: &mut aptos_channels::Receiver<Event<ConsensusMsg>>,
     msg_tx: &aptos_channel::Sender<AccountAddress, VerifiedEvent>,
     verifier: &ValidatorVerifier,
 ) {
@@ -206,13 +223,13 @@ async fn loopback_commit_vote(
                 let event: UnverifiedEvent = msg.into();
                 // verify the message and send the message into self loop
                 msg_tx
-                    .push(author, event.verify(verifier, false).unwrap())
+                    .push(author, event.verify(author, verifier, false).unwrap())
                     .ok();
             }
-        }
+        },
         _ => {
             panic!("We are expecting a commit vote message.");
-        }
+        },
     };
 }
 

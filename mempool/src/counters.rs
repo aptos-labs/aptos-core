@@ -7,8 +7,8 @@ use aptos_metrics_core::{
     register_int_counter, register_int_counter_vec, register_int_gauge_vec, Histogram,
     HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
+use aptos_short_hex_str::AsShortHexStr;
 use once_cell::sync::Lazy;
-use short_hex_str::AsShortHexStr;
 use std::time::Duration;
 
 // Core mempool index labels

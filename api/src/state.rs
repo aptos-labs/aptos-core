@@ -1,16 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::response::{
-    api_disabled, build_not_found, module_not_found, resource_not_found, table_item_not_found,
-    StdApiError,
-};
 use crate::{
     accept_type::AcceptType,
     failpoint::fail_point_poem,
     response::{
+        api_disabled, build_not_found, module_not_found, resource_not_found, table_item_not_found,
         BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
-        InternalError,
+        InternalError, StdApiError,
     },
     ApiTags, Context,
 };
@@ -20,7 +17,8 @@ use aptos_api_types::{
     MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawTableItemRequest,
     TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
 };
-use aptos_state_view::StateView;
+use aptos_state_view::TStateView;
+use aptos_storage_interface::state_view::DbStateView;
 use aptos_types::{
     access_path::AccessPath,
     state_store::{state_key::StateKey, table::TableHandle},
@@ -33,7 +31,6 @@ use poem_openapi::{
     OpenApi,
 };
 use std::{convert::TryInto, sync::Arc};
-use storage_interface::state_view::DbStateView;
 
 /// API for retrieving individual state
 pub struct StateApi {
@@ -280,10 +277,10 @@ impl StateApi {
                     })?;
 
                 BasicResponse::try_from_json((resource, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 
@@ -331,10 +328,10 @@ impl StateApi {
                     })?;
 
                 BasicResponse::try_from_json((module, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 
@@ -421,10 +418,10 @@ impl StateApi {
                     })?;
 
                 BasicResponse::try_from_json((move_value, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 
@@ -473,7 +470,7 @@ impl StateApi {
             AcceptType::Json => Err(api_disabled("Get raw table item by json")),
             AcceptType::Bcs => {
                 BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 }

@@ -13,15 +13,16 @@ use super::BLOCK_CF_NAME;
 use anyhow::Result;
 use aptos_consensus_types::block::Block;
 use aptos_crypto::HashValue;
-use schemadb::schema::{KeyCodec, Schema, ValueCodec};
+use aptos_schemadb::schema::{KeyCodec, Schema, ValueCodec};
 
 #[derive(Debug)]
 pub struct BlockSchema;
 
 impl Schema for BlockSchema {
-    const COLUMN_FAMILY_NAME: schemadb::ColumnFamilyName = BLOCK_CF_NAME;
     type Key = HashValue;
     type Value = Block;
+
+    const COLUMN_FAMILY_NAME: aptos_schemadb::ColumnFamilyName = BLOCK_CF_NAME;
 }
 
 impl KeyCodec<BlockSchema> for HashValue {

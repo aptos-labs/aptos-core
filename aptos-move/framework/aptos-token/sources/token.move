@@ -117,9 +117,6 @@ module aptos_token::token {
     /// Cannot burn 0 Token
     const ENO_BURN_TOKEN_WITH_ZERO_AMOUNT: u64 = 29;
 
-    /// Withdraw proof expires
-    const EWITHDRAW_PROOF_EXPIRES: u64 = 29;
-
     /// Token is not burnable by owner
     const EOWNER_CANNOT_BURN_TOKEN: u64 = 30;
 
@@ -148,6 +145,9 @@ module aptos_token::token {
 
     /// Withdraw capability doesn't have sufficient amount
     const EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT: u64 = 38;
+
+    /// Withdraw proof expires
+    const EWITHDRAW_PROOF_EXPIRES: u64 = 39;
 
     //
     // Core data structures for holding tokens
@@ -776,6 +776,7 @@ module aptos_token::token {
         token_event_store::emit_default_property_mutate_event(creator, token_data_id.collection, token_data_id.name, keys, old_values, new_values);
     }
 
+    /// Mutate the token_properties of one token.
     public fun mutate_one_token(
         account: &signer,
         token_owner: address,
@@ -1228,6 +1229,14 @@ module aptos_token::token {
         token.id
     }
 
+    public fun get_direct_transfer(receiver: address): bool acquires TokenStore {
+        if (!exists<TokenStore>(receiver)) {
+            return false
+        };
+
+        borrow_global<TokenStore>(receiver).direct_transfer
+    }
+
     public fun create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig {
         TokenMutabilityConfig {
             maximum: *vector::borrow(mutate_setting, TOKEN_MAX_MUTABLE_IND),
@@ -1464,6 +1473,71 @@ module aptos_token::token {
 
         let token_data = table::borrow(all_token_data, token_data_id);
         token_data.royalty
+    }
+
+    /// return the token_data_id from the token_id
+    public fun get_tokendata_id(token_id: TokenId): TokenDataId {
+        token_id.token_data_id
+    }
+
+    /// return the mutation setting of the token
+    public fun get_tokendata_mutability_config(token_data_id: TokenDataId): TokenMutabilityConfig acquires Collections {
+        let creator_addr = token_data_id.creator;
+        assert!(exists<Collections>(creator_addr), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        let all_token_data = &borrow_global<Collections>(creator_addr).token_data;
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
+        table::borrow(all_token_data, token_data_id).mutability_config
+    }
+
+    /// return if the token's maximum is mutable
+    public fun get_token_mutability_maximum(config: &TokenMutabilityConfig): bool {
+        config.maximum
+    }
+
+    /// return if the token royalty is mutable with a token mutability config
+    public fun get_token_mutability_royalty(config: &TokenMutabilityConfig): bool {
+        config.royalty
+    }
+
+    /// return if the token uri is mutable with a token mutability config
+    public fun get_token_mutability_uri(config: &TokenMutabilityConfig): bool {
+        config.uri
+    }
+
+    /// return if the token description is mutable with a token mutability config
+    public fun get_token_mutability_description(config: &TokenMutabilityConfig): bool {
+        config.description
+    }
+
+    /// return if the tokendata's default properties is mutable with a token mutability config
+    public fun get_token_mutability_default_properties(config: &TokenMutabilityConfig): bool {
+        config.properties
+    }
+
+    #[view]
+    /// return the collection mutation setting
+    public fun get_collection_mutability_config(
+        creator: address,
+        collection_name: String
+    ): CollectionMutabilityConfig acquires Collections {
+        assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        let all_collection_data = &borrow_global<Collections>(creator).collection_data;
+        assert!(table::contains(all_collection_data, collection_name), error::not_found(ECOLLECTION_NOT_PUBLISHED));
+        table::borrow(all_collection_data, collection_name).mutability_config
+    }
+
+    /// return if the collection description is mutable with a collection mutability config
+    public fun get_collection_mutability_description(config: &CollectionMutabilityConfig): bool {
+        config.description
+    }
+
+    /// return if the collection uri is mutable with a collection mutability config
+    public fun get_collection_mutability_uri(config: &CollectionMutabilityConfig): bool {
+        config.uri
+    }
+    /// return if the collection maximum is mutable with collection mutability config
+    public fun get_collection_mutability_maximum(config: &CollectionMutabilityConfig): bool {
+        config.maximum
     }
 
     //
@@ -2001,7 +2075,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe, owner = @0xafe)]
-    #[expected_failure(abort_code = 327696)]
+    #[expected_failure(abort_code = 327696, location = Self)]
     fun test_opt_in_direct_transfer_fail(
         creator: &signer,
         owner: &signer,
@@ -2026,7 +2100,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe, owner = @0xafe)]
-    #[expected_failure(abort_code = 327696)]
+    #[expected_failure(abort_code = 327696, location = Self)]
     fun test_opt_in_direct_deposit_fail(
         creator: &signer,
         owner: &signer,
@@ -2068,7 +2142,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe, owner = @0x456)]
-    #[expected_failure(abort_code = 327710)]
+    #[expected_failure(abort_code = 327710, location = Self)]
     fun test_burn_token_by_owner_without_burnable_config(
         creator: &signer,
         owner: &signer,
@@ -2263,7 +2337,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 65572)]
+    #[expected_failure(abort_code = 65572, location = Self)]
     fun test_mutate_tokendata_maximum_from_zero(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2429,7 +2503,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 65569)]
+    #[expected_failure(abort_code = 65569, location = Self)]
     fun test_no_zero_balance_token_deposit(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2449,7 +2523,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 65548)]
+    #[expected_failure(abort_code = 65548, location = Self)]
     fun test_split_out_zero_token(
         creator: &signer,
     ) acquires Collections, TokenStore {
@@ -2481,7 +2555,7 @@ module aptos_token::token {
     }
 
     #[test]
-    #[expected_failure(abort_code = 65570)]
+    #[expected_failure(abort_code = 65570, location = Self)]
     public fun test_enter_illegal_royalty(){
         create_royalty(101, 100, @0xcafe);
     }
@@ -2518,6 +2592,46 @@ module aptos_token::token {
         assert!(option::is_none(&cap), 1);
         merge(&mut token, token_1);
         token
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_get_collection_mutability_config(creator: &signer) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+
+        // token owner mutate the token property
+        create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, true],
+        );
+
+        get_collection_mutability_config(@0xcafe, get_collection_name());
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_get_tokendata_mutability_config(creator: &signer) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, true],
+        );
+
+        get_tokendata_mutability_config(token_id.token_data_id);
     }
 
     //

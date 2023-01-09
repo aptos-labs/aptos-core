@@ -35,12 +35,10 @@ use crate::{
     x25519,
 };
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
-use rand::{CryptoRng, RngCore};
-use std::convert::{TryFrom, TryInto};
-
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-
+use rand::{CryptoRng, RngCore};
+use std::convert::{TryFrom, TryInto};
 //
 // Underlying Implementation
 // =========================
@@ -48,7 +46,6 @@ use proptest_derive::Arbitrary;
 // We re-export the dalek-x25519 library,
 // This makes it easier to uniformalize build dalek-x25519.
 //
-
 pub use x25519_dalek;
 
 //
@@ -249,7 +246,7 @@ impl traits::ValidCryptoMaterial for PublicKey {
 
 impl std::fmt::Display for PublicKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", hex::encode(&self.0))
+        write!(f, "{}", hex::encode(self.0))
     }
 }
 

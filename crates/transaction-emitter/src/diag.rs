@@ -3,6 +3,7 @@
 
 use anyhow::{bail, format_err, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_transaction_emitter_lib::{query_sequence_number, Cluster, TxnEmitter};
 use futures::future::join_all;
 use itertools::zip;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -11,7 +12,6 @@ use std::{
     cmp::min,
     time::{Duration, Instant},
 };
-use transaction_emitter_lib::{query_sequence_number, Cluster, TxnEmitter};
 
 pub async fn diag(cluster: &Cluster) -> Result<()> {
     let client = cluster.random_instance().rest_client();

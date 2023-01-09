@@ -7,14 +7,19 @@ use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
-use aptos_config::config::{
-    NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
-    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+use aptos_config::{
+    config::{
+        NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+    },
+    keys::ConfigKey,
 };
-use aptos_crypto::{hash::HashValue, SigningKey};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
+use aptos_db::AptosDB;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_mempool::mocks::MockSharedMempool;
+use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{
@@ -22,9 +27,11 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
+use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -32,20 +39,12 @@ use aptos_types::{
     transaction::{Transaction, TransactionStatus},
 };
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
+use aptos_vm_validator::vm_validator::VMValidator;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
-use mempool_notifications::MempoolNotificationSender;
-use storage_interface::DbReaderWriter;
-
-use aptos_config::keys::ConfigKey;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_types::aggregate_signature::AggregateSignature;
 use rand::SeedableRng;
 use serde_json::{json, Value};
 use std::{boxed::Box, iter::once, net::SocketAddr, sync::Arc, time::Duration};
-use storage_interface::state_view::DbStateView;
-use vm_validator::vm_validator::VMValidator;
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
 
@@ -201,6 +200,14 @@ impl TestContext {
         self.fake_time_usecs = fake_time_usecs;
     }
 
+    pub fn check_golden_output_no_prune(&mut self, msg: Value) {
+        if self.golden_output.is_none() {
+            self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(':', "_")));
+        }
+
+        self.golden_output.as_ref().unwrap().log(&msg.to_string());
+    }
+
     pub fn check_golden_output(&mut self, msg: Value) {
         if self.golden_output.is_none() {
             self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(':', "_")));
@@ -261,22 +268,22 @@ impl TestContext {
         nval["data"] = match val["type"].as_str() {
             Some("0x1::code::PackageRegistry") => {
                 Value::String("package registry omitted".to_string())
-            }
+            },
             // Ideally this wouldn't be stripped, but it changes by minor changes to the
             // Move modules, which leads to a bad devx.
             Some("0x1::state_storage::StateStorageUsage") => {
                 Value::String("state storage omitted".to_string())
-            }
+            },
             Some("0x1::state_storage::GasParameter") => {
                 Value::String("state storage gas parameter omitted".to_string())
-            }
+            },
             _ => {
                 if val["bytecode"].as_str().is_some() {
                     Value::String("bytecode omitted".to_string())
                 } else {
                     val["data"].clone()
                 }
-            }
+            },
         };
         nval
     }
@@ -572,7 +579,7 @@ impl TestContext {
     pub fn get_routes_with_poem(
         &self,
         poem_address: SocketAddr,
-    ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
         warp::path!("v1" / ..).and(reverse_proxy_filter(
             "v1".to_string(),
             format!("http://{}/v1", poem_address),

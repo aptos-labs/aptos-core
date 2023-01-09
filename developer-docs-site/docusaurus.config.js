@@ -114,6 +114,11 @@ const config = {
                 type: "doc",
                 docId: "guides/getting-started",
               },
+              {
+                label: "Integrate Aptos",
+                type: "doc",
+                docId: "guides/system-integrators-guide",
+              },
             ],
           },
           {
@@ -121,6 +126,11 @@ const config = {
             label: "Build Apps",
             position: "left",
             items: [
+              {
+                type: "doc",
+                label: "Follow Standards",
+                docId: "concepts/coin-and-token/index",
+              },
               {
                 type: "doc",
                 label: "Develop by Tutorial",
@@ -168,6 +178,11 @@ const config = {
                 type: "doc",
                 docId: "guides/move-guides/upgrading-move-code",
               },
+              {
+                label: "Move References",
+                type: "doc",
+                docId: "reference/move",
+              },
             ],
           },
           {
@@ -176,7 +191,7 @@ const config = {
             position: "left",
             items: [
               {
-                label: "Find Nodes",
+                label: "Understand Nodes",
                 type: "doc",
                 docId: "nodes/nodes-landing",
               },
@@ -189,6 +204,11 @@ const config = {
                 label: "Install FullNodes",
                 type: "doc",
                 docId: "nodes/full-node/index",
+              },
+              {
+                label: "Measure Nodes",
+                type: "doc",
+                docId: "nodes/measure/index",
               },
               {
                 label: "Configure Nodes",
@@ -219,6 +239,11 @@ const config = {
                 label: "Rust SDK",
                 type: "doc",
                 docId: "sdks/rust-sdk",
+              },
+              {
+                label: "Move References",
+                type: "doc",
+                docId: "reference/move",
               },
               {
                 label: "Aptos Glossary",

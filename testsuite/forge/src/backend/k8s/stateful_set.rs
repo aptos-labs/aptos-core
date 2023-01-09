@@ -1,24 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Get, K8sApi, Result, KUBECTL_BIN};
-use std::{process::Command, sync::Arc, time::Duration};
-
-use anyhow::bail;
-use aptos_retrier::ExponentWithLimitDelay;
-use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Pod};
-
+use crate::{create_k8s_client, Get, K8sApi, Result, KUBECTL_BIN};
 use again::RetryPolicy;
+use anyhow::bail;
 use aptos_logger::info;
+use aptos_retrier::ExponentWithLimitDelay;
 use json_patch::{Patch as JsonPatch, PatchOperation, ReplaceOperation};
+use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Pod};
 use kube::{
     api::{Api, Meta, Patch, PatchParams},
     client::Client as K8sClient,
 };
 use serde_json::{json, Value};
+use std::{process::Command, sync::Arc, time::Duration};
 use thiserror::Error;
-
-use crate::create_k8s_client;
 
 #[derive(Error, Debug)]
 #[error("{0}")]
@@ -132,25 +128,25 @@ async fn check_stateful_set_status(
                                             return Err(WorkloadScalingError::FinalError(
                                                 "ImagePullBackOff".to_string(),
                                             ));
-                                        }
+                                        },
                                         "CrashLoopBackOff" => {
                                             info!("Pod {} has CrashLoopBackOff", &pod_name);
                                             return Err(WorkloadScalingError::FinalError(
                                                 "CrashLoopBackOff".to_string(),
                                             ));
-                                        }
+                                        },
                                         "ErrImagePull" => {
                                             info!("Pod {} has ErrImagePull", &pod_name);
                                             return Err(WorkloadScalingError::FinalError(
                                                 "ErrImagePull".to_string(),
                                             ));
-                                        }
+                                        },
                                         _ => {
                                             info!("Waiting for pod {}", &pod_name);
                                             return Err(WorkloadScalingError::RetryableError(
                                                 format!("Waiting for pod {}", &pod_name),
                                             ));
-                                        }
+                                        },
                                     }
                                 }
                             }
@@ -170,14 +166,14 @@ async fn check_stateful_set_status(
                     &pod_name
                 )))
             }
-        }
+        },
         Err(e) => {
             info!("Failed to get StatefulSet: {}", e);
             Err(WorkloadScalingError::RetryableError(format!(
                 "Failed to get StatefulSet: {}",
                 e
             )))
-        }
+        },
     }
 }
 
@@ -322,10 +318,9 @@ pub async fn check_for_container_restart(
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use k8s_openapi::api::apps::v1::StatefulSet;
-    use k8s_openapi::api::apps::v1::{StatefulSetSpec, StatefulSetStatus};
-    use k8s_openapi::api::core::v1::{
-        ContainerState, ContainerStateWaiting, ContainerStatus, PodStatus,
+    use k8s_openapi::api::{
+        apps::v1::{StatefulSet, StatefulSetSpec, StatefulSetStatus},
+        core::v1::{ContainerState, ContainerStateWaiting, ContainerStatus, PodStatus},
     };
     use kube::{api::ObjectMeta, Error as KubeError};
 

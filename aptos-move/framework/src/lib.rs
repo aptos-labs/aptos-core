@@ -14,22 +14,18 @@ pub use built_package::*;
 mod module_metadata;
 pub use module_metadata::*;
 
-mod error_map;
 pub mod natives;
 mod release_builder;
 pub use release_builder::*;
 pub mod docgen;
+mod extended_checks;
 pub mod prover;
 mod release_bundle;
 mod released_framework;
 
-pub use released_framework::*;
-
+use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 pub use release_bundle::*;
-
-use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
-use flate2::Compression;
+pub use released_framework::*;
 use std::path::PathBuf;
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf

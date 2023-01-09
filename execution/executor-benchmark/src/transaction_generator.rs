@@ -5,6 +5,7 @@ use crate::account_generator::{AccountCache, AccountGenerator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::aptos_test_root_address,
@@ -24,7 +25,6 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
-use storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 
 const META_FILENAME: &str = "metadata.toml";
 const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -155,7 +155,7 @@ impl TransactionGenerator {
     ) -> Self {
         let path = db_dir.as_ref().join(META_FILENAME);
 
-        let num_existing_accounts = File::open(&path).map_or(0, |mut file| {
+        let num_existing_accounts = File::open(path).map_or(0, |mut file| {
             let mut contents = vec![];
             file.read_to_end(&mut contents).unwrap();
             let test_case: TestCase = toml::from_slice(&contents).expect("Must exist.");
@@ -250,7 +250,7 @@ impl TransactionGenerator {
 
         // We don't store the # of existing seed accounts now. Thus here we just blindly re-create
         // and re-mint seed accounts here.
-        let num_seed_accounts = (num_new_accounts / 1000).max(1).min(100000);
+        let num_seed_accounts = (num_new_accounts / 1000).clamp(1, 100000);
         let seed_accounts_cache = Self::gen_seed_account_cache(reader, num_seed_accounts);
 
         println!(

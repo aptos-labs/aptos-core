@@ -5,32 +5,48 @@ spec aptos_std::multi_ed25519 {
     // -----------------------
 
     spec new_unvalidated_public_key_from_bytes(bytes: vector<u8>): UnvalidatedPublicKey {
+        include NewUnvalidatedPublicKeyFromBytesAbortsIf;
+        ensures result == UnvalidatedPublicKey { bytes };
+    }
+    spec schema NewUnvalidatedPublicKeyFromBytesAbortsIf {
+        bytes: vector<u8>;
         let length = len(bytes);
         aborts_if length / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES > MAX_NUMBER_OF_PUBLIC_KEYS;
         aborts_if length % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES != THRESHOLD_SIZE_BYTES;
-        ensures result == UnvalidatedPublicKey { bytes };
     }
 
     spec new_validated_public_key_from_bytes(bytes: vector<u8>): Option<ValidatedPublicKey> {
-        aborts_if len(bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES
-            && len(bytes) / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES > MAX_NUMBER_OF_PUBLIC_KEYS;
+        aborts_if false;
         let cond = len(bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES
             && spec_public_key_validate_internal(bytes);
         ensures cond ==> result == option::spec_some(ValidatedPublicKey{bytes});
         ensures !cond ==> result == option::spec_none<ValidatedPublicKey>();
     }
 
-    spec new_signature_from_bytes(bytes: vector<u8>): Signature {
-        aborts_if len(bytes) % INDIVIDUAL_SIGNATURE_NUM_BYTES != BITMAP_NUM_OF_BYTES;
-        ensures result == Signature { bytes };
+    spec new_validated_public_key_from_bytes_v2(bytes: vector<u8>): Option<ValidatedPublicKey> {
+        let cond = spec_public_key_validate_v2_internal(bytes);
+        ensures cond ==> result == option::spec_some(ValidatedPublicKey{bytes});
+        ensures !cond ==> result == option::spec_none<ValidatedPublicKey>();
     }
 
+    spec new_signature_from_bytes(bytes: vector<u8>): Signature {
+        include NewSignatureFromBytesAbortsIf;
+        ensures result == Signature { bytes };
+    }
+    spec schema NewSignatureFromBytesAbortsIf {
+        bytes: vector<u8>;
+        aborts_if len(bytes) % INDIVIDUAL_SIGNATURE_NUM_BYTES != BITMAP_NUM_OF_BYTES;
+    }
+
+    spec public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8> {
+        pragma opaque;
+        aborts_if false;
+        ensures [abstract] result == spec_public_key_bytes_to_authentication_key(pk_bytes);
+    }
 
     // ----------------
     // Native functions
     // ----------------
-
-    spec fun spec_public_key_validate_internal(bytes: vector<u8>): bool;
 
     spec fun spec_signature_verify_strict_internal(
         multisignature: vector<u8>,
@@ -40,8 +56,14 @@ spec aptos_std::multi_ed25519 {
 
     spec public_key_validate_internal(bytes: vector<u8>): bool {
         pragma opaque;
-        aborts_if len(bytes) / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES > MAX_NUMBER_OF_PUBLIC_KEYS;
+        aborts_if false;
+        ensures (len(bytes) / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES > MAX_NUMBER_OF_PUBLIC_KEYS) ==> (result == false);
         ensures result == spec_public_key_validate_internal(bytes);
+    }
+
+    spec public_key_validate_v2_internal(bytes: vector<u8>): bool {
+        pragma opaque;
+        ensures result == spec_public_key_validate_v2_internal(bytes);
     }
 
     spec signature_verify_strict_internal(
@@ -52,5 +74,22 @@ spec aptos_std::multi_ed25519 {
         pragma opaque;
         aborts_if false;
         ensures result == spec_signature_verify_strict_internal(multisignature, public_key, message);
+    }
+
+
+    // ----------------
+    // Helper functions
+    // ----------------
+
+    spec fun spec_public_key_validate_internal(bytes: vector<u8>): bool;
+
+    spec fun spec_public_key_validate_v2_internal(bytes: vector<u8>): bool;
+
+    spec fun spec_public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8>;
+
+    spec fun spec_signature_verify_strict_t<T>(signature: Signature, public_key: UnvalidatedPublicKey, data: T): bool {
+        let encoded = ed25519::new_signed_message<T>(data);
+        let message = bcs::serialize(encoded);
+        spec_signature_verify_strict_internal(signature.bytes, public_key.bytes, message)
     }
 }

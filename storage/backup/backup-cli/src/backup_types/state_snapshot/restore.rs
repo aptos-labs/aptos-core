@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::OTHER_TIMERS_SECONDS;
-use crate::utils::stream::StreamX;
 use crate::{
     backup_types::{
         epoch_ending::restore::EpochHistory, state_snapshot::manifest::StateSnapshotBackup,
@@ -15,16 +13,18 @@ use crate::{
             VERIFY_STATE_SNAPSHOT_LEAF_INDEX, VERIFY_STATE_SNAPSHOT_TARGET_LEAF_INDEX,
             VERIFY_STATE_SNAPSHOT_VERSION,
         },
+        OTHER_TIMERS_SECONDS,
     },
     storage::{BackupStorage, FileHandle},
     utils::{
-        read_record_bytes::ReadRecordBytes, storage_ext::BackupStorageExt, GlobalRestoreOptions,
-        RestoreRunMode,
+        read_record_bytes::ReadRecordBytes, storage_ext::BackupStorageExt, stream::StreamX,
+        GlobalRestoreOptions, RestoreRunMode,
     },
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::StateSnapshotReceiver;
 use aptos_types::{
     access_path::Path,
     ledger_info::LedgerInfoWithSignatures,
@@ -38,7 +38,6 @@ use futures::{stream, TryStreamExt};
 use move_binary_format::CompiledModule;
 use move_bytecode_verifier::verify_module_with_config;
 use std::sync::Arc;
-use storage_interface::StateSnapshotReceiver;
 use tokio::time::Instant;
 
 #[derive(Parser)]
@@ -219,7 +218,7 @@ impl StateSnapshotRestoreController {
     }
 
     fn validate_modules(blob: &[(StateKey, StateValue)]) {
-        let config = verifier_config();
+        let config = verifier_config(false);
         for (key, value) in blob {
             if let StateKey::AccessPath(p) = key {
                 if let Path::Code(module_id) = p.get_path() {

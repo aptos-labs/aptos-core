@@ -1,11 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::response::{
-    bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
-    block_pruned_by_height, json_api_disabled, version_not_found, version_pruned, ForbiddenError,
-    InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
+use crate::{
+    accept_type::AcceptType,
+    response::{
+        bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
+        block_pruned_by_height, json_api_disabled, version_not_found, version_pruned,
+        ForbiddenError, InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
+    },
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
@@ -16,31 +18,32 @@ use aptos_crypto::HashValue;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::error;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
-use aptos_state_view::StateView;
-use aptos_types::access_path::{AccessPath, Path};
-use aptos_types::account_config::NewBlockEvent;
-use aptos_types::account_view::AccountView;
-use aptos_types::on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig};
-use aptos_types::transaction::Transaction;
+use aptos_state_view::TStateView;
+use aptos_storage_interface::{
+    state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
+    DbReader, Order, MAX_REQUEST_LIMIT,
+};
 use aptos_types::{
+    access_path::{AccessPath, Path},
     account_address::AccountAddress,
+    account_config::NewBlockEvent,
     account_state::AccountState,
+    account_view::AccountView,
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig},
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
-    transaction::{SignedTransaction, TransactionWithProof, Version},
+    transaction::{SignedTransaction, Transaction, TransactionWithProof, Version},
 };
 use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned};
 use futures::{channel::oneshot, SinkExt};
 use itertools::Itertools;
 use move_core_types::language_storage::{ModuleId, StructTag};
-use std::sync::RwLock;
-use std::{collections::HashMap, sync::Arc};
-use storage_interface::{
-    state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
-    DbReader, Order, MAX_REQUEST_LIMIT,
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
 };
 
 // Context holds application scope context
@@ -912,14 +915,15 @@ impl Context {
 
             let gas_schedule_params =
                 match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
+                    let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
-                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
                     None => GasSchedule::fetch_config(&storage_adapter)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
-                            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+                            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0)
                         })
                         .ok_or_else(|| {
                             E::internal_with_code(
@@ -950,12 +954,12 @@ impl Context {
                 if !self.node_config.api.json_output_enabled {
                     return Err(json_api_disabled(api_name));
                 }
-            }
+            },
             AcceptType::Bcs => {
                 if !self.node_config.api.bcs_output_enabled {
                     return Err(bcs_api_disabled(api_name));
                 }
-            }
+            },
         }
         Ok(())
     }

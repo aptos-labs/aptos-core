@@ -4,23 +4,22 @@
 //! This module provides `Pruner` which manages a thread pruning old data in the background and is
 //! meant to be triggered by other threads as they commit new data to the DB.
 
-use crate::metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW};
-
+use crate::{
+    metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW},
+    pruner::{
+        db_pruner::DBPruner,
+        pruner_manager::PrunerManager,
+        state_pruner_worker::StatePrunerWorker,
+        state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+    },
+    pruner_utils,
+};
 use aptos_config::config::StateMerklePrunerConfig;
 use aptos_infallible::Mutex;
-
-use crate::pruner::pruner_manager::PrunerManager;
 use aptos_jellyfish_merkle::StaleNodeIndex;
+use aptos_schemadb::{schema::KeyCodec, DB};
 use aptos_types::transaction::Version;
-use schemadb::schema::KeyCodec;
-use schemadb::DB;
 use std::{sync::Arc, thread::JoinHandle};
-
-use crate::pruner::db_pruner::DBPruner;
-use crate::pruner::state_pruner_worker::StatePrunerWorker;
-use crate::pruner::state_store::generics::StaleNodeIndexSchemaTrait;
-use crate::pruner::state_store::StateMerklePruner;
-use crate::pruner_utils;
 
 /// The `Pruner` is meant to be part of a `AptosDB` instance and runs in the background to prune old
 /// data.

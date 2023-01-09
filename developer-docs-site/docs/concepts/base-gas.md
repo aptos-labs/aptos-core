@@ -218,7 +218,7 @@ Hence per the item-wise read methodology described above, reading the last eleme
 
 ## Payload gas
 
-Payload gas is defined in [`transaction.rs`], which incorporates storage gas with several payload- and pricing-associated parameters:
+Payload gas is defined in [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs), which incorporates storage gas with several payload- and pricing-associated parameters:
 
 | Parameter                       | Meaning                                                                                |
 |---------------------------------|----------------------------------------------------------------------------------------|
@@ -239,7 +239,7 @@ Then, to convert from external gas units to octas, multiply by the "gas price", 
 
 ### Unit and pricing constants
 
-As of the time of this writing, `min_price_per_gas_unit` in [`transaction.rs`] is defined as [`aptos_global_constants`]`::GAS_UNIT_PRICE` (which is itself defined as 100), with other noteworthy [`transaction.rs`] constants as follows:
+As of the time of this writing, `min_price_per_gas_unit` in [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs) is defined as [`aptos_global_constants`]`::GAS_UNIT_PRICE` (which is itself defined as 100), with other noteworthy [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs) constants as follows:
 
 | Constant                  | Value  |
 |---------------------------|--------|
@@ -318,7 +318,7 @@ In extreme cases it is possible for instruction gas to far outweigh storage gas,
 
 ### Payload gas
 
-As of the time of this writing, [`transaction.rs`] defines the minimum amount of internal gas per transaction as 1,500,000 internal units (15,000 octas at minimum), an amount that increases by 2,000 internal gas units (20 octas minimum) per byte for payloads larger than 600 bytes, with the maximum number of bytes permitted in a transaction set at 65536.
+As of the time of this writing, [`transaction/mod.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction/mod.rs) defines the minimum amount of internal gas per transaction as 1,500,000 internal units (15,000 octas at minimum), an amount that increases by 2,000 internal gas units (20 octas minimum) per byte for payloads larger than 600 bytes, with the maximum number of bytes permitted in a transaction set at 65536.
 Hence in practice, payload gas is unlikely to be a concern.
 
 <!--- Alphabetized reference links -->

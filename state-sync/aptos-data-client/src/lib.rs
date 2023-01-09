@@ -3,6 +3,10 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_storage_service_types::{
+    responses::{CompleteDataRange, TransactionOrOutputListWithProof},
+    Epoch,
+};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
@@ -12,8 +16,6 @@ use async_trait::async_trait;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{fmt, fmt::Display};
-use storage_service_types::responses::TransactionOrOutputListWithProof;
-use storage_service_types::{responses::CompleteDataRange, Epoch};
 use thiserror::Error;
 
 pub type ResponseId = u64;
@@ -54,8 +56,8 @@ impl Error {
     }
 }
 
-impl From<storage_service_types::responses::Error> for Error {
-    fn from(error: storage_service_types::responses::Error) -> Self {
+impl From<aptos_storage_service_types::responses::Error> for Error {
+    fn from(error: aptos_storage_service_types::responses::Error) -> Self {
         Self::InvalidResponse(error.to_string())
     }
 }

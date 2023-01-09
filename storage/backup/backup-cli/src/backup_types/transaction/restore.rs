@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::OTHER_TIMERS_SECONDS;
 use crate::{
     backup_types::{
         epoch_ending::restore::EpochHistory,
@@ -10,6 +9,7 @@ use crate::{
     metrics::{
         restore::{TRANSACTION_REPLAY_VERSION, TRANSACTION_SAVE_VERSION},
         verify::VERIFY_TRANSACTION_VERSION,
+        OTHER_TIMERS_SECONDS,
     },
     storage::{BackupStorage, FileHandle},
     utils::{
@@ -21,18 +21,19 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
+use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_types::TransactionReplayer;
 use aptos_logger::prelude::*;
-use aptos_types::write_set::WriteSet;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
     transaction::{Transaction, TransactionInfo, TransactionListWithProof, Version},
+    write_set::WriteSet,
 };
 use aptos_vm::AptosVM;
-use aptosdb::backup::restore_handler::RestoreHandler;
 use clap::Parser;
 use futures::{
     future,
@@ -49,7 +50,6 @@ use std::{
     sync::Arc,
     time::Instant,
 };
-use storage_interface::DbReaderWriter;
 use tokio::io::BufReader;
 
 const BATCH_SIZE: usize = if cfg!(test) { 2 } else { 10000 };
@@ -284,7 +284,7 @@ impl TransactionRestoreBatchController {
                             *last_chunk_last_version = chunk.last_version;
                             Some(chunk_res)
                         }
-                    }
+                    },
                     Err(_) => Some(chunk_res),
                 };
                 future::ready(res)

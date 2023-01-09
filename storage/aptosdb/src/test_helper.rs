@@ -6,21 +6,19 @@ use super::*;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, schema::state_value::StateValueSchema,
 };
-use aptos_types::ledger_info::generate_ledger_info_with_sig;
-
 use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
 use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_temppath::TempPath;
 use aptos_types::{
     contract_event::ContractEvent,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::InMemoryAccumulator,
     proptest_types::{AccountInfoUniverse, BlockGen},
 };
-use proptest::sample::Index;
-use proptest::{collection::vec, prelude::*};
-use scratchpad::SparseMerkleTree;
+use proptest::{collection::vec, prelude::*, sample::Index};
+use std::fmt::Debug;
 
 prop_compose! {
     pub fn arb_state_kv_sets(
@@ -50,7 +48,7 @@ pub(crate) fn update_store(
     input: impl Iterator<Item = (StateKey, Option<StateValue>)>,
     first_version: Version,
 ) -> HashValue {
-    use storage_interface::{jmt_update_refs, jmt_updates};
+    use aptos_storage_interface::{jmt_update_refs, jmt_updates};
     let mut root_hash = *aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
     for (i, (key, value)) in input.enumerate() {
         let value_state_set = vec![(key, value)].into_iter().collect();
@@ -64,13 +62,13 @@ pub(crate) fn update_store(
                 version.checked_sub(1),
             )
             .unwrap();
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         store
             .put_value_sets(
                 vec![&value_state_set],
                 version,
                 StateStorageUsage::new_untracked(),
-                &mut batch,
+                &batch,
             )
             .unwrap();
         store.ledger_db.write_schemas(batch).unwrap();
@@ -655,6 +653,64 @@ fn group_txns_by_account(
     account_to_txns
 }
 
+fn assert_items_equal<'a, T: 'a + Debug + Eq>(
+    iter: impl Iterator<Item = &'a T>,
+    db_iter_res: Result<impl Iterator<Item = Result<T>>>,
+) {
+    for (item, db_item) in itertools::zip_eq(iter, db_iter_res.unwrap()) {
+        assert_eq!(item, &db_item.unwrap());
+    }
+}
+
+fn verify_ledger_iterators(
+    db: &AptosDB,
+    txns_to_commit: &[TransactionToCommit],
+    first_version: Version,
+    ledger_info_with_sigs: &LedgerInfoWithSignatures,
+) {
+    let num_txns = txns_to_commit.len() as u64;
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.transaction()),
+        db.get_transaction_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.transaction_info()),
+        db.get_transaction_info_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit
+            .iter()
+            .map(|t| t.events().to_vec())
+            .collect::<Vec<_>>()
+            .iter(),
+        db.get_events_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.write_set()),
+        db.get_write_set_iterator(first_version, num_txns),
+    );
+    let range_proof = db
+        .get_transaction_accumulator_range_proof(
+            first_version,
+            num_txns,
+            ledger_info_with_sigs.ledger_info().version(),
+        )
+        .unwrap();
+    range_proof
+        .verify(
+            ledger_info_with_sigs
+                .ledger_info()
+                .transaction_accumulator_hash(),
+            Some(first_version),
+            &db.get_transaction_info_iterator(first_version, num_txns)
+                .unwrap()
+                .map(|txn_info_res| Ok(txn_info_res?.hash()))
+                .collect::<Result<Vec<_>>>()
+                .unwrap(),
+        )
+        .unwrap()
+}
+
 pub fn verify_committed_transactions(
     db: &AptosDB,
     txns_to_commit: &[TransactionToCommit],
@@ -662,6 +718,7 @@ pub fn verify_committed_transactions(
     ledger_info_with_sigs: &LedgerInfoWithSignatures,
     is_latest: bool,
 ) {
+    verify_ledger_iterators(db, txns_to_commit, first_version, ledger_info_with_sigs);
     let ledger_info = ledger_info_with_sigs.ledger_info();
     let ledger_version = ledger_info.version();
     assert_eq!(
@@ -769,9 +826,9 @@ pub fn verify_committed_transactions(
 }
 
 pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &TransactionInfo) {
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     db.ledger_store
-        .put_transaction_infos(version, &[txn_info.clone()], &mut batch)
+        .put_transaction_infos(version, &[txn_info.clone()], &batch)
         .unwrap();
     db.ledger_db.write_schemas(batch).unwrap();
 }

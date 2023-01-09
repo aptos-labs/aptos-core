@@ -16,12 +16,12 @@
 
 use crate::schema::{ensure_slice_len_eq, EPOCH_BY_VERSION_CF_NAME};
 use anyhow::Result;
-use aptos_types::transaction::Version;
-use byteorder::{BigEndian, ReadBytesExt};
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
+use aptos_types::transaction::Version;
+use byteorder::{BigEndian, ReadBytesExt};
 use std::mem::size_of;
 
 define_schema!(

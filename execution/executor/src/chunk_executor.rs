@@ -15,13 +15,17 @@ use crate::{
         APTOS_EXECUTOR_EXECUTE_CHUNK_SECONDS, APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS,
     },
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aptos_executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, TransactionReplayer,
 };
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
+use aptos_storage_interface::{
+    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
+    ExecutedTrees,
+};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -34,10 +38,6 @@ use aptos_types::{
 use aptos_vm::VMExecutor;
 use fail::fail_point;
 use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
-use storage_interface::{
-    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
-    ExecutedTrees,
-};
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
@@ -188,23 +188,13 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let first_version_in_request = txn_list_with_proof.first_transaction_version;
         let (_persisted_view, latest_view) = self.commit_queue.lock().persisted_and_latest_view();
 
-        // Verify input transaction list.
-        txn_list_with_proof.verify(verified_target_li.ledger_info(), first_version_in_request)?;
-
-        // Skip transactions already in ledger.
-        let txns_to_skip = txn_list_with_proof.proof.verify_extends_ledger(
-            latest_view.txn_accumulator().num_leaves(),
-            latest_view.txn_accumulator().root_hash(),
+        let (txn_info_list_with_proof, txns_to_skip, transactions) = verify_chunk(
+            txn_list_with_proof,
+            verified_target_li,
             first_version_in_request,
+            &latest_view,
+            num_txns,
         )?;
-        let mut transactions = txn_list_with_proof.transactions;
-        transactions.drain(..txns_to_skip as usize);
-        if txns_to_skip == num_txns {
-            info!(
-                "Skipping all transactions in the given chunk! Num transactions: {:?}",
-                num_txns
-            );
-        }
 
         // Execute transactions.
         let state_view = self.state_view(&latest_view)?;
@@ -217,7 +207,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             epoch_change_li,
             &latest_view,
             chunk_output,
-            &txn_list_with_proof.proof.transaction_infos[txns_to_skip..],
+            &txn_info_list_with_proof.transaction_infos[txns_to_skip..],
         )?;
 
         // Add result to commit queue.
@@ -257,7 +247,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             first_version_in_request,
         )?;
         let mut txns_and_outputs = txn_output_list_with_proof.transactions_and_outputs;
-        txns_and_outputs.drain(..txns_to_skip as usize);
+        txns_and_outputs.drain(..txns_to_skip);
 
         // Apply transaction outputs.
         let state_view = self.state_view(&latest_view)?;
@@ -295,6 +285,77 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
     }
 }
 
+/// Verifies the transaction list proof against the ledger info and returns transactions
+/// that are not already applied in the ledger.
+#[cfg(not(feature = "consensus-only-perf-test"))]
+fn verify_chunk(
+    txn_list_with_proof: TransactionListWithProof,
+    verified_target_li: &LedgerInfoWithSignatures,
+    first_version_in_request: Option<u64>,
+    latest_view: &ExecutedTrees,
+    num_txns: usize,
+) -> Result<
+    (
+        aptos_types::proof::TransactionInfoListWithProof,
+        usize,
+        Vec<Transaction>,
+    ),
+    anyhow::Error,
+> {
+    // Verify input transaction list
+    txn_list_with_proof.verify(verified_target_li.ledger_info(), first_version_in_request)?;
+
+    let txn_list = txn_list_with_proof.transactions;
+    let txn_info_with_proof = txn_list_with_proof.proof;
+
+    // Skip transactions already in ledger
+    let txns_to_skip = txn_info_with_proof.verify_extends_ledger(
+        latest_view.txn_accumulator().num_leaves(),
+        latest_view.txn_accumulator().root_hash(),
+        first_version_in_request,
+    )?;
+
+    let mut transactions = txn_list;
+    transactions.drain(..txns_to_skip);
+    if txns_to_skip == num_txns {
+        info!(
+            "Skipping all transactions in the given chunk! Num transactions: {:?}",
+            num_txns
+        );
+    }
+
+    Ok((txn_info_with_proof, txns_to_skip, transactions))
+}
+
+/// In consensus-only mode, the [TransactionListWithProof](transaction list) is *not*
+/// verified against the proof and the [LedgerInfoWithSignatures](ledger info).
+/// This is because the [FakeAptosDB] from where these transactions come from
+/// returns an empty proof and not an actual proof, so proof verification will
+/// fail regardless. This function does not skip any transactions that may be
+/// already in the ledger, because it is not necessary as execution is disabled.
+#[cfg(feature = "consensus-only-perf-test")]
+fn verify_chunk(
+    txn_list_with_proof: TransactionListWithProof,
+    _verified_target_li: &LedgerInfoWithSignatures,
+    _first_version_in_request: Option<u64>,
+    _latest_view: &ExecutedTrees,
+    _num_txns: usize,
+) -> Result<
+    (
+        aptos_types::proof::TransactionInfoListWithProof,
+        usize,
+        Vec<Transaction>,
+    ),
+    anyhow::Error,
+> {
+    // no-op: we do not verify the proof in consensus-only mode
+    Ok((
+        txn_list_with_proof.proof,
+        0,
+        txn_list_with_proof.transactions,
+    ))
+}
+
 impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
     fn replay(
         &self,
@@ -328,23 +389,15 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
         events: Vec<Vec<ContractEvent>>,
         txns_to_skip: Arc<BTreeSet<Version>>,
     ) -> Result<()> {
-        let current_begin_version = {
-            self.commit_queue
-                .lock()
-                .persisted_and_latest_view()
-                .1
-                .version()
-                .ok_or_else(|| anyhow!("Current version is not available"))?
-        };
-
-        let mut offset = current_begin_version;
+        let (_parent_view, latest_view) = self.commit_queue.lock().persisted_and_latest_view();
+        let first_version = latest_view.num_transactions() as Version;
+        let mut offset = first_version;
         let total_length = transactions.len();
 
-        for version in txns_to_skip
-            .range(current_begin_version + 1..current_begin_version + total_length as u64 + 1)
-        {
-            let remaining = transactions.split_off((version - offset) as usize);
-            let remaining_info = transaction_infos.split_off((version - offset) as usize);
+        for version in txns_to_skip.range(first_version..first_version + total_length as u64) {
+            let version = *version;
+            let remaining = transactions.split_off((version - offset + 1) as usize);
+            let remaining_info = transaction_infos.split_off((version - offset + 1) as usize);
             let txn_to_skip = transactions.pop().unwrap();
             let txn_info = transaction_infos.pop().unwrap();
 
@@ -353,8 +406,8 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
             self.apply_transaction_and_output(
                 txn_to_skip,
                 TransactionOutput::new(
-                    writesets[(version - current_begin_version - 1) as usize].clone(),
-                    events[(version - current_begin_version - 1) as usize].clone(),
+                    writesets[(version - first_version) as usize].clone(),
+                    events[(version - first_version) as usize].clone(),
                     txn_info.gas_used(),
                     TransactionStatus::Keep(txn_info.status().clone()),
                 ),
@@ -363,7 +416,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 
             transactions = remaining;
             transaction_infos = remaining_info;
-            offset = version + 1;
+            offset = version;
         }
         self.replay_impl(transactions, transaction_infos)
     }

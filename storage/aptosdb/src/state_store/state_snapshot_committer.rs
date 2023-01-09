@@ -9,6 +9,7 @@ use crate::state_store::{
     StateDb,
 };
 use aptos_logger::trace;
+use aptos_storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta};
 use std::{
     sync::{
         mpsc,
@@ -17,7 +18,6 @@ use std::{
     },
     thread::JoinHandle,
 };
-use storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta};
 
 pub(crate) struct StateSnapshotCommitter {
     state_db: Arc<StateDb>,
@@ -100,18 +100,18 @@ impl StateSnapshotCommitter {
                             snapshot_ready_sender,
                         })
                         .unwrap();
-                }
+                },
                 CommitMessage::Sync(finish_sender) => {
                     self.state_merkle_batch_commit_sender
                         .send(CommitMessage::Sync(finish_sender))
                         .unwrap();
-                }
+                },
                 CommitMessage::Exit => {
                     self.state_merkle_batch_commit_sender
                         .send(CommitMessage::Exit)
                         .unwrap();
                     break;
-                }
+                },
             }
             trace!("State snapshot committing thread exit.")
         }

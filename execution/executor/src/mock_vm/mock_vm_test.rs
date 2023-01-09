@@ -1,16 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
-
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
 use anyhow::Result;
-use aptos_state_view::StateView;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_state_view::TStateView;
 use aptos_types::{
-    account_address::AccountAddress, state_store::state_key::StateKey, write_set::WriteOp,
+    account_address::AccountAddress,
+    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
+    write_set::WriteOp,
 };
 use aptos_vm::VMExecutor;
+use std::collections::BTreeMap;
 
 fn gen_address(index: u8) -> AccountAddress {
     AccountAddress::new([index; AccountAddress::LENGTH])
@@ -18,7 +18,9 @@ fn gen_address(index: u8) -> AccountAddress {
 
 struct MockStateView;
 
-impl StateView for MockStateView {
+impl TStateView for MockStateView {
+    type Key = StateKey;
+
     fn get_state_value(&self, _state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         Ok(None)
     }

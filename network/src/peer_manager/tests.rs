@@ -21,21 +21,21 @@ use crate::{
     ProtocolId,
 };
 use anyhow::anyhow;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{PeerRole, MAX_INBOUND_CONNECTIONS},
     network_id::NetworkContext,
 };
 use aptos_infallible::RwLock;
+use aptos_memsocket::MemorySocket;
+use aptos_netcore::transport::{
+    boxed::BoxedTransport, memory::MemoryTransport, ConnectionOrigin, TransportExt,
+};
 use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{channel::oneshot, io::AsyncWriteExt, stream::StreamExt};
-use memsocket::MemorySocket;
-use netcore::transport::{
-    boxed::BoxedTransport, memory::MemoryTransport, ConnectionOrigin, TransportExt,
-};
 use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Handle;
 use tokio_util::compat::{
@@ -167,10 +167,10 @@ async fn assert_peer_disconnected_event(
             assert_eq!(*actual_reason, reason);
             assert_eq!(actual_metadata.origin, origin);
             peer_manager.handle_connection_event(connection_event);
-        }
+        },
         event => {
             panic!("Expected a LostPeer event, received: {:?}", event);
-        }
+        },
     }
 }
 

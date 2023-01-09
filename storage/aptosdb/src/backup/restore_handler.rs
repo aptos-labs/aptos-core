@@ -1,14 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::db_metadata::{DbMetadataKey, DbMetadataSchema};
-use crate::state_restore::StateSnapshotRestore;
 use crate::{
-    backup::restore_utils, event_store::EventStore, ledger_store::LedgerStore,
-    state_store::StateStore, transaction_store::TransactionStore, AptosDB,
+    backup::restore_utils,
+    db_metadata::{DbMetadataKey, DbMetadataSchema},
+    event_store::EventStore,
+    ledger_store::LedgerStore,
+    state_restore::StateSnapshotRestore,
+    state_store::StateStore,
+    transaction_store::TransactionStore,
+    AptosDB,
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_schemadb::DB;
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -16,9 +22,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
-use schemadb::DB;
 use std::sync::Arc;
-use storage_interface::DbReader;
 
 /// Provides functionalities for AptosDB data restore.
 #[derive(Clone)]

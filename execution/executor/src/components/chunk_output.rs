@@ -7,16 +7,16 @@ use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_executor_types::ExecutedChunk;
 use aptos_logger::{trace, warn};
+use aptos_storage_interface::{
+    cached_state_view::{CachedStateView, StateCache},
+    ExecutedTrees,
+};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
-use storage_interface::{
-    cached_state_view::{CachedStateView, StateCache},
-    ExecutedTrees,
-};
 
 pub struct ChunkOutput {
     /// Input transactions.
@@ -24,7 +24,7 @@ pub struct ChunkOutput {
     /// Raw VM output.
     pub transaction_outputs: Vec<TransactionOutput>,
     /// Carries the frozen base state view, so all in-mem nodes involved won't drop before the
-    /// execution result is processed; as well as al the accounts touched during execution, together
+    /// execution result is processed; as well as all the accounts touched during execution, together
     /// with their proofs.
     pub state_cache: StateCache,
 }
@@ -34,7 +34,7 @@ impl ChunkOutput {
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<Self> {
-        let transaction_outputs = V::execute_block(transactions.clone(), &state_view)?;
+        let transaction_outputs = Self::execute_block::<V>(transactions.clone(), &state_view)?;
 
         // to print txn output for debugging, uncomment:
         // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
@@ -95,6 +95,46 @@ impl ChunkOutput {
             trace!("Execution status: {:?}", status);
         }
     }
+
+    /// Executes the block of [Transaction]s using the [VMExecutor] and returns
+    /// a vector of [TransactionOutput]s.
+    #[cfg(not(feature = "consensus-only-perf-test"))]
+    fn execute_block<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: &CachedStateView,
+    ) -> Result<Vec<TransactionOutput>> {
+        Ok(V::execute_block(transactions, &state_view)?)
+    }
+
+    /// In consensus-only mode, executes the block of [Transaction]s using the
+    /// [VMExecutor] only if its a genesis block. In all other cases, this
+    /// method returns an [TransactionOutput] with an empty [WriteSet], constant
+    /// gas and a [ExecutionStatus::Success] for each of the [Transaction]s.
+    #[cfg(feature = "consensus-only-perf-test")]
+    fn execute_block<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: &CachedStateView,
+    ) -> Result<Vec<TransactionOutput>> {
+        use aptos_state_view::{StateViewId, TStateView};
+        use aptos_types::write_set::WriteSet;
+
+        let transaction_outputs = match state_view.id() {
+            // this state view ID implies a genesis block in non-test cases.
+            StateViewId::Miscellaneous => V::execute_block(transactions, &state_view)?,
+            _ => transactions
+                .iter()
+                .map(|_| {
+                    TransactionOutput::new(
+                        WriteSet::default(),
+                        Vec::new(),
+                        100,
+                        TransactionStatus::Keep(ExecutionStatus::Success),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        };
+        Ok(transaction_outputs)
+    }
 }
 
 pub fn update_counters_for_processed_chunk(
@@ -130,7 +170,7 @@ pub fn update_counters_for_processed_chunk(
                 ),
                 ExecutionStatus::ExecutionFailure { .. } => {
                     ("keep_rejected", "ExecutionFailure", "error".to_string())
-                }
+                },
                 ExecutionStatus::MiscellaneousError(e) => (
                     "keep_rejected",
                     "MiscellaneousError",
@@ -183,12 +223,12 @@ pub fn update_counters_for_processed_chunk(
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
                         .with_label_values(&[process_type, "script", state])
                         .inc();
-                }
+                },
                 aptos_types::transaction::TransactionPayload::ModuleBundle(_module) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
                         .with_label_values(&[process_type, "module", state])
                         .inc();
-                }
+                },
                 aptos_types::transaction::TransactionPayload::EntryFunction(function) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
                         .with_label_values(&[process_type, "function", state])
@@ -220,7 +260,7 @@ pub fn update_counters_for_processed_chunk(
                             ])
                             .inc();
                     }
-                }
+                },
             }
         }
 

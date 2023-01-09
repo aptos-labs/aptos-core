@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use proxy::Proxy;
+use aptos_proxy::Proxy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
@@ -124,7 +124,7 @@ impl Client {
                 let resp = resp.into_string()?;
                 let branches: Vec<Branch> = serde_json::from_str(&resp)?;
                 Ok(branches.into_iter().map(|b| b.name).collect())
-            }
+            },
             _ => Err(resp.into()),
         }
     }
@@ -169,10 +169,10 @@ impl Client {
         let json = match self.get_sha(path) {
             Ok(hash) => {
                 json!({ "branch": self.branch.to_string(), "content": content, "message": format!("[aptos-management] {}", path), "sha": hash })
-            }
+            },
             Err(Error::NotFound(_)) => {
                 json!({ "branch": self.branch.to_string(), "content": content, "message": format!("[aptos-management] {}", path) })
-            }
+            },
             Err(e) => return Err(e),
         };
 
@@ -223,7 +223,7 @@ impl Client {
                 }
 
                 Err(Error::SerializationError(resp))
-            }
+            },
             404 => Err(Error::NotFound(path.into())),
             _ => Err(resp.into()),
         }
@@ -296,9 +296,9 @@ mod tests {
     fn test_files() {
         let path = "data.txt";
         let value1 = "hello";
-        let value1_encoded = base64::encode(&value1);
+        let value1_encoded = base64::encode(value1);
         let value2 = "world";
-        let value2_encoded = base64::encode(&value2);
+        let value2_encoded = base64::encode(value2);
 
         let github = Client::new(OWNER.into(), REPOSITORY.into(), BRANCH.into(), TOKEN.into());
 
@@ -326,12 +326,12 @@ mod tests {
         let path1_root = "dir";
         let path1 = "dir/data1.txt";
         let value1 = "hello";
-        let value1_encoded = base64::encode(&value1);
+        let value1_encoded = base64::encode(value1);
 
         let path2_root = "dir1";
         let path2 = "dir1/data1.txt";
         let value2 = "world";
-        let value2_encoded = base64::encode(&value2);
+        let value2_encoded = base64::encode(value2);
 
         let github = Client::new(OWNER.into(), REPOSITORY.into(), BRANCH.into(), TOKEN.into());
 
@@ -370,7 +370,7 @@ mod tests {
         let file0 = "root_dir/another_dir/another_dir/ok.txt";
         let file1 = "root_dir/another_dir/ok.txt";
         let value = "hello";
-        let value_encoded = base64::encode(&value);
+        let value_encoded = base64::encode(value);
 
         let github = Client::new(OWNER.into(), REPOSITORY.into(), BRANCH.into(), TOKEN.into());
 

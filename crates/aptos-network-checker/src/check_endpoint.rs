@@ -8,15 +8,16 @@ use aptos_config::{
     network_id::{NetworkContext, NetworkId},
 };
 use aptos_crypto::x25519::{self, PRIVATE_KEY_SIZE};
-use aptos_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
-use futures::{AsyncReadExt, AsyncWriteExt};
-use network::transport::TCPBufferCfg;
-use network::{
+use aptos_network::{
     noise::{HandshakeAuthMode, NoiseUpgrader},
     protocols::wire::handshake::v1::ProtocolIdSet,
-    transport::{resolve_and_connect, TcpSocket},
-    transport::{upgrade_outbound, UpgradeContext, SUPPORTED_MESSAGING_PROTOCOL},
+    transport::{
+        resolve_and_connect, upgrade_outbound, TCPBufferCfg, TcpSocket, UpgradeContext,
+        SUPPORTED_MESSAGING_PROTOCOL,
+    },
 };
+use aptos_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
+use futures::{AsyncReadExt, AsyncWriteExt};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 
@@ -136,10 +137,10 @@ async fn check_endpoint_no_handshake(address: NetworkAddress) -> Result<String> 
             } else {
                 bail!("Endpoint {} responded with data when it shouldn't", address);
             }
-        }
+        },
         Err(error) => {
             bail!("Failed to read from {} due to error: {:#}", address, error);
-        }
+        },
     }
 }
 

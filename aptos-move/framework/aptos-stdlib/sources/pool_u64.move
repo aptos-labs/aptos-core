@@ -327,7 +327,7 @@ module aptos_std::pool_u64 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 196611)]
+    #[expected_failure(abort_code = 196611, location = Self)]
     public entry fun test_destroy_empty_should_fail_if_not_empty() {
         let pool = create(1);
         update_total_coins(&mut pool, 100);
@@ -428,7 +428,7 @@ module aptos_std::pool_u64 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 196610)]
+    #[expected_failure(abort_code = 196610, location = Self)]
     public entry fun test_add_shares_should_enforce_shareholder_limit() {
         let pool = create(2);
         add_shares(&mut pool, @1, 1);
@@ -449,7 +449,7 @@ module aptos_std::pool_u64 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 65537)]
+    #[expected_failure(abort_code = 65537, location = Self)]
     public entry fun test_redeem_shares_non_existent_shareholder() {
         let pool = create(1);
         add_shares(&mut pool, @1, 1);
@@ -458,7 +458,7 @@ module aptos_std::pool_u64 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 65540)]
+    #[expected_failure(abort_code = 65540, location = Self)]
     public entry fun test_redeem_shares_insufficient_shares() {
         let pool = create(1);
         add_shares(&mut pool, @1, 1);
@@ -488,7 +488,7 @@ module aptos_std::pool_u64 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 65537)]
+    #[expected_failure(abort_code = 65537, location = Self)]
     public entry fun test_deduct_shares_non_existent_shareholder() {
         let pool = create(1);
         add_shares(&mut pool, @1, 1);
@@ -497,7 +497,7 @@ module aptos_std::pool_u64 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 65540)]
+    #[expected_failure(abort_code = 65540, location = Self)]
     public entry fun test_deduct_shares_insufficient_shares() {
         let pool = create(1);
         add_shares(&mut pool, @1, 1);

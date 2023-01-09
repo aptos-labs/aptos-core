@@ -1,20 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::*;
 use crate::{
     state_restore::StateSnapshotRestore,
     test_helper::{arb_state_kv_sets, update_store},
     AptosDB,
 };
 use aptos_jellyfish_merkle::TreeReader;
+use aptos_storage_interface::{
+    jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver,
+};
 use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
 };
 use proptest::{collection::hash_map, prelude::*};
-use storage_interface::{jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver};
-
-use super::*;
 
 fn put_value_set(
     state_store: &StateStore,
@@ -31,13 +32,13 @@ fn put_value_set(
     let root = state_store
         .merklize_value_set(jmt_update_refs(&jmt_updates), None, version, base_version)
         .unwrap();
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     state_store
         .put_value_sets(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
-            &mut batch,
+            &batch,
         )
         .unwrap();
     state_store.ledger_db.write_schemas(batch).unwrap();

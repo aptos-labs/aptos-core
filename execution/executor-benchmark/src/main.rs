@@ -97,7 +97,7 @@ impl Opt {
                     level
                 );
                 level
-            }
+            },
             Some(level) => level,
         }
     }
@@ -163,7 +163,7 @@ fn main() {
             num_accounts,
             init_account_balance,
         } => {
-            executor_benchmark::db_generator::run(
+            aptos_executor_benchmark::db_generator::run(
                 num_accounts,
                 init_account_balance,
                 opt.block_size,
@@ -171,13 +171,13 @@ fn main() {
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
             );
-        }
+        },
         Command::RunExecutor {
             blocks,
             data_dir,
             checkpoint_dir,
         } => {
-            executor_benchmark::run_benchmark(
+            aptos_executor_benchmark::run_benchmark(
                 opt.block_size,
                 blocks,
                 data_dir,
@@ -185,14 +185,14 @@ fn main() {
                 opt.verify_sequence_numbers,
                 opt.pruner_opt.pruner_config(),
             );
-        }
+        },
         Command::AddAccounts {
             data_dir,
             checkpoint_dir,
             num_new_accounts,
             init_account_balance,
         } => {
-            executor_benchmark::add_accounts(
+            aptos_executor_benchmark::add_accounts(
                 num_new_accounts,
                 init_account_balance,
                 opt.block_size,
@@ -201,6 +201,6 @@ fn main() {
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
             );
-        }
+        },
     }
 }

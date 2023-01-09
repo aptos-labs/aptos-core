@@ -3,6 +3,7 @@
 
 //! TCP Transport
 use crate::transport::Transport;
+use aptos_proxy::Proxy;
 use aptos_types::{
     network_address::{parse_dns_tcp, parse_ip_tcp, parse_tcp, IpFilter, NetworkAddress},
     PeerId,
@@ -13,7 +14,6 @@ use futures::{
     ready,
     stream::Stream,
 };
-use proxy::Proxy;
 use std::{
     fmt::Debug,
     io,
@@ -45,6 +45,7 @@ impl TCPBufferCfg {
             outbound_tx_buffer_bytes: None,
         }
     }
+
     pub fn new_configs(
         inbound_rx: Option<u32>,
         inbound_tx: Option<u32>,
@@ -90,11 +91,11 @@ impl TcpTransport {
 }
 
 impl Transport for TcpTransport {
-    type Output = TcpSocket;
     type Error = ::std::io::Error;
-    type Listener = TcpListenerStream;
     type Inbound = future::Ready<io::Result<TcpSocket>>;
+    type Listener = TcpListenerStream;
     type Outbound = TcpOutbound;
+    type Output = TcpSocket;
 
     fn listen_on(
         &self,
@@ -332,7 +333,7 @@ impl Stream for TcpListenerStream {
                     future::ready(Ok(TcpSocket::new(socket))),
                     dialer_addr,
                 ))))
-            }
+            },
             Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
             Poll::Pending => Poll::Pending,
         }
@@ -426,13 +427,13 @@ mod test {
                     let mut buf = [0; 3];
                     out.read_exact(&mut buf).await?;
                     assert_eq!(&buf, b"Air");
-                }
+                },
                 ConnectionOrigin::Outbound => {
                     let mut buf = [0; 5];
                     out.read_exact(&mut buf).await?;
                     assert_eq!(&buf, b"Earth");
                     out.write_all(b"Air").await?;
-                }
+                },
             }
             Ok(())
         });

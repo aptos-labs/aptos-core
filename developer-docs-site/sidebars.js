@@ -81,7 +81,7 @@ const sidebars = {
       link: { type: "doc", id: "concepts/coin-and-token/index" },
       collapsible: true,
       collapsed: true,
-      items: ["concepts/coin-and-token/aptos-coin", "concepts/coin-and-token/aptos-token"],
+      items: ["concepts/coin-and-token/aptos-coin", "concepts/coin-and-token/aptos-token", "guides/wallet-standard"],
     },
     {
       type: "category",
@@ -96,12 +96,7 @@ const sidebars = {
       link: { type: "doc", id: "guides/index" },
       collapsible: true,
       collapsed: true,
-      items: [
-        "guides/sign-a-transaction",
-        "guides/resource-accounts",
-        "guides/wallet-standard",
-        "guides/handle-aptos-errors",
-      ],
+      items: ["guides/sign-a-transaction", "guides/resource-accounts", "guides/handle-aptos-errors"],
     },
     {
       type: "category",
@@ -119,6 +114,7 @@ const sidebars = {
     {
       type: "category",
       label: "Develop Locally",
+      link: { type: "doc", id: "nodes/local-testnet/index" },
       collapsible: true,
       collapsed: true,
       items: [
@@ -139,8 +135,17 @@ const sidebars = {
         "concepts/base-gas",
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",
+        "guides/move-guides/mint-nft-cli",
         "guides/move-guides/upgrading-move-code",
       ],
+    },
+    {
+      type: "category",
+      label: "Aptos Wallet Adapter",
+      link: { type: "doc", id: "concepts/wallet-adapter-concept" },
+      collapsible: true,
+      collapsed: true,
+      items: ["guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
     },
     {
       type: "html",
@@ -149,17 +154,11 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Find Nodes",
+      label: "Understand Nodes",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/nodes-landing" },
-      items: [
-        "concepts/node-networks-sync",
-        "nodes/aptos-deployments",
-        "nodes/leaderboard-metrics",
-        "nodes/node-health-checker/index",
-        "nodes/node-health-checker/node-health-checker-faq",
-      ],
+      items: ["concepts/node-networks-sync", "nodes/aptos-deployments", "nodes/leaderboard-metrics"],
     },
     /** Delete during clean up
     {
@@ -238,11 +237,24 @@ const sidebars = {
       items: [
         "concepts/fullnodes",
         "nodes/full-node/fullnode-source-code-or-docker",
+        "nodes/full-node/bootstrap-fullnode",
         "nodes/full-node/update-fullnode-with-new-releases",
         "nodes/full-node/network-identity-fullnode",
         "nodes/full-node/fullnode-network-connections",
         "nodes/full-node/run-a-fullnode-on-gcp",
         "nodes/indexer-fullnode",
+      ],
+    },
+    {
+      type: "category",
+      label: "Measure Nodes",
+      collapsible: true,
+      collapsed: true,
+      link: { type: "doc", id: "nodes/measure/index" },
+      items: [
+        "nodes/measure/node-inspection-service",
+        "nodes/measure/node-health-checker",
+        "nodes/measure/node-health-checker-faq",
       ],
     },
     {
@@ -273,13 +285,8 @@ const sidebars = {
       value: "Reference",
       className: "sidebar-title",
     },
-    {
-      type: "category",
-      label: "Aptos API",
-      collapsible: true,
-      collapsed: true,
-      items: ["nodes/aptos-api-spec", "reference/index"],
-    },
+    "reference/index",
+    "nodes/aptos-api-spec",
     {
       type: "category",
       label: "Aptos SDKs",

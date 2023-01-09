@@ -6,10 +6,10 @@ use crate::{
     protocols::stream::{InboundStreamBuffer, OutboundStream, StreamFragment, StreamHeader},
     testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
 };
+use aptos_memsocket::MemorySocket;
 use bcs::test_helpers::assert_canonical_encode_decode;
 use futures::{executor::block_on, future, sink::SinkExt, stream::StreamExt};
 use futures_util::stream::select;
-use memsocket::MemorySocket;
 use proptest::{collection::vec, prelude::*};
 
 // Ensure serialization of ProtocolId enum takes 1 byte.
@@ -62,19 +62,17 @@ fn stream_message() {
         num_fragments: 10,
         message,
     };
-    assert_eq!(
-        bcs::to_bytes(&stream_header).unwrap(),
-        vec![42, 0, 0, 0, 10, 3, 2, 0, 11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100],
-    );
+    assert_eq!(bcs::to_bytes(&stream_header).unwrap(), vec![
+        42, 0, 0, 0, 10, 3, 2, 0, 11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100
+    ],);
     let stream_fragment = StreamFragment {
         request_id: 42,
         fragment_id: 254,
         raw_data: vec![11, 22, 33],
     };
-    assert_eq!(
-        bcs::to_bytes(&stream_fragment).unwrap(),
-        vec![42, 0, 0, 0, 254, 3, 11, 22, 33],
-    );
+    assert_eq!(bcs::to_bytes(&stream_fragment).unwrap(), vec![
+        42, 0, 0, 0, 254, 3, 11, 22, 33
+    ],);
 }
 
 #[test]
@@ -236,8 +234,8 @@ proptest! {
 
         let mut message_tx = MultiplexMessageSink::new(socket_tx, 128, None);
         let message_rx = MultiplexMessageStream::new(socket_rx, 128, None);
-        let (stream_tx, stream_rx) = channel::new_test(1024);
-        let (mut msg_tx, msg_rx) = channel::new_test(1024);
+        let (stream_tx, stream_rx) = aptos_channels::new_test(1024);
+        let (mut msg_tx, msg_rx) = aptos_channels::new_test(1024);
         let mut outbound_stream = OutboundStream::new(128, 64 * 255, stream_tx);
         let mut inbound_stream = InboundStreamBuffer::new(255);
 

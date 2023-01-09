@@ -119,7 +119,7 @@ impl Aggregator {
                 AggregatorState::NegativeDelta => history.record_negative(self.value),
                 AggregatorState::Data => {
                     unreachable!("history is not tracked when aggregator knows its value")
-                }
+                },
             }
         }
     }
@@ -131,11 +131,11 @@ impl Aggregator {
                 // If aggregator knows the value, add directly and keep the state.
                 self.value = addition(self.value, value, self.limit)?;
                 return Ok(());
-            }
+            },
             AggregatorState::PositiveDelta => {
                 // If positive delta, add directly but also record the state.
                 self.value = addition(self.value, value, self.limit)?;
-            }
+            },
             AggregatorState::NegativeDelta => {
                 // Negative delta is a special case, since the state might
                 // change depending on how big the `value` is. Suppose
@@ -149,7 +149,7 @@ impl Aggregator {
                 } else {
                     self.value = subtraction(self.value, value)?;
                 }
-            }
+            },
         }
 
         // Record side-effects of addition in history.
@@ -166,7 +166,7 @@ impl Aggregator {
                 // record the history.
                 self.value = subtraction(self.value, value)?;
                 return Ok(());
-            }
+            },
             AggregatorState::PositiveDelta => {
                 // Positive delta is a special case because the state can
                 // change depending on how big the `value` is. Suppose
@@ -185,14 +185,14 @@ impl Aggregator {
                     self.value = subtraction(value, self.value)?;
                     self.state = AggregatorState::NegativeDelta;
                 }
-            }
+            },
             AggregatorState::NegativeDelta => {
                 // Since we operate on unsigned integers, we have to add
                 // when subtracting from negative delta. Note that if limit
                 // is some X, then we cannot subtract more than X, and so
                 // we should return an error there.
                 self.value = addition(self.value, value, self.limit)?;
-            }
+            },
         }
 
         // Record side-effects of addition in history.
@@ -247,13 +247,13 @@ impl Aggregator {
                     match self.state {
                         AggregatorState::PositiveDelta => {
                             self.value = addition(value_from_storage, self.value, self.limit)?;
-                        }
+                        },
                         AggregatorState::NegativeDelta => {
                             self.value = subtraction(value_from_storage, self.value)?;
-                        }
+                        },
                         AggregatorState::Data => {
                             unreachable!("history is not tracked when aggregator knows its value")
-                        }
+                        },
                     }
 
                     // Change the state and return the new value. Also, make
@@ -364,7 +364,7 @@ pub fn extension_error(message: impl ToString) -> PartialVMError {
 mod test {
     use super::*;
     use crate::delta_change_set::serialize;
-    use aptos_state_view::StateView;
+    use aptos_state_view::TStateView;
     use aptos_types::{
         account_address::AccountAddress,
         state_store::{
@@ -391,7 +391,9 @@ mod test {
         }
     }
 
-    impl StateView for FakeTestStorage {
+    impl TStateView for FakeTestStorage {
+        type Key = StateKey;
+
         fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
             Ok(self.data.get(state_key).cloned())
         }
@@ -421,7 +423,7 @@ mod test {
             .iter()
             .flat_map(|b| b.to_vec())
             .collect();
-        let key = AggregatorHandle(AccountAddress::from_bytes(&bytes).unwrap());
+        let key = AggregatorHandle(AccountAddress::from_bytes(bytes).unwrap());
         AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
     }
 

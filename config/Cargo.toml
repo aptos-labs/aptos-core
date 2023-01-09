@@ -19,6 +19,7 @@ aptos-crypto-derive = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-secure-storage = { workspace = true }
+aptos-short-hex-str = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
@@ -29,8 +30,8 @@ poem-openapi = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }
-short-hex-str = { workspace = true }
 thiserror = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 aptos-crypto = { workspace = true }

@@ -203,7 +203,7 @@ module aptos_framework::resource_account {
     }
 
     #[test(user = @0x1111)]
-    #[expected_failure(abort_code = 0x10002)]
+    #[expected_failure(abort_code = 0x10002, location = aptos_std::simple_map)]
     public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
         account::create_account(user_addr);
@@ -241,7 +241,7 @@ module aptos_framework::resource_account {
     }
 
     #[test(framework = @0x1, user = @0x2345)]
-    #[expected_failure(abort_code = 0x60005)]
+    #[expected_failure(abort_code = 0x60005, location = aptos_framework::coin)]
     public entry fun without_coin(framework: signer, user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
         aptos_framework::aptos_account::create_account(user_addr);

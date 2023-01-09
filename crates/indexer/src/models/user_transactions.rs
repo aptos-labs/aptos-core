@@ -87,7 +87,7 @@ impl UserTransaction {
                 entry_function_id_str: match &txn.request.payload {
                     TransactionPayload::EntryFunctionPayload(payload) => {
                         payload.function.to_string()
-                    }
+                    },
                     _ => String::default(),
                 },
                 epoch,

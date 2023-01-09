@@ -12,7 +12,7 @@ use std::fmt::Debug;
 /// `define_schema!` allows a schema to be defined in the following syntax:
 /// ```
 /// use anyhow::Result;
-/// use schemadb::{
+/// use aptos_schemadb::{
 ///     define_schema,
 ///     schema::{KeyCodec, SeekKeyCodec, ValueCodec},
 /// };
@@ -66,14 +66,15 @@ use std::fmt::Debug;
 /// ```
 #[macro_export]
 macro_rules! define_schema {
-    ($schema_type: ident, $key_type: ty, $value_type: ty, $cf_name: expr) => {
+    ($schema_type:ident, $key_type:ty, $value_type:ty, $cf_name:expr) => {
         #[derive(Debug)]
         pub(crate) struct $schema_type;
 
         impl $crate::schema::Schema for $schema_type {
-            const COLUMN_FAMILY_NAME: $crate::ColumnFamilyName = $cf_name;
             type Key = $key_type;
             type Value = $value_type;
+
+            const COLUMN_FAMILY_NAME: $crate::ColumnFamilyName = $cf_name;
         }
     };
 }
@@ -159,9 +160,9 @@ pub mod fuzzing {
 
     #[macro_export]
     macro_rules! test_no_panic_decoding {
-        ($schema_type: ty) => {
+        ($schema_type:ty) => {
+            use aptos_schemadb::schema::fuzzing::{arb_small_vec_u8, assert_no_panic_decoding};
             use proptest::prelude::*;
-            use schemadb::schema::fuzzing::{arb_small_vec_u8, assert_no_panic_decoding};
 
             proptest! {
                 #[test]

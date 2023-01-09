@@ -10,10 +10,11 @@ use crate::{
         conn_notifs_channel, ConnectionRequest, ConnectionRequestSender, PeerManager,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::{network::AppConfig, wire::handshake::v1::ProtocolIdSet},
+    protocols::{network::NetworkApplicationConfig, wire::handshake::v1::ProtocolIdSet},
     transport::{self, AptosNetTransport, Connection, APTOS_TCP_TRANSPORT},
     ProtocolId,
 };
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{PeerSet, RateLimitConfig, HANDSHAKE_VERSION},
     network_id::NetworkContext,
@@ -21,16 +22,15 @@ use aptos_config::{
 use aptos_crypto::x25519;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
-use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
-use channel::{self, aptos_channel, message_queues::QueueStyle};
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
-use netcore::transport::memory::MemoryTransport;
-use netcore::transport::{
+use aptos_netcore::transport::memory::MemoryTransport;
+use aptos_netcore::transport::{
     tcp::{TCPBufferCfg, TcpSocket, TcpTransport},
     Transport,
 };
+use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
+use aptos_time_service::TimeService;
+use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use std::{clone::Clone, collections::HashMap, fmt::Debug, net::IpAddr, sync::Arc};
 use tokio::runtime::Handle;
 
@@ -150,7 +150,7 @@ impl PeerManagerContext {
 
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 type MemoryPeerManager =
-    PeerManager<AptosNetTransport<MemoryTransport>, NoiseStream<memsocket::MemorySocket>>;
+    PeerManager<AptosNetTransport<MemoryTransport>, NoiseStream<aptos_memsocket::MemorySocket>>;
 type TcpPeerManager = PeerManager<AptosNetTransport<TcpTransport>, NoiseStream<TcpSocket>>;
 
 enum TransportPeerManager {
@@ -303,7 +303,7 @@ impl PeerManagerBuilder {
                     ),
                     executor,
                 )))
-            }
+            },
             #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
             [Memory(_)] => Some(TransportPeerManager::Memory(self.build_with_transport(
                 AptosNetTransport::new(
@@ -422,26 +422,11 @@ impl PeerManagerBuilder {
             .tcp_buffer_cfg
     }
 
-    /// Register a peer-to-peer service (i.e., both client and service) for given
-    /// protocols.
-    pub fn add_p2p_service(
-        &mut self,
-        config: &AppConfig,
-    ) -> (
-        (PeerManagerRequestSender, ConnectionRequestSender),
-        (
-            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-            conn_notifs_channel::Receiver,
-        ),
-    ) {
-        (self.add_client(config), self.add_service(config))
-    }
-
     /// Register a client that's interested in some set of protocols and return
     /// the outbound channels into network.
     pub fn add_client(
         &mut self,
-        config: &AppConfig,
+        config: &NetworkApplicationConfig,
     ) -> (PeerManagerRequestSender, ConnectionRequestSender) {
         self.transport_context().add_protocols(&config.protocols);
         let pm_context = self.peer_manager_context();
@@ -454,7 +439,7 @@ impl PeerManagerBuilder {
     /// Register a service for handling some protocols.
     pub fn add_service(
         &mut self,
-        config: &AppConfig,
+        config: &NetworkApplicationConfig,
     ) -> (
         aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         conn_notifs_channel::Receiver,

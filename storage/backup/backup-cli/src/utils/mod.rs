@@ -16,20 +16,22 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
+use aptos_db::{
+    backup::restore_handler::RestoreHandler,
+    state_restore::{
+        StateSnapshotProgress, StateSnapshotRestore, StateValueBatch, StateValueWriter,
+    },
+    AptosDB, GetRestoreHandler,
+};
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{NodeBatch, TreeWriter};
 use aptos_logger::info;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::Version,
     waypoint::Waypoint,
-};
-use aptosdb::state_restore::StateSnapshotProgress;
-use aptosdb::{
-    backup::restore_handler::RestoreHandler,
-    state_restore::{StateSnapshotRestore, StateValueBatch, StateValueWriter},
-    AptosDB, GetRestoreHandler,
 };
 use clap::Parser;
 use std::{
@@ -189,7 +191,7 @@ impl RestoreRunMode {
         match self {
             Self::Restore { restore_handler } => {
                 restore_handler.get_state_restore_receiver(version, expected_root_hash)
-            }
+            },
             Self::Verify => {
                 let mock_store = Arc::new(MockStore);
                 StateSnapshotRestore::new_overwrite(
@@ -198,7 +200,7 @@ impl RestoreRunMode {
                     version,
                     expected_root_hash,
                 )
-            }
+            },
         }
     }
 
@@ -206,7 +208,7 @@ impl RestoreRunMode {
         match self {
             Self::Restore { restore_handler } => {
                 restore_handler.reset_state_store();
-            }
+            },
             Self::Verify => (),
         }
     }
@@ -215,11 +217,11 @@ impl RestoreRunMode {
         match self {
             RestoreRunMode::Restore { restore_handler } => {
                 restore_handler.get_next_expected_transaction_version()
-            }
+            },
             RestoreRunMode::Verify => {
                 info!("This is a dry run. Assuming resuming point at version 0.");
                 Ok(0)
-            }
+            },
         }
     }
 
@@ -227,7 +229,7 @@ impl RestoreRunMode {
         match self {
             RestoreRunMode::Restore { restore_handler } => {
                 restore_handler.get_in_progress_state_snapshot_version()
-            }
+            },
             RestoreRunMode::Verify => Ok(None),
         }
     }

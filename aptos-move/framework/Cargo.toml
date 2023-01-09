@@ -17,7 +17,6 @@ anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-gas-algebra-ext =  { workspace = true }
-aptos-module-verifier = { workspace = true }
 aptos-sdk-builder = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
@@ -30,6 +29,7 @@ base64 = { workspace = true }
 bcs = { workspace = true }
 bellman = "0.13.1"
 better_any = { workspace = true }
+blake2-rfc = { workspace = true }
 bls12_381 = "0.7.1"
 clap = { workspace = true }
 codespan-reporting = { workspace = true }
@@ -70,6 +70,7 @@ sha3 = { workspace = true }
 siphasher = { workspace = true }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
+thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
 criterion = "0.4.0"
 rand.workspace = true

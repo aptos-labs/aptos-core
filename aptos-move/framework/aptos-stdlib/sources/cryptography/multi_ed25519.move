@@ -4,6 +4,7 @@
 module aptos_std::multi_ed25519 {
     use std::bcs;
     use std::error;
+    use std::features;
     use std::option::{Self, Option};
     use std::vector;
     use aptos_std::ed25519;
@@ -20,6 +21,10 @@ module aptos_std::multi_ed25519 {
 
     /// The threshold must be in the range `[1, n]`, where n is the total number of signers.
     const E_INVALID_THRESHOLD_OR_NUMBER_OF_SIGNERS: u64 = 3;
+
+    /// The native functions have not been rolled out yet.
+    const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 4;
+
     //
     // Constants
     //
@@ -84,7 +89,7 @@ module aptos_std::multi_ed25519 {
     //
 
     #[test_only]
-    public fun generate_keys(threshold: u8, n: u8): (SecretKey,ValidatedPublicKey) {
+    public fun generate_keys(threshold: u8, n: u8): (SecretKey, ValidatedPublicKey) {
         assert!(1 <= threshold && threshold <= n, error::invalid_argument(E_INVALID_THRESHOLD_OR_NUMBER_OF_SIGNERS));
         let (sk_bytes, pk_bytes) = generate_keys_internal(threshold, n);
         let sk = SecretKey {
@@ -112,17 +117,46 @@ module aptos_std::multi_ed25519 {
     }
 
     /// Parses the input 32 bytes as an *unvalidated* MultiEd25519 public key.
+    ///
+    /// NOTE: This function could have also checked that the # of sub-PKs is > 0, but it did not. However, since such
+    /// invalid PKs are rejected during signature verification  (see `bugfix_unvalidated_pk_from_zero_subpks`) they
+    /// will not cause problems.
+    ///
+    /// We could fix this API by adding a new one that checks the # of sub-PKs is > 0, but it is likely not a good idea
+    /// to reproduce the PK validation logic in Move. We should not have done so in the first place. Instead, we will
+    /// leave it as is and continue assuming `UnvalidatedPublicKey` objects could be invalid PKs that will safely be
+    /// rejected during signature verification.
     public fun new_unvalidated_public_key_from_bytes(bytes: vector<u8>): UnvalidatedPublicKey {
-        assert!(vector::length(&bytes) / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES <= MAX_NUMBER_OF_PUBLIC_KEYS, error::invalid_argument(E_WRONG_PUBKEY_SIZE));
-        assert!(vector::length(&bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES, error::invalid_argument(E_WRONG_PUBKEY_SIZE));
+        let len = vector::length(&bytes);
+        let num_sub_pks = len / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES;
+
+        assert!(num_sub_pks <= MAX_NUMBER_OF_PUBLIC_KEYS, error::invalid_argument(E_WRONG_PUBKEY_SIZE));
+        assert!(len % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES, error::invalid_argument(E_WRONG_PUBKEY_SIZE));
         UnvalidatedPublicKey { bytes }
     }
 
-    /// Parses the input bytes as a *validated* MultiEd25519 public key.
+    /// DEPRECATED: Use `new_validated_public_key_from_bytes_v2` instead. See `public_key_validate_internal` comments.
+    ///
+    /// (Incorrectly) parses the input bytes as a *validated* MultiEd25519 public key.
     public fun new_validated_public_key_from_bytes(bytes: vector<u8>): Option<ValidatedPublicKey> {
         // Note that `public_key_validate_internal` will check that `vector::length(&bytes) / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES <= MAX_NUMBER_OF_PUBLIC_KEYS`.
         if (vector::length(&bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES &&
             public_key_validate_internal(bytes)) {
+            option::some(ValidatedPublicKey {
+                bytes
+            })
+        } else {
+            option::none<ValidatedPublicKey>()
+        }
+    }
+
+    /// Parses the input bytes as a *validated* MultiEd25519 public key (see `public_key_validate_internal_v2`).
+    public fun new_validated_public_key_from_bytes_v2(bytes: vector<u8>): Option<ValidatedPublicKey> {
+        if (!features::multi_ed25519_pk_validate_v2_enabled()) {
+            abort(error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
+        };
+
+        if (public_key_validate_v2_internal(bytes)) {
             option::some(ValidatedPublicKey {
                 bytes
             })
@@ -156,7 +190,7 @@ module aptos_std::multi_ed25519 {
         pk.bytes
     }
 
-    /// Serializes an ValidatedPublicKey struct to 32-bytes.
+    /// Serializes a ValidatedPublicKey struct to 32-bytes.
     public fun validated_public_key_to_bytes(pk: &ValidatedPublicKey): vector<u8> {
         pk.bytes
     }
@@ -166,10 +200,18 @@ module aptos_std::multi_ed25519 {
         sig.bytes
     }
 
+    /// DEPRECATED: Use `public_key_validate_v2` instead. See `public_key_validate_internal` comments.
+    ///
     /// Takes in an *unvalidated* public key and attempts to validate it.
     /// Returns `Some(ValidatedPublicKey)` if successful and `None` otherwise.
     public fun public_key_validate(pk: &UnvalidatedPublicKey): Option<ValidatedPublicKey> {
         new_validated_public_key_from_bytes(pk.bytes)
+    }
+
+    /// Takes in an *unvalidated* public key and attempts to validate it.
+    /// Returns `Some(ValidatedPublicKey)` if successful and `None` otherwise.
+    public fun public_key_validate_v2(pk: &UnvalidatedPublicKey): Option<ValidatedPublicKey> {
+        new_validated_public_key_from_bytes_v2(pk.bytes)
     }
 
     /// Verifies a purported MultiEd25519 `multisignature` under an *unvalidated* `public_key` on the specified `message`.
@@ -195,14 +237,70 @@ module aptos_std::multi_ed25519 {
         public_key_bytes_to_authentication_key(pk.bytes)
     }
 
+    /// Returns the number n of sub-PKs in an unvalidated t-out-of-n MultiEd25519 PK.
+    /// If this `UnvalidatedPublicKey` would pass validation in `public_key_validate`, then the returned # of sub-PKs
+    /// can be relied upon as correct.
+    ///
+    /// We provide this API as a cheaper alternative to calling `public_key_validate` and then `validated_public_key_num_sub_pks`
+    /// when the input `pk` is known to be valid.
+    public fun unvalidated_public_key_num_sub_pks(pk: &UnvalidatedPublicKey): u8 {
+        let len = vector::length(&pk.bytes);
+
+        ((len / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES) as u8)
+    }
+
+    /// Returns the number t of sub-PKs in an unvalidated t-out-of-n MultiEd25519 PK (i.e., the threshold) or `None`
+    /// if `bytes` does not correctly encode such a PK.
+    public fun unvalidated_public_key_threshold(pk: &UnvalidatedPublicKey): Option<u8> {
+        check_and_get_threshold(pk.bytes)
+    }
+
     /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
     public fun validated_public_key_to_authentication_key(pk: &ValidatedPublicKey): vector<u8> {
         public_key_bytes_to_authentication_key(pk.bytes)
     }
 
+    /// Returns the number n of sub-PKs in a validated t-out-of-n MultiEd25519 PK.
+    /// Since the format of this PK has been validated, the returned # of sub-PKs is guaranteed to be correct.
+    public fun validated_public_key_num_sub_pks(pk: &ValidatedPublicKey): u8 {
+        let len = vector::length(&pk.bytes);
+
+        ((len / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES) as u8)
+    }
+
+    /// Returns the number t of sub-PKs in a validated t-out-of-n MultiEd25519 PK (i.e., the threshold).
+    public fun validated_public_key_threshold(pk: &ValidatedPublicKey): u8 {
+        let len = vector::length(&pk.bytes);
+        let threshold_byte = *vector::borrow(&pk.bytes, len - 1);
+
+        threshold_byte
+    }
+
+    /// Checks that the serialized format of a t-out-of-n MultiEd25519 PK correctly encodes 1 <= n <= 32 sub-PKs.
+    /// (All `ValidatedPublicKey` objects are guaranteed to pass this check.)
+    /// Returns the threshold t <= n of the PK.
+    public fun check_and_get_threshold(bytes: vector<u8>): Option<u8> {
+        let len = vector::length(&bytes);
+        if (len == 0) {
+            return option::none<u8>()
+        };
+
+        let threshold_num_of_bytes = len % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES;
+        let num_of_keys = len / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES;
+        let threshold_byte = *vector::borrow(&bytes, len - 1);
+
+        if (num_of_keys == 0 || num_of_keys > MAX_NUMBER_OF_PUBLIC_KEYS || threshold_num_of_bytes != 1) {
+            return option::none<u8>()
+        } else if (threshold_byte == 0 || threshold_byte > (num_of_keys as u8)) {
+            return option::none<u8>()
+        } else {
+            return option::some(threshold_byte)
+        }
+    }
+
     /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
     fun public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8> {
-        std::vector::push_back(&mut pk_bytes, SIGNATURE_SCHEME_ID);
+        vector::push_back(&mut pk_bytes, SIGNATURE_SCHEME_ID);
         std::hash::sha3_256(pk_bytes)
     }
 
@@ -210,10 +308,26 @@ module aptos_std::multi_ed25519 {
     // Native functions
     //
 
+    /// DEPRECATED: Use `public_key_validate_internal_v2` instead. This function was NOT correctly implemented:
+    ///
+    ///  1. It does not check that the # of sub public keys is > 0, which leads to invalid `ValidatedPublicKey` objects
+    ///     against which no signature will verify, since `signature_verify_strict_internal` will reject such invalid PKs.
+    ///     This is not a security issue, but a correctness issue. See `bugfix_validated_pk_from_zero_subpks`.
+    ///  2. It charges too much gas: if the first sub-PK is invalid, it will charge for verifying all remaining sub-PKs.
+    ///
+    /// DEPRECATES:
+    ///  - new_validated_public_key_from_bytes
+    ///  - public_key_validate
+    ///
     /// Return `true` if the bytes in `public_key` can be parsed as a valid MultiEd25519 public key: i.e., all underlying
     /// PKs pass point-on-curve and not-in-small-subgroup checks.
     /// Returns `false` otherwise.
     native fun public_key_validate_internal(bytes: vector<u8>): bool;
+
+    /// Return `true` if the bytes in `public_key` can be parsed as a valid MultiEd25519 public key: i.e., all underlying
+    /// sub-PKs pass point-on-curve and not-in-small-subgroup checks.
+    /// Returns `false` otherwise.
+    native fun public_key_validate_v2_internal(bytes: vector<u8>): bool;
 
     /// Return true if the MultiEd25519 `multisignature` on `message` verifies against the MultiEd25519 `public_key`.
     /// Returns `false` if either:
@@ -248,27 +362,94 @@ module aptos_std::multi_ed25519 {
         *first_sig_byte = *first_sig_byte ^ 0xff;
     }
 
+
+    #[test(fx = @std)]
+    fun bugfix_validated_pk_from_zero_subpks(fx: signer) {
+        features::change_feature_flags(&fx, vector[ features::multi_ed25519_pk_validate_v2_feature()], vector[]);
+        let bytes = vector<u8>[1u8];
+        assert!(vector::length(&bytes) == 1, 1);
+
+        // Try deserializing a MultiEd25519 `ValidatedPublicKey` with 0 Ed25519 sub-PKs and 1 threshold byte.
+        // This would ideally NOT succeed, but it currently does. Regardless, such invalid PKs will be safely dismissed
+        // during signature verification.
+        let some = new_validated_public_key_from_bytes(bytes);
+        assert!(option::is_none(&check_and_get_threshold(bytes)), 1);   // ground truth
+        assert!(option::is_some(&some), 2);                             // incorrect
+
+        // In contrast, the v2 API will fail deserializing, as it should.
+        let none = new_validated_public_key_from_bytes_v2(bytes);
+        assert!(option::is_none(&none), 3);
+    }
+
+    #[test(fx = @std)]
+    fun test_validated_pk_without_threshold_byte(fx: signer) {
+        features::change_feature_flags(&fx, vector[ features::multi_ed25519_pk_validate_v2_feature()], vector[]);
+
+        let (_, subpk) = ed25519::generate_keys();
+        let bytes = ed25519::validated_public_key_to_bytes(&subpk);
+        assert!(vector::length(&bytes) == INDIVIDUAL_PUBLIC_KEY_NUM_BYTES, 1);
+
+        // Try deserializing a MultiEd25519 `ValidatedPublicKey` with 1 Ed25519 sub-PKs but no threshold byte, which
+        // will not succeed,
+        let none = new_validated_public_key_from_bytes(bytes);
+        assert!(option::is_none(&check_and_get_threshold(bytes)), 1);   // ground truth
+        assert!(option::is_none(&none), 2);                             // correct
+
+        // Similarly, the v2 API will also fail deserializing.
+        let none = new_validated_public_key_from_bytes_v2(bytes);
+        assert!(option::is_none(&none), 3);                             // also correct
+    }
+
+    #[test(fx = @std)]
+    fun test_validated_pk_from_small_order_subpk(fx: signer) {
+        features::change_feature_flags(&fx, vector[ features::multi_ed25519_pk_validate_v2_feature()], vector[]);
+        let torsion_point_with_threshold_1 = vector<u8>[
+            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 1,
+        ];
+
+        assert!(option::extract(&mut check_and_get_threshold(torsion_point_with_threshold_1)) == 1, 1);
+
+        // Try deserializing a MultiEd25519 `ValidatedPublicKey` with 1 Ed25519 sub-PKs and 1 threshold byte, as it should,
+        // except the sub-PK is of small order. This should not succeed,
+        let none = new_validated_public_key_from_bytes(torsion_point_with_threshold_1);
+        assert!(option::is_none(&none), 2);
+
+        // Similarly, the v2 API will also fail deserializing.
+        let none = new_validated_public_key_from_bytes_v2(torsion_point_with_threshold_1);
+        assert!(option::is_none(&none), 3);
+    }
+
     #[test]
     fun test_gen_sign_verify() {
         let thresholds = vector[1, 1, 2, 2, 3, 15,]; // the thresholds, implicitly encoded in the public keys
         let party_counts = vector[1, 2, 2, 3, 10, 32,];
         let test_case_count = vector::length(&party_counts);
         let test_case_idx = 0;
+
         while (test_case_idx < test_case_count) {
             let threshold = *vector::borrow(&thresholds, test_case_idx);
             let group_size = *vector::borrow(&party_counts, test_case_idx);
+
             let (sk, pk) = generate_keys(threshold, group_size);
+            assert!(validated_public_key_threshold(&pk) == threshold, 1);
+            assert!(validated_public_key_num_sub_pks(&pk) == group_size, 2);
+            assert!(public_key_validate_v2_internal(pk.bytes), 3);
+
             let upk = public_key_into_unvalidated(pk);
+            assert!(option::extract(&mut unvalidated_public_key_threshold(&upk)) == threshold, 4);
+            assert!(unvalidated_public_key_num_sub_pks(&upk) == group_size, 5);
+
             let msg1 = b"Hello Aptos!";
             let sig1 = sign_arbitrary_bytes(&sk, msg1);
-            assert!(signature_verify_strict(&sig1, &upk, msg1), 1);
+            assert!(signature_verify_strict(&sig1, &upk, msg1), 6);
 
             let obj2 = TestMessage {
                 foo: b"Hello Move!",
                 bar: 64,
             };
             let sig2 = sign_struct(&sk, copy obj2);
-            assert!(signature_verify_strict_t(&sig2, &upk, copy obj2), 2);
+            assert!(signature_verify_strict_t(&sig2, &upk, copy obj2), 7);
 
             test_case_idx = test_case_idx + 1;
         }
@@ -277,12 +458,18 @@ module aptos_std::multi_ed25519 {
     #[test]
     fun test_threshold_not_met_rejection() {
         let (sk,pk) = generate_keys(4, 5);
+        assert!(validated_public_key_threshold(&pk) == 4, 1);
+        assert!(validated_public_key_num_sub_pks(&pk) == 5, 2);
+        assert!(public_key_validate_v2_internal(pk.bytes), 3);
+
         let upk = public_key_into_unvalidated(pk);
+        assert!(option::extract(&mut unvalidated_public_key_threshold(&upk)) == 4, 4);
+        assert!(unvalidated_public_key_num_sub_pks(&upk) == 5, 5);
 
         let msg1 = b"Hello Aptos!";
         let sig1 = sign_arbitrary_bytes(&sk, msg1);
         maul_first_signature(&mut sig1);
-        assert!(!signature_verify_strict(&sig1, &upk, msg1), 3);
+        assert!(!signature_verify_strict(&sig1, &upk, msg1), 6);
 
         let obj2 = TestMessage {
             foo: b"Hello Move!",
@@ -290,8 +477,6 @@ module aptos_std::multi_ed25519 {
         };
         let sig2 = sign_struct(&sk, copy obj2);
         maul_first_signature(&mut sig2);
-        assert!(!signature_verify_strict_t(&sig2, &upk, copy obj2), 4);
+        assert!(!signature_verify_strict_t(&sig2, &upk, copy obj2), 7);
     }
-
-
 }

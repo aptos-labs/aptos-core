@@ -1,19 +1,24 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{
-    AccountIdentifier, Allow, Amount, Block, BlockIdentifier, Currency, InternalOperation,
-    NetworkIdentifier, Operation, PartialBlockIdentifier, Peer, PublicKey, Signature,
-    SigningPayload, SyncStatus, Transaction, TransactionIdentifier, Version,
+use crate::{
+    types::{
+        AccountIdentifier, Allow, Amount, Block, BlockIdentifier, Currency, InternalOperation,
+        NetworkIdentifier, Operation, PartialBlockIdentifier, Peer, PublicKey, Signature,
+        SigningPayload, SyncStatus, Transaction, TransactionIdentifier, Version,
+    },
+    AccountAddress, ApiError,
 };
-use crate::{AccountAddress, ApiError};
 use aptos_rest_client::aptos_api_types::U64;
-use aptos_types::chain_id::ChainId;
-use aptos_types::transaction::{RawTransaction, SignedTransaction};
-use serde::de::Error;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
+use aptos_types::{
+    chain_id::ChainId,
+    transaction::{RawTransaction, SignedTransaction},
+};
+use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 /// Request for an account's currency balance either now, or historically
 ///

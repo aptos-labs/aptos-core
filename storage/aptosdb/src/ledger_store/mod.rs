@@ -4,7 +4,6 @@
 //! This file defines ledger store APIs that are related to the main ledger accumulator, from the
 //! root(LedgerInfo) to leaf(TransactionInfo).
 
-use crate::utils::iterators::{EpochEndingLedgerInfoIter, ExpectContinuousVersions};
 use crate::{
     errors::AptosDbError,
     schema::{
@@ -12,6 +11,7 @@ use crate::{
         transaction_accumulator::TransactionAccumulatorSchema,
         transaction_info::TransactionInfoSchema,
     },
+    utils::iterators::{EpochEndingLedgerInfoIter, ExpectContinuousVersions},
 };
 use anyhow::{ensure, format_err, Result};
 use aptos_accumulator::{HashReader, MerkleAccumulator};
@@ -19,6 +19,7 @@ use aptos_crypto::{
     hash::{CryptoHash, TransactionAccumulatorHasher},
     HashValue,
 };
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -30,7 +31,6 @@ use aptos_types::{
 };
 use arc_swap::ArcSwap;
 use itertools::Itertools;
-use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{ops::Deref, sync::Arc};
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ impl LedgerStore {
                 // transaction), so this normally doesn't happen. However this part of
                 // implementation doesn't need to rely on this assumption.
                 return Ok(0);
-            }
+            },
         };
         ensure!(
             epoch_end_version <= version,
@@ -272,7 +272,7 @@ impl LedgerStore {
         &self,
         first_version: u64,
         txn_infos: &[TransactionInfo],
-        batch: &mut SchemaBatch,
+        batch: &SchemaBatch,
     ) -> Result<HashValue> {
         // write txn_info
         (first_version..first_version + txn_infos.len() as u64)
@@ -298,7 +298,7 @@ impl LedgerStore {
     pub fn put_ledger_info(
         &self,
         ledger_info_with_sigs: &LedgerInfoWithSignatures,
-        batch: &mut SchemaBatch,
+        batch: &SchemaBatch,
     ) -> Result<()> {
         let ledger_info = ledger_info_with_sigs.ledger_info();
 

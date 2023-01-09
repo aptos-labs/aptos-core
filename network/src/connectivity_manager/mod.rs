@@ -39,6 +39,9 @@ use aptos_config::{
 use aptos_crypto::x25519;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_num_variants::NumVariants;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::{
@@ -46,14 +49,11 @@ use futures::{
     future::{BoxFuture, FutureExt},
     stream::{FuturesUnordered, StreamExt},
 };
-use netcore::transport::ConnectionOrigin;
-use num_variants::NumVariants;
 use rand::{
     prelude::{SeedableRng, SmallRng},
     seq::SliceRandom,
 };
 use serde::Serialize;
-use short_hex_str::AsShortHexStr;
 use std::{
     cmp::{min, Ordering},
     collections::{hash_map::Entry, HashMap, HashSet},
@@ -96,7 +96,7 @@ pub struct ConnectivityManager<TBackoff> {
     /// Channel to receive notifications from PeerManager.
     connection_notifs_rx: conn_notifs_channel::Receiver,
     /// Channel over which we receive requests from other actors.
-    requests_rx: channel::Receiver<ConnectivityRequest>,
+    requests_rx: aptos_channels::Receiver<ConnectivityRequest>,
     /// Peers queued to be dialed, potentially with some delay. The dial can be canceled by
     /// sending over (or dropping) the associated oneshot sender.
     dial_queue: HashMap<PeerId, oneshot::Sender<()>>,
@@ -127,6 +127,7 @@ pub struct ConnectivityManager<TBackoff> {
 pub enum DiscoverySource {
     OnChainValidatorSet,
     File,
+    Rest,
     Config,
 }
 
@@ -138,15 +139,12 @@ impl fmt::Debug for DiscoverySource {
 
 impl fmt::Display for DiscoverySource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                DiscoverySource::OnChainValidatorSet => "OnChainValidatorSet",
-                DiscoverySource::File => "File",
-                DiscoverySource::Config => "Config",
-            }
-        )
+        write!(f, "{}", match self {
+            DiscoverySource::OnChainValidatorSet => "OnChainValidatorSet",
+            DiscoverySource::File => "File",
+            DiscoverySource::Config => "Config",
+            DiscoverySource::Rest => "Rest",
+        })
     }
 }
 
@@ -181,7 +179,7 @@ impl DiscoveredPeerSet {
                 } else {
                     false
                 }
-            }
+            },
             Entry::Vacant(_) => true,
         }
     }
@@ -216,6 +214,7 @@ impl DiscoveredPeer {
             last_dial_time: SystemTime::UNIX_EPOCH,
         }
     }
+
     /// Peers without keys are not able to be mutually authenticated to
     pub fn is_eligible(&self) -> bool {
         !self.keys.is_empty()
@@ -307,7 +306,7 @@ where
         seeds: PeerSet,
         connection_reqs_tx: ConnectionRequestSender,
         connection_notifs_rx: conn_notifs_channel::Receiver,
-        requests_rx: channel::Receiver<ConnectivityRequest>,
+        requests_rx: aptos_channels::Receiver<ConnectivityRequest>,
         connectivity_check_interval: Duration,
         backoff_strategy: TBackoff,
         max_delay: Duration,
@@ -467,14 +466,14 @@ where
             .cloned()
             .collect();
 
-        for p in stale_dials.into_iter() {
+        for peer_id in stale_dials {
             debug!(
-                NetworkSchema::new(&self.network_context).remote_peer(&p),
+                NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                 "{} Cancelling stale dial {}",
                 self.network_context,
-                p.short_str()
+                peer_id.short_str()
             );
-            self.dial_queue.remove(&p);
+            self.dial_queue.remove(&peer_id);
         }
     }
 
@@ -662,13 +661,13 @@ where
                     src,
                 );
                 self.handle_update_discovered_peers(src, discovered_peers);
-            }
+            },
             ConnectivityRequest::GetDialQueueSize(sender) => {
                 sender.send(self.dial_queue.len()).unwrap();
-            }
+            },
             ConnectivityRequest::GetConnectedSize(sender) => {
                 sender.send(self.connected.len()).unwrap();
-            }
+            },
         }
     }
 
@@ -791,7 +790,7 @@ where
                 // Cancel possible queued dial to this peer.
                 self.dial_states.remove(&peer_id);
                 self.dial_queue.remove(&peer_id);
-            }
+            },
             peer_manager::ConnectionNotification::LostPeer(metadata, _context, _reason) => {
                 let peer_id = metadata.remote_peer_id;
                 if let Some(stored_metadata) = self.connected.get(&peer_id) {
@@ -822,7 +821,7 @@ where
                         metadata.addr
                     );
                 }
-            }
+            },
         }
     }
 }
@@ -844,7 +843,7 @@ fn log_dial_result(
                 peer_id.short_str(),
                 addr
             );
-        }
+        },
         DialResult::Cancelled => {
             info!(
                 NetworkSchema::new(&network_context).remote_peer(&peer_id),
@@ -852,7 +851,7 @@ fn log_dial_result(
                 network_context,
                 peer_id.short_str()
             );
-        }
+        },
         DialResult::Failed(err) => match err {
             PeerManagerError::AlreadyConnected(a) => {
                 info!(
@@ -864,7 +863,7 @@ fn log_dial_result(
                     peer_id.short_str(),
                     a
                 );
-            }
+            },
             e => {
                 info!(
                     NetworkSchema::new(&network_context)
@@ -877,7 +876,7 @@ fn log_dial_result(
                     addr,
                     e
                 );
-            }
+            },
         },
     }
 }

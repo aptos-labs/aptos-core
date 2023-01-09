@@ -19,9 +19,9 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
+use aptos_db::backup::backup_handler::DbState;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
-use aptosdb::backup::backup_handler::DbState;
 use clap::Parser;
 use futures::{stream, Future, StreamExt};
 use std::{fmt::Debug, sync::Arc};
@@ -183,7 +183,7 @@ impl BackupCoordinator {
                         .map_err(|e| anyhow!("Receivers should not be cancelled: {}", e))
                         .unwrap()
                 }
-            }
+            },
             Err(e) => warn!(
                 "Failed pulling DbState from local node: {}. Will keep trying.",
                 e
@@ -371,7 +371,7 @@ fn get_next_snapshot(last_in_backup: Option<u64>, db_state: DbState, interval: u
 #[cfg(test)]
 mod tests {
     use crate::coordinators::backup::{get_batch_range, get_next_snapshot};
-    use aptosdb::backup::backup_handler::DbState;
+    use aptos_db::backup::backup_handler::DbState;
 
     #[test]
     fn test_get_batch_range() {

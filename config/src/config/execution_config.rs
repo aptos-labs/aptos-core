@@ -105,7 +105,7 @@ impl ExecutionConfig {
                 self.genesis_file_location = PathBuf::from(GENESIS_DEFAULT);
             }
             let path = root_dir.full_path(&self.genesis_file_location);
-            let mut file = File::create(&path).map_err(|e| Error::IO("genesis".into(), e))?;
+            let mut file = File::create(path).map_err(|e| Error::IO("genesis".into(), e))?;
             let data = bcs::to_bytes(&genesis).map_err(|e| Error::BCS("genesis", e))?;
             file.write_all(&data)
                 .map_err(|e| Error::IO("genesis".into(), e))?;
@@ -119,7 +119,7 @@ mod test {
     use super::*;
     use aptos_temppath::TempPath;
     use aptos_types::{
-        transaction::{ChangeSet, Transaction, WriteSetPayload},
+        transaction::{ChangeSet, NoOpChangeSetChecker, Transaction, WriteSetPayload},
         write_set::WriteSetMut,
     };
 
@@ -136,7 +136,12 @@ mod test {
     #[test]
     fn test_some_and_load_genesis() {
         let fake_genesis = Transaction::GenesisTransaction(WriteSetPayload::Direct(
-            ChangeSet::new(WriteSetMut::new(vec![]).freeze().unwrap(), vec![], 3).unwrap(),
+            ChangeSet::new(
+                WriteSetMut::new(vec![]).freeze().unwrap(),
+                vec![],
+                &NoOpChangeSetChecker,
+            )
+            .unwrap(),
         ));
         let (mut config, path) = generate_config();
         config.genesis = Some(fake_genesis.clone());

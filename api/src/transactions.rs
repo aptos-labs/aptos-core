@@ -121,8 +121,8 @@ impl VerifyInput for SubmitTransactionsBatchPost {
                 for request in inner.0.iter() {
                     request.verify()?;
                 }
-            }
-            SubmitTransactionsBatchPost::Bcs(_) => {}
+            },
+            SubmitTransactionsBatchPost::Bcs(_) => {},
         }
         Ok(())
     }
@@ -248,7 +248,7 @@ impl TransactionsApi {
         accept_type: AcceptType,
         /// Address of account with or without a `0x` prefix
         address: Path<Address>,
-        /// Ledger version to start list of transactions
+        /// Account sequence number to start list of transactions
         ///
         /// If not provided, defaults to showing the latest transactions
         start: Query<Option<U64>>,
@@ -369,7 +369,7 @@ impl TransactionsApi {
         let signed_transactions_batch = self.get_signed_transactions_batch(&ledger_info, data)?;
         if self.context.max_submit_transaction_batch_size() < signed_transactions_batch.len() {
             return Err(SubmitTransactionError::bad_request_with_code(
-                &format!(
+                format!(
                     "Submitted too many transactions: {}, while limit is {}",
                     signed_transactions_batch.len(),
                     self.context.max_submit_transaction_batch_size(),
@@ -444,7 +444,7 @@ impl TransactionsApi {
                         .prioritized_gas_estimate
                         .unwrap_or(gas_estimation.gas_estimate),
                 )
-            }
+            },
             (true, false) => Some(self.context.estimate_gas_price(&ledger_info)?.gas_estimate),
             (false, false) => None,
         };
@@ -608,7 +608,7 @@ impl TransactionsApi {
                     &latest_ledger_info,
                     BasicResponseStatus::Ok,
                 ))
-            }
+            },
         }
     }
 }
@@ -647,10 +647,10 @@ impl TransactionsApi {
                     &latest_ledger_info,
                     BasicResponseStatus::Ok,
                 ))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 
@@ -729,7 +729,7 @@ impl TransactionsApi {
                                     ledger_info,
                                 )
                             })?
-                    }
+                    },
                     TransactionData::Pending(txn) => resolver
                         .as_converter(self.context.db.clone())
                         .try_into_pending_transaction(*txn)
@@ -744,7 +744,7 @@ impl TransactionsApi {
                 };
 
                 BasicResponse::try_from_json((transaction, ledger_info, BasicResponseStatus::Ok))
-            }
+            },
             AcceptType::Bcs => BasicResponse::try_from_bcs((
                 transaction_data,
                 ledger_info,
@@ -820,7 +820,7 @@ impl TransactionsApi {
             )),
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 
@@ -876,7 +876,7 @@ impl TransactionsApi {
                                     )
                                 })?;
                         }
-                    }
+                    },
                     TransactionPayload::Script(script) => {
                         if script.code().is_empty() {
                             return Err(SubmitTransactionError::bad_request_with_code(
@@ -898,13 +898,13 @@ impl TransactionsApi {
                                     )
                                 })?;
                         }
-                    }
-                    TransactionPayload::ModuleBundle(_) => {}
+                    },
+                    TransactionPayload::ModuleBundle(_) => {},
                 }
                 // TODO: Verify script args?
 
                 Ok(signed_transaction)
-            }
+            },
             SubmitTransactionPost::Json(data) => self
                 .context
                 .move_resolver_poem(ledger_info)?
@@ -979,7 +979,7 @@ impl TransactionsApi {
                     &mempool_status.message,
                     AptosErrorCode::MempoolIsFull,
                 ))
-            }
+            },
             MempoolStatusCode::VmError => {
                 if let Some(status) = vm_status_opt {
                     Err(AptosError::new_with_vm_status(
@@ -998,7 +998,7 @@ impl TransactionsApi {
                         StatusCode::UNKNOWN_STATUS,
                     ))
                 }
-            }
+            },
             MempoolStatusCode::InvalidSeqNumber => Err(AptosError::new_with_error_code(
                 mempool_status.message,
                 AptosErrorCode::SequenceNumberTooOld,
@@ -1051,7 +1051,7 @@ impl TransactionsApi {
                         ledger_info,
                         SubmitTransactionResponseStatus::Accepted,
                     ))
-                }
+                },
                 // With BCS, we don't return the pending transaction for efficiency, because there
                 // is no new information.  The hash can be retrieved by hashing the original
                 // transaction.
@@ -1199,7 +1199,7 @@ impl TransactionsApi {
                                 AptosErrorCode::InternalError,
                                 &ledger_info,
                             ))
-                        }
+                        },
                     }
                 }
                 BasicResponse::try_from_json((
@@ -1207,10 +1207,10 @@ impl TransactionsApi {
                     &ledger_info,
                     BasicResponseStatus::Ok,
                 ))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((simulated_txn, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 

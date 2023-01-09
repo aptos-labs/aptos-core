@@ -684,13 +684,13 @@ module aptos_framework::voting {
     }
 
     #[test(governance = @0x123)]
-    #[expected_failure(abort_code = 0x10004)]
+    #[expected_failure(abort_code = 0x10004, location = Self)]
     public fun create_proposal_with_empty_execution_hash_should_fail(governance: &signer) acquires VotingForum {
         create_proposal_with_empty_execution_hash_should_fail_generic(governance, false);
     }
 
     #[test(governance = @0x123)]
-    #[expected_failure(abort_code = 0x10004)]
+    #[expected_failure(abort_code = 0x10004, location = Self)]
     public fun create_proposal_with_empty_execution_hash_should_fail_multi_step(governance: &signer) acquires VotingForum {
         create_proposal_with_empty_execution_hash_should_fail_generic(governance, true);
     }
@@ -738,7 +738,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code=0x5000a)]
+    #[expected_failure(abort_code=0x5000a, location = Self)]
     public entry fun test_voting_passed_multi_step_cannot_use_single_step_resolve_function(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         test_voting_passed_generic(aptos_framework, governance, true, false);
     }
@@ -772,13 +772,13 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x30003)]
+    #[expected_failure(abort_code = 0x30003, location = Self)]
     public entry fun test_cannot_resolve_twice(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         test_cannot_resolve_twice_generic(aptos_framework, governance, false);
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x30003)]
+    #[expected_failure(abort_code = 0x30003, location = Self)]
     public entry fun test_cannot_resolve_twice_multi_step(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         test_cannot_resolve_twice_generic(aptos_framework, governance, true);
     }
@@ -862,7 +862,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x30008)]
+    #[expected_failure(abort_code = 0x30008, location = Self)]
     public entry fun test_voting_passed_early_in_same_tx_should_fail(
         aptos_framework: &signer,
         governance: &signer
@@ -871,7 +871,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x30008)]
+    #[expected_failure(abort_code = 0x30008, location = Self)]
     public entry fun test_voting_passed_early_in_same_tx_should_fail_multi_step(
         aptos_framework: &signer,
         governance: &signer
@@ -902,19 +902,19 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x30002)]
+    #[expected_failure(abort_code = 0x30002, location = Self)]
     public entry fun test_voting_failed(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         test_voting_failed_generic(aptos_framework, governance, false);
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x30002)]
+    #[expected_failure(abort_code = 0x30002, location = Self)]
     public entry fun test_voting_failed_multi_step(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         test_voting_failed_generic(aptos_framework, governance, true);
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x30005)]
+    #[expected_failure(abort_code = 0x30005, location = Self)]
     public entry fun test_cannot_vote_after_voting_period_is_over(
         aptos_framework: signer,
         governance: signer
@@ -932,7 +932,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code=0x30009)]
+    #[expected_failure(abort_code=0x30009, location = Self)]
     public entry fun test_cannot_vote_after_multi_step_proposal_starts_executing(
         aptos_framework: signer,
         governance: signer
@@ -981,13 +981,13 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x30002)]
+    #[expected_failure(abort_code = 0x30002, location = Self)]
     public entry fun test_voting_failed_early(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         test_voting_failed_early_generic(aptos_framework, governance, true);
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x30002)]
+    #[expected_failure(abort_code = 0x30002, location = Self)]
     public entry fun test_voting_failed_early_multi_step(aptos_framework: &signer, governance: &signer) acquires VotingForum {
         test_voting_failed_early_generic(aptos_framework, governance, false);
     }
@@ -1006,7 +1006,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x10007)]
+    #[expected_failure(abort_code = 0x10007, location = Self)]
     public entry fun test_cannot_set_min_threshold_higher_than_early_resolution(
         aptos_framework: &signer,
         governance: &signer,
@@ -1015,7 +1015,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x10007)]
+    #[expected_failure(abort_code = 0x10007, location = Self)]
     public entry fun test_cannot_set_min_threshold_higher_than_early_resolution_multi_step(
         aptos_framework: &signer,
         governance: &signer,

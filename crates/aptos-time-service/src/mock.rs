@@ -187,6 +187,12 @@ impl MockTimeService {
     }
 }
 
+impl Default for MockTimeService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TimeServiceTrait for MockTimeService {
     fn now(&self) -> Instant {
         let this = self.lock();
@@ -381,7 +387,7 @@ impl Future for MockSleep {
                 // We're still waiting. Update our `Waker` so we can get notified.
                 maybe_waker.replace(cx.waker().clone());
                 Poll::Pending
-            }
+            },
             // If we're not in the queue then we are done!
             None => Poll::Ready(()),
         }

@@ -7,6 +7,75 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 06 January 2023
+
+- Added an *Authors* list to the bottom of every page on Aptos.dev giving credit to all contributors to the document, both within Aptos Labs and externally.
+
+## 30 December 2022
+
+- Added [Node Inspection Service](nodes/measure/node-inspection-service.md) document that explains how to access node metrics for validators and fullnodes and highlights key metrics for monitoring.
+
+- Added instructions for [running archival nodes](guides/state-sync.md#running-archival-nodes), specifically avoiding fast syncing and ledger pruning. 
+
+## 29 December 2022
+
+- Improved [Update Aptos Validator Node](nodes/validator-node/operator/update-validator-node.md) with a section on securely running multiple validator fullnodes (VFNs) plus links to [Bootstrap Fullnode from Snapshot](nodes/full-node/bootstrap-fullnode.md) and [state synchronization](guides/state-sync.md).
+
+## 26 December 2022
+
+- Restored and refined [Bootstrap Fullnode from Snapshot](nodes/full-node/bootstrap-fullnode.md) to simplify and expedite Aptos fullnode starts in devnet and testnet environments.
+
+## 20 December 2022
+
+- Added [Formal Verification, the Move Language, and the Move Prover](https://www.certik.com/resources/blog/2wSOZ3mC55AB6CYol6Q2rP-formal-verification-the-move-language-and-the-move-prover) blog post from the community to the [Supporting Move resources](guides/move-guides/index.md#supporting-move-resources) list.
+
+## 14 December 2022
+
+- Noted you may employ the [Aptos Name Service](https://www.aptosnames.com/) to secure .apt domains for key [accounts](concepts/accounts.md).
+
+## 12 December 2022
+
+- Released [Node Health Checker](nodes/measure/node-health-checker.md) web interface for evaluating fullnodes at: https://nodetools.aptosfoundation.org/#/node_checker
+
+## 11 December 2022
+
+- [Renamed](https://github.com/aptos-labs/aptos-core/pull/5778) `AptosGovernance::create_proposal` to `aptos_governance::create_proposal` and added information on [Aptos Improvement Proposals (AIPs)](concepts/governance.md#aptos-improvement-proposals-aips) and the [Technical Implementation of Aptos Governance](concepts/governance.md#technical-implementation-of-aptos-governance).
+
+## 09 December 2022
+
+- Added an [Aptos Wallet Adapter overview](concepts/wallet-adapter-concept.md) and instructions for both [dApp](guides/wallet-adapter-for-dapp.md) and [wallet](guides/wallet-adapter-for-wallets.md) builders.
+
+## 08 December 2022
+
+- Released [aptos-node-v1.1.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.1.0) to Mainnet:
+
+  Framework upgrade through governance voting:
+  - Testnet upgrade - Nov 30th
+  - Mainnet upgrade - Dec 12th - 19th (7 days voting period) required by fullnode operators
+
+  New features and enhancements:
+  - Move
+    - [New chain_id native function + corresponding new gas schedule entry](https://github.com/aptos-labs/aptos-core/pull/5288).
+  - Blockchain
+    - Added automatic chain-health based back pressure to improve reliability. Automatic slow-down (through max block size reduction) is triggered in some scenarios.
+    - Improved timeouts for state synchronization: (i) lower timeouts for optimistic fetch (to help reduce end-to-end latency); and (ii) exponential back-off for low-bandwidth nodes.
+
+  Resolved issues:
+  - Move
+    - Explicit error codes in resource account.
+    - Improved Leader Election (gated behind feature flag).
+
+  See these resources for more details on the release:
+    - [#mainnet-release](https://discord.com/channels/945856774056083548/1042502400507916349) Discord channel for more detailed descriptions of the above changes.
+    - [Aptos Releases](https://github.com/aptos-labs/aptos-core/releases) list for all releases.
+    - [`testnet`](https://github.com/aptos-labs/aptos-core/commits/testnet) branch commits for the changes landing in mainnet today.
+
+## 05 December 2022
+
+- Moved recently pared down System Integrators Guide to [Use the Aptos REST Read API](guides/aptos-apis.md).
+- Resurrected last full version of the [Aptos System Integrators Guide](guides/system-integrators-guide.md).
+- Renamed System Integrators Guide to [Integrate Aptos with Your Platform](guides/system-integrators-guide.md) and updated it with our latest guidance.
+
 ## 02 December 2022
 
 - Distributed a survey asking how we can make the Aptos developer experience better: https://aptos.typeform.com/dev-survey

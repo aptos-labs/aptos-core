@@ -5,24 +5,22 @@ use crate::common;
 use aptos_types::transaction::{
     ArgumentABI, EntryABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
+use heck::CamelCase;
 use move_core_types::{
     account_address::AccountAddress,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
 };
+use once_cell::sync::Lazy;
 use serde_generate::{
     golang,
     indent::{IndentConfig, IndentedWriter},
     CodeGeneratorConfig,
 };
-
-use heck::CamelCase;
-use move_core_types::language_storage::StructTag;
-use once_cell::sync::Lazy;
-use std::str::FromStr;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
     path::PathBuf,
+    str::FromStr,
 };
 
 /// Output transaction builders and decoders in Go for the given ABIs.
@@ -65,7 +63,7 @@ pub fn output(
         match abi {
             EntryABI::TransactionScript(abi) => {
                 emitter.output_transaction_script_encoder_function(abi)?
-            }
+            },
             EntryABI::EntryFunction(abi) => emitter.output_entry_function_encoder_function(abi)?,
         };
     }
@@ -74,7 +72,7 @@ pub fn output(
         match abi {
             EntryABI::TransactionScript(abi) => {
                 emitter.output_transaction_script_decoder_function(abi)?
-            }
+            },
             EntryABI::EntryFunction(abi) => emitter.output_entry_function_decoder_function(abi)?,
         };
     }
@@ -475,7 +473,7 @@ func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunc
                         "{}.BcsDeserialize{}(script.Value.Args[{}])",
                         left, right, index
                     )
-                }
+                },
                 Some(type_name) => format!(
                     "bcs.NewDeserializer(script.Value.Args[{}]).Deserialize{}()",
                     index, type_name
@@ -571,7 +569,7 @@ var entry_function_decoder_map = map[string]func(aptostypes.TransactionPayload) 
     "#,
                     type_name
                 )
-            }
+            },
         };
         writeln!(
             self.out,
@@ -602,8 +600,11 @@ func encode_{}_argument(arg {}) []byte {{
         let (constructor, stmt) = match type_tag {
             Bool => ("Bool", default_stmt),
             U8 => ("U8", default_stmt),
+            U16 => ("U16", default_stmt),
+            U32 => ("U32", default_stmt),
             U64 => ("U64", default_stmt),
             U128 => ("U128", default_stmt),
+            U256 => ("U256", default_stmt),
             Address => ("Address", "value = arg.Value".into()),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => ("U8Vector", default_stmt),
@@ -717,12 +718,15 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
         match type_tag {
             Bool => "bool".into(),
             U8 => "uint8".into(),
+            U16 => "uint16".into(),
+            U32 => "uint32".into(),
             U64 => "uint64".into(),
             U128 => "serde.Uint128".into(),
+            U256 => unimplemented!(),
             Address => "aptostypes.AccountAddress".into(),
             Vector(type_tag) => {
                 format!("[]{}", Self::quote_type(type_tag))
-            }
+            },
             Struct(struct_tag) => match struct_tag {
                 tag if &**tag == Lazy::force(&str_tag) => "[]uint8".into(),
                 _ => common::type_not_allowed(type_tag),
@@ -744,8 +748,11 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
         match type_tag {
             Bool => format!("(*aptostypes.TransactionArgument__Bool)(&{})", name),
             U8 => format!("(*aptostypes.TransactionArgument__U8)(&{})", name),
+            U16 => format!("(*aptostypes.TransactionArgument__U16)(&{})", name),
+            U32 => format!("(*aptostypes.TransactionArgument__U32)(&{})", name),
             U64 => format!("(*aptostypes.TransactionArgument__U64)(&{})", name),
             U128 => format!("(*aptostypes.TransactionArgument__U128)(&{})", name),
+            U256 => format!("(*aptostypes.TransactionArgument__U256)(&{})", name),
             Address => format!("&aptostypes.TransactionArgument__Address{{{}}}", name),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => format!("(*aptostypes.TransactionArgument__U8Vector)(&{})", name),
@@ -766,8 +773,11 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
         match type_tag {
             Bool => Some("Bool"),
             U8 => Some("U8"),
+            U16 => Some("U16"),
+            U32 => Some("U32"),
             U64 => Some("U64"),
             U128 => Some("U128"),
+            U256 => None,
             Address => None,
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => Some("Bytes"),

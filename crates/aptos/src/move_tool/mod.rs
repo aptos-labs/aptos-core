@@ -8,62 +8,57 @@ pub use package_hooks::*;
 pub mod stored_package;
 mod transactional_tests_runner;
 
-pub use stored_package::*;
-
-use crate::common::types::MoveManifestAccountWrapper;
-use crate::common::types::{CliConfig, ConfigSearchMode, ProfileOptions, RestOptions};
-use crate::common::utils::{
-    create_dir_if_not_exist, dir_default_to_current, prompt_yes_with_override, write_to_file,
-};
-use crate::governance::CompileScriptFunction;
-use crate::move_tool::manifest::{
-    Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo,
-};
 use crate::{
     common::{
         types::{
-            load_account_arg, CliError, CliTypedResult, MovePackageDir, PromptOptions,
+            load_account_arg, CliConfig, CliError, CliTypedResult, ConfigSearchMode,
+            MoveManifestAccountWrapper, MovePackageDir, ProfileOptions, PromptOptions, RestOptions,
             TransactionOptions, TransactionSummary,
         },
-        utils::check_if_file_exists,
+        utils::{
+            check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
+            prompt_yes_with_override, write_to_file,
+        },
     },
+    governance::CompileScriptFunction,
+    move_tool::manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
     CliCommand, CliResult,
 };
-use aptos_framework::docgen::DocgenOptions;
-use aptos_framework::natives::code::UpgradePolicy;
-use aptos_framework::prover::ProverOptions;
-use aptos_framework::{BuildOptions, BuiltPackage};
+use aptos_framework::{
+    docgen::DocgenOptions, natives::code::UpgradePolicy, prover::ProverOptions, BuildOptions,
+    BuiltPackage,
+};
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
-use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
-use aptos_types::account_address::{create_resource_address, AccountAddress};
-use aptos_types::transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload};
+use aptos_types::{
+    account_address::{create_resource_address, AccountAddress},
+    transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload},
+};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
 use itertools::Itertools;
-use move_cli::base::test::UnitTestResult;
+use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::env::MOVE_HOME;
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+};
+use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
+use move_unit_test::UnitTestingConfig;
 use serde::Serialize;
-use std::fmt::{Display, Formatter};
-use std::ops::Deref;
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
+    env,
+    fmt::{Display, Formatter},
+    ops::Deref,
     path::{Path, PathBuf},
     str::FromStr,
 };
+pub use stored_package::*;
 use tokio::task;
 use transactional_tests_runner::TransactionalTestOpts;
-use {
-    move_cli,
-    move_core_types::{
-        identifier::Identifier,
-        language_storage::{ModuleId, TypeTag},
-    },
-    move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
-    move_unit_test::UnitTestingConfig,
-};
 
 /// Tool for Move related operations
 ///
@@ -106,8 +101,22 @@ impl MoveTool {
             MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
-            }
+            },
         }
+    }
+}
+
+const VAR_BYTECODE_VERSION: &str = "MOVE_BYTECODE_VERSION";
+
+fn set_bytecode_version(version: Option<u32>) {
+    // Note: this is a bit of a hack to get the compiler emit bytecode with the right
+    //       version. In the future, we should add an option to the Move package system
+    //       that would allow us to configure this directly instead of relying on
+    //       environment variables.
+    if let Some(ver) = version {
+        env::set_var(VAR_BYTECODE_VERSION, ver.to_string());
+    } else if env::var(VAR_BYTECODE_VERSION) == Err(env::VarError::NotPresent) {
+        env::set_var(VAR_BYTECODE_VERSION, "5");
     }
 }
 
@@ -158,30 +167,24 @@ impl FrameworkPackageArgs {
         // Add the framework dependency if it's provided
         let mut dependencies = BTreeMap::new();
         if let Some(ref path) = self.framework_local_dir {
-            dependencies.insert(
-                APTOS_FRAMEWORK.to_string(),
-                Dependency {
-                    local: Some(path.display().to_string()),
-                    git: None,
-                    rev: None,
-                    subdir: None,
-                    aptos: None,
-                    address: None,
-                },
-            );
+            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
+                local: Some(path.display().to_string()),
+                git: None,
+                rev: None,
+                subdir: None,
+                aptos: None,
+                address: None,
+            });
         } else {
             let git_rev = self.framework_git_rev.as_deref().unwrap_or(DEFAULT_BRANCH);
-            dependencies.insert(
-                APTOS_FRAMEWORK.to_string(),
-                Dependency {
-                    local: None,
-                    git: Some(APTOS_GIT_PATH.to_string()),
-                    rev: Some(git_rev.to_string()),
-                    subdir: Some(SUBDIR_PATH.to_string()),
-                    aptos: None,
-                    address: None,
-                },
-            );
+            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
+                local: None,
+                git: Some(APTOS_GIT_PATH.to_string()),
+                rev: Some(git_rev.to_string()),
+                subdir: Some(SUBDIR_PATH.to_string()),
+                aptos: None,
+                address: None,
+            });
         }
 
         let manifest = MovePackageManifest {
@@ -281,6 +284,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<String>> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
             ..self
@@ -289,6 +293,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
                 .build_options(
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
+                    self.move_options.bytecode_version_or_detault(),
                 )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
@@ -296,12 +301,11 @@ impl CliCommand<Vec<String>> for CompilePackage {
         if self.save_metadata {
             pack.extract_metadata_and_save()?;
         }
-        let mut ids = Vec::new();
-        for module in pack.modules() {
-            verify_module_init_function(module)
-                .map_err(|e| CliError::MoveCompilationError(e.to_string()))?;
-            ids.push(module.self_id().to_string());
-        }
+        let ids = pack
+            .modules()
+            .into_iter()
+            .map(|m| m.self_id().to_string())
+            .collect::<Vec<_>>();
         Ok(ids)
     }
 }
@@ -339,6 +343,7 @@ impl CliCommand<&'static str> for TestPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
@@ -411,6 +416,7 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let ProvePackage {
             move_options,
             prover_options,
@@ -450,6 +456,7 @@ impl CliCommand<&'static str> for DocumentPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let DocumentPackage {
             move_options,
             docgen_options,
@@ -464,6 +471,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             named_addresses: move_options.named_addresses(),
             docgen_options: Some(docgen_options),
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
+            bytecode_version: Some(move_options.bytecode_version_or_detault()),
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
@@ -537,6 +545,7 @@ impl IncludedArtifacts {
         self,
         skip_fetch_latest_git_deps: bool,
         named_addresses: BTreeMap<String, AccountAddress>,
+        bytecode_version: u32,
     ) -> BuildOptions {
         use IncludedArtifacts::*;
         match self {
@@ -548,6 +557,7 @@ impl IncludedArtifacts {
                 with_error_map: true,
                 named_addresses,
                 skip_fetch_latest_git_deps,
+                bytecode_version: Some(bytecode_version),
                 ..BuildOptions::default()
             },
             Sparse => BuildOptions {
@@ -557,6 +567,7 @@ impl IncludedArtifacts {
                 with_error_map: true,
                 named_addresses,
                 skip_fetch_latest_git_deps,
+                bytecode_version: Some(bytecode_version),
                 ..BuildOptions::default()
             },
             All => BuildOptions {
@@ -566,6 +577,7 @@ impl IncludedArtifacts {
                 with_error_map: true,
                 named_addresses,
                 skip_fetch_latest_git_deps,
+                bytecode_version: Some(bytecode_version),
                 ..BuildOptions::default()
             },
         }
@@ -581,6 +593,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let PublishPackage {
             move_options,
             txn_options,
@@ -591,6 +604,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         let options = included_artifacts_args.included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
+            move_options.bytecode_version_or_detault(),
         );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
@@ -646,6 +660,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let CreateResourceAccountAndPublishPackage {
             seed,
             address_name,
@@ -676,6 +691,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         let options = included_artifacts_args.included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
+            move_options.bytecode_version_or_detault(),
         );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
@@ -796,12 +812,15 @@ impl CliCommand<&'static str> for VerifyPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
         // First build the package locally to get the package metadata
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
+            bytecode_version: Some(self.move_options.bytecode_version_or_detault()),
             ..self.included_artifacts.build_options(
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
+                self.move_options.bytecode_version_or_detault(),
             )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
@@ -894,7 +913,7 @@ impl CliCommand<&'static str> for ListPackage {
                     println!("  source_digest: {}", data.source_digest());
                     println!("  modules: {}", data.module_names().into_iter().join(", "));
                 }
-            }
+            },
         }
         Ok("list succeeded")
     }
@@ -916,6 +935,7 @@ impl CliCommand<&'static str> for CleanPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
         let path = self.move_options.get_package_path()?;
         let build_dir = path.join("build");
         // Only remove the build dir if it exists, allowing for users to still clean their cache
@@ -1114,7 +1134,7 @@ impl FunctionArgType {
                     })?);
                 }
                 bcs::to_bytes(&encoded)
-            }
+            },
             FunctionArgType::String => bcs::to_bytes(arg),
             FunctionArgType::U8 => bcs::to_bytes(
                 &u8::from_str(arg).map_err(|err| CliError::UnableToParse("u8", err.to_string()))?,
@@ -1131,7 +1151,7 @@ impl FunctionArgType {
                 let raw = hex::decode(arg)
                     .map_err(|err| CliError::UnableToParse("raw", err.to_string()))?;
                 Ok(raw)
-            }
+            },
             FunctionArgType::Vector(inner) => {
                 let parsed = match inner.deref() {
                     FunctionArgType::Address => parse_vector_arg(arg, |arg| {
@@ -1161,10 +1181,10 @@ impl FunctionArgType {
                     }),
                     vector_type => {
                         panic!("Unsupported vector type vector<{}>", vector_type)
-                    }
+                    },
                 }?;
                 Ok(parsed)
-            }
+            },
         }
         .map_err(|err| CliError::BCS("arg", err))
     }
@@ -1185,6 +1205,7 @@ fn parse_vector_arg<T: Serialize, F: Fn(&str) -> CliTypedResult<T>>(
 
 impl FromStr for FunctionArgType {
     type Err = CliError;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "address" => Ok(FunctionArgType::Address),
@@ -1224,7 +1245,7 @@ impl FromStr for FunctionArgType {
                 } else {
                     Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','hex_array','string','u8','u64','u128','raw', 'vector<inner_type>']", str)))
                 }
-            }
+            },
         }
     }
 }
@@ -1256,6 +1277,7 @@ impl ArgWithType {
             arg: bcs::to_bytes(&arg).unwrap(),
         }
     }
+
     pub fn raw(arg: Vec<u8>) -> Self {
         ArgWithType {
             _ty: FunctionArgType::Raw,

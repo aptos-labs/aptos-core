@@ -6,16 +6,15 @@ use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
-    restore::JellyfishMerkleRestore,
-    IO_POOL, {Key, TreeReader, TreeWriter, Value},
+    restore::JellyfishMerkleRestore, Key, TreeReader, TreeWriter, Value, IO_POOL,
 };
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::{proof::SparseMerkleRangeProof, transaction::Version};
+use aptos_storage_interface::StateSnapshotReceiver;
+use aptos_types::{
+    proof::SparseMerkleRangeProof, state_store::state_storage_usage::StateStorageUsage,
+    transaction::Version,
+};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::sync::Arc;
-use storage_interface::StateSnapshotReceiver;
+use std::{collections::HashMap, hash::Hash, sync::Arc};
 
 #[cfg(test)]
 mod restore_test;

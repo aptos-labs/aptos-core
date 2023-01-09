@@ -2,23 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::PeerMonitoringServiceConfig;
+use aptos_network::{
+    peer_manager::{ConnectionNotification, PeerManagerNotification},
+    protocols::network::{
+        Event, NetworkApplicationConfig, NetworkEvents, NewNetworkEvents, RpcError,
+    },
+    ProtocolId,
+};
+use aptos_peer_monitoring_service_types::{
+    PeerMonitoringServiceMessage, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+    Result,
+};
 use aptos_types::PeerId;
 use bytes::Bytes;
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     future,
     stream::{BoxStream, Stream, StreamExt},
-};
-use network::{
-    peer_manager::{ConnectionNotification, PeerManagerNotification},
-    protocols::network::{AppConfig, Event, NetworkEvents, NewNetworkEvents, RpcError},
-    ProtocolId,
-};
-use peer_monitoring_service_types::{
-    PeerMonitoringServiceMessage, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
-    Result,
 };
 use std::{
     pin::Pin,
@@ -28,9 +30,12 @@ use std::{
 // TODO(joshlind): remove the code duplication and boilerplate between
 // the different AptosNet services.
 
-pub fn network_endpoint_config(peer_monitoring_config: PeerMonitoringServiceConfig) -> AppConfig {
+/// Returns a network application config for the peer monitoring service
+pub fn peer_monitoring_service_network_config(
+    peer_monitoring_config: PeerMonitoringServiceConfig,
+) -> NetworkApplicationConfig {
     let max_network_channel_size = peer_monitoring_config.max_network_channel_size as usize;
-    AppConfig::service(
+    NetworkApplicationConfig::service(
         [ProtocolId::PeerMonitoringServiceRpc],
         aptos_channel::Config::new(max_network_channel_size)
             .queue_style(QueueStyle::FIFO)
@@ -79,7 +84,7 @@ impl PeerMonitoringServiceNetworkEvents {
             ) => {
                 let response_tx = ResponseSender::new(response_tx);
                 Some((peer_id, protocol_id, request, response_tx))
-            }
+            },
             _ => None, // We don't use DirectSend and don't care about connection events
         }
     }

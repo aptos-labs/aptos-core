@@ -181,7 +181,7 @@ impl AccountPicker {
             AccountPickStyle::Limited(limit) => {
                 let remaining = (0..num_accounts).map(|idx| (idx, limit)).collect();
                 AccountPicker::Limited(remaining)
-            }
+            },
         }
     }
 
@@ -191,7 +191,7 @@ impl AccountPicker {
             AccountPicker::Limited(remaining) => {
                 let remaining_idx = index.index(remaining.len());
                 Self::pick_limited(remaining, remaining_idx)
-            }
+            },
         }
     }
 
@@ -206,7 +206,7 @@ impl AccountPicker {
                 let account_idx_1 = Self::pick_limited(remaining, remaining_idx_1);
 
                 [account_idx_1, account_idx_2]
-            }
+            },
         }
     }
 

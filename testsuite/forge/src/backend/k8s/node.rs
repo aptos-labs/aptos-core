@@ -1,22 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::backend::k8s::stateful_set;
 use crate::{
-    get_free_port, scale_stateful_set_replicas, FullNode, HealthCheckError, Node, NodeExt, Result,
-    Validator, Version, KUBECTL_BIN, LOCALHOST, NODE_METRIC_PORT, REST_API_HAPROXY_SERVICE_PORT,
-    REST_API_SERVICE_PORT,
+    backend::k8s::stateful_set, get_free_port, scale_stateful_set_replicas, FullNode,
+    HealthCheckError, Node, NodeExt, Result, Validator, Version, KUBECTL_BIN, LOCALHOST,
+    NODE_METRIC_PORT, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
 };
 use anyhow::{anyhow, format_err};
 use aptos_config::config::NodeConfig;
+use aptos_db::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
 use aptos_secure_storage::SECURE_STORAGE_DB_NAME;
-use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
+use aptos_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use reqwest::Url;
 use serde_json::Value;
-use state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use std::{
     fmt::{Debug, Formatter},
     process::{Command, Stdio},
@@ -87,21 +86,21 @@ impl K8sNode {
                     Ok(Some(status)) => {
                         info!("Port-forward may have started already: exit {}", status);
                         Ok(())
-                    }
+                    },
                     Ok(None) => {
                         info!(
                             "Port-forward started for {:?} from {} --> {}",
                             self, port, remote_port
                         );
                         Ok(())
-                    }
+                    },
                     Err(err) => Err(anyhow!(
                         "Port-forward did not work: {:?} error {}",
                         port_forward_args,
                         err
                     )),
                 }
-            }
+            },
             Err(err) => Err(anyhow!(
                 "Port-forward did not start: {:?} error {}",
                 port_forward_args,
@@ -188,7 +187,7 @@ impl Node for K8sNode {
         info!("{:?}", delete_storage_paths);
         let cleanup_output = Command::new(KUBECTL_BIN)
             .stdout(Stdio::inherit())
-            .args(&delete_storage_paths)
+            .args(delete_storage_paths)
             .output()
             .expect("failed to clear node storage");
         assert!(

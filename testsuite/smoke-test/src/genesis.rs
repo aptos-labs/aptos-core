@@ -16,8 +16,12 @@ use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use regex::Regex;
-use std::time::Instant;
-use std::{fs, process::Command, str::FromStr, time::Duration};
+use std::{
+    fs,
+    process::Command,
+    str::FromStr,
+    time::{Duration, Instant},
+};
 
 fn update_node_config_restart(validator: &mut LocalNode, mut config: NodeConfig) {
     validator.stop();
@@ -53,7 +57,7 @@ async fn wait_for_node(validator: &mut dyn Validator, expected_to_connect: usize
 /// 3. Test the nodes and clients resume working after updating waypoint
 /// 4. Test a node lagging behind can sync to the waypoint
 async fn test_genesis_transaction_flow() {
-    let db_bootstrapper = workspace_builder::get_bin("db-bootstrapper");
+    let db_bootstrapper = workspace_builder::get_bin("aptos-db-bootstrapper");
     let aptos_cli = workspace_builder::get_bin("aptos");
 
     // prebuild tools.
@@ -265,6 +269,6 @@ fn parse_waypoint(db_bootstrapper_output: &str) -> Waypoint {
     let waypoint = Regex::new(r"Got waypoint: (\d+:\w+)")
         .unwrap()
         .captures(db_bootstrapper_output)
-        .ok_or_else(|| anyhow!("Failed to parse db-bootstrapper output."));
+        .ok_or_else(|| anyhow!("Failed to parse aptos-db-bootstrapper output."));
     Waypoint::from_str(waypoint.unwrap()[1].into()).unwrap()
 }

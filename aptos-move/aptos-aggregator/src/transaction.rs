@@ -5,10 +5,10 @@ use crate::delta_change_set::{deserialize, DeltaChangeSet};
 use anyhow::bail;
 use aptos_state_view::StateView;
 use aptos_types::{
-    transaction::{ChangeSet, TransactionOutput},
+    transaction::{ChangeSet, CheckChangeSet, TransactionOutput},
     write_set::{TransactionWrite, WriteOp, WriteSet, WriteSetMut},
 };
-use std::collections::btree_map;
+use std::{collections::btree_map, sync::Arc};
 
 /// Helpful trait for e.g. extracting u128 value out of TransactionWrite that we know is
 /// for aggregator (i.e. if we have seen a DeltaOp for the same access path).
@@ -31,19 +31,19 @@ impl AggregatorValue {
 pub struct ChangeSetExt {
     delta_change_set: DeltaChangeSet,
     change_set: ChangeSet,
-    gas_feature_version: u64,
+    checker: Arc<dyn CheckChangeSet>,
 }
 
 impl ChangeSetExt {
     pub fn new(
         delta_change_set: DeltaChangeSet,
         change_set: ChangeSet,
-        gas_feature_version: u64,
+        checker: Arc<dyn CheckChangeSet>,
     ) -> Self {
         ChangeSetExt {
             delta_change_set,
             change_set,
-            gas_feature_version,
+            checker,
         }
     }
 
@@ -63,7 +63,7 @@ impl ChangeSetExt {
         use btree_map::Entry::*;
         use WriteOp::*;
 
-        let gas_feature_version = self.gas_feature_version;
+        let checker = self.checker.clone();
         let (mut delta_set, change_set) = self.into_inner();
         let (write_set, events) = change_set.into_inner();
         let mut write_set = write_set.into_mut();
@@ -77,14 +77,14 @@ impl ChangeSetExt {
                     Creation(data) => {
                         let val: u128 = bcs::from_bytes(data)?;
                         *r = Creation(bcs::to_bytes(&op.apply_to(val)?)?);
-                    }
+                    },
                     Modification(data) => {
                         let val: u128 = bcs::from_bytes(data)?;
                         *r = Modification(bcs::to_bytes(&op.apply_to(val)?)?);
-                    }
+                    },
                     Deletion => {
                         bail!("Failed to apply Aggregator delta -- value already deleted");
-                    }
+                    },
                 }
             } else {
                 match delta_ops.entry(key) {
@@ -93,18 +93,18 @@ impl ChangeSetExt {
                         // delta, ensuring the strict ordering.
                         op.merge_onto(*entry.get())?;
                         *entry.into_mut() = op;
-                    }
+                    },
                     Vacant(entry) => {
                         entry.insert(op);
-                    }
+                    },
                 }
             }
         }
 
         Ok(Self {
             delta_change_set: delta_set,
-            change_set: ChangeSet::new(write_set.freeze()?, events, gas_feature_version)?,
-            gas_feature_version,
+            change_set: ChangeSet::new(write_set.freeze()?, events, checker.as_ref())?,
+            checker,
         })
     }
 
@@ -112,7 +112,7 @@ impl ChangeSetExt {
         use btree_map::Entry::*;
         use WriteOp::*;
 
-        let gas_feature_version = self.gas_feature_version;
+        let checker = self.checker.clone();
         let (mut delta, change_set) = self.into_inner();
         let (write_set, mut events) = change_set.into_inner();
         let mut write_set = write_set.into_mut();
@@ -128,20 +128,20 @@ impl ChangeSetExt {
                         (Modification(_) | Creation(_), Creation(_))
                         | (Deletion, Deletion | Modification(_)) => {
                             bail!("The given change sets cannot be squashed")
-                        }
+                        },
                         (Modification(_), Modification(data)) => *r = Modification(data),
                         (Creation(_), Modification(data)) => *r = Creation(data),
                         (Modification(_), Deletion) => *r = Deletion,
                         (Deletion, Creation(data)) => *r = Modification(data),
                         (Creation(_), Deletion) => {
                             entry.remove();
-                        }
+                        },
                     }
-                }
+                },
                 Vacant(entry) => {
                     delta.remove(entry.key());
                     entry.insert(op);
-                }
+                },
             }
         }
 
@@ -149,8 +149,8 @@ impl ChangeSetExt {
 
         Ok(Self {
             delta_change_set: delta,
-            change_set: ChangeSet::new(write_set.freeze()?, events, gas_feature_version)?,
-            gas_feature_version,
+            change_set: ChangeSet::new(write_set.freeze()?, events, checker.as_ref())?,
+            checker,
         })
     }
 

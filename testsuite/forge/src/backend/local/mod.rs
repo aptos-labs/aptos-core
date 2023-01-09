@@ -8,22 +8,21 @@ use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
 use rand::rngs::StdRng;
-use std::time::Duration;
 use std::{
     collections::HashMap,
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 mod cargo;
 mod node;
 mod swarm;
+pub use self::swarm::ActiveNodesGuard;
 pub use cargo::cargo_build_common_args;
 pub use node::LocalNode;
 pub use swarm::{LocalSwarm, SwarmDirectory};
-
-pub use self::swarm::ActiveNodesGuard;
 
 #[derive(Clone, Debug)]
 pub struct LocalVersion {
@@ -181,13 +180,14 @@ impl Factory for LocalFactory {
         _cleanup_duration: Duration,
         _genesis_config_fn: Option<GenesisConfigFn>,
         _node_config_fn: Option<NodeConfigFn>,
+        _existing_db_tag: Option<String>,
     ) -> Result<Box<dyn Swarm>> {
         let framework = match genesis_config {
             Some(config) => match config {
                 GenesisConfig::Bundle(bundle) => Some(bundle.clone()),
                 GenesisConfig::Path(_) => {
                     bail!("local forge backend does not support flattened dir for genesis")
-                }
+                },
             },
             None => None,
         };

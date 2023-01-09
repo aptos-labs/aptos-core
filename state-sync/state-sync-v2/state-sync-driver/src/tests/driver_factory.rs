@@ -12,22 +12,22 @@ use aptos_config::{
 use aptos_consensus_notifications::new_consensus_notifier_listener_pair;
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
+use aptos_db::AptosDB;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_test_helpers::bootstrap_genesis;
 use aptos_genesis::test_utils::test_config;
 use aptos_infallible::RwLock;
+use aptos_mempool_notifications::new_mempool_notifier_listener_pair;
+use aptos_network::application::{interface::NetworkClient, storage::PeerMetadataStorage};
+use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_service_client::StorageServiceClient;
 use aptos_temppath::TempPath;
 use aptos_time_service::TimeService;
 use aptos_types::on_chain_config::ON_CHAIN_CONFIG_REGISTRY;
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
 use futures::{FutureExt, StreamExt};
-use mempool_notifications::new_mempool_notifier_listener_pair;
-use network::application::{interface::MultiNetworkSender, storage::PeerMetadataStorage};
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::DbReaderWriter;
-use storage_service_client::StorageServiceClient;
 
 #[test]
 fn test_new_initialized_configs() {
@@ -66,10 +66,12 @@ fn test_new_initialized_configs() {
     let (streaming_service_client, _) = new_streaming_service_client_listener_pair();
 
     // Create a test aptos data client
-    let network_client = StorageServiceClient::new(
-        MultiNetworkSender::new(HashMap::new()),
+    let network_client = StorageServiceClient::new(NetworkClient::new(
+        vec![],
+        vec![],
+        HashMap::new(),
         PeerMetadataStorage::new(&[]),
-    );
+    ));
     let (aptos_data_client, _) = AptosNetDataClient::new(
         node_config.state_sync.aptos_data_client,
         node_config.base.clone(),
@@ -94,6 +96,7 @@ fn test_new_initialized_configs() {
         event_subscription_service,
         aptos_data_client,
         streaming_service_client,
+        TimeService::mock(),
     );
 
     // Verify the initial configs were notified

@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::ReplayConcurrencyLevelOpt;
 use crate::{
     backup_types::epoch_ending::{
         backup::{EpochEndingBackupController, EpochEndingBackupOpt},
@@ -12,19 +11,21 @@ use crate::{
     storage::{local_fs::LocalFs, BackupStorage},
     utils::{
         backup_service_client::BackupServiceClient, test_utils::tmp_db_with_random_content,
-        ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, RocksdbOpt, TrustedWaypointOpt,
+        ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt,
+        RocksdbOpt, TrustedWaypointOpt,
     },
 };
 use aptos_backup_service::start_backup_service;
 use aptos_config::utils::get_available_port;
+use aptos_db::AptosDB;
+use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     ledger_info::LedgerInfoWithSignatures,
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
     waypoint::Waypoint,
 };
-use aptosdb::AptosDB;
 use proptest::{collection::vec, prelude::*};
 use std::{
     convert::TryInto,
@@ -32,7 +33,6 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
 };
-use storage_interface::DbReader;
 use tokio::{runtime::Runtime, time::Duration};
 use warp::Filter;
 

@@ -3,8 +3,8 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
-
 use aptos_crypto::{
+    ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
     PrivateKey, SigningKey, Uniform,
 };
@@ -17,8 +17,6 @@ use aptos_types::{
     },
     utility_coin::APTOS_COIN_TYPE,
 };
-
-use aptos_crypto::ed25519::Ed25519PrivateKey;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -530,7 +528,7 @@ async fn test_signing_message_with_payload(
         format!(
             "0x{}",
             hex::encode(
-                &txn.clone()
+                txn.clone()
                     .into_raw_transaction()
                     .signing_message()
                     .unwrap()

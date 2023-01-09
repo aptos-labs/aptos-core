@@ -5,7 +5,9 @@ id: "build-aptos-cli"
 
 # Build Aptos CLI from Source Code
 
-If you are an advanced user and would like to build the CLI binary by downloading the source code, follow the below steps. **This is not recommended** unless you are on a platform unsupported by the prebuilt binaries. Otherwise, [install the prebuilt CLI binaries](aptos-cli-tool/install-aptos-cli.md) to ease ramp up and reduce variables in your environment.
+If you are an advanced user and would like to build the CLI binary by downloading the source code, follow the below steps, [selecting the network branch](../guides/system-integrators-guide.md#choose-a-network) that meets your use case. For example, `main` contains the latest code yet poses a greater risk of bugs.
+
+**Building the Aptos CLI is not recommended** unless you are on a platform unsupported by the prebuilt binaries. Otherwise, [install the prebuilt CLI binaries](aptos-cli-tool/install-aptos-cli.md) to ease ramp up and reduce variables in your environment.
 
 :::tip Use setup script
 Aptos offers the [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) script for establishing your development environment. This script currently supports macOS and Ubuntu Linux with other Linux distributions working but untested. The script does not support Windows. See the instructions below to manually install necessary dependencies on Windows. 
@@ -38,7 +40,7 @@ If the script above doesn't work for you, you can install these manually, but it
 
 #### Building the Aptos CLI
 
-1. Checkout the correct branch `git checkout --track origin/<branch>`, where `<branch>` is:
+1. Check out the [correct branch](../guides/system-integrators-guide.md#choose-a-network) `git checkout --track origin/<branch>`, where `<branch>` is:
     - `devnet` for building on the Aptos devnet.
     - `testnet` for building on the Aptos testnet.
     - `main` for the current development branch.
@@ -58,7 +60,6 @@ If the script above doesn't work for you, you can install these manually, but it
 
 **> Using the automated script**
 
-1. If on Mac, ensure you have `brew` installed https://brew.sh/
 1. Ensure you have `git` installed https://git-scm.com/book/en/v2/Getting-Started-Installing-Git.
 1. Clone the Aptos core repo:  `git clone https://github.com/aptos-labs/aptos-core.git`.
 1. Change directory into `aptos-core`: `cd aptos-core`
@@ -76,7 +77,7 @@ If the script above does not work for you, you can install these manually, but i
 
 #### Building the Aptos CLI
 
-1. Checkout the correct branch `git checkout --track origin/<branch>`, where `<branch>` is:
+1. Check out the [correct branch](../guides/system-integrators-guide.md#choose-a-network) `git checkout --track origin/<branch>`, where `<branch>` is:
     - `devnet` for building on the Aptos devnet.
     - `testnet` for building on the Aptos testnet.
     - `main` for the current development branch.
@@ -113,7 +114,7 @@ If on Windows, you must install these manually:
 
 #### Building aptos-core
 
-1. Checkout the correct branch `git checkout --track origin/<branch>`, where `<branch>` is:
+1. Check out the [correct branch](../guides/system-integrators-guide.md#choose-a-network) `git checkout --track origin/<branch>`, where `<branch>` is:
     - `devnet` for building on the Aptos devnet.
     - `testnet` for building on the Aptos testnet.
     - `main` for the current development branch.

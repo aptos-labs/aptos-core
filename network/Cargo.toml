@@ -1,5 +1,5 @@
 [package]
-name = "network"
+name = "aptos-network"
 description = "Aptos networking stack"
 version = "0.1.0"
 
@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
+aptos-channels = { workspace = true }
 aptos-compression = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -22,22 +23,23 @@ aptos-crypto-derive = { workspace = true }
 aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-memsocket = { workspace = true, optional = true }
 aptos-metrics-core = { workspace = true }
+aptos-netcore = { workspace = true }
+aptos-num-variants = { workspace = true }
 aptos-proptest-helpers = { workspace = true, optional = true }
 aptos-rate-limiter = { workspace = true }
+aptos-short-hex-str = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
-channel = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
-memsocket = { workspace = true, optional = true }
-netcore = { workspace = true }
-num-variants = { workspace = true }
+maplit = { workspace = true }
 once_cell = { workspace = true }
 pin-project = { workspace = true }
 proptest ={ workspace = true, optional = true }
@@ -46,7 +48,6 @@ rand = { workspace = true, features = ["small_rng"] }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
-short-hex-str = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
@@ -55,17 +56,16 @@ tokio-util = { workspace = true }
 [dev-dependencies]
 aptos-bitvec = { workspace = true, features = ["fuzzing"] }
 aptos-config = { workspace = true, features = ["testing"] }
+aptos-memsocket = { workspace = true }
+aptos-netcore = { workspace = true, features = ["testing"] }
 aptos-proptest-helpers = { workspace = true }
 aptos-time-service = { workspace = true, features = ["testing"] }
 aptos-types = { workspace = true, features = ["fuzzing"] }
-maplit = { workspace = true }
-memsocket = { workspace = true }
-netcore = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand_core = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["aptos-bitvec/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-types/fuzzing", "aptos-proptest-helpers", "aptos-time-service/testing", "aptos-types/fuzzing", "memsocket/testing", "netcore/fuzzing", "proptest", "proptest-derive"]
-testing = ["aptos-config/testing", "aptos-time-service/testing", "memsocket/testing", "netcore/testing"]
+fuzzing = ["aptos-bitvec/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-types/fuzzing", "aptos-proptest-helpers", "aptos-time-service/testing", "aptos-types/fuzzing", "aptos-memsocket/testing", "aptos-netcore/fuzzing", "proptest", "proptest-derive"]
+testing = ["aptos-config/testing", "aptos-time-service/testing", "aptos-memsocket/testing", "aptos-netcore/testing"]

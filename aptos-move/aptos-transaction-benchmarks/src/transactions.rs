@@ -3,6 +3,11 @@
 
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
+use aptos_language_e2e_tests::{
+    account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
+    executor::FakeExecutor,
+    gas_costs::TXN_RESERVED,
+};
 use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
@@ -10,11 +15,6 @@ use aptos_types::{
 };
 use aptos_vm::{block_executor::BlockAptosVM, data_cache::AsMoveResolver};
 use criterion::{measurement::Measurement, BatchSize, Bencher};
-use language_e2e_tests::{
-    account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
-    executor::FakeExecutor,
-    gas_costs::TXN_RESERVED,
-};
 use proptest::{
     collection::vec,
     strategy::{Strategy, ValueTree},
@@ -36,7 +36,6 @@ where
 {
     /// The number of accounts created by default.
     pub const DEFAULT_NUM_ACCOUNTS: usize = 100;
-
     /// The number of transactions created by default.
     pub const DEFAULT_NUM_TRANSACTIONS: usize = 1000;
 

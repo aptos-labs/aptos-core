@@ -121,8 +121,8 @@ module std::fixed_point32 {
     spec schema CreateFromRationalAbortsIf {
         numerator: u64;
         denominator: u64;
-        let scaled_numerator = numerator << 64;
-        let scaled_denominator = denominator << 32;
+        let scaled_numerator = (numerator as u128)<< 64;
+        let scaled_denominator = (denominator as u128) << 32;
         let quotient = scaled_numerator / scaled_denominator;
         aborts_if scaled_denominator == 0 with EDENOMINATOR;
         aborts_if quotient == 0 && scaled_numerator != 0 with ERATIO_OUT_OF_RANGE;

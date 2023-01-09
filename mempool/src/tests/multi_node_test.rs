@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::common;
 use crate::{
     network::MempoolSyncMsg,
     shared_mempool::types::SharedMempoolNotification,
     tests::{
+        common,
         common::TestTransaction,
         node::{
             public_full_node_config, validator_config, vfn_config, Node, NodeId, NodeInfo,
@@ -17,12 +17,12 @@ use aptos_config::{
     config::{NodeConfig, PeerRole},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_types::{transaction::SignedTransaction, PeerId};
-use netcore::transport::ConnectionOrigin;
-use network::{
+use aptos_netcore::transport::ConnectionOrigin;
+use aptos_network::{
     peer_manager::{PeerManagerNotification, PeerManagerRequest},
     ProtocolId,
 };
+use aptos_types::{transaction::SignedTransaction, PeerId};
 use rand::{rngs::StdRng, SeedableRng};
 use std::collections::{HashMap, HashSet};
 
@@ -347,7 +347,7 @@ impl TestHarness {
                                     NetworkId::Validator,
                                     sender.peer_id(NetworkId::Public),
                                 )
-                            }
+                            },
                             _ => PeerNetworkId::new(network_id, remote_peer_id),
                         };
                         let receiver_id =
@@ -378,18 +378,18 @@ impl TestHarness {
                             self.deliver_response(&receiver_id, network_id);
                         }
                         (transactions, remote_peer_id)
-                    }
+                    },
                     req => {
                         panic!("Unexpected broadcast transactions response {:?}", req)
-                    }
+                    },
                 }
-            }
+            },
             req => {
                 panic!(
                     "Unexpected peer manager request, didn't receive broadcast {:?}",
                     req
                 )
-            }
+            },
         }
     }
 
@@ -416,7 +416,7 @@ impl TestHarness {
                                     NetworkId::Public,
                                     sender.peer_id(NetworkId::Validator),
                                 )
-                            }
+                            },
                             _ => PeerNetworkId::new(network_id, remote_peer_id),
                         };
                         let receiver_id =
@@ -427,13 +427,13 @@ impl TestHarness {
                             ProtocolId::MempoolDirectSend,
                             PeerManagerNotification::RecvMessage(sender_peer_id, msg),
                         );
-                    }
+                    },
                     request => panic!(
                         "did not receive expected broadcast ACK, instead got {:?}",
                         request
                     ),
                 }
-            }
+            },
             request => panic!("Node did not ACK broadcast, instead got {:?}", request),
         }
     }

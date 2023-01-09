@@ -1,20 +1,25 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-use crate::pruner::db_pruner::DBPruner;
-use crate::pruner::state_store::generics::StaleNodeIndexSchemaTrait;
-use crate::pruner::state_store::StateMerklePruner;
+use crate::pruner::{
+    db_pruner::DBPruner,
+    state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+};
 use aptos_config::config::StateMerklePrunerConfig;
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_logger::{
     error,
     prelude::{sample, SampleRate},
 };
+use aptos_schemadb::schema::KeyCodec;
 use aptos_types::transaction::Version;
-use schemadb::schema::KeyCodec;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::thread::sleep;
-use std::time::Duration;
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread::sleep,
+    time::Duration,
+};
 
 /// Maintains the state store pruner and periodically calls the db_pruner's prune method to prune
 /// the DB. This also exposes API to report the progress to the parent thread.

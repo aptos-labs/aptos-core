@@ -61,17 +61,17 @@ impl TokenActivity {
             for event in &user_txn.events {
                 let txn_version = user_txn.info.version.0 as i64;
                 let event_type = event.typ.to_string();
-                match TokenEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
+                if let Some(token_event) =
+                    TokenEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
                 {
-                    Some(token_event) => token_activities.push(Self::from_parsed_event(
+                    token_activities.push(Self::from_parsed_event(
                         &event_type,
                         event,
                         &token_event,
                         txn_version,
                         parse_timestamp(user_txn.timestamp.0, txn_version),
-                    )),
-                    None => {}
-                };
+                    ))
+                }
             }
         }
         token_activities

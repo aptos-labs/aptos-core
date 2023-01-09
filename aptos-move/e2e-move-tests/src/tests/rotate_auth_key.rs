@@ -4,14 +4,17 @@
 use crate::{assert_success, MoveHarness};
 use aptos::common::types::RotationProofChallenge;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey};
-use aptos_crypto::{Signature, SigningKey, Uniform, ValidCryptoMaterial};
-use aptos_types::{
-    account_address::AccountAddress, account_config::AccountResource,
-    account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey,
-    state_store::table::TableHandle, transaction::authenticator::AuthenticationKey,
+use aptos_crypto::{
+    multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
+    Signature, SigningKey, Uniform, ValidCryptoMaterial,
 };
-use language_e2e_tests::account::Account;
+use aptos_language_e2e_tests::account::Account;
+use aptos_types::{
+    account_address::AccountAddress,
+    account_config::{AccountResource, CORE_CODE_ADDRESS},
+    state_store::{state_key::StateKey, table::TableHandle},
+    transaction::authenticator::AuthenticationKey,
+};
 use move_core_types::parser::parse_struct_tag;
 
 #[test]
@@ -119,7 +122,7 @@ pub fn assert_successful_key_rotation_transaction<
         struct_name: String::from("RotationProofChallenge"),
         sequence_number,
         originator,
-        current_auth_key: AccountAddress::from_bytes(&current_account.auth_key()).unwrap(),
+        current_auth_key: AccountAddress::from_bytes(current_account.auth_key()).unwrap(),
         new_public_key: new_public_key.to_bytes().to_vec(),
     };
 

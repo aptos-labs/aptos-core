@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Duration;
-
 use crate::metrics::{HISTOGRAM, RESPONSE_STATUS};
 use aptos_logger::{
     debug, info,
@@ -11,6 +9,7 @@ use aptos_logger::{
 };
 use poem::{http::header, Endpoint, Request, Response, Result};
 use poem_openapi::OperationId;
+use std::time::Duration;
 
 /// Logs information about the request and response if the response status code
 /// is >= 500, to help us debug since this will be an error on our side.

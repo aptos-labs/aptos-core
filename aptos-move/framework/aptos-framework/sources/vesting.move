@@ -1052,7 +1052,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x1000C)]
+    #[expected_failure(abort_code = 0x1000C, location = Self)]
     public entry fun test_create_vesting_contract_with_zero_grant_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -1063,7 +1063,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x10004)]
+    #[expected_failure(abort_code = 0x10004, location = Self)]
     public entry fun test_create_vesting_contract_with_no_shareholders_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -1074,7 +1074,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x10005)]
+    #[expected_failure(abort_code = 0x10005, location = Self)]
     public entry fun test_create_vesting_contract_with_mistmaching_shareholders_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -1085,7 +1085,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001)]
+    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
     public entry fun test_create_vesting_contract_with_invalid_withdrawal_address_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -1096,7 +1096,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001)]
+    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
     public entry fun test_create_vesting_contract_with_missing_withdrawal_account_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -1107,7 +1107,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002)]
+    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
     public entry fun test_create_vesting_contract_with_unregistered_withdrawal_account_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -1119,21 +1119,21 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1)]
-    #[expected_failure(abort_code = 0x10002)]
+    #[expected_failure(abort_code = 0x10002, location = Self)]
     public entry fun test_create_empty_vesting_schedule_should_fail(aptos_framework: &signer) {
         setup(aptos_framework, &vector[]);
         create_vesting_schedule(vector[], 1, 1);
     }
 
     #[test(aptos_framework = @0x1)]
-    #[expected_failure(abort_code = 0x10003)]
+    #[expected_failure(abort_code = 0x10003, location = Self)]
     public entry fun test_create_vesting_schedule_with_zero_period_duration_should_fail(aptos_framework: &signer) {
         setup(aptos_framework, &vector[]);
         create_vesting_schedule(vector[fixed_point32::create_from_rational(1, 1)], 1, 0);
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x10006)]
+    #[expected_failure(abort_code = 0x10006, location = Self)]
     public entry fun test_create_vesting_schedule_with_invalid_vesting_start_should_fail(aptos_framework: &signer) {
         setup(aptos_framework, &vector[]);
         timestamp::update_global_time_for_test_secs(1000);
@@ -1266,7 +1266,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]
-    #[expected_failure(abort_code = 0x30008)]
+    #[expected_failure(abort_code = 0x30008, location = Self)]
     public entry fun test_cannot_unlock_rewards_after_contract_is_terminated(
         aptos_framework: &signer,
         admin: &signer,
@@ -1375,7 +1375,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]
-    #[expected_failure(abort_code = 0x30008)]
+    #[expected_failure(abort_code = 0x30008, location = Self)]
     public entry fun test_cannot_vest_after_contract_is_terminated(
         aptos_framework: &signer,
         admin: &signer,
@@ -1393,7 +1393,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]
-    #[expected_failure(abort_code = 0x30008)]
+    #[expected_failure(abort_code = 0x30008, location = Self)]
     public entry fun test_cannot_terminate_twice(
         aptos_framework: &signer,
         admin: &signer,
@@ -1411,7 +1411,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]
-    #[expected_failure(abort_code = 0x30009)]
+    #[expected_failure(abort_code = 0x30009, location = Self)]
     public entry fun test_cannot_call_admin_withdraw_if_contract_is_not_terminated(
         aptos_framework: &signer,
         admin: &signer,
@@ -1428,7 +1428,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001)]
+    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
     public entry fun test_set_beneficiary_with_missing_account_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -1441,7 +1441,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002)]
+    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
     public entry fun test_set_beneficiary_with_unregistered_account_should_fail(
         aptos_framework: &signer,
         admin: &signer,
@@ -1545,7 +1545,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123, resetter = @0x234, random = @0x345)]
-    #[expected_failure(abort_code = 0x5000F)]
+    #[expected_failure(abort_code = 0x5000F, location = Self)]
     public entry fun test_reset_beneficiary_with_unauthorized(
         aptos_framework: &signer,
         admin: &signer,

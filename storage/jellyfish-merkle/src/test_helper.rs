@@ -7,6 +7,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_storage_interface::jmt_update_refs;
 use aptos_types::{
     proof::{SparseMerkleInternalNode, SparseMerkleRangeProof},
     transaction::Version,
@@ -21,7 +22,6 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ops::Bound,
 };
-use storage_interface::jmt_update_refs;
 
 #[derive(
     Arbitrary,
@@ -68,7 +68,7 @@ pub(crate) fn gen_value() -> (HashValue, ValueBlob) {
 
 /// Computes the key immediately after `key`.
 pub fn plus_one(key: HashValue) -> HashValue {
-    assert_ne!(key, HashValue::new([0xff; HashValue::LENGTH]));
+    assert_ne!(key, HashValue::new([0xFF; HashValue::LENGTH]));
 
     let mut buf = key.to_vec();
     for i in (0..HashValue::LENGTH).rev() {
@@ -140,7 +140,7 @@ pub fn arb_kv_pair_with_distinct_last_nibble<V: TestKey>(
 ) -> impl Strategy<Value = ((HashValue, (HashValue, V)), (HashValue, (HashValue, V)))> {
     (
         any::<HashValue>().prop_filter("Can't be 0xffffff...", |key| {
-            *key != HashValue::new([0xff; HashValue::LENGTH])
+            *key != HashValue::new([0xFF; HashValue::LENGTH])
         }),
         vec((any::<HashValue>(), any::<V>()), 2),
     )
@@ -366,17 +366,17 @@ fn compute_root_hash_impl(kvs: Vec<(&[bool], HashValue)>) -> HashValue {
             // Every key starts with a 1-bit, i.e., they are all in the right subtree.
             left_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
             right_hash = compute_root_hash_impl(reduce(&kvs));
-        }
+        },
         Some(index) => {
             // Both left subtree and right subtree have some keys.
             left_hash = compute_root_hash_impl(reduce(&kvs[..index]));
             right_hash = compute_root_hash_impl(reduce(&kvs[index..]));
-        }
+        },
         None => {
             // Every key starts with a 0-bit, i.e., they are all in the left subtree.
             left_hash = compute_root_hash_impl(reduce(&kvs));
             right_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
-        }
+        },
     }
 
     SparseMerkleInternalNode::new(left_hash, right_hash).hash()

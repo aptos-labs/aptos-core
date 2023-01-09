@@ -3,6 +3,12 @@
 
 #![forbid(unsafe_code)]
 
+use crate::{
+    constants::*, core_metrics::create_core_metric_telemetry_event, metrics,
+    network_metrics::create_network_metric_telemetry_event, sender::TelemetrySender,
+    system_information::create_system_info_telemetry_event,
+    telemetry_log_sender::TelemetryLogSender, utils::create_build_info_telemetry_event,
+};
 use aptos_config::config::NodeConfig;
 use aptos_logger::{
     aptos_logger::RUST_LOG_TELEMETRY, prelude::*, telemetry_log_writer::TelemetryLog,
@@ -19,22 +25,10 @@ use std::{
     collections::BTreeMap,
     env,
     future::Future,
-    sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tokio::{
-    runtime::{Builder, Runtime},
-    task::JoinHandle,
-    time,
-};
+use tokio::{runtime::Runtime, task::JoinHandle, time};
 use uuid::Uuid;
-
-use crate::{
-    constants::*, core_metrics::create_core_metric_telemetry_event, metrics,
-    network_metrics::create_network_metric_telemetry_event, sender::TelemetrySender,
-    system_information::create_system_info_telemetry_event,
-    telemetry_log_sender::TelemetryLogSender, utils::create_build_info_telemetry_event,
-};
 
 // The chain ID key
 const CHAIN_ID_KEY: &str = "CHAIN_ID";
@@ -110,7 +104,7 @@ pub fn start_telemetry_service(
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> Option<Runtime> {
     if enable_prometheus_node_metrics() {
-        node_resource_metrics::register_node_metrics_collector();
+        aptos_node_resource_metrics::register_node_metrics_collector();
     }
 
     // Don't start the service if telemetry has been disabled
@@ -120,17 +114,7 @@ pub fn start_telemetry_service(
     }
 
     // Create the telemetry runtime
-    let telemetry_runtime = Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("telemetry-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("Failed to create the Aptos Telemetry runtime!");
-
+    let telemetry_runtime = aptos_runtimes::spawn_named_runtime("telemetry".into(), None);
     telemetry_runtime.handle().spawn(spawn_telemetry_service(
         node_config,
         chain_id,
@@ -536,14 +520,14 @@ fn spawn_telemetry_event_sender(
                     debug!("Failed telemetry response: {:?}", response.text().await);
                     metrics::increment_telemetry_failures(&event_name);
                 }
-            }
+            },
             Err(error) => {
                 debug!(
                     "Failed to send telemetry event: {}. Error: {:?}",
                     event_name, error
                 );
                 metrics::increment_telemetry_failures(&event_name);
-            }
+            },
         }
     })
 }

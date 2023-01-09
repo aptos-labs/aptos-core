@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
+use aptos_language_e2e_tests::account::TransactionBuilder;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::CoinStoreResource,
     transaction::{Script, TransactionArgument},
 };
-use language_e2e_tests::account::TransactionBuilder;
 use move_core_types::move_resource::MoveStructType;
 
 #[test]
@@ -44,17 +44,13 @@ fn test_two_to_two_transfer() {
     let david_start = read_coin(&h, david.address());
 
     let code = package.extract_script_code()[0].clone();
-    let script = Script::new(
-        code,
-        vec![],
-        vec![
-            TransactionArgument::U64(amount_alice),
-            TransactionArgument::U64(amount_bob),
-            TransactionArgument::Address(*carol.address()),
-            TransactionArgument::Address(*david.address()),
-            TransactionArgument::U64(amount_carol),
-        ],
-    );
+    let script = Script::new(code, vec![], vec![
+        TransactionArgument::U64(amount_alice),
+        TransactionArgument::U64(amount_bob),
+        TransactionArgument::Address(*carol.address()),
+        TransactionArgument::Address(*david.address()),
+        TransactionArgument::U64(amount_carol),
+    ]);
 
     let transaction = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob.clone()])

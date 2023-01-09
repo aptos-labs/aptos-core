@@ -1,22 +1,26 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::rocks_db::database_schema::{SecureStorageKey, SecureStorageSchema, SecureStorageValue};
-use crate::{CryptoKVStorage, Error, GetResponse, KVStorage};
+use crate::{
+    rocks_db::database_schema::{SecureStorageKey, SecureStorageSchema, SecureStorageValue},
+    CryptoKVStorage, Error, GetResponse, KVStorage,
+};
 use anyhow::{anyhow, Result};
 use aptos_crypto::_once_cell::sync::Lazy;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use schemadb::{
+use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
     ColumnFamilyName, Options, SchemaBatch, DB,
 };
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::{path::Path, sync::Arc, time::Instant};
+use aptos_time_service::{TimeService, TimeServiceTrait};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Instant,
+};
 
 /// The name of the secure storage db file
 pub const SECURE_STORAGE_DB_NAME: &str = "secure_storage_db";
@@ -134,7 +138,7 @@ impl KVStorage for RocksDbStorage {
             Some(secure_storage_value) => {
                 let SecureStorageValue::SerializedValue(value) = secure_storage_value;
                 Ok(serde_json::from_slice(&value)?)
-            }
+            },
             None => Err(Error::KeyNotSet(key.to_string())),
         }
     }

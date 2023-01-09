@@ -1,33 +1,37 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::docgen::DocgenOptions;
-use crate::error_map::generate_error_map;
-use crate::natives::code::{
-    ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
+use crate::{
+    docgen::DocgenOptions,
+    extended_checks,
+    natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
+    zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
+    APTOS_METADATA_KEY_V1, METADATA_V1_MIN_FILE_FORMAT_VERSION,
 };
-use crate::{zip_metadata, zip_metadata_str, RuntimeModuleMetadata, APTOS_METADATA_KEY};
-use aptos_module_verifier::module_init::verify_module_init_function;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::EntryABI;
+use anyhow::bail;
+use aptos_types::{account_address::AccountAddress, transaction::EntryABI};
 use clap::Parser;
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use itertools::Itertools;
 use move_binary_format::CompiledModule;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_core_types::errmap::ErrorMapping;
-use move_core_types::metadata::Metadata;
+use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::model::GlobalEnv;
-use move_package::compilation::compiled_package::CompiledPackage;
-use move_package::compilation::package_layout::CompiledPackageLayout;
-use move_package::source_package::manifest_parser::{
-    parse_move_manifest_string, parse_source_manifest,
+use move_package::{
+    compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
+    source_package::manifest_parser::{parse_move_manifest_string, parse_source_manifest},
+    BuildConfig, ModelConfig,
 };
-use move_package::{BuildConfig, ModelConfig};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
-use std::io::stderr;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    io::stderr,
+    path::{Path, PathBuf},
+};
 
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
 pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
@@ -54,6 +58,8 @@ pub struct BuildOptions {
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
+    #[clap(long)]
+    pub bytecode_version: Option<u32>,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -72,6 +78,7 @@ impl Default for BuildOptions {
             // This is false by default, because it could accidentally pull new dependencies
             // while in a test (and cause some havoc)
             skip_fetch_latest_git_deps: false,
+            bytecode_version: None,
         }
     }
 }
@@ -101,13 +108,10 @@ pub(crate) fn build_model(
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
     };
-    build_config.move_model_for_package(
-        package_path,
-        ModelConfig {
-            target_filter,
-            all_files_as_targets: false,
-        },
-    )
+    build_config.move_model_for_package(package_path, ModelConfig {
+        target_filter,
+        all_files_as_targets: false,
+    })
 }
 
 impl BuiltPackage {
@@ -130,53 +134,56 @@ impl BuiltPackage {
         };
         eprintln!("Compiling, may take a little while to download git dependencies...");
         let mut package = build_config.compile_package_no_exit(&package_path, &mut stderr())?;
-        for module in package.root_modules_map().iter_modules().iter() {
-            verify_module_init_function(module)?;
-        }
 
-        let error_map = if options.with_error_map || options.with_docs {
-            let model = build_model(
-                package_path.as_path(),
-                options.named_addresses.clone(),
-                None,
-            )?;
-            if options.with_docs {
-                let docgen = if let Some(opts) = options.docgen_options.clone() {
-                    opts
-                } else {
-                    DocgenOptions::default()
-                };
-                let dep_paths = package
-                    .deps_compiled_units
-                    .iter()
-                    .map(|(_, u)| {
-                        u.source_path
-                            .parent()
-                            .unwrap()
-                            .parent()
-                            .unwrap()
-                            .join("doc")
-                            .display()
-                            .to_string()
-                    })
-                    .unique()
-                    .collect::<Vec<_>>();
-                docgen.run(package_path.display().to_string(), dep_paths, &model)?
+        // Build the Move model for extra processing and run extended checks as well derive
+        // runtime metadata
+        let model = &build_model(
+            package_path.as_path(),
+            options.named_addresses.clone(),
+            None,
+        )?;
+        let runtime_metadata = extended_checks::run_extended_checks(model);
+        if model.diag_count(Severity::Warning) > 0 {
+            let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+            model.report_diag(&mut error_writer, Severity::Warning);
+            if model.has_errors() {
+                bail!("extended checks failed")
             }
-            Some(generate_error_map(&model))
-        } else {
-            None
-        };
-
-        if let Some(map) = &error_map {
-            inject_module_metadata(
-                package_path
-                    .join(CompiledPackageLayout::Root.path())
-                    .join(package.compiled_package_info.package_name.as_str()),
-                &mut package,
-                map,
-            )?
         }
+        inject_runtime_metadata(
+            package_path
+                .join(CompiledPackageLayout::Root.path())
+                .join(package.compiled_package_info.package_name.as_str()),
+            &mut package,
+            runtime_metadata,
+            options.bytecode_version,
+        )?;
+
+        // If enabled generate docs.
+        if options.with_docs {
+            let docgen = if let Some(opts) = options.docgen_options.clone() {
+                opts
+            } else {
+                DocgenOptions::default()
+            };
+            let dep_paths = package
+                .deps_compiled_units
+                .iter()
+                .map(|(_, u)| {
+                    u.source_path
+                        .parent()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .join("doc")
+                        .display()
+                        .to_string()
+                })
+                .unique()
+                .collect::<Vec<_>>();
+            docgen.run(package_path.display().to_string(), dep_paths, model)?
+        }
+
         Ok(Self {
             options,
             package_path,
@@ -203,7 +210,11 @@ impl BuiltPackage {
     pub fn extract_code(&self) -> Vec<Vec<u8>> {
         self.package
             .root_modules()
-            .map(|unit_with_source| unit_with_source.unit.serialize(None))
+            .map(|unit_with_source| {
+                unit_with_source
+                    .unit
+                    .serialize(self.options.bytecode_version)
+            })
             .collect()
     }
 
@@ -235,7 +246,11 @@ impl BuiltPackage {
     pub fn extract_script_code(&self) -> Vec<Vec<u8>> {
         self.package
             .scripts()
-            .map(|unit_with_source| unit_with_source.unit.serialize(None))
+            .map(|unit_with_source| {
+                unit_with_source
+                    .unit
+                    .serialize(self.options.bytecode_version)
+            })
             .collect()
     }
 
@@ -248,7 +263,7 @@ impl BuiltPackage {
             .map(|s| s.to_string())
             .unwrap_or_default();
         let manifest_file = self.package_path.join("Move.toml");
-        let manifest = std::fs::read_to_string(&manifest_file)?;
+        let manifest = std::fs::read_to_string(manifest_file)?;
         let custom_props = extract_custom_fields(&manifest)?;
         let manifest = zip_metadata_str(&manifest)?;
         let upgrade_policy = if let Some(val) = custom_props.get(UPGRADE_POLICY_CUSTOM_FIELD) {
@@ -310,7 +325,7 @@ impl BuiltPackage {
         let data = self.extract_metadata()?;
         let path = self.package_artifacts_path();
         std::fs::create_dir_all(&path)?;
-        std::fs::write(path.join(METADATA_FILE_NAME), &bcs::to_bytes(&data)?)?;
+        std::fs::write(path.join(METADATA_FILE_NAME), bcs::to_bytes(&data)?)?;
         Ok(())
     }
 }
@@ -325,27 +340,35 @@ fn extract_custom_fields(toml: &str) -> anyhow::Result<BTreeMap<String, String>>
         .collect())
 }
 
-fn inject_module_metadata(
+fn inject_runtime_metadata(
     package_path: PathBuf,
     pack: &mut CompiledPackage,
-    error_map: &ErrorMapping,
+    metadata: BTreeMap<ModuleId, RuntimeModuleMetadataV1>,
+    bytecode_version: Option<u32>,
 ) -> anyhow::Result<()> {
     for unit_with_source in pack.root_compiled_units.iter_mut() {
         match &mut unit_with_source.unit {
             CompiledUnit::Module(named_module) => {
-                if let Some(module_map) = error_map
-                    .module_error_maps
-                    .get(&named_module.module.self_id())
-                {
-                    if !module_map.is_empty() {
-                        let serialized_metadata = bcs::to_bytes(&RuntimeModuleMetadata {
-                            error_map: module_map.clone(),
-                        })
-                        .expect("BCS for RuntimeModuleMetadata");
-                        named_module.module.metadata.push(Metadata {
-                            key: APTOS_METADATA_KEY.clone(),
-                            value: serialized_metadata,
-                        });
+                if let Some(module_metadata) = metadata.get(&named_module.module.self_id()) {
+                    if !module_metadata.is_empty() {
+                        if bytecode_version.unwrap_or(METADATA_V1_MIN_FILE_FORMAT_VERSION)
+                            >= METADATA_V1_MIN_FILE_FORMAT_VERSION
+                        {
+                            let serialized_metadata = bcs::to_bytes(&module_metadata)
+                                .expect("BCS for RuntimeModuleMetadata");
+                            named_module.module.metadata.push(Metadata {
+                                key: APTOS_METADATA_KEY_V1.clone(),
+                                value: serialized_metadata,
+                            });
+                        } else {
+                            let serialized_metadata =
+                                bcs::to_bytes(&module_metadata.clone().downgrade())
+                                    .expect("BCS for RuntimeModuleMetadata");
+                            named_module.module.metadata.push(Metadata {
+                                key: APTOS_METADATA_KEY.clone(),
+                                value: serialized_metadata,
+                            });
+                        }
 
                         // Also need to update the .mv file on disk.
                         let path = package_path
@@ -353,13 +376,13 @@ fn inject_module_metadata(
                             .join(named_module.name.as_str())
                             .with_extension(MOVE_COMPILED_EXTENSION);
                         if path.is_file() {
-                            let bytes = unit_with_source.unit.serialize(None);
-                            std::fs::write(path, &bytes)?;
+                            let bytes = unit_with_source.unit.serialize(bytecode_version);
+                            std::fs::write(path, bytes)?;
                         }
                     }
                 }
-            }
-            CompiledUnit::Script(_) => {}
+            },
+            CompiledUnit::Script(_) => {},
         }
     }
     Ok(())

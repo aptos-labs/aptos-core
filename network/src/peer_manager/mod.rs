@@ -21,20 +21,20 @@ use crate::{
     },
     ProtocolId,
 };
+use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
+use aptos_netcore::transport::{ConnectionOrigin, Transport};
 use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
-use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
     sink::SinkExt,
     stream::StreamExt,
 };
-use netcore::transport::{ConnectionOrigin, Transport};
-use short_hex_str::AsShortHexStr;
 use std::{
     collections::{hash_map::Entry, HashMap},
     marker::PhantomData,
@@ -102,13 +102,13 @@ where
     /// Channels to send NewPeer/LostPeer notifications to.
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
     /// Channel used to send Dial requests to the ConnectionHandler actor
-    transport_reqs_tx: channel::Sender<TransportRequest>,
+    transport_reqs_tx: aptos_channels::Sender<TransportRequest>,
     /// Sender for connection events.
-    transport_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
+    transport_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
     /// Receiver for connection requests.
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
     /// Receiver for connection events.
-    transport_notifs_rx: channel::Receiver<TransportNotification<TSocket>>,
+    transport_notifs_rx: aptos_channels::Receiver<TransportNotification<TSocket>>,
     /// A map of outstanding disconnect requests.
     outstanding_disconnect_requests:
         HashMap<ConnectionId, oneshot::Sender<Result<(), PeerManagerError>>>,
@@ -160,12 +160,12 @@ where
         inbound_rate_limiters: IpAddrTokenBucketLimiter,
         outbound_rate_limiters: IpAddrTokenBucketLimiter,
     ) -> Self {
-        let (transport_notifs_tx, transport_notifs_rx) = channel::new(
+        let (transport_notifs_tx, transport_notifs_rx) = aptos_channels::new(
             channel_size,
             &counters::PENDING_CONNECTION_HANDLER_NOTIFICATIONS,
         );
         let (transport_reqs_tx, transport_reqs_rx) =
-            channel::new(channel_size, &counters::PENDING_PEER_MANAGER_DIAL_REQUESTS);
+            aptos_channels::new(channel_size, &counters::PENDING_PEER_MANAGER_DIAL_REQUESTS);
         //TODO now that you can only listen on a socket inside of a tokio runtime we'll need to
         // rethink how we init the PeerManager so we don't have to do this funny thing.
         let transport_notifs_tx_clone = transport_notifs_tx.clone();
@@ -308,7 +308,7 @@ where
                                 conn.metadata
                             )
                         }
-                    }
+                    },
                     ConnectionOrigin::Inbound => {
                         // Everything below here is meant for unknown peers only, role comes from
                         // Noise handshake and if it's not `Unknown` it is trusted
@@ -352,7 +352,7 @@ where
                                 return;
                             }
                         }
-                    }
+                    },
                 }
 
                 // Add new peer, updating counters and all
@@ -363,7 +363,7 @@ where
                 );
                 self.add_peer(conn);
                 self.update_connected_peers_metrics();
-            }
+            },
             TransportNotification::Disconnected(lost_conn_metadata, reason) => {
                 // See: https://github.com/aptos-labs/aptos-core/issues/3128#issuecomment-605351504 for
                 // detailed reasoning on `Disconnected` events should be handled correctly.
@@ -429,7 +429,7 @@ where
                 self.inbound_rate_limiters.try_garbage_collect_key(&ip_addr);
                 self.outbound_rate_limiters
                     .try_garbage_collect_key(&ip_addr);
-            }
+            },
         }
     }
 
@@ -470,7 +470,7 @@ where
                     let request = TransportRequest::DialPeer(requested_peer_id, addr, response_tx);
                     self.transport_reqs_tx.send(request).await.unwrap();
                 };
-            }
+            },
             ConnectionRequest::DisconnectPeer(peer_id, resp_tx) => {
                 // Send a CloseConnection request to Peer and drop the send end of the
                 // PeerRequest channel.
@@ -502,7 +502,7 @@ where
                         );
                     }
                 }
-            }
+            },
         }
     }
 
@@ -519,10 +519,10 @@ where
         let (peer_id, protocol_id, peer_request) = match request {
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                 (peer_id, msg.protocol_id(), PeerRequest::SendDirectSend(msg))
-            }
+            },
             PeerManagerRequest::SendRpc(peer_id, req) => {
                 (peer_id, req.protocol_id(), PeerRequest::SendRpc(req))
-            }
+            },
         };
 
         if let Some((conn_metadata, sender)) = self.active_peers.get_mut(&peer_id) {

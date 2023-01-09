@@ -3,9 +3,9 @@
 
 use crate::{utils, utils::sum_all_histogram_counts};
 use aptos_config::config::NodeConfig;
+use aptos_state_sync_driver::metrics::StorageSynchronizerOperations;
 use aptos_telemetry_service::types::telemetry::TelemetryEvent;
 use prometheus::core::Collector;
-use state_sync_driver::metrics::StorageSynchronizerOperations;
 use std::collections::BTreeMap;
 
 /// Core metrics event name
@@ -112,14 +112,14 @@ fn collect_state_sync_metrics(
 
     core_metrics.insert(
         STATE_SYNC_SYNCED_EPOCH.into(),
-        state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
+        aptos_state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
             .with_label_values(&[StorageSynchronizerOperations::SyncedEpoch.get_label()])
             .get()
             .to_string(),
     );
     core_metrics.insert(
         STATE_SYNC_SYNCED_VERSION.into(),
-        state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
+        aptos_state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
             .with_label_values(&[StorageSynchronizerOperations::Synced.get_label()])
             .get()
             .to_string(),
@@ -144,18 +144,18 @@ fn collect_state_sync_metrics(
 fn collect_storage_metrics(core_metrics: &mut BTreeMap<String, String>) {
     core_metrics.insert(
         STORAGE_LEDGER_VERSION.into(),
-        aptosdb::metrics::LEDGER_VERSION.get().to_string(),
+        aptos_db::metrics::LEDGER_VERSION.get().to_string(),
     );
     core_metrics.insert(
         STORAGE_MIN_READABLE_LEDGER_VERSION.into(),
-        aptosdb::metrics::PRUNER_LEAST_READABLE_VERSION
+        aptos_db::metrics::PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["ledger_pruner"])
             .get()
             .to_string(),
     );
     core_metrics.insert(
         STORAGE_MIN_READABLE_STATE_VERSION.into(),
-        aptosdb::metrics::PRUNER_LEAST_READABLE_VERSION
+        aptos_db::metrics::PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["state_store"])
             .get()
             .to_string(),

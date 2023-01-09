@@ -219,14 +219,14 @@ mod tests {
         block_metadata::BlockMetadata,
         chain_id::ChainId,
         transaction::{
-            ChangeSet, RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload,
-            WriteSetPayload,
+            ChangeSet, NoOpChangeSetChecker, RawTransaction, Script, SignedTransaction,
+            Transaction, TransactionPayload, WriteSetPayload,
         },
         write_set::WriteSetMut,
     };
     use claims::{assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
-    use tokio::runtime::{Builder, Runtime};
+    use tokio::runtime::Runtime;
 
     #[test]
     fn test_mempool_not_listening() {
@@ -303,18 +303,17 @@ mod tests {
         match mempool_listener.select_next_some().now_or_never() {
             Some(mempool_commit_notification) => match user_transaction {
                 Transaction::UserTransaction(signed_transaction) => {
-                    assert_eq!(
-                        mempool_commit_notification.transactions,
-                        vec![CommittedTransaction {
+                    assert_eq!(mempool_commit_notification.transactions, vec![
+                        CommittedTransaction {
                             sender: signed_transaction.sender(),
                             sequence_number: signed_transaction.sequence_number(),
-                        }]
-                    );
+                        }
+                    ]);
                     assert_eq!(
                         mempool_commit_notification.block_timestamp_usecs,
                         block_timestamp_usecs
                     );
-                }
+                },
                 result => panic!("Expected user transaction but got: {:?}", result),
             },
             result => panic!("Expected mempool commit notification but got: {:?}", result),
@@ -388,17 +387,13 @@ mod tests {
                     .freeze()
                     .expect("freeze cannot fail"),
                 vec![],
-                3,
+                &NoOpChangeSetChecker,
             )
             .unwrap(),
         ))
     }
 
     fn create_runtime() -> Runtime {
-        Builder::new_multi_thread()
-            .disable_lifo_slot()
-            .enable_all()
-            .build()
-            .unwrap()
+        aptos_runtimes::spawn_named_runtime("test".into(), None)
     }
 }

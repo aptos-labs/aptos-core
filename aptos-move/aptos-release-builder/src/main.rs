@@ -25,7 +25,8 @@ pub enum Commands {
     },
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let args = Argument::parse();
 
     // TODO: Being able to parse the release config from a TOML file to generate the proposals.
@@ -37,6 +38,6 @@ fn main() -> Result<()> {
             .generate_release_proposal_scripts(output_dir.as_path()),
         Commands::WriteDefault { output_path } => {
             aptos_release_builder::ReleaseConfig::default().save_config(output_path.as_path())
-        }
+        },
     }
 }

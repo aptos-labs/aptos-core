@@ -5,11 +5,12 @@ use crate::shared_mempool::types::{MultiBatchId, QuorumStoreRequest};
 use anyhow::Error;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::Schema;
+use aptos_mempool_notifications::MempoolCommitNotification;
 use aptos_types::{account_address::AccountAddress, on_chain_config::OnChainConfigPayload};
-use mempool_notifications::MempoolCommitNotification;
 use serde::Serialize;
 use std::{fmt, fmt::Write, time::SystemTime};
 
+#[derive(Default)]
 pub struct TxnsLog {
     txns: Vec<(AccountAddress, u64, Option<String>, Option<SystemTime>)>,
     len: usize,

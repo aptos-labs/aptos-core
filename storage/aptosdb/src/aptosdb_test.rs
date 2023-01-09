@@ -16,19 +16,18 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
 use aptos_temppath::TempPath;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::transaction::{TransactionToCommit, Version};
 use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleLeafNode,
-    state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{ExecutionStatus, TransactionInfo},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
+    transaction::{ExecutionStatus, TransactionInfo, TransactionToCommit, Version},
 };
 use proptest::prelude::*;
-use std::collections::HashSet;
-use std::sync::Arc;
-use storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
+use std::{collections::HashSet, sync::Arc};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
 proptest! {

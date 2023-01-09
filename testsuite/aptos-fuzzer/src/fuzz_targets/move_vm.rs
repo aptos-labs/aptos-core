@@ -43,7 +43,9 @@ fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
     use MoveTypeLayout as L;
 
     match layout {
-        L::Bool | L::U8 | L::U64 | L::U128 | L::Address | L::Signer => true,
+        L::Bool | L::U8 | L::U16 | L::U32 | L::U64 | L::U128 | L::U256 | L::Address | L::Signer => {
+            true
+        },
 
         L::Vector(layout) => is_valid_layout(layout),
 
@@ -54,7 +56,7 @@ fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
                 return false;
             }
             struct_layout.fields().iter().all(is_valid_layout)
-        }
+        },
     }
 }
 

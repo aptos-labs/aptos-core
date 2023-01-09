@@ -13,6 +13,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     epoch_change::EpochChangeProof,
@@ -20,7 +21,6 @@ use aptos_types::{
     on_chain_config::ValidatorSet,
 };
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::DbReader;
 
 pub struct MockSharedStorage {
     // Safety state
@@ -106,16 +106,14 @@ impl MockStorage {
             .block
             .lock()
             .clone()
-            .into_iter()
-            .map(|(_, v)| v)
+            .into_values()
             .collect();
         let quorum_certs = self
             .shared_storage
             .qc
             .lock()
             .clone()
-            .into_iter()
-            .map(|(_, v)| v)
+            .into_values()
             .collect();
         blocks.sort_by_key(Block::round);
         let last_vote = self.shared_storage.last_vote.lock().clone();
@@ -287,7 +285,7 @@ impl PersistentLivenessStorage for EmptyStorage {
             Err(e) => {
                 eprintln!("{}", e);
                 panic!("Construct recovery data during genesis should never fail");
-            }
+            },
         }
     }
 

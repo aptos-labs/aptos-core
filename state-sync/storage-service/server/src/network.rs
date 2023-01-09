@@ -2,31 +2,37 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::StorageServiceConfig;
+use aptos_network::{
+    peer_manager::{ConnectionNotification, PeerManagerNotification},
+    protocols::network::{
+        Event, NetworkApplicationConfig, NetworkEvents, NewNetworkEvents, RpcError,
+    },
+    ProtocolId,
+};
+use aptos_storage_service_types::{
+    requests::StorageServiceRequest, responses::StorageServiceResponse, Result,
+    StorageServiceMessage,
+};
 use aptos_types::PeerId;
 use bytes::Bytes;
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     future,
     stream::{BoxStream, Stream, StreamExt},
 };
-use network::{
-    peer_manager::{ConnectionNotification, PeerManagerNotification},
-    protocols::network::{AppConfig, Event, NetworkEvents, NewNetworkEvents, RpcError},
-    ProtocolId,
-};
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use storage_service_types::requests::StorageServiceRequest;
-use storage_service_types::responses::StorageServiceResponse;
-use storage_service_types::{Result, StorageServiceMessage};
 
-pub fn network_endpoint_config(storage_config: StorageServiceConfig) -> AppConfig {
+/// Returns a network application config for the storage service
+pub fn storage_service_network_config(
+    storage_config: StorageServiceConfig,
+) -> NetworkApplicationConfig {
     let max_network_channel_size = storage_config.max_network_channel_size as usize;
-    AppConfig::service(
+    NetworkApplicationConfig::service(
         [ProtocolId::StorageServiceRpc],
         aptos_channel::Config::new(max_network_channel_size)
             .queue_style(QueueStyle::FIFO)
@@ -66,7 +72,7 @@ impl StorageServiceNetworkEvents {
             ) => {
                 let response_tx = ResponseSender::new(response_tx);
                 Some((peer_id, protocol_id, request, response_tx))
-            }
+            },
             // We don't use DirectSend and don't care about connection events.
             _ => None,
         }

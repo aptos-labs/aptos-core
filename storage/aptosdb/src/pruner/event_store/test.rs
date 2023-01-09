@@ -4,6 +4,7 @@
 use crate::{AptosDB, EventStore, LedgerPrunerManager, PrunerManager};
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_proptest_helpers::Index;
+use aptos_schemadb::SchemaBatch;
 use aptos_temppath::TempPath;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -11,7 +12,6 @@ use aptos_types::{
     transaction::Version,
 };
 use proptest::{collection::vec, prelude::*, proptest};
-use schemadb::SchemaBatch;
 use std::sync::Arc;
 
 proptest! {
@@ -56,13 +56,13 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let event_store = &aptos_db.event_store;
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     let num_versions = events.len();
 
     // Write events to DB
     for (version, events_for_version) in events.iter().enumerate() {
         event_store
-            .put_events(version as u64, events_for_version, &mut batch)
+            .put_events(version as u64, events_for_version, &batch)
             .unwrap();
     }
     aptos_db.ledger_db.write_schemas(batch).unwrap();
@@ -101,13 +101,13 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let event_store = &aptos_db.event_store;
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     let num_versions = events.len();
 
     // Write events to DB
     for (version, events_for_version) in events.iter().enumerate() {
         event_store
-            .put_events(version as u64, events_for_version, &mut batch)
+            .put_events(version as u64, events_for_version, &batch)
             .unwrap();
     }
     aptos_db.ledger_db.write_schemas(batch).unwrap();
@@ -188,7 +188,7 @@ fn verify_events_in_store(
     version: Version,
     event_store: &Arc<EventStore>,
 ) {
-    let events_from_db = event_store.get_events_by_version(version as u64).unwrap();
+    let events_from_db = event_store.get_events_by_version(version).unwrap();
     assert_eq!(
         events_from_db.len(),
         events.get(version as usize).unwrap().len()

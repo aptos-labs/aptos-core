@@ -4,10 +4,9 @@
 #![forbid(unsafe_code)]
 
 use anyhow::{anyhow, Result};
-
 use aptos_executor_types::ExecutedChunk;
+use aptos_storage_interface::{DbReader, ExecutedTrees};
 use std::{collections::VecDeque, sync::Arc};
-use storage_interface::{DbReader, ExecutedTrees};
 
 pub struct ChunkCommitQueue {
     persisted_view: ExecutedTrees,

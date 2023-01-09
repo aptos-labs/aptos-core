@@ -3,20 +3,24 @@
 
 use super::*;
 use crate::{
-    application::storage::PeerMetadataStorage,
+    application::{interface::NetworkClient, storage::PeerMetadataStorage, types::PeerInfo},
     peer_manager::{
-        self, conn_notifs_channel, ConnectionRequest, PeerManagerNotification, PeerManagerRequest,
+        self, conn_notifs_channel, ConnectionRequest, ConnectionRequestSender,
+        PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
     protocols::{
-        network::{NewNetworkEvents, NewNetworkSender},
+        network::{NetworkSender, NewNetworkEvents, NewNetworkSender},
         rpc::InboundRpcRequest,
+        wire::handshake::v1::{ProtocolId::HealthCheckerRpc, ProtocolIdSet},
     },
     transport::ConnectionMetadata,
     ProtocolId,
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_time_service::{MockTimeService, TimeService};
-use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{executor::block_on, future};
+use maplit::hashmap;
+use std::sync::Arc;
 
 const PING_INTERVAL: Duration = Duration::from_secs(1);
 const PING_TIMEOUT: Duration = Duration::from_millis(500);
@@ -27,10 +31,13 @@ struct TestHarness {
     peer_mgr_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
     connection_notifs_tx: conn_notifs_channel::Sender,
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
 }
 
 impl TestHarness {
-    fn new_permissive(ping_failures_tolerated: u64) -> (Self, HealthChecker) {
+    fn new_permissive(
+        ping_failures_tolerated: u64,
+    ) -> (Self, HealthChecker<NetworkClient<HealthCheckerMsg>>) {
         ::aptos_logger::Logger::init_for_testing();
         let mock_time = TimeService::mock();
 
@@ -41,20 +48,26 @@ impl TestHarness {
             aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (connection_notifs_tx, connection_notifs_rx) = conn_notifs_channel::new();
 
-        let hc_network_tx = HealthCheckerNetworkSender::new(
+        let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(peer_mgr_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
         let hc_network_rx =
             HealthCheckerNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
+
+        let network_context = NetworkContext::mock();
+        let peer_metadata_storage = PeerMetadataStorage::test();
+        let network_client = NetworkClient::new(
+            vec![],
+            vec![HealthCheckerRpc],
+            hashmap! {network_context.network_id() => network_sender},
+            peer_metadata_storage.clone(),
+        );
+
         let health_checker = HealthChecker::new(
-            NetworkContext::mock(),
+            network_context,
             mock_time.clone(),
-            HealthCheckNetworkInterface::new(
-                PeerMetadataStorage::test(),
-                hc_network_tx,
-                hc_network_rx,
-            ),
+            HealthCheckNetworkInterface::new(network_client, hc_network_rx),
             PING_INTERVAL,
             PING_TIMEOUT,
             ping_failures_tolerated,
@@ -67,12 +80,13 @@ impl TestHarness {
                 peer_mgr_notifs_tx,
                 connection_reqs_rx,
                 connection_notifs_tx,
+                peer_metadata_storage,
             },
             health_checker,
         )
     }
 
-    fn new_strict() -> (Self, HealthChecker) {
+    fn new_strict() -> (Self, HealthChecker<NetworkClient<HealthCheckerMsg>>) {
         Self::new_permissive(0 /* ping_failures_tolerated */)
     }
 
@@ -151,21 +165,31 @@ impl TestHarness {
 
     async fn send_new_peer_notification(&mut self, peer_id: PeerId) {
         let (delivered_tx, delivered_rx) = oneshot::channel();
+        let network_context = NetworkContext::mock();
         let notif = peer_manager::ConnectionNotification::NewPeer(
             ConnectionMetadata::mock(peer_id),
-            NetworkContext::mock(),
+            network_context,
         );
         self.connection_notifs_tx
             .push_with_feedback(peer_id, notif, Some(delivered_tx))
             .unwrap();
         delivered_rx.await.unwrap();
+
+        // Insert a new connection metadata into the peer metadata storage
+        let mut connection_metadata = ConnectionMetadata::mock(peer_id);
+        connection_metadata.application_protocols =
+            ProtocolIdSet::from_iter(vec![HealthCheckerRpc]);
+        self.peer_metadata_storage.insert(
+            PeerNetworkId::new(network_context.network_id(), peer_id),
+            PeerInfo::new(connection_metadata),
+        );
     }
 }
 
 async fn expect_pong(res_rx: oneshot::Receiver<Result<Bytes, RpcError>>) {
     let res_data = res_rx.await.unwrap().unwrap();
     match bcs::from_bytes(&res_data).unwrap() {
-        HealthCheckerMsg::Pong(_) => {}
+        HealthCheckerMsg::Pong(_) => {},
         msg => panic!("Unexpected HealthCheckerMsg: {:?}", msg),
     };
 }

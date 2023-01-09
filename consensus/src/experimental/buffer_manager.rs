@@ -1,27 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
-
-use futures::{
-    channel::{
-        mpsc::{UnboundedReceiver, UnboundedSender},
-        oneshot,
-    },
-    FutureExt, SinkExt, StreamExt,
-};
-use tokio::time::{Duration, Instant};
-
-use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock};
-use aptos_logger::prelude::*;
-use aptos_types::{
-    account_address::AccountAddress, ledger_info::LedgerInfoWithSignatures,
-    validator_verifier::ValidatorVerifier,
-};
-
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
@@ -37,17 +16,32 @@ use crate::{
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
 };
+use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_types::epoch_change::EpochChangeProof;
-use futures::channel::mpsc::unbounded;
+use aptos_logger::prelude::*;
+use aptos_types::{
+    account_address::AccountAddress, epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
+};
+use futures::{
+    channel::{
+        mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+        oneshot,
+    },
+    FutureExt, SinkExt, StreamExt,
+};
 use once_cell::sync::OnceCell;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
+use tokio::time::{Duration, Instant};
 
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
 pub const LOOP_INTERVAL_MS: u64 = 1500;
 
-pub type ResetAck = ();
-
-pub fn sync_ack_new() -> ResetAck {}
+#[derive(Debug, Default)]
+pub struct ResetAck {}
 
 pub struct ResetRequest {
     pub tx: oneshot::Sender<ResetAck>,
@@ -87,7 +81,7 @@ pub struct BufferManager {
     signing_phase_rx: Receiver<SigningResponse>,
 
     commit_msg_tx: NetworkSender,
-    commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
+    commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
 
     // we don't hear back from the persisting phase
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
@@ -118,7 +112,7 @@ impl BufferManager {
         signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
         signing_phase_rx: Receiver<SigningResponse>,
         commit_msg_tx: NetworkSender,
-        commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
+        commit_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
@@ -337,7 +331,7 @@ impl BufferManager {
 
         self.stop = stop;
         self.reset().await;
-        tx.send(sync_ack_new()).unwrap();
+        tx.send(ResetAck::default()).unwrap();
         info!("Reset finishes");
     }
 
@@ -355,7 +349,7 @@ impl BufferManager {
             Err(e) => {
                 error!("Execution error {:?}", e);
                 return;
-            }
+            },
         };
         info!(
             "Receive executed response {}",
@@ -402,7 +396,7 @@ impl BufferManager {
             Err(e) => {
                 error!("Signing failed {:?}", e);
                 return;
-            }
+            },
         };
         info!(
             "Receive signing response {}",
@@ -464,14 +458,14 @@ impl BufferManager {
                         Err(e) => {
                             error!("Failed to add commit vote {:?}", e);
                             item
-                        }
+                        },
                     };
                     self.buffer.set(&current_cursor, new_item);
                     if self.buffer.get(&current_cursor).is_aggregated() {
                         return Some(target_block_id);
                     }
                 }
-            }
+            },
             VerifiedEvent::CommitDecision(commit_proof) => {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
                 info!(
@@ -492,10 +486,10 @@ impl BufferManager {
                         return Some(target_block_id);
                     }
                 }
-            }
+            },
             _ => {
                 unreachable!();
-            }
+            },
         }
         None
     }
@@ -540,16 +534,16 @@ impl BufferManager {
             match self.buffer.get(&cursor) {
                 BufferItem::Ordered(_) => {
                     pending_ordered += 1;
-                }
+                },
                 BufferItem::Executed(_) => {
                     pending_executed += 1;
-                }
+                },
                 BufferItem::Signed(_) => {
                     pending_signed += 1;
-                }
+                },
                 BufferItem::Aggregated(_) => {
                     pending_aggregated += 1;
-                }
+                },
             }
             cursor = self.buffer.get_next(&cursor);
         }

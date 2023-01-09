@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::config::{PeerRole, RoleType};
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use short_hex_str::AsShortHexStr;
 use std::{fmt, str::FromStr};
 
 /// A grouping of common information between all networking code for logging.
@@ -240,6 +240,7 @@ impl PeerNetworkId {
             peer_id,
         }
     }
+
     pub fn network_id(&self) -> NetworkId {
         self.network_id
     }

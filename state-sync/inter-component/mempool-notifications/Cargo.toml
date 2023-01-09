@@ -1,5 +1,5 @@
 [package]
-name = "mempool-notifications"
+name = "aptos-mempool-notifications"
 description = "The notification interface between state sync and mempool"
 version = "0.1.0"
 
@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-runtimes = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }

@@ -4,32 +4,31 @@
 //! Implementation of writing logs to both local printers (e.g. stdout) and remote loggers
 //! (e.g. Logstash)
 
-use crate::sample::SampleRate;
-use crate::telemetry_log_writer::{TelemetryLog, TelemetryLogWriter};
 use crate::{
     counters::{
         PROCESSED_STRUCT_LOG_COUNT, STRUCT_LOG_PARSE_ERROR_COUNT, STRUCT_LOG_QUEUE_ERROR_COUNT,
     },
     logger::Logger,
-    sample, Event, Filter, Key, Level, LevelFilter, Metadata,
+    sample,
+    sample::SampleRate,
+    telemetry_log_writer::{TelemetryLog, TelemetryLogWriter},
+    Event, Filter, Key, Level, LevelFilter, Metadata,
 };
 use aptos_infallible::RwLock;
 use backtrace::Backtrace;
 use chrono::{SecondsFormat, Utc};
 use futures::channel;
 use once_cell::sync::Lazy;
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
-use std::fmt::Debug;
-use std::io::Stdout;
-use std::time::Duration;
+use serde::{ser::SerializeStruct, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
     env, fmt,
-    io::Write,
+    fmt::Debug,
+    io::{Stdout, Write},
     str::FromStr,
     sync::{self, Arc},
     thread,
+    time::Duration,
 };
 use strum_macros::EnumString;
 use tokio::time;
@@ -115,7 +114,7 @@ impl LogEntry {
                             // Log and skip the value that can't be serialized
                             eprintln!("error serializing structured log: {} for key {:?}", e, key);
                             return;
-                        }
+                        },
                     },
                 };
 
@@ -491,11 +490,11 @@ impl Logger for AptosData {
                     if let Err(err) = oneshot_receiver.recv_timeout(FLUSH_TIMEOUT) {
                         eprintln!("[Logging] Unable to flush recv: {}", err);
                     }
-                }
+                },
                 Err(err) => {
                     eprintln!("[Logging] Unable to flush send: {}", err);
                     std::thread::sleep(FLUSH_TIMEOUT);
-                }
+                },
             }
         }
     }
@@ -549,7 +548,7 @@ impl LoggerService {
                             let _ = writer.write(s);
                         }
                     }
-                }
+                },
                 LoggerServiceEvent::Flush(sender) => {
                     // Flush is only done on TelemetryLogWriter
                     if let Some(writer) = &mut telemetry_writer {
@@ -562,18 +561,18 @@ impl LoggerService {
                                             eprintln!("Timed out flushing telemetry: {}", err)
                                         );
                                     }
-                                }
+                                },
                                 Err(err) => {
                                     sample!(
                                         SampleRate::Duration(Duration::from_secs(60)),
                                         eprintln!("Failed to flush telemetry: {}", err)
                                     );
-                                }
+                                },
                             }
                         }
                     }
                     let _ = sender.send(());
-                }
+                },
             }
         }
     }
@@ -604,6 +603,7 @@ impl Writer for StdoutWriter {
     fn write(&self, log: String) {
         println!("{}", log);
     }
+
     fn write_buferred(&mut self, log: String) {
         self.buffer
             .write_fmt(format_args!("{}\n", log))
@@ -636,6 +636,7 @@ impl Writer for FileWriter {
             eprintln!("Unable to write to log file: {}", err);
         }
     }
+
     fn write_buferred(&mut self, log: String) {
         self.write(log);
     }
@@ -681,7 +682,7 @@ fn json_format(entry: &LogEntry) -> Result<String, fmt::Error> {
             // TODO: Improve the error handling here. Currently we're just increasing some misleadingly-named metric and dropping any context on why this could not be deserialized.
             STRUCT_LOG_PARSE_ERROR_COUNT.inc();
             Err(fmt::Error)
-        }
+        },
     }
 }
 

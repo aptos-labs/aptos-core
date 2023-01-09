@@ -8,15 +8,15 @@ use crate::{
     metrics::{increment_counter, start_timer},
     network::PeerMonitoringServiceNetworkEvents,
 };
-use ::network::{application::storage::PeerMetadataStorage, ProtocolId};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::PeerMonitoringServiceConfig;
 use aptos_logger::prelude::*;
-use futures::stream::StreamExt;
-use peer_monitoring_service_types::{
+use aptos_network::{application::storage::PeerMetadataStorage, ProtocolId};
+use aptos_peer_monitoring_service_types::{
     ConnectedPeersResponse, PeerMonitoringServiceError, PeerMonitoringServiceRequest,
     PeerMonitoringServiceResponse, Result, ServerProtocolVersionResponse,
 };
+use futures::stream::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
@@ -138,11 +138,11 @@ impl Handler {
             PeerMonitoringServiceRequest::GetConnectedPeers => self.get_connected_peers(),
             PeerMonitoringServiceRequest::GetDepthFromValidators => {
                 self.get_depth_from_validators()
-            }
+            },
             PeerMonitoringServiceRequest::GetKnownPeers => self.get_known_peers(),
             PeerMonitoringServiceRequest::GetServerProtocolVersion => {
                 self.get_server_protocol_version()
-            }
+            },
             PeerMonitoringServiceRequest::GetValidatorsAndVFNs => self.get_validators_and_vfns(),
             PeerMonitoringServiceRequest::Ping => self.handle_ping(),
         };
@@ -164,10 +164,10 @@ impl Handler {
                 match error {
                     Error::InvalidRequest(error) => {
                         Err(PeerMonitoringServiceError::InvalidRequest(error))
-                    }
+                    },
                     error => Err(PeerMonitoringServiceError::InternalError(error.to_string())),
                 }
-            }
+            },
             Ok(response) => {
                 // The request was successful
                 increment_counter(
@@ -176,7 +176,7 @@ impl Handler {
                     response.get_label(),
                 );
                 Ok(response)
-            }
+            },
         }
     }
 
@@ -230,10 +230,10 @@ fn log_monitoring_service_response(
         Ok(response) => {
             let response = format!("{:?}", response);
             debug!(LogSchema::new(LogEntry::SentPeerMonitoringResponse).response(&response));
-        }
+        },
         Err(error) => {
             let error = format!("{:?}", error);
             debug!(LogSchema::new(LogEntry::SentPeerMonitoringResponse).response(&error));
-        }
+        },
     };
 }

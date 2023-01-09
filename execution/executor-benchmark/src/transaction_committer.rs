@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::hash::HashValue;
+use aptos_db::metrics::API_LATENCY_SECONDS;
 use aptos_executor::{
     block_executor::BlockExecutor,
     metrics::{
@@ -11,14 +12,13 @@ use aptos_executor::{
 };
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::prelude::*;
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::Version,
 };
 use aptos_vm::AptosVM;
-use aptosdb::metrics::API_LATENCY_SECONDS;
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},

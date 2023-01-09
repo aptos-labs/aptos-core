@@ -3,8 +3,8 @@
 
 use crate::protocols::wire::messaging::v1::{MultiplexMessage, NetworkMessage};
 use anyhow::{bail, ensure};
+use aptos_channels::Sender;
 use aptos_id_generator::{IdGenerator, U32IdGenerator};
-use channel::Sender;
 use futures_util::SinkExt;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -197,16 +197,16 @@ impl OutboundStream {
         let rest = match &mut message {
             NetworkMessage::Error(_) => {
                 unreachable!("NetworkMessage::Error should always fit in a single frame")
-            }
+            },
             NetworkMessage::RpcRequest(request) => {
                 request.raw_request.split_off(self.max_frame_size)
-            }
+            },
             NetworkMessage::RpcResponse(response) => {
                 response.raw_response.split_off(self.max_frame_size)
-            }
+            },
             NetworkMessage::DirectSendMsg(message) => {
                 message.raw_msg.split_off(self.max_frame_size)
-            }
+            },
         };
         let chunks = rest.chunks(self.max_frame_size);
         ensure!(

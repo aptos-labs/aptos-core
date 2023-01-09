@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{corpus_from_strategy, fuzz_data_to_value, FuzzTargetImpl};
-use aptos_proptest_helpers::ValueGenerator;
-
 //
 // Noise wrapper
 //
-
-use network::noise::fuzzing::{
+use aptos_network::noise::fuzzing::{
     fuzz_initiator, fuzz_post_handshake, fuzz_responder, generate_corpus,
 };
+use aptos_proptest_helpers::ValueGenerator;
 
 #[derive(Clone, Debug, Default)]
 pub struct NetworkNoiseInitiator;
@@ -64,7 +62,7 @@ impl FuzzTargetImpl for NetworkNoiseStream {
 // Handshake protocol
 //
 
-use network::fuzzing::{
+use aptos_network::fuzzing::{
     exchange_handshake_input, fuzz_network_handshake_protocol_exchange,
     fuzz_network_handshake_protocol_negotiation, perform_handshake_input,
 };
@@ -107,7 +105,7 @@ impl FuzzTargetImpl for NetworkHandshakeNegotiation {
 // Peer NetworkMessages Receive
 //
 
-use network::peer;
+use aptos_network::peer;
 
 #[derive(Clone, Debug, Default)]
 pub struct PeerNetworkMessagesReceive;

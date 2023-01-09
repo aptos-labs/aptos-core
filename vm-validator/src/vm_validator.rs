@@ -3,6 +3,11 @@
 
 use anyhow::Result;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
+use aptos_storage_interface::{
+    cached_state_view::CachedDbStateView,
+    state_view::{DbStateView, LatestDbStateCheckpointView},
+    DbReader,
+};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountSequenceInfo,
@@ -13,10 +18,6 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::sync::Arc;
-use storage_interface::state_view::DbStateView;
-use storage_interface::{
-    cached_state_view::CachedDbStateView, state_view::LatestDbStateCheckpointView, DbReader,
-};
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]

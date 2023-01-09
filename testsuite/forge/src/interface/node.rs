@@ -4,9 +4,9 @@
 use crate::{Result, Version};
 use anyhow::anyhow;
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
+use aptos_inspection_service::inspection_client::InspectionClient;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
-use inspection_service::inspection_client::InspectionClient;
 use std::{
     collections::HashMap,
     time::{Duration, Instant},
@@ -224,8 +224,8 @@ pub trait NodeExt: Node {
                         self.peer_id(),
                         error,
                     ))
-                }
-                Err(_) => {} // For other errors we'll retry
+                },
+                Err(_) => {}, // For other errors we'll retry
             }
 
             tokio::time::sleep(Duration::from_millis(500)).await;
