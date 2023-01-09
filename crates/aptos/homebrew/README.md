@@ -5,10 +5,10 @@ The [Aptos command line interface (CLI)](https://aptos.dev/cli-tools/aptos-cli-t
 ## Quick guide
 
 - [Formula in Homebrew GitHub](https://github.com/Homebrew/homebrew-core/blob/master/Formula/aptos.rb)
-- [Aptos 1.0.3 New Formula PR for Github](https://github.com/Homebrew/homebrew-core/pull/119832)
+- [Aptos 1.0.3 New Formula PR for GitHub](https://github.com/Homebrew/homebrew-core/pull/119832)
 
 ### Getting started
-Copy the `aptos.rb` file to your homebrew folders directory. On Mac M1, this will most likely be:
+Copy the `aptos.rb` file to your `homebrew` `formula` directory. For example, on macOS with an M1, this will likely be:
 
 ```bash
 /opt/homebrew/Library/Taps/homebrew/homebrew-core/Formula
@@ -17,7 +17,7 @@ Copy the `aptos.rb` file to your homebrew folders directory. On Mac M1, this wil
 
 ### Development
 
-After you've copied `aptos.rb` to your local homebrew formulas directory, you can modify it and use the commands below for testing.
+After you've copied `aptos.rb` to your local `homebrew` `formula` directory, you can modify it and use the commands below for testing.
 
 ```bash
 # On Mac M1, homebrew formulas are located locally at
@@ -41,9 +41,9 @@ brew livecheck --debug aptos
 
 Once you have audited and tested your brew formula using the commands above, make sure you:
 
-1. Commit your changes to `aptos-core` in `crates/aptos/homebrew`
-2. Fork the homebrew core repo, more details can be found [here](https://docs.brew.sh/How-To-Open-a-Homebrew-Pull-Request#formulae-related-pull-request)
-3. Create a PR on the [Homebrew Core](https://github.com/Homebrew/homebrew-core/pulls) repo with your changes
+1. Commit your changes to `aptos-core` in `crates/aptos/homebrew`.
+2. Fork the Homebrew Core repository per [How to Open a Homebrew Pull Request](https://docs.brew.sh/How-To-Open-a-Homebrew-Pull-Request#formulae-related-pull-request).
+3. Create a PR on the [Homebrew Core](https://github.com/Homebrew/homebrew-core/pulls) repo with your changes.
 
 ## Aptos.rb structure overview
 
@@ -84,7 +84,7 @@ class Aptos < Formula
 
 [Brew livecheck](https://docs.brew.sh/Brew-Livecheck) uses strategies to find the newest version of a formula or cask’s software by checking upstream. The strategy used below checks for all `aptos-cli-v<SEMVER>` tags for `aptos-core`. The regex ensures that releases for other, non-CLI builds are not factored into livecheck. 
 
-Livecheck is run on a schedule with BrewTestBot and will update the bottles automatically on a schedule to ensure they're up to date. For more info on how BrewTestBot and brew livecheck works, please see [this discussion link](https://github.com/Homebrew/discussions/discussions/3083).
+Livecheck is run on a schedule with BrewTestBot and will update the bottles automatically on a schedule to ensure they're up to date. For more info on how BrewTestBot and brew livecheck works, please see the [How does BrewTestBot work and when does it update formulae?](https://github.com/Homebrew/discussions/discussions/3083) discussion.
 
 ```ruby
 ...
@@ -98,21 +98,21 @@ Livecheck is run on a schedule with BrewTestBot and will update the bottles auto
 ...
 ```
 
-To run livecheck for testing I reccommend running
+To run livecheck for testing, we recommend including the `--debug` argument:
 
 ```bash
 brew livecheck --debug aptos
 ```
 
-### Depends On and Installation
+### Depends on and installation
 
-- `depends_on` is for specifying other [homebrew formulas as dependencies](https://docs.brew.sh/Formula-Cookbook#specifying-other-formulae-as-dependencies)
-- Currently we use v1.64 of rust, as specified in the Cargo.toml of the project. If we were to use the latest stable build of rust 
+- `depends_on` is for specifying other [homebrew formulas as dependencies](https://docs.brew.sh/Formula-Cookbook#specifying-other-formulae-as-dependencies).
+- Currently, we use v1.64 of Rust, as specified in the `Cargo.toml` file of the project. If we were to use the latest stable build of Rust 
 going forward, we would modify the formula slightly. See the comments below for more details.
 
 
 ```ruby
-  # Installs listed homebrew dependencies before aptos installation
+  # Installs listed homebrew dependencies before Aptos installation
   # Dependencies needed: https://aptos.dev/cli-tools/build-aptos-cli
   # See scripts/dev_setup.sh in aptos-core for more info
   depends_on "cmake" => :build
@@ -127,8 +127,8 @@ going forward, we would modify the formula slightly. See the comments below for 
   end
 
   # Currently must compile with the same rustc version specified in the
-  # root Cargo.toml file of aptos-core (currently it is pegged to rust 
-  # v1.64). In the future if it becomes compatible with the latest rust
+  # root Cargo.toml file of aptos-core (currently it is pegged to Rust 
+  # v1.64). In the future if it becomes compatible with the latest Rust
   # toolchain, we can remove the use of rustup-init, replacing it with a 
   # depends_on "rust" => :build
   # above and build the binary without rustup as a dependency
@@ -143,13 +143,13 @@ going forward, we would modify the formula slightly. See the comments below for 
 
 ### Tests
 
-To run tests simply run 
+To conduct tests, run:
 
 ```bash
 brew test aptos
 ```
 
-The test that currently exists generates a new key via aptos cli and ensures that the shell output matches the filename(s) for that key.
+The current test generates a new key via the Aptos CLI and ensures the shell output matches the filename(s) for that key.
 
 ```ruby
   ...
@@ -159,12 +159,12 @@ The test that currently exists generates a new key via aptos cli and ensures tha
   ...
 ```
 
-## FAQ
+## Supporting resources
 
-- To view other homebrew related FAQ or ask questions, please visit their [discussions board](https://github.com/orgs/Homebrew/discussions).
-- For similar Rust related build examples I reccommend checking out
+- To view other Homebrew-related FAQs or ask questions yourself, visit the [discussions board](https://github.com/orgs/Homebrew/discussions).
+- For similar Rust-related build examples, we recommend:
   - [`rustfmt.rb`](https://github.com/Homebrew/homebrew-core/blob/master/Formula/rustfmt.rb)
   - [`solana.rb`](https://github.com/Homebrew/homebrew-core/blob/master/Formula/solana.rb)
-- Other guides
-  - [Homebrew formula cookbook](https://docs.brew.sh/Formula-Cookbook)
+- Finally, note these key Homebew guides:
+  - [Homebrew Formula Cookbook](https://docs.brew.sh/Formula-Cookbook)
   - [Creating and Running Your Own Homebrew Tap - Rust Runbook](https://publishing-project.rivendellweb.net/creating-and-running-your-own-homebrew-tap/)
