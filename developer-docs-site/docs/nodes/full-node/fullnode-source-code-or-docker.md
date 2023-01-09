@@ -12,6 +12,10 @@ Alternatively, you can use the public fullnodes provided by Aptos Labs. However,
 
 Public fullnodes can be run by anyone. This tutorial explains how to configure a public fullnode to connect to an Aptos network.
 
+:::caution Choose a network
+This document describes how to start a public fullnode in the Aptos `mainnet` network yet can easily be used to do the same in the `devnet` and `testnet` networks. To do so, instead check out the desired branch and use the `genesis.blob` and `waypoint.txt` node files for the respective branch: [`mainnet`](../node-files-all-networks/node-files.md), [`devnet`](../node-files-all-networks/node-files-devnet.md), and [`testnet`](../node-files-all-networks/node-files-testnet.md).
+:::
+
 ## Hardware requirements
 
 We recommend the following hardware resources:
@@ -71,7 +75,7 @@ This document describes how to configure your public fullnode using both methods
 
 With your development environment ready, now you can start to setup your fullnode.
 
-5. Checkout the `mainnet` branch using `git checkout --track origin/mainnet`.
+5. Check out the `mainnet` branch using `git checkout --track origin/mainnet`.
 
 6. Make sure your current working directory is `aptos-core`.
 
@@ -201,8 +205,10 @@ docker run --pull=always \
 
 **NOTE**: Ensure you have opened the relevant ports: 8080, 9101 and 6180. You may also need to update the 127.0.0.1 with 0.0.0.0 in the `fullnode.yaml` for the fields `listen_address` and `address` field in the `api` list.
 
-:::tip
-To connect to a network other than mainnet, all you need is to download and use the network-specific genesis blob and waypoint files. See here ➜ https://github.com/aptos-labs/aptos-networks.
+:::caution Don't want to connect to mainnet?
+To connect to other networks (e.g., `devnet` and `testnet`), you can find genesis and waypoint here ➜ https://github.com/aptos-labs/aptos-networks.
+Be sure to download the `genesis.blob` and `waypoint.txt` for those networks, instead of using the genesis
+and waypoint pointed to by the `curl` commands above.
 :::
 
 Ensure you have opened the relevant ports: 8080, 9101 and 6180. You may also need to update the 127.0.0.1 with 0.0.0.0 in the `fullnode.yaml` for the fields `listen_address` and `address` field in the `api` list.
