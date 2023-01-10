@@ -10,6 +10,10 @@ echo "Building all rust-based docker images"
 echo "PROFILE: $PROFILE"
 echo "FEATURES: $FEATURES"
 
+cd profdata
+cat x* > /tmp/merged.profdata
+cd ..
+
 # Build all the rust binaries
 cargo build --locked --profile=$PROFILE \
     -p aptos \
