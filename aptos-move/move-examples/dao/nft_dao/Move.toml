@@ -9,4 +9,3 @@ aptos_framework = "0x1"
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }
 AptosToken = { local = "../../../framework/aptos-token" }
-DataStructure = { local = "../../data_structures" }

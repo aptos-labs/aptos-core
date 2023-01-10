@@ -21,13 +21,13 @@
 /// Note: This current version stores all the signer_capability in the contract space. If the code upgrades, a potential risk is the platform operation can obtain the signer capability of the DAOs on this platform
 /// It allows the operator to obtain the signer of these DAOs without any consent.
 /// TODO: explore new tooling to dynamically compiling DAO modules on server side and store the signercapability in each DAO's own moudle to avoid exposing signer capability to platform
-module dao_platform::nft_dao {
+module dao_platform::nft_dao_platform {
     use aptos_framework::account::{SignerCapability, create_signer_with_capability};
     use aptos_framework::account;
     use aptos_framework::aptos_account::transfer_coins;
     use aptos_framework::timestamp;
-    use aptos_std::bucket_table::BucketTable;
-    use aptos_std::bucket_table;
+    use dao_platform::bucket_table::BucketTable;
+    use dao_platform::bucket_table;
     use aptos_std::table::Table;
     use aptos_std::table;
     use aptos_token::property_map::PropertyMap;
@@ -243,7 +243,6 @@ module dao_platform::nft_dao {
             signer::address_of(&res_signer),
         )
     }
-
 
     /// Only DAO Goverance token holders can create proposal
     public entry fun create_proposal(
