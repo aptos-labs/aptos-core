@@ -110,7 +110,7 @@ impl PayloadClient for QuorumStoreClient {
                     exclude_payloads.clone(),
                 )
                 .await?;
-            if payload.is_empty() && !pending_ordering && count > 0 {
+            if payload.is_empty() && count > 0 {
                 if let Some(callback) = callback_wrapper.take() {
                     callback.await;
                 }
