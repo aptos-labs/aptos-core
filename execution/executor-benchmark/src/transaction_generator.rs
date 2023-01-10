@@ -361,10 +361,10 @@ impl TransactionGenerator {
             let transactions: Vec<_> = (0..block_size)
                 .into_iter()
                 .map(|_| {
-                    let (sender, receiver) =
+                    let (sender, _) =
                         self.accounts_cache.as_mut().unwrap().get_random_transfer();
                     sender.sign_with_transaction_builder(
-                        self.transaction_factory.transfer(receiver, 1),
+                        self.transaction_factory.create_user_account(sender.public_key()),
                     )
                 })
                 .map(Transaction::UserTransaction)
