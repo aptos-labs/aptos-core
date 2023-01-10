@@ -10,9 +10,6 @@ validator:
     requests:
       cpu: "45"
       memory: 64Gi
-  storage:
-    class: ssd
-    size: 2500Gi
 
 fullnode:
   # at most one VFN per validator, depending on numFullnodeGroups
