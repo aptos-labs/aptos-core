@@ -27,8 +27,9 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
-// - V5
+// - V6
 //   - Added a new native function - blake2b_256.
+// - V5
 //   - u16, u32, u256
 //   - free_write_bytes_quota
 //   - configurable ChangeSetConfigs
@@ -46,7 +47,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 5;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 6;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
