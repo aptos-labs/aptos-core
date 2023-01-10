@@ -28,7 +28,15 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_core_types::vm_status::VMStatus;
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
+const REUSE_NUM: usize = 20;
+pub static REUSE_COUNTER: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -123,6 +131,11 @@ impl BlockAptosVM {
                         .collect()
                 })
             });
+
+        let cnt = REUSE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        if cnt == REUSE_NUM {
+            REUSE_COUNTER.store(0, Ordering::Release);
+        }
 
         match ret {
             Ok(outputs) => Ok(outputs),

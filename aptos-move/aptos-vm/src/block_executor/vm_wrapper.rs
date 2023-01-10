@@ -4,7 +4,7 @@
 use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
-    block_executor::AptosTransactionOutput,
+    block_executor::{AptosTransactionOutput, REUSE_COUNTER},
     data_cache::{AsMoveResolver, StorageAdapter},
     logging::AdapterLogSchema,
 };
@@ -12,14 +12,25 @@ use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::Transactio
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
+use arc_swap::ArcSwapOption;
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::VMStatus,
 };
+use once_cell::sync::Lazy;
+use std::sync::atomic::Ordering;
+
+pub static VMS: Lazy<Vec<ArcSwapOption<AptosVM>>> = Lazy::new(|| {
+    let mut ret = Vec::new();
+    for _ in 0..200 {
+        ret.push(ArcSwapOption::empty())
+    }
+    ret
+});
 
 pub(crate) struct AptosExecutorTask<'a, S> {
-    vm: AptosVM,
+    // vm: AptosVM,
     base_view: &'a S,
 }
 
@@ -29,24 +40,28 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Output = AptosTransactionOutput;
     type Txn = PreprocessedTransaction;
 
-    fn init(argument: &'a S) -> Self {
-        let vm = AptosVM::new(argument);
+    fn init(argument: &'a S, thread_id: usize) -> Self {
+        let reuse_counter = REUSE_COUNTER.load(Ordering::Acquire);
 
-        // Loading `0x1::account` and its transitive dependency into the code cache.
-        //
-        // This should give us a warm VM to avoid the overhead of VM cold start.
-        // Result of this load could be omitted as this is a best effort approach and won't hurt if that fails.
-        //
-        // Loading up `0x1::account` should be sufficient as this is the most common module
-        // used for prologue, epilogue and transfer functionality.
+        if reuse_counter == 0 || VMS[thread_id].load().is_none() {
+            let vm = AptosVM::new(argument);
 
-        let _ = vm.load_module(
-            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &StorageAdapter::new(argument),
-        );
+            // Loading `0x1::account` and its transitive dependency into the code cache.
+            //
+            // This should give us a warm VM to avoid the overhead of VM cold start.
+            // Result of this load could be omitted as this is a best effort approach and won't hurt if that fails.
+            //
+            // Loading up `0x1::account` should be sufficient as this is the most common module
+            // used for prologue, epilogue and transfer functionality.
+
+            let _ = vm.load_module(
+                &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
+                &StorageAdapter::new(argument),
+            );
+            VMS[thread_id].store(Some(vm.into()));
+        }
 
         Self {
-            vm,
             base_view: argument,
         }
     }
@@ -60,11 +75,14 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         txn: &PreprocessedTransaction,
         txn_idx: usize,
         materialize_deltas: bool,
+        thread_id: usize,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
 
-        match self
-            .vm
+        match VMS[thread_id]
+            .load()
+            .as_ref()
+            .unwrap()
             .execute_single_transaction(txn, &view.as_move_resolver(), &log_context)
         {
             Ok((vm_status, mut output_ext, sender)) => {

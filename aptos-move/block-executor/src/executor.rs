@@ -20,7 +20,7 @@ use once_cell::sync::Lazy;
 use std::{
     collections::btree_map::BTreeMap,
     marker::PhantomData,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
@@ -67,6 +67,7 @@ where
         scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
+        thread_id: usize,
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
@@ -80,6 +81,7 @@ where
             txn,
             idx_to_execute,
             false,
+            thread_id,
         );
         let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
@@ -194,10 +196,11 @@ where
         scheduler: &Scheduler,
         base_view: &S,
         committing: bool,
+        thread_id: usize,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(*executor_arguments);
+        let executor = E::init(*executor_arguments, thread_id);
         drop(init_timer);
 
         let mut scheduler_task = SchedulerTask::NoTask;
@@ -227,6 +230,7 @@ where
                     scheduler,
                     &executor,
                     base_view,
+                    thread_id,
                 ),
                 SchedulerTask::ExecutionTask(_, Some(condvar)) => {
                     let (lock, cvar) = &*condvar;
@@ -264,9 +268,12 @@ where
         let committing = AtomicBool::new(true);
         let scheduler = Scheduler::new(num_txns);
 
+        let ids = AtomicUsize::new(0);
+
         RAYON_EXEC_POOL.scope(|s| {
             for _ in 0..self.concurrency_level {
                 s.spawn(|_| {
+                    let id = ids.fetch_add(1, Ordering::Relaxed);
                     self.work_task_with_scope(
                         &executor_initial_arguments,
                         signature_verified_block,
@@ -275,6 +282,7 @@ where
                         &scheduler,
                         base_view,
                         committing.swap(false, Ordering::SeqCst),
+                        id,
                     );
                 });
             }
@@ -332,7 +340,7 @@ where
         base_view: &S,
     ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         let num_txns = signature_verified_block.len();
-        let executor = E::init(executor_arguments);
+        let executor = E::init(executor_arguments, 0);
         let mut data_map = BTreeMap::new();
 
         let mut ret = Vec::with_capacity(num_txns);
@@ -342,6 +350,7 @@ where
                 txn,
                 idx,
                 true,
+                0,
             );
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
