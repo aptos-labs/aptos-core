@@ -6,7 +6,7 @@ pub(crate) mod vm_wrapper;
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     block_executor::vm_wrapper::AptosExecutorTask,
-    AptosVM,
+    AptosVM, ResourceKey,
 };
 use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
 use aptos_block_executor::{
@@ -22,13 +22,25 @@ use aptos_block_executor::{
 use aptos_logger::debug;
 use aptos_state_view::StateView;
 use aptos_types::{
+    access_path::AccessPath,
+    account_address::AccountAddress,
+    account_config::{AccountResource, CoinStoreResource},
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use move_core_types::vm_status::VMStatus;
+use move_core_types::{move_resource::MoveStructType, vm_status::VMStatus};
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+pub static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(AptosVM::get_num_proof_reading_threads())
+        .thread_name(|index| format!("proof_reader_{}", index))
+        .build()
+        .unwrap()
+});
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -133,6 +145,37 @@ impl BlockAptosVM {
         state_view: &S,
         concurrency_level: usize,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let addrs: HashSet<AccountAddress> = transactions
+            .iter()
+            .flat_map(|txn| {
+                if let Transaction::UserTransaction(t) = txn {
+                    Some(t.sender())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        IO_POOL.install(|| {
+            addrs.par_iter().for_each(|addr| {
+                let ap_coin = AccessPath::resource_access_path(ResourceKey::new(
+                    *addr,
+                    CoinStoreResource::struct_tag(),
+                ));
+                let ap_seq = AccessPath::resource_access_path(ResourceKey::new(
+                    *addr,
+                    AccountResource::struct_tag(),
+                ));
+
+                let _ = state_view
+                    .get_state_value(&StateKey::AccessPath(ap_coin))
+                    .expect("account must exist in data store");
+                let _ = state_view
+                    .get_state_value(&StateKey::AccessPath(ap_seq))
+                    .expect("account must exist in data store");
+            });
+        });
+
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
