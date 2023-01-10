@@ -364,7 +364,8 @@ impl TransactionGenerator {
                     let (sender, receiver) =
                         self.accounts_cache.as_mut().unwrap().get_random_transfer();
                     sender.sign_with_transaction_builder(
-                        self.transaction_factory.transfer(receiver, 1),
+                        self.transaction_factory.create_user_account(sender.public_key()),
+                        //self.transaction_factory.transfer(receiver, 1),
                     )
                 })
                 .map(Transaction::UserTransaction)
