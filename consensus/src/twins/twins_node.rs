@@ -22,7 +22,7 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_network::{
-    application::interface::NetworkClient,
+    application::interface::{NetworkClient, NetworkServiceEvents},
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network,
@@ -87,6 +87,8 @@ impl SMRNode {
         );
         let consensus_network_client = ConsensusNetworkClient::new(network_client);
         let network_events = NetworkEvents::new(consensus_rx, conn_notifs_channel);
+        let network_service_events =
+            NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
 
         playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
@@ -144,7 +146,8 @@ impl SMRNode {
             storage.clone(),
             reconfig_listener,
         );
-        let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
+        let (network_task, network_receiver) =
+            NetworkTask::new(network_service_events, self_receiver);
 
         runtime.spawn(network_task.start());
         runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));

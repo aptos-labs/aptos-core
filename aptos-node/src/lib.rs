@@ -14,7 +14,6 @@ pub mod utils;
 #[cfg(test)]
 mod tests;
 
-use crate::network::ApplicationNetworkHandle;
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_config::config::{NodeConfig, PersistableConfig};
@@ -375,12 +374,10 @@ pub fn setup_environment_and_start_node(
     // Set up the networks and gather the application network handles
     let (
         network_runtimes,
-        peer_metadata_storage,
-        mempool_network_handles,
-        consensus_network_handle,
-        storage_service_server_network_handles,
-        storage_client_network_senders,
-    ) = network::setup_networks_and_get_handles(
+        consensus_network_interfaces,
+        mempool_network_interfaces,
+        storage_service_network_interfaces,
+    ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
         &mut event_subscription_service,
@@ -390,9 +387,7 @@ pub fn setup_environment_and_start_node(
     let (state_sync_runtimes, mempool_listener, consensus_notifier) =
         state_sync::start_state_sync_and_get_notification_handles(
             &node_config,
-            storage_service_server_network_handles,
-            storage_client_network_senders,
-            peer_metadata_storage.clone(),
+            storage_service_network_interfaces,
             genesis_waypoint,
             event_subscription_service,
             db_rw.clone(),
@@ -408,14 +403,13 @@ pub fn setup_environment_and_start_node(
             &mut node_config,
             &db_rw,
             mempool_reconfig_subscription,
-            &peer_metadata_storage,
-            mempool_network_handles,
+            mempool_network_interfaces,
             mempool_listener,
             mempool_client_receiver,
         );
 
     // Create the consensus runtime (this blocks on state sync first)
-    let consensus_runtime = consensus_network_handle.map(|application_network_handle| {
+    let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
         // Wait until state sync has been initialized
         debug!("Waiting until state sync is initialized!");
         state_sync_runtimes.block_until_initialized();
@@ -426,8 +420,7 @@ pub fn setup_environment_and_start_node(
             &mut node_config,
             db_rw,
             consensus_reconfig_subscription,
-            peer_metadata_storage,
-            application_network_handle,
+            consensus_network_interfaces,
             consensus_notifier,
             consensus_to_mempool_sender,
         )

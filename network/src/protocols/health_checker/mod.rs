@@ -24,7 +24,10 @@ use crate::{
     logging::NetworkSchema,
     protocols::{
         health_checker::interface::{HealthCheckData, HealthCheckNetworkInterface},
-        network::{Event, NetworkApplicationConfig, NetworkEvents},
+        network::{
+            Event, NetworkApplicationConfig, NetworkClientConfig, NetworkEvents,
+            NetworkServiceConfig,
+        },
         rpc::error::RpcError,
     },
     ProtocolId,
@@ -59,12 +62,19 @@ pub type HealthCheckerNetworkEvents = NetworkEvents<HealthCheckerMsg>;
 
 /// Returns a network application config for the health check client and service
 pub fn health_checker_network_config() -> NetworkApplicationConfig {
-    NetworkApplicationConfig::client_and_service(
-        [ProtocolId::HealthCheckerRpc],
+    let direct_send_protocols = vec![]; // Health checker doesn't use direct send
+    let rpc_protocols = vec![ProtocolId::HealthCheckerRpc];
+
+    let network_client_config =
+        NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
+    let network_service_config = NetworkServiceConfig::new(
+        direct_send_protocols,
+        rpc_protocols,
         aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
             .queue_style(QueueStyle::LIFO)
             .counters(&counters::PENDING_HEALTH_CHECKER_NETWORK_EVENTS),
-    )
+    );
+    NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{bootstrap_api, indexer, mpsc::Receiver, ApplicationNetworkHandle};
+use crate::{bootstrap_api, indexer, mpsc::Receiver, network::ApplicationNetworkInterfaces};
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::network_interface::ConsensusMsg;
@@ -10,11 +10,9 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::storage::PeerMetadataStorage;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_types::chain_id::ChainId;
 use futures::channel::{mpsc, mpsc::Sender};
-use maplit::hashmap;
 use std::{sync::Arc, thread, time::Instant};
 use tokio::runtime::Runtime;
 
@@ -60,22 +58,20 @@ pub fn start_consensus_runtime(
     node_config: &mut NodeConfig,
     db_rw: DbReaderWriter,
     consensus_reconfig_subscription: Option<ReconfigNotificationListener>,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
-    consensus_network_handle: ApplicationNetworkHandle<ConsensusMsg>,
+    consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
 ) -> Runtime {
     let instant = Instant::now();
     let consensus_runtime = aptos_consensus::consensus_provider::start_consensus(
         node_config,
-        hashmap! {consensus_network_handle.network_id => consensus_network_handle.network_sender},
-        consensus_network_handle.network_events,
+        consensus_network_interfaces.network_client,
+        consensus_network_interfaces.network_service_events,
         Arc::new(consensus_notifier),
         consensus_to_mempool_sender,
         db_rw,
         consensus_reconfig_subscription
             .expect("Consensus requires a reconfiguration subscription!"),
-        peer_metadata_storage,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     consensus_runtime
@@ -86,8 +82,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     node_config: &mut NodeConfig,
     db_rw: &DbReaderWriter,
     mempool_reconfig_subscription: ReconfigNotificationListener,
-    peer_metadata_storage: &Arc<PeerMetadataStorage>,
-    mempool_network_handles: Vec<ApplicationNetworkHandle<MempoolSyncMsg>>,
+    network_interfaces: ApplicationNetworkInterfaces<MempoolSyncMsg>,
     mempool_listener: MempoolNotificationListener,
     mempool_client_receiver: Receiver<MempoolClientRequest>,
 ) -> (Runtime, Sender<QuorumStoreRequest>) {
@@ -95,28 +90,17 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
         mpsc::channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
 
-    // Destruct the mempool network handle.
-    // TODO: the bootstrap method should be refactored to avoid using large tuples.
-    let mut deconstructed_network_handles = vec![];
-    for application_network_handle in mempool_network_handles {
-        deconstructed_network_handles.push((
-            application_network_handle.network_id,
-            application_network_handle.network_sender,
-            application_network_handle.network_events,
-        ))
-    }
-
     // Bootstrap and start mempool
     let instant = Instant::now();
     let mempool = aptos_mempool::bootstrap(
         node_config,
         Arc::clone(&db_rw.reader),
-        deconstructed_network_handles,
+        network_interfaces.network_client,
+        network_interfaces.network_service_events,
         mempool_client_receiver,
         consensus_to_mempool_receiver,
         mempool_listener,
         mempool_reconfig_subscription,
-        peer_metadata_storage.clone(),
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 
