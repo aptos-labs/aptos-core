@@ -7,8 +7,12 @@ slug: "run-validator-node-using-gcp"
 
 This is a step-by-step guide to install an Aptos node on Google GCP. Follow these steps to configure a validator node and a validator fullnode on separate machines. 
 
-:::danger Did you set up your GCP account and created a project?
+:::danger Did you set up your GCP account and create a project?
 This guide assumes you already have GCP account setup, and have created a new project for deploying Aptos node. If you are not familiar with GCP (Google Cloud Platform), checkout this [Prerequisites section](https://aptos.dev/tutorials/run-a-fullnode-on-gcp#prerequisites) for GCP account setup.
+:::
+
+:::danger Do you have stale volumes after bumping your deployment's era?
+`era` is a concept relevant only to kubernetes deployments of an Aptos Node. Changing the `era` provides an easy way to wipe your deployment's state. However, this may lead to dangling persistent volumes, which must be cleaned up manually.
 :::
 
 ## Before you proceed
