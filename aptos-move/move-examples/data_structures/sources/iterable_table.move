@@ -3,14 +3,14 @@ module aptos_std::iterable_table {
     use aptos_std::table_with_length::{Self, TableWithLength};
 
     /// The iterable wrapper around value, points to previous and next key if any.
-    struct IterableValue<K: copy + store + drop, V: store> has store {
+    struct IterableValue<K: copy + drop, V> has store {
         val: V,
         prev: Option<K>,
         next: Option<K>,
     }
 
     /// An iterable table implementation based on double linked list.
-    struct IterableTable<K: copy + store + drop, V: store> has store {
+    struct IterableTable<K: copy  + drop, V: store> has store {
         inner: TableWithLength<K, IterableValue<K, V>>,
         head: Option<K>,
         tail: Option<K>,

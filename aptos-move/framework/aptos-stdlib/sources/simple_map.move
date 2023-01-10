@@ -23,17 +23,17 @@ module aptos_std::simple_map {
         value: Value,
     }
 
-    public fun length<Key: store, Value: store>(map: &SimpleMap<Key, Value>): u64 {
+    public fun length<Key, Value>(map: &SimpleMap<Key, Value>): u64 {
         vector::length(&map.data)
     }
 
-    public fun create<Key: store, Value: store>(): SimpleMap<Key, Value> {
+    public fun create<Key, Value>(): SimpleMap<Key, Value> {
         SimpleMap {
             data: vector::empty(),
         }
     }
 
-    public fun borrow<Key: store, Value: store>(
+    public fun borrow<Key, Value>(
         map: &SimpleMap<Key, Value>,
         key: &Key,
     ): &Value {
@@ -43,7 +43,7 @@ module aptos_std::simple_map {
         &vector::borrow(&map.data, idx).value
     }
 
-    public fun borrow_mut<Key: store, Value: store>(
+    public fun borrow_mut<Key, Value>(
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
     ): &mut Value {
@@ -53,7 +53,7 @@ module aptos_std::simple_map {
         &mut vector::borrow_mut(&mut map.data, idx).value
     }
 
-    public fun contains_key<Key: store, Value: store>(
+    public fun contains_key<Key, Value>(
         map: &SimpleMap<Key, Value>,
         key: &Key,
     ): bool {
@@ -61,12 +61,12 @@ module aptos_std::simple_map {
         option::is_some(&maybe_idx)
     }
 
-    public fun destroy_empty<Key: store, Value: store>(map: SimpleMap<Key, Value>) {
+    public fun destroy_empty<Key, Value>(map: SimpleMap<Key, Value>) {
         let SimpleMap { data } = map;
         vector::destroy_empty(data);
     }
 
-    public fun add<Key: store, Value: store>(
+    public fun add<Key, Value>(
         map: &mut SimpleMap<Key, Value>,
         key: Key,
         value: Value,
@@ -77,7 +77,7 @@ module aptos_std::simple_map {
         vector::push_back(&mut map.data, Element { key, value });
     }
 
-    public fun remove<Key: store, Value: store>(
+    public fun remove<Key, Value>(
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
     ): (Key, Value) {
@@ -88,7 +88,7 @@ module aptos_std::simple_map {
         (key, value)
     }
 
-    fun find<Key: store, Value: store>(
+    fun find<Key, Value>(
         map: &SimpleMap<Key, Value>,
         key: &Key,
     ): option::Option<u64>{
