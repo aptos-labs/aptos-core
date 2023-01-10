@@ -11,12 +11,12 @@ use aptos_sdk::{
 use async_trait::async_trait;
 use rand::{prelude::StdRng, Rng, seq::SliceRandom};
 use rand_core::{OsRng, SeedableRng};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use super::{
     publishing::{module_simple::EntryPoints, publish_util::Package},
     TransactionExecutor,
 };
-use aptos_logger::info;
+use aptos_logger::{info, warn, sample, sample::SampleRate};
 
 #[allow(dead_code)]
 pub struct CallCustomModulesGenerator {
@@ -58,7 +58,13 @@ impl TransactionGenerator for CallCustomModulesGenerator {
         let mut accounts_to_burn = if let Some(accounts_pool_lock) = &self.accounts_pool {
             let mut accounts_pool = accounts_pool_lock.write();
             let num_in_pool = accounts_pool.len();
-            assert!(num_in_pool > needed, "Left in pool {}, needed {}", num_in_pool, needed);
+            if num_in_pool < needed {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(120)),
+                    warn!("Cannot fetch enough accounts from pool, left in pool {}, needed {}", num_in_pool, needed);
+                );
+                return Vec::new();
+            }
             accounts_pool.drain((num_in_pool - needed)..).collect::<Vec<_>>()
         } else {
             Vec::new()

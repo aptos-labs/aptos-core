@@ -104,11 +104,14 @@ pub async fn emit_transactions_with_cluster(
         transaction_mix_per_phase.get_mut(phase).unwrap().push((transaction_type, weight));
     }
 
+    let delay_after_minting = Duration::from_secs(args.delay_after_minting.unwrap_or(0));
+
     let mut emit_job_request =
         EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
             .mode(emitter_mode)
             .transaction_mix_per_phase(transaction_mix_per_phase)
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
+            .delay_after_minting(delay_after_minting)
             .gas_price(aptos_global_constants::GAS_UNIT_PRICE);
     if reuse_accounts {
         emit_job_request = emit_job_request.reuse_accounts();
@@ -122,6 +125,7 @@ pub async fn emit_transactions_with_cluster(
     if let Some(expected_gas_per_txn) = args.expected_gas_per_txn {
         emit_job_request = emit_job_request.expected_gas_per_txn(expected_gas_per_txn);
     }
+
     if !cluster.coin_source_is_root {
         emit_job_request = emit_job_request.prompt_before_spending();
     }
@@ -130,6 +134,7 @@ pub async fn emit_transactions_with_cluster(
             &mut coin_source_account,
             emit_job_request,
             duration,
+            delay_after_minting,
             min(10, max(args.duration / 5, 1)),
         )
         .await?;

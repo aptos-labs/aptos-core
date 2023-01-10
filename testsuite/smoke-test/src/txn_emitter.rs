@@ -64,7 +64,7 @@ pub async fn generate_traffic(
         ])
         .mode(EmitJobMode::ConstTps { tps: 20 });
     emitter
-        .emit_txn_for_with_stats(chain_info.root_account, emit_job_request, duration, 3)
+        .emit_txn_for_with_stats(chain_info.root_account, emit_job_request, duration, Duration::ZERO, 3)
         .await
 }
 

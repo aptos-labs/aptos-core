@@ -181,6 +181,8 @@ pub struct EmitJobRequest {
     expected_max_txns: u64,
     expected_gas_per_txn: u64,
     prompt_before_spending: bool,
+
+    delay_after_minting: Duration,
 }
 
 impl Default for EmitJobRequest {
@@ -199,6 +201,7 @@ impl Default for EmitJobRequest {
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             prompt_before_spending: false,
+            delay_after_minting: Duration::from_secs(0),
         }
     }
 }
@@ -272,6 +275,11 @@ impl EmitJobRequest {
         self
     }
 
+    pub fn delay_after_minting(mut self, delay_after_minting: Duration) -> Self {
+        self.delay_after_minting = delay_after_minting;
+        self
+    }
+
     pub fn calculate_mode_params(&self) -> EmitModeParams {
         let clients_count = self.rest_clients.len();
 
@@ -307,7 +315,7 @@ impl EmitJobRequest {
                     accounts_per_worker: 1,
                     workers_per_endpoint: num_workers_per_endpoint,
                     check_account_sequence_only_once_fraction: 0.0,
-                    check_account_sequence_sleep_millis: 300,
+                    check_account_sequence_sleep_millis: 1000,
                 }
             },
             EmitJobMode::ConstTps { tps } => {
@@ -383,7 +391,7 @@ impl EmitJobRequest {
                     accounts_per_worker: 1,
                     workers_per_endpoint: num_workers_per_endpoint,
                     check_account_sequence_only_once_fraction: 1.0 - sample_latency_fraction,
-                    check_account_sequence_sleep_millis: 300,
+                    check_account_sequence_sleep_millis: 1000,
                 }
             },
         }
@@ -540,6 +548,11 @@ impl TxnEmitter {
         let mut all_accounts = account_minter
             .create_accounts(&req, &mode_params, num_accounts)
             .await?;
+        if !req.delay_after_minting.is_zero() {
+            info!("Sleeping after minting for {}s", req.delay_after_minting.as_secs());
+            tokio::time::sleep(req.delay_after_minting).await;
+        }
+
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
@@ -642,6 +655,7 @@ impl TxnEmitter {
         source_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
+        pause_between_phases: Duration,
         print_stats_interval: Option<u64>,
     ) -> Result<TxnStats> {
         let phases = emit_job_request.transaction_mix_per_phase.len();
@@ -673,7 +687,7 @@ impl TxnEmitter {
         emit_job_request: EmitJobRequest,
         duration: Duration,
     ) -> Result<TxnStats> {
-        self.emit_txn_for_impl(source_account, emit_job_request, duration, None).await
+        self.emit_txn_for_impl(source_account, emit_job_request, duration, Duration::ZERO, None).await
     }
 
     pub async fn emit_txn_for_with_stats(
@@ -681,9 +695,10 @@ impl TxnEmitter {
         source_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
+        pause_between_phases: Duration,
         interval_secs: u64,
     ) -> Result<TxnStats> {
-        self.emit_txn_for_impl(source_account, emit_job_request, duration, Some(interval_secs)).await
+        self.emit_txn_for_impl(source_account, emit_job_request, duration,  pause_between_phases, Some(interval_secs)).await
     }
 
     pub async fn submit_single_transaction(
