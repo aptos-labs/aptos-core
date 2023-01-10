@@ -66,7 +66,7 @@ pub trait ExecutorTask: Sync {
     type Argument: Sync + Copy;
 
     /// Create an instance of the transaction executor.
-    fn init(args: Self::Argument) -> Self;
+    fn init(args: Self::Argument, thread_id: usize) -> Self;
 
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
@@ -75,6 +75,7 @@ pub trait ExecutorTask: Sync {
         txn: &Self::Txn,
         txn_idx: usize,
         materialize_deltas: bool,
+        thread_id: usize,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 }
 

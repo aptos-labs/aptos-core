@@ -15,7 +15,11 @@ use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_state_view::TStateView;
 use num_cpus;
 use once_cell::sync::Lazy;
-use std::{collections::btree_map::BTreeMap, marker::PhantomData};
+use std::{
+    collections::btree_map::BTreeMap,
+    marker::PhantomData,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -106,6 +110,7 @@ where
         scheduler: &'a Scheduler,
         executor: &E,
         base_view: &S,
+        thread_id: usize,
     ) -> SchedulerTask<'a> {
         let _timer = BLOCK_EXECUTOR_TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
@@ -119,6 +124,7 @@ where
             txn,
             idx_to_execute,
             false,
+            thread_id,
         );
         let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
@@ -231,11 +237,12 @@ where
         versioned_data_cache: &MVHashMap<T::Key, T::Value>,
         scheduler: &Scheduler,
         base_view: &S,
+        thread_id: usize,
     ) {
         let _timer = BLOCK_EXECUTOR_WORK_TASK_WITH_SCOPE_SECONDS.start_timer();
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = BLOCK_EXECUTOR_EXECUTOR_INIT_SECONDS.start_timer();
-        let executor = E::init(*executor_arguments);
+        let executor = E::init(*executor_arguments, thread_id);
         drop(init_timer);
 
         let mut scheduler_task = SchedulerTask::NoTask;
@@ -257,6 +264,7 @@ where
                     scheduler,
                     &executor,
                     base_view,
+                    thread_id,
                 ),
                 SchedulerTask::ExecutionTask(_, Some(condvar), _guard) => {
                     let (lock, cvar) = &*condvar;
@@ -293,9 +301,12 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
+        let ids = AtomicUsize::new(0);
+
         RAYON_EXEC_POOL.scope(|s| {
             for _ in 0..self.concurrency_level {
                 s.spawn(|_| {
+                    let id = ids.fetch_add(1, Ordering::Relaxed);
                     self.work_task_with_scope(
                         &executor_initial_arguments,
                         signature_verified_block,
@@ -303,6 +314,7 @@ where
                         &versioned_data_cache,
                         &scheduler,
                         base_view,
+                        id,
                     );
                 });
             }
@@ -358,7 +370,7 @@ where
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
-        let executor = E::init(executor_arguments);
+        let executor = E::init(executor_arguments, 0);
         let mut data_map = BTreeMap::new();
 
         let mut ret = Vec::with_capacity(num_txns);
@@ -368,6 +380,7 @@ where
                 txn,
                 idx,
                 true,
+                0,
             );
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
