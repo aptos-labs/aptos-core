@@ -3,36 +3,16 @@ validator:
   rust_log: debug,hyper=off
   # force enable the telemetry service to try to send telemetry
   force_enable_telemetry: true
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: cloud.google.com/machine-family
-                operator: In
-                values:
-                  - t2d
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchExpressions:
-              - key: app.kubernetes.io/part-of
-                operator: In
-                values:
-                  - aptos-node
-          topologyKey: kubernetes.io/hostname
-    image:
-      repo: us-west1-docker.pkg.dev/aptos-global/aptos-internal/validator
-    resources:
-      limits:
-        cpu: "45"
-        memory: 64Gi
-      requests:
-        cpu: "45"
-        memory: 64Gi
-    storage:
-      class: ssd
-      size: 2500Gi
+  resources:
+    limits:
+      cpu: "45"
+      memory: 64Gi
+    requests:
+      cpu: "45"
+      memory: 64Gi
+  storage:
+    class: ssd
+    size: 2500Gi
 
 fullnode:
   # at most one VFN per validator, depending on numFullnodeGroups
