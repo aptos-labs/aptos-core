@@ -116,7 +116,7 @@ impl Ed25519PublicKey {
             bits
         };
         let mtg_point = curve25519_dalek::montgomery::MontgomeryPoint(key_bits);
-        let sign = if negative { 1u8 } else { 0u8 };
+        let sign = u8::from(negative);
         let ed_point = mtg_point
             .to_edwards(sign)
             .ok_or(CryptoMaterialError::DeserializationError)?;
@@ -250,7 +250,7 @@ impl VerifyingKey for Ed25519PublicKey {
 
 impl fmt::Display for Ed25519PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.0.as_bytes()))
+        write!(f, "{}", hex::encode(self.0.as_bytes()))
     }
 }
 

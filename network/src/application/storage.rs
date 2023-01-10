@@ -226,3 +226,13 @@ where
         self.map.write()
     }
 }
+
+impl<Key, Value> Default for LockingHashMap<Key, Value>
+where
+    Key: Clone + Debug + Eq + Hash,
+    Value: Clone + Debug,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}

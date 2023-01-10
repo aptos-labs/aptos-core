@@ -22,15 +22,31 @@ To failover from an outdated or erroneous validator node to an updated and relia
    * [required packages Aptos depends upon](../../../guides/getting-started#prepare-development-environment)
    * [Aptos CLI](../../../cli-tools/aptos-cli-tool/install-aptos-cli.md)
 1. Copy the configuration files between the two nodes. See the files in the [validator setup](running-validator-node/index.md) documentation you used for the full list.
+1. Synchonize data on the validator fullnode:
+   * For mainnet, use [state synchronization](../../../guides/state-sync.md).
+   * For devnet or testnet, [bootstrap a new fullnode from snapshot](../../full-node/bootstrap-fullnode.md).
 
 ## Failover
 
 To replace the validator node:
 
 1. Update DNS to [swap the node network addresses on-chain](staking-pool-operations.md#3-update-validator-network-addresses-on-chain).
-1. Turn down the validator node and validator full node intended to replace the validator.
-1. Restart the former validator full node with the validator node configuration.
+1. Turn down the validator node and validator fullnode intended to replace the validator.
+1. Restart the former validator fullnode with the validator node configuration.
 1. Observe that before DNS changes take effect that only outbound connections will form.
 1. Either reuse the former validator node or create anew to backfill the validator fullnode.
 1. Start the validator fullnode.
 1. Use [Node Health Checker](../../measure/node-health-checker.md) and follow [Node Liveness Criteria](node-liveness-criteria.md) to ensure the validator node is functioning properly.
+
+## Run multiple validator fullnodes
+
+You may want to have a VFN ready for failover or need access to REST APIs for building without any rate limits. Note you have the ability to run a [local multinode network](../../../guides/running-a-local-multi-node-network.md) that may be suitable.
+
+With caution, you may also run multiple fullnodes on the Aptos network. Note that it is not currently recommended to run multiple VFNs with the same [network identity](../../identity-and-configuration.md) and connect them to the validator using the `vfn` network, as this may cause issues with node metrics and telemetry.
+
+To run multiple fullnodes and connect them to your validator:
+
+1. Connect only one fullnode using the `vfn` network configuration in the validator configuration `.yaml` file. This will be your single VFN (as registered on-chain) that other Aptos nodes will connect to.
+1. Connect the rest of your fullnodes to the validator using a `public` network configuration *and a different network identity* in the validator configuration `.yaml` file. These will be your additional VFNs that you can use for other purposes.
+
+Note that because the additional VFNs will not be registered on-chain, other nodes will not know their network addresses and will not be able to to connect to them. These would be for your use only.

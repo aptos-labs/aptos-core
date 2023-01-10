@@ -685,13 +685,13 @@ impl RoundManager {
         if self.decoupled_execution() && self.block_store.back_pressure() {
             // In case of back pressure, we delay processing proposal. This is done by resending the
             // same proposal to self after some time.
-            Ok(self
-                .resend_verified_proposal_to_self(
-                    proposal,
-                    BACK_PRESSURE_POLLING_INTERVAL_MS,
-                    self.local_config.round_initial_timeout_ms,
-                )
-                .await)
+            self.resend_verified_proposal_to_self(
+                proposal,
+                BACK_PRESSURE_POLLING_INTERVAL_MS,
+                self.local_config.round_initial_timeout_ms,
+            )
+            .await;
+            Ok(())
         } else {
             self.process_verified_proposal(proposal).await
         }

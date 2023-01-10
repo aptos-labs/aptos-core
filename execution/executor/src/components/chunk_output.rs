@@ -24,7 +24,7 @@ pub struct ChunkOutput {
     /// Raw VM output.
     pub transaction_outputs: Vec<TransactionOutput>,
     /// Carries the frozen base state view, so all in-mem nodes involved won't drop before the
-    /// execution result is processed; as well as al the accounts touched during execution, together
+    /// execution result is processed; as well as all the accounts touched during execution, together
     /// with their proofs.
     pub state_cache: StateCache,
 }
@@ -34,7 +34,7 @@ impl ChunkOutput {
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<Self> {
-        let transaction_outputs = V::execute_block(transactions.clone(), &state_view)?;
+        let transaction_outputs = Self::execute_block::<V>(transactions.clone(), &state_view)?;
 
         // to print txn output for debugging, uncomment:
         // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
@@ -94,6 +94,46 @@ impl ChunkOutput {
         if !status.is_empty() {
             trace!("Execution status: {:?}", status);
         }
+    }
+
+    /// Executes the block of [Transaction]s using the [VMExecutor] and returns
+    /// a vector of [TransactionOutput]s.
+    #[cfg(not(feature = "consensus-only-perf-test"))]
+    fn execute_block<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: &CachedStateView,
+    ) -> Result<Vec<TransactionOutput>> {
+        Ok(V::execute_block(transactions, &state_view)?)
+    }
+
+    /// In consensus-only mode, executes the block of [Transaction]s using the
+    /// [VMExecutor] only if its a genesis block. In all other cases, this
+    /// method returns an [TransactionOutput] with an empty [WriteSet], constant
+    /// gas and a [ExecutionStatus::Success] for each of the [Transaction]s.
+    #[cfg(feature = "consensus-only-perf-test")]
+    fn execute_block<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: &CachedStateView,
+    ) -> Result<Vec<TransactionOutput>> {
+        use aptos_state_view::{StateViewId, TStateView};
+        use aptos_types::write_set::WriteSet;
+
+        let transaction_outputs = match state_view.id() {
+            // this state view ID implies a genesis block in non-test cases.
+            StateViewId::Miscellaneous => V::execute_block(transactions, &state_view)?,
+            _ => transactions
+                .iter()
+                .map(|_| {
+                    TransactionOutput::new(
+                        WriteSet::default(),
+                        Vec::new(),
+                        100,
+                        TransactionStatus::Keep(ExecutionStatus::Success),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        };
+        Ok(transaction_outputs)
     }
 }
 

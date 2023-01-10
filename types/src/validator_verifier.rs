@@ -298,7 +298,7 @@ impl ValidatorVerifier {
         num_validators: u16,
         bitvec: &BitVec,
     ) -> std::result::Result<(), VerifyError> {
-        if bitvec.num_buckets() != BitVec::required_buckets(num_validators as u16) {
+        if bitvec.num_buckets() != BitVec::required_buckets(num_validators) {
             return Err(VerifyError::InvalidBitVec);
         }
         if let Some(last_bit) = bitvec.last_set_bit() {

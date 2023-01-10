@@ -46,7 +46,7 @@ module "validator" {
   chain_id       = local.chain_id
   era            = var.era
   chain_name     = local.chain_name
-  image_tag      = var.image_tag
+  image_tag      = var.validator_image_tag != "" ? var.validator_image_tag : var.image_tag
   validator_name = "aptos-node"
 
   validator_storage_class = var.validator_storage_class
@@ -94,12 +94,6 @@ provider "kubernetes" {
 
 locals {
   genesis_helm_chart_path = "${path.module}/../helm/genesis"
-
-  # these values are the most likely to be changed by the user and may be managed by terraform to trigger re-deployment
-  genesis_helm_values_managed = {
-    "imageTag"  = var.image_tag
-    "chain.era" = var.era
-  }
 }
 
 
@@ -108,12 +102,6 @@ resource "helm_release" "genesis" {
   chart       = local.genesis_helm_chart_path
   max_history = 5
   wait        = false
-
-  lifecycle {
-    ignore_changes = [
-      values,
-    ]
-  }
 
   values = [
     jsonencode({
@@ -141,16 +129,11 @@ resource "helm_release" "genesis" {
   ]
 
   dynamic "set" {
-    for_each = var.manage_via_tf ? local.genesis_helm_values_managed : {}
+    for_each = var.manage_via_tf ? toset([""]) : toset([])
     content {
-      name  = set.key
-      value = set.value
+      # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+      name  = "chart_sha1"
+      value = sha1(join("", [for f in fileset(local.genesis_helm_chart_path, "**") : filesha1("${local.genesis_helm_chart_path}/${f}")]))
     }
-  }
-
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
-  set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.genesis_helm_chart_path, "**") : filesha1("${local.genesis_helm_chart_path}/${f}")]))
   }
 }

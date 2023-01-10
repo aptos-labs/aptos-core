@@ -355,6 +355,7 @@ impl RosettaClient {
         new_operator: Option<AccountAddress>,
         new_voter: Option<AccountAddress>,
         stake_amount: Option<u64>,
+        commission_percentage: Option<u64>,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
         max_gas: Option<u64>,
@@ -375,6 +376,7 @@ impl RosettaClient {
             new_operator,
             new_voter,
             stake_amount,
+            commission_percentage,
         )];
 
         self.submit_operations(

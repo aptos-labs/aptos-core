@@ -9,6 +9,8 @@
 //! It relays read/write operations on the physical storage via [`schemadb`] to the underlying
 //! Key-Value storage system, and implements aptos data structures on top of it.
 
+#[cfg(feature = "consensus-only-perf-test")]
+pub mod fake_aptosdb;
 // Used in this and other crates for testing.
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helper;
@@ -79,14 +81,15 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
-    contract_event::EventWithVersion,
+    contract_event::{ContractEvent, EventWithVersion},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
-        TransactionAccumulatorSummary, TransactionInfoListWithProof,
+        TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
+        TransactionInfoListWithProof,
     },
     state_proof::StateProof,
     state_store::{
@@ -101,6 +104,7 @@ use aptos_types::{
         TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
         TransactionWithProof, Version,
     },
+    write_set::WriteSet,
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use itertools::zip_eq;
@@ -1156,6 +1160,90 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_transaction_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<Transaction>> + '_>> {
+        gauged_api("get_transaction_iterator", || {
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+            self.error_if_ledger_pruned("Transaction", start_version)?;
+
+            let iter = self
+                .transaction_store
+                .get_transaction_iter(start_version, limit as usize)?;
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<Transaction>> + '_>)
+        })
+    }
+
+    fn get_transaction_info_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<TransactionInfo>> + '_>> {
+        gauged_api("get_transaction_info_iterator", || {
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+            self.error_if_ledger_pruned("Transaction", start_version)?;
+
+            let iter = self
+                .ledger_store
+                .get_transaction_info_iter(start_version, limit as usize)?;
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<TransactionInfo>> + '_>)
+        })
+    }
+
+    fn get_events_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<Vec<ContractEvent>>> + '_>> {
+        gauged_api("get_events_iterator", || {
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+            self.error_if_ledger_pruned("Transaction", start_version)?;
+
+            let iter = self
+                .event_store
+                .get_events_by_version_iter(start_version, limit as usize)?;
+            Ok(Box::new(iter)
+                as Box<
+                    dyn Iterator<Item = Result<Vec<ContractEvent>>> + '_,
+                >)
+        })
+    }
+
+    fn get_write_set_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<WriteSet>> + '_>> {
+        gauged_api("get_write_set_iterator", || {
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+            self.error_if_ledger_pruned("Transaction", start_version)?;
+
+            let iter = self
+                .transaction_store
+                .get_write_set_iter(start_version, limit as usize)?;
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<WriteSet>> + '_>)
+        })
+    }
+
+    fn get_transaction_accumulator_range_proof(
+        &self,
+        first_version: Version,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<TransactionAccumulatorRangeProof> {
+        gauged_api("get_transaction_accumulator_range_proof", || {
+            self.error_if_ledger_pruned("Transaction", first_version)?;
+
+            self.ledger_store.get_transaction_range_proof(
+                Some(first_version),
+                limit,
+                ledger_version,
+            )
+        })
+    }
+
     /// Gets ledger info at specified version and ensures it's an epoch ending.
     fn get_epoch_ending_ledger_info(&self, version: u64) -> Result<LedgerInfoWithSignatures> {
         gauged_api("get_epoch_ending_ledger_info", || {
@@ -1800,7 +1888,7 @@ impl GetRestoreHandler for Arc<AptosDB> {
     }
 }
 
-fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
+pub(crate) fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
 where
     F: FnOnce() -> Result<T>,
 {

@@ -413,7 +413,7 @@ impl CliTestFramework {
         &self,
         index: usize,
         amount: u64,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
         WithdrawStake {
             node_op_options: self.transaction_options(index, None),
             amount,

@@ -305,6 +305,9 @@ RUN apt-get update && apt-get install -y \
     valgrind \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
+# Install pyroscope for profiling
+RUN curl https://dl.pyroscope.io/release/pyroscope_0.36.0_amd64.deb --output pyroscope_0.36.0_amd64.deb && apt-get install ./pyroscope_0.36.0_amd64.deb
+
 ### Because build machine perf might not match run machine perf, we have to symlink
 ### Even if version slightly off, still mostly works
 RUN ln -sf /usr/bin/perf_* /usr/bin/perf
@@ -313,11 +316,11 @@ RUN echo "deb http://deb.debian.org/debian sid main contrib non-free" >> /etc/ap
 RUN echo "deb-src http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
 
 RUN apt-get update && apt-get install -y \
-		arping bison clang-format cmake dh-python \
-		dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
-		libbpf-dev libclang-11-dev libclang-cpp-dev libedit-dev libelf-dev \
-		libfl-dev libzip-dev linux-libc-dev llvm-11-dev libluajit-5.1-dev \
-		luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
+    arping bison clang-format cmake dh-python \
+    dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
+    libbpf-dev libclang-11-dev libclang-cpp-dev libedit-dev libelf-dev \
+    libfl-dev libzip-dev linux-libc-dev llvm-11-dev libluajit-5.1-dev \
+    luajit python3-netaddr python3-pyroute2 python3-distutils python3 \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN git clone https://github.com/aptos-labs/bcc.git

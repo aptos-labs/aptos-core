@@ -102,7 +102,7 @@ fn test_state_store_pruner() {
             &aptos_db.ledger_db,
             state_store,
             vec![(key.clone(), value.clone())],
-            i as u64, /* version */
+            i, /* version */
         ));
     }
 
@@ -249,8 +249,7 @@ fn test_state_store_pruner_partial_version() {
             .state_merkle_db
             .iter::<StaleNodeIndexSchema>(ReadOptions::default())
             .unwrap()
-            .collect::<Vec<_>>()
-            .len(),
+            .count(),
         0
     );
 }
@@ -273,7 +272,7 @@ fn test_state_store_pruner_disabled() {
             &aptos_db.ledger_db,
             state_store,
             vec![(key.clone(), value.clone())],
-            i as u64, /* version */
+            i, /* version */
         ));
     }
 
@@ -395,7 +394,7 @@ fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
                 current_state_values.insert(k.clone(), (version, v.clone()))
             {
                 pruner
-                    .wake_and_wait_pruner(version as u64 /* latest_version */)
+                    .wake_and_wait_pruner(version /* latest_version */)
                     .unwrap();
                 if version > 0 {
                     verify_state_value(
