@@ -23,9 +23,8 @@ When you are minting an NFT, the NFT is stored under your [account](../../concep
 
 ## Understand minting
 
-Review the [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutorial) source code and accompanying READMEs.
-
-Explore the `mint_nft` function in [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move).
+* Review the [mint_nft](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) source code and code comments within each subdirectory.
+* Explore the `mint_event_ticket` function defined within each subdirectory.
 
 ### Initialization
 
