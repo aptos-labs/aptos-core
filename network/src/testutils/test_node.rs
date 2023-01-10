@@ -113,9 +113,6 @@ impl InboundNetworkHandle {
     }
 }
 
-/// An application specific network handle
-pub type ApplicationNetworkHandle<Sender, Events> = (NetworkId, Sender, Events);
-
 /// A unique identifier of a node across the entire network
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct NodeId {
