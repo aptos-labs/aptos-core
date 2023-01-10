@@ -133,13 +133,8 @@ const config = {
               },
               {
                 type: "doc",
-                label: "Develop by Tutorial",
+                label: "Develop with SDKs",
                 docId: "tutorials/index",
-              },
-              {
-                type: "doc",
-                label: "Use Aptos SDKs",
-                docId: "sdks/index",
               },
               {
                 type: "doc",
@@ -228,17 +223,9 @@ const config = {
                 docId: "nodes/aptos-api-spec",
               },
               {
-                href: "https://aptos-labs.github.io/ts-sdk-doc/",
-                label: "TypeScript SDK",
-              },
-              {
-                href: "https://pypi.org/project/aptos-sdk/",
-                label: "Python SDK",
-              },
-              {
-                label: "Rust SDK",
+                label: "Aptos SDKs",
                 type: "doc",
-                docId: "sdks/rust-sdk",
+                docId: "sdks/index",
               },
               {
                 label: "Move References",
