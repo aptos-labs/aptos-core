@@ -51,7 +51,6 @@
 -  [Function `element_neg_internal`](#0x1_curves_element_neg_internal)
 -  [Function `serialize_element_uncompressed_internal`](#0x1_curves_serialize_element_uncompressed_internal)
 -  [Function `serialize_element_compressed_internal`](#0x1_curves_serialize_element_compressed_internal)
--  [Function `pairing_internal`](#0x1_curves_pairing_internal)
 -  [Function `multi_pairing_internal`](#0x1_curves_multi_pairing_internal)
 
 
@@ -329,7 +328,7 @@ Perform a bilinear mapping.
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing">pairing</a>&lt;G1,G2,Gt&gt;(point_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G1&gt;, point_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G2&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
-        handle: <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>&lt;G1,G2,Gt&gt;(point_1.handle, point_2.handle)
+        handle: <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(1, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[point_1.handle], 1, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[point_2.handle])
     }
 }
 </code></pre>
@@ -1335,28 +1334,6 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed_internal">serialize_element_compressed_internal</a>&lt;G&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_curves_pairing_internal"></a>
-
-## Function `pairing_internal`
-
-
-
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>&lt;G1, G2, Gt&gt;(g1_handle: u64, g2_handle: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing_internal">pairing_internal</a>&lt;G1,G2,Gt&gt;(g1_handle: u64, g2_handle: u64): u64;
 </code></pre>
 
 

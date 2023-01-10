@@ -19,7 +19,7 @@ use ark_ec::group::Group;
 use ark_ff::PrimeField;
 use bls12_381::G2Prepared;
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::InternalGas;
+use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
 use move_core_types::language_storage::TypeTag;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::loaded_data::runtime_types::Type;
@@ -34,6 +34,7 @@ use std::collections::VecDeque;
 use std::iter::Map;
 use std::ops::{Add, Mul, Neg};
 use std::slice::Iter;
+use once_cell::sync::Lazy;
 
 pub mod abort_codes {
     pub const E_CURVE_TYPE_NOT_SUPPORTED: u64 = 1;
@@ -41,52 +42,79 @@ pub mod abort_codes {
 
 #[derive(Debug, Clone)]
 pub struct Bls12381GasParameters {
-    pub fr_serialize: InternalGas,
-    pub fr_deserialize: InternalGas,
-    pub fr_from_u64: InternalGas,
-    pub fr_neg: InternalGas,
     pub fr_add: InternalGas,
-    pub fr_sub: InternalGas,
-    pub fr_mul: InternalGas,
-    pub fr_inv: InternalGas,
+    pub fr_deserialize: InternalGas,
     pub fr_div: InternalGas,
     pub fr_eq: InternalGas,
-    pub g1_deserialize_point_uncompressed: InternalGas,
-    pub g1_deserialize_point_compressed: InternalGas,
-    pub g1_serialize_point_uncompressed: InternalGas,
-    pub g1_serialize_point_compressed: InternalGas,
-    pub g1_point_add: InternalGas,
-    pub g1_point_eq: InternalGas,
-    pub g1_affine_infinity: InternalGas,
-    pub g1_affine_generator: InternalGas,
-    pub g1_proj_infinity: InternalGas,
-    pub g1_proj_generator: InternalGas,
-    pub g1_affine_mul_to_proj: InternalGas,
-    pub g1_affine_serialize_uncompressed: InternalGas,
-    pub g1_affine_deserialize_uncompressed: InternalGas,
-    pub g1_affine_serialize_compressed: InternalGas,
-    pub g1_affine_deserialize_compressed: InternalGas,
-    pub g1_affine_neg: InternalGas,
+    pub fr_from_u64: InternalGas,
+    pub fr_inv: InternalGas,
+    pub fr_mul: InternalGas,
+    pub fr_neg: InternalGas,
+    pub fr_serialize: InternalGas,
+    pub fr_sub: InternalGas,
+    pub fr_to_repr: InternalGas,
+    pub fq12_clone: InternalGas,
+    pub fq12_deserialize: InternalGas,
+    pub fq12_eq: InternalGas,
+    pub fq12_inv: InternalGas,
+    pub fq12_mul: InternalGas,
+    pub fq12_one: InternalGas,
+    pub fq12_pow_fr: InternalGas,
+    pub fq12_serialize: InternalGas,
     pub g1_affine_add: InternalGas,
-    pub g1_proj_to_affine: InternalGas,
-    pub g1_proj_neg: InternalGas,
+    pub g1_affine_deserialize_compressed: InternalGas,
+    pub g1_affine_deserialize_uncompressed: InternalGas,
+    pub g1_affine_eq_proj: InternalGas,
+    pub g1_affine_generator: InternalGas,
+    pub g1_affine_infinity: InternalGas,
+    pub g1_affine_mul_to_proj: InternalGas,
+    pub g1_affine_neg: InternalGas,
+    pub g1_affine_serialize_uncompressed: InternalGas,
+    pub g1_affine_serialize_compressed: InternalGas,
+    pub g1_affine_to_prepared: InternalGasPerArg,
+    pub g1_affine_to_proj: InternalGas,
     pub g1_proj_add: InternalGas,
     pub g1_proj_addassign: InternalGas,
-    pub g1_proj_sub: InternalGas,
-    pub g1_proj_subassign: InternalGas,
+    pub g1_proj_eq: InternalGas,
+    pub g1_proj_generator: InternalGas,
+    pub g1_proj_infinity: InternalGas,
     pub g1_proj_mul: InternalGas,
     pub g1_proj_mulassign: InternalGas,
-    pub g1_affine_eq_proj: InternalGas,
-    pub g1_proj_eq: InternalGas,
-    pub g1_affine_to_prepared: InternalGas,
-    pub g1_proj_to_prepared: InternalGas,
+    pub g1_proj_neg: InternalGas,
+    pub g1_proj_sub: InternalGas,
+    pub g1_proj_subassign: InternalGas,
+    pub g1_proj_to_affine: InternalGas,
+    pub g1_proj_to_prepared: InternalGasPerArg,
+    pub g2_affine_add: InternalGas,
+    pub g2_affine_deserialize_compressed: InternalGas,
+    pub g2_affine_deserialize_uncompressed: InternalGas,
+    pub g2_affine_eq_proj: InternalGas,
+    pub g2_affine_generator: InternalGas,
+    pub g2_affine_infinity: InternalGas,
+    pub g2_affine_mul_to_proj: InternalGas,
+    pub g2_affine_neg: InternalGas,
+    pub g2_affine_serialize_compressed: InternalGas,
+    pub g2_affine_serialize_uncompressed: InternalGas,
+    pub g2_affine_to_prepared: InternalGasPerArg,
+    pub g2_affine_to_proj: InternalGas,
+    pub g2_proj_add: InternalGas,
+    pub g2_proj_addassign: InternalGas,
+    pub g2_proj_eq: InternalGas,
+    pub g2_proj_generator: InternalGas,
+    pub g2_proj_infinity: InternalGas,
+    pub g2_proj_mul: InternalGas,
+    pub g2_proj_mulassign: InternalGas,
+    pub g2_proj_neg: InternalGas,
+    pub g2_proj_sub: InternalGas,
+    pub g2_proj_subassign: InternalGas,
+    pub g2_proj_to_affine: InternalGas,
+    pub g2_proj_to_prepared: InternalGasPerArg,
     pub pairing_product_base: InternalGas,
-    pub pairing_product_per_pair: InternalGas,
+    pub pairing_product_per_pair: InternalGasPerArg,
 }
 
 #[derive(Debug, Clone)]
 pub struct GasParameters {
-    pub base: InternalGas,
     pub bls12_381: Bls12381GasParameters,
 }
 
@@ -219,15 +247,17 @@ fn serialize_element_uncompressed_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
-    let serialized = match type_tag.as_str() {
+    let (cost, serialized) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let mut buf = vec![];
             context
                 .extensions()
                 .get::<ArksContext>()
                 .get_g1_point(handle)
+                .into_affine()
                 .serialize_uncompressed(&mut buf);
-            buf
+            let cost = gas_params.bls12_381.g1_proj_to_affine + gas_params.bls12_381.g1_affine_serialize_uncompressed;
+            (cost, buf)
         }
         "0x1::curves::BLS12_381_G2" => {
             let mut buf = vec![];
@@ -235,8 +265,10 @@ fn serialize_element_uncompressed_internal(
                 .extensions()
                 .get::<ArksContext>()
                 .get_g2_point(handle)
+                .into_affine()
                 .serialize_uncompressed(&mut buf);
-            buf
+            let cost = gas_params.bls12_381.g2_proj_to_affine + gas_params.bls12_381.g2_affine_serialize_uncompressed;
+            (cost, buf)
         }
         "0x1::curves::BLS12_381_Gt" => {
             let mut buf = vec![];
@@ -245,12 +277,13 @@ fn serialize_element_uncompressed_internal(
                 .get::<ArksContext>()
                 .get_gt_point(handle)
                 .serialize_uncompressed(&mut buf);
-            buf
+            let cost = gas_params.bls12_381.fq12_serialize;
+            (cost, buf)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::vector_u8(serialized)],
     ))
 }
@@ -266,38 +299,43 @@ fn serialize_element_compressed_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
-    let serialized = match type_tag.as_str() {
+    let (cost, serialized) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
+            let cost = gas_params.bls12_381.g1_proj_to_affine + gas_params.bls12_381.g1_affine_serialize_compressed;
             let mut buf = vec![];
             context
                 .extensions()
                 .get::<ArksContext>()
                 .get_g1_point(handle)
+                .into_affine()
                 .serialize(&mut buf);
-            buf
+            (cost, buf)
         }
         "0x1::curves::BLS12_381_G2" => {
+            let cost = gas_params.bls12_381.g2_proj_to_affine + gas_params.bls12_381.g2_affine_serialize_compressed;
             let mut buf = vec![];
             context
                 .extensions()
                 .get::<ArksContext>()
                 .get_g2_point(handle)
+                .into_affine()
                 .serialize(&mut buf);
-            buf
+            (cost, buf)
         }
         "0x1::curves::BLS12_381_Gt" => {
+            let cost = gas_params.bls12_381.fq12_serialize;
             let mut buf = vec![];
             context
                 .extensions()
                 .get::<ArksContext>()
                 .get_gt_point(handle)
                 .serialize(&mut buf);
-            buf
+            (cost, buf)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::vector_u8(serialized)],
     ))
 }
@@ -313,8 +351,9 @@ fn deserialize_element_uncompressed_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     let bytes = pop_arg!(args, Vec<u8>);
-    let (succ, handle) = match type_tag.as_str() {
+    let (cost, succ, handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
+            let cost = gas_params.bls12_381.g1_affine_deserialize_uncompressed + gas_params.bls12_381.g1_affine_to_proj;
             let point = ark_bls12_381::G1Affine::deserialize_uncompressed(bytes.as_slice());
             match point {
                 Ok(point) => {
@@ -322,12 +361,13 @@ fn deserialize_element_uncompressed_internal(
                         .extensions_mut()
                         .get_mut::<ArksContext>()
                         .add_g1_point(point.into_projective());
-                    (true, handle)
+                    (cost, true, handle)
                 }
-                _ => (false, 0),
+                _ => (cost, false, 0),
             }
         }
         "0x1::curves::BLS12_381_G2" => {
+            let cost = gas_params.bls12_381.g2_affine_deserialize_uncompressed + gas_params.bls12_381.g2_affine_to_proj;
             let point = ark_bls12_381::G2Affine::deserialize_uncompressed(bytes.as_slice());
             match point {
                 Ok(point) => {
@@ -335,12 +375,13 @@ fn deserialize_element_uncompressed_internal(
                         .extensions_mut()
                         .get_mut::<ArksContext>()
                         .add_g2_point(point.into_projective());
-                    (true, handle)
+                    (cost, true, handle)
                 }
-                _ => (false, 0),
+                _ => (cost, false, 0),
             }
         }
         "0x1::curves::BLS12_381_Gt" => {
+            let cost = gas_params.bls12_381.fq12_deserialize + gas_params.bls12_381.fq12_pow_fr + gas_params.bls12_381.fq12_eq;
             let point = ark_bls12_381::Fq12::deserialize(bytes.as_slice());
             match point {
                 Ok(point) => {
@@ -355,18 +396,18 @@ fn deserialize_element_uncompressed_internal(
                             .extensions_mut()
                             .get_mut::<ArksContext>()
                             .add_gt_point(point);
-                        (true, handle)
+                        (cost, true, handle)
                     } else {
-                        (false, 0)
+                        (cost, false, 0)
                     }
                 }
-                _ => (false, 0),
+                _ => (cost, false, 0),
             }
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::bool(succ), Value::u64(handle as u64)],
     ))
 }
@@ -382,8 +423,9 @@ fn deserialize_element_compressed_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     let bytes = pop_arg!(args, Vec<u8>);
-    let (succ, handle) = match type_tag.as_str() {
+    let (cost, succ, handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
+            let cost = gas_params.bls12_381.g1_affine_deserialize_compressed + gas_params.bls12_381.g1_affine_to_proj;
             let point = ark_bls12_381::G1Affine::deserialize(bytes.as_slice());
             match point {
                 Ok(point) => {
@@ -391,12 +433,13 @@ fn deserialize_element_compressed_internal(
                         .extensions_mut()
                         .get_mut::<ArksContext>()
                         .add_g1_point(point.into_projective());
-                    (true, handle)
+                    (cost, true, handle)
                 }
-                _ => (false, 0),
+                _ => (cost, false, 0),
             }
         }
         "0x1::curves::BLS12_381_G2" => {
+            let cost = gas_params.bls12_381.g2_affine_deserialize_compressed + gas_params.bls12_381.g2_affine_to_proj;
             let point = ark_bls12_381::G2Affine::deserialize(bytes.as_slice());
             match point {
                 Ok(point) => {
@@ -404,12 +447,13 @@ fn deserialize_element_compressed_internal(
                         .extensions_mut()
                         .get_mut::<ArksContext>()
                         .add_g2_point(point.into_projective());
-                    (true, handle)
+                    (cost, true, handle)
                 }
-                _ => (false, 0),
+                _ => (cost, false, 0),
             }
         }
         "0x1::curves::BLS12_381_Gt" => {
+            let cost = gas_params.bls12_381.fq12_deserialize + gas_params.bls12_381.fq12_pow_fr + gas_params.bls12_381.fq12_eq;
             let point = ark_bls12_381::Fq12::deserialize(bytes.as_slice());
             match point {
                 Ok(point) => {
@@ -424,18 +468,18 @@ fn deserialize_element_compressed_internal(
                             .extensions_mut()
                             .get_mut::<ArksContext>()
                             .add_gt_point(point);
-                        (true, handle)
+                        (cost, true, handle)
                     } else {
-                        (false, 0)
+                        (cost, false, 0)
                     }
                 }
-                _ => (false, 0),
+                _ => (cost, false, 0),
             }
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::bool(succ), Value::u64(handle as u64)],
     ))
 }
@@ -451,7 +495,7 @@ fn scalar_from_bytes_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     let bytes = pop_arg!(args, Vec<u8>);
-    let (succ, handle) = match type_tag.as_str() {
+    let (cost, succ, handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let scalar = ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice());
             match (scalar) {
@@ -460,15 +504,15 @@ fn scalar_from_bytes_internal(
                         .extensions_mut()
                         .get_mut::<ArksContext>()
                         .add_scalar(scalar);
-                    (true, handle)
+                    (gas_params.bls12_381.fr_deserialize, true, handle)
                 }
-                _ => (false, 0),
+                _ => (gas_params.bls12_381.fr_deserialize, false, 0),
             }
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::bool(succ), Value::u64(handle as u64)],
     ))
 }
@@ -484,7 +528,7 @@ fn scalar_to_bytes_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
-    let serialized = match type_tag.as_str() {
+    let (cost, serialized) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let mut buf = vec![];
             context
@@ -492,12 +536,12 @@ fn scalar_to_bytes_internal(
                 .get::<ArksContext>()
                 .get_scalar(handle)
                 .serialize_uncompressed(&mut buf);
-            buf
+            (gas_params.bls12_381.fr_serialize, buf)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::vector_u8(serialized)],
     ))
 }
@@ -513,18 +557,18 @@ fn scalar_from_u64_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     let v = pop_arg!(args, u64);
-    let handle = match type_tag.as_str() {
+    let (cost, handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let handle = context
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_scalar(ark_bls12_381::Fr::from(v as u128));
-            handle
+            (gas_params.bls12_381.fr_from_u64, handle)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::u64(handle as u64)],
     ))
 }
@@ -541,7 +585,7 @@ fn scalar_add_internal(
         .to_string();
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
-    let handle = match type_tag.as_str() {
+    let (cost, handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
@@ -556,12 +600,12 @@ fn scalar_add_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_scalar(result);
-            result_handle
+            (gas_params.bls12_381.fr_add, result_handle)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::u64(handle as u64)],
     ))
 }
@@ -578,7 +622,7 @@ fn scalar_mul_internal(
         .to_string();
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
-    let handle = match type_tag.as_str() {
+    let (cost, handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
@@ -593,12 +637,12 @@ fn scalar_mul_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_scalar(result);
-            result_handle
+            (gas_params.bls12_381.fr_mul, result_handle)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::u64(handle as u64)],
     ))
 }
@@ -614,7 +658,7 @@ fn scalar_neg_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
-    let result_handle = match type_tag.as_str() {
+    let (cost, result_handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let result = context
                 .extensions()
@@ -625,12 +669,12 @@ fn scalar_neg_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_scalar(result);
-            result_handle
+            (gas_params.bls12_381.fr_neg, result_handle)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::u64(result_handle as u64)],
     ))
 }
@@ -646,7 +690,7 @@ fn scalar_inv_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
-    let (succeeded, result_handle) = match type_tag.as_str() {
+    let (cost, succeeded, result_handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let op_result = context
                 .extensions()
@@ -659,15 +703,15 @@ fn scalar_inv_internal(
                         .extensions_mut()
                         .get_mut::<ArksContext>()
                         .add_scalar(scalar);
-                    (true, ret)
+                    (gas_params.bls12_381.fr_inv, true, ret)
                 }
-                None => (false, 0),
+                None => (gas_params.bls12_381.fr_inv, false, 0),
             }
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::bool(succeeded), Value::u64(result_handle as u64)],
     ))
 }
@@ -684,7 +728,7 @@ fn scalar_eq_internal(
         .to_string();
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
-    let result = match type_tag.as_str() {
+    let (cost, result) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
@@ -694,17 +738,17 @@ fn scalar_eq_internal(
                 .extensions()
                 .get::<ArksContext>()
                 .get_scalar(handle_2);
-            scalar_1 == scalar_2
+            (gas_params.bls12_381.fr_eq, scalar_1 == scalar_2)
         }
         _ => {
             return Ok(NativeResult::err(
-                gas_params.base,
+                gas_params.bls12_381.fr_eq,
                 abort_codes::E_CURVE_TYPE_NOT_SUPPORTED,
             ))
         }
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::bool(result)],
     ))
 }
@@ -719,14 +763,14 @@ fn point_identity_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle = match type_tag.as_str() {
+    let (cost, handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let point = ark_bls12_381::G1Projective::zero();
             let handle = context
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_g1_point(point);
-            handle
+            (gas_params.bls12_381.g1_proj_infinity, handle)
         }
         "0x1::curves::BLS12_381_G2" => {
             let point = ark_bls12_381::G2Projective::zero();
@@ -734,7 +778,7 @@ fn point_identity_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_g2_point(point);
-            handle
+            (gas_params.bls12_381.g2_proj_infinity, handle)
         }
         "0x1::curves::BLS12_381_Gt" => {
             let point = ark_bls12_381::Fq12::one();
@@ -742,36 +786,39 @@ fn point_identity_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_gt_point(point);
-            handle
+            (gas_params.bls12_381.fq12_one, handle)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::u64(handle as u64)],
     ))
 }
 
-pub const PID_BLS12_381: u8 = 1;
+const gt_generator: Lazy<ark_bls12_381::Fq12> = Lazy::new(||{
+    let buf = hex::decode("b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f").unwrap();
+    ark_bls12_381::Fq12::deserialize(buf.as_slice()).unwrap()
+});
 
 fn point_generator_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
+    mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let handle = match type_tag.as_str() {
+    let (cost, handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let point = ark_bls12_381::G1Projective::prime_subgroup_generator();
             let handle = context
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_g1_point(point);
-            handle
+            (gas_params.bls12_381.g1_proj_generator, handle)
         }
         "0x1::curves::BLS12_381_G2" => {
             let point = ark_bls12_381::G2Projective::prime_subgroup_generator();
@@ -779,26 +826,25 @@ fn point_generator_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_g2_point(point);
-            handle
+            (gas_params.bls12_381.g2_proj_generator, handle)
         }
         "0x1::curves::BLS12_381_Gt" => {
-            let buf = hex::decode("b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f").unwrap();
-            let point = ark_bls12_381::Fq12::deserialize(buf.as_slice()).unwrap();
+            let point = gt_generator.clone();
             let handle = context
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_gt_point(point);
-            handle
+            (gas_params.bls12_381.fq12_clone, handle)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::u64(handle as u64)],
     ))
 }
 
-fn point_eq_internal(
+fn element_eq_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -810,7 +856,7 @@ fn point_eq_internal(
         .to_string();
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
-    let result = match type_tag.as_str() {
+    let (cost, result) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let point_1 = context
                 .extensions()
@@ -821,7 +867,7 @@ fn point_eq_internal(
                 .get::<ArksContext>()
                 .get_g1_point(handle_2);
             let result = point_1.eq(point_2);
-            result
+            (gas_params.bls12_381.g1_proj_eq, result)
         }
         "0x1::curves::BLS12_381_G2" => {
             let point_1 = context
@@ -833,7 +879,7 @@ fn point_eq_internal(
                 .get::<ArksContext>()
                 .get_g2_point(handle_2);
             let result = point_1.eq(point_2);
-            result
+            (gas_params.bls12_381.g2_proj_eq, result)
         }
         "0x1::curves::BLS12_381_Gt" => {
             let point_1 = context
@@ -845,18 +891,18 @@ fn point_eq_internal(
                 .get::<ArksContext>()
                 .get_gt_point(handle_2);
             let result = point_1.eq(point_2);
-            result
+            (gas_params.bls12_381.fq12_eq, result)
         }
         _ => todo!(),
     };
 
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::bool(result)],
     ))
 }
 
-fn point_add_internal(
+fn element_add_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -868,7 +914,7 @@ fn point_add_internal(
         .to_string();
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
-    let handle = match type_tag.as_str() {
+    let (cost, handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let point_1 = context
                 .extensions()
@@ -883,7 +929,7 @@ fn point_add_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_g1_point(result);
-            handle
+            (gas_params.bls12_381.g1_proj_add, handle)
         }
         "0x1::curves::BLS12_381_G2" => {
             let point_1 = context
@@ -899,7 +945,7 @@ fn point_add_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_g2_point(result);
-            handle
+            (gas_params.bls12_381.g2_proj_add, handle)
         }
         "0x1::curves::BLS12_381_Gt" => {
             let point_1 = context
@@ -915,17 +961,17 @@ fn point_add_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_gt_point(result);
-            handle
+            (gas_params.bls12_381.fq12_mul, handle)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::u64(handle as u64)],
     ))
 }
 
-fn point_mul_internal(
+fn element_mul_scalar_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -937,7 +983,7 @@ fn point_mul_internal(
         .to_string();
     let point_handle = pop_arg!(args, u64) as usize;
     let scalar_handle = pop_arg!(args, u64) as usize;
-    let handle = match type_tag.as_str() {
+    let (cost, handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let point = context
                 .extensions()
@@ -952,7 +998,7 @@ fn point_mul_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_g1_point(result);
-            handle
+            (gas_params.bls12_381.g1_proj_mul, handle)
         }
         "0x1::curves::BLS12_381_G2" => {
             let point = context
@@ -968,7 +1014,7 @@ fn point_mul_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_g2_point(result);
-            handle
+            (gas_params.bls12_381.g2_proj_mul, handle)
         }
         "0x1::curves::BLS12_381_Gt" => {
             let point = context
@@ -984,17 +1030,17 @@ fn point_mul_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_gt_point(result);
-            handle
+            (gas_params.bls12_381.fr_to_repr + gas_params.bls12_381.fq12_pow_fr, handle)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::u64(handle as u64)],
     ))
 }
 
-fn point_neg_internal(
+fn element_neg_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -1005,7 +1051,7 @@ fn point_neg_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     let point_handle = pop_arg!(args, u64) as usize;
-    let handle = match type_tag.as_str() {
+    let (cost, handle) = match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let point = context
                 .extensions()
@@ -1016,7 +1062,7 @@ fn point_neg_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_g1_point(result);
-            handle
+            (gas_params.bls12_381.g1_proj_neg, handle)
         }
         "0x1::curves::BLS12_381_G2" => {
             let point = context
@@ -1028,7 +1074,7 @@ fn point_neg_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_g2_point(result);
-            handle
+            (gas_params.bls12_381.g2_proj_neg, handle)
         }
         "0x1::curves::BLS12_381_Gt" => {
             let point = context
@@ -1040,61 +1086,12 @@ fn point_neg_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_gt_point(result);
-            handle
+            (gas_params.bls12_381.fq12_inv, handle)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
-        smallvec![Value::u64(handle as u64)],
-    ))
-}
-
-fn pairing_internal(
-    gas_params: &GasParameters,
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    assert_eq!(3, ty_args.len());
-    let type_tag_0 = context
-        .type_to_type_tag(ty_args.get(0).unwrap())?
-        .to_string();
-    let type_tag_1 = context
-        .type_to_type_tag(ty_args.get(1).unwrap())?
-        .to_string();
-    let type_tag_2 = context
-        .type_to_type_tag(ty_args.get(2).unwrap())?
-        .to_string();
-    let handle_2 = pop_arg!(args, u64) as usize;
-    let handle_1 = pop_arg!(args, u64) as usize;
-    let handle = match (
-        type_tag_0.as_str(),
-        type_tag_1.as_str(),
-        type_tag_2.as_str(),
-    ) {
-        ("0x1::curves::BLS12_381_G1", "0x1::curves::BLS12_381_G2", "0x1::curves::BLS12_381_Gt") => {
-            let point_1 = context
-                .extensions()
-                .get::<ArksContext>()
-                .get_g1_point(handle_1)
-                .into_affine();
-            let point_2 = context
-                .extensions()
-                .get::<ArksContext>()
-                .get_g2_point(handle_2)
-                .into_affine();
-            let result = ark_bls12_381::Bls12_381::pairing(point_1, point_2);
-            let handle = context
-                .extensions_mut()
-                .get_mut::<ArksContext>()
-                .add_gt_point(result);
-            handle
-        }
-        _ => todo!(),
-    };
-    Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::u64(handle as u64)],
     ))
 }
@@ -1117,12 +1114,13 @@ fn multi_pairing_internal(
         .to_string();
     let g2_handles = pop_vec_u64(&mut args)?;
     let g1_handles = pop_vec_u64(&mut args)?;
-    let handle = match (
+    let (cost, handle) = match (
         type_tag_0.as_str(),
         type_tag_1.as_str(),
         type_tag_2.as_str(),
     ) {
         ("0x1::curves::BLS12_381_G1", "0x1::curves::BLS12_381_G2", "0x1::curves::BLS12_381_Gt") => {
+            let cost = (gas_params.bls12_381.g1_affine_to_prepared + gas_params.bls12_381.g2_affine_to_prepared + gas_params.bls12_381.pairing_product_per_pair) * NumArgs::new(g1_handles.len() as u64) + gas_params.bls12_381.pairing_product_base;
             let g1_prepared: Vec<ark_ec::models::bls12::g1::G1Prepared<Parameters>> = g1_handles
                 .iter()
                 .map(|&handle| {
@@ -1156,12 +1154,12 @@ fn multi_pairing_internal(
                 .extensions_mut()
                 .get_mut::<ArksContext>()
                 .add_gt_point(result);
-            result_handle
+            (cost, result_handle)
         }
         _ => todo!(),
     };
     Ok(NativeResult::ok(
-        gas_params.base,
+        cost,
         smallvec![Value::u64(handle as u64)],
     ))
 }
@@ -1232,23 +1230,19 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         ),
         (
             "element_add_internal",
-            make_native_from_func(gas_params.clone(), point_add_internal),
+            make_native_from_func(gas_params.clone(), element_add_internal),
         ),
         (
             "element_mul_internal",
-            make_native_from_func(gas_params.clone(), point_mul_internal),
+            make_native_from_func(gas_params.clone(), element_mul_scalar_internal),
         ),
         (
             "element_neg_internal",
-            make_native_from_func(gas_params.clone(), point_neg_internal),
+            make_native_from_func(gas_params.clone(), element_neg_internal),
         ),
         (
             "element_eq_internal",
-            make_native_from_func(gas_params.clone(), point_eq_internal),
-        ),
-        (
-            "pairing_internal",
-            make_native_from_func(gas_params.clone(), pairing_internal),
+            make_native_from_func(gas_params.clone(), element_eq_internal),
         ),
         (
             "multi_pairing_internal",
