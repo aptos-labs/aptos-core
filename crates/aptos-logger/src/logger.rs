@@ -63,7 +63,7 @@ pub fn set_global_logger(logger: Arc<dyn Logger>, console_port: Option<u16>) {
             return;
         }
     }
-    if None == console_port {
+    if console_port.is_none() {
         let _ = tracing::subscriber::set_global_default(
             crate::tracing_adapter::TracingToAptosDataLayer
                 .with_subscriber(tracing_subscriber::Registry::default()),

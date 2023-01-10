@@ -40,7 +40,7 @@ impl ExecutedTrees {
     }
 
     pub fn num_transactions(&self) -> u64 {
-        self.txn_accumulator().num_leaves() as u64
+        self.txn_accumulator().num_leaves()
     }
 
     pub fn state_id(&self) -> HashValue {

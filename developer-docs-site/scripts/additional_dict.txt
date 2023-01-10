@@ -200,6 +200,7 @@ URI
 Upgradeable
 Uptime
 VFN
+VFNs
 VM
 VMs
 VN

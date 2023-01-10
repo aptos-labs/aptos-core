@@ -125,7 +125,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
     pub fn add_write(&self, key: &K, version: Version, data: V) {
         let (txn_idx, incarnation) = version;
 
-        let mut map = self.data.entry(key.clone()).or_insert(BTreeMap::new());
+        let mut map = self.data.entry(key.clone()).or_default();
         let prev_entry = map.insert(
             txn_idx,
             CachePadded::new(Entry::new_write_from(FLAG_DONE, incarnation, data)),
@@ -143,7 +143,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
 
     /// Add a delta at a specified key.
     pub fn add_delta(&self, key: &K, txn_idx: usize, delta: DeltaOp) {
-        let mut map = self.data.entry(key.clone()).or_insert(BTreeMap::new());
+        let mut map = self.data.entry(key.clone()).or_default();
         map.insert(
             txn_idx,
             CachePadded::new(Entry::new_delta_from(FLAG_DONE, delta)),
@@ -245,5 +245,11 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
             },
             None => Err(NotFound),
         }
+    }
+}
+
+impl<K: Hash + Clone + Eq, V: TransactionWrite> Default for MVHashMap<K, V> {
+    fn default() -> Self {
+        Self::new()
     }
 }

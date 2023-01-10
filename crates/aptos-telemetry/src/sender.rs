@@ -416,16 +416,16 @@ mod tests {
 
         // Should call the server once and cache the key
         assert_eq!(mock.hits(), 1);
-        assert_eq!(result1.is_ok(), true);
+        assert!(result1.is_ok());
         assert_eq!(result1.unwrap(), private_key.public_key());
-        assert_eq!(result2.is_ok(), true);
+        assert!(result2.is_ok());
         assert_eq!(result2.unwrap(), private_key.public_key());
 
         client.reset_token();
 
         let result3 = client.server_public_key().await;
         assert_eq!(mock.hits(), 2);
-        assert_eq!(result3.is_ok(), true);
+        assert!(result3.is_ok());
         assert_eq!(result3.unwrap(), private_key.public_key());
     }
 

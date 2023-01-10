@@ -44,7 +44,7 @@ fn test_nil_block() {
     );
     assert_eq!(nil_block.round(), 1);
     assert_eq!(nil_block.timestamp_usecs(), genesis_block.timestamp_usecs());
-    assert_eq!(nil_block.is_nil_block(), true);
+    assert!(nil_block.is_nil_block());
     assert!(nil_block.author().is_none());
 
     let dummy_verifier = Arc::new(ValidatorVerifier::new(vec![]));
@@ -79,7 +79,7 @@ fn test_nil_block() {
         Vec::new(),
     )
     .unwrap();
-    assert_eq!(nil_block_child.is_nil_block(), false);
+    assert!(!nil_block_child.is_nil_block());
     assert_eq!(nil_block_child.round(), 2);
     assert_eq!(nil_block_child.parent_id(), nil_block.id());
 }
@@ -101,7 +101,7 @@ fn test_block_relation() {
     )
     .unwrap();
     assert_eq!(next_block.round(), 1);
-    assert_eq!(genesis_block.is_parent_of(&next_block), true);
+    assert!(genesis_block.is_parent_of(&next_block));
     assert_eq!(
         next_block.quorum_cert().certified_block().id(),
         genesis_block.id()
