@@ -643,7 +643,7 @@ impl TestContext {
             .context
             .get_latest_ledger_info_with_signatures()
             .unwrap();
-        let epoch = parent.ledger_info().epoch();
+        let epoch = parent.ledger_info().next_block_epoch();
         let version = parent.ledger_info().version() + (block_size as u64);
         let info = LedgerInfo::new(
             BlockInfo::new(

@@ -5,16 +5,21 @@ slug: "run-validator-node-using-azure"
 
 # On Azure
 
-This is a step-by-step guide to install an Aptos node on Azure. Follow these steps to configure a validator node and a validator fullnode on separate machines. 
+This is a step-by-step guide to install an Aptos node on Microsoft Azure. Follow these steps to configure a validator node and a validator fullnode on separate machines. 
 
-:::danger Did you set up your Azure account?
+:::caution Did you set up your Azure account?
 This guide assumes that you already have Azure account setup.
+:::
+
+:::danger Do you have stale volumes after bumping your deployment's era?
+`era` is a concept relevant only to Kubernetes deployments of an Aptos node. Changing the `era` provides an easy way to wipe your deployment's state. However, this may lead to dangling persistent volumes on validator fullnodes. Confirm the existence of these volumes with `kubectl get pvc` and delete them manually to minimize costs.
 :::
 
 ## Before you proceed
 
 Make sure you complete these prerequisite steps before you proceed:
 
+- **Azure account**: https://azure.microsoft.com/
 - **Aptos CLI**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
 - **Terraform 1.2.4**: https://www.terraform.io/downloads.html
 - **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/

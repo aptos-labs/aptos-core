@@ -1634,6 +1634,16 @@ impl DbWriter for AptosDB {
                     new_root_hash,
                     expected_root_hash,
                 );
+                let current_epoch = self
+                    .ledger_store
+                    .get_latest_ledger_info_option()
+                    .map_or(0, |li| li.ledger_info().next_block_epoch());
+                ensure!(
+                    x.ledger_info().epoch() == current_epoch,
+                    "Gap in epoch history. Trying to put in LedgerInfo in epoch: {}, current epoch: {}",
+                    x.ledger_info().epoch(),
+                    current_epoch,
+                );
 
                 self.ledger_store.put_ledger_info(x, &batch)?;
             }
