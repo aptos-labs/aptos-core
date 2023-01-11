@@ -56,7 +56,7 @@ The `default_properties` field is a key-value store with type information. It le
 
 You can also use the `token_properties` defined in the token itself for customization on-chain. You can create customized values for a property of this  specific token, thereby allowing a token to have a different property value from its default.
 
-Note that limit exist to storing customized token properties on-chain, namely 1000 properties per token with field names limited to 128 characters.
+Note that limits exist to storing customized token properties on-chain, namely 1000 properties per token with field names limited to 128 characters.
 
 ### Evolving from fungible token to NFT
 
