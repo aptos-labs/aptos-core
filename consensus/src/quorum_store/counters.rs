@@ -3,7 +3,7 @@
 
 use aptos_metrics_core::{
     op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, Histogram, HistogramVec, IntCounter,
+    register_int_counter, Histogram, HistogramVec, IntCounter, IntGauge, register_int_gauge,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -131,6 +131,16 @@ pub static NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_num_batch_left_when_pull_for_block",
         "Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.",
+        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of local batches/PoS left when forming a block proposal.
+pub static NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_num_local_batch_left_when_pull_for_block",
+        "Histogram for the number of locally created batches/PoS left when forming a block proposal.",
         // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
     )
     .unwrap()
@@ -338,6 +348,14 @@ pub static BATCH_EXPIRED_SMALLER_ROUND_WHEN_PULL_PROOFS_COUNT: Lazy<IntCounter> 
     register_int_counter!(
         "quorum_store_gap_batch_expired_smaller_round_when_pull_count",
         "Count for the number of expired batches due to smaller round when pulling the proofs for consensus."
+    )
+    .unwrap()
+});
+
+pub static QS_BACKPRESSURE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "quorum_store_backpressure",
+        "Indicator of whether Quorum Store is backpressured. QS should be backpressured when (1) number of batches exceeds the threshold, or (2) consensus is backpressured."
     )
     .unwrap()
 });

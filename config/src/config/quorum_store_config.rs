@@ -32,6 +32,7 @@ pub struct QuorumStoreConfig {
     pub num_nodes_per_worker_handles: usize,
     // when the remaining certified batches in the quorum store is > back_pressure_factor * num of validators, backpressure quorum store
     pub back_pressure_factor: usize,
+    pub back_pressure_local_batch_num: usize,
 }
 
 impl Default for QuorumStoreConfig {
@@ -55,6 +56,7 @@ impl Default for QuorumStoreConfig {
             mempool_txn_pull_max_bytes: 1000000,
             num_nodes_per_worker_handles: 10,
             back_pressure_factor: 1, // back pressure limit for QS is back_pressure_factor * num_validator
+            back_pressure_local_batch_num: 100, // QS will be backpressured if the remaining local batches is more than this number
         }
     }
 }

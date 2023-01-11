@@ -51,7 +51,9 @@ pub struct BatchGenerator {
     max_batch_id: u64,
     last_batch_id: u64,
     remaining_proof_num: usize,
+    remaining_local_proof_num: usize,
     back_pressure_limit: usize,
+    back_pressure_local_batch_limit: usize,
     block_store: Arc<dyn BlockReader + Send + Sync>,
 }
 
@@ -69,6 +71,7 @@ impl BatchGenerator {
         batch_expiry_round_gap_when_init: Round,
         end_batch_ms: u128,
         back_pressure_limit: usize,
+        back_pressure_local_batch_limit: usize,
         block_store: Arc<dyn BlockReader + Send + Sync>,
     ) -> Self {
         let batch_id = if let Some(id) = db
@@ -98,7 +101,9 @@ impl BatchGenerator {
             max_batch_id: 0,
             last_batch_id: 0,
             remaining_proof_num: 0,
+            remaining_local_proof_num: 0,
             back_pressure_limit,
+            back_pressure_local_batch_limit,
             block_store,
         }
     }
@@ -110,7 +115,16 @@ impl BatchGenerator {
             self.remaining_proof_num, self.back_pressure_limit
         );
         counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(self.remaining_proof_num as f64);
-        self.remaining_proof_num > self.back_pressure_limit || self.block_store.back_pressure()
+        // if self.remaining_proof_num > self.back_pressure_limit || self.block_store.back_pressure() {
+        //     counters::QS_BACKPRESSURE.set(1);
+        //     return true;
+        // }
+        if self.remaining_local_proof_num > self.back_pressure_local_batch_limit || self.block_store.back_pressure() {
+            counters::QS_BACKPRESSURE.set(1);
+            return true;
+        }
+        counters::QS_BACKPRESSURE.set(0);
+        return false;
     }
 
     async fn handle_scheduled_pull(

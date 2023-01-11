@@ -312,6 +312,7 @@ impl InnerBuilder {
             self.config.batch_expiry_round_gap_when_init,
             self.config.end_batch_ms,
             self.config.back_pressure_factor * self.verifier.len(),
+            self.config.back_pressure_local_batch_num,
             block_store,
         );
         spawn_named!(

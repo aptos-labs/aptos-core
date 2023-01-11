@@ -25,6 +25,7 @@ pub struct ProofManager {
     proofs_for_consensus: ProofQueue,
     latest_logical_time: LogicalTime,
     remaining_proof_num: usize,
+    remaining_local_proof_num: usize,
 }
 
 impl ProofManager {
@@ -33,6 +34,7 @@ impl ProofManager {
             proofs_for_consensus: ProofQueue::new(),
             latest_logical_time: LogicalTime::new(epoch, 0),
             remaining_proof_num: 0,
+            remaining_local_proof_num: 0,
         }
     }
 
@@ -41,12 +43,12 @@ impl ProofManager {
         proof: ProofOfStore,
         network_sender: &mut NetworkSender,
     ) {
-        self.proofs_for_consensus.push(proof.clone());
+        self.proofs_for_consensus.push(proof.clone(), true);
         network_sender.broadcast_proof_of_store(proof).await;
     }
 
     pub(crate) fn handle_remote_proof(&mut self, proof: ProofOfStore) {
-        self.proofs_for_consensus.push(proof.clone());
+        self.proofs_for_consensus.push(proof.clone(), false);
     }
 
     pub(crate) fn handle_commit_notification(
@@ -81,13 +83,14 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let (proof_block, remaining_proof_num) = self.proofs_for_consensus.pull_proofs(
+                let (proof_block, remaining_proof_num, remaining_local_proof_num) = self.proofs_for_consensus.pull_proofs(
                     &excluded_proofs,
                     LogicalTime::new(self.latest_logical_time.epoch(), round),
                     max_txns,
                     max_bytes,
                 );
                 self.remaining_proof_num = remaining_proof_num;
+                self.remaining_local_proof_num = remaining_local_proof_num;
 
                 let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
                     Payload::empty(true)
