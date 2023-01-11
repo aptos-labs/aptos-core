@@ -4,6 +4,7 @@ module aptos_std::curves {
     // Error codes
     const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 1;
     const E_UNKNOWN_GROUP: u64 = 2;
+    const E_UNKNOWN_PAIRING: u64 = 3;
 
     /// A phantom type that represents the 1st pairing input group `G1` in BLS12-381 pairing.
     ///
@@ -663,5 +664,16 @@ module aptos_std::curves {
     fun test_unknown_group(fx: signer) {
         std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
         let _ = group_order<UnknownGroup>();
+    }
+
+    #[test(fx = @std)]
+    #[expected_failure(abort_code = E_UNKNOWN_PAIRING, location = Self)]
+    fun test_unknown_pairing(fx: signer) {
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
+        // Attempt an invalid pairing: (G2, G1) -> Gt
+        pairing<BLS12_381_G2, BLS12_381_G1, BLS12_381_Gt>(
+            &element_mul(&scalar_from_u64(7), &group_generator<BLS12_381_G2>()),
+            &element_mul(&scalar_from_u64(5), &group_generator<BLS12_381_G1>()),
+        );
     }
 }
