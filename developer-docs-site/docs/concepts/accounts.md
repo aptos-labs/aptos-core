@@ -112,8 +112,7 @@ Generating the authentication key for an account requires that you provide one o
 identifiers for this account, i.e., whether the account is a single signature or a multisig account:
 
 - **1-byte single-signature scheme identifier**: `0x00`.
-- **1-byte multisig scheme identifier**: `0x01`. Make sure to also provide the value of `K` to generate the
-- K-of-N multisig authentication key.
+- **1-byte multisig scheme identifier**: `0x01`. Make sure to also provide the value of `K` to generate the K-of-N multisig authentication key.
 
 ## Single signer authentication
 
