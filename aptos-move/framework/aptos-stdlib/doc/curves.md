@@ -19,8 +19,8 @@
 -  [Function `scalar_mul`](#0x1_curves_scalar_mul)
 -  [Function `scalar_inv`](#0x1_curves_scalar_inv)
 -  [Function `scalar_eq`](#0x1_curves_scalar_eq)
--  [Function `identity`](#0x1_curves_identity)
--  [Function `generator`](#0x1_curves_generator)
+-  [Function `group_identity`](#0x1_curves_group_identity)
+-  [Function `group_generator`](#0x1_curves_group_generator)
 -  [Function `element_neg`](#0x1_curves_element_neg)
 -  [Function `element_add`](#0x1_curves_element_add)
 -  [Function `element_double`](#0x1_curves_element_double)
@@ -33,6 +33,8 @@
 -  [Function `deserialize_element_uncompressed`](#0x1_curves_deserialize_element_uncompressed)
 -  [Function `deserialize_element_compressed`](#0x1_curves_deserialize_element_compressed)
 -  [Function `element_eq`](#0x1_curves_element_eq)
+-  [Function `is_prime_order`](#0x1_curves_is_prime_order)
+-  [Function `group_order`](#0x1_curves_group_order)
 -  [Function `abort_if_feature_disabled`](#0x1_curves_abort_if_feature_disabled)
 -  [Function `deserialize_element_uncompressed_internal`](#0x1_curves_deserialize_element_uncompressed_internal)
 -  [Function `deserialize_element_compressed_internal`](#0x1_curves_deserialize_element_compressed_internal)
@@ -47,8 +49,10 @@
 -  [Function `scalar_to_bytes_internal`](#0x1_curves_scalar_to_bytes_internal)
 -  [Function `element_add_internal`](#0x1_curves_element_add_internal)
 -  [Function `element_eq_internal`](#0x1_curves_element_eq_internal)
--  [Function `identity_internal`](#0x1_curves_identity_internal)
--  [Function `generator_internal`](#0x1_curves_generator_internal)
+-  [Function `group_identity_internal`](#0x1_curves_group_identity_internal)
+-  [Function `is_prime_order_internal`](#0x1_curves_is_prime_order_internal)
+-  [Function `group_order_internal`](#0x1_curves_group_order_internal)
+-  [Function `group_generator_internal`](#0x1_curves_group_generator_internal)
 -  [Function `element_mul_internal`](#0x1_curves_element_mul_internal)
 -  [Function `element_double_internal`](#0x1_curves_element_double_internal)
 -  [Function `element_neg_internal`](#0x1_curves_element_neg_internal)
@@ -544,13 +548,13 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 
 </details>
 
-<a name="0x1_curves_identity"></a>
+<a name="0x1_curves_group_identity"></a>
 
-## Function `identity`
+## Function `group_identity`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_identity">identity</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_group_identity">group_identity</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -559,10 +563,10 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_identity">identity</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_group_identity">group_identity</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
-        handle: <a href="curves.md#0x1_curves_identity_internal">identity_internal</a>&lt;G&gt;()
+        handle: <a href="curves.md#0x1_curves_group_identity_internal">group_identity_internal</a>&lt;G&gt;()
     }
 }
 </code></pre>
@@ -571,13 +575,13 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 
 </details>
 
-<a name="0x1_curves_generator"></a>
+<a name="0x1_curves_group_generator"></a>
 
-## Function `generator`
+## Function `group_generator`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_generator">generator</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_group_generator">group_generator</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -586,10 +590,10 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_generator">generator</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_group_generator">group_generator</a>&lt;G&gt;(): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
-        handle: <a href="curves.md#0x1_curves_generator_internal">generator_internal</a>&lt;G&gt;()
+        handle: <a href="curves.md#0x1_curves_group_generator_internal">group_generator_internal</a>&lt;G&gt;()
     }
 }
 </code></pre>
@@ -724,7 +728,7 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_simul_element_mul">simul_element_mul</a>&lt;G&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;&gt;, elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     //TODO: replace the naive implementation.
-    <b>let</b> result = <a href="curves.md#0x1_curves_identity">identity</a>&lt;G&gt;();
+    <b>let</b> result = <a href="curves.md#0x1_curves_group_identity">group_identity</a>&lt;G&gt;();
     <b>let</b> num_elements = std::vector::length(elements);
     <b>let</b> num_scalars = std::vector::length(scalars);
     <b>assert</b>!(num_elements == num_scalars, 1);
@@ -941,6 +945,56 @@ See the comments on the actual type <code>G</code> for the format details.
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_eq">element_eq</a>&lt;G&gt;(element_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;, element_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): bool {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_element_eq_internal">element_eq_internal</a>&lt;G&gt;(element_1.handle, element_2.handle)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_is_prime_order"></a>
+
+## Function `is_prime_order`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_is_prime_order">is_prime_order</a>&lt;G&gt;(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_is_prime_order">is_prime_order</a>&lt;G&gt;(): bool {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
+    <a href="curves.md#0x1_curves_is_prime_order_internal">is_prime_order_internal</a>&lt;G&gt;()
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_group_order"></a>
+
+## Function `group_order`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_group_order">group_order</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_group_order">group_order</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
+    <a href="curves.md#0x1_curves_group_order_internal">group_order_internal</a>&lt;G&gt;()
 }
 </code></pre>
 
@@ -1260,13 +1314,13 @@ See the comments on the actual type <code>G</code> for the format details.
 
 </details>
 
-<a name="0x1_curves_identity_internal"></a>
+<a name="0x1_curves_group_identity_internal"></a>
 
-## Function `identity_internal`
+## Function `group_identity_internal`
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_identity_internal">identity_internal</a>&lt;G&gt;(): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_group_identity_internal">group_identity_internal</a>&lt;G&gt;(): u64
 </code></pre>
 
 
@@ -1275,20 +1329,20 @@ See the comments on the actual type <code>G</code> for the format details.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_identity_internal">identity_internal</a>&lt;G&gt;(): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_group_identity_internal">group_identity_internal</a>&lt;G&gt;(): u64;
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_curves_generator_internal"></a>
+<a name="0x1_curves_is_prime_order_internal"></a>
 
-## Function `generator_internal`
+## Function `is_prime_order_internal`
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_generator_internal">generator_internal</a>&lt;G&gt;(): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_is_prime_order_internal">is_prime_order_internal</a>&lt;G&gt;(): bool
 </code></pre>
 
 
@@ -1297,7 +1351,51 @@ See the comments on the actual type <code>G</code> for the format details.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_generator_internal">generator_internal</a>&lt;G&gt;(): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_is_prime_order_internal">is_prime_order_internal</a>&lt;G&gt;(): bool;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_group_order_internal"></a>
+
+## Function `group_order_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_group_order_internal">group_order_internal</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_group_order_internal">group_order_internal</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_group_generator_internal"></a>
+
+## Function `group_generator_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_group_generator_internal">group_generator_internal</a>&lt;G&gt;(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_group_generator_internal">group_generator_internal</a>&lt;G&gt;(): u64;
 </code></pre>
 
 
