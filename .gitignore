@@ -100,3 +100,7 @@ __pycache__
 
 # ignore framework release bundle file
 **/*.mrb
+
+# Profiler outputs
+aptos-move/aptos-vm-profiling/**/*.log
+aptos-move/aptos-vm-profiling/**/*.txt

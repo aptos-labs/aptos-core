@@ -16,6 +16,7 @@ members = [
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
+    "aptos-move/aptos-vm-profiling",
     "aptos-move/block-executor",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
@@ -337,6 +338,7 @@ futures-channel = "= 0.3.24"
 futures-util = "0.3.21"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
+glob = "0.3.0"
 goldenfile = "1.1.0"
 handlebars = "4.2.2"
 heck = "0.3.2"

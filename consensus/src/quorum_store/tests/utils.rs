@@ -14,8 +14,8 @@ use aptos_types::{
 };
 use bcs::to_bytes;
 
-/// Creates a single test transaction
-pub fn create_transaction() -> Transaction {
+// Creates a single test transaction
+fn create_transaction() -> Transaction {
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = private_key.public_key();
 
@@ -38,7 +38,7 @@ pub fn create_transaction() -> Transaction {
     Transaction::UserTransaction(signed_transaction)
 }
 
-pub fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
+pub(crate) fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
     (0..size)
         .map(|_| match create_transaction() {
             Transaction::UserTransaction(inner) => inner,
@@ -47,10 +47,10 @@ pub fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
         .collect()
 }
 
-pub fn create_vec_serialized_transactions(size: u64) -> Vec<SerializedTransaction> {
+pub(crate) fn create_vec_serialized_transactions(size: u64) -> Vec<SerializedTransaction> {
     create_vec_signed_transactions(size)
         .iter()
-        .map(|signed_txn| SerializedTransaction::from_signed_txn(signed_txn))
+        .map(SerializedTransaction::from_signed_txn)
         .collect()
 }
 

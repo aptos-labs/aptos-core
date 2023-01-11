@@ -2,16 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{
-    batch_aggregator::{BatchAggregator, BatchAggregatorError, IncrementalBatchState},
+    batch_aggregator::{BatchAggregationError, BatchAggregator, IncrementalBatchState},
     tests::utils::create_vec_serialized_transactions,
     types::{BatchId, SerializedTransaction},
 };
+use aptos_types::transaction::SignedTransaction;
 use claims::{assert_ge, assert_matches, assert_ok, assert_ok_eq};
 
-fn split_vec(txns: &Vec<SerializedTransaction>, size: usize) -> Vec<Vec<SerializedTransaction>> {
+fn split_vec(txns: &[SerializedTransaction], size: usize) -> Vec<Vec<SerializedTransaction>> {
     let mut ret = Vec::new();
     for chunk in txns.chunks(size) {
-        ret.push(chunk.iter().map(|txn| txn.clone()).collect());
+        ret.push(chunk.to_vec());
     }
     ret
 }
@@ -31,7 +32,6 @@ fn test_batch_state_fragments() {
     let num_txns = 10;
 
     let all_txns = create_vec_serialized_transactions(num_txns);
-    let all_txns_clone = all_txns.clone();
     let txns_size = all_txns[0].len() * (num_txns as usize);
     let fragmented_txns1 = split_vec(&all_txns, 5);
     let fragmented_txns2 = split_vec(&all_txns, 3);
@@ -56,50 +56,56 @@ fn test_batch_state_fragments() {
 
     assert!(batch.is_ok());
     let whole_res = batch.unwrap();
-    assert_eq!(whole_res.1.len(), 10);
+    assert_eq!(whole_res.1.len(), num_txns as usize);
     assert_eq!(whole_res.0, txns_size);
 
     assert_ok_eq!(batch1, whole_res);
     assert_ok_eq!(batch2, whole_res);
+}
+
+#[test]
+fn test_batch_state_size_limit() {
+    let num_txns = 10;
+
+    let all_txns = create_vec_serialized_transactions(num_txns);
+    let txns_size = all_txns[0].len() * (num_txns as usize);
 
     assert_ge!(txns_size, 1500);
     let mut state_small = IncrementalBatchState::new(1500);
     assert_eq!(
-        state_small.append_transactions(all_txns_clone).unwrap_err(),
-        BatchAggregatorError::SizeLimitExceeded
+        state_small.append_transactions(all_txns).unwrap_err(),
+        BatchAggregationError::SizeLimitExceeded
     );
     assert_eq!(state_small.num_fragments(), 1);
 
     assert_eq!(
         state_small.append_transactions(Vec::new()).unwrap_err(),
-        BatchAggregatorError::SizeLimitExceeded
+        BatchAggregationError::SizeLimitExceeded
     );
     assert_eq!(state_small.num_fragments(), 2);
 
     let batch_overflow = state_small.finalize_batch();
     assert_eq!(
         batch_overflow.unwrap_err(),
-        BatchAggregatorError::SizeLimitExceeded
+        BatchAggregationError::SizeLimitExceeded
     );
 }
 
 #[test]
 fn test_batch_state_deserialization() {
     let mut state = IncrementalBatchState::new(1000);
-    let txns = vec![SerializedTransaction {
-        bytes: vec![8, 2, 0],
-    }];
+    let txns = vec![SerializedTransaction::from_bytes(vec![8, 2, 0])];
 
     assert_eq!(state.num_fragments(), 0);
     assert_eq!(
         state.append_transactions(txns).unwrap_err(),
-        BatchAggregatorError::DeserializationError
+        BatchAggregationError::DeserializationError
     );
     assert_eq!(state.num_fragments(), 1);
 
     assert_eq!(
         state.append_transactions(Vec::new()).unwrap_err(),
-        BatchAggregatorError::DeserializationError
+        BatchAggregationError::DeserializationError
     );
     assert_eq!(state.num_fragments(), 2);
 
@@ -107,7 +113,7 @@ fn test_batch_state_deserialization() {
         state
             .append_transactions(create_vec_serialized_transactions(20))
             .unwrap_err(),
-        BatchAggregatorError::DeserializationError
+        BatchAggregationError::DeserializationError
     );
 
     // Would overflow a non-error state.
@@ -115,7 +121,7 @@ fn test_batch_state_deserialization() {
     let batch = state.finalize_batch();
     assert_eq!(
         batch.unwrap_err(),
-        BatchAggregatorError::DeserializationError
+        BatchAggregationError::DeserializationError
     );
 }
 
@@ -125,12 +131,12 @@ fn check_outdated_fragments(aggregator: &mut BatchAggregator, pairs: Vec<(BatchI
             aggregator
                 .append_transactions(i, j, Vec::new())
                 .unwrap_err(),
-            BatchAggregatorError::OutdatedFragment
+            BatchAggregationError::OutdatedFragment
         );
 
         assert_eq!(
             aggregator.end_batch(i, j, Vec::new()).unwrap_err(),
-            BatchAggregatorError::OutdatedFragment
+            BatchAggregationError::OutdatedFragment
         );
     }
 }
@@ -144,7 +150,7 @@ fn test_batch_aggregator_ids() {
         aggregator
             .append_transactions(3, 1, Vec::new())
             .unwrap_err(),
-        BatchAggregatorError::MissedFragment
+        BatchAggregationError::MissedFragment
     );
     // Everything <= batch 3 is now outdated.
     for i in 0..3 {
@@ -153,7 +159,7 @@ fn test_batch_aggregator_ids() {
                 aggregator
                     .append_transactions(i, j, Vec::new())
                     .unwrap_err(),
-                BatchAggregatorError::OutdatedFragment
+                BatchAggregationError::OutdatedFragment
             );
         }
     }
@@ -165,17 +171,14 @@ fn test_batch_aggregator_ids() {
         &mut aggregator,
         (0..5)
             .into_iter()
-            .flat_map(move |i| (0..2).into_iter().map(move |j| (i, j)))
+            .flat_map(move |i| (0..3).into_iter().map(move |j| (i, j)))
             .collect(),
     );
     assert_ok!(aggregator.append_transactions(4, 3, Vec::new()));
-    assert_matches!(aggregator.end_batch(4, 4, Vec::new()), Ok((0, _, _)));
-
-    assert_eq!(
-        aggregator
-            .append_transactions(4, 0, Vec::new())
-            .unwrap_err(),
-        BatchAggregatorError::OutdatedFragment
+    let _empty_vec: Vec<SignedTransaction> = Vec::new();
+    assert_matches!(
+        aggregator.end_batch(4, 4, Vec::new()),
+        Ok((0, _empty_vec, _))
     );
 
     // Starting with (3,0) should work for a newly created aggregator.
@@ -183,7 +186,10 @@ fn test_batch_aggregator_ids() {
     assert_ok!(aggregator.append_transactions(3, 0, Vec::new()));
 
     check_outdated_fragments(&mut aggregator, vec![(3, 0), (2, 0), (2, 7), (0, 0)]);
-    assert_matches!(aggregator.end_batch(3, 1, Vec::new()), Ok((0, _, _)));
+    assert_matches!(
+        aggregator.end_batch(3, 1, Vec::new()),
+        Ok((0, _empty_vec, _))
+    );
 }
 
 #[test]
@@ -204,36 +210,36 @@ fn test_batch_aggregator() {
     assert_ok!(aggregator.append_transactions(4, 0, fragmented_txns1[0].clone()));
     assert_ok!(aggregator.append_transactions(4, 1, fragmented_txns1[1].clone()));
     check_outdated_fragments(&mut aggregator, vec![(4, 0), (4, 1), (3, 0)]);
-    assert_ok_eq!(aggregator.end_batch(4, 2, Vec::new()), base_res.clone(),);
+    assert_ok_eq!(aggregator.end_batch(4, 2, Vec::new()), base_res);
 
     assert_ok!(aggregator.append_transactions(6, 0, fragmented_txns1[0].clone()));
     assert_ok!(aggregator.append_transactions(6, 1, Vec::new()));
     assert_ok!(aggregator.append_transactions(6, 2, Vec::new()));
     assert_ok_eq!(
         aggregator.end_batch(6, 3, fragmented_txns1[1].clone()),
-        base_res.clone()
+        base_res
     );
 
     assert_eq!(
         aggregator
             .append_transactions(6, 0, Vec::new())
             .unwrap_err(),
-        BatchAggregatorError::OutdatedFragment
+        BatchAggregationError::OutdatedFragment
     );
 
     assert_eq!(
         aggregator
             .append_transactions(7, 1, fragmented_txns1[0].clone())
             .unwrap_err(),
-        BatchAggregatorError::MissedFragment
+        BatchAggregationError::MissedFragment
     );
     assert_eq!(
         aggregator
             .append_transactions(7, 0, Vec::new())
             .unwrap_err(),
-        BatchAggregatorError::OutdatedFragment
+        BatchAggregationError::OutdatedFragment
     );
-    assert_ok_eq!(aggregator.end_batch(8, 0, all_txns_clone), base_res.clone());
+    assert_ok_eq!(aggregator.end_batch(8, 0, all_txns_clone), base_res);
 
     assert_ok!(aggregator.append_transactions(9, 0, fragmented_txns1[0].clone()));
     assert_ok!(aggregator.append_transactions(9, 1, fragmented_txns1[0].clone()));
@@ -241,25 +247,21 @@ fn test_batch_aggregator() {
         aggregator
             .append_transactions(9, 2, fragmented_txns1[1].clone())
             .unwrap_err(),
-        BatchAggregatorError::SizeLimitExceeded
+        BatchAggregationError::SizeLimitExceeded
     );
 
     assert_eq!(
         aggregator.end_batch(9, 2, Vec::new()).unwrap_err(),
-        BatchAggregatorError::OutdatedFragment
+        BatchAggregationError::OutdatedFragment
     );
     assert_eq!(
         aggregator.end_batch(9, 3, Vec::new()).unwrap_err(),
-        BatchAggregatorError::SizeLimitExceeded
+        BatchAggregationError::SizeLimitExceeded
     );
 
-    // Observes missed fragment but still starts aggregating 10.
-    assert_eq!(
-        aggregator
-            .append_transactions(10, 0, Vec::new())
-            .unwrap_err(),
-        BatchAggregatorError::MissedFragment
-    );
+    // Observes missed fragment but still starts aggregating 10. Since aggregation was
+    // successful, the return type is Ok(()).
+    assert_ok!(aggregator.append_transactions(10, 0, Vec::new()));
 
     // Observes missed fragment but still processes batch 11.
     let half_res = aggregator
@@ -268,13 +270,13 @@ fn test_batch_aggregator() {
     assert_eq!(half_res.1.len(), 5);
     assert_ne!(half_res.2, base_res.2);
 
-    for i in 0..3 {
-        assert_ok!(aggregator.append_transactions(12, 2 * i, fragmented_txns2[i].clone()));
+    for (i, txn) in fragmented_txns2.iter().enumerate().take(3) {
+        assert_ok!(aggregator.append_transactions(12, 2 * i, txn.clone()));
         assert_ok!(aggregator.append_transactions(12, 2 * i + 1, Vec::new()));
     }
     assert_ok_eq!(
         aggregator.end_batch(12, 6, fragmented_txns2[3].clone()),
-        base_res.clone()
+        base_res
     );
 
     assert_ok!(aggregator.append_transactions(15, 0, fragmented_txns1[0].clone()));
@@ -282,13 +284,13 @@ fn test_batch_aggregator() {
         aggregator
             .end_batch(15, 2, fragmented_txns1[1].clone())
             .unwrap_err(),
-        BatchAggregatorError::MissedFragment
+        BatchAggregationError::MissedFragment
     );
     assert_eq!(
         aggregator
             .end_batch(15, 2, fragmented_txns1[1].clone())
             .unwrap_err(),
-        BatchAggregatorError::OutdatedFragment
+        BatchAggregationError::OutdatedFragment
     );
 
     assert_ok!(aggregator.append_transactions(16, 0, fragmented_txns1[0].clone()));
@@ -296,12 +298,15 @@ fn test_batch_aggregator() {
         aggregator
             .append_transactions(16, 2, fragmented_txns1[1].clone())
             .unwrap_err(),
-        BatchAggregatorError::MissedFragment
+        BatchAggregationError::MissedFragment
     );
     assert_eq!(
         aggregator
             .end_batch(16, 2, fragmented_txns1[1].clone())
             .unwrap_err(),
-        BatchAggregatorError::OutdatedFragment
+        BatchAggregationError::OutdatedFragment
     );
+
+    assert_ok!(aggregator.end_batch(17, 0, Vec::new()));
+    assert_ok!(aggregator.end_batch(18, 0, Vec::new()));
 }

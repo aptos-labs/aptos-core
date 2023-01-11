@@ -3,7 +3,7 @@
 
 use aptos_metrics_core::{
     op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, Histogram, HistogramVec, IntCounter, IntGauge, register_int_gauge,
+    register_int_counter, register_int_gauge, Histogram, HistogramVec, IntCounter, IntGauge,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
