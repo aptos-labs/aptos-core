@@ -44,7 +44,7 @@ The Aptos token standard supports [mutation of a fungible token to an NFT](#evol
 
 ### Storing customized token properties on-chain
 
-The Aptos token standard provides an easy way to store properties on-chain. You can define your own properties based on your application. Each token can also have its own property values. These properties can be directly read and written by smart contracts.
+The Aptos token standard provides an easy way to store properties on-chain and be used by [Aptos Names](https://www.aptosnames.com/) and other services. You can define your own properties based on your application. Each token can also have its own property values. These properties can be directly read and written by smart contracts.
 
 #### Default properties
 
@@ -55,6 +55,8 @@ The `default_properties` field is a key-value store with type information. It le
 #### Token properties
 
 You can also use the `token_properties` defined in the token itself for customization on-chain. You can create customized values for a property of this  specific token, thereby allowing a token to have a different property value from its default.
+
+Note that limit exist to storing customized token properties on-chain, namely 1000 properties per token with field names limited to 128 characters.
 
 ### Evolving from fungible token to NFT
 
