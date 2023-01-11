@@ -13,7 +13,7 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 11 January 2023
 
-- Greatly expanded the [First Dapp tutorial](tutorials/first-dapp.md) to include a section on publishing the Move module using the TypeScript SDK, adds labels to outputs, improve the initialization for Petra wallet and the Aptos CLI, and more.
+- Greatly expanded the [First Dapp tutorial](tutorials/first-dapp.md) to include a section on publishing the Move module using the TypeScript SDK, adds labels to output, improve the initialization for Petra wallet and the Aptos CLI, and more.
 
 - Noted in the [Aptos Token Standard](concepts/coin-and-token/aptos-token.md) that limits exist to storing customized token properties on-chain, namely 1000 properties per token with field names limited to 128 characters.
 
