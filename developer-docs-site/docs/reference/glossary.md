@@ -295,7 +295,7 @@ See [Resource accounts](../guides/resource-accounts.md).
 
 - A [**table**](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/doc/table.md) implements the Table type and in Aptos is used to store information as key-value data within an account at large scale.
 
-See [`table.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/table.move) for the associated Aptos source file. See the Stack Overflow answer for [Given a key, how do I read the value from a table via the API?](https://stackoverflow.com/questions/74296605/given-a-key-how-do-i-read-the-value-from-a-table-via-the-api) to read table data.
+See [`table.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/table.move) for the associated Aptos source file.
 
 ### Transaction
 
