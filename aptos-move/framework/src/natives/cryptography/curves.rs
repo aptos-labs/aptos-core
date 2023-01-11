@@ -37,7 +37,7 @@ use std::slice::Iter;
 use once_cell::sync::Lazy;
 
 pub mod abort_codes {
-    pub const E_CURVE_TYPE_NOT_SUPPORTED: u64 = 1;
+    pub const E_UNKNOWN_GROUP: u64 = 2;
 }
 
 #[derive(Debug, Clone)]
@@ -746,7 +746,7 @@ fn scalar_eq_internal(
         _ => {
             return Ok(NativeResult::err(
                 gas_params.bls12_381.fr_eq,
-                abort_codes::E_CURVE_TYPE_NOT_SUPPORTED,
+                abort_codes::E_UNKNOWN_GROUP,
             ))
         }
     };
@@ -861,16 +861,21 @@ fn group_order_internal(
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
-    let (cost, bytes) = match type_tag.as_str() {
+    match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
-            (InternalGas::zero(), bls12381_r_bytes_lendian.clone())
+            Ok(NativeResult::ok(
+                InternalGas::zero(),
+                smallvec![Value::vector_u8(bls12381_r_bytes_lendian.clone())],
+            ))
         }
-        _ => todo!(),
-    };
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::vector_u8(bytes)],
-    ))
+        _ => {
+            Ok(NativeResult::err(
+                InternalGas::zero(),
+                abort_codes::E_UNKNOWN_GROUP,
+            ))
+
+        },
+    }
 }
 
 fn is_prime_order_internal(

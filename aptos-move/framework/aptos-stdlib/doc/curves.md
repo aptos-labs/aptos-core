@@ -316,6 +316,15 @@ See the comments on the specific <code>G</code> for more details about <code><a 
 
 
 
+<a name="0x1_curves_E_UNKNOWN_GROUP"></a>
+
+
+
+<pre><code><b>const</b> <a href="curves.md#0x1_curves_E_UNKNOWN_GROUP">E_UNKNOWN_GROUP</a>: u64 = 2;
+</code></pre>
+
+
+
 <a name="0x1_curves_pairing"></a>
 
 ## Function `pairing`

@@ -3,6 +3,7 @@ module aptos_std::curves {
 
     // Error codes
     const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 1;
+    const E_UNKNOWN_GROUP: u64 = 2;
 
     /// A phantom type that represents the 1st pairing input group `G1` in BLS12-381 pairing.
     ///
@@ -626,6 +627,7 @@ module aptos_std::curves {
     #[test(fx = @std)]
     fun test_bls12381_pairing(fx: signer) {
         std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
+        // Single pairing.
         let gt_point_1 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
             &element_mul(&scalar_from_u64(5), &group_generator<BLS12_381_G1>()),
             &element_mul(&scalar_from_u64(7), &group_generator<BLS12_381_G2>()),
@@ -640,11 +642,8 @@ module aptos_std::curves {
         );
         assert!(element_eq(&gt_point_1, &gt_point_2), 1);
         assert!(element_eq(&gt_point_1, &gt_point_3), 1);
-    }
 
-    #[test(fx = @std)]
-    fun test_bls12381_multi_pairing(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
+        // Multiple pairing.
         let g1_point_1 = group_generator<BLS12_381_G1>();
         let g2_point_1 = group_generator<BLS12_381_G2>();
         let g1_point_2 = element_mul(&scalar_from_u64<BLS12_381_G1>(5), &g1_point_1);
@@ -654,5 +653,15 @@ module aptos_std::curves {
         let expected = element_mul(&scalar_from_u64<BLS12_381_Gt>(111), &pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point_1, &g2_point_1));
         let actual = multi_pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&vector[g1_point_1, g1_point_2, g1_point_3], &vector[g2_point_1, g2_point_2, g2_point_3]);
         assert!(element_eq(&expected, &actual), 1);
+    }
+
+    #[test_only]
+    struct UnknownGroup {}
+
+    #[test(fx = @std)]
+    #[expected_failure(abort_code = E_UNKNOWN_GROUP, location = Self)]
+    fun test_unknown_group(fx: signer) {
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
+        let _ = group_order<UnknownGroup>();
     }
 }
