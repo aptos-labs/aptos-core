@@ -23,7 +23,7 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 23 December 2022
 
-- Added instructions for [manually installing build dependencies on Windows]()
+- Added instructions for [manually installing build dependencies on Windows](guides/getting-started.md#set-up-build-dependencies).
 
 ## 20 December 2022
 
