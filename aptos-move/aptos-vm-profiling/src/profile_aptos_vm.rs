@@ -28,8 +28,8 @@ fn run_aptos_p2p() -> Result<()> {
 
     let genesis_blob = bcs::to_bytes(GENESIS_CHANGE_SET_HEAD.write_set())?;
 
-    let log_path = Path::join(*PATH_CRATE_ROOT, "p2p.log");
-    let annotation_path = Path::join(*PATH_CRATE_ROOT, "p2p.txt");
+    let log_path = Path::join(&PATH_CRATE_ROOT, "p2p.log");
+    let annotation_path = Path::join(&PATH_CRATE_ROOT, "p2p.txt");
 
     crate::valgrind::profile_with_valgrind(
         [&*PATH_BIN_RUN_APTOS_P2P],
