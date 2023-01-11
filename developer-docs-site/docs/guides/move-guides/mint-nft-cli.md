@@ -5,7 +5,7 @@ slug: "mint-nft-cli"
 
 # Mint an NFT with Aptos CLI
 
-This tutorial lets you use the Aptos CLI to mint NFTs in Aptos testnet so you can see how the process works and employ related functions in your code.
+This tutorial lets you use the Aptos CLI to mint non-fungible tokens (NFTs) in Aptos testnet so you can see how the process works and employ related functions in your code.
 
 ## Prerequisites
 
@@ -14,17 +14,36 @@ This tutorial assumes you have:
 * a [GitHub account](https://docs.github.com/en/get-started/signing-up-for-github/signing-up-for-a-new-github-account)
 * the [GitHub CLI](https://cli.github.com/)
 * the [Aptos CLI](../../cli-tools/aptos-cli-tool/install-aptos-cli.md) (or you can run from [aptos-core](https://github.com/aptos-labs/aptos-core) source via `cargo run`)
-
-## Role of accounts
-
-When you are minting an NFT, the NFT is stored under your [account](../../concepts/accounts.md) address. When you submit a transaction, you sign the transaction.
-
-[Resource accounts](../resource-accounts.md) allow the delegation of signing transactions. You create a resource account to grant a signer capability that can be stored in a new resource on the same account and can sign transactions autonomously. The signer capability is protected as no one has access to the private key for the resource account.
+* the `aptos-core` repository checked out: `git clone https://github.com/aptos-labs/aptos-core.git`
 
 ## Understand minting
 
+TODO: Consider moving all of this conceptual information to its own page, perhaps a new NFT index. Merge with conceptual information from Workshop #2.
+
 * Review the [mint_nft](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) source code and code comments within each subdirectory.
 * Explore the `mint_event_ticket` function defined within each subdirectory.
+
+### NFT types
+
+The two most common types of NFT are Event ticket / certificates and PFP NFTs.
+
+#### Event tickets and certificates
+
+This kind of NFT has a base token, and every new NFT generated from this base token has the same token data ID and image. They are generally used as certificates, meaning each NFT created from the base token is considered a printing edition of the base token.
+
+You might use this type of NFT for event tickets where each NFT is a ticket and has properties representing expiration date and if the ticket has been used. When you mint the NFT, you may set an expiration time for the event ticket and `is_ticket_used` to `false`. When the ticket is used, you update `is_ticket_used` to `true`.
+
+#### Profile picture (PFP) NFTs
+
+A PFP NFT has a unique token data ID and picture for each token. There are generally no printing editions of this NFT. Most NFT collections on NFT marketplaces are of this kind. They are generally proofs of ownership of an art piece.
+
+In this tutorial, we describe how to create and mint event ticket NFTs.
+
+### Accounts
+
+When you are minting an NFT, the NFT is stored under your [account](../../concepts/accounts.md) address. When you submit a transaction, you sign the transaction. Find your account configuration information in `.aptos/config.yaml` relative to where you run `aptos init` (below).
+
+[Resource accounts](../resource-accounts.md) allow the delegation of signing transactions. You create a resource account to grant a signer capability that can be stored in a new resource on the same account and can sign transactions autonomously. The signer capability is protected as no one has access to the private key for the resource account.
 
 ### Initialization
 
@@ -88,32 +107,39 @@ And then use the reference to the signer capability in the  `ModuleData` struct 
 
 In this manner, you can later use the signer capability already stored in module. When you move a module and its structs into an account, they become visible in [Aptos Explorer](https://explorer.aptoslabs.com/) associated with the account.
 
-## Mint with the Aptos CLI
+## Create a collection and token
 
 Now that you have an understanding of the Aptos minting process and are starting to write smart contracts with Move, you are ready to create your first testnet NFT with the Aptos CLI.
 
-### Install Aptos CLI and create an account
+In this section, we create a collection and token and then mint a token to a receiver.
+
+### Create an account
 
 1. [Install the Aptos CLI](../../cli-tools/aptos-cli-tool/install-aptos-cli.md) and note its [many uses](../../cli-tools/aptos-cli-tool/use-aptos-cli.md) for later if you haven't experienced its goodness already.
 
-2. Create an account on Aptos testnet to receive the NFT by running the following command and selecting `testnet`:
+2. Create a default (typical) account on Aptos testnet to receive the NFT by running the following command and selecting `testnet`:
   ```shell
-  aptos init --profile nft-receiver
+  aptos init
   ```
 
-3. When prompted for a network, select `testnet` by entering it and hitting return:
+3. Receive the output:
   ```shell
-  Configuring for profile nft-receiver
+  Configuring for profile default
+  ```
+
+3. When prompted for a network:
+  ```shell
   Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]
-  testnet
   ```
+  Select `testnet` by entering it and hitting return.
 
-4. When prompted for your private key, hit enter to generate a new key:
+4. When prompted for your private key:
   ```shell
   Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
   ```
+  Hit enter to generate a new key.
 
-5. Receive output resembling:
+5. Receive output indicating success and resembling:
   ```shell
   No key given, generating key...
   Account a233bf7be2b93f1e532f8ea88c49e0c70a873d082890b6d9685f89b5e40d50c2 does not exist, you will need to create and fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account
@@ -126,6 +152,66 @@ Now that you have an understanding of the Aptos minting process and are starting
   ```
 
 6. Note your configuration information can be found in `.aptos/config.yaml` relative to where you ran `aptos init`. Read that file to see each profile's private and public keys, account address, and REST API URL.
+
+### Publish the module
+
+1. In your `aptos-core` source checkout, navigate to the `aptos-core/aptos-move/move-examples/mint_nft/1-Create-NFT` directory:
+
+```shell
+cd aptos-core/aptos-move/move-examples/mint_nft/1-Create-NFT
+```
+
+2. Run `aptos move publish` to publish the Move module in that directory, updating it with your default account address from `.aptos/config.yaml`:
+
+```shell
+aptos move publish --named-addresses mint_nft=<default-account-address>
+```
+
+For example:
+
+```shell
+aptos move publish --named-addresses mint_nft=a911e7374107ad434bbc5369289cf5855c3b1a2938a6bfce0776c1d296271cde
+```
+
+3. Receive output asking you to accept a gas fee for the transaction:
+
+```shell
+    Compiling, may take a little while to download git dependencies...
+    INCLUDING DEPENDENCY AptosFramework
+    INCLUDING DEPENDENCY AptosStdlib
+    INCLUDING DEPENDENCY AptosToken
+    INCLUDING DEPENDENCY MoveStdlib
+    BUILDING Examples
+    package size 2770 bytes
+    Do you want to submit a transaction for a range of [1164400 - 1746600] Octas at a gas unit price of 100 Octas? [yes/no]
+```
+
+4. Enter `yes` and receive results indicating success:
+
+```shell
+    {
+      "Result": {
+        "transaction_hash": "0x576a2e9481e71b629335b98ea75c87d124e1b435e843e7a2ef8938ae21bebfa3",
+        "gas_used": 11679,
+        "gas_unit_price": 100,  
+        "sender": "a911e7374107ad434bbc5369289cf5855c3b1a2938a6bfce0776c1d296271cde",
+        "sequence_number": 0,
+        "success": true,
+        "timestamp_us": 1669659103283876,
+        "version": 12735152,
+        "vm_status": "Executed successfully"
+      }
+    }
+```
+
+### See the module on Aptos Explorer
+
+1. Go to the [Aptos Explorer](https://explorer.aptoslabs.com/) in a web browser>
+2. Select the network you used: testnet
+3. Search for the transaction by `transaction_hash` in the search field, using your own unique transaction hash.
+4. View the changes made in publishing this module under the *Changes* tab.
+
+### Fund your account
 
 ### Install wallet and import account
 
