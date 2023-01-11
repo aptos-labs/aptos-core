@@ -24,7 +24,7 @@
 -  [Function `element_neg`](#0x1_curves_element_neg)
 -  [Function `element_add`](#0x1_curves_element_add)
 -  [Function `element_mul`](#0x1_curves_element_mul)
--  [Function `simul_point_mul`](#0x1_curves_simul_point_mul)
+-  [Function `simul_element_mul`](#0x1_curves_simul_element_mul)
 -  [Function `scalar_from_bytes`](#0x1_curves_scalar_from_bytes)
 -  [Function `scalar_to_bytes`](#0x1_curves_scalar_to_bytes)
 -  [Function `serialize_element_uncompressed`](#0x1_curves_serialize_element_uncompressed)
@@ -316,7 +316,7 @@ See the comments on the specific <code>G</code> for more details about <code><a 
 Perform a bilinear mapping.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing">pairing</a>&lt;G1, G2, Gt&gt;(point_1: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;, point_2: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;Gt&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing">pairing</a>&lt;G1, G2, Gt&gt;(element_1: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;, element_2: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;Gt&gt;
 </code></pre>
 
 
@@ -325,10 +325,10 @@ Perform a bilinear mapping.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing">pairing</a>&lt;G1,G2,Gt&gt;(point_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G1&gt;, point_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G2&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing">pairing</a>&lt;G1,G2,Gt&gt;(element_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G1&gt;, element_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G2&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
-        handle: <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(1, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[point_1.handle], 1, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[point_2.handle])
+        handle: <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(1, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[element_1.handle], 1, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[element_2.handle])
     }
 }
 </code></pre>
@@ -601,7 +601,7 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_neg">element_neg</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_neg">element_neg</a>&lt;G&gt;(element: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -610,10 +610,10 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_neg">element_neg</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_neg">element_neg</a>&lt;G&gt;(element: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
-        handle: <a href="curves.md#0x1_curves_element_neg_internal">element_neg_internal</a>&lt;G&gt;(point.handle)
+        handle: <a href="curves.md#0x1_curves_element_neg_internal">element_neg_internal</a>&lt;G&gt;(element.handle)
     }
 }
 </code></pre>
@@ -628,7 +628,7 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_add">element_add</a>&lt;G&gt;(point_1: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;, point_2: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_add">element_add</a>&lt;G&gt;(element_1: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;, element_2: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -637,10 +637,10 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_add">element_add</a>&lt;G&gt;(point_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;, point_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_add">element_add</a>&lt;G&gt;(element_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;, element_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
-        handle: <a href="curves.md#0x1_curves_element_add_internal">element_add_internal</a>&lt;G&gt;(point_1.handle, point_2.handle)
+        handle: <a href="curves.md#0x1_curves_element_add_internal">element_add_internal</a>&lt;G&gt;(element_1.handle, element_2.handle)
     }
 }
 </code></pre>
@@ -655,7 +655,7 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_mul">element_mul</a>&lt;G&gt;(_scalar: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;, _point: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_mul">element_mul</a>&lt;G&gt;(scalar: &<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;, element: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -664,10 +664,10 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_mul">element_mul</a>&lt;G&gt;(_scalar: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;, _point: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_mul">element_mul</a>&lt;G&gt;(scalar: &<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;, element: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
-        handle: <a href="curves.md#0x1_curves_element_mul_internal">element_mul_internal</a>&lt;G&gt;(_scalar.handle, _point.handle)
+        handle: <a href="curves.md#0x1_curves_element_mul_internal">element_mul_internal</a>&lt;G&gt;(scalar.handle, element.handle)
     }
 }
 </code></pre>
@@ -676,13 +676,13 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 
 </details>
 
-<a name="0x1_curves_simul_point_mul"></a>
+<a name="0x1_curves_simul_element_mul"></a>
 
-## Function `simul_point_mul`
+## Function `simul_element_mul`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_simul_point_mul">simul_point_mul</a>&lt;G&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;&gt;, points: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_simul_element_mul">simul_element_mul</a>&lt;G&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G&gt;&gt;, elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -691,18 +691,18 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_simul_point_mul">simul_point_mul</a>&lt;G&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;&gt;, points: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_simul_element_mul">simul_element_mul</a>&lt;G&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;&gt;, elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     //TODO: replace the naive implementation.
     <b>let</b> result = <a href="curves.md#0x1_curves_identity">identity</a>&lt;G&gt;();
-    <b>let</b> num_points = std::vector::length(points);
+    <b>let</b> num_elements = std::vector::length(elements);
     <b>let</b> num_scalars = std::vector::length(scalars);
-    <b>assert</b>!(num_points == num_scalars, 1);
+    <b>assert</b>!(num_elements == num_scalars, 1);
     <b>let</b> i = 0;
-    <b>while</b> (i &lt; num_points) {
+    <b>while</b> (i &lt; num_elements) {
         <b>let</b> scalar = std::vector::borrow(scalars, i);
-        <b>let</b> point = std::vector::borrow(points, i);
-        result = <a href="curves.md#0x1_curves_element_add">element_add</a>(&result, &<a href="curves.md#0x1_curves_element_mul">element_mul</a>(scalar, point));
+        <b>let</b> element = std::vector::borrow(elements, i);
+        result = <a href="curves.md#0x1_curves_element_add">element_add</a>(&result, &<a href="curves.md#0x1_curves_element_mul">element_mul</a>(scalar, element));
         i = i + 1;
     };
     result
@@ -783,7 +783,7 @@ Encode an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;</cod
 See the comments on the actual type <code>G</code> for the format details.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;G&gt;(element: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -792,9 +792,9 @@ See the comments on the actual type <code>G</code> for the format details.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;G&gt;(element: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <a href="curves.md#0x1_curves_serialize_element_uncompressed_internal">serialize_element_uncompressed_internal</a>&lt;G&gt;(point.handle)
+    <a href="curves.md#0x1_curves_serialize_element_uncompressed_internal">serialize_element_uncompressed_internal</a>&lt;G&gt;(element.handle)
 }
 </code></pre>
 
@@ -810,7 +810,7 @@ Encode an <code><a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;</cod
 See the comments on the actual type <code>G</code> for the format details.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed">serialize_element_compressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed">serialize_element_compressed</a>&lt;G&gt;(element: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -819,9 +819,9 @@ See the comments on the actual type <code>G</code> for the format details.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed">serialize_element_compressed</a>&lt;G&gt;(point: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed">serialize_element_compressed</a>&lt;G&gt;(element: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <a href="curves.md#0x1_curves_serialize_element_compressed_internal">serialize_element_compressed_internal</a>&lt;G&gt;(point.handle)
+    <a href="curves.md#0x1_curves_serialize_element_compressed_internal">serialize_element_compressed_internal</a>&lt;G&gt;(element.handle)
 }
 </code></pre>
 
@@ -899,7 +899,7 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_eq">element_eq</a>&lt;G&gt;(point_1: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;, point_2: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_eq">element_eq</a>&lt;G&gt;(element_1: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;, element_2: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): bool
 </code></pre>
 
 
@@ -908,9 +908,9 @@ See the comments on the actual type <code>G</code> for the format details.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_eq">element_eq</a>&lt;G&gt;(point_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;, point_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_eq">element_eq</a>&lt;G&gt;(element_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;, element_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): bool {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <a href="curves.md#0x1_curves_element_eq_internal">element_eq_internal</a>&lt;G&gt;(point_1.handle, point_2.handle)
+    <a href="curves.md#0x1_curves_element_eq_internal">element_eq_internal</a>&lt;G&gt;(element_1.handle, element_2.handle)
 }
 </code></pre>
 
@@ -1258,7 +1258,7 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_element_mul_internal">element_mul_internal</a>&lt;G&gt;(scalar_handle: u64, point_handle: u64): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_element_mul_internal">element_mul_internal</a>&lt;G&gt;(scalar_handle: u64, element_handle: u64): u64
 </code></pre>
 
 
@@ -1267,7 +1267,7 @@ See the comments on the actual type <code>G</code> for the format details.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_element_mul_internal">element_mul_internal</a>&lt;G&gt;(scalar_handle: u64, point_handle: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_element_mul_internal">element_mul_internal</a>&lt;G&gt;(scalar_handle: u64, element_handle: u64): u64;
 </code></pre>
 
 

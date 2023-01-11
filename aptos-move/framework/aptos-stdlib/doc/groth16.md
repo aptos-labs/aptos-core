@@ -351,7 +351,7 @@
     <a href="groth16.md#0x1_groth16_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <b>let</b> scalars: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">curves::Scalar</a>&lt;G1&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="curves.md#0x1_curves_scalar_from_u64">curves::scalar_from_u64</a>&lt;G1&gt;(1)];
     std::vector::append(&<b>mut</b> scalars, *public_inputs);
-    <b>let</b> g1_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.a, <a href="curves.md#0x1_curves_simul_point_mul">curves::simul_point_mul</a>(&scalars, &pvk.gamma_abc_g1), proof.c];
+    <b>let</b> g1_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G1&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.a, <a href="curves.md#0x1_curves_simul_element_mul">curves::simul_element_mul</a>(&scalars, &pvk.gamma_abc_g1), proof.c];
     <b>let</b> g2_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G2&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];
 
     <a href="curves.md#0x1_curves_element_eq">curves::element_eq</a>(&pvk.alpha_g1_beta_g2, &<a href="curves.md#0x1_curves_multi_pairing">curves::multi_pairing</a>&lt;G1,G2,Gt&gt;(&g1_elements, &g2_elements))

@@ -118,10 +118,10 @@ module aptos_std::curves {
     }
 
     /// Perform a bilinear mapping.
-    public fun pairing<G1,G2,Gt>(point_1: &Element<G1>, point_2: &Element<G2>): Element<Gt> {
+    public fun pairing<G1,G2,Gt>(element_1: &Element<G1>, element_2: &Element<G2>): Element<Gt> {
         abort_if_feature_disabled();
         Element<Gt> {
-            handle: multi_pairing_internal<G1,G2,Gt>(1, vector[point_1.handle], 1, vector[point_2.handle])
+            handle: multi_pairing_internal<G1,G2,Gt>(1, vector[element_1.handle], 1, vector[element_2.handle])
         }
     }
 
@@ -204,39 +204,39 @@ module aptos_std::curves {
         }
     }
 
-    public fun element_neg<G>(point: &Element<G>): Element<G> {
+    public fun element_neg<G>(element: &Element<G>): Element<G> {
         abort_if_feature_disabled();
         Element<G> {
-            handle: element_neg_internal<G>(point.handle)
+            handle: element_neg_internal<G>(element.handle)
         }
     }
 
-    public fun element_add<G>(point_1: &Element<G>, point_2: &Element<G>): Element<G> {
+    public fun element_add<G>(element_1: &Element<G>, element_2: &Element<G>): Element<G> {
         abort_if_feature_disabled();
         Element<G> {
-            handle: element_add_internal<G>(point_1.handle, point_2.handle)
+            handle: element_add_internal<G>(element_1.handle, element_2.handle)
         }
     }
 
-    public fun element_mul<G>(_scalar: &Scalar<G>, _point: &Element<G>): Element<G> {
+    public fun element_mul<G>(scalar: &Scalar<G>, element: &Element<G>): Element<G> {
         abort_if_feature_disabled();
         Element<G> {
-            handle: element_mul_internal<G>(_scalar.handle, _point.handle)
+            handle: element_mul_internal<G>(scalar.handle, element.handle)
         }
     }
 
-    public fun simul_point_mul<G>(scalars: &vector<Scalar<G>>, points: &vector<Element<G>>): Element<G> {
+    public fun simul_element_mul<G>(scalars: &vector<Scalar<G>>, elements: &vector<Element<G>>): Element<G> {
         abort_if_feature_disabled();
         //TODO: replace the naive implementation.
         let result = identity<G>();
-        let num_points = std::vector::length(points);
+        let num_elements = std::vector::length(elements);
         let num_scalars = std::vector::length(scalars);
-        assert!(num_points == num_scalars, 1);
+        assert!(num_elements == num_scalars, 1);
         let i = 0;
-        while (i < num_points) {
+        while (i < num_elements) {
             let scalar = std::vector::borrow(scalars, i);
-            let point = std::vector::borrow(points, i);
-            result = element_add(&result, &element_mul(scalar, point));
+            let element = std::vector::borrow(elements, i);
+            result = element_add(&result, &element_mul(scalar, element));
             i = i + 1;
         };
         result
@@ -266,16 +266,16 @@ module aptos_std::curves {
 
     /// Encode an `Element<G>` to a byte array with an uncompressed format.
     /// See the comments on the actual type `G` for the format details.
-    public fun serialize_element_uncompressed<G>(point: &Element<G>): vector<u8> {
+    public fun serialize_element_uncompressed<G>(element: &Element<G>): vector<u8> {
         abort_if_feature_disabled();
-        serialize_element_uncompressed_internal<G>(point.handle)
+        serialize_element_uncompressed_internal<G>(element.handle)
     }
 
     /// Encode an `Element<G>` to a byte array with a compressed format.
     /// See the comments on the actual type `G` for the format details.
-    public fun serialize_element_compressed<G>(point: &Element<G>): vector<u8> {
+    public fun serialize_element_compressed<G>(element: &Element<G>): vector<u8> {
         abort_if_feature_disabled();
-        serialize_element_compressed_internal<G>(point.handle)
+        serialize_element_compressed_internal<G>(element.handle)
     }
 
     /// Decode an `Element<G>` from a byte array with an uncompressed format.
@@ -302,9 +302,9 @@ module aptos_std::curves {
         }
     }
 
-    public fun element_eq<G>(point_1: &Element<G>, point_2: &Element<G>): bool {
+    public fun element_eq<G>(element_1: &Element<G>, element_2: &Element<G>): bool {
         abort_if_feature_disabled();
-        element_eq_internal<G>(point_1.handle, point_2.handle)
+        element_eq_internal<G>(element_1.handle, element_2.handle)
     }
 
     fun abort_if_feature_disabled() {
@@ -327,7 +327,7 @@ module aptos_std::curves {
     native fun element_eq_internal<G>(handle_1: u64, handle_2: u64): bool;
     native fun identity_internal<G>(): u64;
     native fun generator_internal<G>(): u64;
-    native fun element_mul_internal<G>(scalar_handle: u64, point_handle: u64): u64;
+    native fun element_mul_internal<G>(scalar_handle: u64, element_handle: u64): u64;
     native fun element_neg_internal<G>(handle: u64): u64;
     native fun serialize_element_uncompressed_internal<G>(handle: u64): vector<u8>;
     native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
@@ -410,7 +410,7 @@ module aptos_std::curves {
         let point_3g = element_mul(&scalar_3, &point_g);
         let scalars = vector[scalar_1, scalar_2, scalar_3];
         let points = vector[point_g, point_2g, point_3g];
-        let point_14g_calc = simul_point_mul(&scalars, &points);
+        let point_14g_calc = simul_element_mul(&scalars, &points);
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
     }
 
@@ -490,7 +490,7 @@ module aptos_std::curves {
         let point_3g = element_mul(&scalar_3, &point_g);
         let scalars = vector[scalar_1, scalar_2, scalar_3];
         let points = vector[point_g, point_2g, point_3g];
-        let point_14g_calc = simul_point_mul(&scalars, &points);
+        let point_14g_calc = simul_element_mul(&scalars, &points);
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
     }
 
@@ -571,7 +571,7 @@ module aptos_std::curves {
         let point_3g = element_mul(&scalar_3, &point_g);
         let scalars = vector[scalar_1, scalar_2, scalar_3];
         let points = vector[point_g, point_2g, point_3g];
-        let point_14g_calc = simul_point_mul(&scalars, &points);
+        let point_14g_calc = simul_element_mul(&scalars, &points);
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
     }
 

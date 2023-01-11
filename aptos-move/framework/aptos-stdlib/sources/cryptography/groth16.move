@@ -88,7 +88,7 @@ module aptos_std::groth16 {
         abort_if_feature_disabled();
         let scalars: vector<curves::Scalar<G1>> = vector[curves::scalar_from_u64<G1>(1)];
         std::vector::append(&mut scalars, *public_inputs);
-        let g1_elements: vector<curves::Element<G1>> = vector[proof.a, curves::simul_point_mul(&scalars, &pvk.gamma_abc_g1), proof.c];
+        let g1_elements: vector<curves::Element<G1>> = vector[proof.a, curves::simul_element_mul(&scalars, &pvk.gamma_abc_g1), proof.c];
         let g2_elements: vector<curves::Element<G2>> = vector[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];
 
         curves::element_eq(&pvk.alpha_g1_beta_g2, &curves::multi_pairing<G1,G2,Gt>(&g1_elements, &g2_elements))
