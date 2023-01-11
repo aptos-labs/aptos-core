@@ -135,7 +135,7 @@ going forward, we would modify the formula slightly. See the comments below for 
   # above and build the binary without rustup as a dependency
   #
   # Uses build_cli_release.sh for creating the compiled binaries.
-  # This drastically reduces their size (ie. 2.2gb on Linux for release
+  # This drastically reduces their size (ie. 2.2 GB on Linux for release
   # build becomes 40 MB when run with opt-level = "z", strip, lto, etc).
   # See cargo.toml [profile.cli] section for more details
   def install
