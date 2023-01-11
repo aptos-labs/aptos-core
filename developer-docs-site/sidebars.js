@@ -67,7 +67,7 @@ const sidebars = {
           items: [
             "cli-tools/aptos-cli-tool/install-aptos-cli",
             "cli-tools/build-aptos-cli",
-            "cli-tools/aptos-cli-tool/use-aptos-cli"
+            "cli-tools/aptos-cli-tool/use-aptos-cli",
           ],
         },
         "cli-tools/install-move-prover",
