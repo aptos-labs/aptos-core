@@ -11,6 +11,13 @@ FROM rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f24
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
 RUN apt-get update && apt-get install binutils lld
+# install cargo chef to cafhe dependencies
+RUN cargo install cargo-chef@0.1.51
+
+### Build Rust dependencies ###
+FROM rust-base as planner
+COPY --link . .
+RUN cargo chef prepare --recipe-path recipe.json
 
 ### Build Rust code ###
 FROM rust-base as builder
@@ -21,17 +28,6 @@ FROM rust-base as builder
 ARG BUILT_VIA_BUILDKIT
 ENV BUILT_VIA_BUILDKIT $BUILT_VIA_BUILDKIT
 
-RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
-
-COPY --link . /aptos/
-
-RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarch_64/g") \
-    && curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v21.5/protoc-21.5-linux-$ARCHITECTURE.zip" \
-    && unzip -o "protoc-21.5-linux-$ARCHITECTURE.zip" -d /usr/local bin/protoc \
-    && unzip -o "protoc-21.5-linux-$ARCHITECTURE.zip" -d /usr/local 'include/*' \
-    && chmod +x "/usr/local/bin/protoc" \
-    && rm "protoc-21.5-linux-$ARCHITECTURE.zip"
-
 # cargo profile and features
 ARG PROFILE
 ENV PROFILE ${PROFILE}
@@ -39,6 +35,21 @@ ARG FEATURES
 ENV FEATURES ${FEATURES}
 ARG GIT_CREDENTIALS
 ENV GIT_CREDENTIALS ${GIT_CREDENTIALS}
+
+RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
+RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarch_64/g") \
+    && curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v21.5/protoc-21.5-linux-$ARCHITECTURE.zip" \
+    && unzip -o "protoc-21.5-linux-$ARCHITECTURE.zip" -d /usr/local bin/protoc \
+    && unzip -o "protoc-21.5-linux-$ARCHITECTURE.zip" -d /usr/local 'include/*' \
+    && chmod +x "/usr/local/bin/protoc" \
+    && rm "protoc-21.5-linux-$ARCHITECTURE.zip"
+
+# Use cargo chef
+COPY --from=planner /aptos/recipe.json recipe.json
+# Build dependencies - this is the caching Docker layer!
+RUN cargo chef cook --profile ${PROFILE} --recipe-path recipe.json
+
+COPY --link . /aptos/
 
 RUN GIT_CREDENTIALS="$GIT_CREDENTIALS" git config --global credential.helper store && echo "${GIT_CREDENTIALS}" > ~/.git-credentials
 RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target
