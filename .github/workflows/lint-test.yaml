@@ -6,8 +6,8 @@ on:
       - main
       - devnet
       - testnet
-      - auto
-      - canary
+      - mainnet
+      - aptos-node-v*
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
