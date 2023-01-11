@@ -7,6 +7,25 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 11 January 2023
+
+- Greatly expanded the [First Dapp tutorial](tutorials/first-dapp.md) to include a section on publishing the Move module using the TypeScript SDK, adds labels to outputs, improve the initialization for Petra wallet and the Aptos CLI, and more.
+
+- Noted in the [Aptos Token Standard](concepts/coin-and-token/aptos-token.md) that limits exist to storing customized token properties on-chain, namely 1000 properties per token with field names limited to 128 characters.
+
+- Added examples for requesting staking commission to [Staking Pool Operations](nodes/validator-node/operator/staking-pool-operations.md).
+
+
+## 10 January 2023
+
+- Explained in Validator cloud setup docs ([AWS](nodes/validator-node/operator/running-validator-node/using-aws.md), [Azure](nodes/validator-node/operator/running-validator-node/using-azure.md) and [GCP](nodes/validator-node/operator/running-validator-node/using-gcp.md)) how to check for and remove remaining Kubernetes volumes after changing the `era` to reset a deployment's state.
+
+- Expanded support for other networks in [Start Public Fullnode with Aptos Source or Docker](nodes/full-node/fullnode-source-code-or-docker.md) by adding files and instructions for fullnodes in `devnet` and `testnet`, as well as the default `mainnet`.
+
+- Enhanced [Run a Public Fullnode on GCP](nodes/full-node/run-a-fullnode-on-gcp.md) with details on fixing Terraform version mismatches, a link to the Docker image, and example output from `kubectl` commands.
+
+- Added a [Node types](concepts/node-networks-sync.md#node-types) section to Node Networks and Synchronization describing the various forms of nodes supported by Aptos: validator nodes, public fullnodes, validator fullnodes, and archival nodes.
+
 ## 06 January 2023
 
 - Added an *Authors* list to the bottom of every page on Aptos.dev giving credit to all contributors to the document, both within Aptos Labs and externally.
