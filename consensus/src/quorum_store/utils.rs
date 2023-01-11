@@ -252,6 +252,8 @@ impl ProofQueue {
         max_txns: u64,
         max_bytes: u64,
     ) -> (Vec<ProofOfStore>, usize, usize) {
+        counters::BATCH_QUEUE_SIZE_WHEN_PULL_FOR_BLOCK.observe(self.digest_queue.len() as f64);
+
         let num_expired = self
             .digest_queue
             .iter()
@@ -261,6 +263,7 @@ impl ProofQueue {
             claims::assert_some!(self.digest_proof.remove(&digest));
         }
         debug!("QS: num_expired {}", num_expired);
+        counters::BATCH_QUEUE_EXPIRED_SIZE_WHEN_PULL_FOR_BLOCK.observe(num_expired as f64);
 
         let mut ret = Vec::new();
         let mut cur_bytes = 0;
@@ -317,9 +320,10 @@ impl ProofQueue {
                     }
                 }
             }
-            counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(remaining_proof_size as f64);
-            counters::NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(remaining_local_proof_size as f64);
         }
+        counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(remaining_proof_size as f64);
+        counters::NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(remaining_local_proof_size as f64);
+
         (ret, remaining_proof_size, remaining_local_proof_size)
     }
 
