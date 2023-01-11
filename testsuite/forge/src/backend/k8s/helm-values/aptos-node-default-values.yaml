@@ -7,8 +7,8 @@ validator:
 fullnode:
   # at most one VFN per validator, depending on numFullnodeGroups
   groups:
-  - name: fullnode
-    replicas: 1
+    - name: fullnode
+      replicas: 1
   rust_log: debug,hyper=off
   # force enable the telemetry service to try to send telemetry
   force_enable_telemetry: true
@@ -35,7 +35,7 @@ service:
 # always assume we're spinning up a testnet and doing genesis rather than using the single validator test mode
 loadTestGenesis: false
 # always run forge in privileged mode for extra testing capability
-enablePrivilegedMode: true
+enablePrivilegedMode: false
 # always run forge with profiling enabled
 pyroscope:
-  enabled: true
+  enabled: false
