@@ -25,6 +25,10 @@ This page shows the key updates to the developer documentation on this site.
 
 - Restored and refined [Bootstrap Fullnode from Snapshot](nodes/full-node/bootstrap-fullnode.md) to simplify and expedite Aptos fullnode starts in devnet and testnet environments.
 
+## 23 December 2022
+
+- Added instructions for [manually installing build dependencies on Windows](guides/getting-started.md#set-up-build-dependencies).
+
 ## 20 December 2022
 
 - Added [Formal Verification, the Move Language, and the Move Prover](https://www.certik.com/resources/blog/2wSOZ3mC55AB6CYol6Q2rP-formal-verification-the-move-language-and-the-move-prover) blog post from the community to the [Supporting Move resources](guides/move-guides/index.md#supporting-move-resources) list.
