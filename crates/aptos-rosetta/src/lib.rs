@@ -15,14 +15,7 @@ use aptos_config::config::ApiConfig;
 use aptos_logger::{debug, warn};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use aptos_warp_webserver::{logger, Error, WebServer};
-use std::{
-    collections::BTreeMap,
-    convert::Infallible,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
+use std::{collections::BTreeMap, convert::Infallible, sync::Arc};
 use tokio::task::JoinHandle;
 use warp::{
     http::{HeaderValue, Method, StatusCode},
@@ -121,16 +114,7 @@ pub fn bootstrap(
     rest_client: Option<aptos_rest_client::Client>,
     owner_addresses: Vec<AccountAddress>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("rosetta-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[rosetta] failed to create runtime");
+    let runtime = aptos_runtimes::spawn_named_runtime("rosetta".into(), None);
 
     debug!("Starting up Rosetta server with {:?}", api_config);
 

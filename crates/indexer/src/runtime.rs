@@ -20,7 +20,7 @@ use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
 use std::{collections::VecDeque, sync::Arc};
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 pub struct MovingAverage {
     window_millis: u64,
@@ -84,12 +84,7 @@ pub fn bootstrap(
         return None;
     }
 
-    let runtime = Builder::new_multi_thread()
-        .thread_name("indexer")
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[indexer] failed to create runtime");
+    let runtime = aptos_runtimes::spawn_named_runtime("indexer".into(), None);
 
     let indexer_config = config.indexer.clone();
     let node_config = config.clone();

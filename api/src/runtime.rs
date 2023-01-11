@@ -20,14 +20,8 @@ use poem::{
     EndpointExt, Route, Server,
 };
 use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
-use std::{
-    net::SocketAddr,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
-use tokio::runtime::{Builder, Handle, Runtime};
+use std::{net::SocketAddr, sync::Arc};
+use tokio::runtime::{Handle, Runtime};
 
 const VERSION: &str = include_str!("../doc/.version");
 
@@ -38,16 +32,7 @@ pub fn bootstrap(
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
 ) -> anyhow::Result<Runtime> {
-    let runtime = Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("api-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .context("[api] failed to create runtime")?;
+    let runtime = aptos_runtimes::spawn_named_runtime("api".into(), None);
 
     let context = Context::new(chain_id, db, mp_sender, config.clone());
 
