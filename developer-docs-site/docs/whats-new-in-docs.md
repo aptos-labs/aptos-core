@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 12 January 2023
+
+- Added [Homebrew](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md) support for the Aptos CLI, enabling [easy installation](cli-tools/aptos-cli-tool/index.md) via the macOS, Linux, and Windows Subsystem for Linux (WSL) package manager.
+
 ## 11 January 2023
 
 - Greatly expanded the [First Dapp tutorial](tutorials/first-dapp.md) to include a section on publishing the Move module using the TypeScript SDK, adds labels to outputs, improve the initialization for Petra wallet and the Aptos CLI, and more.
