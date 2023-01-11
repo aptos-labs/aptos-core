@@ -61,6 +61,7 @@ pub struct Bls12381GasParameters {
     pub fq12_one: InternalGas,
     pub fq12_pow_fr: InternalGas,
     pub fq12_serialize: InternalGas,
+    pub fq12_square: InternalGas,
     pub g1_affine_add: InternalGas,
     pub g1_affine_deserialize_compressed: InternalGas,
     pub g1_affine_deserialize_uncompressed: InternalGas,
@@ -75,6 +76,7 @@ pub struct Bls12381GasParameters {
     pub g1_affine_to_proj: InternalGas,
     pub g1_proj_add: InternalGas,
     pub g1_proj_addassign: InternalGas,
+    pub g1_proj_double: InternalGas,
     pub g1_proj_eq: InternalGas,
     pub g1_proj_generator: InternalGas,
     pub g1_proj_infinity: InternalGas,
@@ -99,6 +101,7 @@ pub struct Bls12381GasParameters {
     pub g2_affine_to_proj: InternalGas,
     pub g2_proj_add: InternalGas,
     pub g2_proj_addassign: InternalGas,
+    pub g2_proj_double: InternalGas,
     pub g2_proj_eq: InternalGas,
     pub g2_proj_generator: InternalGas,
     pub g2_proj_infinity: InternalGas,
@@ -1040,6 +1043,62 @@ fn element_mul_scalar_internal(
     ))
 }
 
+fn element_double_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let point_handle = pop_arg!(args, u64) as usize;
+    let (cost, handle) = match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
+            let point = context
+                .extensions()
+                .get::<ArksContext>()
+                .get_g1_point(point_handle);
+            let result = ark_ec::ProjectiveCurve::double(point);
+            let handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_g1_point(result);
+            (gas_params.bls12_381.g1_proj_double, handle)
+        }
+        "0x1::curves::BLS12_381_G2" => {
+            let point = context
+                .extensions()
+                .get::<ArksContext>()
+                .get_g2_point(point_handle);
+            let result = ark_ec::ProjectiveCurve::double(point);
+            let handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_g2_point(result);
+            (gas_params.bls12_381.g2_proj_double, handle)
+        }
+        "0x1::curves::BLS12_381_Gt" => {
+            let element = context
+                .extensions()
+                .get::<ArksContext>()
+                .get_gt_point(point_handle);
+            let result = element.square();
+            let handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_gt_point(result);
+            (gas_params.bls12_381.fq12_square, handle)
+        }
+        _ => todo!(),
+    };
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![Value::u64(handle as u64)],
+    ))
+}
+
 fn element_neg_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -1235,6 +1294,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "element_mul_internal",
             make_native_from_func(gas_params.clone(), element_mul_scalar_internal),
+        ),
+        (
+            "element_double_internal",
+            make_native_from_func(gas_params.clone(), element_double_internal),
         ),
         (
             "element_neg_internal",

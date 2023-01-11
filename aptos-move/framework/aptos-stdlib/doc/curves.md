@@ -23,6 +23,7 @@
 -  [Function `generator`](#0x1_curves_generator)
 -  [Function `element_neg`](#0x1_curves_element_neg)
 -  [Function `element_add`](#0x1_curves_element_add)
+-  [Function `element_double`](#0x1_curves_element_double)
 -  [Function `element_mul`](#0x1_curves_element_mul)
 -  [Function `simul_element_mul`](#0x1_curves_simul_element_mul)
 -  [Function `scalar_from_bytes`](#0x1_curves_scalar_from_bytes)
@@ -39,6 +40,7 @@
 -  [Function `scalar_from_bytes_internal`](#0x1_curves_scalar_from_bytes_internal)
 -  [Function `scalar_neg_internal`](#0x1_curves_scalar_neg_internal)
 -  [Function `scalar_add_internal`](#0x1_curves_scalar_add_internal)
+-  [Function `scalar_double_internal`](#0x1_curves_scalar_double_internal)
 -  [Function `scalar_mul_internal`](#0x1_curves_scalar_mul_internal)
 -  [Function `scalar_inv_internal`](#0x1_curves_scalar_inv_internal)
 -  [Function `scalar_eq_internal`](#0x1_curves_scalar_eq_internal)
@@ -48,6 +50,7 @@
 -  [Function `identity_internal`](#0x1_curves_identity_internal)
 -  [Function `generator_internal`](#0x1_curves_generator_internal)
 -  [Function `element_mul_internal`](#0x1_curves_element_mul_internal)
+-  [Function `element_double_internal`](#0x1_curves_element_double_internal)
 -  [Function `element_neg_internal`](#0x1_curves_element_neg_internal)
 -  [Function `serialize_element_uncompressed_internal`](#0x1_curves_serialize_element_uncompressed_internal)
 -  [Function `serialize_element_compressed_internal`](#0x1_curves_serialize_element_compressed_internal)
@@ -649,6 +652,33 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 
 </details>
 
+<a name="0x1_curves_element_double"></a>
+
+## Function `element_double`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_double">element_double</a>&lt;G&gt;(element: &<a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">curves::Element</a>&lt;G&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_element_double">element_double</a>&lt;G&gt;(element: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+    <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
+    <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+        handle: <a href="curves.md#0x1_curves_element_double_internal">element_double_internal</a>&lt;G&gt;(element.handle)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_curves_element_mul"></a>
 
 ## Function `element_mul`
@@ -1076,6 +1106,28 @@ See the comments on the actual type <code>G</code> for the format details.
 
 </details>
 
+<a name="0x1_curves_scalar_double_internal"></a>
+
+## Function `scalar_double_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_scalar_double_internal">scalar_double_internal</a>&lt;G&gt;(handle: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_scalar_double_internal">scalar_double_internal</a>&lt;G&gt;(handle: u64): u64;
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_curves_scalar_mul_internal"></a>
 
 ## Function `scalar_mul_internal`
@@ -1268,6 +1320,28 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_element_mul_internal">element_mul_internal</a>&lt;G&gt;(scalar_handle: u64, element_handle: u64): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_element_double_internal"></a>
+
+## Function `element_double_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_element_double_internal">element_double_internal</a>&lt;G&gt;(element_handle: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_element_double_internal">element_double_internal</a>&lt;G&gt;(element_handle: u64): u64;
 </code></pre>
 
 

@@ -218,6 +218,13 @@ module aptos_std::curves {
         }
     }
 
+    public fun element_double<G>(element: &Element<G>): Element<G> {
+        abort_if_feature_disabled();
+        Element<G> {
+            handle: element_double_internal<G>(element.handle)
+        }
+    }
+
     public fun element_mul<G>(scalar: &Scalar<G>, element: &Element<G>): Element<G> {
         abort_if_feature_disabled();
         Element<G> {
@@ -319,6 +326,7 @@ module aptos_std::curves {
     native fun scalar_from_bytes_internal<G>(bytes: vector<u8>): (bool, u64);
     native fun scalar_neg_internal<G>(handle: u64): u64;
     native fun scalar_add_internal<G>(handle_1: u64, handle_2: u64): u64;
+    native fun scalar_double_internal<G>(handle: u64): u64;
     native fun scalar_mul_internal<G>(handle_1: u64, handle_2: u64): u64;
     native fun scalar_inv_internal<G>(handle: u64): (bool, u64);
     native fun scalar_eq_internal<G>(handle_1: u64, handle_2: u64): bool;
@@ -328,6 +336,7 @@ module aptos_std::curves {
     native fun identity_internal<G>(): u64;
     native fun generator_internal<G>(): u64;
     native fun element_mul_internal<G>(scalar_handle: u64, element_handle: u64): u64;
+    native fun element_double_internal<G>(element_handle: u64): u64;
     native fun element_neg_internal<G>(handle: u64): u64;
     native fun serialize_element_uncompressed_internal<G>(handle: u64): vector<u8>;
     native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
@@ -389,6 +398,11 @@ module aptos_std::curves {
         assert!(element_eq(&point_7g_calc, &point_7g_from_comp), 1);
         assert!(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328191c1a98287eec115a8cb0a1cf4968c6fd101ca4593938d73918dd8e81471d8a3ac4b38930aed539564436b6a4baad8d10" == serialize_element_uncompressed(&point_7g_calc), 1);
         assert!(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32899" == serialize_element_compressed(&point_7g_calc), 1);
+
+        // Point double.
+        let point_2g = element_mul(&scalar_2, &point_g);
+        let point_double_g = element_double(&point_g);
+        assert!(element_eq(&point_2g, &point_double_g), 1);
 
         // Point negation.
         let point_minus_7g_calc = element_neg(&point_7g_calc);
@@ -470,6 +484,11 @@ module aptos_std::curves {
         assert!(x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020dddcc1399cdf852dab1e2c8dc3b0ce819362f3a12da56f37aee93d3881ca760e467942c92428864a6172c80bf4daeb7082070fa8e8937746ae82d57ec8b639977f8ceaef21a11375de52b02e145dc39021bf4cab7eeaa955688a1b75436f9ec05" == serialize_element_uncompressed(&point_7g_calc), 1);
         assert!(x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020d" == serialize_element_compressed(&point_7g_calc), 1);
 
+        // Point double.
+        let point_2g = element_mul(&scalar_2, &point_g);
+        let point_double_g = element_double(&point_g);
+        assert!(element_eq(&point_2g, &point_double_g), 1);
+
         // Point negation.
         let point_minus_7g_calc = element_neg(&point_7g_calc);
         assert!(x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673028d" == serialize_element_compressed(&point_minus_7g_calc), 1);
@@ -550,6 +569,11 @@ module aptos_std::curves {
         assert!(element_eq(&point_7g_calc, &point_7g_from_comp), 1);
         assert!(x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c185d185b4605dc9808517196bba9d00a3e37bca466c19187486db104ee03962d39fe473e276355618e44c965f05082bb027a7baa4bcc6d8c0775c1e8a481e77df36ddad91e75a982302937f543a11fe71922dcd4f46fe8f951f91cde412b359507f2b3b6df0374bfe55c9a126ad31ce254e67d64194d32d7955ec791c9555ea5a917fc47aba319e909de82da946eb36e12aff936708402228295db2712f2fc807c95092a86afd71220699df13e2d2fdf2857976cb1e605f72f1b2edabadba3ff05501221fe81333c13917c85d725ce92791e115eb0289a5d0b3330901bb8b0ed146abeb81381b7331f1c508fb14e057b05d8b0190a9e74a3d046dcd24e7ab747049945b3d8a120c4f6d88e67661b55573aa9b361367488a1ef7dffd967d64a1518" == serialize_element_uncompressed(&point_7g_calc), 1);
         assert!(x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c185d185b4605dc9808517196bba9d00a3e37bca466c19187486db104ee03962d39fe473e276355618e44c965f05082bb027a7baa4bcc6d8c0775c1e8a481e77df36ddad91e75a982302937f543a11fe71922dcd4f46fe8f951f91cde412b359507f2b3b6df0374bfe55c9a126ad31ce254e67d64194d32d7955ec791c9555ea5a917fc47aba319e909de82da946eb36e12aff936708402228295db2712f2fc807c95092a86afd71220699df13e2d2fdf2857976cb1e605f72f1b2edabadba3ff05501221fe81333c13917c85d725ce92791e115eb0289a5d0b3330901bb8b0ed146abeb81381b7331f1c508fb14e057b05d8b0190a9e74a3d046dcd24e7ab747049945b3d8a120c4f6d88e67661b55573aa9b361367488a1ef7dffd967d64a1518" == serialize_element_compressed(&point_7g_calc), 1);
+
+        // Point double.
+        let point_2g = element_mul(&scalar_2, &point_g);
+        let point_double_g = element_double(&point_g);
+        assert!(element_eq(&point_2g, &point_double_g), 1);
 
         // Point negation.
         let point_minus_7g_calc = element_neg(&point_7g_calc);
