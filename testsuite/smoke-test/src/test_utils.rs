@@ -45,7 +45,7 @@ pub async fn transfer_coins(
     txn
 }
 
-pub async fn transfer_and_reconfig(
+pub async fn transfer_and_maybe_reconfig(
     client: &RestClient,
     transaction_factory: &TransactionFactory,
     root_account: &mut LocalAccount,
