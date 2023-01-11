@@ -5,7 +5,7 @@ module aptos_framework::delegation_pool {
     use std::vector;
 
     use aptos_std::math64::min;
-    use aptos_std::pool_u64_unbound as pool_u64;
+    use aptos_std::pool_u64_unbound::{Self as pool_u64, total_coins};
     use aptos_std::table::{Self, Table};
 
     use aptos_framework::account;
@@ -162,9 +162,14 @@ module aptos_framework::delegation_pool {
         let pool = borrow_global_mut<DelegationPool>(pool_address);
 
         // refresh total coins on share pools and attempt to advance lockup epoch
-        synchronize_delegation_pool(pool, pool_address);
+        synchronize_delegation_pool(pool);
 
         account::create_signer_with_capability(&pool.stake_pool_signer_cap)
+    }
+
+    /// Get the address of delegation pool reference `pool`.
+    fun get_pool_address(pool: &DelegationPool): address {
+        account::get_signer_capability_address(&pool.stake_pool_signer_cap)
     }
 
     /// Return the index of the current lockup cycle on delegation pool `pool_address`.
@@ -200,7 +205,7 @@ module aptos_framework::delegation_pool {
         let delegator_address = signer::address_of(delegator);
 
         // extract from absolute added stake the maximum amount the delegator would unfairly earn this epoch
-        let amount_added = charge_add_stake_fee(pool, pool_address, amount);
+        let amount_added = charge_add_stake_fee(pool, amount);
 
         coin::transfer<AptosCoin>(delegator, signer::address_of(&stake_pool_signer), amount);
         stake::add_stake(&stake_pool_signer, amount);
@@ -272,10 +277,12 @@ module aptos_framework::delegation_pool {
     }
 
     public entry fun withdraw(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
-        let stake_pool_signer = retrieve_stake_pool_signer(pool_address);
-        let pool = borrow_global_mut<DelegationPool>(pool_address);
-        let delegator_address = signer::address_of(delegator);
+        retrieve_stake_pool_signer(pool_address);
+        withdraw_internal(borrow_global_mut<DelegationPool>(pool_address), signer::address_of(delegator), amount);
+    }
 
+    fun withdraw_internal(pool: &mut DelegationPool, delegator_address: address, amount: u64) {
+        let pool_address = get_pool_address(pool);
         let (withdrawal_exists, withdrawal_lockup_epoch) = pending_withdrawal_exists(pool, delegator_address);
         if (!(
             withdrawal_exists &&
@@ -294,6 +301,7 @@ module aptos_framework::delegation_pool {
         // short-circuit if amount to withdraw is 0 so no event is emitted
         if (amount == 0) { return };
 
+        let stake_pool_signer = account::create_signer_with_capability(&pool.stake_pool_signer_cap);
         stake::withdraw(&stake_pool_signer, amount);
         coin::transfer<AptosCoin>(&stake_pool_signer, delegator_address, amount);
 
@@ -375,7 +383,7 @@ module aptos_framework::delegation_pool {
     /// Compute the fee paid out of `coins_amount` stake if adding it to delegation pool `pool_address` now.
     public fun get_add_stake_fee(pool_address: address, coins_amount: u64): u64 acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
-        coins_amount - charge_add_stake_fee(borrow_global<DelegationPool>(pool_address), pool_address, coins_amount)
+        coins_amount - charge_add_stake_fee(borrow_global<DelegationPool>(pool_address), coins_amount)
     }
 
     /// Return a mutable reference to the share pool of `pending_inactive` stake on the
@@ -396,7 +404,8 @@ module aptos_framework::delegation_pool {
         }
     }
 
-    fun charge_add_stake_fee(pool: &DelegationPool, pool_address: address, coins_amount: u64): u64 {
+    fun charge_add_stake_fee(pool: &DelegationPool, coins_amount: u64): u64 {
+        let pool_address = get_pool_address(pool);
         // if the underlying stake pool earns rewards this epoch, charge delegator
         // the maximum amount it would earn from new added stake in `pending_active` state
         if (stake::is_current_epoch_validator(pool_address)) {
@@ -485,9 +494,8 @@ module aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u64 {
-        if (coins_amount == 0) return 0;
-
         let shares_to_redeem = amount_to_shares_to_redeem(&pool.active_shares, shareholder, coins_amount);
+        if (shares_to_redeem == 0) return 0;
         pool_u64::redeem_shares(&mut pool.active_shares, shareholder, shares_to_redeem)
     }
 
@@ -503,12 +511,11 @@ module aptos_framework::delegation_pool {
         coins_amount: u64,
         lockup_epoch: u64,
     ): u64 {
-        if (coins_amount == 0) return 0;
-
         let current_lockup_epoch = pool.current_lockup_epoch;
         let inactive_shares = table::borrow_mut(&mut pool.inactive_shares, lockup_epoch);
 
         let shares_to_redeem = amount_to_shares_to_redeem(inactive_shares, shareholder, coins_amount);
+        if (shares_to_redeem == 0) return 0;
         let redeemed_coins = pool_u64::redeem_shares(inactive_shares, shareholder, shares_to_redeem);
 
         // if delegator reactivated entire pending_inactive stake or withdrawn entire past stake,
@@ -522,7 +529,7 @@ module aptos_framework::delegation_pool {
             pool.total_coins_inactive = pool.total_coins_inactive - redeemed_coins;
 
             // delete shares pool of ended lockup epoch if everyone have withdrawn
-            if (pool_u64::total_coins(inactive_shares) == 0) {
+            if (total_coins(inactive_shares) == 0) {
                 pool_u64::destroy_empty(table::remove<u64, pool_u64::Pool>(&mut pool.inactive_shares, lockup_epoch));
             }
         };
@@ -530,7 +537,8 @@ module aptos_framework::delegation_pool {
         redeemed_coins
     }
 
-    fun synchronize_delegation_pool(pool: &mut DelegationPool, pool_address: address) {
+    fun synchronize_delegation_pool(pool: &mut DelegationPool) {
+        let pool_address = get_pool_address(pool);
         let (active, inactive, pending_active, pending_inactive) = stake::get_stake(pool_address);
 
         // update total coins accumulated by `active` + `pending_active` shares
