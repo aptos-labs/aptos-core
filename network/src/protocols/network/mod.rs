@@ -318,10 +318,10 @@ impl<TMessage: Message> NetworkSender<TMessage> {
         &self,
         recipients: impl Iterator<Item = PeerId>,
         protocol: ProtocolId,
-        message: TMessage,
+        message: &TMessage,
     ) -> Result<(), NetworkError> {
         // Serialize message.
-        let mdata = protocol.to_bytes(&message)?.into();
+        let mdata = protocol.to_bytes(message)?.into();
         self.peer_mgr_reqs_tx
             .send_to_many(recipients, protocol, mdata)?;
         Ok(())

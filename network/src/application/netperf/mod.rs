@@ -7,6 +7,7 @@
 //! and simplify network-related performance profiling and debugging
 //!
 
+use crate::error::NetworkError;
 use crate::{
     application::{
         netperf::interface::{
@@ -50,15 +51,6 @@ const NETPERF_COMMAND_CHANNEL_SIZE: usize = 1024;
 const NETPERF_DEFAULT_MSG_SIZE: usize = 64 * 1024;
 const NETPERF_DEFAULT_DURTAION_SEC: u64 = 10;
 
-pub struct NetPerf {
-    network_context: Arc<NetworkContext>,
-    peers: Arc<PeerMetadataStorage>,
-    peer_list: Arc<DashMap<PeerId, PeerNetPerfStat>>, //with capacity and hasher
-    sender: Arc<NetPerfNetworkSender>,
-    events: NetPerfNetworkEvents,
-    netperf_port: u16,
-}
-
 struct PeerNetPerfStat {}
 
 impl PeerNetPerfStat {
@@ -67,7 +59,6 @@ impl PeerNetPerfStat {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone)]
 struct NetPerfState {
     network_context: Arc<NetworkContext>,
@@ -75,6 +66,27 @@ struct NetPerfState {
     peer_list: Arc<DashMap<PeerId, PeerNetPerfStat>>, //with capacity and hasher
     sender: Arc<NetPerfNetworkSender>,
     tx: Sender<NetPerfCommands>,
+}
+
+impl NetPerfState {
+    fn send_to_many(
+        &self,
+        recipients: impl Iterator<Item = PeerId>,
+        protocol: ProtocolId,
+        msg: &NetPerfMsg,
+    ) -> Result<(), NetworkError> {
+        self.sender.send_to_many(recipients, protocol, msg)
+    }
+}
+
+#[allow(dead_code)]
+pub struct NetPerf {
+    network_context: Arc<NetworkContext>,
+    peers: Arc<PeerMetadataStorage>,
+    peer_list: Arc<DashMap<PeerId, PeerNetPerfStat>>, //with capacity and hasher
+    sender: Arc<NetPerfNetworkSender>,
+    events: NetPerfNetworkEvents,
+    netperf_port: u16,
 }
 
 impl NetPerf {
@@ -295,26 +307,24 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
         }
     }
 }
-
+#[allow(dead_code)]
 fn loop_body(state: &NetPerfState, msg: &NetPerfMsg, iter: impl Iterator<Item = PeerId>) -> bool {
     /* TODO(AlexM):
- * 1. Fine grained control with send_to.
- *    Its interesting to see which of the validator queus gets filled.
- * 2. msg.clone() is a disaster
- * */
-    let rc = state.sender.send_to_many(iter,
-        ProtocolId::NetPerfDirectSendCompressed,
-        msg.clone(),
-    );
+     * 1. Fine grained control with send_to.
+     *    Its interesting to see which of the validator queus gets filled.
+     * */
+    let rc = state
+        .send_to_many(iter, ProtocolId::NetPerfDirectSendCompressed, &msg);
     if rc.is_err() {
         true
     } else {
         /* maybe add dedicated pep-peer counters? but network_application_{out/in}bound_traffic
-       * seems to have us covered
-       * */
+         * seems to have us covered
+         * */
         false
     }
 }
+
 async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration) {
     let mut should_yield;
     let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(size));
@@ -330,9 +340,17 @@ async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration)
     });
     info!("Broadcast loop starting");
     loop {
-
         let iter = state.peer_list.iter().map(|entry| entry.key().to_owned());
-        should_yield = loop_body(&state, &msg, iter);
+        let rc = state
+            .send_to_many(iter, ProtocolId::NetPerfDirectSendCompressed, &msg);
+        should_yield = if rc.is_err() {
+            true
+        } else {
+            /* maybe add dedicated pep-peer counters? but network_application_{out/in}bound_traffic
+             * seems to have us covered
+             * */
+            false
+        };
 
         if done.load(std::sync::atomic::Ordering::Relaxed) {
             break;
@@ -345,8 +363,10 @@ async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration)
         }
     }
     info!(
-            NetworkSchema::new(&state.network_context),
-            "{} NetPerf Broadcast finished: sent: {} yield {}", state.network_context,
-            sent, yield_count,
-        );
+        NetworkSchema::new(&state.network_context),
+        "{} NetPerf Broadcast finished: sent: {} yield {}",
+        state.network_context,
+        sent,
+        yield_count,
+    );
 }

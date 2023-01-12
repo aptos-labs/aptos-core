@@ -48,7 +48,7 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
 
     /// Sends the given message to each peer in the specified peer list.
     /// Note: this method does not guarantee message delivery or handle responses.
-    fn send_to_peers(&self, _message: Message, _peers: &[PeerNetworkId]) -> Result<(), Error>;
+    fn send_to_peers(&self, _message: &Message, _peers: &[PeerNetworkId]) -> Result<(), Error>;
 
     /// Sends the given message to the specified peer with the corresponding
     /// timeout. Awaits a response from the peer, or hits the timeout
@@ -153,7 +153,7 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         Ok(network_sender.send_to(peer.peer_id(), direct_send_protocol_id, message)?)
     }
 
-    fn send_to_peers(&self, message: Message, peers: &[PeerNetworkId]) -> Result<(), Error> {
+    fn send_to_peers(&self, message: &Message, peers: &[PeerNetworkId]) -> Result<(), Error> {
         // Sort peers by protocol
         let mut peers_per_protocol = HashMap::new();
         let mut peers_without_a_protocol = vec![];
@@ -188,7 +188,7 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
             {
                 let network_sender = self.get_sender_for_network_id(&network_id)?;
                 let peer_ids = peers.map(|peer_network_id| peer_network_id.peer_id());
-                network_sender.send_to_many(peer_ids, protocol_id, message.clone())?;
+                network_sender.send_to_many(peer_ids, protocol_id, message)?;
             }
         }
         Ok(())

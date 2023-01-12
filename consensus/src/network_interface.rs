@@ -149,7 +149,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient
     pub fn send_to_many(
         &self,
         peers: impl Iterator<Item = PeerId>,
-        message: ConsensusMsg,
+        message: &ConsensusMsg,
     ) -> Result<(), Error> {
         let peer_network_ids: Vec<PeerNetworkId> = peers
             .map(|peer| self.get_peer_network_id_for_peer(peer))
