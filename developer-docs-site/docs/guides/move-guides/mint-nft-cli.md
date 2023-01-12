@@ -399,43 +399,8 @@ The final phase of development is to make the smart contract module ready for pr
 Here we will enable signature verification
 
 
-## Fund your account
 
-TODO: Consider moving this to an entirely new document outside of Move entirely. Perhaps under *Set Environment* in Aptos.dev.
-
-### Install wallet and import account
-
-1. Read `.aptos/config.yaml` to see and copy the `nft-receiver` private key.
-
-2. Install the wallet of your choice. We use the [Petra Wallet](../../guides/install-petra-wallet.md) Chrome extension.
-
-3. Open the wallet and select the [Testnet network](https://petra.app/docs/use) in the wallet via *Petra settings > Network > Testnet*.
-
-4. Go to *Petra > Settings > Switch account > Add Account > Import private key*.
-
-5. Paste the `nft-receiver` private key there.
-
-6. Click **Submit** to add the previously created account to the wallet.
-
-7. You are switched into that account automatically.
-
-### Get coins from faucet
-
-1. Go to the *Petra > Settings > Network > Testnet* network if not there already.
-
-2. Connect your wallet to the Aptos faucet at https://aptoslabs.com/testnet-faucet:
-
-  ![Faucet connect](../../../static/img/connect-wallet-faucet.png "Connect faucet to wallet")
-
-3. Select your wallet type:
-
-  ![Wallet select](../../../static/img/select-wallet-faucet.png "Select your wallet for faucet")
-
-4. Approve the connection request:
-
-  ![Faucet approval](../../../static/img/approve-wallet-faucet.png "Approve connecting faucet to wallet")
-
-5. Now when you load your wallet, you will see a **Faucet** button next to **Send**. Click **Faucet** to receive one APT per click to use when minting.
+TODO: Organize or remove the original Workshop #1 text below.
 
 ### Mint the NFT
 
