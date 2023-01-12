@@ -296,6 +296,26 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
     }
 }
 
+fn loop_body(state: &NetPerfState, msg: &NetPerfMsg) -> bool {
+    /* TODO(AlexM):
+ * 1. Fine grained control with send_to.
+ *    Its interesting to see which of the validator queus gets filled.
+ * 2. msg.clone() is a disaster
+ * */
+    let rc = state.sender.send_to_many(
+        state.peer_list.iter().map(|entry| entry.key().to_owned()),
+        ProtocolId::NetPerfDirectSendCompressed,
+        msg.clone(),
+    );
+    if rc.is_err() {
+        true
+    } else {
+        /* maybe add dedicated pep-peer counters? but network_application_{out/in}bound_traffic
+       * seems to have us covered
+       * */
+        false
+    }
+}
 async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration) {
     let mut should_yield = false;
     let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(size));
@@ -312,24 +332,8 @@ async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration)
 
     info!("Broadcast loop starting");
     loop {
-        /* TODO(AlexM):
-         * 1. Fine grained control with send_to.
-         *    Its interesting to see which of the validator queus gets filled.
-         * 2. msg.clone() is a disaster
-         * */
-        let rc = state.sender.send_to_many(
-            state.peer_list.iter().map(|entry| entry.key().to_owned()),
-            ProtocolId::NetPerfDirectSendCompressed,
-            msg.clone(),
-        );
-        if rc.is_err() {
-            should_yield = true;
-        } else {
-            /* maybe add dedicated pep-peer counters? but network_application_{out/in}bound_traffic
-           * seems to have us covered
-           * */
-            sent += 1;
-        }
+
+        should_yield = loop_body(&state, &msg);
 
         if done.load(std::sync::atomic::Ordering::Relaxed) {
             break;
@@ -337,7 +341,8 @@ async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration)
         if should_yield {
             yield_count += 1;
             tokio::task::yield_now().await;
-            should_yield = false;
+        } else {
+            sent += 1;
         }
     }
     info!(
