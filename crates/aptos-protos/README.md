@@ -35,3 +35,9 @@ Now we can generate the protos:
 ```bash
 buf generate
 ```
+
+Clean up the generated files like this (from the repo root):
+```
+pre-commit run --all-files
+scripts/rust_lint.sh
+```

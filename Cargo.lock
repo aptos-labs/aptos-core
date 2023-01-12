@@ -326,6 +326,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-api-v2"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-api-test-context",
+ "aptos-api-types",
+ "aptos-build-info",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-gas",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics-core",
+ "aptos-proptest-helpers",
+ "aptos-protos",
+ "aptos-sdk",
+ "aptos-state-view",
+ "aptos-storage-interface",
+ "aptos-types",
+ "aptos-vm",
+ "async-trait",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "bytes 1.2.1",
+ "fail 0.5.0",
+ "futures",
+ "hex",
+ "hyper",
+ "itertools",
+ "mime",
+ "move-core-types",
+ "move-package",
+ "once_cell",
+ "paste",
+ "percent-encoding",
+ "poem",
+ "poem-openapi",
+ "proptest",
+ "rand 0.7.3",
+ "regex",
+ "reqwest",
+ "serde 1.0.149",
+ "serde_json",
+ "tokio",
+ "tonic",
+ "tonic-reflection",
+ "url",
+ "warp",
+]
+
+[[package]]
 name = "aptos-backup-cli"
 version = "0.1.0"
 dependencies = [
@@ -1817,6 +1868,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-api",
+ "aptos-api-v2",
  "aptos-backup-service",
  "aptos-build-info",
  "aptos-cached-packages",
@@ -10057,6 +10109,20 @@ dependencies = [
  "tower-service",
  "tracing",
  "tracing-futures",
+]
+
+[[package]]
+name = "tonic-reflection"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67494bad4dda4c9bffae901dfe14e2b2c0f760adb4706dc10beeb81799f7f7b2"
+dependencies = [
+ "bytes 1.2.1",
+ "prost",
+ "prost-types",
+ "tokio",
+ "tokio-stream",
+ "tonic",
 ]
 
 [[package]]

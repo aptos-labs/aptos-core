@@ -11,29 +11,29 @@
 
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransactionsOutput {
-    #[prost(message, repeated, tag = "1")]
+    #[prost(message, repeated, tag="1")]
     pub transactions: ::prost::alloc::vec::Vec<TransactionOutput>,
     /// Timestamp of the first transaction in the batch.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub transactions_timestamp: ::core::option::Option<super::super::util::timestamp::Timestamp>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransactionOutput {
     /// Encoded aptos.proto.v1.Transaction proto data.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub encoded_proto_data: ::prost::alloc::string::String,
-    #[prost(uint64, tag = "2")]
+    #[prost(uint64, tag="2")]
     pub version: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StreamStatus {
-    #[prost(enumeration = "stream_status::StatusType", tag = "1")]
+    #[prost(enumeration="stream_status::StatusType", tag="1")]
     pub r#type: i32,
     /// Required. Start version of current batch/stream, inclusive.
-    #[prost(uint64, tag = "2")]
+    #[prost(uint64, tag="2")]
     pub start_version: u64,
     /// End version of current *batch*, exclusive.
-    #[prost(uint64, optional, tag = "3")]
+    #[prost(uint64, optional, tag="3")]
     pub end_version: ::core::option::Option<u64>,
 }
 /// Nested message and enum types in `StreamStatus`.
@@ -62,22 +62,22 @@ pub mod stream_status {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RawDatastreamRequest {
     /// Required; start version of current stream.
-    #[prost(uint64, tag = "1")]
+    #[prost(uint64, tag="1")]
     pub starting_version: u64,
-    #[prost(uint64, tag = "3")]
+    #[prost(uint64, tag="3")]
     pub processor_task_count: u64,
-    #[prost(uint64, tag = "2")]
+    #[prost(uint64, tag="2")]
     pub processor_batch_size: u64,
     /// Required; batch size in the response.
-    #[prost(uint64, tag = "4")]
+    #[prost(uint64, tag="4")]
     pub output_batch_size: u64,
     /// Required; for validation purpose.
-    #[prost(uint32, tag = "5")]
+    #[prost(uint32, tag="5")]
     pub chain_id: u32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RawDatastreamResponse {
-    #[prost(oneof = "raw_datastream_response::Response", tags = "1, 2")]
+    #[prost(oneof="raw_datastream_response::Response", tags="1, 2")]
     pub response: ::core::option::Option<raw_datastream_response::Response>,
 }
 /// Nested message and enum types in `RawDatastreamResponse`.
@@ -102,9 +102,9 @@ pub mod raw_datastream_response {
     }
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Response {
-        #[prost(message, tag = "1")]
+        #[prost(message, tag="1")]
         Status(super::StreamStatus),
-        #[prost(message, tag = "2")]
+        #[prost(message, tag="2")]
         Data(super::TransactionsOutput),
     }
 }

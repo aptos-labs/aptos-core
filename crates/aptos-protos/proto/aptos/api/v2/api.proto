@@ -1,0 +1,18 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.api.v2;
+
+service Api {
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+}
+
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloReply {
+  string message = 1;
+}

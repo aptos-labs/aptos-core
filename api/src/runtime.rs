@@ -185,6 +185,7 @@ pub fn attach_poem_to_runtime(
             .allow_headers(vec![header::CONTENT_TYPE, header::ACCEPT]);
 
         // Build routes for the API
+        // https://github.com/poem-web/poem/issues/478
         let route = Route::new()
             .nest(
                 "/v1",

@@ -7,6 +7,7 @@ mod log_build_information;
 
 use anyhow::{anyhow, Context};
 use aptos_api::bootstrap as bootstrap_api;
+use aptos_api_v2::bootstrap as bootstrap_api_v2;
 use aptos_backup_service::start_backup_service;
 use aptos_build_info::build_information;
 use aptos_config::{
@@ -166,6 +167,7 @@ impl AptosNodeArgs {
 /// Runtime handle to ensure that all inner runtimes stay in scope
 pub struct AptosHandle {
     _api: Option<Runtime>,
+    _api_v2: Option<Runtime>,
     _backup: Runtime,
     _consensus_runtime: Option<Runtime>,
     _mempool: Runtime,
@@ -846,15 +848,23 @@ pub fn setup_environment(
 
     let (mp_client_sender, mp_client_events) = mpsc::channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let api_runtime = if node_config.api.enabled {
-        Some(bootstrap_api(
-            &node_config,
-            chain_id,
-            aptos_db.clone(),
-            mp_client_sender.clone(),
-        )?)
+    let (api_runtime, api_v2_runtime) = if node_config.api.enabled {
+        (
+            Some(bootstrap_api(
+                &node_config,
+                chain_id,
+                aptos_db.clone(),
+                mp_client_sender.clone(),
+            )?),
+            Some(bootstrap_api_v2(
+                &node_config,
+                chain_id,
+                aptos_db.clone(),
+                mp_client_sender.clone(),
+            )?),
+        )
     } else {
-        None
+        (None, None)
     };
 
     let indexer_grpc = match bootstrap_indexer_grpc(
@@ -916,6 +926,7 @@ pub fn setup_environment(
 
     Ok(AptosHandle {
         _api: api_runtime,
+        _api_v2: api_v2_runtime,
         _backup: backup_service,
         _consensus_runtime: consensus_runtime,
         _mempool: mempool,

@@ -3,6 +3,13 @@
 
 // @generated
 pub mod aptos {
+    pub mod api {
+        // @@protoc_insertion_point(attribute:aptos.api.v2)
+        pub mod v2 {
+            include!("aptos.api.v2.rs");
+            // @@protoc_insertion_point(aptos.api.v2)
+        }
+    }
     pub mod datastream {
         // @@protoc_insertion_point(attribute:aptos.datastream.v1)
         pub mod v1 {
