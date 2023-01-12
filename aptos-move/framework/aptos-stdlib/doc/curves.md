@@ -59,6 +59,8 @@
 -  [Function `serialize_element_uncompressed_internal`](#0x1_curves_serialize_element_uncompressed_internal)
 -  [Function `serialize_element_compressed_internal`](#0x1_curves_serialize_element_compressed_internal)
 -  [Function `multi_pairing_internal`](#0x1_curves_multi_pairing_internal)
+-  [Function `random_element_internal`](#0x1_curves_random_element_internal)
+-  [Function `random_scalar_internal`](#0x1_curves_random_scalar_internal)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -1546,6 +1548,50 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, g2_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_random_element_internal"></a>
+
+## Function `random_element_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_random_element_internal">random_element_internal</a>&lt;G&gt;(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_random_element_internal">random_element_internal</a>&lt;G&gt;(): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_random_scalar_internal"></a>
+
+## Function `random_scalar_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_random_scalar_internal">random_scalar_internal</a>&lt;G&gt;(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_random_scalar_internal">random_scalar_internal</a>&lt;G&gt;(): u64;
 </code></pre>
 
 

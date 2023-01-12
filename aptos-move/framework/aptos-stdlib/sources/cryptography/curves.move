@@ -326,6 +326,22 @@ module aptos_std::curves {
         group_order_internal<G>()
     }
 
+    #[test_only]
+    public fun random_element<G>(): Element<G> {
+        abort_if_feature_disabled();
+        Element<G> {
+            handle: random_element_internal<G>()
+        }
+    }
+
+    #[test_only]
+    public fun random_scalar<G>(): Scalar<G> {
+        abort_if_feature_disabled();
+        Scalar<G> {
+            handle: random_scalar_internal<G>()
+        }
+    }
+
     fun abort_if_feature_disabled() {
         if (!std::features::generic_curves_enabled()) {
             abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
@@ -355,6 +371,8 @@ module aptos_std::curves {
     native fun serialize_element_uncompressed_internal<G>(handle: u64): vector<u8>;
     native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
     native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
+    native fun random_element_internal<G>(): u64;
+    native fun random_scalar_internal<G>(): u64;
 
     #[test(fx = @std)]
     fun test_bls12_381_g1(fx: signer) {
@@ -642,6 +660,19 @@ module aptos_std::curves {
         );
         assert!(element_eq(&gt_point_1, &gt_point_2), 1);
         assert!(element_eq(&gt_point_1, &gt_point_3), 1);
+
+        // Pairing with random points.
+        let g1_point = random_element<BLS12_381_G1>();
+        let g2_point = random_element<BLS12_381_G2>();
+        // e(k1*P1, k2*P2)
+        let k1 = random_scalar<BLS12_381_G1>();
+        let k2 = random_scalar<BLS12_381_G2>();
+        let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_mul(&k1, &g1_point), &element_mul(&k2,&g2_point));
+        // e(P1,P2)^(k1*k2)
+        let k1_for_gt = std::option::extract(&mut scalar_from_bytes<BLS12_381_Gt>(&scalar_to_bytes(&k1)));
+        let k2_for_gt = std::option::extract(&mut scalar_from_bytes<BLS12_381_Gt>(&scalar_to_bytes(&k2)));
+        let gt_element_another = element_mul(&scalar_mul(&k1_for_gt, &k2_for_gt), &pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point, &g2_point));
+        assert!(element_eq(&gt_element, &gt_element_another), 1);
 
         // Multiple pairing.
         let g1_point_1 = group_generator<BLS12_381_G1>();

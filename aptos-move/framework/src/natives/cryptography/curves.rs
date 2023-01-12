@@ -34,6 +34,7 @@ use std::collections::VecDeque;
 use std::iter::Map;
 use std::ops::{Add, Mul, Neg};
 use std::slice::Iter;
+use ark_std::{test_rng, UniformRand};
 use once_cell::sync::Lazy;
 use crate::natives::cryptography::curves::abort_codes::E_UNKNOWN_GROUP;
 
@@ -52,6 +53,7 @@ pub struct Bls12381GasParameters {
     pub fr_inv: InternalGas,
     pub fr_mul: InternalGas,
     pub fr_neg: InternalGas,
+    pub fr_rand: InternalGas,
     pub fr_serialize: InternalGas,
     pub fr_sub: InternalGas,
     pub fr_to_repr: InternalGas,
@@ -85,6 +87,7 @@ pub struct Bls12381GasParameters {
     pub g1_proj_mul: InternalGas,
     pub g1_proj_mulassign: InternalGas,
     pub g1_proj_neg: InternalGas,
+    pub g1_proj_rand: InternalGas,
     pub g1_proj_sub: InternalGas,
     pub g1_proj_subassign: InternalGas,
     pub g1_proj_to_affine: InternalGas,
@@ -110,6 +113,7 @@ pub struct Bls12381GasParameters {
     pub g2_proj_mul: InternalGas,
     pub g2_proj_mulassign: InternalGas,
     pub g2_proj_neg: InternalGas,
+    pub g2_proj_rand: InternalGas,
     pub g2_proj_sub: InternalGas,
     pub g2_proj_subassign: InternalGas,
     pub g2_proj_to_affine: InternalGas,
@@ -997,6 +1001,91 @@ fn is_prime_order_internal(
     }
 }
 
+#[cfg(feature = "testing")]
+fn random_scalar_internal(
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+            let r = ark_bls12_381::Fr::rand(&mut test_rng());
+            let handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_scalar(r);
+            Ok(NativeResult::ok(
+                InternalGas::zero(),
+                smallvec![Value::u64(handle as u64)],
+            ))
+        }
+        _ => {
+            Ok(NativeResult::err(
+                InternalGas::zero(),
+                abort_codes::E_UNKNOWN_GROUP,
+            ))
+        }
+    }
+}
+
+#[cfg(feature = "testing")]
+fn random_element_internal(
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    match type_tag.as_str() {
+        "0x1::curves::BLS12_381_G1" => {
+            let point = ark_bls12_381::G1Projective::rand(&mut test_rng());
+            let handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_g1_point(point);
+            Ok(NativeResult::ok(
+                InternalGas::zero(),
+                smallvec![Value::u64(handle as u64)],
+            ))
+        }
+        "0x1::curves::BLS12_381_G2" => {
+            let point = ark_bls12_381::G2Projective::rand(&mut test_rng());
+            let handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_g2_point(point);
+            Ok(NativeResult::ok(
+                InternalGas::zero(),
+                smallvec![Value::u64(handle as u64)],
+            ))
+        }
+        "0x1::curves::BLS12_381_Gt" => {
+            let k = ark_bls12_381::Fr::rand(&mut test_rng());
+            let point = BLS12381_GT_GENERATOR.clone().pow(k.into_repr());
+            let handle = context
+                .extensions_mut()
+                .get_mut::<ArksContext>()
+                .add_gt_point(point);
+            Ok(NativeResult::ok(
+                InternalGas::zero(),
+                smallvec![Value::u64(handle as u64)],
+            ))
+        }
+        _ => {
+            Ok(NativeResult::err(
+                InternalGas::zero(),
+                abort_codes::E_UNKNOWN_GROUP,
+            ))
+        }
+    }
+}
+
 fn element_eq_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -1504,7 +1593,16 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
 
     // Test-only natives.
     #[cfg(feature = "testing")]
-    natives.append(&mut vec![]);
+    natives.append(&mut vec![
+        (
+            "random_element_internal",
+            make_test_only_native_from_func(random_element_internal),
+        ),
+        (
+            "random_scalar_internal",
+            make_test_only_native_from_func(random_scalar_internal),
+        ),
+    ]);
 
     crate::natives::helpers::make_module_natives(natives)
 }
