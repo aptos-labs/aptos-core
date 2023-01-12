@@ -1,6 +1,6 @@
 ---
 name: "\U0001FA90 DevEx RFC"
-about: Open an RFC for DevEx improvements
+about: Open a Request for Comments (RFC) for DevEx improvements
 title: "[DevEx RFC] "
 labels: DevEx
 assignees: ''
@@ -18,7 +18,7 @@ assignees: ''
 
 ## Proposals
 
-<!-- Given this is an RFC and not a direct proposal, you are are encouraged to propose multiple solutions to the problem to stimulate discussion. Naturally, the RFC creator will have their own opinion about which solution is best. This is fine, just make sure to explain your reasoning, e.g. with pros / cons / examples. -->
+<!-- Given this is an RFC and not a direct proposal, you are encouraged to propose multiple solutions to the problem to stimulate discussion. Naturally, the RFC creator will have their own opinion about which solution is best. This is fine, just make sure to explain your reasoning, e.g. with pros / cons / examples. -->
 
 ## FAQ
 
