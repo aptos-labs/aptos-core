@@ -27,10 +27,8 @@ ark-serialize = "0.3.0"
 ark-std = "0.3.0"
 base64 = { workspace = true }
 bcs = { workspace = true }
-bellman = "0.13.1"
 better_any = { workspace = true }
 blake2-rfc = { workspace = true }
-bls12_381 = "0.7.1"
 clap = { workspace = true }
 codespan-reporting = { workspace = true }
 curve25519-dalek = { workspace = true }

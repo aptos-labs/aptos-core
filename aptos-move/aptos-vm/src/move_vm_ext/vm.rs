@@ -5,7 +5,7 @@ use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
-use aptos_framework::natives::cryptography::curves::{ArksContext, Bls12381Context};
+use aptos_framework::natives::cryptography::curves::ArksContext;
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     cryptography::ristretto255_point::NativeRistrettoPointContext,
@@ -74,7 +74,6 @@ impl MoveVmExt {
 
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
-        extensions.add(Bls12381Context::new());
         extensions.add(ArksContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 

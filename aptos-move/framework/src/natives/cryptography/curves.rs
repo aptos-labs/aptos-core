@@ -10,13 +10,10 @@ use ark_ec::{AffineCurve, PairingEngine};
 use ark_ff::fields::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use better_any::{Tid, TidAble};
-use bls12_381;
-// use group::{Group};
 use ark_bls12_381::{Fq12, Fr, Parameters};
 use ark_ec::bls12::{Bls12Parameters, G1Prepared};
 use ark_ec::group::Group;
 use ark_ff::PrimeField;
-use bls12_381::G2Prepared;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
 use move_core_types::language_storage::TypeTag;
@@ -181,65 +178,6 @@ impl ArksContext {
     }
 
     pub fn get_gt_point(&self, handle: usize) -> &ark_bls12_381::Fq12 {
-        self.gt_point_store.get(handle).unwrap()
-    }
-}
-
-#[derive(Tid)]
-pub struct Bls12381Context {
-    scalar_store: Vec<bls12_381::Scalar>,
-    g1_point_store: Vec<bls12_381::G1Projective>,
-    g2_point_store: Vec<bls12_381::G2Projective>,
-    gt_point_store: Vec<bls12_381::Gt>,
-}
-
-impl Bls12381Context {
-    pub fn new() -> Self {
-        Self {
-            scalar_store: vec![],
-            g1_point_store: vec![],
-            g2_point_store: vec![],
-            gt_point_store: vec![],
-        }
-    }
-
-    pub fn add_scalar(&mut self, scalar: bls12_381::Scalar) -> usize {
-        let ret = self.scalar_store.len();
-        self.scalar_store.push(scalar);
-        ret
-    }
-
-    pub fn get_scalar(&self, handle: usize) -> &bls12_381::Scalar {
-        self.scalar_store.get(handle).unwrap()
-    }
-
-    pub fn add_g1_point(&mut self, p0: bls12_381::G1Projective) -> usize {
-        let ret = self.g1_point_store.len();
-        self.g1_point_store.push(p0);
-        ret
-    }
-
-    pub fn get_g1_point(&self, handle: usize) -> &bls12_381::G1Projective {
-        self.g1_point_store.get(handle).unwrap()
-    }
-
-    pub fn add_g2_point(&mut self, p0: bls12_381::G2Projective) -> usize {
-        let ret = self.g2_point_store.len();
-        self.g2_point_store.push(p0);
-        ret
-    }
-
-    pub fn get_g2_point(&self, handle: usize) -> &bls12_381::G2Projective {
-        self.g2_point_store.get(handle).unwrap()
-    }
-
-    pub fn add_gt_point(&mut self, point: bls12_381::Gt) -> usize {
-        let ret = self.gt_point_store.len();
-        self.gt_point_store.push(point);
-        ret
-    }
-
-    pub fn get_gt_point(&self, handle: usize) -> &bls12_381::Gt {
         self.gt_point_store.get(handle).unwrap()
     }
 }
