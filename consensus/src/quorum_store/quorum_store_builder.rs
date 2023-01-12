@@ -127,6 +127,8 @@ pub struct InnerBuilder {
     batch_store_cmd_rx: Option<tokio::sync::mpsc::Receiver<BatchStoreCommand>>,
     batch_reader_cmd_tx: tokio::sync::mpsc::Sender<BatchReaderCommand>,
     batch_reader_cmd_rx: Option<tokio::sync::mpsc::Receiver<BatchReaderCommand>>,
+    back_pressure_tx: tokio::sync::mpsc::Sender<bool>,
+    back_pressure_rx: Option<tokio::sync::mpsc::Receiver<bool>>,
     quorum_store_storage_path: PathBuf,
     num_network_workers_for_fragment: usize,
     quorum_store_storage: Option<Arc<QuorumStoreDB>>,
@@ -162,6 +164,7 @@ impl InnerBuilder {
             tokio::sync::mpsc::channel(config.channel_size);
         let (batch_reader_cmd_tx, batch_reader_cmd_rx) =
             tokio::sync::mpsc::channel(config.channel_size);
+        let (back_pressure_tx, back_pressure_rx) = tokio::sync::mpsc::channel(config.channel_size);
 
         Self {
             epoch,
@@ -188,6 +191,8 @@ impl InnerBuilder {
             batch_store_cmd_rx: Some(batch_store_cmd_rx),
             batch_reader_cmd_tx,
             batch_reader_cmd_rx: Some(batch_reader_cmd_rx),
+            back_pressure_tx,
+            back_pressure_rx: Some(back_pressure_rx),
             quorum_store_storage_path,
             num_network_workers_for_fragment,
             quorum_store_storage: None,
@@ -299,6 +304,7 @@ impl InnerBuilder {
         .unwrap();
 
         let batch_generator_cmd_rx = self.batch_generator_cmd_rx.take().unwrap();
+        let back_pressure_rx = self.back_pressure_rx.take().unwrap();
         let batch_generator = BatchGenerator::new(
             self.epoch,
             quorum_store_storage,
@@ -311,13 +317,10 @@ impl InnerBuilder {
             self.config.max_batch_bytes,
             self.config.batch_expiry_round_gap_when_init,
             self.config.end_batch_ms,
-            self.config.back_pressure_factor * self.verifier.len(),
-            self.config.back_pressure_local_batch_num,
-            block_store,
         );
         spawn_named!(
             "batch_generator",
-            batch_generator.start(batch_generator_cmd_rx, interval)
+            batch_generator.start(batch_generator_cmd_rx, back_pressure_rx, interval)
         )
         .unwrap();
 
@@ -346,11 +349,17 @@ impl InnerBuilder {
         .unwrap();
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
-        let proof_manager = ProofManager::new(self.epoch);
+        let proof_manager = ProofManager::new(
+            self.epoch,
+            self.config.back_pressure_factor * self.verifier.len(),
+            self.config.back_pressure_local_batch_num,
+            block_store,
+        );
         spawn_named!(
             "proof_manager",
             proof_manager.start(
                 self.network_sender.clone(),
+                self.back_pressure_tx.clone(),
                 self.consensus_to_quorum_store_receiver,
                 proof_manager_cmd_rx,
             )

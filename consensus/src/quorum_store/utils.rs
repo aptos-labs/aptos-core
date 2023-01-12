@@ -322,7 +322,8 @@ impl ProofQueue {
             }
         }
         counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(remaining_proof_size as f64);
-        counters::NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(remaining_local_proof_size as f64);
+        counters::NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK
+            .observe(remaining_local_proof_size as f64);
 
         (ret, remaining_proof_size, remaining_local_proof_size)
     }
