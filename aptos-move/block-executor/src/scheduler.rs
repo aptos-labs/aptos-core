@@ -8,7 +8,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
         Arc, Condvar,
-    },
+    }, hint,
 };
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
@@ -495,6 +495,15 @@ impl Scheduler {
         let (idx_to_validate, wave) =
             Self::unpack_validation_idx(self.validation_idx.fetch_add(1, Ordering::SeqCst));
 
+        if idx_to_validate >= self.num_txns {
+            if !self.done() {
+                // Avoid pointlessly spinning, and give priority to other threads that may
+                // be working to finish the remaining tasks.
+                hint::spin_loop();
+            }
+            return None;
+        }
+
         // If incarnation was last executed, and thus ready for validation,
         // return version and wave for validation task, otherwise None.
         self.is_executed(idx_to_validate, false)
@@ -510,6 +519,15 @@ impl Scheduler {
     /// - Otherwise, return None.
     fn try_execute_next_version(&self) -> Option<(Version, Option<DependencyCondvar>)> {
         let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::SeqCst);
+
+        if idx_to_execute >= self.num_txns {
+            if !self.done() {
+                // Avoid pointlessly spinning, and give priority to other threads that may
+                // be working to finish the remaining tasks.
+                hint::spin_loop();
+            }
+            return None;
+        }
 
         // If successfully incarnated (changed status from ready to executing),
         // return version for execution task, otherwise None.
