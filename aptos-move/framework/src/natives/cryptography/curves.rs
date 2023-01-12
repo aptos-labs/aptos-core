@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::cryptography::groth16_bls12381_bellman::BellmanContext;
 use crate::natives::util::{make_native_from_func, make_test_only_native_from_func};
 use crate::pop_vec_arg;
 use aptos_crypto::bls12381::arithmetics::Scalar;

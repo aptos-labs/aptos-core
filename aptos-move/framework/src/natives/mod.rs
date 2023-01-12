@@ -14,8 +14,8 @@ pub mod transaction_context;
 pub mod type_info;
 pub mod util;
 
-use crate::natives::cryptography::{curves, groth16_bls12381_bellman};
-use crate::natives::cryptography::{groth16, multi_ed25519};
+use crate::natives::cryptography::curves;
+use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
 use aptos_gas_algebra_ext::AbstractValueSize;
 use cryptography::ed25519;
@@ -36,8 +36,6 @@ pub mod status {
 pub struct GasParameters {
     pub account: account::GasParameters,
     pub curves: curves::GasParameters,
-    pub groth16: groth16::GasParameters,
-    pub groth16_bls12381_bellman: groth16_bls12381_bellman::GasParameters,
     pub ed25519: ed25519::GasParameters,
     pub bls12381: cryptography::bls12381::GasParameters,
     pub secp256k1: cryptography::secp256k1::GasParameters,
@@ -153,8 +151,6 @@ impl GasParameters {
                     g2_proj_rand: 0.into(),
                 },
             },
-            groth16: groth16::GasParameters { base: 0.into() },
-            groth16_bls12381_bellman: groth16_bls12381_bellman::GasParameters { base: 0.into() },
             ed25519: ed25519::GasParameters {
                 base: 0.into(),
                 per_pubkey_deserialize: 0.into(),
@@ -290,11 +286,6 @@ pub fn all_natives(
     add_natives_from_module!("curves", curves::make_all(gas_params.curves.clone()));
     add_natives_from_module!("ed25519", ed25519::make_all(gas_params.ed25519.clone()));
     add_natives_from_module!("genesis", account::make_all(gas_params.account));
-    // add_natives_from_module!("groth16", groth16::make_all(gas_params.groth16));
-    add_natives_from_module!(
-        "groth16_bls12381_bellman",
-        groth16_bls12381_bellman::make_all(gas_params.groth16_bls12381_bellman)
-    );
     add_natives_from_module!("multi_ed25519", multi_ed25519::make_all(gas_params.ed25519));
     add_natives_from_module!(
         "bls12381",
