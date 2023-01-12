@@ -93,7 +93,7 @@ provider "kubernetes" {
 }
 
 locals {
-  genesis_helm_chart_path = "${path.module}/../helm/genesis"
+  genesis_helm_chart_path = "${path.module}/../../helm/genesis"
 }
 
 
