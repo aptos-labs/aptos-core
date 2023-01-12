@@ -822,6 +822,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-db-tool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-backup-service",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-db",
+ "aptos-executor",
+ "aptos-executor-test-helpers",
+ "aptos-executor-types",
+ "aptos-infallible",
+ "aptos-jellyfish-merkle",
+ "aptos-logger",
+ "aptos-proptest-helpers",
+ "aptos-push-metrics",
+ "aptos-scratchpad",
+ "aptos-storage-interface",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "async-trait",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "bytes 1.2.1",
+ "clap 3.2.23",
+ "futures",
+ "itertools",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "num_cpus",
+ "once_cell",
+ "pin-project",
+ "proptest",
+ "rand 0.7.3",
+ "regex",
+ "reqwest",
+ "serde 1.0.149",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "tokio",
+ "tokio-stream",
+ "tokio-util 0.7.3",
+ "warp",
+]
+
+[[package]]
 name = "aptos-debugger"
 version = "0.1.0"
 dependencies = [
