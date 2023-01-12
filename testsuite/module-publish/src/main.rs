@@ -47,7 +47,7 @@ fn main() -> Result<()> {
     // for the modules compiled, so people can change it as they wish and need to.
     let base_path =
         base_dir.join("../../crates/transaction-emitter-lib/src/transaction_generator/publishing/");
-    let mut generic_mod = std::fs::File::create(&base_path.join("raw_module_data.rs")).unwrap();
+    let mut generic_mod = std::fs::File::create(base_path.join("raw_module_data.rs")).unwrap();
 
     //
     // File header

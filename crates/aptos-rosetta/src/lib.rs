@@ -69,8 +69,8 @@ impl RosettaContext {
                     let store = store.into_inner();
                     let pool_addresses: Vec<_> = store
                         .staking_contracts
-                        .iter()
-                        .map(|(_operator, pool)| pool.pool_address)
+                        .values()
+                        .map(|pool| pool.pool_address)
                         .collect();
                     for pool_address in pool_addresses {
                         pool_address_to_owner.insert(pool_address, *owner_address);
@@ -170,7 +170,7 @@ pub async fn bootstrap_async(
 /// Collection of all routes for the server
 pub fn routes(
     context: RosettaContext,
-) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
+) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone {
     account::routes(context.clone())
         .or(block::block_route(context.clone()))
         .or(construction::combine_route(context.clone()))
@@ -219,7 +219,7 @@ const HEALTH_CHECK_DEFAULT_SECS: u64 = 300;
 
 pub fn health_check_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("-" / "healthy")
         .and(warp::path::end())
         .and(warp::query().map(move |params: HealthCheckParams| params))

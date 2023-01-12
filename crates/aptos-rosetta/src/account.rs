@@ -26,7 +26,7 @@ use warp::Filter;
 /// Account routes e.g. balance
 pub fn routes(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::post().and(
         warp::path!("account" / "balance")
             .and(warp::body::json())

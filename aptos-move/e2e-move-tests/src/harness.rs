@@ -448,6 +448,12 @@ impl MoveHarness {
     }
 }
 
+impl Default for MoveHarness {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Enables golden files for the given harness. The golden file will be stored side-by-side
 /// with the data directory of a Rust source, named after the test function.
 #[macro_export]

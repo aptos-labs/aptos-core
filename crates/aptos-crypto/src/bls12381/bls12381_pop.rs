@@ -147,12 +147,12 @@ impl std::hash::Hash for ProofOfPossession {
 
 impl fmt::Debug for ProofOfPossession {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }
 
 impl fmt::Display for ProofOfPossession {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.to_bytes()))
+        write!(f, "{}", hex::encode(self.to_bytes()))
     }
 }

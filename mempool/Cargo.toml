@@ -60,3 +60,4 @@ proptest = { workspace = true }
 default = []
 failpoints = ["fail/failpoints", "aptos-vm-validator/failpoints"]
 fuzzing = ["proptest", "aptos-types/fuzzing", "aptos-storage-interface/fuzzing", "aptos-config/fuzzing"]
+consensus-only-perf-test = []

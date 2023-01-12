@@ -46,7 +46,7 @@ impl Fetcher {
 
     pub fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
         let info = self.context.get_latest_ledger_info_wrapped()?;
-        self.highest_known_version = info.ledger_version.0 as u64;
+        self.highest_known_version = info.ledger_version.0;
         self.chain_id = info.chain_id;
         Ok(())
     }
@@ -180,11 +180,8 @@ async fn fetch_raw_txns_with_retries(
 ) -> Vec<TransactionOnChainData> {
     let mut retries = 0;
     loop {
-        match context.get_transactions(
-            starting_version as u64,
-            num_transactions_to_fetch,
-            ledger_version as u64,
-        ) {
+        match context.get_transactions(starting_version, num_transactions_to_fetch, ledger_version)
+        {
             Ok(raw_txns) => return raw_txns,
             Err(err) => {
                 UNABLE_TO_FETCH_TRANSACTION.inc();
@@ -233,7 +230,7 @@ async fn fetch_nexts(
 
     let (_, _, block_event) = context
         .db
-        .get_block_info_by_version(starting_version as u64)
+        .get_block_info_by_version(starting_version)
         .unwrap_or_else(|_| {
             panic!(
                 "Could not get block_info for start version {}",
@@ -465,12 +462,8 @@ impl TransactionFetcherTrait for TransactionFetcher {
 
         let options2 = self.options.clone();
         let fetcher_handle = tokio::spawn(async move {
-            let mut fetcher = Fetcher::new(
-                context,
-                starting_version as u64,
-                options2,
-                transactions_sender,
-            );
+            let mut fetcher =
+                Fetcher::new(context, starting_version, options2, transactions_sender);
             fetcher.run().await;
         });
         self.fetcher_handle = Some(fetcher_handle);

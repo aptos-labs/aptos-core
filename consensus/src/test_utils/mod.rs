@@ -41,7 +41,7 @@ pub async fn build_simple_tree() -> (Vec<Arc<ExecutedBlock>>, Arc<BlockStore>) {
         .expect("genesis block must exist");
     assert_eq!(block_store.len(), 1);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
-    assert_eq!(block_store.block_exists(genesis_block.id()), true);
+    assert!(block_store.block_exists(genesis_block.id()));
 
     //       ╭--> A1--> A2--> A3
     // Genesis--> B1--> B2

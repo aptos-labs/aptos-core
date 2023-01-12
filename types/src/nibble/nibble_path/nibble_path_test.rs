@@ -87,12 +87,12 @@ fn test_nibble_iterator() {
 fn test_get_bit() {
     let bytes = vec![0x01, 0x02];
     let nibble_path = NibblePath::new_even(bytes);
-    assert_eq!(nibble_path.get_bit(0), false);
-    assert_eq!(nibble_path.get_bit(1), false);
-    assert_eq!(nibble_path.get_bit(2), false);
-    assert_eq!(nibble_path.get_bit(7), true);
-    assert_eq!(nibble_path.get_bit(8), false);
-    assert_eq!(nibble_path.get_bit(14), true);
+    assert!(!nibble_path.get_bit(0));
+    assert!(!nibble_path.get_bit(1));
+    assert!(!nibble_path.get_bit(2));
+    assert!(nibble_path.get_bit(7));
+    assert!(!nibble_path.get_bit(8));
+    assert!(nibble_path.get_bit(14));
 }
 
 #[test]
