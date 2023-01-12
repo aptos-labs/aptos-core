@@ -185,6 +185,10 @@ Optionally, check out a release branch to install an Aptos node:
 
 Now your basic Aptos development environment is ready. Head over to our [Developer Tutorials](tutorials/index.md) to get started in Aptos.
 
+## Create and fund test accounts
+
+Use the Aptos CLI and wallet of your choice to create and fund an Aptos account in `testnet` (or `devnet`).
+
 ## Understand the Aptos Token Standard
 
 The [Aptos Token Standard](../concepts/coin-and-token/index.md) lays out the rules for creating and distributing digital assets on the Aptos blockchain.
