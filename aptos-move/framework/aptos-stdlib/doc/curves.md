@@ -353,7 +353,7 @@ Perform a bilinear mapping.
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_pairing">pairing</a>&lt;G1,G2,Gt&gt;(element_1: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G1&gt;, element_2: &<a href="curves.md#0x1_curves_Element">Element</a>&lt;G2&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
-        handle: <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(1, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[element_1.handle], 1, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[element_2.handle])
+        handle: <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[element_1.handle], <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[element_2.handle])
     }
 }
 </code></pre>
@@ -393,7 +393,7 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
     };
 
     <a href="curves.md#0x1_curves_Element">Element</a>&lt;Gt&gt; {
-        handle: <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(num_g1, g1_handles, num_g2, g2_handles)
+        handle: <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(g1_handles, g2_handles)
     }
 }
 </code></pre>
@@ -1534,10 +1534,9 @@ See the comments on the actual type <code>G</code> for the format details.
 
 ## Function `multi_pairing_internal`
 
-TODO: Remove <code>g1_handle_count</code> and <code>g2_handle_count</code> once working with <code><a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code> in rust is well supported.
 
 
-<pre><code><b>fun</b> <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1, G2, Gt&gt;(g1_handle_count: u64, g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, g2_handle_count: u64, g2_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1, G2, Gt&gt;(g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, g2_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
 </code></pre>
 
 
@@ -1546,7 +1545,7 @@ TODO: Remove <code>g1_handle_count</code> and <code>g2_handle_count</code> once 
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(g1_handle_count: u64, g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, g2_handle_count: u64, g2_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, g2_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
 </code></pre>
 
 

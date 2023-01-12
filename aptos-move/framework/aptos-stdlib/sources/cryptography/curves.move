@@ -123,7 +123,7 @@ module aptos_std::curves {
     public fun pairing<G1,G2,Gt>(element_1: &Element<G1>, element_2: &Element<G2>): Element<Gt> {
         abort_if_feature_disabled();
         Element<Gt> {
-            handle: multi_pairing_internal<G1,G2,Gt>(1, vector[element_1.handle], 1, vector[element_2.handle])
+            handle: multi_pairing_internal<G1,G2,Gt>(vector[element_1.handle], vector[element_2.handle])
         }
     }
 
@@ -143,7 +143,7 @@ module aptos_std::curves {
         };
 
         Element<Gt> {
-            handle: multi_pairing_internal<G1,G2,Gt>(num_g1, g1_handles, num_g2, g2_handles)
+            handle: multi_pairing_internal<G1,G2,Gt>(g1_handles, g2_handles)
         }
     }
 
@@ -354,8 +354,7 @@ module aptos_std::curves {
     native fun element_neg_internal<G>(handle: u64): u64;
     native fun serialize_element_uncompressed_internal<G>(handle: u64): vector<u8>;
     native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
-    ///TODO: Remove `g1_handle_count` and `g2_handle_count` once working with `vector<u64>` in rust is well supported.
-    native fun multi_pairing_internal<G1,G2,Gt>(g1_handle_count: u64, g1_handles: vector<u64>, g2_handle_count: u64, g2_handles: vector<u64>): u64;
+    native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
 
     #[test(fx = @std)]
     fun test_bls12_381_g1(fx: signer) {

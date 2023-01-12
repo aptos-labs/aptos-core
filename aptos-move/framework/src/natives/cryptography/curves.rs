@@ -1352,8 +1352,8 @@ fn multi_pairing_internal(
     let type_tag_2 = context
         .type_to_type_tag(ty_args.get(2).unwrap())?
         .to_string();
-    let g2_handles = pop_vec_u64(&mut args)?;
-    let g1_handles = pop_vec_u64(&mut args)?;
+    let g2_handles = pop_arg!(args, Vec<u64>);
+    let g1_handles = pop_arg!(args, Vec<u64>);
     match (
         type_tag_0.as_str(),
         type_tag_1.as_str(),
@@ -1507,20 +1507,4 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     natives.append(&mut vec![]);
 
     crate::natives::helpers::make_module_natives(natives)
-}
-
-/// A workaround for popping a vector<u64> from the argument stack,
-/// before [a proper fix](`https://github.com/move-language/move/pull/773`) is complete.
-/// It requires the move native function to push 2 items in the argument stack:
-/// first the length of the vector as a u64, then the vector itself.
-/// TODO: Remove this once working with `vector<u64>` in rust is well supported.
-fn pop_vec_u64(args: &mut VecDeque<Value>) -> PartialVMResult<Vec<u64>> {
-    let vector = args.pop_back().unwrap().value_as::<Vector>()?;
-    let vector_len = args.pop_back().unwrap().value_as::<u64>()?;
-    let mut values = Vec::with_capacity(vector_len as usize);
-    for item in vector.unpack(&Type::U64, vector_len)?.into_iter() {
-        let value = item.value_as::<u64>()?;
-        values.push(value);
-    }
-    Ok(values)
 }
