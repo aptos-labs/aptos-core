@@ -122,7 +122,7 @@ pub fn assert_successful_key_rotation_transaction<
         struct_name: String::from("RotationProofChallenge"),
         sequence_number,
         originator,
-        current_auth_key: AccountAddress::from_bytes(&current_account.auth_key()).unwrap(),
+        current_auth_key: AccountAddress::from_bytes(current_account.auth_key()).unwrap(),
         new_public_key: new_public_key.to_bytes().to_vec(),
     };
 

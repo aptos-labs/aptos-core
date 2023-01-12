@@ -466,14 +466,14 @@ where
             .cloned()
             .collect();
 
-        for p in stale_dials.into_iter() {
+        for peer_id in stale_dials {
             debug!(
-                NetworkSchema::new(&self.network_context).remote_peer(&p),
+                NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                 "{} Cancelling stale dial {}",
                 self.network_context,
-                p.short_str()
+                peer_id.short_str()
             );
-            self.dial_queue.remove(&p);
+            self.dial_queue.remove(&peer_id);
         }
     }
 

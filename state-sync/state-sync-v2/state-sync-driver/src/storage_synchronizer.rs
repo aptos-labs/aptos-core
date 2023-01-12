@@ -674,7 +674,7 @@ fn spawn_state_snapshot_receiver<
                             metrics::set_gauge(
                                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
                                 operation_label,
-                                last_committed_state_index as u64,
+                                last_committed_state_index,
                             );
                             metrics::observe_value(
                                 &metrics::STORAGE_SYNCHRONIZER_CHUNK_SIZES,

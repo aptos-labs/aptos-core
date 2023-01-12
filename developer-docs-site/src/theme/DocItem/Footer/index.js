@@ -1,6 +1,7 @@
 import React from "react";
 import Footer from "@theme-original/DocItem/Footer";
-import BrowserOnly from "@docusaurus/BrowserOnly";
+import { useLocation } from "@docusaurus/router";
+import CONTRIBUTORS from "../../../contributors.json";
 
 const Contributor = ({ contributor }) => {
   const { username, name, email } = contributor;
@@ -16,8 +17,8 @@ const Contributor = ({ contributor }) => {
 
 const Contributors = ({ contributors }) => {
   return (
-    <div class="aptos-contributors">
-      <h2 class="docusaurus-mt-lg">Authors</h2>
+    <div className="aptos-contributors">
+      <h2 className="docusaurus-mt-lg">Authors</h2>
       <div>
         {contributors.map((contributor) => {
           return (
@@ -32,16 +33,14 @@ const Contributors = ({ contributors }) => {
 };
 
 export default function FooterWrapper(props) {
+  const location = useLocation();
+  let urlPath = location.pathname;
+  if (urlPath.endsWith("/")) urlPath = urlPath.substring(0, urlPath.length - 1);
+  const contributors = CONTRIBUTORS[urlPath];
   return (
     <>
       <Footer {...props} />
-      <BrowserOnly>
-        {() => {
-          const contributorsNode = document.getElementById("aptos-doc-contributors")?.textContent;
-          const contributors = contributorsNode ? JSON.parse(contributorsNode) : [];
-          return contributors.length > 0 && <Contributors contributors={contributors} />;
-        }}
-      </BrowserOnly>
+      {contributors?.length > 0 && <Contributors contributors={contributors} />}
     </>
   );
 }

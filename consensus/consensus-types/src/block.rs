@@ -279,7 +279,7 @@ impl Block {
             // but don't allow anything that shouldn't be there.
             //
             // we validate the full correctness of this field in round_manager.process_proposal()
-            let succ_round = self.round() + (if self.is_nil_block() { 1 } else { 0 });
+            let succ_round = self.round() + u64::from(self.is_nil_block());
             let skipped_rounds = succ_round.checked_sub(parent.round() + 1);
             ensure!(
                 skipped_rounds.is_some(),

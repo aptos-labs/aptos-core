@@ -112,8 +112,7 @@ Generating the authentication key for an account requires that you provide one o
 identifiers for this account, i.e., whether the account is a single signature or a multisig account:
 
 - **1-byte single-signature scheme identifier**: `0x00`.
-- **1-byte multisig scheme identifier**: `0x01`. Make sure to also provide the value of `K` to generate the
-- K-of-N multisig authentication key.
+- **1-byte multisig scheme identifier**: `0x01`. Make sure to also provide the value of `K` to generate the K-of-N multisig authentication key.
 
 ## Single signer authentication
 
@@ -157,6 +156,8 @@ Refreshing the keys is generally regarded as good hygiene in the security field.
 system integrators who are used to using a mnemonic to represent both a private key and its associated account.
 To simplify this for the system integrators, Aptos provides an on-chain mapping via aptos account lookup-address.
 The on-chain data maps an effective account address as defined by the current mnemonic to the actual account address.
+
+For more information, see [`account.move`](https://github.com/aptos-labs/aptos-core/blob/d4a859bb0987f8e35e7471469c3bcd4ae4b49855/aptos-move/framework/aptos-framework/sources/account.move#L251).
 
 ## Access control with signer
 

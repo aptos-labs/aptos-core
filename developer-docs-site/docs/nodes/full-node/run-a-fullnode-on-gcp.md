@@ -93,7 +93,13 @@ You can deploy a public fullnode on GCP by using the Aptos fullnode Terraform mo
   touch main.tf
   ```
 
-4. Modify `main.tf` file to configure Terraform, and create public fullnode from Terraform module. Example content for `main.tf`:
+4. Modify the `main.tf` file to configure Terraform and create a public fullnode from the Terraform module.
+
+**Note:** If you are using a different version of Terraform, you will need to use the `tfenv` command to change the required version. 
+
+You can find the Docker image tag at https://hub.docker.com/r/aptoslabs/validator/tags?page=1&ordering=last_updated&name=devnet
+
+Example content for `main.tf`:
 
   ```rust
   terraform {
@@ -109,9 +115,10 @@ You can deploy a public fullnode on GCP by using the Aptos fullnode Terraform mo
     source        = "github.com/aptos-labs/aptos-core.git//terraform/fullnode/gcp?ref=main"
     region        = "us-central1"  # Specify the region
     zone          = "c"            # Specify the zone suffix
-    project       = "gcp-fullnode" # Specify your GCP project name
+    project       = "gcp-fullnode" # Specify your GCP project ID
+    fullnode_name = "BUCKET_NAME" #bucket name created in step 2
     era           = 1              # bump era number to wipe the chain
-    image_tag     = "devnet" # Specify the docker image tag to use
+    image_tag     = "devnet" # Specify the docker image tag 
   }
   ```
 
@@ -156,12 +163,24 @@ Once Terraform apply finished, you can follow this section to validate your depl
   ```bash
   kubectl get pods -n aptos
   ```
+You should see this:
+
+```
+NAME                       READY   STATUS    RESTARTS   AGE
+devnet0-aptos-fullnode-0   1/1     Running   0          56s
+```
 
 3. Get your public fullnode IP:
 
   ```bash
   kubectl get svc -o custom-columns=IP:status.loadBalancer.ingress -n aptos
   ```
+  
+  You should see this:
+  
+  ```IP
+[map[ip:104.198.36.142]]
+```
 
 4. Check the REST API, make sure that the ledger version is increasing:
 
@@ -169,6 +188,11 @@ Once Terraform apply finished, you can follow this section to validate your depl
   curl http://<IP>/v1
   # Example command syntax: curl http://104.198.36.142/v1
   ```
+  
+  You should see this:
+  ```
+  {"chain_id":25,"epoch":"22","ledger_version":"9019844","oldest_ledger_version":"0","ledger_timestamp":"1661620200131348","node_role":"full_node","oldest_block_height":"0","block_height":"1825467"}
+```
 
 5. To verify the correctness of your public fullnode, as outlined in the section [Verify the correctness of your FullNode](/nodes/full-node/fullnode-source-code-or-docker#verify-the-correctness-of-your-public-fullnode), you will need to:
    - Set up a port-forwarding mechanism directly to the aptos pod in one ssh terminal, and

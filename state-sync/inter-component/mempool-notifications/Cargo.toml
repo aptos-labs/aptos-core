@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-runtimes = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }

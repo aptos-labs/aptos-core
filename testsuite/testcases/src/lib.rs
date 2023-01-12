@@ -20,7 +20,7 @@ pub mod two_traffics_test;
 pub mod validator_join_leave_test;
 pub mod validator_reboot_stress_test;
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use aptos_forge::{
     EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
     TxnEmitter, TxnStats, Version,
@@ -30,7 +30,7 @@ use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 const WARMUP_DURATION_FRACTION: f32 = 0.07;
 const COOLDOWN_DURATION_FRACTION: f32 = 0.04;
@@ -76,12 +76,8 @@ pub fn create_emitter_and_request(
 }
 
 pub fn traffic_emitter_runtime() -> Result<Runtime> {
-    let mut runtime_builder = Builder::new_multi_thread();
-    runtime_builder.disable_lifo_slot().enable_all();
-    runtime_builder.worker_threads(64);
-    runtime_builder
-        .build()
-        .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))
+    let runtime = aptos_runtimes::spawn_named_runtime("emitter".into(), Some(64));
+    Ok(runtime)
 }
 
 pub fn generate_traffic(

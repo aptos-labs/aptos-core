@@ -18,6 +18,11 @@ pub struct SerializedTransaction {
 }
 
 impl SerializedTransaction {
+    #[cfg(test)]
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Self {
+        Self { bytes }
+    }
+
     pub fn from_signed_txn(txn: &SignedTransaction) -> Self {
         Self {
             bytes: to_bytes(&txn).unwrap(),
