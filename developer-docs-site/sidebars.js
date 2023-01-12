@@ -73,6 +73,7 @@ const sidebars = {
         "cli-tools/install-move-prover",
       ],
     },
+    "guides/get-test-funds",
     "guides/system-integrators-guide",
     {
       type: "html",
