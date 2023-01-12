@@ -218,47 +218,6 @@ devnet0-aptos-fullnode-0   1/1     Running   0          56s
 
    * Exit port-forwarding when you are done by entering control-c in the terminal.
 
-## Update public fullnode with new releases
-
-Aptos devnet releases can be of two types: 
-- One with a data wipe to start over the Aptos blockchain
-- Second type is only a software update without a data wipe
-
-### Upgrade with data wipe
-
-1. You can increase the `era` number in `main.tf` to trigger a new data volume creation, which will start the node on a new DB.
-
-2. Update `image_tag` in `main.tf`.
-
-3. Update Terraform module for fullnode, run this in the same directory of your `main.tf` file:
-
-  ```bash
-  terraform get -update
-  ```
-
-4. Apply Terraform changes:
-
-  ```bash
-  terraform apply
-  ```
-
-### Upgrade without data wipe
-
-1. Update `image_tag` in `main.tf`.
-
-2. Update Terraform module for fullnode, run this in the same directory of your `main.tf` file:
-
-  ```bash
-  terraform get -update
-  ```
-
-3. Apply Terraform changes:
-
-  ```bash
-  terraform apply
-  # if you didn't update the image tag, terraform will show nothing to change, in this case, force helm update
-  terraform apply -var force_helm_update=true
-  ```
 
 ## Configure identity and seed peers
 
