@@ -389,9 +389,12 @@ aptos move run --function-id <resource-account-address>::create_nft_with_resourc
 ```shell
 "vm_status": "Executed successfully"
 ```
+
 8. [See the transactions on Aptos Explorer](#see-the-module-on-aptos-explorer) as before by searching for their `transaction_hash` strings.
 
 ## Prepare module for production
+
+The final phase of development is to make the smart contract module ready for production. 
 
 Here we will enable signature verification
 
