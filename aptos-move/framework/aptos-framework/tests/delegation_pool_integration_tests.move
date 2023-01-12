@@ -83,7 +83,7 @@ module aptos_framework::delegation_pool_integration_tests {
             account::create_account_for_test(validator_address);
         };
 
-        dp::initialize_delegation_pool(validator, vector::empty<u8>());
+        dp::initialize_delegation_pool(validator, 0, vector::empty<u8>());
         let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
 
         let pk_bytes = bls12381::public_key_to_bytes(public_key);
@@ -882,7 +882,7 @@ module aptos_framework::delegation_pool_integration_tests {
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
         let validator_address = signer::address_of(validator);
         account::create_account_for_test(validator_address);
-        dp::initialize_delegation_pool(validator, vector::empty<u8>());
+        dp::initialize_delegation_pool(validator, 0, vector::empty<u8>());
         validator_address = dp::get_owned_pool_address(validator_address);
         mint_and_add_stake(validator, 100);
 
@@ -901,7 +901,7 @@ module aptos_framework::delegation_pool_integration_tests {
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
         let validator_address = signer::address_of(validator);
         account::create_account_for_test(validator_address);
-        dp::initialize_delegation_pool(validator, vector::empty<u8>());
+        dp::initialize_delegation_pool(validator, 0, vector::empty<u8>());
         validator_address = dp::get_owned_pool_address(validator_address);
         mint_and_add_stake(validator, 100);
 
