@@ -3,8 +3,6 @@
 
 use crate::natives::util::{make_native_from_func, make_test_only_native_from_func};
 use crate::pop_vec_arg;
-use aptos_crypto::bls12381::arithmetics::Scalar;
-use aptos_crypto::bls12381::PrivateKey;
 use ark_ec::ProjectiveCurve;
 use ark_ec::{AffineCurve, PairingEngine};
 use ark_ff::fields::Field;
