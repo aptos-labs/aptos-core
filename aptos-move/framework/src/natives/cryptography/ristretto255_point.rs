@@ -269,7 +269,7 @@ pub(crate) fn native_point_mul(
     // Compute result = a * point (or a = a * point) and return a RistrettoPointHandle
     let result_handle = match in_place {
         false => {
-            let point: RistrettoPoint = point_data.get_point(&point_handle).mul(scalar);
+            let point = point_data.get_point(&point_handle).mul(scalar);
             point_data.add_point(point)
         },
         true => {
