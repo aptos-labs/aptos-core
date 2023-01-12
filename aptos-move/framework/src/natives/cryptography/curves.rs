@@ -1,33 +1,30 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::util::{make_native_from_func, make_test_only_native_from_func};
-use crate::pop_vec_arg;
+use crate::natives::util::make_native_from_func;
+#[cfg(feature = "testing")]
+use crate::natives::util::make_test_only_native_from_func;
 use ark_ec::ProjectiveCurve;
 use ark_ec::{AffineCurve, PairingEngine};
 use ark_ff::fields::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use better_any::{Tid, TidAble};
-use ark_bls12_381::{Fq12, Fr, Parameters};
-use ark_ec::bls12::{Bls12Parameters, G1Prepared};
+use ark_bls12_381::{Parameters};
 use ark_ec::group::Group;
 use ark_ff::PrimeField;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
-use move_core_types::language_storage::TypeTag;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::loaded_data::runtime_types::Type;
 use move_vm_types::natives::function::NativeResult;
 use move_vm_types::pop_arg;
 use move_vm_types::values::Value;
-use move_vm_types::values::{Struct, Vector};
 use num_traits::identities::Zero;
 use num_traits::One;
 use smallvec::smallvec;
 use std::collections::VecDeque;
-use std::iter::Map;
 use std::ops::{Add, Mul, Neg};
-use std::slice::Iter;
+#[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
 use once_cell::sync::Lazy;
 use crate::natives::cryptography::curves::abort_codes::E_UNKNOWN_GROUP;
@@ -199,7 +196,8 @@ fn serialize_element_uncompressed_internal(
                 .get::<ArksContext>()
                 .get_g1_point(handle)
                 .into_affine()
-                .serialize_uncompressed(&mut buf);
+                .serialize_uncompressed(&mut buf)
+                .unwrap();
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g1_proj_to_affine + gas_params.bls12_381.g1_affine_serialize_uncompressed,
                 smallvec![Value::vector_u8(buf)],
@@ -212,7 +210,8 @@ fn serialize_element_uncompressed_internal(
                 .get::<ArksContext>()
                 .get_g2_point(handle)
                 .into_affine()
-                .serialize_uncompressed(&mut buf);
+                .serialize_uncompressed(&mut buf)
+                .unwrap();
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g2_proj_to_affine + gas_params.bls12_381.g2_affine_serialize_uncompressed,
                 smallvec![Value::vector_u8(buf)],
@@ -224,7 +223,8 @@ fn serialize_element_uncompressed_internal(
                 .extensions()
                 .get::<ArksContext>()
                 .get_gt_point(handle)
-                .serialize_uncompressed(&mut buf);
+                .serialize_uncompressed(&mut buf)
+                .unwrap();
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fq12_serialize,
                 smallvec![Value::vector_u8(buf)],
@@ -255,7 +255,8 @@ fn serialize_element_compressed_internal(
                 .get::<ArksContext>()
                 .get_g1_point(handle)
                 .into_affine()
-                .serialize(&mut buf);
+                .serialize(&mut buf)
+                .unwrap();
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g1_proj_to_affine + gas_params.bls12_381.g1_affine_serialize_compressed,
                 smallvec![Value::vector_u8(buf)],
@@ -268,7 +269,8 @@ fn serialize_element_compressed_internal(
                 .get::<ArksContext>()
                 .get_g2_point(handle)
                 .into_affine()
-                .serialize(&mut buf);
+                .serialize(&mut buf)
+                .unwrap();
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g2_proj_to_affine + gas_params.bls12_381.g2_affine_serialize_compressed,
                 smallvec![Value::vector_u8(buf)],
@@ -280,7 +282,8 @@ fn serialize_element_compressed_internal(
                 .extensions()
                 .get::<ArksContext>()
                 .get_gt_point(handle)
-                .serialize(&mut buf);
+                .serialize(&mut buf)
+                .unwrap();
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fq12_serialize,
                 smallvec![Value::vector_u8(buf)],
@@ -403,8 +406,7 @@ fn deserialize_element_compressed_internal(
     match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" => {
             let cost = gas_params.bls12_381.g1_affine_deserialize_compressed + gas_params.bls12_381.g1_affine_to_proj;
-            let point = ark_bls12_381::G1Affine::deserialize(bytes.as_slice());
-            match point {
+            match ark_bls12_381::G1Affine::deserialize(bytes.as_slice()) {
                 Ok(point) => {
                     let handle = context
                         .extensions_mut()
@@ -500,7 +502,7 @@ fn scalar_from_bytes_internal(
     match type_tag.as_str() {
         "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
             let scalar = ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice());
-            match (scalar) {
+            match scalar {
                 Ok(scalar) => {
                     let handle = context
                         .extensions_mut()
@@ -543,7 +545,7 @@ fn scalar_to_bytes_internal(
                 .extensions()
                 .get::<ArksContext>()
                 .get_scalar(handle)
-                .serialize_uncompressed(&mut buf);
+                .serialize_uncompressed(&mut buf).unwrap();
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fr_serialize,
                 smallvec![Value::vector_u8(buf)],
@@ -776,7 +778,7 @@ fn group_identity_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
+    mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     let type_tag = context
@@ -940,7 +942,7 @@ fn is_prime_order_internal(
 fn random_scalar_internal(
     context: &mut NativeContext,
     ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
+    mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     let type_tag = context
@@ -971,7 +973,7 @@ fn random_scalar_internal(
 fn random_element_internal(
     context: &mut NativeContext,
     ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
+    mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     let type_tag = context
