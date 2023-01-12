@@ -51,7 +51,7 @@ const NETPERF_DEFAULT_MSG_SIZE: usize = 64 * 1024;
 const NETPERF_DEFAULT_DURTAION_SEC: u64 = 10;
 
 pub struct NetPerf {
-    network_context: NetworkContext,
+    network_context: Arc<NetworkContext>,
     peers: Arc<PeerMetadataStorage>,
     peer_list: Arc<DashMap<PeerId, PeerNetPerfStat>>, //with capacity and hasher
     sender: Arc<NetPerfNetworkSender>,
@@ -70,6 +70,7 @@ impl PeerNetPerfStat {
 #[allow(dead_code)]
 #[derive(Clone)]
 struct NetPerfState {
+    network_context: Arc<NetworkContext>,
     peers: Arc<PeerMetadataStorage>,
     peer_list: Arc<DashMap<PeerId, PeerNetPerfStat>>, //with capacity and hasher
     sender: Arc<NetPerfNetworkSender>,
@@ -85,7 +86,7 @@ impl NetPerf {
         netperf_port: u16,
     ) -> Self {
         NetPerf {
-            network_context,
+            network_context: Arc::new(NetworkContext::from(network_context)),
             peers,
             peer_list: Arc::new(DashMap::with_capacity(128)),
             sender,
@@ -109,6 +110,7 @@ impl NetPerf {
 
     fn net_perf_state(&self, sender: Sender<NetPerfCommands>) -> NetPerfState {
         NetPerfState {
+            network_context: self.network_context.clone(),
             peers: self.peers.clone(),
             sender: self.sender.clone(),
             peer_list: self.peer_list.clone(),
@@ -156,7 +158,7 @@ impl NetPerf {
                             match msg {
                                 NetPerfMsg::BlockOfBytes(_bytes) => {
                                     /* maybe add dedicated counters? but network_application_{out/in}bound_traffic
-                                     * seems to have us coverred
+                                     * seems to have us covered
                                      * */
                                 }
 
@@ -300,14 +302,18 @@ async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration)
     let done = Arc::new(AtomicBool::new(false));
     let stop = done.clone();
 
+    let mut sent = 0;
+    let mut yield_count = 0;
+
     tokio::spawn(async move {
         tokio::time::sleep(duration).await;
         stop.store(true, std::sync::atomic::Ordering::Relaxed);
     });
 
+    info!("Broadcast loop starting");
     loop {
         /* TODO(AlexM):
-         * 1. Fine grained controll with send_to.
+         * 1. Fine grained control with send_to.
          *    Its interesting to see which of the validator queus gets filled.
          * 2. msg.clone() is a disaster
          * */
@@ -317,19 +323,26 @@ async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration)
             msg.clone(),
         );
         if rc.is_err() {
-            should_yield = true
-        } //else update peer counters
-          /* maybe add dedicated counters? but network_application_{out/in}bound_traffic
-           * seems to have us coverred
+            should_yield = true;
+        } else {
+            /* maybe add dedicated pep-peer counters? but network_application_{out/in}bound_traffic
+           * seems to have us covered
            * */
+            sent += 1;
+        }
 
         if done.load(std::sync::atomic::Ordering::Relaxed) {
             break;
         }
         if should_yield {
+            yield_count += 1;
             tokio::task::yield_now().await;
             should_yield = false;
         }
     }
-    info!("Broadcast Op Finished");
+    info!(
+            NetworkSchema::new(&state.network_context),
+            "{} NetPerf Broadcast finished: sent: {} yield {}", state.network_context,
+            sent, yield_count,
+        );
 }
