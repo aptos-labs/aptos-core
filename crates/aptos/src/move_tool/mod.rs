@@ -744,10 +744,14 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
         }
-        txn_options
-            .submit_transaction(payload)
-            .await
-            .map(TransactionSummary::from)
+        if txn_options.profile_gas {
+            txn_options.profile_gas(payload).await
+        } else {
+            txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        }
     }
 }
 
@@ -1133,15 +1137,21 @@ impl CliCommand<TransactionSummary> for RunFunction {
             type_args.push(type_tag)
         }
 
-        self.txn_options
-            .submit_transaction(TransactionPayload::EntryFunction(EntryFunction::new(
-                self.function_id.module_id,
-                self.function_id.member_id,
-                type_args,
-                args,
-            )))
-            .await
-            .map(TransactionSummary::from)
+        let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+            self.function_id.module_id,
+            self.function_id.member_id,
+            type_args,
+            args,
+        ));
+
+        if self.txn_options.profile_gas {
+            self.txn_options.profile_gas(payload).await
+        } else {
+            self.txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        }
     }
 }
 
@@ -1243,13 +1253,16 @@ impl CliCommand<TransactionSummary> for RunScript {
             type_args.push(type_tag)
         }
 
-        let txn = self
-            .txn_options
-            .submit_transaction(TransactionPayload::Script(Script::new(
-                bytecode, type_args, args,
-            )))
-            .await?;
-        Ok(TransactionSummary::from(&txn))
+        let payload = TransactionPayload::Script(Script::new(bytecode, type_args, args));
+
+        if self.txn_options.profile_gas {
+            self.txn_options.profile_gas(payload).await
+        } else {
+            self.txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        }
     }
 }
 

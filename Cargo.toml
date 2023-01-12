@@ -9,6 +9,7 @@ members = [
     "aptos-move/aptos-aggregator",
     "aptos-move/aptos-debugger",
     "aptos-move/aptos-gas",
+    "aptos-move/aptos-gas-profiling",
     "aptos-move/aptos-release-builder",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
@@ -282,6 +283,7 @@ aptos-framework = { path = "aptos-move/framework" }
 aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
 aptos-gas = { path = "aptos-move/aptos-gas" }
 aptos-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
+aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
 aptos-genesis = { path = "crates/aptos-genesis" }
 aptos-github-client = { path = "secure/storage/github" }
 aptos-global-constants = { path = "config/global-constants" }
@@ -454,6 +456,7 @@ hyper-tls = "0.5.0"
 include_dir = { version = "0.7.2", features = ["glob"] }
 indicatif = "0.15.0"
 indoc = "1.0.6"
+inferno = "0.11.14"
 ipnet = "2.5.0"
 itertools = "0.10.3"
 jemallocator = { version = "0.3.2", features = [
