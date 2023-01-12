@@ -296,14 +296,13 @@ async fn netperf_comp_handler(state: NetPerfState, mut rx: Receiver<NetPerfComma
     }
 }
 
-fn loop_body(state: &NetPerfState, msg: &NetPerfMsg) -> bool {
+fn loop_body(state: &NetPerfState, msg: &NetPerfMsg, iter: impl Iterator<Item = PeerId>) -> bool {
     /* TODO(AlexM):
  * 1. Fine grained control with send_to.
  *    Its interesting to see which of the validator queus gets filled.
  * 2. msg.clone() is a disaster
  * */
-    let rc = state.sender.send_to_many(
-        state.peer_list.iter().map(|entry| entry.key().to_owned()),
+    let rc = state.sender.send_to_many(iter,
         ProtocolId::NetPerfDirectSendCompressed,
         msg.clone(),
     );
@@ -317,7 +316,7 @@ fn loop_body(state: &NetPerfState, msg: &NetPerfMsg) -> bool {
     }
 }
 async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration) {
-    let mut should_yield = false;
+    let mut should_yield;
     let msg = NetPerfMsg::BlockOfBytes(NetPerfPayload::new(size));
     let done = Arc::new(AtomicBool::new(false));
     let stop = done.clone();
@@ -329,11 +328,11 @@ async fn netperf_broadcast(state: NetPerfState, size: usize, duration: Duration)
         tokio::time::sleep(duration).await;
         stop.store(true, std::sync::atomic::Ordering::Relaxed);
     });
-
     info!("Broadcast loop starting");
     loop {
 
-        should_yield = loop_body(&state, &msg);
+        let iter = state.peer_list.iter().map(|entry| entry.key().to_owned());
+        should_yield = loop_body(&state, &msg, iter);
 
         if done.load(std::sync::atomic::Ordering::Relaxed) {
             break;
