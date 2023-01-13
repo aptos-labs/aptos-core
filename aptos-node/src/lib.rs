@@ -198,7 +198,7 @@ pub fn setup_test_environment_and_start_node<R>(
     rng: R,
 ) -> anyhow::Result<()>
 where
-    R: ::rand::RngCore + ::rand::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     // If there wasn't a test directory specified, create a temporary one
     let test_dir =
@@ -235,7 +235,7 @@ where
 
         // Write the mint key to disk
         let serialized_keys = bcs::to_bytes(&root_key)?;
-        let mut key_file = std::fs::File::create(&aptos_root_key_path)?;
+        let mut key_file = fs::File::create(&aptos_root_key_path)?;
         key_file.write_all(&serialized_keys)?;
 
         // Build a waypoint file so that clients / docker can grab it easily
