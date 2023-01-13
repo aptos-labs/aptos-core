@@ -244,20 +244,7 @@ impl ProofQueue {
             },
         }
         if local {
-            match self.digest_proof.entry(*proof.digest()) {
-                Vacant(entry) => {
-                    self.local_digest_queue
-                        .push_back((*proof.digest(), proof.expiration()));
-                    entry.insert(Some(proof));
-                },
-                Occupied(mut entry) => {
-                    if entry.get().is_some()
-                        && entry.get().as_ref().unwrap().expiration() < proof.expiration()
-                    {
-                        entry.insert(Some(proof));
-                    }
-                },
-            }
+            self.local_digest_queue.push_back((*proof.digest(), proof.expiration()));
         }
     }
 
