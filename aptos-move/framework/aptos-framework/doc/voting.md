@@ -1383,10 +1383,9 @@ Return true if the voting period of the given proposal has already ended.
 </code></pre>
 
 
-The same as spec of <code><a href="voting.md#0x1_voting_create_proposal_v2">create_proposal_v2</a>()</code>.
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>include</b> <a href="voting.md#0x1_voting_CreateProposal">CreateProposal</a>&lt;ProposalType&gt;{is_multi_step_proposal: <b>false</b>};
 </code></pre>
 
 
@@ -1400,22 +1399,43 @@ The same as spec of <code><a href="voting.md#0x1_voting_create_proposal_v2">crea
 </code></pre>
 
 
+The min_vote_threshold lower thanearly_resolution_vote_threshold.
+Make sure the execution script's hash is not empty.
+VotingForum<ProposalType> existed under the voting_forum_address.
+The next_proposal_id in VotingForum is up to MAX_U64.
 CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
-<pre><code><b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
-<b>let</b> proposal_id = voting_forum.next_proposal_id;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
-<b>aborts_if</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals,proposal_id);
-<b>aborts_if</b> len(early_resolution_vote_threshold.vec) != 0 && min_vote_threshold &gt; early_resolution_vote_threshold.vec[0];
-<b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
-<b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
-<b>aborts_if</b> len(execution_hash) &lt;= 0;
-<b>let</b> execution_key = std::string::spec_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
-<b>aborts_if</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(metadata,execution_key);
-<b>aborts_if</b> voting_forum.next_proposal_id + 1 &gt; MAX_U64;
-<b>let</b> is_multi_step_in_execution_key = std::string::spec_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
-<b>aborts_if</b> is_multi_step_proposal && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(metadata,is_multi_step_in_execution_key);
+<pre><code><b>include</b> <a href="voting.md#0x1_voting_CreateProposal">CreateProposal</a>&lt;ProposalType&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_voting_CreateProposal"></a>
+
+
+<pre><code><b>schema</b> <a href="voting.md#0x1_voting_CreateProposal">CreateProposal</a>&lt;ProposalType&gt; {
+    voting_forum_address: <b>address</b>;
+    execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    min_vote_threshold: u128;
+    early_resolution_vote_threshold: Option&lt;u128&gt;;
+    metadata: SimpleMap&lt;String, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;;
+    is_multi_step_proposal: bool;
+    <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>let</b> proposal_id = voting_forum.next_proposal_id;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals,proposal_id);
+    <b>aborts_if</b> len(early_resolution_vote_threshold.vec) != 0 && min_vote_threshold &gt; early_resolution_vote_threshold.vec[0];
+    <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
+    <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+    <b>aborts_if</b> len(execution_hash) &lt;= 0;
+    <b>let</b> execution_key = std::string::spec_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(metadata,execution_key);
+    <b>aborts_if</b> voting_forum.next_proposal_id + 1 &gt; MAX_U64;
+    <b>let</b> is_multi_step_in_execution_key = std::string::spec_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+    <b>aborts_if</b> is_multi_step_proposal && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(metadata,is_multi_step_in_execution_key);
+}
 </code></pre>
 
 
@@ -1484,7 +1504,7 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>include</b> <a href="voting.md#0x1_voting_ContainsProposalID">ContainsProposalID</a>&lt;ProposalType&gt;;
+<b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
 </code></pre>
 
@@ -1502,7 +1522,7 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>include</b> <a href="voting.md#0x1_voting_ContainsProposalID">ContainsProposalID</a>&lt;ProposalType&gt;;
+<b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
 </code></pre>
@@ -1520,7 +1540,7 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-<pre><code><b>include</b> <a href="voting.md#0x1_voting_ContainsProposalID">ContainsProposalID</a>&lt;ProposalType&gt;;
+<pre><code><b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 </code></pre>
 
 
@@ -1553,7 +1573,7 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 <pre><code><b>pragma</b> addition_overflow_unchecked;
-<b>include</b> <a href="voting.md#0x1_voting_ContainsProposalID">ContainsProposalID</a>&lt;ProposalType&gt;;
+<b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 </code></pre>
 
 
@@ -1569,7 +1589,7 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-<pre><code><b>include</b> <a href="voting.md#0x1_voting_ContainsProposalID">ContainsProposalID</a>&lt;ProposalType&gt;;
+<pre><code><b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 </code></pre>
 
 
@@ -1585,7 +1605,7 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-<pre><code><b>include</b> <a href="voting.md#0x1_voting_ContainsProposalID">ContainsProposalID</a>&lt;ProposalType&gt;;
+<pre><code><b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 </code></pre>
 
 
@@ -1601,16 +1621,16 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-<pre><code><b>include</b> <a href="voting.md#0x1_voting_ContainsProposalID">ContainsProposalID</a>&lt;ProposalType&gt;;
+<pre><code><b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 </code></pre>
 
 
 
 
-<a name="0x1_voting_ContainsProposalID"></a>
+<a name="0x1_voting_AbortsIfNotContainProposalID"></a>
 
 
-<pre><code><b>schema</b> <a href="voting.md#0x1_voting_ContainsProposalID">ContainsProposalID</a>&lt;ProposalType&gt; {
+<pre><code><b>schema</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt; {
     proposal_id: u64;
     voting_forum_address: <b>address</b>;
     <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);

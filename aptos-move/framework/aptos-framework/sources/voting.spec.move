@@ -110,7 +110,7 @@ spec aptos_framework::voting {
         // This function aborts when the proposal is not resolvable.
 
         // TODO: Find a way to specify when it will abort. The opaque with spec fun doesn't work.
-        pragma aborts_if_is_partial;
+        pragma aborts_if_is_strict = false;
         // pragma opaque;
         // aborts_if [abstract] spec_is_proposal_resolvable(voting_forum_address, proposal_id);
     }
