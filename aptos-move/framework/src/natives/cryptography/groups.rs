@@ -1238,7 +1238,7 @@ fn element_mul_scalar_internal(
     }
 }
 
-fn simul_element_mul_scalar_internal(
+fn element_multi_scalar_mul_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -1660,8 +1660,8 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), element_mul_scalar_internal),
         ),
         (
-            "simul_element_mul_internal",
-            make_native_from_func(gas_params.clone(), simul_element_mul_scalar_internal),
+            "element_multi_scalar_mul_internal",
+            make_native_from_func(gas_params.clone(), element_multi_scalar_mul_internal),
         ),
         (
             "element_double_internal",

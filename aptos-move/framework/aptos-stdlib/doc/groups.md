@@ -59,7 +59,7 @@
 -  [Function `element_neg_internal`](#0x1_groups_element_neg_internal)
 -  [Function `serialize_element_uncompressed_internal`](#0x1_groups_serialize_element_uncompressed_internal)
 -  [Function `serialize_element_compressed_internal`](#0x1_groups_serialize_element_compressed_internal)
--  [Function `simul_element_mul_internal`](#0x1_groups_simul_element_mul_internal)
+-  [Function `element_multi_scalar_mul_internal`](#0x1_groups_element_multi_scalar_mul_internal)
 -  [Function `pairing_product_internal`](#0x1_groups_pairing_product_internal)
 -  [Function `hash_to_element_internal`](#0x1_groups_hash_to_element_internal)
 
@@ -805,7 +805,7 @@ Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> for a list of scalars <code>k[]
     };
 
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
-        handle: <a href="groups.md#0x1_groups_simul_element_mul_internal">simul_element_mul_internal</a>&lt;G&gt;(scalar_handles, element_handles)
+        handle: <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G&gt;(scalar_handles, element_handles)
     }
 
 }
@@ -1577,13 +1577,13 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 
 </details>
 
-<a name="0x1_groups_simul_element_mul_internal"></a>
+<a name="0x1_groups_element_multi_scalar_mul_internal"></a>
 
-## Function `simul_element_mul_internal`
+## Function `element_multi_scalar_mul_internal`
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_simul_element_mul_internal">simul_element_mul_internal</a>&lt;G&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
 </code></pre>
 
 
@@ -1592,7 +1592,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_simul_element_mul_internal">simul_element_mul_internal</a>&lt;G&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
 </code></pre>
 
 

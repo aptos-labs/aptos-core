@@ -272,7 +272,7 @@ module aptos_std::groups {
         };
 
         Element<G> {
-            handle: simul_element_mul_internal<G>(scalar_handles, element_handles)
+            handle: element_multi_scalar_mul_internal<G>(scalar_handles, element_handles)
         }
 
     }
@@ -396,7 +396,7 @@ module aptos_std::groups {
     native fun element_neg_internal<G>(handle: u64): u64;
     native fun serialize_element_uncompressed_internal<G>(handle: u64): vector<u8>;
     native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
-    native fun simul_element_mul_internal<G>(scalar_handles: vector<u64>, element_handles: vector<u64>): u64;
+    native fun element_multi_scalar_mul_internal<G>(scalar_handles: vector<u64>, element_handles: vector<u64>): u64;
     native fun pairing_product_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
     native fun hash_to_element_internal<G>(bytes: vector<u8>): u64;
     #[test_only]
@@ -480,7 +480,7 @@ module aptos_std::groups {
         let point_2g_calc = element_add(&point_minus_7g_calc, &point_9g);
         assert!(element_eq(&point_2g, &point_2g_calc), 1);
 
-        // Simultaneous point multiplication.
+        // Multi-scalar multiplication.
         let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_G1>(14), &point_g);
         let scalar_1 = scalar_from_u64<BLS12_381_G1>(1);
         let scalar_2 = scalar_from_u64<BLS12_381_G1>(2);
@@ -573,7 +573,7 @@ module aptos_std::groups {
         let point_2g_calc = element_add(&point_minus_7g_calc, &point_9g);
         assert!(element_eq(&point_2g, &point_2g_calc), 1);
 
-        // Simultaneous point multiplication.
+        // Multi-scalar multiplication.
         let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_G2>(14), &point_g);
         let scalar_1 = scalar_from_u64<BLS12_381_G2>(1);
         let scalar_2 = scalar_from_u64<BLS12_381_G2>(2);
@@ -667,7 +667,7 @@ module aptos_std::groups {
         let point_2g_calc = element_add(&point_minus_7g_calc, &point_9g);
         assert!(element_eq(&point_2g, &point_2g_calc), 1);
 
-        // Simultaneous point multiplication.
+        // Multi-scalar multiplication.
         let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_Gt>(14), &point_g);
         let scalar_1 = scalar_from_u64<BLS12_381_Gt>(1);
         let scalar_2 = scalar_from_u64<BLS12_381_Gt>(2);
