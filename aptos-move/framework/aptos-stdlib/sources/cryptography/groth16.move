@@ -6,6 +6,7 @@ module aptos_std::groth16 {
     // Error codes
     const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 1;
 
+    /// A Groth16 verifying key.
     struct VerifyingKey<phantom G1, phantom G2, phantom Gt> has drop {
         alpha_g1: groups::Element<G1>,
         beta_g2: groups::Element<G2>,
@@ -14,6 +15,7 @@ module aptos_std::groth16 {
         gamma_abc_g1: vector<groups::Element<G1>>,
     }
 
+    /// A Groth16 verifying key pre-processed for faster verification.
     struct PreparedVerifyingKey<phantom G1, phantom G2, phantom Gt> has drop {
         alpha_g1_beta_g2: groups::Element<Gt>,
         gamma_g2_neg: groups::Element<G2>,
@@ -21,12 +23,14 @@ module aptos_std::groth16 {
         gamma_abc_g1: vector<groups::Element<G1>>,
     }
 
+    /// A Groth16 proof.
     struct Proof<phantom G1, phantom G2, phantom Gt> has drop {
         a: groups::Element<G1>,
         b: groups::Element<G2>,
         c: groups::Element<G1>,
     }
 
+    /// Create a new Groth16 verifying key.
     public fun new_vk<G1,G2,Gt>(alpha_g1: groups::Element<G1>, beta_g2: groups::Element<G2>, gamma_g2: groups::Element<G2>, delta_g2: groups::Element<G2>, gamma_abc_g1: vector<groups::Element<G1>>): VerifyingKey<G1,G2,Gt> {
         abort_if_feature_disabled();
         VerifyingKey {
@@ -38,6 +42,7 @@ module aptos_std::groth16 {
         }
     }
 
+    /// Create a new pre-processed Groth16 verifying key.
     public fun new_pvk<G1,G2,Gt>(alpha_g1_beta_g2: groups::Element<Gt>, gamma_g2_neg: groups::Element<G2>, delta_g2_neg: groups::Element<G2>, gamma_abc_g1: vector<groups::Element<G1>>): PreparedVerifyingKey<G1,G2,Gt> {
         abort_if_feature_disabled();
         PreparedVerifyingKey {
@@ -48,6 +53,7 @@ module aptos_std::groth16 {
         }
     }
 
+    /// Pre-process a Groth16 verification key `vk` for faster verification.
     public fun prepare_verifying_key<G1,G2,Gt>(vk: &VerifyingKey<G1,G2,Gt>): PreparedVerifyingKey<G1,G2,Gt> {
         abort_if_feature_disabled();
         PreparedVerifyingKey {
@@ -58,11 +64,13 @@ module aptos_std::groth16 {
         }
     }
 
+    /// Create a Groth16 proof.
     public fun new_proof<G1,G2,Gt>(a: groups::Element<G1>, b: groups::Element<G2>, c: groups::Element<G1>): Proof<G1,G2,Gt> {
         abort_if_feature_disabled();
         Proof { a, b, c }
     }
 
+    /// Verify a Groth16 proof.
     public fun verify_proof<G1,G2,Gt>(vk: &VerifyingKey<G1,G2,Gt>, public_inputs: &vector<groups::Scalar<G1>>, proof: &Proof<G1,G2,Gt>): bool {
         abort_if_feature_disabled();
         let left = groups::pairing<G1,G2,Gt>(&proof.a, &proof.b);
@@ -84,6 +92,7 @@ module aptos_std::groth16 {
         groups::element_eq(&left, &right)
     }
 
+    /// Verify a Groth16 proof `proof` against the public inputs `public_inputs` with a prepared verification key `pvk`.
     public fun verify_proof_with_pvk<G1,G2,Gt>(pvk: &PreparedVerifyingKey<G1,G2,Gt>, public_inputs: &vector<groups::Scalar<G1>>, proof: &Proof<G1,G2,Gt>): bool {
         abort_if_feature_disabled();
         let scalars: vector<groups::Scalar<G1>> = vector[groups::scalar_from_u64<G1>(1)];
