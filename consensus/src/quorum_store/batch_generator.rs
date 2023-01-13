@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::block_storage::BlockReader;
 use crate::quorum_store::batch_coordinator::BatchCoordinatorCommand;
 use crate::quorum_store::counters;
 use crate::quorum_store::quorum_store_db::BatchIdDB;
@@ -49,7 +50,8 @@ pub struct BatchGenerator {
     // temp variable for debug the txn seq number too new issue
     max_batch_id: u64,
     last_batch_id: u64,
-    back_pressure: bool,
+    block_store: Arc<dyn BlockReader + Send + Sync>, // for consensus back pressure
+    qs_back_pressure: bool, // quorum store back pressure, get updated from proof manager when pulling for consensus
 }
 
 impl BatchGenerator {
@@ -65,6 +67,7 @@ impl BatchGenerator {
         max_batch_bytes: usize,
         batch_expiry_round_gap_when_init: Round,
         end_batch_ms: u128,
+        block_store: Arc<dyn BlockReader + Send + Sync>,
     ) -> Self {
         let batch_id = if let Some(id) = db
             .clean_and_get_batch_id(epoch)
@@ -92,7 +95,8 @@ impl BatchGenerator {
             last_end_batch_time: Instant::now(),
             max_batch_id: 0,
             last_batch_id: 0,
-            back_pressure: false,
+            block_store,
+            qs_back_pressure: false,
         }
     }
 
@@ -293,7 +297,8 @@ impl BatchGenerator {
 
             tokio::select! {
                 _ = interval.tick() => {
-                    if self.back_pressure {
+                    if self.qs_back_pressure || self.block_store.back_pressure() {
+                        counters::QS_BACKPRESSURE.set(1);
                         // quorum store needs to be back pressured
                         // if last txn pull is not back pressured, there may be unfinished batch so we need to end the batch
                         if !back_pressure_in_last_pull {
@@ -303,6 +308,7 @@ impl BatchGenerator {
                         }
                         back_pressure_in_last_pull = true;
                     } else {
+                        counters::QS_BACKPRESSURE.set(0);
                         // no back pressure
                         if let Some(proof_rx) = self.handle_scheduled_pull(false).await {
                             proofs_in_progress.push(Box::pin(proof_rx));
@@ -353,7 +359,7 @@ impl BatchGenerator {
                     }
                 },
                 Some(updated_back_pressure) = back_pressure_rx.recv() => {
-                    self.back_pressure = updated_back_pressure;
+                    self.qs_back_pressure = updated_back_pressure;
                 },
             }
         }

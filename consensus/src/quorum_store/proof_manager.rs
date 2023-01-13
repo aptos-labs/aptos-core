@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::BlockReader;
 use crate::network::{NetworkSender, QuorumStoreSender};
 use crate::quorum_store::counters;
 use crate::quorum_store::utils::ProofQueue;
@@ -13,7 +12,6 @@ use aptos_logger::prelude::*;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
 use std::collections::HashSet;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -28,7 +26,6 @@ pub struct ProofManager {
     latest_logical_time: LogicalTime,
     back_pressure_limit: usize,
     back_pressure_local_batch_limit: usize,
-    block_store: Arc<dyn BlockReader + Send + Sync>,
     remaining_proof_num: usize,
     remaining_local_proof_num: usize,
 }
@@ -38,14 +35,12 @@ impl ProofManager {
         epoch: u64,
         back_pressure_limit: usize,
         back_pressure_local_batch_limit: usize,
-        block_store: Arc<dyn BlockReader + Send + Sync>,
     ) -> Self {
         Self {
             proofs_for_consensus: ProofQueue::new(),
             latest_logical_time: LogicalTime::new(epoch, 0),
             back_pressure_limit,
             back_pressure_local_batch_limit,
-            block_store,
             remaining_proof_num: 0,
             remaining_local_proof_num: 0,
         }
@@ -125,24 +120,8 @@ impl ProofManager {
     }
 
     /// return true when quorum store is back pressured
-    pub(crate) fn back_pressure(&self) -> bool {
-        debug!(
-            "QS: back pressure check remaining_proof_num {} back_pressure_limit {}",
-            self.remaining_proof_num, self.back_pressure_limit
-        );
-        counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(self.remaining_proof_num as f64);
-        // if self.remaining_proof_num > self.back_pressure_limit || self.block_store.back_pressure() {
-        //     counters::QS_BACKPRESSURE.set(1);
-        //     return true;
-        // }
-        if self.remaining_local_proof_num > self.back_pressure_local_batch_limit
-            || self.block_store.back_pressure()
-        {
-            counters::QS_BACKPRESSURE.set(1);
-            return true;
-        }
-        counters::QS_BACKPRESSURE.set(0);
-        return false;
+    pub(crate) fn qs_back_pressure(&self) -> bool {
+        return self.remaining_local_proof_num > self.back_pressure_local_batch_limit;
     }
 
     pub async fn start(
@@ -162,7 +141,7 @@ impl ProofManager {
                 Some(msg) = proposal_rx.next() => {
                     self.handle_proposal_request(msg);
 
-                    let updated_back_pressure = self.back_pressure();
+                    let updated_back_pressure = self.qs_back_pressure();
                     if updated_back_pressure != back_pressure {
                         back_pressure = updated_back_pressure;
                         if back_pressure_tx.send(back_pressure).await.is_err() {

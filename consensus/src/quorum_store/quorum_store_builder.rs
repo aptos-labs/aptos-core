@@ -317,6 +317,7 @@ impl InnerBuilder {
             self.config.max_batch_bytes,
             self.config.batch_expiry_round_gap_when_init,
             self.config.end_batch_ms,
+            block_store,
         );
         spawn_named!(
             "batch_generator",
@@ -353,7 +354,6 @@ impl InnerBuilder {
             self.epoch,
             self.config.back_pressure_factor * self.verifier.len(),
             self.config.back_pressure_local_batch_num,
-            block_store,
         );
         spawn_named!(
             "proof_manager",
