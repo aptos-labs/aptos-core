@@ -7,28 +7,28 @@ module aptos_std::groups {
     const E_UNKNOWN_PAIRING: u64 = 3;
 
     /// `BLS12_381_G1` represents a group used in BLS12-381 pairing.
-    /// The group is a prime-order group on an elliptic curve `y^2=x^3+4` defined over `Fq`.
+    /// The group is a prime-order subgroup on the elliptic curve `y^2=x^3+4` defined over `Fq`.
     /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
-    /// THe order of the group `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// THe order of the subgroup `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
     ///
     /// A `Scalar<BLS12_381_G1>` is an integer between 0 and `r-1`.
     ///
-    /// Function `deserialize_scalar<BLS12_381_G1>` and `serialize_scalar<BLS12_381_G1>`
-    /// assumes a 32-byte little-endian encoding of a `Scalar<BLS12_381_G1>`.
+    /// Functions `deserialize_scalar<BLS12_381_G1>` and `serialize_scalar<BLS12_381_G1>`
+    /// assume a 32-byte little-endian encoding of a `Scalar<BLS12_381_G1>`.
     ///
     /// An `Element<BLS12_381_G1>` is an element in `G1`.
     ///
-    /// Function `serialize_element_uncompressed<BLS12_381_G1>` and `deserialize_element_uncompressed<BLS12_381_G1>`
-    /// assumes a 96-byte encoding `[b_0, ..., b_95]` of an `Element<BLS12_381_G1>`, with the following rules.
+    /// Functions `serialize_element_uncompressed<BLS12_381_G1>` and `deserialize_element_uncompressed<BLS12_381_G1>`
+    /// assume a 96-byte encoding `[b_0, ..., b_95]` of an `Element<BLS12_381_G1>`, with the following rules.
     /// - `b_95 & 0x40` is the infinity flag.
     /// - The infinity flag is 1 if and only if the element is the point at infinity.
     /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq)`, with the following rules.
     ///     - `[b_0, ..., b_47 & 0x3f]` is a 48-byte little-endian encoding of `x`.
     ///     - `[b_48, ..., b_95 & 0x3f]` is a 48-byte little-endian encoding of 'y'.
     ///
-    /// Function `serialize_element_compressed<BLS12_381_G1>` and `deserialize_element_compressed<BLS12_381_G1>`
-    /// assumes a 48-byte encoding `[b_0, ..., b_47]` of an `Element<BLS12_381_G1>` with the following rules.
+    /// Functions `serialize_element_compressed<BLS12_381_G1>` and `deserialize_element_compressed<BLS12_381_G1>`
+    /// assume a 48-byte encoding `[b_0, ..., b_47]` of an `Element<BLS12_381_G1>` with the following rules.
     /// - `b_47 & 0x40` is the infinity flag.
     /// - The infinity flag is 1 if and only if the element is the point at infinity.
     /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve, with the following rules.
@@ -38,21 +38,21 @@ module aptos_std::groups {
     struct BLS12_381_G1 {}
 
     /// `BLS12_381_G2` represents a group used in BLS12-381 pairing.
-    /// The group is a prime-order group on an elliptic curve `y^2=x^3+4(u+1)` defined over `Fq2`.
+    /// The group is a prime-order subgroup on an elliptic curve `y^2=x^3+4(u+1)` defined over `Fq2`.
     /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
     /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
-    /// THe order of the group `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// THe order of the subgroup `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
     ///
     /// A `Scalar<BLS12_381_G2>` is an integer between 0 and `r-1`.
     ///
-    /// Function `deserialize_scalar<BLS12_381_G2>` and `serialize_scalar<BLS12_381_G2>`
-    /// assumes a 32-byte little-endian encoding of a `Scalar<BLS12_381_G2>`.
+    /// Functions `deserialize_scalar<BLS12_381_G2>` and `serialize_scalar<BLS12_381_G2>`
+    /// assume a 32-byte little-endian encoding of a `Scalar<BLS12_381_G2>`.
     ///
     /// An `Element<BLS12_381_G2>` is an element in `G2`.
     ///
-    /// Function `serialize_element_uncompressed<BLS12_381_G2>` and `deserialize_element_uncompressed<BLS12_381_G2>`
-    /// assumes a 192-byte encoding `[b_0, ..., b_191]` of an `Element<BLS12_381_G2>`, with the following rules.
+    /// Functions `serialize_element_uncompressed<BLS12_381_G2>` and `deserialize_element_uncompressed<BLS12_381_G2>`
+    /// assume a 192-byte encoding `[b_0, ..., b_191]` of an `Element<BLS12_381_G2>`, with the following rules.
     /// - `b_191 & 0x40` is the infinity flag.
     /// - The infinity flag is 1 if and only if the element is the point at infinity.
     /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq2)`, with the following rules.
@@ -63,8 +63,8 @@ module aptos_std::groups {
     ///         - `[b_96, ..., b_143]` is a 48-byte little-endian encoding of `y_0`.
     ///         - `[b_144, ..., b_191 & 0x3f]` is a 48-byte little-endian encoding of `y_1`.
     ///
-    /// Function `serialize_element_compressed<BLS12_381_G2>` and `deserialize_element_compressed<BLS12_381_G2>`
-    /// assumes a 96-byte encoding `[b_0, ..., b_95]` of an `Element<BLS12_381_G2>` with the following rules.
+    /// Functions `serialize_element_compressed<BLS12_381_G2>` and `deserialize_element_compressed<BLS12_381_G2>`
+    /// assume a 96-byte encoding `[b_0, ..., b_95]` of an `Element<BLS12_381_G2>` with the following rules.
     /// - `b_95 & 0x40` is the infinity flag.
     /// - The infinity flag is 1 if and only if the element is the point at infinity.
     /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq2)`, with the following rules.
@@ -77,7 +77,7 @@ module aptos_std::groups {
     struct BLS12_381_G2 {}
 
     /// `BLS12_381_Gt` represents a group used in BLS12-381 pairing.
-    /// The group is a prime-order group on an `Fq12`.
+    /// The group is a prime-order subgroup on `Fq12`.
     /// `Fq12` is an extension field of `Fq6`, constructed as `Fq12=Fq6[w]/(w^2-v)`.
     /// `Fq6` is an extension field of `Fq2`, constructed as `Fq6=Fq2[v]/(v^2-u-1)`.
     /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
@@ -87,12 +87,12 @@ module aptos_std::groups {
     ///
     /// A `Scalar<BLS12_381_G2>` is an integer between 0 and `r-1`.
     ///
-    /// Function `deserialize_scalar<BLS12_381_Gt>` and `serialize_scalar<BLS12_381_Gt>`
-    /// assumes a 32-byte little-endian encoding of a `Scalar<BLS12_381_Gt>`.
+    /// Functions `deserialize_scalar<BLS12_381_Gt>` and `serialize_scalar<BLS12_381_Gt>`
+    /// assume a 32-byte little-endian encoding of a `Scalar<BLS12_381_Gt>`.
     ///
     /// An `Element<BLS12_381_Gt>` is an element in `Gt`.
     ///
-    /// Function `serialize_element_uncompressed<BLS12_381_Gt>` and `deserialize_element_uncompressed<BLS12_381_Gt>`,
+    /// Functions `serialize_element_uncompressed<BLS12_381_Gt>` and `deserialize_element_uncompressed<BLS12_381_Gt>`,
     /// as well as `serialize_element_ompressed<BLS12_381_Gt>` and `deserialize_element_compressed<BLS12_381_Gt>`,
     /// assume a 576-byte encoding `[b_0, ..., b_575]` of an `Element<BLS12_381_Gt>`, with the following rules.
     ///     - Assume the given element is `e=c_0+c_1*w` where `c_i=c_i0+c_i1*v+c_i2*v^2 for i=0..1` and `c_ij=c_ij0+c_ij1*u for j=0..2`.
