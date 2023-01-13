@@ -314,7 +314,8 @@ RUN cmake ..
 RUN make
 RUN make install
 WORKDIR ..
-RUN cp -r rust_demangler /usr/lib/python3/dist-packages/rust_demangler
+# commenting out rust_demangler cp in testnet branch due to it breaking build for not yet understood reason
+# RUN cp -r rust_demangler /usr/lib/python3/dist-packages/rust_demangler
 
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1
