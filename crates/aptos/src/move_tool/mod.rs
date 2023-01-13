@@ -167,24 +167,30 @@ impl FrameworkPackageArgs {
         // Add the framework dependency if it's provided
         let mut dependencies = BTreeMap::new();
         if let Some(ref path) = self.framework_local_dir {
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
-                local: Some(path.display().to_string()),
-                git: None,
-                rev: None,
-                subdir: None,
-                aptos: None,
-                address: None,
-            });
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: Some(path.display().to_string()),
+                    git: None,
+                    rev: None,
+                    subdir: None,
+                    aptos: None,
+                    address: None,
+                },
+            );
         } else {
             let git_rev = self.framework_git_rev.as_deref().unwrap_or(DEFAULT_BRANCH);
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
-                local: None,
-                git: Some(APTOS_GIT_PATH.to_string()),
-                rev: Some(git_rev.to_string()),
-                subdir: Some(SUBDIR_PATH.to_string()),
-                aptos: None,
-                address: None,
-            });
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: None,
+                    git: Some(APTOS_GIT_PATH.to_string()),
+                    rev: Some(git_rev.to_string()),
+                    subdir: Some(SUBDIR_PATH.to_string()),
+                    aptos: None,
+                    address: None,
+                },
+            );
         }
 
         let manifest = MovePackageManifest {
@@ -320,6 +326,10 @@ pub struct TestPackage {
     #[clap(long, short)]
     pub filter: Option<String>,
 
+    /// A boolean value to skip warnings.
+    #[clap(long, short = 'w')]
+    pub ignore_compile_warnings: bool,
+
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
 
@@ -356,6 +366,7 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestingConfig {
                 filter: self.filter,
                 report_stacktrace_on_abort: true,
+                ignore_compile_warnings: self.ignore_compile_warnings,
                 ..UnitTestingConfig::default_with_bound(None)
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
