@@ -1,4 +1,5 @@
 ABI
+ABIs
 ACK
 AIP
 AIT
@@ -20,7 +21,6 @@ AptosCoin
 AptosLabs
 AptosNet
 AptosWalletAdapterProvider
-autoConnect
 BCS
 BFT
 BIP
@@ -40,13 +40,11 @@ CoinType
 Ctrl
 DAO
 DApps
-Dapps
-dapps
 DDoS
 DECL
-doesnt
 DM
 DNS
+Dapps
 Dev
 Devnet
 DoS
@@ -128,7 +126,6 @@ ManagedCoin
 Merkle
 MiB
 Modularity
-monorepo
 Monterey
 MoonCoin
 MoveVM
@@ -139,9 +136,9 @@ Multisigner
 NFT
 NFTs
 NHC
+NPM
 NetworkAddress
 NoAvailablePeers
-NPM
 ORM
 Octa
 Octas
@@ -169,13 +166,13 @@ Reusability
 Ruleset
 SDK
 SDKs
+SHA
 SPLITABLE
 SSD
 STM
 SYNACK
 Scalable
 SeaLevel
-SHA
 SignMessagePayload
 SignerCap
 Skylake
@@ -192,6 +189,8 @@ TokenClient
 TokenData
 TokenStore
 TokenTransfers
+TransactionBuilder
+TransactionBuilderABI
 TransactionFee
 Transactional
 Traw
@@ -230,6 +229,7 @@ arweave
 atomicity
 auth
 authenticator
+autoConnect
 aws
 backend
 backfill
@@ -253,6 +253,7 @@ cryptographically
 dApp
 dApps
 dapp
+dapps
 data's
 deallocate
 deduping
@@ -264,6 +265,7 @@ deserialized
 deserializing
 dev
 devnet
+doesnt
 eg
 endian
 faq
@@ -309,11 +311,12 @@ mdash
 mempool
 mempools
 merkle
+monorepo
 multisig
 namespace
 natively
-nft
 nestable
+nft
 nonce
 nonces
 nonfungible
@@ -392,8 +395,8 @@ uptime
 upvote
 url
 useBaseUrl
-usecase
 useWallet
+usecase
 utc
 validator
 validator's
@@ -407,9 +410,7 @@ waypoint
 webapp
 whitepaper
 withdrawable
+WSL
 xlarge
 yaml
 yamls
-TransactionBuilder
-ABIs
-TransactionBuilderABI

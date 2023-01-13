@@ -6,8 +6,8 @@ on:
       - main
       - devnet
       - testnet
-      - auto
-      - canary
+      - mainnet
+      - aptos-node-v*
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
@@ -128,6 +128,8 @@ jobs:
 
   rust-consensus-only-unit-test:
     runs-on: high-perf-docker
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
       - uses: actions/checkout@v3
         with:

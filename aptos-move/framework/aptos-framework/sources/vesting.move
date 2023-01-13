@@ -416,8 +416,12 @@ module aptos_framework::vesting {
         assert_active_vesting_contract(contract_address);
 
         let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
-        let contract_signer = &get_vesting_account_signer_internal(vesting_contract);
-        staking_contract::unlock_rewards(contract_signer, vesting_contract.staking.operator);
+        let operator = vesting_contract.staking.operator;
+        let (total_active_stake, _, commission_amount) =
+            staking_contract::staking_contract_amounts(contract_address, operator);
+        // Accumulated rewards, excluding unpaid commission, that entirely belongs to the shareholders.
+        let accumulated_rewards = total_active_stake - vesting_contract.remaining_grant - commission_amount;
+        unlock_stake(vesting_contract, accumulated_rewards);
     }
 
     /// Unlock any vested portion of the grant.
@@ -1232,6 +1236,57 @@ module aptos_framework::vesting {
         let accumulated_rewards = get_accumulated_rewards(contract_address);
         let commission = accumulated_rewards / 10; // 10%.
         let staker_rewards = accumulated_rewards - commission;
+        unlock_rewards(contract_address);
+        stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, accumulated_rewards);
+        assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);
+
+        // Distribution should pay commission to operator first and remaining amount to shareholders.
+        stake::fast_forward_to_unlock(stake_pool_address);
+        stake::assert_stake_pool(stake_pool_address, with_rewards(GRANT_AMOUNT), with_rewards(accumulated_rewards), 0, 0);
+        // Operator also earns more commission from the rewards earnt on the withdrawn rewards.
+        let commission_on_staker_rewards = (with_rewards(staker_rewards) - staker_rewards) / 10;
+        staker_rewards = with_rewards(staker_rewards) - commission_on_staker_rewards;
+        commission = with_rewards(commission) + commission_on_staker_rewards;
+        distribute(contract_address);
+        // Rounding error leads to a dust amount of 1 transferred to the staker.
+        assert!(coin::balance<AptosCoin>(shareholder_address) == staker_rewards + 1, 0);
+        assert!(coin::balance<AptosCoin>(operator_address) == commission - 1, 1);
+    }
+
+    #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234, operator = @0x345)]
+    public entry fun test_request_commission_should_not_lock_rewards_for_shareholders(
+        aptos_framework: &signer,
+        admin: &signer,
+        shareholder: &signer,
+        operator: &signer,
+    ) acquires AdminStore, VestingContract {
+        let admin_address = signer::address_of(admin);
+        let operator_address = signer::address_of(operator);
+        let shareholder_address = signer::address_of(shareholder);
+        setup(aptos_framework, &vector[admin_address, shareholder_address, operator_address]);
+        let contract_address = setup_vesting_contract(
+            admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
+        assert!(operator_commission_percentage(contract_address) == 0, 0);
+
+        // 10% commission will be paid to the operator.
+        update_operator(admin, contract_address, operator_address, 10);
+        assert!(operator_commission_percentage(contract_address) == 10, 0);
+
+        // Operator needs to join the validator set for the stake pool to earn rewards.
+        let stake_pool_address = stake_pool_address(contract_address);
+        let (_sk, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, stake_pool_address, true);
+
+        // Stake pool earns some rewards.
+        stake::end_epoch();
+
+        // Operator requests commission directly with staking_contract first.
+        let accumulated_rewards = get_accumulated_rewards(contract_address);
+        let commission = accumulated_rewards / 10; // 10%.
+        let staker_rewards = accumulated_rewards - commission;
+        staking_contract::request_commission(operator, contract_address, operator_address);
+
+        // Unlock vesting rewards. This should still pay out the accumulated rewards to shareholders.
         unlock_rewards(contract_address);
         stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, accumulated_rewards);
         assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);
