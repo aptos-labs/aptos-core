@@ -5,12 +5,13 @@ slug: "mint-nft-cli"
 
 # Mint an NFT with Aptos CLI
 
-This tutorial lets you use the Aptos CLI to mint non-fungible tokens (NFTs) in Aptos testnet so you can see how the process works and employ related functions in your code.
+This codelab lets you use the Aptos CLI to mint non-fungible tokens (NFTs) in Aptos testnet so you can see how the process works and employ related functions in your code.
 
 ## Prerequisites
 
 This tutorial assumes you have:
 
+* your [environment set up](../getting-started.md)
 * a [GitHub account](https://docs.github.com/en/get-started/signing-up-for-github/signing-up-for-a-new-github-account)
 * the [GitHub CLI](https://cli.github.com/)
 * the [Aptos CLI](../../cli-tools/aptos-cli-tool/install-aptos-cli.md) (or you can run from [aptos-core](https://github.com/aptos-labs/aptos-core) source via `cargo run`)
@@ -221,11 +222,11 @@ Since the Move model often requires knowing the signer of a transaction, Aptos p
 
 When you create a resource account you also grant that account the signer capability. If we don't use a resource account for this module, we would need to manually sign for all transactions. The only field inside the signer capability is the `address` of the signer. A native function converts the signer capability to the signer.
 
+This work maps to the demonstration in [create_nft_with_resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move).
+
 ### Create a resource account
 
-Just as you created a default (typical) account on Aptos testnet, you will now do the same for a resource account to receive the NFT. This work maps to the demonstration in [create_nft_with_resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move).
-
-To create a resource account, once again issue `aptos init` but this time use the `--profile` argument to create a specific account, in this case `nft-receiver`.
+Just as you created a default (typical) account on Aptos testnet, you will now do the same for a resource account to receive the NFT. To create a resource account, once again issue `aptos init` but this time use the `--profile` argument to create a specific account, in this case `nft-receiver`.
 
 1. Create an `nft-receiver` account on Aptos testnet by running the following command.
   ```shell
@@ -300,17 +301,17 @@ Publishing a module under a resource account means that we will not be able to u
 
 If you will need to update the configuration of the module, we suggest adding a few admin functions to control the configurations of the module. You will also need to add the admin account's address to the module's `Move.toml` file so the admin functions can confirm the caller to the admin functions is actually a valid administrator.
 
+This work maps to the demonstration in [reate_nft_with_resource_and_admin_accounts.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/3-Adding-Admin/sources/create_nft_with_resource_and_admin_accounts.move).
+
 ### Create admin account
 
 Here we create an admin account and include two admin functions so we can set and update when/if we want to enable token minting for this contract.
 
-1.  Run `aptos-init` once again, this time to create an admin account:
+Run `aptos-init` once again, this time to create an admin account:
 
 ```shell
 `aptos init --profile admin`
 ```
-
-2. Edit `Move.toml` to replace `admin_addr = "0xcafe"` with the new administrator address from `.aptos/config.yaml`.
 
 ### Publish the module under a resource account
 
@@ -320,15 +321,17 @@ Here we create an admin account and include two admin functions so we can set an
 cd aptos-move/move-examples/mint_nft/3-Adding-Admin
 ```
 
-2. Run the following CLI command to publish the module under a resource account, updating the `<seed>` and `default-account-address>` with your own:
+2. Edit `Move.toml` in that directory to replace `admin_addr = "0xcafe"` with the new `admin` address from `.aptos/config.yaml`.
+
+3. Run the following CLI command to publish the module under a resource account, updating the `<seed>` and `default-account-address>` with your own:
 
 ```shell
 aptos move create-resource-account-and-publish-package --seed <seed> --address-name mint_nft --profile default --named-addresses source_addr=<default-account-address>
 ```
 
-3. As usual, receive output asking you to accept a gas fee for the transaction and enter: `yes`.
+4. As usual, receive output asking you to accept a gas fee for the transaction and enter: `yes`.
 
-4. Receive the output:
+5. Receive the output:
 
 ```shell
 "Result": "Success"`
@@ -392,15 +395,99 @@ aptos move run --function-id <resource-account-address>::create_nft_with_resourc
 
 8. [See the transactions on Aptos Explorer](#see-the-module-on-aptos-explorer) as before by searching for their `transaction_hash` strings.
 
-## Prepare module for production
+## 4. Prepare module for production
 
-The final phase of development is to make the smart contract module ready for production. 
+The final phase of development is to make the smart contract module ready for production. This work maps to the demonstration in [create_nft_getting_production_ready.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/4-Getting-Production-Ready/sources/create_nft_getting_production_ready.move).
 
-Here we will enable signature verification
+We prepare the module for production by:
+
+* adding a `TokenMintingEvent` to emit a custom event for tracking minting of tokens from this module.
+* enabling signature verification and ntroducing the concept of a proof challenge to prevent bot spamming.
+* including [unit tests](https://move-language.github.io/move/unit-testing.html) to make sure our code works as expected.
 
 
+### Publish the module under a resource account
 
-TODO: Organize or remove the original Workshop #1 text below.
+1. In your `aptos-core` source checkout, navigate to the `aptos-core/aptos-move/move-examples/mint_nft/1-Create-NFT` directory:
+
+```shell
+cd aptos-move/move-examples/mint_nft/4-Getting-Production-Ready
+```
+
+2. Edit `Move.toml` in that directory to replace `admin_addr = "0xbeef"` with the admin address we created in [3. Add admin account and functions](#3-add-admin-account-and-functions).
+
+2. Run the following CLI command to publish the module under a resource account, replacing `<seed>` and `<default-account-address>` with your own: 
+
+```shell
+aptos move create-resource-account-and-publish-package --seed <seed> --address-name mint_nft --profile default --named-addresses source_addr=<default-account-address>
+```
+
+3. As usual, receive output asking you to accept a gas fee for the transaction, enter `yes`, and receive results indicating success.
+
+### Mint a token with `mint_event_ticket()`
+
+1. Generate a keypair to validate the signature against:
+
+```shell
+aptos key generate --key-type ed25519 --output-file output.key
+```
+
+2. View and copy the public key we just generated:
+
+```shell
+more output.key.pub
+```
+
+3. Update the public key stored within `ModuleData` by running the command and replacing `<resource-account-address>` and `<new-public-key>` with your own:
+
+```shell
+aptos move run --function-id <resource-account-address>::create_nft_getting_production_ready::set_public_key --args hex:<new-public-key> --profile admin
+```
+
+4. Accept the gas fee for the transaction and receive results indicating success.
+
+### Generate a valid signature
+
+1. Find and copy the `admin_private_key`:
+
+```shell
+more output.key
+```
+
+2. Find and copy the addresses for the `nft-receiver` and `resource` account from `.aptos/config.yaml`.
+
+
+2. Find and copy the `receiver_account_sequence_number` by looking up the NFT receiver's address on the [Aptos Explorer](https://explorer.aptoslabs.com/) *Info* tab.
+
+TODO: Find out where this tab is and link directly to it if possible. I don't see it from the home page.
+
+3. Open the file `aptos-core/aptos/move-e2e-tests/src/tests/mint_nft.rs` for editing.
+
+4. In function `generate_nft_tutorial_part4_signature`, replace the `resource_address`, `nft_receiver`, `admin_private_key`, and `receiver_account_sequence_number` variables with the actual values from your temporary copies above.
+
+5. Run to generate a valid signature and copy it:
+
+```shell
+cargo test generate_nft_tutorial_part4_signature -- --nocapture
+```
+
+6. Call mint_event_ticket() with your `<resource-account-address>` and the `<new-signature>` we just generated:
+
+```shell
+aptos move run --function-id <resource-account-address>::create_nft_getting_production_ready::mint_event_ticket --args hex:<new-signature> --profile nft-receiver
+```
+
+7. Accept the gas fee for the transaction and receive results indicating success.
+
+This completes the Mint NFT via CLI codelab. Congratulations on your completion.
+
+TODO: Ask for some visual evidence of completion, such as the certificate Chloe proposed to Kevin in the issue.
+
+-----
+
+# Workshop #1
+
+TODO: Integrate above or remove the original Workshop #1 text below. Ask Chloe for guidance.
 
 ### Mint the NFT
 
