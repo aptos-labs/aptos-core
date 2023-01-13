@@ -1,6 +1,6 @@
 module aptos_std::groth16 {
     #[test_only]
-    use aptos_std::groups::{BLS12_381_G1, BLS12_381_G2, scalar_from_bytes, deserialize_element_uncompressed, BLS12_381_Gt};
+    use aptos_std::groups::{BLS12_381_G1, BLS12_381_G2, deserialize_scalar, deserialize_element_uncompressed, BLS12_381_Gt};
     use aptos_std::groups;
 
     // Error codes
@@ -74,7 +74,7 @@ module aptos_std::groth16 {
         while (i < n) {
             let cur_scalar = std::vector::borrow(public_inputs, i);
             let cur_point = std::vector::borrow(&vk.gamma_abc_g1, i+1);
-            acc = groups::element_add(&acc, &groups::element_mul(cur_scalar, cur_point));
+            acc = groups::element_add(&acc, &groups::element_scalar_mul(cur_scalar, cur_point));
             i = i + 1;
         };
 
@@ -88,10 +88,10 @@ module aptos_std::groth16 {
         abort_if_feature_disabled();
         let scalars: vector<groups::Scalar<G1>> = vector[groups::scalar_from_u64<G1>(1)];
         std::vector::append(&mut scalars, *public_inputs);
-        let g1_elements: vector<groups::Element<G1>> = vector[proof.a, groups::simul_element_mul(&scalars, &pvk.gamma_abc_g1), proof.c];
+        let g1_elements: vector<groups::Element<G1>> = vector[proof.a, groups::element_multi_scalar_mul(&scalars, &pvk.gamma_abc_g1), proof.c];
         let g2_elements: vector<groups::Element<G2>> = vector[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];
 
-        groups::element_eq(&pvk.alpha_g1_beta_g2, &groups::multi_pairing<G1,G2,Gt>(&g1_elements, &g2_elements))
+        groups::element_eq(&pvk.alpha_g1_beta_g2, &groups::pairing_product<G1,G2,Gt>(&g1_elements, &g2_elements))
     }
 
     fun abort_if_feature_disabled() {
@@ -123,7 +123,7 @@ module aptos_std::groth16 {
         );
 
         let public_inputs: vector<groups::Scalar<BLS12_381_G1>> = vector[
-            std::option::extract(&mut scalar_from_bytes(&x"08436a5c0c09f30892728d4ad89cc85523967b1c4f57f1e7b10dffd751e0483b")),
+            std::option::extract(&mut deserialize_scalar(&x"08436a5c0c09f30892728d4ad89cc85523967b1c4f57f1e7b10dffd751e0483b")),
         ];
         assert!(verify_proof(&vk, &public_inputs, &proof), 1);
 
@@ -153,7 +153,7 @@ module aptos_std::groth16 {
         );
 
         let public_inputs: vector<groups::Scalar<BLS12_381_G1>> = vector[
-            std::option::extract(&mut scalar_from_bytes(&x"08436a5c0c09f30892728d4ad89cc85523967b1c4f57f1e7b10dffd751e0483b")),
+            std::option::extract(&mut deserialize_scalar(&x"08436a5c0c09f30892728d4ad89cc85523967b1c4f57f1e7b10dffd751e0483b")),
         ];
         assert!(verify_proof_with_pvk(&pvk, &public_inputs, &proof), 1);
     }

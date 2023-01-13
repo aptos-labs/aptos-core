@@ -317,7 +317,7 @@
     <b>while</b> (i &lt; n) {
         <b>let</b> cur_scalar = std::vector::borrow(public_inputs, i);
         <b>let</b> cur_point = std::vector::borrow(&vk.gamma_abc_g1, i+1);
-        acc = <a href="groups.md#0x1_groups_element_add">groups::element_add</a>(&acc, &<a href="groups.md#0x1_groups_element_mul">groups::element_mul</a>(cur_scalar, cur_point));
+        acc = <a href="groups.md#0x1_groups_element_add">groups::element_add</a>(&acc, &<a href="groups.md#0x1_groups_element_scalar_mul">groups::element_scalar_mul</a>(cur_scalar, cur_point));
         i = i + 1;
     };
 
@@ -351,10 +351,10 @@
     <a href="groth16.md#0x1_groth16_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <b>let</b> scalars: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G1&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="groups.md#0x1_groups_scalar_from_u64">groups::scalar_from_u64</a>&lt;G1&gt;(1)];
     std::vector::append(&<b>mut</b> scalars, *public_inputs);
-    <b>let</b> g1_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G1&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.a, <a href="groups.md#0x1_groups_simul_element_mul">groups::simul_element_mul</a>(&scalars, &pvk.gamma_abc_g1), proof.c];
+    <b>let</b> g1_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G1&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.a, <a href="groups.md#0x1_groups_element_multi_scalar_mul">groups::element_multi_scalar_mul</a>(&scalars, &pvk.gamma_abc_g1), proof.c];
     <b>let</b> g2_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G2&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];
 
-    <a href="groups.md#0x1_groups_element_eq">groups::element_eq</a>(&pvk.alpha_g1_beta_g2, &<a href="groups.md#0x1_groups_multi_pairing">groups::multi_pairing</a>&lt;G1,G2,Gt&gt;(&g1_elements, &g2_elements))
+    <a href="groups.md#0x1_groups_element_eq">groups::element_eq</a>(&pvk.alpha_g1_beta_g2, &<a href="groups.md#0x1_groups_pairing_product">groups::pairing_product</a>&lt;G1,G2,Gt&gt;(&g1_elements, &g2_elements))
 }
 </code></pre>
 

@@ -490,7 +490,7 @@ fn deserialize_element_compressed_internal(
     }
 }
 
-fn scalar_from_bytes_internal(
+fn deserialize_scalar_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -529,7 +529,7 @@ fn scalar_from_bytes_internal(
     }
 }
 
-fn scalar_to_bytes_internal(
+fn serialize_scalar_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -1612,12 +1612,12 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), deserialize_element_compressed_internal),
         ),
         (
-            "scalar_from_bytes_internal",
-            make_native_from_func(gas_params.clone(), scalar_from_bytes_internal),
+            "deserialize_scalar_internal",
+            make_native_from_func(gas_params.clone(), deserialize_scalar_internal),
         ),
         (
-            "scalar_to_bytes_internal",
-            make_native_from_func(gas_params.clone(), scalar_to_bytes_internal),
+            "serialize_scalar_internal",
+            make_native_from_func(gas_params.clone(), serialize_scalar_internal),
         ),
         (
             "scalar_eq_internal",
