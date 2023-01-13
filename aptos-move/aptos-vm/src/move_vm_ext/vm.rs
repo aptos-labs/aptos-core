@@ -5,7 +5,7 @@ use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
-use aptos_framework::natives::cryptography::curves::ArksContext;
+use aptos_framework::natives::cryptography::groups::ArksContext;
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     cryptography::ristretto255_point::NativeRistrettoPointContext,

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod bls12381;
-pub mod curves;
+pub mod groups;
 pub mod ed25519;
 pub mod multi_ed25519;
 pub mod ristretto255;

@@ -111,10 +111,10 @@ module std::features {
         is_enabled(BLAKE2B_256_NATIVE)
     }
 
-    const GENERIC_CURVES: u64 = 9;
-    public fun get_generic_curves_feature(): u64 { GENERIC_CURVES }
-    public fun generic_curves_enabled(): bool acquires Features {
-        is_enabled(GENERIC_CURVES)
+    const GENERIC_GROUPS: u64 = 9;
+    public fun get_generic_groups_feature(): u64 { GENERIC_GROUPS }
+    public fun generic_groups_enabled(): bool acquires Features {
+        is_enabled(GENERIC_GROUPS)
     }
 
     const GROTH16: u64 = 10;

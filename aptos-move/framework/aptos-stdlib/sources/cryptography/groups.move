@@ -1,4 +1,4 @@
-module aptos_std::curves {
+module aptos_std::groups {
     use std::option::Option;
 
     // Error codes
@@ -351,7 +351,7 @@ module aptos_std::curves {
     }
 
     fun abort_if_feature_disabled() {
-        if (!std::features::generic_curves_enabled()) {
+        if (!std::features::generic_groups_enabled()) {
             abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
         };
     }
@@ -385,7 +385,7 @@ module aptos_std::curves {
 
     #[test(fx = @std)]
     fun test_bls12_381_g1(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
         // Group info.
         assert!(is_prime_order<BLS12_381_G1>(), 1);
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_G1>(), 1);
@@ -474,7 +474,7 @@ module aptos_std::curves {
 
     #[test(fx = @std)]
     fun test_bls12_381_g2(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
         // Group info.
         assert!(is_prime_order<BLS12_381_G2>(), 1);
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_G2>(), 1);
@@ -563,7 +563,7 @@ module aptos_std::curves {
 
     #[test(fx = @std)]
     fun test_bls12_381_gt(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
         // Group info.
         assert!(is_prime_order<BLS12_381_Gt>(), 1);
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_Gt>(), 1);
@@ -653,7 +653,7 @@ module aptos_std::curves {
 
     #[test(fx = @std)]
     fun test_bls12381_pairing(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
         // Single pairing.
         let gt_point_1 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
             &element_mul(&scalar_from_u64(5), &group_generator<BLS12_381_G1>()),
@@ -701,14 +701,14 @@ module aptos_std::curves {
     #[test(fx = @std)]
     #[expected_failure(abort_code = E_UNKNOWN_GROUP, location = Self)]
     fun test_unknown_group(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
         let _ = group_order<UnknownGroup>();
     }
 
     #[test(fx = @std)]
     #[expected_failure(abort_code = E_UNKNOWN_PAIRING, location = Self)]
     fun test_unknown_pairing(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature()], vector[]);
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
         // Attempt an invalid pairing: (G2, G1) -> Gt
         pairing<BLS12_381_G2, BLS12_381_G1, BLS12_381_Gt>(
             &element_mul(&scalar_from_u64(7), &group_generator<BLS12_381_G2>()),

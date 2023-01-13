@@ -14,13 +14,13 @@ pub mod transaction_context;
 pub mod type_info;
 pub mod util;
 
-use crate::natives::cryptography::curves;
+use crate::natives::cryptography::groups;
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
 use aptos_gas_algebra_ext::AbstractValueSize;
 use cryptography::ed25519;
 
-use crate::natives::cryptography::curves::Bls12381GasParameters;
+use crate::natives::cryptography::groups::Bls12381GasParameters;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
 use move_vm_types::values::Value;
@@ -35,7 +35,7 @@ pub mod status {
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub account: account::GasParameters,
-    pub curves: curves::GasParameters,
+    pub groups: groups::GasParameters,
     pub ed25519: ed25519::GasParameters,
     pub bls12381: cryptography::bls12381::GasParameters,
     pub secp256k1: cryptography::secp256k1::GasParameters,
@@ -72,7 +72,7 @@ impl GasParameters {
                 per_msg_hashing: 0.into(),
                 per_byte_hashing: 0.into(),
             },
-            curves: curves::GasParameters {
+            groups: groups::GasParameters {
                 bls12_381: Bls12381GasParameters {
                     fr_serialize: 0.into(),
                     fr_deserialize: 0.into(),
@@ -283,7 +283,7 @@ pub fn all_natives(
     }
 
     add_natives_from_module!("account", account::make_all(gas_params.account.clone()));
-    add_natives_from_module!("curves", curves::make_all(gas_params.curves.clone()));
+    add_natives_from_module!("groups", groups::make_all(gas_params.groups.clone()));
     add_natives_from_module!("ed25519", ed25519::make_all(gas_params.ed25519.clone()));
     add_natives_from_module!("genesis", account::make_all(gas_params.account));
     add_natives_from_module!("multi_ed25519", multi_ed25519::make_all(gas_params.ed25519));

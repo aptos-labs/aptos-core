@@ -23,8 +23,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `multi_ed25519_pk_validate_v2_enabled`](#0x1_features_multi_ed25519_pk_validate_v2_enabled)
 -  [Function `get_blake2b_256_feature`](#0x1_features_get_blake2b_256_feature)
 -  [Function `blake2b_256_enabled`](#0x1_features_blake2b_256_enabled)
--  [Function `get_generic_curves_feature`](#0x1_features_get_generic_curves_feature)
--  [Function `generic_curves_enabled`](#0x1_features_generic_curves_enabled)
+-  [Function `get_generic_groups_feature`](#0x1_features_get_generic_groups_feature)
+-  [Function `generic_groups_enabled`](#0x1_features_generic_groups_enabled)
 -  [Function `get_groth16_feature`](#0x1_features_get_groth16_feature)
 -  [Function `groth16_enabled`](#0x1_features_groth16_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
@@ -135,11 +135,11 @@ The provided signer has not a framework address.
 
 
 
-<a name="0x1_features_GENERIC_CURVES"></a>
+<a name="0x1_features_GENERIC_GROUPS"></a>
 
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_GENERIC_CURVES">GENERIC_CURVES</a>: u64 = 9;
+<pre><code><b>const</b> <a href="features.md#0x1_features_GENERIC_GROUPS">GENERIC_GROUPS</a>: u64 = 9;
 </code></pre>
 
 
@@ -524,13 +524,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_generic_curves_feature"></a>
+<a name="0x1_features_get_generic_groups_feature"></a>
 
-## Function `get_generic_curves_feature`
+## Function `get_generic_groups_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_curves_feature">get_generic_curves_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_groups_feature">get_generic_groups_feature</a>(): u64
 </code></pre>
 
 
@@ -539,20 +539,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_curves_feature">get_generic_curves_feature</a>(): u64 { <a href="features.md#0x1_features_GENERIC_CURVES">GENERIC_CURVES</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_groups_feature">get_generic_groups_feature</a>(): u64 { <a href="features.md#0x1_features_GENERIC_GROUPS">GENERIC_GROUPS</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_generic_curves_enabled"></a>
+<a name="0x1_features_generic_groups_enabled"></a>
 
-## Function `generic_curves_enabled`
+## Function `generic_groups_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_curves_enabled">generic_curves_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_groups_enabled">generic_groups_enabled</a>(): bool
 </code></pre>
 
 
@@ -561,8 +561,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_curves_enabled">generic_curves_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GENERIC_CURVES">GENERIC_CURVES</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_groups_enabled">generic_groups_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GENERIC_GROUPS">GENERIC_GROUPS</a>)
 }
 </code></pre>
 

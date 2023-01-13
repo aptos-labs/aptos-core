@@ -27,7 +27,7 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
 use once_cell::sync::Lazy;
-use crate::natives::cryptography::curves::abort_codes::E_UNKNOWN_GROUP;
+use crate::natives::cryptography::groups::abort_codes::E_UNKNOWN_GROUP;
 
 pub mod abort_codes {
     pub const E_UNKNOWN_GROUP: u64 = 2;
@@ -190,7 +190,7 @@ fn serialize_element_uncompressed_internal(
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let mut buf = vec![];
             context
                 .extensions()
@@ -204,7 +204,7 @@ fn serialize_element_uncompressed_internal(
                 smallvec![Value::vector_u8(buf)],
             ))
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let mut buf = vec![];
             context
                 .extensions()
@@ -218,7 +218,7 @@ fn serialize_element_uncompressed_internal(
                 smallvec![Value::vector_u8(buf)],
             ))
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let mut buf = vec![];
             context
                 .extensions()
@@ -249,7 +249,7 @@ fn serialize_element_compressed_internal(
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let mut buf = vec![];
             context
                 .extensions()
@@ -263,7 +263,7 @@ fn serialize_element_compressed_internal(
                 smallvec![Value::vector_u8(buf)],
             ))
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let mut buf = vec![];
             context
                 .extensions()
@@ -277,7 +277,7 @@ fn serialize_element_compressed_internal(
                 smallvec![Value::vector_u8(buf)],
             ))
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let mut buf = vec![];
             context
                 .extensions()
@@ -308,7 +308,7 @@ fn deserialize_element_uncompressed_internal(
         .to_string();
     let bytes = pop_arg!(args, Vec<u8>);
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let cost = gas_params.bls12_381.g1_affine_deserialize_uncompressed + gas_params.bls12_381.g1_affine_to_proj;
             let point = ark_bls12_381::G1Affine::deserialize_uncompressed(bytes.as_slice());
             match point {
@@ -330,7 +330,7 @@ fn deserialize_element_uncompressed_internal(
                 }
             }
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let cost = gas_params.bls12_381.g2_affine_deserialize_uncompressed + gas_params.bls12_381.g2_affine_to_proj;
             let point = ark_bls12_381::G2Affine::deserialize_uncompressed(bytes.as_slice());
             match point {
@@ -352,7 +352,7 @@ fn deserialize_element_uncompressed_internal(
                 }
             }
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let cost = (gas_params.bls12_381.fq12_deserialize + gas_params.bls12_381.fq12_pow_fr + gas_params.bls12_381.fq12_eq) * NumArgs::one();
             let point = ark_bls12_381::Fq12::deserialize(bytes.as_slice());
             match point {
@@ -405,7 +405,7 @@ fn deserialize_element_compressed_internal(
         .to_string();
     let bytes = pop_arg!(args, Vec<u8>);
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let cost = gas_params.bls12_381.g1_affine_deserialize_compressed + gas_params.bls12_381.g1_affine_to_proj;
             match ark_bls12_381::G1Affine::deserialize(bytes.as_slice()) {
                 Ok(point) => {
@@ -426,7 +426,7 @@ fn deserialize_element_compressed_internal(
                 }
             }
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let cost = gas_params.bls12_381.g2_affine_deserialize_compressed + gas_params.bls12_381.g2_affine_to_proj;
             let point = ark_bls12_381::G2Affine::deserialize(bytes.as_slice());
             match point {
@@ -448,7 +448,7 @@ fn deserialize_element_compressed_internal(
                 }
             }
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let cost = (gas_params.bls12_381.fq12_deserialize + gas_params.bls12_381.fq12_pow_fr + gas_params.bls12_381.fq12_eq) * NumArgs::one();
             let point = ark_bls12_381::Fq12::deserialize(bytes.as_slice());
             match point {
@@ -501,7 +501,7 @@ fn scalar_from_bytes_internal(
         .to_string();
     let bytes = pop_arg!(args, Vec<u8>);
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let scalar = ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice());
             match scalar {
                 Ok(scalar) => {
@@ -540,7 +540,7 @@ fn scalar_to_bytes_internal(
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let mut buf = vec![];
             context
                 .extensions()
@@ -570,7 +570,7 @@ fn scalar_from_u64_internal(
         .to_string();
     let value = pop_arg!(args, u64);
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let handle = context
                 .extensions_mut()
                 .get_mut::<ArksContext>()
@@ -599,7 +599,7 @@ fn scalar_add_internal(
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -637,7 +637,7 @@ fn scalar_mul_internal(
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -674,7 +674,7 @@ fn scalar_neg_internal(
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let result = context
                 .extensions()
                 .get::<ArksContext>()
@@ -707,7 +707,7 @@ fn scalar_inv_internal(
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let op_result = context
                 .extensions()
                 .get::<ArksContext>()
@@ -752,7 +752,7 @@ fn scalar_eq_internal(
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -786,7 +786,7 @@ fn group_identity_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let point = ark_bls12_381::G1Projective::zero();
             let handle = context
                 .extensions_mut()
@@ -797,7 +797,7 @@ fn group_identity_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let point = ark_bls12_381::G2Projective::zero();
             let handle = context
                 .extensions_mut()
@@ -808,7 +808,7 @@ fn group_identity_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let point = ark_bls12_381::Fq12::one();
             let handle = context
                 .extensions_mut()
@@ -848,7 +848,7 @@ fn group_generator_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let point = ark_bls12_381::G1Projective::prime_subgroup_generator();
             let handle = context
                 .extensions_mut()
@@ -859,7 +859,7 @@ fn group_generator_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let point = ark_bls12_381::G2Projective::prime_subgroup_generator();
             let handle = context
                 .extensions_mut()
@@ -870,7 +870,7 @@ fn group_generator_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let point = BLS12381_GT_GENERATOR.clone();
             let handle = context
                 .extensions_mut()
@@ -901,7 +901,7 @@ fn group_order_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             Ok(NativeResult::ok(
                 InternalGas::zero(),
                 smallvec![Value::vector_u8(BLS12381_R_BYTES_LENDIAN.clone())],
@@ -927,7 +927,7 @@ fn is_prime_order_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             Ok(NativeResult::ok(
                 InternalGas::zero(),
                 smallvec![Value::bool(true)],
@@ -950,7 +950,7 @@ fn random_scalar_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" | "0x1::curves::BLS12_381_G2" | "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let r = ark_bls12_381::Fr::rand(&mut test_rng());
             let handle = context
                 .extensions_mut()
@@ -981,7 +981,7 @@ fn random_element_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let point = ark_bls12_381::G1Projective::rand(&mut test_rng());
             let handle = context
                 .extensions_mut()
@@ -992,7 +992,7 @@ fn random_element_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let point = ark_bls12_381::G2Projective::rand(&mut test_rng());
             let handle = context
                 .extensions_mut()
@@ -1003,7 +1003,7 @@ fn random_element_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let k = ark_bls12_381::Fr::rand(&mut test_rng());
             let point = BLS12381_GT_GENERATOR.clone().pow(k.into_repr());
             let handle = context
@@ -1037,7 +1037,7 @@ fn element_eq_internal(
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1051,7 +1051,7 @@ fn element_eq_internal(
                 smallvec![Value::bool(point_1.eq(point_2))],
             ))
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1065,7 +1065,7 @@ fn element_eq_internal(
                 smallvec![Value::bool(point_1.eq(point_2))],
             ))
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1098,7 +1098,7 @@ fn element_add_internal(
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1117,7 +1117,7 @@ fn element_add_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1136,7 +1136,7 @@ fn element_add_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let point_1 = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1174,7 +1174,7 @@ fn element_mul_scalar_internal(
     let point_handle = pop_arg!(args, u64) as usize;
     let scalar_handle = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let point = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1193,7 +1193,7 @@ fn element_mul_scalar_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let point = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1212,7 +1212,7 @@ fn element_mul_scalar_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let point = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1253,7 +1253,7 @@ fn simul_element_mul_scalar_internal(
     let num_scalars = scalar_handles.len();
     if num_points == num_scalars {
         match type_tag.as_str() {
-            "0x1::curves::BLS12_381_G1" => {
+            "0x1::groups::BLS12_381_G1" => {
                 let points = point_handles.iter().map(|&handle|{
                     context
                         .extensions()
@@ -1281,7 +1281,7 @@ fn simul_element_mul_scalar_internal(
                     smallvec![Value::u64(handle as u64)],
                 ))
             }
-            "0x1::curves::BLS12_381_G2" => {
+            "0x1::groups::BLS12_381_G2" => {
                 let points = point_handles.iter().map(|&handle|{
                     context
                         .extensions()
@@ -1309,7 +1309,7 @@ fn simul_element_mul_scalar_internal(
                     smallvec![Value::u64(handle as u64)],
                 ))
             }
-            "0x1::curves::BLS12_381_Gt" => {
+            "0x1::groups::BLS12_381_Gt" => {
                 let elements = point_handles.iter().map(|&handle|{
                     context
                         .extensions()
@@ -1360,7 +1360,7 @@ fn element_double_internal(
         .to_string();
     let point_handle = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let point = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1375,7 +1375,7 @@ fn element_double_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let point = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1390,7 +1390,7 @@ fn element_double_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let element = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1423,7 +1423,7 @@ fn element_neg_internal(
         .to_string();
     let point_handle = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::curves::BLS12_381_G1" => {
+        "0x1::groups::BLS12_381_G1" => {
             let point = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1438,7 +1438,7 @@ fn element_neg_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_G2" => {
+        "0x1::groups::BLS12_381_G2" => {
             let point = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1453,7 +1453,7 @@ fn element_neg_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::curves::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Gt" => {
             let point = context
                 .extensions()
                 .get::<ArksContext>()
@@ -1497,7 +1497,7 @@ fn multi_pairing_internal(
         type_tag_1.as_str(),
         type_tag_2.as_str(),
     ) {
-        ("0x1::curves::BLS12_381_G1", "0x1::curves::BLS12_381_G2", "0x1::curves::BLS12_381_Gt") => {
+        ("0x1::groups::BLS12_381_G1", "0x1::groups::BLS12_381_G2", "0x1::groups::BLS12_381_Gt") => {
             let g1_prepared: Vec<ark_ec::models::bls12::g1::G1Prepared<Parameters>> = g1_handles
                 .iter()
                 .map(|&handle| {

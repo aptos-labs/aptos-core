@@ -1,33 +1,33 @@
 module aptos_std::groth16 {
     #[test_only]
-    use aptos_std::curves::{BLS12_381_G1, BLS12_381_G2, scalar_from_bytes, deserialize_element_uncompressed, BLS12_381_Gt};
-    use aptos_std::curves;
+    use aptos_std::groups::{BLS12_381_G1, BLS12_381_G2, scalar_from_bytes, deserialize_element_uncompressed, BLS12_381_Gt};
+    use aptos_std::groups;
 
     // Error codes
     const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 1;
 
     struct VerifyingKey<phantom G1, phantom G2, phantom Gt> has drop {
-        alpha_g1: curves::Element<G1>,
-        beta_g2: curves::Element<G2>,
-        gamma_g2: curves::Element<G2>,
-        delta_g2: curves::Element<G2>,
-        gamma_abc_g1: vector<curves::Element<G1>>,
+        alpha_g1: groups::Element<G1>,
+        beta_g2: groups::Element<G2>,
+        gamma_g2: groups::Element<G2>,
+        delta_g2: groups::Element<G2>,
+        gamma_abc_g1: vector<groups::Element<G1>>,
     }
 
     struct PreparedVerifyingKey<phantom G1, phantom G2, phantom Gt> has drop {
-        alpha_g1_beta_g2: curves::Element<Gt>,
-        gamma_g2_neg: curves::Element<G2>,
-        delta_g2_neg: curves::Element<G2>,
-        gamma_abc_g1: vector<curves::Element<G1>>,
+        alpha_g1_beta_g2: groups::Element<Gt>,
+        gamma_g2_neg: groups::Element<G2>,
+        delta_g2_neg: groups::Element<G2>,
+        gamma_abc_g1: vector<groups::Element<G1>>,
     }
 
     struct Proof<phantom G1, phantom G2, phantom Gt> has drop {
-        a: curves::Element<G1>,
-        b: curves::Element<G2>,
-        c: curves::Element<G1>,
+        a: groups::Element<G1>,
+        b: groups::Element<G2>,
+        c: groups::Element<G1>,
     }
 
-    public fun new_vk<G1,G2,Gt>(alpha_g1: curves::Element<G1>, beta_g2: curves::Element<G2>, gamma_g2: curves::Element<G2>, delta_g2: curves::Element<G2>, gamma_abc_g1: vector<curves::Element<G1>>): VerifyingKey<G1,G2,Gt> {
+    public fun new_vk<G1,G2,Gt>(alpha_g1: groups::Element<G1>, beta_g2: groups::Element<G2>, gamma_g2: groups::Element<G2>, delta_g2: groups::Element<G2>, gamma_abc_g1: vector<groups::Element<G1>>): VerifyingKey<G1,G2,Gt> {
         abort_if_feature_disabled();
         VerifyingKey {
             alpha_g1,
@@ -38,7 +38,7 @@ module aptos_std::groth16 {
         }
     }
 
-    public fun new_pvk<G1,G2,Gt>(alpha_g1_beta_g2: curves::Element<Gt>, gamma_g2_neg: curves::Element<G2>, delta_g2_neg: curves::Element<G2>, gamma_abc_g1: vector<curves::Element<G1>>): PreparedVerifyingKey<G1,G2,Gt> {
+    public fun new_pvk<G1,G2,Gt>(alpha_g1_beta_g2: groups::Element<Gt>, gamma_g2_neg: groups::Element<G2>, delta_g2_neg: groups::Element<G2>, gamma_abc_g1: vector<groups::Element<G1>>): PreparedVerifyingKey<G1,G2,Gt> {
         abort_if_feature_disabled();
         PreparedVerifyingKey {
             alpha_g1_beta_g2,
@@ -51,22 +51,22 @@ module aptos_std::groth16 {
     public fun prepare_verifying_key<G1,G2,Gt>(vk: &VerifyingKey<G1,G2,Gt>): PreparedVerifyingKey<G1,G2,Gt> {
         abort_if_feature_disabled();
         PreparedVerifyingKey {
-            alpha_g1_beta_g2: curves::pairing<G1,G2,Gt>(&vk.alpha_g1, &vk.beta_g2),
-            gamma_g2_neg: curves::element_neg(&vk.gamma_g2),
-            delta_g2_neg: curves::element_neg(&vk.delta_g2),
+            alpha_g1_beta_g2: groups::pairing<G1,G2,Gt>(&vk.alpha_g1, &vk.beta_g2),
+            gamma_g2_neg: groups::element_neg(&vk.gamma_g2),
+            delta_g2_neg: groups::element_neg(&vk.delta_g2),
             gamma_abc_g1: vk.gamma_abc_g1,
         }
     }
 
-    public fun new_proof<G1,G2,Gt>(a: curves::Element<G1>, b: curves::Element<G2>, c: curves::Element<G1>): Proof<G1,G2,Gt> {
+    public fun new_proof<G1,G2,Gt>(a: groups::Element<G1>, b: groups::Element<G2>, c: groups::Element<G1>): Proof<G1,G2,Gt> {
         abort_if_feature_disabled();
         Proof { a, b, c }
     }
 
-    public fun verify_proof<G1,G2,Gt>(vk: &VerifyingKey<G1,G2,Gt>, public_inputs: &vector<curves::Scalar<G1>>, proof: &Proof<G1,G2,Gt>): bool {
+    public fun verify_proof<G1,G2,Gt>(vk: &VerifyingKey<G1,G2,Gt>, public_inputs: &vector<groups::Scalar<G1>>, proof: &Proof<G1,G2,Gt>): bool {
         abort_if_feature_disabled();
-        let left = curves::pairing<G1,G2,Gt>(&proof.a, &proof.b);
-        let right_1 = curves::pairing<G1,G2,Gt>(&vk.alpha_g1, &vk.beta_g2);
+        let left = groups::pairing<G1,G2,Gt>(&proof.a, &proof.b);
+        let right_1 = groups::pairing<G1,G2,Gt>(&vk.alpha_g1, &vk.beta_g2);
 
         let n = std::vector::length(public_inputs);
         let i = 0;
@@ -74,24 +74,24 @@ module aptos_std::groth16 {
         while (i < n) {
             let cur_scalar = std::vector::borrow(public_inputs, i);
             let cur_point = std::vector::borrow(&vk.gamma_abc_g1, i+1);
-            acc = curves::element_add(&acc, &curves::element_mul(cur_scalar, cur_point));
+            acc = groups::element_add(&acc, &groups::element_mul(cur_scalar, cur_point));
             i = i + 1;
         };
 
-        let right_2 = curves::pairing(&acc, &vk.gamma_g2);
-        let right_3 = curves::pairing(&proof.c, &vk.delta_g2);
-        let right = curves::element_add(&curves::element_add(&right_1, &right_2), &right_3);
-        curves::element_eq(&left, &right)
+        let right_2 = groups::pairing(&acc, &vk.gamma_g2);
+        let right_3 = groups::pairing(&proof.c, &vk.delta_g2);
+        let right = groups::element_add(&groups::element_add(&right_1, &right_2), &right_3);
+        groups::element_eq(&left, &right)
     }
 
-    public fun verify_proof_with_pvk<G1,G2,Gt>(pvk: &PreparedVerifyingKey<G1,G2,Gt>, public_inputs: &vector<curves::Scalar<G1>>, proof: &Proof<G1,G2,Gt>): bool {
+    public fun verify_proof_with_pvk<G1,G2,Gt>(pvk: &PreparedVerifyingKey<G1,G2,Gt>, public_inputs: &vector<groups::Scalar<G1>>, proof: &Proof<G1,G2,Gt>): bool {
         abort_if_feature_disabled();
-        let scalars: vector<curves::Scalar<G1>> = vector[curves::scalar_from_u64<G1>(1)];
+        let scalars: vector<groups::Scalar<G1>> = vector[groups::scalar_from_u64<G1>(1)];
         std::vector::append(&mut scalars, *public_inputs);
-        let g1_elements: vector<curves::Element<G1>> = vector[proof.a, curves::simul_element_mul(&scalars, &pvk.gamma_abc_g1), proof.c];
-        let g2_elements: vector<curves::Element<G2>> = vector[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];
+        let g1_elements: vector<groups::Element<G1>> = vector[proof.a, groups::simul_element_mul(&scalars, &pvk.gamma_abc_g1), proof.c];
+        let g2_elements: vector<groups::Element<G2>> = vector[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];
 
-        curves::element_eq(&pvk.alpha_g1_beta_g2, &curves::multi_pairing<G1,G2,Gt>(&g1_elements, &g2_elements))
+        groups::element_eq(&pvk.alpha_g1_beta_g2, &groups::multi_pairing<G1,G2,Gt>(&g1_elements, &g2_elements))
     }
 
     fun abort_if_feature_disabled() {
@@ -102,8 +102,8 @@ module aptos_std::groth16 {
 
     #[test(fx = @std)]
     fun test_verify_mimc_proof(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature(), std::features::get_groth16_feature()], vector[]);
-        let gamma_abc_g1: vector<curves::Element<BLS12_381_G1>> = vector[
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature(), std::features::get_groth16_feature()], vector[]);
+        let gamma_abc_g1: vector<groups::Element<BLS12_381_G1>> = vector[
             std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"00192808ef3f352b15066066b5784284ad310194591851848b9ca5099b7bd35d818a7902e4ec148b244d97c553599d0d0c961ac300485ea9d75a4251b7e54d9b9f2467cff599c19f399a0098f9ce6b88497c3f8e9cde85c9b4cdbf2cbc429118")),
             std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"cdd8b7ce59d13e8f29e7d7083b619feb96e38f0e520c46403be8df7ec7d4025b7e24aadb947528e057b5117cabe62012c8e331dc103e205add7ecdd52d109dd2a56e5e990921b5e1b3aeb724e5b8069011b7589e7ef42d975d0711d51f806e19")),
         ];
@@ -122,7 +122,7 @@ module aptos_std::groth16 {
             std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"756ec20e1941b949e9a8af556925e3f6430f1cd1eeb801fe0186b3b664cb8457060f0e27551b5cc2b3dad878761c8d03acb8e0cbd8da8d0d541f60503b0726064310d0063802fad36fb362d11ef1060a22916dab9727b0d9feaf2f8636d74a02"))
         );
 
-        let public_inputs: vector<curves::Scalar<BLS12_381_G1>> = vector[
+        let public_inputs: vector<groups::Scalar<BLS12_381_G1>> = vector[
             std::option::extract(&mut scalar_from_bytes(&x"08436a5c0c09f30892728d4ad89cc85523967b1c4f57f1e7b10dffd751e0483b")),
         ];
         assert!(verify_proof(&vk, &public_inputs, &proof), 1);
@@ -133,8 +133,8 @@ module aptos_std::groth16 {
 
     #[test(fx = @std)]
     fun test_verify_mimc_proof_with_pvk(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_curves_feature(), std::features::get_groth16_feature()], vector[]);
-        let gamma_abc_g1: vector<curves::Element<BLS12_381_G1>> = vector[
+        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature(), std::features::get_groth16_feature()], vector[]);
+        let gamma_abc_g1: vector<groups::Element<BLS12_381_G1>> = vector[
             std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"00192808ef3f352b15066066b5784284ad310194591851848b9ca5099b7bd35d818a7902e4ec148b244d97c553599d0d0c961ac300485ea9d75a4251b7e54d9b9f2467cff599c19f399a0098f9ce6b88497c3f8e9cde85c9b4cdbf2cbc429118")),
             std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"cdd8b7ce59d13e8f29e7d7083b619feb96e38f0e520c46403be8df7ec7d4025b7e24aadb947528e057b5117cabe62012c8e331dc103e205add7ecdd52d109dd2a56e5e990921b5e1b3aeb724e5b8069011b7589e7ef42d975d0711d51f806e19")),
         ];
@@ -152,7 +152,7 @@ module aptos_std::groth16 {
             std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"756ec20e1941b949e9a8af556925e3f6430f1cd1eeb801fe0186b3b664cb8457060f0e27551b5cc2b3dad878761c8d03acb8e0cbd8da8d0d541f60503b0726064310d0063802fad36fb362d11ef1060a22916dab9727b0d9feaf2f8636d74a02"))
         );
 
-        let public_inputs: vector<curves::Scalar<BLS12_381_G1>> = vector[
+        let public_inputs: vector<groups::Scalar<BLS12_381_G1>> = vector[
             std::option::extract(&mut scalar_from_bytes(&x"08436a5c0c09f30892728d4ad89cc85523967b1c4f57f1e7b10dffd751e0483b")),
         ];
         assert!(verify_proof_with_pvk(&pvk, &public_inputs, &proof), 1);
