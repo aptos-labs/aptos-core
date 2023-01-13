@@ -25,6 +25,7 @@
 -  [Function `element_add`](#0x1_groups_element_add)
 -  [Function `element_double`](#0x1_groups_element_double)
 -  [Function `element_mul`](#0x1_groups_element_mul)
+-  [Function `hash_to_element`](#0x1_groups_hash_to_element)
 -  [Function `simul_element_mul`](#0x1_groups_simul_element_mul)
 -  [Function `scalar_from_bytes`](#0x1_groups_scalar_from_bytes)
 -  [Function `scalar_to_bytes`](#0x1_groups_scalar_to_bytes)
@@ -60,8 +61,7 @@
 -  [Function `serialize_element_compressed_internal`](#0x1_groups_serialize_element_compressed_internal)
 -  [Function `simul_element_mul_internal`](#0x1_groups_simul_element_mul_internal)
 -  [Function `multi_pairing_internal`](#0x1_groups_multi_pairing_internal)
--  [Function `random_element_internal`](#0x1_groups_random_element_internal)
--  [Function `random_scalar_internal`](#0x1_groups_random_scalar_internal)
+-  [Function `hash_to_element_internal`](#0x1_groups_hash_to_element_internal)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -723,6 +723,33 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
         handle: <a href="groups.md#0x1_groups_element_mul_internal">element_mul_internal</a>&lt;G&gt;(scalar.handle, element.handle)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_groups_hash_to_element"></a>
+
+## Function `hash_to_element`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_hash_to_element">hash_to_element</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_hash_to_element">hash_to_element</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+    <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
+    <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+        handle: <a href="groups.md#0x1_groups_hash_to_element_internal">hash_to_element_internal</a>&lt;G&gt;(bytes)
     }
 }
 </code></pre>
@@ -1585,13 +1612,13 @@ See the comments on the actual type <code>G</code> for the format details.
 
 </details>
 
-<a name="0x1_groups_random_element_internal"></a>
+<a name="0x1_groups_hash_to_element_internal"></a>
 
-## Function `random_element_internal`
+## Function `hash_to_element_internal`
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_random_element_internal">random_element_internal</a>&lt;G&gt;(): u64
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_hash_to_element_internal">hash_to_element_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
@@ -1600,29 +1627,7 @@ See the comments on the actual type <code>G</code> for the format details.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_random_element_internal">random_element_internal</a>&lt;G&gt;(): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_groups_random_scalar_internal"></a>
-
-## Function `random_scalar_internal`
-
-
-
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_random_scalar_internal">random_scalar_internal</a>&lt;G&gt;(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_random_scalar_internal">random_scalar_internal</a>&lt;G&gt;(): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_hash_to_element_internal">hash_to_element_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 

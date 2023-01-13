@@ -9,7 +9,7 @@ use ark_ec::{AffineCurve, PairingEngine};
 use ark_ff::fields::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use better_any::{Tid, TidAble};
-use ark_bls12_381::{Parameters};
+use ark_bls12_381::{Fr, Parameters};
 use ark_ec::group::Group;
 use ark_ff::PrimeField;
 use move_binary_format::errors::PartialVMResult;
@@ -27,6 +27,7 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
 use once_cell::sync::Lazy;
+use sha2::{Digest, Sha256};
 use crate::natives::cryptography::groups::abort_codes::E_UNKNOWN_GROUP;
 
 pub mod abort_codes {
@@ -1542,6 +1543,50 @@ fn multi_pairing_internal(
     }
 }
 
+fn hash_to_bls12381_fr(bytes: &[u8]) -> ark_bls12_381::Fr {
+    let mut digest = sha2::Sha256::digest(bytes).to_vec();
+    digest[31] = 0;
+    Fr::from_random_bytes(digest.as_slice()).unwrap()
+}
+fn hash_to_element_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    let type_tag = context
+        .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let bytes = pop_arg!(args, Vec<u8>);
+    match type_tag.as_str() {
+        "0x1::groups::BLS12_381_G1" => {
+            //TODO: replace this naive implementation.
+            let x = hash_to_bls12381_fr(bytes.as_slice());
+            let point = ark_bls12_381::G1Projective::prime_subgroup_generator().mul(x.into_repr());
+            let handle = context.extensions_mut().get_mut::<ArksContext>().add_g1_point(point);
+            Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::u64(handle as u64)]))
+        }
+        "0x1::groups::BLS12_381_G2" => {
+            //TODO: replace this naive implementation.
+            let x = hash_to_bls12381_fr(bytes.as_slice());
+            let point = ark_bls12_381::G2Projective::prime_subgroup_generator().mul(x.into_repr());
+            let handle = context.extensions_mut().get_mut::<ArksContext>().add_g2_point(point);
+            Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::u64(handle as u64)]))
+        }
+        "0x1::groups::BLS12_381_Gt" => {
+            //TODO: replace this naive implementation.
+            let x = hash_to_bls12381_fr(bytes.as_slice());
+            let element = BLS12381_GT_GENERATOR.clone().pow(x.into_repr());
+            let handle = context.extensions_mut().get_mut::<ArksContext>().add_gt_point(element);
+            Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::u64(handle as u64)]))
+        }
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+        }
+    }
+}
+
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
     let mut natives = vec![];
 
@@ -1641,6 +1686,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "is_prime_order_internal",
             make_native_from_func(gas_params.clone(), is_prime_order_internal),
+        ),
+        (
+            "hash_to_element_internal",
+            make_native_from_func(gas_params.clone(), hash_to_element_internal),
         ),
     ]);
 

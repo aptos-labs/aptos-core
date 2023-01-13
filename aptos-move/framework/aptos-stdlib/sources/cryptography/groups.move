@@ -234,6 +234,13 @@ module aptos_std::groups {
         }
     }
 
+    public fun hash_to_element<G>(bytes: vector<u8>): Element<G> {
+        abort_if_feature_disabled();
+        Element<G> {
+            handle: hash_to_element_internal<G>(bytes)
+        }
+    }
+
     public fun simul_element_mul<G>(scalars: &vector<Scalar<G>>, elements: &vector<Element<G>>): Element<G> {
         abort_if_feature_disabled();
 
@@ -380,7 +387,10 @@ module aptos_std::groups {
     native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
     native fun simul_element_mul_internal<G>(scalar_handles: vector<u64>, element_handles: vector<u64>): u64;
     native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
+    native fun hash_to_element_internal<G>(bytes: vector<u8>): u64;
+    #[test_only]
     native fun random_element_internal<G>(): u64;
+    #[test_only]
     native fun random_scalar_internal<G>(): u64;
 
     #[test(fx = @std)]
@@ -470,6 +480,10 @@ module aptos_std::groups {
         let points = vector[point_g, point_2g, point_3g];
         let point_14g_calc = simul_element_mul(&scalars, &points);
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
+
+        // Hash to group.
+        let point = hash_to_element<BLS12_381_G1>(x"1234");
+        assert!(element_eq(&group_identity<BLS12_381_G1>(), &element_mul(&scalar_from_u64<BLS12_381_G1>(0), &point)), 1);
     }
 
     #[test(fx = @std)]
@@ -559,6 +573,10 @@ module aptos_std::groups {
         let points = vector[point_g, point_2g, point_3g];
         let point_14g_calc = simul_element_mul(&scalars, &points);
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
+
+        // Hash to group.
+        let point = hash_to_element<BLS12_381_G2>(x"1234");
+        assert!(element_eq(&group_identity<BLS12_381_G2>(), &element_mul(&scalar_from_u64<BLS12_381_G2>(0), &point)), 1);
     }
 
     #[test(fx = @std)]
@@ -649,6 +667,10 @@ module aptos_std::groups {
         let points = vector[point_g, point_2g, point_3g];
         let point_14g_calc = simul_element_mul(&scalars, &points);
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
+
+        // Hash to group.
+        let point = hash_to_element<BLS12_381_Gt>(x"1234");
+        assert!(element_eq(&group_identity<BLS12_381_Gt>(), &element_mul(&scalar_from_u64<BLS12_381_Gt>(0), &point)), 1);
     }
 
     #[test(fx = @std)]
