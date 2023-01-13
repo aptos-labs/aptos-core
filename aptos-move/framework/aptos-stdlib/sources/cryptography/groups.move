@@ -82,15 +82,8 @@ module aptos_std::groups {
     /// `Fq6` is an extension field of `Fq2`, constructed as `Fq6=Fq2[v]/(v^2-u-1)`.
     /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
     /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
-    /// THe order of the group `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// The order of the group `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
-    ///
-    /// A phantom type that represents the 2nd pairing input group `G2` in BLS12-381 pairing.
-    ///
-    /// In BLS12-381, a finite field `Fq` is used, where
-    /// `q` equals to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
-    /// `Gt` is the multiplicative subgroup of `Fq12`.
-    /// `Gt` has a prime order `r` with value 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     ///
     /// A `Scalar<BLS12_381_G2>` is an integer between 0 and `r-1`.
     ///
