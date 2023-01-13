@@ -1,6 +1,6 @@
 ## Create and Fund Aptos Account
 
-For testing purposes, you will want to create an Aptos account and fund it with testnet tokens. This document accompanies the command line instructions for the Aptos CLI on [creating](../cli-tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) and [funding]()(../cli-tools/aptos-cli-tool/use-aptos-cli.md#fund-an-account-with-the-faucet) accounts, focusing upon the testnet network and leveraging a graphical wallet rather than the CLI.
+For testing purposes, you will want to create an Aptos account and fund it with testnet tokens. This document accompanies the command line instructions for the Aptos CLI on [creating](../cli-tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) and [funding](../cli-tools/aptos-cli-tool/use-aptos-cli.md#fund-an-account-with-the-faucet) accounts, focusing upon the testnet network and leveraging a graphical wallet rather than the CLI.
 
 ## Prerequisites
 
@@ -10,6 +10,8 @@ You will need these installed to proceed:
 * [Aptos CLI](../cli-tools/aptos-cli-tool/index.md)
 
 ## Create Aptos account
+
+First, understand you can use your private key straight from the wallet and not have to import it from the CLI.
 
 Note that you may create specific account types by passing the `--profile` argument and a unique name to `aptos-init` for special assignments later. Here we will create a `default` (typical) account.
 
@@ -46,7 +48,7 @@ Note that you may create specific account types by passing the `--profile` argum
 
 ## Import account
 
-Here we will add the account to your wallet. We use the [Petra Wallet](../../guides/install-petra-wallet.md) Chrome extension here:
+Here we will add the account to your [wallet](https://github.com/aptos-foundation/ecosystem-projects#wallets). We use the [Petra Wallet](../../guides/install-petra-wallet.md) Chrome extension here:
 
 1. Read `.aptos/config.yaml` to see and copy the `default` private key.
 3. Open the wallet and select the [Testnet network](https://petra.app/docs/use) in the wallet via *Petra settings > Network > Testnet*.
