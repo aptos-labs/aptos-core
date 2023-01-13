@@ -2,30 +2,37 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod account_generator;
+pub mod benchmark_transaction;
 pub mod db_generator;
+pub mod fake_executor;
 pub mod pipeline;
 pub mod transaction_committer;
 pub mod transaction_executor;
 pub mod transaction_generator;
 
 use crate::{
-    pipeline::Pipeline, transaction_committer::TransactionCommitter,
-    transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
+    benchmark_transaction::BenchmarkTransaction, pipeline::Pipeline,
+    transaction_committer::TransactionCommitter, transaction_executor::TransactionExecutor,
+    transaction_generator::TransactionGenerator,
 };
 use aptos_config::config::{
     NodeConfig, PrunerConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::AptosDB;
-use aptos_executor::block_executor::BlockExecutor;
+use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
 use aptos_storage_interface::DbReaderWriter;
-use aptos_vm::AptosVM;
 use std::{fs, path::Path};
 
-pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<AptosVM>) {
+pub fn init_db_and_executor<V>(
+    config: &NodeConfig,
+) -> (DbReaderWriter, BlockExecutor<V, BenchmarkTransaction>)
+where
+    V: TransactionBlockExecutor<BenchmarkTransaction>,
+{
     let db = DbReaderWriter::new(
         AptosDB::open(
             &config.storage.dir(),
@@ -66,21 +73,23 @@ fn create_checkpoint(source_dir: impl AsRef<Path>, checkpoint_dir: impl AsRef<Pa
 }
 
 /// Runs the benchmark with given parameters.
-pub fn run_benchmark(
+pub fn run_benchmark<V>(
     block_size: usize,
     num_transfer_blocks: usize,
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
     pruner_config: PrunerConfig,
-) {
+) where
+    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+{
     create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
 
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
 
-    let (db, executor) = init_db_and_executor(&config);
+    let (db, executor) = init_db_and_executor::<V>(&config);
     let version = db.reader.get_latest_version().unwrap();
 
     let (pipeline, block_sender) = Pipeline::new(executor, version);
@@ -101,7 +110,7 @@ pub fn run_benchmark(
     }
 }
 
-pub fn add_accounts(
+pub fn add_accounts<V>(
     num_new_accounts: usize,
     init_account_balance: u64,
     block_size: usize,
@@ -109,10 +118,12 @@ pub fn add_accounts(
     checkpoint_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
-) {
+) where
+    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+{
     assert!(source_dir.as_ref() != checkpoint_dir.as_ref());
     create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
-    add_accounts_impl(
+    add_accounts_impl::<V>(
         num_new_accounts,
         init_account_balance,
         block_size,
@@ -123,7 +134,7 @@ pub fn add_accounts(
     );
 }
 
-fn add_accounts_impl(
+fn add_accounts_impl<V>(
     num_new_accounts: usize,
     init_account_balance: u64,
     block_size: usize,
@@ -131,11 +142,13 @@ fn add_accounts_impl(
     output_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
-) {
+) where
+    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+{
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = output_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
-    let (db, executor) = init_db_and_executor(&config);
+    let (db, executor) = init_db_and_executor::<V>(&config);
 
     let version = db.reader.get_latest_version().unwrap();
 
@@ -189,13 +202,14 @@ fn add_accounts_impl(
 mod tests {
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_temppath::TempPath;
+    use aptos_vm::AptosVM;
 
     #[test]
     fn test_benchmark() {
         let storage_dir = TempPath::new();
         let checkpoint_dir = TempPath::new();
 
-        crate::db_generator::run(
+        crate::db_generator::run::<AptosVM>(
             25, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000, /* init_account_balance */
@@ -205,7 +219,7 @@ mod tests {
             true,
         );
 
-        super::run_benchmark(
+        super::run_benchmark::<AptosVM>(
             5, /* block_size */
             5, /* num_transfer_blocks */
             storage_dir.as_ref(),
