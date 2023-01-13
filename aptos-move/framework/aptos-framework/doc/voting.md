@@ -1347,7 +1347,6 @@ Return true if the voting period of the given proposal has already ended.
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
-<b>invariant</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -1424,6 +1423,7 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
     is_multi_step_proposal: bool;
     <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>let</b> proposal_id = voting_forum.next_proposal_id;
+    <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>aborts_if</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals,proposal_id);
     <b>aborts_if</b> len(early_resolution_vote_threshold.vec) != 0 && min_vote_threshold &gt; early_resolution_vote_threshold.vec[0];
@@ -1451,7 +1451,8 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
 <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
 <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals, proposal_id);
@@ -1467,15 +1468,6 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-
-<a name="0x1_voting_spec_is_proposal_resolvable"></a>
-
-
-<pre><code><b>fun</b> <a href="voting.md#0x1_voting_spec_is_proposal_resolvable">spec_is_proposal_resolvable</a>(voting_forum_address: <b>address</b>, proposal_id: u64): bool;
-</code></pre>
-
-
-
 <a name="@Specification_1_is_proposal_resolvable"></a>
 
 ### Function `is_proposal_resolvable`
@@ -1487,7 +1479,8 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>pragma</b> aborts_if_is_strict = <b>false</b>;
 </code></pre>
 
 
@@ -1503,7 +1496,8 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
 </code></pre>
@@ -1521,7 +1515,8 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
@@ -1540,7 +1535,8 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-<pre><code><b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 </code></pre>
 
 
@@ -1572,7 +1568,8 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-<pre><code><b>pragma</b> addition_overflow_unchecked;
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>pragma</b> addition_overflow_unchecked;
 <b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 </code></pre>
 
@@ -1676,7 +1673,8 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
