@@ -262,10 +262,25 @@ impl ProofQueue {
             .iter()
             .take_while(|(_, expiration_time)| *expiration_time < current_time)
             .count();
-        for (digest, _expiration_time) in self.digest_queue.drain(0..num_expired) {
+        let mut num_expired_but_not_committed = 0;
+        for (digest, expiration_time) in self.digest_queue.drain(0..num_expired) {
+            match self
+                    .digest_proof
+                    .get(&digest)
+                    .expect("Entry for unexpired digest must exist")
+                {
+                    Some(_) => {
+                        // non-committed proof that is expired
+                        num_expired_but_not_committed += 1;
+                        if expiration_time.round() < current_time.round() {
+                            counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
+                                .observe((current_time.round() - expiration_time.round()) as f64);
+                        }
+                    },
+                    None => {}, // Proof was already committed
+                }
             claims::assert_some!(self.digest_proof.remove(&digest));
         }
-        debug!("QS: num_expired {}", num_expired);
 
         let mut ret = Vec::new();
         let mut cur_bytes = 0;
@@ -290,17 +305,15 @@ impl ProofQueue {
                     None => {}, // Proof was already committed, skip.
                 }
             }
-            if *expiration < current_time {
-                if expiration.epoch() < current_time.epoch() {
-                    counters::BATCH_EXPIRED_SMALLER_EPOCH_WHEN_PULL_PROOFS_COUNT.inc();
-                }
+            if *expiration < current_time && !excluded_proofs.contains(digest) {
+                num_expired_but_not_committed += 1;
                 if expiration.round() < current_time.round() {
-                    counters::BATCH_EXPIRED_SMALLER_ROUND_WHEN_PULL_PROOFS_COUNT.inc();
                     counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
                         .observe((current_time.round() - expiration.round()) as f64);
                 }
             }
         }
+        counters::EXPIRED_PROOFS_WHEN_PULL.observe(num_expired_but_not_committed as f64);
         counters::BLOCK_SIZE_WHEN_PULL.observe(cur_txns as f64);
         counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
         counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);

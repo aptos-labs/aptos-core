@@ -122,6 +122,16 @@ pub static PROOF_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of expired proof-of-store when pulled for consensus.
+pub static EXPIRED_PROOFS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_proof_size_when_pull",
+        "Histogram for the number of expired proof-of-store when pulled for consensus.",
+        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Histogram for the gaps between expiration round of the batch and the last certified round, and expiration round is higher.
 pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_HIGHER: Lazy<Histogram> =
     Lazy::new(|| {
@@ -360,24 +370,6 @@ pub static RECEIVED_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_received_batch_count",
         "Count of the number of batches received from other nodes."
-    )
-    .unwrap()
-});
-
-/// Count for the number of expired batches due to smaller epoch when pulling the proofs for consensus.
-pub static BATCH_EXPIRED_SMALLER_EPOCH_WHEN_PULL_PROOFS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "quorum_store_gap_batch_expired_smaller_epoch_when_pull_count",
-        "Count for the number of expired batches due to smaller epoch when pulling the proofs for consensus."
-    )
-    .unwrap()
-});
-
-/// Count for the number of expired batches due to smaller round when pulling the proofs for consensus.
-pub static BATCH_EXPIRED_SMALLER_ROUND_WHEN_PULL_PROOFS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "quorum_store_gap_batch_expired_smaller_round_when_pull_count",
-        "Count for the number of expired batches due to smaller round when pulling the proofs for consensus."
     )
     .unwrap()
 });
