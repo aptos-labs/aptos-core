@@ -166,6 +166,25 @@ impl ProofManager {
                         },
                         ProofManagerCommand::CommitNotification(logical_time, digests) => {
                             self.handle_commit_notification(logical_time, digests);
+
+                            // update the backpressure upon new commmit round
+                            let (_, remaining_proof_num, remaining_local_proof_num) =
+                                self.proofs_for_consensus.pull_proofs(
+                                    &HashSet::new(),
+                                    logical_time,
+                                    0,
+                                    0,
+                                );
+                            self.remaining_proof_num = remaining_proof_num;
+                            self.remaining_local_proof_num = remaining_local_proof_num;
+
+                            let updated_back_pressure = self.qs_back_pressure();
+                            if updated_back_pressure != back_pressure {
+                                back_pressure = updated_back_pressure;
+                                if back_pressure_tx.send(back_pressure).await.is_err() {
+                                    debug!("Failed to send back_pressure for proposal");
+                                }
+                            }
                         },
                     }
                 },
