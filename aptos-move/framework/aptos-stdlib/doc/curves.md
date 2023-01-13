@@ -58,6 +58,7 @@
 -  [Function `element_neg_internal`](#0x1_curves_element_neg_internal)
 -  [Function `serialize_element_uncompressed_internal`](#0x1_curves_serialize_element_uncompressed_internal)
 -  [Function `serialize_element_compressed_internal`](#0x1_curves_serialize_element_compressed_internal)
+-  [Function `simul_element_mul_internal`](#0x1_curves_simul_element_mul_internal)
 -  [Function `multi_pairing_internal`](#0x1_curves_multi_pairing_internal)
 -  [Function `random_element_internal`](#0x1_curves_random_element_internal)
 -  [Function `random_scalar_internal`](#0x1_curves_random_scalar_internal)
@@ -747,19 +748,27 @@ Compute the product of multiple pairing: <code>e(p1_1,p2_1) * ... * e(p1_n,p2_n)
 
 <pre><code><b>public</b> <b>fun</b> <a href="curves.md#0x1_curves_simul_element_mul">simul_element_mul</a>&lt;G&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Scalar">Scalar</a>&lt;G&gt;&gt;, elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt;&gt;): <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
     <a href="curves.md#0x1_curves_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    //TODO: replace the naive implementation.
-    <b>let</b> result = <a href="curves.md#0x1_curves_group_identity">group_identity</a>&lt;G&gt;();
-    <b>let</b> num_elements = std::vector::length(elements);
+
     <b>let</b> num_scalars = std::vector::length(scalars);
-    <b>assert</b>!(num_elements == num_scalars, 1);
+    <b>let</b> scalar_handles = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> i = 0;
-    <b>while</b> (i &lt; num_elements) {
-        <b>let</b> scalar = std::vector::borrow(scalars, i);
-        <b>let</b> element = std::vector::borrow(elements, i);
-        result = <a href="curves.md#0x1_curves_element_add">element_add</a>(&result, &<a href="curves.md#0x1_curves_element_mul">element_mul</a>(scalar, element));
+    <b>while</b> (i &lt; num_scalars) {
+        std::vector::push_back(&<b>mut</b> scalar_handles, std::vector::borrow(scalars, i).handle);
         i = i + 1;
     };
-    result
+
+    <b>let</b> num_elements = std::vector::length(elements);
+    <b>let</b> element_handles = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; num_elements) {
+        std::vector::push_back(&<b>mut</b> element_handles, std::vector::borrow(elements, i).handle);
+        i = i + 1;
+    };
+
+    <a href="curves.md#0x1_curves_Element">Element</a>&lt;G&gt; {
+        handle: <a href="curves.md#0x1_curves_simul_element_mul_internal">simul_element_mul_internal</a>&lt;G&gt;(scalar_handles, element_handles)
+    }
+
 }
 </code></pre>
 
@@ -1526,6 +1535,28 @@ See the comments on the actual type <code>G</code> for the format details.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_serialize_element_compressed_internal">serialize_element_compressed_internal</a>&lt;G&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_curves_simul_element_mul_internal"></a>
+
+## Function `simul_element_mul_internal`
+
+
+
+<pre><code><b>fun</b> <a href="curves.md#0x1_curves_simul_element_mul_internal">simul_element_mul_internal</a>&lt;G&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="curves.md#0x1_curves_simul_element_mul_internal">simul_element_mul_internal</a>&lt;G&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
 </code></pre>
 
 

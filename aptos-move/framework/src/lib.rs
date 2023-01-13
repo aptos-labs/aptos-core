@@ -3,6 +3,8 @@
 
 #![forbid(unsafe_code)]
 
+extern crate core;
+
 mod aptos;
 
 pub use aptos::*;

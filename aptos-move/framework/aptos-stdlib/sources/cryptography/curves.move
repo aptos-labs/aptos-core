@@ -236,19 +236,27 @@ module aptos_std::curves {
 
     public fun simul_element_mul<G>(scalars: &vector<Scalar<G>>, elements: &vector<Element<G>>): Element<G> {
         abort_if_feature_disabled();
-        //TODO: replace the naive implementation.
-        let result = group_identity<G>();
-        let num_elements = std::vector::length(elements);
+
         let num_scalars = std::vector::length(scalars);
-        assert!(num_elements == num_scalars, 1);
+        let scalar_handles = vector[];
         let i = 0;
-        while (i < num_elements) {
-            let scalar = std::vector::borrow(scalars, i);
-            let element = std::vector::borrow(elements, i);
-            result = element_add(&result, &element_mul(scalar, element));
+        while (i < num_scalars) {
+            std::vector::push_back(&mut scalar_handles, std::vector::borrow(scalars, i).handle);
             i = i + 1;
         };
-        result
+
+        let num_elements = std::vector::length(elements);
+        let element_handles = vector[];
+        let i = 0;
+        while (i < num_elements) {
+            std::vector::push_back(&mut element_handles, std::vector::borrow(elements, i).handle);
+            i = i + 1;
+        };
+
+        Element<G> {
+            handle: simul_element_mul_internal<G>(scalar_handles, element_handles)
+        }
+
     }
 
     /// Decode a `Scalar<G>` from a byte array.
@@ -370,6 +378,7 @@ module aptos_std::curves {
     native fun element_neg_internal<G>(handle: u64): u64;
     native fun serialize_element_uncompressed_internal<G>(handle: u64): vector<u8>;
     native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
+    native fun simul_element_mul_internal<G>(scalar_handles: vector<u64>, element_handles: vector<u64>): u64;
     native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
     native fun random_element_internal<G>(): u64;
     native fun random_scalar_internal<G>(): u64;

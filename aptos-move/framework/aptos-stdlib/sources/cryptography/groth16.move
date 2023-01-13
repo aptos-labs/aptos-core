@@ -157,5 +157,4 @@ module aptos_std::groth16 {
         ];
         assert!(verify_proof_with_pvk(&pvk, &public_inputs, &proof), 1);
     }
-
 }
