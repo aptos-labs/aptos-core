@@ -121,7 +121,7 @@ module aptos_std::groups {
     public fun pairing<G1,G2,Gt>(element_1: &Element<G1>, element_2: &Element<G2>): Element<Gt> {
         abort_if_feature_disabled();
         Element<Gt> {
-            handle: multi_pairing_internal<G1,G2,Gt>(vector[element_1.handle], vector[element_2.handle])
+            handle: pairing_product_internal<G1,G2,Gt>(vector[element_1.handle], vector[element_2.handle])
         }
     }
 
@@ -141,7 +141,7 @@ module aptos_std::groups {
         };
 
         Element<Gt> {
-            handle: multi_pairing_internal<G1,G2,Gt>(g1_handles, g2_handles)
+            handle: pairing_product_internal<G1,G2,Gt>(g1_handles, g2_handles)
         }
     }
 
@@ -397,7 +397,7 @@ module aptos_std::groups {
     native fun serialize_element_uncompressed_internal<G>(handle: u64): vector<u8>;
     native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
     native fun simul_element_mul_internal<G>(scalar_handles: vector<u64>, element_handles: vector<u64>): u64;
-    native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
+    native fun pairing_product_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
     native fun hash_to_element_internal<G>(bytes: vector<u8>): u64;
     #[test_only]
     native fun random_element_internal<G>(): u64;

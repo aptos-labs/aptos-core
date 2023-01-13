@@ -30,6 +30,7 @@
 
 ## Struct `VerifyingKey`
 
+A Groth16 verifying key.
 
 
 <pre><code><b>struct</b> <a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>&lt;G1, G2, Gt&gt; <b>has</b> drop
@@ -81,6 +82,7 @@
 
 ## Struct `PreparedVerifyingKey`
 
+A Groth16 verifying key pre-processed for faster verification.
 
 
 <pre><code><b>struct</b> <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">PreparedVerifyingKey</a>&lt;G1, G2, Gt&gt; <b>has</b> drop
@@ -126,6 +128,7 @@
 
 ## Struct `Proof`
 
+A Groth16 proof.
 
 
 <pre><code><b>struct</b> <a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1, G2, Gt&gt; <b>has</b> drop
@@ -179,6 +182,7 @@
 
 ## Function `new_vk`
 
+Create a new Groth16 verifying key.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_vk">new_vk</a>&lt;G1, G2, Gt&gt;(alpha_g1: <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G1&gt;, beta_g2: <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G2&gt;, gamma_g2: <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G2&gt;, delta_g2: <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G2&gt;, gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G1&gt;&gt;): <a href="groth16.md#0x1_groth16_VerifyingKey">groth16::VerifyingKey</a>&lt;G1, G2, Gt&gt;
@@ -210,6 +214,7 @@
 
 ## Function `new_pvk`
 
+Create a new pre-processed Groth16 verifying key.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_pvk">new_pvk</a>&lt;G1, G2, Gt&gt;(alpha_g1_beta_g2: <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;Gt&gt;, gamma_g2_neg: <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G2&gt;, delta_g2_neg: <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G2&gt;, gamma_abc_g1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G1&gt;&gt;): <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">groth16::PreparedVerifyingKey</a>&lt;G1, G2, Gt&gt;
@@ -240,6 +245,7 @@
 
 ## Function `prepare_verifying_key`
 
+Pre-process a Groth16 verification key <code>vk</code> for faster verification.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_prepare_verifying_key">prepare_verifying_key</a>&lt;G1, G2, Gt&gt;(vk: &<a href="groth16.md#0x1_groth16_VerifyingKey">groth16::VerifyingKey</a>&lt;G1, G2, Gt&gt;): <a href="groth16.md#0x1_groth16_PreparedVerifyingKey">groth16::PreparedVerifyingKey</a>&lt;G1, G2, Gt&gt;
@@ -270,6 +276,7 @@
 
 ## Function `new_proof`
 
+Create a Groth16 proof.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_proof">new_proof</a>&lt;G1, G2, Gt&gt;(a: <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G1&gt;, b: <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G2&gt;, c: <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G1&gt;): <a href="groth16.md#0x1_groth16_Proof">groth16::Proof</a>&lt;G1, G2, Gt&gt;
@@ -295,6 +302,7 @@
 
 ## Function `verify_proof`
 
+Verify a Groth16 proof.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof">verify_proof</a>&lt;G1, G2, Gt&gt;(vk: &<a href="groth16.md#0x1_groth16_VerifyingKey">groth16::VerifyingKey</a>&lt;G1, G2, Gt&gt;, public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G1&gt;&gt;, proof: &<a href="groth16.md#0x1_groth16_Proof">groth16::Proof</a>&lt;G1, G2, Gt&gt;): bool
@@ -336,6 +344,7 @@
 
 ## Function `verify_proof_with_pvk`
 
+Verify a Groth16 proof <code>proof</code> against the public inputs <code>public_inputs</code> with a prepared verification key <code>pvk</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof_with_pvk">verify_proof_with_pvk</a>&lt;G1, G2, Gt&gt;(pvk: &<a href="groth16.md#0x1_groth16_PreparedVerifyingKey">groth16::PreparedVerifyingKey</a>&lt;G1, G2, Gt&gt;, public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G1&gt;&gt;, proof: &<a href="groth16.md#0x1_groth16_Proof">groth16::Proof</a>&lt;G1, G2, Gt&gt;): bool

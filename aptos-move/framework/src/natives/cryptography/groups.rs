@@ -1475,7 +1475,7 @@ fn element_neg_internal(
     }
 }
 
-fn multi_pairing_internal(
+fn pairing_product_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -1676,8 +1676,8 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), element_eq_internal),
         ),
         (
-            "multi_pairing_internal",
-            make_native_from_func(gas_params.clone(), multi_pairing_internal),
+            "pairing_product_internal",
+            make_native_from_func(gas_params.clone(), pairing_product_internal),
         ),
         (
             "group_order_internal",
