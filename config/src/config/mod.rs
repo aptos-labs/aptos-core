@@ -588,13 +588,12 @@ mod test {
     }
 
     #[test]
-    // TODO(joshlind): once the 'matches' crate becomes stable, clean this test up!
     fn verify_parse_role_error_on_invalid_role() {
         let invalid_role_type = "this is not a valid role type";
-        match RoleType::from_str(invalid_role_type) {
-            Err(ParseRoleError(_)) => { /* the expected error was thrown! */ },
-            _ => panic!("A ParseRoleError should have been thrown on the invalid role type!"),
-        }
+        assert!(matches!(
+            RoleType::from_str(invalid_role_type),
+            Err(ParseRoleError(_))
+        ));
     }
 
     #[test]
@@ -606,5 +605,16 @@ mod test {
         let contents = std::include_str!("test_data/safety_rules.yaml");
         SafetyRulesConfig::parse(contents)
             .unwrap_or_else(|e| panic!("Error in safety_rules.yaml: {}", e));
+    }
+
+    #[test]
+    fn validate_invalid_network_id() {
+        let mut config = NodeConfig::default_for_public_full_node();
+        let network = config.full_node_networks.iter_mut().next().unwrap();
+        network.network_id = NetworkId::Validator;
+        assert!(matches!(
+            config.validate_network_configs(),
+            Err(Error::InvariantViolation(_))
+        ));
     }
 }
