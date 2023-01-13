@@ -214,14 +214,16 @@ impl MempoolProxy {
 
 // TODO: unitest
 pub struct ProofQueue {
-    digest_queue: VecDeque<(HashValue, LogicalTime)>,
-    digest_proof: HashMap<HashValue, Option<(ProofOfStore, bool)>>, // None means committed, boolean indicates whether the proof is local
+    digest_queue: VecDeque<(HashValue, LogicalTime)>, // queue of all proofs
+    local_digest_queue: VecDeque<(HashValue, LogicalTime)>, // queue of local proofs, to make back pressure update more efficient
+    digest_proof: HashMap<HashValue, Option<ProofOfStore>>, // None means committed
 }
 
 impl ProofQueue {
     pub(crate) fn new() -> Self {
         Self {
             digest_queue: VecDeque::new(),
+            local_digest_queue: VecDeque::new(),
             digest_proof: HashMap::new(),
         }
     }
@@ -231,15 +233,31 @@ impl ProofQueue {
             Vacant(entry) => {
                 self.digest_queue
                     .push_back((*proof.digest(), proof.expiration()));
-                entry.insert(Some((proof, local)));
+                entry.insert(Some(proof.clone()));
             },
             Occupied(mut entry) => {
                 if entry.get().is_some()
-                    && entry.get().as_ref().unwrap().0.expiration() < proof.expiration()
+                    && entry.get().as_ref().unwrap().expiration() < proof.expiration()
                 {
-                    entry.insert(Some((proof, local)));
+                    entry.insert(Some(proof.clone()));
                 }
             },
+        }
+        if local {
+            match self.digest_proof.entry(*proof.digest()) {
+                Vacant(entry) => {
+                    self.local_digest_queue
+                        .push_back((*proof.digest(), proof.expiration()));
+                    entry.insert(Some(proof));
+                },
+                Occupied(mut entry) => {
+                    if entry.get().is_some()
+                        && entry.get().as_ref().unwrap().expiration() < proof.expiration()
+                    {
+                        entry.insert(Some(proof));
+                    }
+                },
+            }
         }
     }
 
@@ -251,9 +269,7 @@ impl ProofQueue {
         current_time: LogicalTime,
         max_txns: u64,
         max_bytes: u64,
-    ) -> (Vec<ProofOfStore>, usize, usize) {
-        counters::BATCH_QUEUE_SIZE_WHEN_PULL_FOR_BLOCK.observe(self.digest_queue.len() as f64);
-
+    ) -> Vec<ProofOfStore> {
         let num_expired = self
             .digest_queue
             .iter()
@@ -263,29 +279,24 @@ impl ProofQueue {
             claims::assert_some!(self.digest_proof.remove(&digest));
         }
         debug!("QS: num_expired {}", num_expired);
-        counters::BATCH_QUEUE_EXPIRED_SIZE_WHEN_PULL_FOR_BLOCK.observe(num_expired as f64);
 
         let mut ret = Vec::new();
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
-        let mut remaining_proof_size = 0;
-        let mut remaining_local_proof_size = 0;
-        let mut block_finished = false;
 
         for (digest, expiration) in self.digest_queue.iter() {
-            if !block_finished && *expiration >= current_time && !excluded_proofs.contains(digest) {
+            if *expiration >= current_time && !excluded_proofs.contains(digest) {
                 match self
                     .digest_proof
                     .get(digest)
                     .expect("Entry for unexpired digest must exist")
                 {
-                    Some((proof, _)) => {
+                    Some(proof) => {
                         cur_bytes = cur_bytes + proof.info().num_bytes;
                         cur_txns = cur_txns + proof.info().num_txns;
                         if cur_bytes > max_bytes || cur_txns > max_txns {
                             // Exceeded the limit for requested bytes or number of transactions.
-                            block_finished = true;
-                            // break;
+                            break;
                         }
                         ret.push(proof.clone());
                     },
@@ -302,30 +313,46 @@ impl ProofQueue {
                         .observe((current_time.round() - expiration.round()) as f64);
                 }
             }
-            // go through the remaining proofs, record the number of unexpired proofs
-            if block_finished {
-                if *expiration >= current_time && !excluded_proofs.contains(digest) {
-                    match self
-                        .digest_proof
-                        .get(digest)
-                        .expect("Entry for unexpired digest must exist")
-                    {
-                        Some((_, local)) => {
-                            remaining_proof_size += 1;
-                            if *local {
-                                remaining_local_proof_size += 1;
-                            }
-                        },
-                        None => {}, // Proof was already committed, skip.
-                    }
+        }
+        counters::BLOCK_SIZE_WHEN_PULL.observe(cur_txns as f64);
+        counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
+        counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
+
+        ret
+    }
+
+    // returns the number of unexpired local proofs
+    pub(crate) fn clean_local_proofs(
+        &mut self,
+        current_time: LogicalTime,
+    ) -> usize {
+        let num_expired = self
+            .local_digest_queue
+            .iter()
+            .take_while(|(_, expiration_time)| *expiration_time < current_time)
+            .count();
+        self.local_digest_queue.drain(0..num_expired);
+
+        let mut remaining_local_proof_size = 0;
+
+        for (digest, expiration) in self.local_digest_queue.iter() {
+            if *expiration >= current_time {
+                match self
+                    .digest_proof
+                    .get(digest)
+                    .expect("Entry for unexpired digest must exist")
+                {
+                    Some(_) => {
+                        remaining_local_proof_size += 1;
+                    },
+                    None => {}, // Proof was already committed, skip.
                 }
             }
         }
-        counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(remaining_proof_size as f64);
         counters::NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK
             .observe(remaining_local_proof_size as f64);
 
-        (ret, remaining_proof_size, remaining_local_proof_size)
+        remaining_local_proof_size
     }
 
     //mark in the hashmap committed PoS, but keep them until they expire

@@ -92,6 +92,36 @@ pub static NUM_FRAGMENT_PER_BATCH: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of transactions per block when pulled for consensus.
+pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_block_size_when_pull",
+        "Histogram for the number of transactions per block when pulled for consensus.",
+        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the total size of transactions per block when pulled for consensus.
+pub static BLOCK_BYTES_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_block_bytes_when_pull",
+        "Histogram for the total size of transactions per block when pulled for consensus.",
+        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of proof-of-store per block when pulled for consensus.
+pub static PROOF_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_proof_size_when_pull",
+        "Histogram for the number of proof-of-store per block when pulled for consensus.",
+        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Histogram for the gaps between expiration round of the batch and the last certified round, and expiration round is higher.
 pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_HIGHER: Lazy<Histogram> =
     Lazy::new(|| {
@@ -126,41 +156,21 @@ pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS: Lazy
     .unwrap()
     });
 
-/// Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.
-pub static NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "quorum_store_num_batch_left_when_pull_for_block",
-        "Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.",
-        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
-    )
-    .unwrap()
-});
+// /// Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.
+// pub static NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+//     register_histogram!(
+//         "quorum_store_num_batch_left_when_pull_for_block",
+//         "Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.",
+//         // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+//     )
+//     .unwrap()
+// });
 
 /// Histogram for the number of local batches/PoS left when forming a block proposal.
 pub static NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_num_local_batch_left_when_pull_for_block",
         "Histogram for the number of locally created batches/PoS left when forming a block proposal.",
-        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
-    )
-    .unwrap()
-});
-
-/// Histogram for the batches/PoS queue size (including expired) when forming a block proposal.
-pub static BATCH_QUEUE_SIZE_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "quorum_store_batch_queue_size_when_pull_for_block",
-        "Histogram for the batches/PoS queue size (including expired) when forming a block proposal.",
-        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
-    )
-    .unwrap()
-});
-
-/// Histogram for the expired prefix size in batches/PoS queue when forming a block proposal.
-pub static BATCH_QUEUE_EXPIRED_SIZE_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "quorum_store_batch_queue_expired_size_when_pull_for_block",
-        "Histogram for the size of expired batches/PoS prefix in the queue when forming a block proposal.",
         // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
     )
     .unwrap()

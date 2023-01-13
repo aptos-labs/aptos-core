@@ -91,15 +91,14 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let (proof_block, remaining_proof_num, remaining_local_proof_num) =
+                let proof_block =
                     self.proofs_for_consensus.pull_proofs(
                         &excluded_proofs,
                         LogicalTime::new(self.latest_logical_time.epoch(), round),
                         max_txns,
                         max_bytes,
                     );
-                self.remaining_proof_num = remaining_proof_num;
-                self.remaining_local_proof_num = remaining_local_proof_num;
+                self.remaining_local_proof_num = self.proofs_for_consensus.clean_local_proofs(LogicalTime::new(self.latest_logical_time.epoch(), round));
 
                 let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
                     Payload::empty(true)
@@ -168,16 +167,7 @@ impl ProofManager {
                             self.handle_commit_notification(logical_time, digests);
 
                             // update the backpressure upon new commmit round
-                            let (_, remaining_proof_num, remaining_local_proof_num) =
-                                self.proofs_for_consensus.pull_proofs(
-                                    &HashSet::new(),
-                                    logical_time,
-                                    0,
-                                    0,
-                                );
-                            self.remaining_proof_num = remaining_proof_num;
-                            self.remaining_local_proof_num = remaining_local_proof_num;
-
+                            self.remaining_local_proof_num = self.proofs_for_consensus.clean_local_proofs(logical_time);
                             let updated_back_pressure = self.qs_back_pressure();
                             if updated_back_pressure != back_pressure {
                                 back_pressure = updated_back_pressure;
