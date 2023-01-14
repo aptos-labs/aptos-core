@@ -1,6 +1,13 @@
-## Create and Fund Aptos Account
+---
+title: "Create and Fund Accounts"
+slug: "getting-started"
+---
 
-For testing purposes, you will want to create an Aptos account and fund it with testnet tokens. This document accompanies the command line instructions for the Aptos CLI on [creating](../cli-tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) and [funding](../cli-tools/aptos-cli-tool/use-aptos-cli.md#fund-an-account-with-the-faucet) accounts, focusing upon the testnet network and leveraging a graphical wallet rather than the CLI.
+## Create and Fund Aptos Accounts
+
+For testing purposes, you will want to create an Aptos account and fund it with testnet tokens. Much of this can be accomplished in the [wallet](https://github.com/aptos-foundation/ecosystem-projects#wallets) of your choice. We use the [Petra Wallet](https://petra.app/docs/use) here in combination with the [Aptos CLI](../cli-tools/aptos-cli-tool/index.md) to show you how they work together.
+
+This document accompanies the command line instructions for the Aptos CLI on [creating](../cli-tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) and [funding](../cli-tools/aptos-cli-tool/use-aptos-cli.md#fund-an-account-with-the-faucet) accounts, focusing upon the testnet network and leveraging a graphical wallet rather than the CLI.
 
 ## Prerequisites
 
@@ -48,7 +55,7 @@ Note that you may create specific account types by passing the `--profile` argum
 
 ## Import account
 
-Here we will add the account to your [wallet](https://github.com/aptos-foundation/ecosystem-projects#wallets). We use the [Petra Wallet](../../guides/install-petra-wallet.md) Chrome extension here:
+Here we will add the account to your [wallet](https://github.com/aptos-foundation/ecosystem-projects#wallets). We use the [Petra Wallet](./install-petra-wallet.md) Chrome extension here:
 
 1. Read `.aptos/config.yaml` to see and copy the `default` private key.
 3. Open the wallet and select the [Testnet network](https://petra.app/docs/use) in the wallet via *Petra settings > Network > Testnet*.
@@ -61,9 +68,9 @@ Here we will add the account to your [wallet](https://github.com/aptos-foundatio
 
 1. Go to the *Petra > Settings > Network > Testnet* network if not there already.
 2. Connect your wallet to the Aptos faucet at https://aptoslabs.com/testnet-faucet:
-  ![Faucet connect](../../../static/img/connect-wallet-faucet.png "Connect faucet to wallet")
+  ![Faucet connect](/img/connect-wallet-faucet.png "Connect faucet to wallet")
 3. Select your wallet type:
-  ![Wallet select](../../../static/img/select-wallet-faucet.png "Select your wallet for faucet")
+  ![Wallet select](/img/select-wallet-faucet.png "Select your wallet for faucet")
 4. Approve the connection request:
-  ![Faucet approval](../../../static/img/approve-wallet-faucet.png "Approve connecting faucet to wallet")
+  ![Faucet approval](/img/approve-wallet-faucet.png "Approve connecting faucet to wallet")
 5. Now when you load your wallet, you will see a **Faucet** button next to **Send**. Click **Faucet** to receive one APT per click to use when minting.
