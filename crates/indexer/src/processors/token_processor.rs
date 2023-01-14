@@ -393,7 +393,11 @@ fn insert_token_activities(
                     event_creation_number,
                     event_sequence_number,
                 ))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    event_index.eq(excluded(event_index)),
+                )),
             None,
         )?;
     }
