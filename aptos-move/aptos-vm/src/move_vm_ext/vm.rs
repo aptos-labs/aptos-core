@@ -114,8 +114,8 @@ pub fn verifier_config(_treat_friend_as_private: bool) -> VerifierConfig {
         max_type_nodes: Some(256),
         max_dependency_depth: Some(256),
         max_push_size: Some(10000),
-        max_struct_definitions: Some(200),
-        max_fields_in_struct: Some(30),
-        max_function_definitions: Some(1000),
+        max_struct_definitions: None,
+        max_fields_in_struct: None,
+        max_function_definitions: None,
     }
 }
