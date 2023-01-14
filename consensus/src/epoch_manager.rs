@@ -126,9 +126,7 @@ pub struct EpochManager {
     // number of network_listener workers to handle QS Fragment messages, should be >= 1
     // the total number of network workers is num_network_workers_for_fragment+2
     num_network_workers_for_fragment: usize,
-    // vector of network_listener channels to handle QS messages, including Batch, SignedDigest, Fragment
-    // vec[0] for Batch, vec[1] for SignedDigest, vec[2],...,vec[num_network_workers_for_fragment+1] for Fragment
-    quorum_store_msg_tx_vec: Vec<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     quorum_store_coordinator_tx: Option<Sender<CoordinatorCommand>>,
 }
 
@@ -170,7 +168,7 @@ impl EpochManager {
             block_retrieval_tx: None,
             quorum_store_storage_path: node_config.storage.dir(),
             num_network_workers_for_fragment: 2,
-            quorum_store_msg_tx_vec: Vec::new(),
+            quorum_store_msg_tx: None,
             quorum_store_coordinator_tx: None,
         }
     }
@@ -661,9 +659,8 @@ impl EpochManager {
             ))
         };
 
-        let (payload_manager, quorum_store_msg_tx_vec) =
-            quorum_store_builder.init_payload_manager();
-        self.quorum_store_msg_tx_vec = quorum_store_msg_tx_vec;
+        let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
+        self.quorum_store_msg_tx = quorum_store_msg_tx;
 
         let payload_client = QuorumStoreClient::new(
             consensus_to_quorum_store_tx,
@@ -923,42 +920,14 @@ impl EpochManager {
             );
         }
         match event {
-            // quorum_store_event @ (VerifiedEvent::SignedDigest(_)
-            // | VerifiedEvent::Fragment(_)
-            // | VerifiedEvent::Batch(_)) => {
-            //     let idx = peer_id.to_vec()[0] as usize % self.num_network_workers_for_fragment;
-            //     debug!(
-            //         "QS: peer_id {:?},  # network_worker {}, hashed to idx {}",
-            //         peer_id, self.num_network_workers_for_fragment, idx
-            //     );
-            //     let sender = &mut self.quorum_store_msg_tx_vec[idx];
-            //     sender.push(peer_id, quorum_store_event)?;
-            // }
-            // TODO: make sure requests are handled
-            quorum_store_event @ VerifiedEvent::BatchRequestMsg(_) => {
-                let sender = &mut self.quorum_store_msg_tx_vec[0];
-                sender.push(peer_id, quorum_store_event)?;
-            },
-            quorum_store_event @ VerifiedEvent::UnverifiedBatchMsg(_) => {
-                let sender = &mut self.quorum_store_msg_tx_vec[0];
-                sender.push(peer_id, quorum_store_event)?;
-            },
-            quorum_store_event @ VerifiedEvent::SignedDigestMsg(_) => {
-                let sender = &mut self.quorum_store_msg_tx_vec[1];
-                sender.push(peer_id, quorum_store_event)?;
-            },
-            quorum_store_event @ VerifiedEvent::ProofOfStoreMsg(_) => {
-                let sender = &mut self.quorum_store_msg_tx_vec[1];
-                sender.push(peer_id, quorum_store_event)?;
-            },
-            quorum_store_event @ VerifiedEvent::FragmentMsg(_) => {
-                let idx = peer_id.to_vec()[0] as usize % self.num_network_workers_for_fragment + 2;
-                debug!(
-                    "QS: peer_id {:?},  # network_worker {}, hashed to idx {}",
-                    peer_id, self.num_network_workers_for_fragment, idx
-                );
-                let sender = &mut self.quorum_store_msg_tx_vec[idx];
-                sender.push(peer_id, quorum_store_event)?;
+            quorum_store_event @ (VerifiedEvent::BatchRequestMsg(_)
+            | VerifiedEvent::UnverifiedBatchMsg(_)
+            | VerifiedEvent::SignedDigestMsg(_)
+            | VerifiedEvent::ProofOfStoreMsg(_)
+            | VerifiedEvent::FragmentMsg(_)) => {
+                if let Some(sender) = &mut self.quorum_store_msg_tx {
+                    sender.push(peer_id, quorum_store_event)?;
+                }
             },
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {

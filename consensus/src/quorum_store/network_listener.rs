@@ -19,7 +19,7 @@ pub(crate) struct NetworkListener {
     network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
     batch_reader_tx: Sender<BatchReaderCommand>,
     proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
-    batch_coordinator_tx: Sender<BatchCoordinatorCommand>,
+    remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
     proof_manager_tx: Sender<ProofManagerCommand>,
 }
 
@@ -28,14 +28,14 @@ impl NetworkListener {
         network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         batch_reader_tx: Sender<BatchReaderCommand>,
         proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
-        batch_coordinator_tx: Sender<BatchCoordinatorCommand>,
+        remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
         proof_manager_tx: Sender<ProofManagerCommand>,
     ) -> Self {
         Self {
             network_msg_rx,
             batch_reader_tx,
             proof_coordinator_tx,
-            batch_coordinator_tx,
+            remote_batch_coordinator_tx,
             proof_manager_tx,
         }
     }
@@ -66,7 +66,15 @@ impl NetworkListener {
                 },
                 VerifiedEvent::FragmentMsg(fragment) => {
                     counters::DELIVERED_FRAGMENTS_COUNT.inc();
-                    self.batch_coordinator_tx
+                    let idx = fragment.source().to_vec()[0] as usize
+                        % self.remote_batch_coordinator_tx.len();
+                    debug!(
+                        "QS: peer_id {:?},  # network_worker {}, hashed to idx {}",
+                        fragment.source(),
+                        self.remote_batch_coordinator_tx.len(),
+                        idx
+                    );
+                    self.remote_batch_coordinator_tx[idx]
                         .send(BatchCoordinatorCommand::RemoteFragment(fragment))
                         .await
                         .expect("Could not send remote fragment");

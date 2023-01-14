@@ -26,10 +26,11 @@ pub struct QuorumStoreCoordinator {
     my_peer_id: PeerId,
     batch_generator_cmd_tx: mpsc::Sender<BatchGeneratorCommand>,
     batch_coordinator_cmd_tx: mpsc::Sender<BatchCoordinatorCommand>,
+    remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
     proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
     proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,
     batch_store_cmd_tx: mpsc::Sender<BatchStoreCommand>,
-    quorum_store_msg_tx_vec: Vec<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
 }
 
 impl QuorumStoreCoordinator {
@@ -37,19 +38,21 @@ impl QuorumStoreCoordinator {
         my_peer_id: PeerId,
         batch_generator_cmd_tx: mpsc::Sender<BatchGeneratorCommand>,
         batch_coordinator_cmd_tx: mpsc::Sender<BatchCoordinatorCommand>,
+        remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
         proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
         proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,
         batch_store_cmd_tx: mpsc::Sender<BatchStoreCommand>,
-        quorum_store_msg_tx_vec: Vec<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
     ) -> Self {
         Self {
             my_peer_id,
             batch_generator_cmd_tx,
             batch_coordinator_cmd_tx,
+            remote_batch_coordinator_cmd_tx,
             proof_coordinator_cmd_tx,
             proof_manager_cmd_tx,
             batch_store_cmd_tx,
-            quorum_store_msg_tx_vec,
+            quorum_store_msg_tx,
         }
     }
 
@@ -79,20 +82,18 @@ impl QuorumStoreCoordinator {
                     // the receiver could be unavailable during shutdown, and resolve this without
                     // panicking.
 
-                    for network_listener_tx in self.quorum_store_msg_tx_vec {
-                        let (network_listener_shutdown_tx, network_listener_shutdown_rx) =
-                            oneshot::channel();
-                        match network_listener_tx.push(
-                            self.my_peer_id,
-                            VerifiedEvent::Shutdown(network_listener_shutdown_tx),
-                        ) {
-                            Ok(()) => debug!("QS: shutdown network listener sent"),
-                            Err(err) => panic!("Failed to send to NetworkListener, Err {:?}", err),
-                        };
-                        network_listener_shutdown_rx
-                            .await
-                            .expect("Failed to stop NetworkListener");
-                    }
+                    let (network_listener_shutdown_tx, network_listener_shutdown_rx) =
+                        oneshot::channel();
+                    match self.quorum_store_msg_tx.push(
+                        self.my_peer_id,
+                        VerifiedEvent::Shutdown(network_listener_shutdown_tx),
+                    ) {
+                        Ok(()) => debug!("QS: shutdown network listener sent"),
+                        Err(err) => panic!("Failed to send to NetworkListener, Err {:?}", err),
+                    };
+                    network_listener_shutdown_rx
+                        .await
+                        .expect("Failed to stop NetworkListener");
 
                     let (batch_generator_shutdown_tx, batch_generator_shutdown_rx) =
                         oneshot::channel();
@@ -115,6 +116,22 @@ impl QuorumStoreCoordinator {
                     batch_coordinator_shutdown_rx
                         .await
                         .expect("Failed to stop BatchCoordinator");
+
+                    for remote_batch_coordinator_cmd_tx in self.remote_batch_coordinator_cmd_tx {
+                        let (
+                            remote_batch_coordinator_shutdown_tx,
+                            remote_batch_coordinator_shutdown_rx,
+                        ) = oneshot::channel();
+                        remote_batch_coordinator_cmd_tx
+                            .send(BatchCoordinatorCommand::Shutdown(
+                                remote_batch_coordinator_shutdown_tx,
+                            ))
+                            .await
+                            .expect("Failed to send to Remote BatchCoordinator");
+                        remote_batch_coordinator_shutdown_rx
+                            .await
+                            .expect("Failed to stop Remote BatchCoordinator");
+                    }
 
                     let (batch_store_shutdown_tx, batch_store_shutdown_rx) = oneshot::channel();
                     self.batch_store_cmd_tx

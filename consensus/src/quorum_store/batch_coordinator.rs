@@ -35,11 +35,9 @@ pub struct BatchCoordinator {
     batch_store_tx: Sender<BatchStoreCommand>,
     proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
     max_batch_bytes: usize,
-    // Local
-    batch_aggregator: BatchAggregator,
-    fragment_id: usize,
-    // Remote
-    batch_aggregators: HashMap<PeerId, BatchAggregator>,
+    remote_batch_aggregators: HashMap<PeerId, BatchAggregator>,
+    local_batch_aggregator: BatchAggregator,
+    local_fragment_id: usize,
 }
 
 impl BatchCoordinator {
@@ -60,9 +58,9 @@ impl BatchCoordinator {
             batch_store_tx,
             proof_coordinator_tx,
             max_batch_bytes,
-            batch_aggregator: BatchAggregator::new(max_batch_bytes),
-            fragment_id: 0,
-            batch_aggregators: HashMap::new(),
+            remote_batch_aggregators: HashMap::new(),
+            local_batch_aggregator: BatchAggregator::new(max_batch_bytes),
+            local_fragment_id: 0,
         }
     }
 
@@ -72,15 +70,15 @@ impl BatchCoordinator {
         fragment_payload: Vec<SerializedTransaction>,
         batch_id: BatchId,
     ) -> Fragment {
-        match self.batch_aggregator.append_transactions(
+        match self.local_batch_aggregator.append_transactions(
             batch_id,
-            self.fragment_id,
+            self.local_fragment_id,
             fragment_payload.clone(),
         ) {
             Ok(()) => Fragment::new(
                 self.epoch,
                 batch_id,
-                self.fragment_id,
+                self.local_fragment_id,
                 fragment_payload,
                 None,
                 self.my_peer_id,
@@ -102,15 +100,16 @@ impl BatchCoordinator {
         expiration: LogicalTime,
         proof_tx: ProofReturnChannel,
     ) -> (BatchStoreCommand, Fragment) {
-        match self
-            .batch_aggregator
-            .end_batch(batch_id, self.fragment_id, fragment_payload.clone())
-        {
+        match self.local_batch_aggregator.end_batch(
+            batch_id,
+            self.local_fragment_id,
+            fragment_payload.clone(),
+        ) {
             Ok((num_bytes, payload, digest)) => {
                 let fragment = Fragment::new(
                     self.epoch,
                     batch_id,
-                    self.fragment_id,
+                    self.local_fragment_id,
                     fragment_payload,
                     Some(expiration.clone()),
                     self.my_peer_id,
@@ -151,7 +150,7 @@ impl BatchCoordinator {
     async fn handle_fragment(&mut self, fragment: Fragment) {
         let source = fragment.source();
         let entry = self
-            .batch_aggregators
+            .remote_batch_aggregators
             .entry(source)
             .or_insert(BatchAggregator::new(self.max_batch_bytes));
         if let Some(expiration) = fragment.maybe_expiration() {
@@ -224,7 +223,7 @@ impl BatchCoordinator {
                     let msg = self.handle_append_to_batch(fragment_payload, batch_id);
                     self.network_sender.broadcast_fragment(msg).await;
 
-                    self.fragment_id = self.fragment_id + 1;
+                    self.local_fragment_id = self.local_fragment_id + 1;
                 },
                 BatchCoordinatorCommand::EndBatch(
                     fragment_payload,
@@ -244,9 +243,9 @@ impl BatchCoordinator {
                         .await
                         .expect("Failed to send to BatchStore");
 
-                    counters::NUM_FRAGMENT_PER_BATCH.observe(self.fragment_id as f64);
+                    counters::NUM_FRAGMENT_PER_BATCH.observe(self.local_fragment_id as f64);
 
-                    self.fragment_id = 0;
+                    self.local_fragment_id = 0;
                 },
                 BatchCoordinatorCommand::RemoteFragment(fragment) => {
                     self.handle_fragment(*fragment).await;

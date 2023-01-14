@@ -44,7 +44,7 @@ impl QuorumStoreBuilder {
         &mut self,
     ) -> (
         Arc<PayloadManager>,
-        Vec<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => inner.init_payload_manager(),
@@ -86,9 +86,9 @@ impl DirectMempoolInnerBuilder {
         &mut self,
     ) -> (
         Arc<PayloadManager>,
-        Vec<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
-        (Arc::from(PayloadManager::DirectMempool), Vec::new())
+        (Arc::from(PayloadManager::DirectMempool), None)
     }
 
     fn start(self) {
@@ -130,10 +130,11 @@ pub struct InnerBuilder {
     back_pressure_tx: tokio::sync::mpsc::Sender<bool>,
     back_pressure_rx: Option<tokio::sync::mpsc::Receiver<bool>>,
     quorum_store_storage_path: PathBuf,
-    num_network_workers_for_fragment: usize,
     quorum_store_storage: Option<Arc<QuorumStoreDB>>,
-    quorum_store_msg_tx_vec: Vec<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
-    quorum_store_msg_rx_vec: Vec<aptos_channel::Receiver<AccountAddress, VerifiedEvent>>,
+    quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
+    quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, VerifiedEvent>>,
+    remote_batch_coordinator_cmd_tx: Vec<tokio::sync::mpsc::Sender<BatchCoordinatorCommand>>,
+    remote_batch_coordinator_cmd_rx: Vec<tokio::sync::mpsc::Receiver<BatchCoordinatorCommand>>,
 }
 
 impl InnerBuilder {
@@ -149,7 +150,7 @@ impl InnerBuilder {
         verifier: ValidatorVerifier,
         backend: SecureBackend,
         quorum_store_storage_path: PathBuf,
-        num_network_workers_for_fragment: usize,
+        num_workers_for_fragment: usize,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
@@ -165,6 +166,20 @@ impl InnerBuilder {
         let (batch_reader_cmd_tx, batch_reader_cmd_rx) =
             tokio::sync::mpsc::channel(config.channel_size);
         let (back_pressure_tx, back_pressure_rx) = tokio::sync::mpsc::channel(config.channel_size);
+        let (quorum_store_msg_tx, quorum_store_msg_rx) =
+            aptos_channel::new::<AccountAddress, VerifiedEvent>(
+                QueueStyle::FIFO,
+                config.channel_size,
+                None,
+            );
+        let mut remote_batch_coordinator_cmd_tx = Vec::new();
+        let mut remote_batch_coordinator_cmd_rx = Vec::new();
+        for _ in 0..num_workers_for_fragment {
+            let (batch_coordinator_cmd_tx, batch_coordinator_cmd_rx) =
+                tokio::sync::mpsc::channel(config.channel_size);
+            remote_batch_coordinator_cmd_tx.push(batch_coordinator_cmd_tx);
+            remote_batch_coordinator_cmd_rx.push(batch_coordinator_cmd_rx);
+        }
 
         Self {
             epoch,
@@ -194,10 +209,11 @@ impl InnerBuilder {
             back_pressure_tx,
             back_pressure_rx: Some(back_pressure_rx),
             quorum_store_storage_path,
-            num_network_workers_for_fragment,
             quorum_store_storage: None,
-            quorum_store_msg_tx_vec: Vec::new(),
-            quorum_store_msg_rx_vec: Vec::new(),
+            quorum_store_msg_tx,
+            quorum_store_msg_rx: Some(quorum_store_msg_rx),
+            remote_batch_coordinator_cmd_tx,
+            remote_batch_coordinator_cmd_rx,
         }
     }
 
@@ -212,20 +228,6 @@ impl InnerBuilder {
             .map(|v| v.value)
             .expect("Unable to get private key");
         let signer = ValidatorSigner::new(self.author, private_key);
-
-        // TODO: probably don't need to clear?
-        self.quorum_store_msg_tx_vec.clear();
-        self.quorum_store_msg_rx_vec.clear();
-        for _ in 0..self.num_network_workers_for_fragment + 2 {
-            let (quorum_store_msg_tx, quorum_store_msg_rx) =
-                aptos_channel::new::<AccountAddress, VerifiedEvent>(
-                    QueueStyle::FIFO,
-                    self.config.channel_size,
-                    None,
-                );
-            self.quorum_store_msg_tx_vec.push(quorum_store_msg_tx);
-            self.quorum_store_msg_rx_vec.push(quorum_store_msg_rx);
-        }
 
         let latest_ledger_info_with_sigs = self
             .aptos_db
@@ -292,10 +294,11 @@ impl InnerBuilder {
             self.author,
             self.batch_generator_cmd_tx.clone(),
             self.batch_coordinator_cmd_tx.clone(),
+            self.remote_batch_coordinator_cmd_tx.clone(),
             self.proof_coordinator_cmd_tx.clone(),
             self.proof_manager_cmd_tx.clone(),
             self.batch_store_cmd_tx.clone(),
-            self.quorum_store_msg_tx_vec.clone(),
+            self.quorum_store_msg_tx.clone(),
         );
         spawn_named!(
             "quorum_store_coordinator",
@@ -325,6 +328,7 @@ impl InnerBuilder {
         )
         .unwrap();
 
+        // TODO: vector of batch_coordinator_cmd_tx/rx
         let batch_coordinator_cmd_rx = self.batch_coordinator_cmd_rx.take().unwrap();
         let batch_coordinator = BatchCoordinator::new(
             self.epoch,
@@ -336,6 +340,20 @@ impl InnerBuilder {
             self.config.max_batch_bytes,
         );
         spawn_named!("batch_coordinator", batch_coordinator.start()).unwrap();
+
+        for remote_batch_coordinator_cmd_rx in self.remote_batch_coordinator_cmd_rx {
+            let batch_coordinator = BatchCoordinator::new(
+                self.epoch,
+                self.author,
+                self.network_sender.clone(),
+                remote_batch_coordinator_cmd_rx,
+                self.batch_store_cmd_tx.clone(),
+                self.proof_coordinator_cmd_tx.clone(),
+                self.config.max_batch_bytes,
+            );
+            // TODO: format #x
+            spawn_named!("batch_coordinator", batch_coordinator.start()).unwrap();
+        }
 
         let proof_coordinator_cmd_rx = self.proof_coordinator_cmd_rx.take().unwrap();
         let proof_coordinator = ProofCoordinator::new(self.config.proof_timeout_ms, self.author);
@@ -378,18 +396,15 @@ impl InnerBuilder {
             .unwrap();
         }
 
-        let mut i = 0;
-        for network_msg_rx in self.quorum_store_msg_rx_vec.into_iter() {
-            let net = NetworkListener::new(
-                network_msg_rx,
-                self.batch_reader_cmd_tx.clone(),
-                self.proof_coordinator_cmd_tx.clone(),
-                self.batch_coordinator_cmd_tx.clone(),
-                self.proof_manager_cmd_tx.clone(),
-            );
-            i += 1;
-            spawn_named!(&format!("network_listener-{}", i), net.start()).unwrap();
-        }
+        let network_msg_rx = self.quorum_store_msg_rx.take().unwrap();
+        let net = NetworkListener::new(
+            network_msg_rx,
+            self.batch_reader_cmd_tx.clone(),
+            self.proof_coordinator_cmd_tx.clone(),
+            self.remote_batch_coordinator_cmd_tx.clone(),
+            self.proof_manager_cmd_tx.clone(),
+        );
+        spawn_named!("network_listener", net.start()).unwrap();
 
         self.coordinator_tx
     }
@@ -398,7 +413,7 @@ impl InnerBuilder {
         &mut self,
     ) -> (
         Arc<PayloadManager>,
-        Vec<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
         self.quorum_store_storage = Some(Arc::new(QuorumStoreDB::new(
             self.quorum_store_storage_path.clone(),
@@ -412,7 +427,7 @@ impl InnerBuilder {
                 // TODO: remove after splitting out clean requests
                 Mutex::new(self.coordinator_tx.clone()),
             )),
-            self.quorum_store_msg_tx_vec.clone(),
+            Some(self.quorum_store_msg_tx.clone()),
         )
     }
 
