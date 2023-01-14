@@ -86,10 +86,10 @@ A <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0
 Functions <code><a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> and <code><a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>
 assume a 32-byte little-endian encoding of a <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>.
 
-An <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> is an element in <code>G1</code>.
+An <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> represents an element in group <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code>.
 
 Functions <code><a href="groups.md#0x1_groups_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> and <code><a href="groups.md#0x1_groups_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>
-assume a 96-byte encoding <code>[b_0, ..., b_95]</code> of an <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>, with the following rules.
+assume a 96-byte encoding <code>[b_0, ..., b_95]</code> for <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>, with the following rules.
 - <code>b_95 & 0x40</code> is the infinity flag.
 - The infinity flag is 1 if and only if the element is the point at infinity.
 - The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq)</code>, with the following rules.
@@ -143,7 +143,7 @@ A <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0
 Functions <code><a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> and <code><a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>
 assume a 32-byte little-endian encoding of a <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>.
 
-An <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> is an element in <code>G2</code>.
+An <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> is an element in group <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code>.
 
 Functions <code><a href="groups.md#0x1_groups_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> and <code><a href="groups.md#0x1_groups_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>
 assume a 192-byte encoding <code>[b_0, ..., b_191]</code> of an <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>, with the following rules.
@@ -209,7 +209,7 @@ A <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0
 Functions <code><a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> and <code><a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>
 assume a 32-byte little-endian encoding of a <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>.
 
-An <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> is an element in <code>Gt</code>.
+An <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> is an element in group <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code>.
 
 Functions <code><a href="groups.md#0x1_groups_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> and <code><a href="groups.md#0x1_groups_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>,
 as well as <code>serialize_element_ompressed&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> and <code><a href="groups.md#0x1_groups_deserialize_element_compressed">deserialize_element_compressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>,

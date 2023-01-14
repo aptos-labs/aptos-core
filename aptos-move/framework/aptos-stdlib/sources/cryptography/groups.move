@@ -17,10 +17,10 @@ module aptos_std::groups {
     /// Functions `deserialize_scalar<BLS12_381_G1>` and `serialize_scalar<BLS12_381_G1>`
     /// assume a 32-byte little-endian encoding of a `Scalar<BLS12_381_G1>`.
     ///
-    /// An `Element<BLS12_381_G1>` is an element in `G1`.
+    /// An `Element<BLS12_381_G1>` represents an element in group `BLS12_381_G1`.
     ///
     /// Functions `serialize_element_uncompressed<BLS12_381_G1>` and `deserialize_element_uncompressed<BLS12_381_G1>`
-    /// assume a 96-byte encoding `[b_0, ..., b_95]` of an `Element<BLS12_381_G1>`, with the following rules.
+    /// assume a 96-byte encoding `[b_0, ..., b_95]` for `Element<BLS12_381_G1>`, with the following rules.
     /// - `b_95 & 0x40` is the infinity flag.
     /// - The infinity flag is 1 if and only if the element is the point at infinity.
     /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq)`, with the following rules.
@@ -49,7 +49,7 @@ module aptos_std::groups {
     /// Functions `deserialize_scalar<BLS12_381_G2>` and `serialize_scalar<BLS12_381_G2>`
     /// assume a 32-byte little-endian encoding of a `Scalar<BLS12_381_G2>`.
     ///
-    /// An `Element<BLS12_381_G2>` is an element in `G2`.
+    /// An `Element<BLS12_381_G2>` is an element in group `BLS12_381_G2`.
     ///
     /// Functions `serialize_element_uncompressed<BLS12_381_G2>` and `deserialize_element_uncompressed<BLS12_381_G2>`
     /// assume a 192-byte encoding `[b_0, ..., b_191]` of an `Element<BLS12_381_G2>`, with the following rules.
@@ -90,7 +90,7 @@ module aptos_std::groups {
     /// Functions `deserialize_scalar<BLS12_381_Gt>` and `serialize_scalar<BLS12_381_Gt>`
     /// assume a 32-byte little-endian encoding of a `Scalar<BLS12_381_Gt>`.
     ///
-    /// An `Element<BLS12_381_Gt>` is an element in `Gt`.
+    /// An `Element<BLS12_381_Gt>` is an element in group `BLS12_381_Gt`.
     ///
     /// Functions `serialize_element_uncompressed<BLS12_381_Gt>` and `deserialize_element_uncompressed<BLS12_381_Gt>`,
     /// as well as `serialize_element_ompressed<BLS12_381_Gt>` and `deserialize_element_compressed<BLS12_381_Gt>`,
