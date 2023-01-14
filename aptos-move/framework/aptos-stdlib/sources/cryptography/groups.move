@@ -7,9 +7,11 @@ module aptos_std::groups {
     const E_UNKNOWN_PAIRING: u64 = 3;
 
     /// `BLS12_381_G1` represents a group used in BLS12-381 pairing.
-    /// The group is a prime-order subgroup on the elliptic curve `y^2=x^3+4` defined over `Fq`.
     /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
-    /// The order of the subgroup `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// `E(Fq)` is an elliptic curve `y^2=x^3+4` defined over `Fq`.
+    /// `BLS12_381_G1` is constructed by a subset of the points on `E(Fq)` and the point at infinity, under point addition. (A subgroup of prime order on `E(Fq)`.)
+    /// The prime order `r` of `BLS12_381_G1` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// The identity of `BLS12_381_G1` is the point at infinity.
     /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
     ///
     /// A `Scalar<BLS12_381_G1>` is an integer between 0 and `r-1`.
@@ -38,10 +40,12 @@ module aptos_std::groups {
     struct BLS12_381_G1 {}
 
     /// `BLS12_381_G2` represents a group used in BLS12-381 pairing.
-    /// The group is a prime-order subgroup on an elliptic curve `y^2=x^3+4(u+1)` defined over `Fq2`.
-    /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
     /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
-    /// The order of the subgroup `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
+    /// `E(Fq2)` is an elliptic curve `y^2=x^3+4(u+1)` defined over `Fq2`.
+    /// `BLS12_381_G2` is constructed by a subset of the points on `E(Fq2)` and the point at infinity, under point addition. (A subgroup of prime order on `E(Fq2)`.)
+    /// The prime order `r` of `BLS12_381_G2` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001, same as `BLS12_381_G1`.
+    /// The identity of `BLS12_381_G2` is the point at infinity.
     /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
     ///
     /// A `Scalar<BLS12_381_G2>` is an integer between 0 and `r-1`.
@@ -77,12 +81,13 @@ module aptos_std::groups {
     struct BLS12_381_G2 {}
 
     /// `BLS12_381_Gt` represents the target group of the pairing defined over the BLS12-381 curves.
-    /// The group is a group of the same prime order r as `BLS12_381_G1` and `BLS12_381_G2`, specifically a multiplicative subgroup of `Fq12`.
-    /// `Fq12` is an extension field of `Fq6`, constructed as `Fq12=Fq6[w]/(w^2-v)`.
-    /// `Fq6` is an extension field of `Fq2`, constructed as `Fq6=Fq2[v]/(v^2-u-1)`.
-    /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
     /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
-    /// The order of the group `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
+    /// `Fq6` is an extension field of `Fq2`, constructed as `Fq6=Fq2[v]/(v^2-u-1)`.
+    /// `Fq12` is an extension field of `Fq6`, constructed as `Fq12=Fq6[w]/(w^2-v)`.
+    /// `BLS12_381_Gt` is a multiplicative subgroup of `Fq12`.
+    /// The order `r` of `BLS12_381_Gt` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001. (Same as `BLS12_381_G1` and `BLS12_381_G2`.)
+    /// The identity of `BLS12_381_G2` is 1.
     /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
     ///
     /// A `Scalar<BLS12_381_G2>` is an integer between 0 and `r-1`.

@@ -76,9 +76,11 @@
 ## Struct `BLS12_381_G1`
 
 <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code> represents a group used in BLS12-381 pairing.
-The group is a prime-order subgroup on the elliptic curve <code>y^2=x^3+4</code> defined over <code>Fq</code>.
 <code>Fq</code> is a finite field with <code>q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab</code>.
-The order of the subgroup <code>r</code> is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+<code>E(Fq)</code> is an elliptic curve <code>y^2=x^3+4</code> defined over <code>Fq</code>.
+<code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code> is constructed by a subset of the points on <code>E(Fq)</code> and the point at infinity, under point addition. (A subgroup of prime order on <code>E(Fq)</code>.)
+The prime order <code>r</code> of <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code> is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+The identity of <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code> is the point at infinity.
 There exists a bilinear mapping from <code>(<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>, <a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>)</code> to <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code>.
 
 A <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> is an integer between 0 and <code>r-1</code>.
@@ -132,10 +134,12 @@ assume a 48-byte encoding <code>[b_0, ..., b_47]</code> of an <code><a href="gro
 ## Struct `BLS12_381_G2`
 
 <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code> represents a group used in BLS12-381 pairing.
-The group is a prime-order subgroup on an elliptic curve <code>y^2=x^3+4(u+1)</code> defined over <code>Fq2</code>.
-<code>Fq2</code> is an extension field of <code>Fq</code>, constructed as <code>Fq2=Fq[u]/(u^2+1)</code>.
 <code>Fq</code> is a finite field with <code>q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab</code>.
-The order of the subgroup <code>r</code> is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+<code>Fq2</code> is an extension field of <code>Fq</code>, constructed as <code>Fq2=Fq[u]/(u^2+1)</code>.
+<code>E(Fq2)</code> is an elliptic curve <code>y^2=x^3+4(u+1)</code> defined over <code>Fq2</code>.
+<code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code> is constructed by a subset of the points on <code>E(Fq2)</code> and the point at infinity, under point addition. (A subgroup of prime order on <code>E(Fq2)</code>.)
+The prime order <code>r</code> of <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code> is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001, same as <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code>.
+The identity of <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code> is the point at infinity.
 There exists a bilinear mapping from <code>(<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>, <a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>)</code> to <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code>.
 
 A <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> is an integer between 0 and <code>r-1</code>.
@@ -196,12 +200,13 @@ assume a 96-byte encoding <code>[b_0, ..., b_95]</code> of an <code><a href="gro
 ## Struct `BLS12_381_Gt`
 
 <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code> represents the target group of the pairing defined over the BLS12-381 curves.
-The group is a group of the same prime order r as <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code> and <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code>, specifically a multiplicative subgroup of <code>Fq12</code>.
-<code>Fq12</code> is an extension field of <code>Fq6</code>, constructed as <code>Fq12=Fq6[w]/(w^2-v)</code>.
-<code>Fq6</code> is an extension field of <code>Fq2</code>, constructed as <code>Fq6=Fq2[v]/(v^2-u-1)</code>.
-<code>Fq2</code> is an extension field of <code>Fq</code>, constructed as <code>Fq2=Fq[u]/(u^2+1)</code>.
 <code>Fq</code> is a finite field with <code>q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab</code>.
-The order of the group <code>r</code> is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+<code>Fq2</code> is an extension field of <code>Fq</code>, constructed as <code>Fq2=Fq[u]/(u^2+1)</code>.
+<code>Fq6</code> is an extension field of <code>Fq2</code>, constructed as <code>Fq6=Fq2[v]/(v^2-u-1)</code>.
+<code>Fq12</code> is an extension field of <code>Fq6</code>, constructed as <code>Fq12=Fq6[w]/(w^2-v)</code>.
+<code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code> is a multiplicative subgroup of <code>Fq12</code>.
+The order <code>r</code> of <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code> is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001. (Same as <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code> and <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code>.)
+The identity of <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code> is 1.
 There exists a bilinear mapping from <code>(<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>, <a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>)</code> to <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code>.
 
 A <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> is an integer between 0 and <code>r-1</code>.
