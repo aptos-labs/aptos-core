@@ -165,9 +165,19 @@ const config = {
                 docId: "guides/move-guides/move-structure",
               },
               {
+                label: "How Base Gas Works",
+                type: "doc",
+                docId: "concepts/base-gas",
+              },
+              {
                 label: "Your First Move Module",
                 type: "doc",
                 docId: "tutorials/first-move-module",
+              },
+              {
+                label: "Mint NFT with Aptos CLI",
+                type: "doc",
+                docId: "guides/move-guides/mint-nft-cli",
               },
               {
                 label: "Upgrade Move Code",
