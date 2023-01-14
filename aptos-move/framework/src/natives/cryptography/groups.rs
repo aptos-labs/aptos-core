@@ -27,7 +27,7 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
 use once_cell::sync::Lazy;
-use sha2::{Digest, Sha256};
+use sha2::Digest;
 use crate::natives::cryptography::groups::abort_codes::E_UNKNOWN_GROUP;
 
 pub mod abort_codes {
@@ -121,14 +121,14 @@ pub struct GasParameters {
 }
 
 #[derive(Tid)]
-pub struct ArksContext {
+pub struct EllipticCurvesContext {
     fr_store: Vec<ark_bls12_381::Fr>,
     g1_point_store: Vec<ark_bls12_381::G1Projective>,
     g2_point_store: Vec<ark_bls12_381::G2Projective>,
     gt_point_store: Vec<ark_bls12_381::Fq12>,
 }
 
-impl ArksContext {
+impl EllipticCurvesContext {
     pub fn new() -> Self {
         Self {
             fr_store: vec![],
@@ -195,7 +195,7 @@ fn serialize_element_uncompressed_internal(
             let mut buf = vec![];
             context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g1_point(handle)
                 .into_affine()
                 .serialize_uncompressed(&mut buf)
@@ -209,7 +209,7 @@ fn serialize_element_uncompressed_internal(
             let mut buf = vec![];
             context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g2_point(handle)
                 .into_affine()
                 .serialize_uncompressed(&mut buf)
@@ -223,7 +223,7 @@ fn serialize_element_uncompressed_internal(
             let mut buf = vec![];
             context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_gt_point(handle)
                 .serialize_uncompressed(&mut buf)
                 .unwrap();
@@ -254,7 +254,7 @@ fn serialize_element_compressed_internal(
             let mut buf = vec![];
             context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g1_point(handle)
                 .into_affine()
                 .serialize(&mut buf)
@@ -268,7 +268,7 @@ fn serialize_element_compressed_internal(
             let mut buf = vec![];
             context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g2_point(handle)
                 .into_affine()
                 .serialize(&mut buf)
@@ -282,7 +282,7 @@ fn serialize_element_compressed_internal(
             let mut buf = vec![];
             context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_gt_point(handle)
                 .serialize(&mut buf)
                 .unwrap();
@@ -316,7 +316,7 @@ fn deserialize_element_uncompressed_internal(
                 Ok(point) => {
                     let handle = context
                         .extensions_mut()
-                        .get_mut::<ArksContext>()
+                        .get_mut::<EllipticCurvesContext>()
                         .add_g1_point(point.into_projective());
                     Ok(NativeResult::ok(
                         cost,
@@ -338,7 +338,7 @@ fn deserialize_element_uncompressed_internal(
                 Ok(point) => {
                     let handle = context
                         .extensions_mut()
-                        .get_mut::<ArksContext>()
+                        .get_mut::<EllipticCurvesContext>()
                         .add_g2_point(point.into_projective());
                     Ok(NativeResult::ok(
                         cost,
@@ -367,7 +367,7 @@ fn deserialize_element_uncompressed_internal(
                     if ark_bls12_381::Fq12::one() == point.pow(r) {
                         let handle = context
                             .extensions_mut()
-                            .get_mut::<ArksContext>()
+                            .get_mut::<EllipticCurvesContext>()
                             .add_gt_point(point);
                         Ok(NativeResult::ok(
                             cost,
@@ -412,7 +412,7 @@ fn deserialize_element_compressed_internal(
                 Ok(point) => {
                     let handle = context
                         .extensions_mut()
-                        .get_mut::<ArksContext>()
+                        .get_mut::<EllipticCurvesContext>()
                         .add_g1_point(point.into_projective());
                     Ok(NativeResult::ok(
                         cost,
@@ -434,7 +434,7 @@ fn deserialize_element_compressed_internal(
                 Ok(point) => {
                     let handle = context
                         .extensions_mut()
-                        .get_mut::<ArksContext>()
+                        .get_mut::<EllipticCurvesContext>()
                         .add_g2_point(point.into_projective());
                     Ok(NativeResult::ok(
                         cost,
@@ -463,7 +463,7 @@ fn deserialize_element_compressed_internal(
                     if ark_bls12_381::Fq12::one() == point.pow(r) {
                         let handle = context
                             .extensions_mut()
-                            .get_mut::<ArksContext>()
+                            .get_mut::<EllipticCurvesContext>()
                             .add_gt_point(point);
                         Ok(NativeResult::ok(
                             cost,
@@ -508,7 +508,7 @@ fn deserialize_scalar_internal(
                 Ok(scalar) => {
                     let handle = context
                         .extensions_mut()
-                        .get_mut::<ArksContext>()
+                        .get_mut::<EllipticCurvesContext>()
                         .add_scalar(scalar);
                     Ok(NativeResult::ok(
                         gas_params.bls12_381.fr_deserialize,
@@ -545,7 +545,7 @@ fn serialize_scalar_internal(
             let mut buf = vec![];
             context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(handle)
                 .serialize_uncompressed(&mut buf).unwrap();
             Ok(NativeResult::ok(
@@ -574,7 +574,7 @@ fn scalar_from_u64_internal(
         "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_scalar(ark_bls12_381::Fr::from(value as u128));
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fr_from_u64,
@@ -603,16 +603,16 @@ fn scalar_add_internal(
         "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(handle_1);
             let scalar_2 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(handle_2);
             let result = scalar_1.add(scalar_2);
             let result_handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_scalar(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fr_add,
@@ -641,16 +641,16 @@ fn scalar_mul_internal(
         "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(handle_1);
             let scalar_2 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(handle_2);
             let result = scalar_1.mul(scalar_2);
             let result_handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_scalar(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fr_mul,
@@ -678,12 +678,12 @@ fn scalar_neg_internal(
         "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let result = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(handle)
                 .neg();
             let result_handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_scalar(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fr_neg,
@@ -711,14 +711,14 @@ fn scalar_inv_internal(
         "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let op_result = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(handle)
                 .inverse();
             match op_result {
                 Some(scalar) => {
                     let ret = context
                         .extensions_mut()
-                        .get_mut::<ArksContext>()
+                        .get_mut::<EllipticCurvesContext>()
                         .add_scalar(scalar);
                     Ok(NativeResult::ok(
                         gas_params.bls12_381.fr_inv,
@@ -756,11 +756,11 @@ fn scalar_eq_internal(
         "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
             let scalar_1 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(handle_1);
             let scalar_2 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(handle_2);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fr_eq,
@@ -791,7 +791,7 @@ fn group_identity_internal(
             let point = ark_bls12_381::G1Projective::zero();
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g1_point(point);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g1_proj_infinity,
@@ -802,7 +802,7 @@ fn group_identity_internal(
             let point = ark_bls12_381::G2Projective::zero();
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g2_point(point);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g2_proj_infinity,
@@ -813,7 +813,7 @@ fn group_identity_internal(
             let point = ark_bls12_381::Fq12::one();
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_gt_point(point);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fq12_one,
@@ -853,7 +853,7 @@ fn group_generator_internal(
             let point = ark_bls12_381::G1Projective::prime_subgroup_generator();
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g1_point(point);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g1_proj_generator,
@@ -864,7 +864,7 @@ fn group_generator_internal(
             let point = ark_bls12_381::G2Projective::prime_subgroup_generator();
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g2_point(point);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g2_proj_generator,
@@ -875,7 +875,7 @@ fn group_generator_internal(
             let point = BLS12381_GT_GENERATOR.clone();
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_gt_point(point);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fq12_clone,
@@ -955,7 +955,7 @@ fn random_scalar_internal(
             let r = ark_bls12_381::Fr::rand(&mut test_rng());
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_scalar(r);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
@@ -986,7 +986,7 @@ fn random_element_internal(
             let point = ark_bls12_381::G1Projective::rand(&mut test_rng());
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g1_point(point);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
@@ -997,7 +997,7 @@ fn random_element_internal(
             let point = ark_bls12_381::G2Projective::rand(&mut test_rng());
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g2_point(point);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
@@ -1009,7 +1009,7 @@ fn random_element_internal(
             let point = BLS12381_GT_GENERATOR.clone().pow(k.into_repr());
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_gt_point(point);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
@@ -1041,11 +1041,11 @@ fn element_eq_internal(
         "0x1::groups::BLS12_381_G1" => {
             let point_1 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g1_point(handle_1);
             let point_2 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g1_point(handle_2);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g1_proj_eq,
@@ -1055,11 +1055,11 @@ fn element_eq_internal(
         "0x1::groups::BLS12_381_G2" => {
             let point_1 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g2_point(handle_1);
             let point_2 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g2_point(handle_2);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g2_proj_eq,
@@ -1069,11 +1069,11 @@ fn element_eq_internal(
         "0x1::groups::BLS12_381_Gt" => {
             let point_1 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_gt_point(handle_1);
             let point_2 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_gt_point(handle_2);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fq12_eq * NumArgs::one(),
@@ -1102,16 +1102,16 @@ fn element_add_internal(
         "0x1::groups::BLS12_381_G1" => {
             let point_1 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g1_point(handle_1);
             let point_2 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g1_point(handle_2);
             let result = point_1.add(point_2);
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g1_point(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g1_proj_add * NumArgs::one(),
@@ -1121,16 +1121,16 @@ fn element_add_internal(
         "0x1::groups::BLS12_381_G2" => {
             let point_1 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g2_point(handle_1);
             let point_2 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g2_point(handle_2);
             let result = point_1.add(point_2);
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g2_point(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g2_proj_add * NumArgs::one(),
@@ -1140,16 +1140,16 @@ fn element_add_internal(
         "0x1::groups::BLS12_381_Gt" => {
             let point_1 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_gt_point(handle_1);
             let point_2 = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_gt_point(handle_2);
             let result = point_1.clone() * point_2.clone();
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_gt_point(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fq12_mul * NumArgs::one(),
@@ -1178,16 +1178,16 @@ fn element_mul_scalar_internal(
         "0x1::groups::BLS12_381_G1" => {
             let point = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g1_point(point_handle);
             let scalar = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(scalar_handle);
             let result = point.mul(scalar);
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g1_point(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g1_proj_mul * NumArgs::one(),
@@ -1197,16 +1197,16 @@ fn element_mul_scalar_internal(
         "0x1::groups::BLS12_381_G2" => {
             let point = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g2_point(point_handle);
             let scalar = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(scalar_handle);
             let result = point.mul(scalar);
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g2_point(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g2_proj_mul * NumArgs::one(),
@@ -1216,16 +1216,16 @@ fn element_mul_scalar_internal(
         "0x1::groups::BLS12_381_Gt" => {
             let point = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_gt_point(point_handle);
             let scalar = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_scalar(scalar_handle);
             let result = point.pow(scalar.into_repr().as_ref());
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_gt_point(result);
             Ok(NativeResult::ok(
                 (gas_params.bls12_381.fr_to_repr + gas_params.bls12_381.fq12_pow_fr) * NumArgs::one(),
@@ -1258,13 +1258,13 @@ fn element_multi_scalar_mul_internal(
                 let points = point_handles.iter().map(|&handle|{
                     context
                         .extensions()
-                        .get::<ArksContext>()
+                        .get::<EllipticCurvesContext>()
                         .get_g1_point(handle as usize)
                 });
                 let scalars = scalar_handles.iter().map(|&handle|{
                     context
                         .extensions()
-                        .get::<ArksContext>()
+                        .get::<EllipticCurvesContext>()
                         .get_scalar(handle as usize)
                 });
 
@@ -1275,7 +1275,7 @@ fn element_multi_scalar_mul_internal(
 
                 let handle = context
                     .extensions_mut()
-                    .get_mut::<ArksContext>()
+                    .get_mut::<EllipticCurvesContext>()
                     .add_g1_point(result);
                 Ok(NativeResult::ok(
                     (gas_params.bls12_381.g1_proj_mul + gas_params.bls12_381.g1_proj_add) * NumArgs::from(num_points as u64),
@@ -1286,13 +1286,13 @@ fn element_multi_scalar_mul_internal(
                 let points = point_handles.iter().map(|&handle|{
                     context
                         .extensions()
-                        .get::<ArksContext>()
+                        .get::<EllipticCurvesContext>()
                         .get_g2_point(handle as usize)
                 });
                 let scalars = scalar_handles.iter().map(|&handle|{
                     context
                         .extensions()
-                        .get::<ArksContext>()
+                        .get::<EllipticCurvesContext>()
                         .get_scalar(handle as usize)
                 });
 
@@ -1303,7 +1303,7 @@ fn element_multi_scalar_mul_internal(
 
                 let handle = context
                     .extensions_mut()
-                    .get_mut::<ArksContext>()
+                    .get_mut::<EllipticCurvesContext>()
                     .add_g2_point(result);
                 Ok(NativeResult::ok(
                     (gas_params.bls12_381.g2_proj_mul + gas_params.bls12_381.g2_proj_add) * NumArgs::from(num_points as u64),
@@ -1314,14 +1314,14 @@ fn element_multi_scalar_mul_internal(
                 let elements = point_handles.iter().map(|&handle|{
                     context
                         .extensions()
-                        .get::<ArksContext>()
+                        .get::<EllipticCurvesContext>()
                         .get_gt_point(handle as usize)
                         .clone()
                 });
                 let scalars = scalar_handles.iter().map(|&handle|{
                     context
                         .extensions()
-                        .get::<ArksContext>()
+                        .get::<EllipticCurvesContext>()
                         .get_scalar(handle as usize)
                         .clone()
                 });
@@ -1333,7 +1333,7 @@ fn element_multi_scalar_mul_internal(
 
                 let handle = context
                     .extensions_mut()
-                    .get_mut::<ArksContext>()
+                    .get_mut::<EllipticCurvesContext>()
                     .add_gt_point(result);
                 Ok(NativeResult::ok(
                     (gas_params.bls12_381.fr_to_repr + gas_params.bls12_381.fq12_pow_fr + gas_params.bls12_381.fq12_mul) * NumArgs::from(num_points as u64),
@@ -1364,12 +1364,12 @@ fn element_double_internal(
         "0x1::groups::BLS12_381_G1" => {
             let point = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g1_point(point_handle);
             let result = ark_ec::ProjectiveCurve::double(point);
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g1_point(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g1_proj_double,
@@ -1379,12 +1379,12 @@ fn element_double_internal(
         "0x1::groups::BLS12_381_G2" => {
             let point = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g2_point(point_handle);
             let result = ark_ec::ProjectiveCurve::double(point);
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g2_point(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g2_proj_double,
@@ -1394,12 +1394,12 @@ fn element_double_internal(
         "0x1::groups::BLS12_381_Gt" => {
             let element = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_gt_point(point_handle);
             let result = element.square();
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_gt_point(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fq12_square,
@@ -1427,12 +1427,12 @@ fn element_neg_internal(
         "0x1::groups::BLS12_381_G1" => {
             let point = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g1_point(point_handle);
             let result = point.neg();
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g1_point(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g1_proj_neg,
@@ -1442,12 +1442,12 @@ fn element_neg_internal(
         "0x1::groups::BLS12_381_G2" => {
             let point = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_g2_point(point_handle);
             let result = point.neg();
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_g2_point(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.g2_proj_neg,
@@ -1457,12 +1457,12 @@ fn element_neg_internal(
         "0x1::groups::BLS12_381_Gt" => {
             let point = context
                 .extensions()
-                .get::<ArksContext>()
+                .get::<EllipticCurvesContext>()
                 .get_gt_point(point_handle);
             let result = point.inverse().unwrap();
             let handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_gt_point(result);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.fq12_inv,
@@ -1504,7 +1504,7 @@ fn pairing_product_internal(
                 .map(|&handle| {
                     let element = context
                         .extensions()
-                        .get::<ArksContext>()
+                        .get::<EllipticCurvesContext>()
                         .get_g1_point(handle as usize);
                     ark_ec::prepare_g1::<ark_bls12_381::Bls12_381>(element.into_affine())
                 })
@@ -1514,7 +1514,7 @@ fn pairing_product_internal(
                 .map(|&handle| {
                     let element = context
                         .extensions()
-                        .get::<ArksContext>()
+                        .get::<EllipticCurvesContext>()
                         .get_g2_point(handle as usize);
                     ark_ec::prepare_g2::<ark_bls12_381::Bls12_381>(element.into_affine())
                 })
@@ -1530,7 +1530,7 @@ fn pairing_product_internal(
             let result = ark_bls12_381::Bls12_381::product_of_pairings(z.as_slice());
             let result_handle = context
                 .extensions_mut()
-                .get_mut::<ArksContext>()
+                .get_mut::<EllipticCurvesContext>()
                 .add_gt_point(result);
             Ok(NativeResult::ok(
                 (gas_params.bls12_381.g1_affine_to_prepared + gas_params.bls12_381.g2_affine_to_prepared + gas_params.bls12_381.pairing_product_per_pair) * NumArgs::new(g1_handles.len() as u64) + gas_params.bls12_381.pairing_product_base,
@@ -1549,7 +1549,7 @@ fn hash_to_bls12381_fr(bytes: &[u8]) -> ark_bls12_381::Fr {
     Fr::from_random_bytes(digest.as_slice()).unwrap()
 }
 fn hash_to_element_internal(
-    gas_params: &GasParameters,
+    _gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -1564,21 +1564,21 @@ fn hash_to_element_internal(
             //TODO: replace this naive implementation.
             let x = hash_to_bls12381_fr(bytes.as_slice());
             let point = ark_bls12_381::G1Projective::prime_subgroup_generator().mul(x.into_repr());
-            let handle = context.extensions_mut().get_mut::<ArksContext>().add_g1_point(point);
+            let handle = context.extensions_mut().get_mut::<EllipticCurvesContext>().add_g1_point(point);
             Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::u64(handle as u64)]))
         }
         "0x1::groups::BLS12_381_G2" => {
             //TODO: replace this naive implementation.
             let x = hash_to_bls12381_fr(bytes.as_slice());
             let point = ark_bls12_381::G2Projective::prime_subgroup_generator().mul(x.into_repr());
-            let handle = context.extensions_mut().get_mut::<ArksContext>().add_g2_point(point);
+            let handle = context.extensions_mut().get_mut::<EllipticCurvesContext>().add_g2_point(point);
             Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::u64(handle as u64)]))
         }
         "0x1::groups::BLS12_381_Gt" => {
             //TODO: replace this naive implementation.
             let x = hash_to_bls12381_fr(bytes.as_slice());
             let element = BLS12381_GT_GENERATOR.clone().pow(x.into_repr());
-            let handle = context.extensions_mut().get_mut::<ArksContext>().add_gt_point(element);
+            let handle = context.extensions_mut().get_mut::<EllipticCurvesContext>().add_gt_point(element);
             Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::u64(handle as u64)]))
         }
         _ => {
