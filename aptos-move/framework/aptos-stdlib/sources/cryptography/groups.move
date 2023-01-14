@@ -9,7 +9,7 @@ module aptos_std::groups {
     /// `BLS12_381_G1` represents a group used in BLS12-381 pairing.
     /// The group is a prime-order subgroup on the elliptic curve `y^2=x^3+4` defined over `Fq`.
     /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
-    /// THe order of the subgroup `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// The order of the subgroup `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
     ///
     /// A `Scalar<BLS12_381_G1>` is an integer between 0 and `r-1`.
@@ -41,7 +41,7 @@ module aptos_std::groups {
     /// The group is a prime-order subgroup on an elliptic curve `y^2=x^3+4(u+1)` defined over `Fq2`.
     /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
     /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
-    /// THe order of the subgroup `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
+    /// The order of the subgroup `r` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
     ///
     /// A `Scalar<BLS12_381_G2>` is an integer between 0 and `r-1`.
@@ -76,8 +76,8 @@ module aptos_std::groups {
     ///         - Here `a=(a_0+a_1*u)` is considered greater than `b=(b_0+b_1*u)` if `a_1>b_1 OR (a_1=b_1 AND a_0>b_0)`.
     struct BLS12_381_G2 {}
 
-    /// `BLS12_381_Gt` represents a group used in BLS12-381 pairing.
-    /// The group is a prime-order subgroup on `Fq12`.
+    /// `BLS12_381_Gt` represents the target group of the pairing defined over the BLS12-381 curves.
+    /// The group is a group of the same prime order r as `BLS12_381_G1` and `BLS12_381_G2`, specifically a multiplicative subgroup of `Fq12`.
     /// `Fq12` is an extension field of `Fq6`, constructed as `Fq12=Fq6[w]/(w^2-v)`.
     /// `Fq6` is an extension field of `Fq2`, constructed as `Fq6=Fq2[v]/(v^2-u-1)`.
     /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
