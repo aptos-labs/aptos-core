@@ -131,6 +131,7 @@ const sidebars = {
       collapsed: true,
       items: [
         "guides/move-guides/move-on-aptos",
+        "guides/move-guides/move-structure",
         "concepts/base-gas",
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",

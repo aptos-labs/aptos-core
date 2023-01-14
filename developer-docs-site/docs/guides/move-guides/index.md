@@ -31,6 +31,38 @@ Start here to learn how the Move language works on the Aptos blockchain.
 
 Then review our auto-generated contents for more [Move References](../../reference/move.md).
 
+## Move tools
+
+## Tools
+
+Use these tools to enhance your Move development experience.
+
+### Aptos CLI
+
+The [Aptos command line interface](https://aptos.dev/cli-tools/aptos-cli-tool/) (CLI) helps you test development iteratively, as many of the functions in our SDKs have corresponding commands.
+
+
+### Petra Wallet
+
+Although you may use any wallet developed for Aptos, the documents here reflect Petra Wallet. We recommend [installing](https://aptos.dev/guides/install-petra-wallet-extension) and [using](https://petra.app/docs/petra-intro) it.
+
+
+### Aptos Simulation API
+
+Use the [Aptos Simulation API](https://aptos.dev/concepts/gas-txn-fee/#estimating-the-gas-units-via-simulation) to test your apps, understanding the blockchain is in an ever-changing state. For example, an auction where people are selling, bidding, and buying will return varying results second by second. Gambling apps may generate wildly different results in a short time. So depending upon your application, you should expect some randomness. So guard your users by keeping simulations realistic.
+
+
+### Move Prover
+
+Install the [Move Prover](https://aptos.dev/cli-tools/install-move-prover) dependencies after installing the Aptos CLI If you want to use the Move Prover to validate your Move code.
+
+
+### IDEs for Move
+
+Install the [IDE plugins for the Move language](https://aptos.dev/guides/getting-started#ide-plugins-for-move-language) for even more handy features.
+
+TODO: Consider moving from Getting Started to here and instead link from there.
+
 ## Supporting Move resources
 
 Use these external resources to learn about the core Move programming language.

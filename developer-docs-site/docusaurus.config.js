@@ -160,6 +160,11 @@ const config = {
                 docId: "guides/move-guides/move-on-aptos",
               },
               {
+                label: "Move Structure",
+                type: "doc",
+                docId: "guides/move-guides/move-structure",
+              },
+              {
                 label: "Your First Move Module",
                 type: "doc",
                 docId: "tutorials/first-move-module",

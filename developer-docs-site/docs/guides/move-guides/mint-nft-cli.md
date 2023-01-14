@@ -5,7 +5,7 @@ slug: "mint-nft-cli"
 
 # Mint an NFT with Aptos CLI
 
-This codelab lets you use the Aptos CLI to mint non-fungible tokens (NFTs) in Aptos testnet so you can see how the process works and employ related functions in your code.
+This codelab lets you use the Aptos CLI to mint non-fungible tokens (NFTs) in Aptos so you can see how the process works and employ related functions in your code. Although this codelab assumes use of the testnet network, you could follow the same steps in devnet or even mainnet, assuming you have the necessary funds in your account.
 
 ## Prerequisites
 
@@ -17,96 +17,26 @@ This tutorial assumes you have:
 * the [Aptos CLI](../../cli-tools/aptos-cli-tool/install-aptos-cli.md) (or you can run from [aptos-core](https://github.com/aptos-labs/aptos-core) source via `cargo run`)
 * the `aptos-core` repository checked out: `git clone https://github.com/aptos-labs/aptos-core.git`
 
-## Understand minting
-
-TODO: Consider moving all of this conceptual information to its own page, perhaps a new NFT index. Merge with conceptual information from Workshop #2.
+Then:
 
 * Review the [mint_nft](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) source code and code comments within each subdirectory.
 * Explore the `mint_event_ticket` function defined within each subdirectory.
 
-### NFT types
+## NFT types
 
 The two most common types of NFT are Event ticket / certificates and PFP NFTs.
 
-#### Event tickets and certificates
+### Event tickets and certificates
 
 This kind of NFT has a base token, and every new NFT generated from this base token has the same token data ID and image. They are generally used as certificates, meaning each NFT created from the base token is considered a printing edition of the base token.
 
 You might use this type of NFT for event tickets where each NFT is a ticket and has properties representing expiration date and if the ticket has been used. When you mint the NFT, you may set an expiration time for the event ticket and `is_ticket_used` to `false`. When the ticket is used, you update `is_ticket_used` to `true`.
 
-#### Profile picture (PFP) NFTs
+### Profile picture (PFP) NFTs
 
 A PFP NFT has a unique token data ID and picture for each token. There are generally no printing editions of this NFT. Most NFT collections on NFT marketplaces are of this kind. They are generally proofs of ownership of an art piece.
 
 In this tutorial, we describe how to create and mint event ticket NFTs.
-
-### Accounts
-
-When you are minting an NFT, the NFT is stored under your [account](../../concepts/accounts.md) address. When you submit a transaction, you sign the transaction. Find your account configuration information in `.aptos/config.yaml` relative to where you run `aptos init` (below).
-
-[Resource accounts](../resource-accounts.md) allow the delegation of signing transactions. You create a resource account to grant a signer capability that can be stored in a new resource on the same account and can sign transactions autonomously. The signer capability is protected as no one has access to the private key for the resource account.
-
-### Initialization
-
-The `init_module` of [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move) always gets called and run when the module is published:
-
-```shell
-    fun init_module(resource_account: &signer) {
-        let resource_signer_cap = resource_account::retrieve_resource_account_cap(resource_account, @source_addr);
-        let resource_signer = account::create_signer_with_capability(&resource_signer_cap);
-```
-
-The `mint_nft` function of [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move) gets a collection and creates a token.
-
-With the resulting TokenData ID, the function uses the resource signer of the module to mint the token to the `nft-receiver`.
-
-For example:
-```shell
-    public entry fun mint_nft(receiver: &signer) acquires ModuleData {
-        let receiver_addr = signer::address_of(receiver);
-```
-
-### Signing
-
-The only argument taken by `mint_nft` is `receiver`. Any `entry fun` will take as the first parameter the type `&signer`. In both Move and Aptos, whenever you submit a transaction, the private key you sign the transaction with automatically makes the associated account the first parameter of the signer.
-
-You can go from the signer to an address but normally not the reverse. So when claiming an NFT, both the private keys of the minter and receiver are needed, as shown in the instructions below.
-
-In the `init_module`, the signer is always the account uploading the contract. This gets combined with:
-
-```shell
-        token::create_collection(&resource_signer, collection, description, collection_uri, maximum_supply, mutate_setting);
-
-```
-Where the `&resource_signer` is the first parameter, defined previously as a new address that has all of the attributes of the original account plus signer capability. See:
-
-```shell
-        signer_cap: account::SignerCapability,
-```
-
-The signer capability allows the module to sign autonomously. The [resource account](../resource-accounts.md) prevents anyone from getting the private key and is entirely controlled by the contract.
-
-### Module data
-
-The `ModuleData` is then initialized and *moved* to the resource account, which has the signer capability:
-
-```shell
-        move_to(resource_account, ModuleData {
-```
-
-In the `mint_nft` function, the first step is borrowing the `ModuleData` struct:
-
-```shell
-        let module_data = borrow_global_mut<ModuleData>(@mint_nft);
-```
-
-And then use the reference to the signer capability in the  `ModuleData` struct to create the `resource_signer`:
-
-```shell
-        let resource_signer = account::create_signer_with_capability(&module_data.signer_cap);
-```
-
-In this manner, you can later use the signer capability already stored in module. When you move a module and its structs into an account, they become visible in [Aptos Explorer](https://explorer.aptoslabs.com/) associated with the account.
 
 ## 1. Create a collection and token
 
@@ -226,7 +156,7 @@ This work maps to the demonstration in [create_nft_with_resource_account.move](h
 
 ### Create a resource account
 
-Just as you created a default (typical) account on Aptos testnet, you will now do the same for a resource account to receive the NFT. To create a resource account, once again issue `aptos init` but this time use the `--profile` argument to create a specific account, in this case `nft-receiver`.
+Just as you created a default account on Aptos testnet, you will now create another user account to receive the NFT. To create that account, once again issue `aptos init` but this time use the `--profile` argument to create a specific account, in this case `nft-receiver`.
 
 1. Create an `nft-receiver` account on Aptos testnet by running the following command.
   ```shell
@@ -248,7 +178,7 @@ Just as you created a default (typical) account on Aptos testnet, you will now d
 cd aptos-move/move-examples/mint_nft/2-Using-Resource-Account
 ```
 
-2. Run the following CLI command to publish the module under a resource account, including your `<seed>` and `<default-account-address>`:
+2. Run the following CLI command to publish the module under a resource account, including your `<default-account-address>` and a `<seed>` of your choosing:
 
 ```shell
 aptos move create-resource-account-and-publish-package --seed <seed> --address-name mint_nft --profile default --named-addresses source_addr=<default-account-address>
@@ -259,8 +189,6 @@ Remember, you can find this address in `.aptos/config.yaml`. For example:
 ```shell
 aptos move create-resource-account-and-publish-package --seed 1235 --address-name mint_nft --profile default --named-addresses source_addr=a911e7374107ad434bbc5369289cf5855c3b1a2938a6bfce0776c1d296271cde
 ```
-
-TODO: Find out what the `<seed>` should be for our users. How do they derive it? Make it up? With what syntax or input?
 
 3. As when you ran `aptos move publish` to mint the NFT, again receive output asking you to accept a gas fee for the transaction and enter: `yes`
 
@@ -526,9 +454,7 @@ TODO: Integrate above or remove the original Workshop #1 text below. Ask Chloe f
 
 3. Click **Library** at bottom.
 
-4. See the NFT in your wallet:
-
-  ![Wallet library NFT](../../../static/img/petra-nft-library.png "See the wallet library with NFT")
+4. See the NFT in your wallet.
 
 ## Deploy the NFT contract
 
