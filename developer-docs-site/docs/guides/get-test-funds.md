@@ -6,7 +6,7 @@ For testing purposes, you will want to create an Aptos account and fund it with 
 
 You will need these installed to proceed:
 
-* The wallet of your choice; we use the [Petra Wallet](../../guides/install-petra-wallet.md) Chrome extension.
+* The wallet of your choice; we use the [Petra Wallet](./install-petra-wallet.md) Chrome extension.
 * [Aptos CLI](../cli-tools/aptos-cli-tool/index.md)
 
 ## Create Aptos account
