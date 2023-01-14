@@ -126,6 +126,8 @@ module aptos_framework::account {
     const ERESOURCE_ACCCOUNT_EXISTS: u64 = 15;
     /// An attempt to create a resource account on an account that has a committed transaction
     const EACCOUNT_ALREADY_USED: u64 = 16;
+    // The signer capability is not offered to any address
+    const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 17;
 
     public(friend) native fun create_signer(addr: address): signer;
 
@@ -375,6 +377,19 @@ module aptos_framework::account {
 
         // Update the existing signer capability offer or put in a new signer capability offer for the recipient.
         option::swap_or_fill(&mut account_resource.signer_capability_offer.for, recipient_address);
+    }
+
+    /// Returns true if the account at `account_addr` has a signer capability offer.
+    public fun is_signer_capability_offered(account_addr: address): bool acquires Account {
+        let account_resource = borrow_global<Account>(account_addr);
+        option::is_some(&account_resource.signer_capability_offer.for)
+    }
+
+    /// Returns the address of the account that has a signer capability offer from the account at `account_addr`.
+    public fun get_signer_capability_offer_for(account_addr: address): address acquires Account{
+        let account_resource = borrow_global<Account>(account_addr);
+        assert!(option::is_some(&account_resource.signer_capability_offer.for), error::not_found(ENO_SIGNER_CAPABILITY_OFFERED));
+        *option::borrow(&account_resource.signer_capability_offer.for)
     }
 
     /// Revoke the account owner's signer capability offer for `to_be_revoked_address` (i.e., the address that
