@@ -125,7 +125,7 @@ pub static PROOF_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
 /// Histogram for the number of expired proof-of-store when pulled for consensus.
 pub static EXPIRED_PROOFS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "quorum_store_proof_size_when_pull",
+        "quorum_store_expired_proof_size_when_pull",
         "Histogram for the number of expired proof-of-store when pulled for consensus.",
         // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
     )
