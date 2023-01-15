@@ -215,6 +215,11 @@ spec aptos_framework::coin {
         ensures dst_coin.value == old(dst_coin.value) + source_coin.value;
     }
 
+    spec merge_and_return_zero_coin<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) : Coin<CoinType> {
+        ensures dst_coin.value == old(dst_coin.value) + source_coin.value;
+        ensures source_coin.value == 0;
+    }
+
     /// An account can only be registered once.
     /// Updating `Account.guid_creation_num` will not overflow.
     spec register<CoinType>(account: &signer) {
