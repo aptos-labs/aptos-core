@@ -153,6 +153,8 @@ module aptos_framework::account {
     const EOFFERER_ADDRESS_DOES_NOT_EXIST: u64 = 17;
     /// The specified rotation capablity offer does not exist at the specified offerer address
     const ENO_SUCH_ROTATION_CAPABILITY_OFFER: u64 = 18;
+    // The signer capability is not offered to any address
+    const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 19;
 
     #[test_only]
     /// Create signer for testing, independently of an Aptos-style `Account`.
