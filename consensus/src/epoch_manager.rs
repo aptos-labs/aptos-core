@@ -1,10 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::quorum_store_builder::{
-    DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder,
-};
-use crate::quorum_store::quorum_store_coordinator::CoordinatorCommand;
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -36,6 +32,10 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::QuorumStoreClient,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
+    quorum_store::{
+        quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
+        quorum_store_coordinator::CoordinatorCommand,
+    },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     state_replication::StateComputer,

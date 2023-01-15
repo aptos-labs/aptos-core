@@ -1,9 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::batch_generator::ProofError;
-use crate::quorum_store::proof_manager::ProofManagerCommand;
-use crate::quorum_store::{counters, types::BatchId, utils::DigestTimeouts};
+use crate::quorum_store::{
+    batch_generator::ProofError, counters, proof_manager::ProofManagerCommand, types::BatchId,
+    utils::DigestTimeouts,
+};
 use aptos_consensus_types::proof_of_store::{
     ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
 };
@@ -17,9 +18,11 @@ use std::{
     collections::{BTreeMap, HashMap},
     time::Duration,
 };
-use tokio::sync::mpsc::Sender;
 use tokio::{
-    sync::{mpsc::Receiver, oneshot as TokioOneshot},
+    sync::{
+        mpsc::{Receiver, Sender},
+        oneshot as TokioOneshot,
+    },
     time,
 };
 

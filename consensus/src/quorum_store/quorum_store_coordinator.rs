@@ -1,21 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::batch_coordinator::BatchCoordinatorCommand;
-use crate::quorum_store::batch_generator::BatchGeneratorCommand;
-use crate::quorum_store::batch_store::BatchStoreCommand;
-use crate::quorum_store::proof_coordinator::ProofCoordinatorCommand;
-use crate::quorum_store::proof_manager::ProofManagerCommand;
-use crate::round_manager::VerifiedEvent;
+use crate::{
+    quorum_store::{
+        batch_coordinator::BatchCoordinatorCommand, batch_generator::BatchGeneratorCommand,
+        batch_store::BatchStoreCommand, proof_coordinator::ProofCoordinatorCommand,
+        proof_manager::ProofManagerCommand,
+    },
+    round_manager::VerifiedEvent,
+};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::PeerId;
+use aptos_types::{account_address::AccountAddress, PeerId};
 use futures::StreamExt;
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 
 pub enum CoordinatorCommand {
     CommitNotification(LogicalTime, Vec<HashValue>),

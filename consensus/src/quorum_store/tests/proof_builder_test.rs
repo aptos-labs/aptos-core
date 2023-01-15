@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::batch_generator::ProofError;
 use crate::quorum_store::{
+    batch_generator::ProofError,
     proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
     tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
 };

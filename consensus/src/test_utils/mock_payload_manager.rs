@@ -5,10 +5,10 @@ use crate::{
     error::QuorumStoreError, payload_client::QuorumStoreClient, state_replication::PayloadClient,
 };
 use anyhow::Result;
-use aptos_consensus_types::request_response::BlockProposalCommand;
 use aptos_consensus_types::{
     block::block_test_utils::random_payload,
     common::{Payload, PayloadFilter, Round},
+    request_response::BlockProposalCommand,
 };
 use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},

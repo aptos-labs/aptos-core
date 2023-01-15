@@ -3,10 +3,9 @@
 
 use crate::{error::QuorumStoreError, monitor, state_replication::PayloadClient};
 use anyhow::Result;
-use aptos_consensus_types::request_response::BlockProposalCommand;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, Round},
-    request_response::ConsensusResponse,
+    request_response::{BlockProposalCommand, ConsensusResponse},
 };
 use aptos_logger::prelude::*;
 use fail::fail_point;

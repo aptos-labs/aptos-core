@@ -1,12 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::{NetworkSender, QuorumStoreSender};
-use crate::quorum_store::counters;
-use crate::quorum_store::utils::ProofQueue;
-use aptos_consensus_types::common::{Payload, PayloadFilter, ProofWithData};
-use aptos_consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
-use aptos_consensus_types::request_response::{BlockProposalCommand, ConsensusResponse};
+use crate::{
+    network::{NetworkSender, QuorumStoreSender},
+    quorum_store::{counters, utils::ProofQueue},
+};
+use aptos_consensus_types::{
+    common::{Payload, PayloadFilter, ProofWithData},
+    proof_of_store::{LogicalTime, ProofOfStore},
+    request_response::{BlockProposalCommand, ConsensusResponse},
+};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use futures::StreamExt;
@@ -101,16 +104,18 @@ impl ProofManager {
                     .proofs_for_consensus
                     .clean_local_proofs(LogicalTime::new(self.latest_logical_time.epoch(), round));
 
-                let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
-                    Payload::empty(true)
-                } else {
-                    debug!(
-                        "QS: GetBlockRequest excluded len {}, block len {}",
-                        excluded_proofs.len(),
-                        proof_block.len()
-                    );
-                    Payload::InQuorumStore(ProofWithData::new(proof_block))
-                });
+                let res = ConsensusResponse::GetBlockResponse(
+                    if proof_block.is_empty() {
+                        Payload::empty(true)
+                    } else {
+                        debug!(
+                            "QS: GetBlockRequest excluded len {}, block len {}",
+                            excluded_proofs.len(),
+                            proof_block.len()
+                        );
+                        Payload::InQuorumStore(ProofWithData::new(proof_block))
+                    },
+                );
                 match callback.send(Ok(res)) {
                     Ok(_) => (),
                     Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),

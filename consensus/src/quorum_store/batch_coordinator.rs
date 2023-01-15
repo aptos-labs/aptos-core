@@ -1,18 +1,24 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::{NetworkSender, QuorumStoreSender};
-use crate::quorum_store::batch_aggregator::BatchAggregator;
-use crate::quorum_store::batch_store::{BatchStoreCommand, PersistRequest};
-use crate::quorum_store::counters;
-use crate::quorum_store::proof_coordinator::{ProofCoordinatorCommand, ProofReturnChannel};
-use crate::quorum_store::types::{BatchId, Fragment, SerializedTransaction};
+use crate::{
+    network::{NetworkSender, QuorumStoreSender},
+    quorum_store::{
+        batch_aggregator::BatchAggregator,
+        batch_store::{BatchStoreCommand, PersistRequest},
+        counters,
+        proof_coordinator::{ProofCoordinatorCommand, ProofReturnChannel},
+        types::{BatchId, Fragment, SerializedTransaction},
+    },
+};
 use aptos_consensus_types::proof_of_store::{LogicalTime, SignedDigestInfo};
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
 use std::collections::HashMap;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::oneshot;
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    oneshot,
+};
 
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {

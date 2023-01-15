@@ -1,11 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::batch_coordinator::BatchCoordinatorCommand;
-use crate::quorum_store::proof_manager::ProofManagerCommand;
 use crate::{
     quorum_store::{
-        batch_reader::BatchReaderCommand, counters, proof_coordinator::ProofCoordinatorCommand,
+        batch_coordinator::BatchCoordinatorCommand, batch_reader::BatchReaderCommand, counters,
+        proof_coordinator::ProofCoordinatorCommand, proof_manager::ProofManagerCommand,
     },
     round_manager::VerifiedEvent,
 };

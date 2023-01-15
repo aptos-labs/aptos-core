@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::batch_reader::BatchReader;
-use crate::quorum_store::quorum_store_coordinator::CoordinatorCommand;
+use crate::quorum_store::{
+    batch_reader::BatchReader, quorum_store_coordinator::CoordinatorCommand,
+};
 use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload},

@@ -1,38 +1,39 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::{BlockReader, BlockStore};
-use crate::network::NetworkSender;
-use crate::payload_manager::PayloadManager;
-use crate::quorum_store::batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand};
-use crate::quorum_store::batch_generator::{BatchGenerator, BatchGeneratorCommand};
-use crate::quorum_store::batch_reader::{BatchReader, BatchReaderCommand};
-use crate::quorum_store::batch_store::{BatchStore, BatchStoreCommand};
-use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
-use crate::quorum_store::network_listener::NetworkListener;
-use crate::quorum_store::proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand};
-use crate::quorum_store::proof_manager::{ProofManager, ProofManagerCommand};
-use crate::quorum_store::quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator};
-use crate::quorum_store::quorum_store_db::QuorumStoreDB;
-use crate::round_manager::VerifiedEvent;
-use aptos_channels::aptos_channel;
-use aptos_channels::message_queues::QueueStyle;
+use crate::{
+    block_storage::{BlockReader, BlockStore},
+    network::NetworkSender,
+    payload_manager::PayloadManager,
+    quorum_store::{
+        batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
+        batch_generator::{BatchGenerator, BatchGeneratorCommand},
+        batch_reader::{BatchReader, BatchReaderCommand},
+        batch_store::{BatchStore, BatchStoreCommand},
+        direct_mempool_quorum_store::DirectMempoolQuorumStore,
+        network_listener::NetworkListener,
+        proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
+        proof_manager::{ProofManager, ProofManagerCommand},
+        quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
+        quorum_store_db::QuorumStoreDB,
+    },
+    round_manager::VerifiedEvent,
+};
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{QuorumStoreConfig, SecureBackend};
-use aptos_consensus_types::common::Author;
-use aptos_consensus_types::request_response::BlockProposalCommand;
+use aptos_consensus_types::{common::Author, request_response::BlockProposalCommand};
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_storage_interface::DbReader;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::validator_signer::ValidatorSigner;
-use aptos_types::validator_verifier::ValidatorVerifier;
+use aptos_types::{
+    account_address::AccountAddress, validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier,
+};
 use futures_channel::mpsc::{Receiver, Sender};
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 pub enum QuorumStoreBuilder {
     DirectMempool(DirectMempoolInnerBuilder),

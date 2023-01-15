@@ -1,24 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::BlockReader;
-use crate::quorum_store::batch_coordinator::BatchCoordinatorCommand;
-use crate::quorum_store::counters;
-use crate::quorum_store::quorum_store_db::BatchIdDB;
-use crate::quorum_store::types::BatchId;
-use crate::quorum_store::utils::{BatchBuilder, MempoolProxy, RoundExpirations};
-use aptos_consensus_types::common::{Round, TransactionSummary};
-use aptos_consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
+use crate::{
+    block_storage::BlockReader,
+    quorum_store::{
+        batch_coordinator::BatchCoordinatorCommand,
+        counters,
+        quorum_store_db::BatchIdDB,
+        types::BatchId,
+        utils::{BatchBuilder, MempoolProxy, RoundExpirations},
+    },
+};
+use aptos_consensus_types::{
+    common::{Round, TransactionSummary},
+    proof_of_store::{LogicalTime, ProofOfStore},
+};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use futures::future::BoxFuture;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
-use futures_channel::mpsc::Sender;
-use futures_channel::oneshot;
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use futures::{future::BoxFuture, stream::FuturesUnordered, StreamExt};
+use futures_channel::{mpsc::Sender, oneshot};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::{sync::mpsc::Sender as TokioSender, time::Interval};
 
 type ProofCompletedChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), ProofError>>;

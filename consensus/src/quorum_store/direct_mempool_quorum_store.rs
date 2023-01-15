@@ -3,10 +3,9 @@
 
 use crate::{monitor, quorum_store::counters};
 use anyhow::Result;
-use aptos_consensus_types::request_response::BlockProposalCommand;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, TransactionSummary},
-    request_response::ConsensusResponse,
+    request_response::{BlockProposalCommand, ConsensusResponse},
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
