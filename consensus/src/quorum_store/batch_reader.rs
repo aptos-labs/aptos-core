@@ -367,7 +367,7 @@ impl BatchReader {
                 );
                 self.batch_store_tx
                     .send(BatchStoreCommand::BatchRequest(
-                        proof.digest().clone(),
+                        *proof.digest(),
                         self.my_peer_id,
                         Some(tx),
                     ))
@@ -465,7 +465,7 @@ impl BatchReader {
             }
                         BatchReaderCommand::GetBatchForSelf(proof, ret_tx) => {
                             batch_requester
-                                .add_request(proof.digest().clone(), proof.shuffled_signers(&verifier), ret_tx)
+                                .add_request(*proof.digest(), proof.shuffled_signers(&verifier), ret_tx)
                                 .await;
                         }
                         BatchReaderCommand::BatchResponse(digest, payload) => {

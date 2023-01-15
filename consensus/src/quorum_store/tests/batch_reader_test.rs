@@ -108,14 +108,14 @@ async fn test_extend_expiration_vs_save() {
         }
     });
 
-    for i in 0..num_experiments {
+    for (i, &digest) in digests.iter().enumerate().take(num_experiments) {
         // Set the conditions for experiment (both threads waiting).
         while start_flag.load(Ordering::Acquire) % 3 != 0 {}
 
         if i % 2 == 1 {
             batch_reader
                 .save(
-                    digests[i],
+                    digest,
                     PersistedValue::new(
                         Some(Vec::new()),
                         LogicalTime::new(10, i as u64 + 30),

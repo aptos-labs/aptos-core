@@ -71,6 +71,8 @@ pub(crate) struct BatchStore<T> {
     validator_signer: Arc<ValidatorSigner>,
 }
 
+// TODO: send config to reduce number of arguments?
+#[allow(clippy::too_many_arguments)]
 impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     pub fn new(
         epoch: u64,
@@ -109,8 +111,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             memory_quota,
             db_quota,
         );
-        if let Err(_) = db.delete_batches(expired_keys) {
-            // TODO: do something
+        if let Err(e) = db.delete_batches(expired_keys) {
+            debug!("Error deleting batches: {:?}", e)
         }
         let batch_reader_clone = batch_reader.clone();
         let net = network_sender.clone();
@@ -128,18 +130,6 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 .await
         });
 
-        // _ = spawn_named!(&("Quorum:BatchReader epoch ".to_owned() + &epoch.to_string()), async move {
-        //     metrics_monitor
-        //         .instrument(batch_reader_clone.start(
-        //             batch_reader_rx,
-        //             net,
-        //             batch_request_num_peers,
-        //             batch_request_timeout_ms,
-        //             validator_verifier,
-        //         ))
-        //         .await
-        // });
-
         let batch_reader_clone = batch_reader.clone();
         (
             Self {
@@ -156,7 +146,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
 
     fn store(&self, persist_request: PersistRequest) -> Option<SignedDigest> {
         debug!("QS: store");
-        let expiration = persist_request.value.expiration.clone();
+        let expiration = persist_request.value.expiration;
         // Network listener should filter messages with wrong expiration epoch.
         assert_eq!(
             expiration.epoch(),
@@ -234,8 +224,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     }
                 },
                 BatchStoreCommand::Clean(digests) => {
-                    if let Err(_) = self.db.delete_batches(digests) {
-                        // TODO: do something
+                    if let Err(e) = self.db.delete_batches(digests) {
+                        debug!("Error deleting batches: {:?}", e)
                     }
                 },
                 BatchStoreCommand::BatchRequest(digest, peer_id, maybe_tx) => {

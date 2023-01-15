@@ -55,7 +55,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[derive(StructOpt, Debug)]
 struct Args {
-    #[structopt(long, default_value = "300")]
+    #[structopt(long, default_value = "900")]
     duration_secs: usize,
     #[structopt(flatten)]
     options: Options,
@@ -200,8 +200,8 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    // let duration = Duration::from_secs(args.duration_secs as u64);
-    let duration = Duration::from_secs(15 * 60);
+    let duration = Duration::from_secs(args.duration_secs as u64);
+    // let duration = Duration::from_secs(15 * 60);
     let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
@@ -648,14 +648,22 @@ fn state_sync_slow_processing_catching_up() -> ForgeConfig<'static> {
 }
 
 fn different_node_speed_and_reliability_test() -> ForgeConfig<'static> {
-    changing_working_quorum_test_helper(20, 120, 100, 70, true, false, &ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 6,
-        max_down_nodes: 5,
-        num_large_validators: 3,
-        add_execution_delay: true,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        20,
+        120,
+        100,
+        70,
+        true,
+        false,
+        &ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 6,
+            max_down_nodes: 5,
+            num_large_validators: 3,
+            add_execution_delay: true,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn large_test_only_few_nodes_down() -> ForgeConfig<'static> {
@@ -699,27 +707,43 @@ fn changing_working_quorum_test_high_load() -> ForgeConfig<'static> {
 }
 
 fn changing_working_quorum_test() -> ForgeConfig<'static> {
-    changing_working_quorum_test_helper(20, 120, 100, 70, true, false, &ChangingWorkingQuorumTest {
-        min_tps: 15,
-        always_healthy_nodes: 0,
-        max_down_nodes: 20,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        // Use longer check duration, as we are bringing enough nodes
-        // to require state-sync to catch up to have consensus.
-        check_period_s: 53,
-    })
+    changing_working_quorum_test_helper(
+        20,
+        120,
+        100,
+        70,
+        true,
+        false,
+        &ChangingWorkingQuorumTest {
+            min_tps: 15,
+            always_healthy_nodes: 0,
+            max_down_nodes: 20,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            // Use longer check duration, as we are bringing enough nodes
+            // to require state-sync to catch up to have consensus.
+            check_period_s: 53,
+        },
+    )
 }
 
 fn consensus_stress_test() -> ForgeConfig<'static> {
-    changing_working_quorum_test_helper(10, 60, 100, 80, true, false, &ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 10,
-        max_down_nodes: 0,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        10,
+        60,
+        100,
+        80,
+        true,
+        false,
+        &ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 10,
+            max_down_nodes: 0,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn load_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
@@ -806,13 +830,11 @@ fn account_creation_or_nft_mint(test_name: String, config: ForgeConfig) -> Forge
                 .mode(EmitJobMode::MaxLoad {
                     mempool_backlog: 30000,
                 })
-                .transaction_type(
-                    if test_name == "account_creation" {
-                        TransactionType::AccountGeneration
-                    } else {
-                        TransactionType::NftMintAndTransfer
-                    },
-                ),
+                .transaction_type(if test_name == "account_creation" {
+                    TransactionType::AccountGeneration
+                } else {
+                    TransactionType::NftMintAndTransfer
+                }),
         )
         .with_success_criteria(
             SuccessCriteria::new(4000)
@@ -1079,13 +1101,11 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(
-                if duration.as_secs() > 1200 {
-                    5000
-                } else {
-                    5500
-                },
-            )
+            SuccessCriteria::new(if duration.as_secs() > 1200 {
+                5000
+            } else {
+                5500
+            })
             .add_no_restarts()
             .add_wait_for_catchup_s(
                 // Give at least 60s for catchup, give 10% of the run for longer durations.
@@ -1121,13 +1141,11 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
             &NetworkLossTest,
         ])
         .with_success_criteria(
-            SuccessCriteria::new(
-                if duration > Duration::from_secs(1200) {
-                    100
-                } else {
-                    1000
-                },
-            )
+            SuccessCriteria::new(if duration > Duration::from_secs(1200) {
+                100
+            } else {
+                1000
+            })
             .add_no_restarts()
             .add_system_metrics_threshold(SystemMetricsThreshold::new(
                 // Check that we don't use more than 12 CPU cores for 30% of the time.
@@ -1151,13 +1169,11 @@ fn changing_working_quorum_test_helper(
     let num_large_validators = test.num_large_validators;
     config
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(
-            if test.max_down_nodes == 0 {
-                0
-            } else {
-                std::cmp::max(2, target_tps / 1000)
-            },
-        )
+        .with_initial_fullnode_count(if test.max_down_nodes == 0 {
+            0
+        } else {
+            std::cmp::max(2, target_tps / 1000)
+        })
         .with_network_tests(vec![test])
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration.into();

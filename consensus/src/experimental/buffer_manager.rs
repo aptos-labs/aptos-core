@@ -160,15 +160,14 @@ impl BufferManager {
         duration: Duration,
     ) {
         counters::BUFFER_MANAGER_RETRY_COUNT.inc();
-        if let Err(e) = spawn_named!(&"retry request", async move {
+        spawn_named!("retry request", async move {
             tokio::time::sleep(duration).await;
             sender
                 .send(request)
                 .await
                 .expect("Failed to send retry request");
-        }) {
-            debug!("QS: spawn_named retry request error {:?}", e);
-        }
+        })
+        .unwrap();
     }
 
     /// process incoming ordered blocks

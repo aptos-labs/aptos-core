@@ -31,15 +31,14 @@ fn test_db_for_data() {
     let signed_txns = create_vec_signed_transactions(200);
     let digest_2 = compute_digest_from_signed_transaction(signed_txns.clone());
     let value_2 = PersistedValue::new(Some(signed_txns), LogicalTime::new(1, 20), source, 1000);
-    assert!(db.save_batch(digest_2, value_2.clone()).is_ok());
+    assert!(db.save_batch(digest_2, value_2).is_ok());
 
     let signed_txns = create_vec_signed_transactions(300);
     let digest_3 = compute_digest_from_signed_transaction(signed_txns.clone());
     let value_3 = PersistedValue::new(Some(signed_txns), LogicalTime::new(1, 20), source, 1000);
-    assert!(db.save_batch(digest_3, value_3.clone()).is_ok());
+    assert!(db.save_batch(digest_3, value_3).is_ok());
 
-    let mut batches = Vec::new();
-    batches.push(digest_3);
+    let batches = vec![digest_3];
     assert!(db.delete_batches(batches).is_ok());
     assert_eq!(
         db.get_batch(digest_3).expect("could not read from db"),

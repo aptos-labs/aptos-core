@@ -59,7 +59,7 @@ impl QuorumStoreDB {
     pub(crate) fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>> {
         let mut iter = self.db.iter::<BatchSchema>(ReadOptions::default())?;
         iter.seek_to_first();
-        Ok(iter.collect::<Result<HashMap<HashValue, PersistedValue>>>()?)
+        iter.collect::<Result<HashMap<HashValue, PersistedValue>>>()
     }
 
     pub(crate) fn save_batch(

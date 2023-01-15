@@ -87,7 +87,7 @@ mod tests {
             Box::pin(listener).run().await
         };
 
-        spawn_named!("[Network] Listner Task", listener_task);
+        spawn_named!("[Network] Listener Task", listener_task).unwrap();
         conn_mgr_reqs_rx
     }
 
@@ -158,7 +158,7 @@ mod tests {
             let peers: PeerSet = PeerSet::new();
             write_peer_set(&peers, path.as_ref().as_ref());
         };
-        spawn_named!("[Network] Writer Task", writer_task);
+        spawn_named!("[Network] Writer Task", writer_task).unwrap();
 
         if let Some(ConnectivityRequest::UpdateDiscoveredPeers(
             DiscoverySource::File,

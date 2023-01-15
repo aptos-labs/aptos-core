@@ -37,7 +37,7 @@ impl BatchRequesterState {
 
     fn next_request_peers(&mut self, num_peers: usize) -> Option<Vec<PeerId>> {
         if self.num_retries < self.max_num_retry {
-            self.num_retries = self.num_retries + 1;
+            self.num_retries += 1;
             let ret = self
                 .signers
                 .iter()
@@ -159,8 +159,7 @@ impl<T: QuorumStoreSender> BatchRequester<T> {
             let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
             let serialized_payload: Vec<u8> = payload
                 .iter()
-                .map(|txn| to_bytes(txn).unwrap())
-                .flatten()
+                .flat_map(|txn| to_bytes(txn).unwrap())
                 .collect();
             hasher.update(&serialized_payload);
             if hasher.finish() == digest {

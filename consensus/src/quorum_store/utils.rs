@@ -53,12 +53,12 @@ impl BatchBuilder {
     }
 
     pub(crate) fn append_transaction(&mut self, txn: &SignedTransaction) -> bool {
-        let serialized_txn = SerializedTransaction::from_signed_txn(&txn);
+        let serialized_txn = SerializedTransaction::from_signed_txn(txn);
 
         if self.num_bytes + serialized_txn.len() <= self.max_bytes && self.num_txns < self.max_txns
         {
             self.num_txns += 1;
-            self.num_bytes = self.num_bytes + serialized_txn.len();
+            self.num_bytes += serialized_txn.len();
 
             self.summaries.push(TransactionSummary {
                 sender: txn.sender(),
@@ -88,7 +88,7 @@ impl BatchBuilder {
     pub(crate) fn take_summaries(&mut self) -> Vec<TransactionSummary> {
         assert!(self.data.is_empty());
 
-        self.id = self.id + 1;
+        self.id += 1;
         self.num_bytes = 0;
         self.num_txns = 0;
         mem::take(&mut self.summaries)
@@ -244,7 +244,8 @@ impl ProofQueue {
             },
         }
         if local {
-            self.local_digest_queue.push_back((*proof.digest(), proof.expiration()));
+            self.local_digest_queue
+                .push_back((*proof.digest(), proof.expiration()));
         }
     }
 
@@ -265,20 +266,20 @@ impl ProofQueue {
         let mut num_expired_but_not_committed = 0;
         for (digest, expiration_time) in self.digest_queue.drain(0..num_expired) {
             match self
-                    .digest_proof
-                    .get(&digest)
-                    .expect("Entry for unexpired digest must exist")
-                {
-                    Some(_) => {
-                        // non-committed proof that is expired
-                        num_expired_but_not_committed += 1;
-                        if expiration_time.round() < current_time.round() {
-                            counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
-                                .observe((current_time.round() - expiration_time.round()) as f64);
-                        }
-                    },
-                    None => {}, // Proof was already committed
-                }
+                .digest_proof
+                .get(&digest)
+                .expect("Entry for unexpired digest must exist")
+            {
+                Some(_) => {
+                    // non-committed proof that is expired
+                    num_expired_but_not_committed += 1;
+                    if expiration_time.round() < current_time.round() {
+                        counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
+                            .observe((current_time.round() - expiration_time.round()) as f64);
+                    }
+                },
+                None => {}, // Proof was already committed
+            }
             claims::assert_some!(self.digest_proof.remove(&digest));
         }
 
@@ -294,8 +295,8 @@ impl ProofQueue {
                     .expect("Entry for unexpired digest must exist")
                 {
                     Some(proof) => {
-                        cur_bytes = cur_bytes + proof.info().num_bytes;
-                        cur_txns = cur_txns + proof.info().num_txns;
+                        cur_bytes += proof.info().num_bytes;
+                        cur_txns += proof.info().num_txns;
                         if cur_bytes > max_bytes || cur_txns > max_txns {
                             // Exceeded the limit for requested bytes or number of transactions.
                             break;
@@ -322,10 +323,7 @@ impl ProofQueue {
     }
 
     // returns the number of unexpired local proofs
-    pub(crate) fn clean_local_proofs(
-        &mut self,
-        current_time: LogicalTime,
-    ) -> usize {
+    pub(crate) fn clean_local_proofs(&mut self, current_time: LogicalTime) -> usize {
         let num_expired = self
             .local_digest_queue
             .iter()

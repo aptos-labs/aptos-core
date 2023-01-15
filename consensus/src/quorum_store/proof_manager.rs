@@ -56,7 +56,7 @@ impl ProofManager {
     }
 
     pub(crate) fn handle_remote_proof(&mut self, proof: ProofOfStore) {
-        self.proofs_for_consensus.push(proof.clone(), false);
+        self.proofs_for_consensus.push(proof, false);
     }
 
     pub(crate) fn handle_commit_notification(
@@ -91,14 +91,15 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let proof_block =
-                    self.proofs_for_consensus.pull_proofs(
-                        &excluded_proofs,
-                        LogicalTime::new(self.latest_logical_time.epoch(), round),
-                        max_txns,
-                        max_bytes,
-                    );
-                self.remaining_local_proof_num = self.proofs_for_consensus.clean_local_proofs(LogicalTime::new(self.latest_logical_time.epoch(), round));
+                let proof_block = self.proofs_for_consensus.pull_proofs(
+                    &excluded_proofs,
+                    LogicalTime::new(self.latest_logical_time.epoch(), round),
+                    max_txns,
+                    max_bytes,
+                );
+                self.remaining_local_proof_num = self
+                    .proofs_for_consensus
+                    .clean_local_proofs(LogicalTime::new(self.latest_logical_time.epoch(), round));
 
                 let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
                     Payload::empty(true)
@@ -120,7 +121,7 @@ impl ProofManager {
 
     /// return true when quorum store is back pressured
     pub(crate) fn qs_back_pressure(&self) -> bool {
-        return self.remaining_local_proof_num > self.back_pressure_local_batch_limit;
+        self.remaining_local_proof_num > self.back_pressure_local_batch_limit
     }
 
     pub async fn start(

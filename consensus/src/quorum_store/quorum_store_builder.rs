@@ -340,8 +340,9 @@ impl InnerBuilder {
         );
         spawn_named!("batch_coordinator", batch_coordinator.start()).unwrap();
 
-        let mut i = 0;
-        for remote_batch_coordinator_cmd_rx in self.remote_batch_coordinator_cmd_rx {
+        for (i, remote_batch_coordinator_cmd_rx) in
+            self.remote_batch_coordinator_cmd_rx.into_iter().enumerate()
+        {
             let batch_coordinator = BatchCoordinator::new(
                 self.epoch,
                 self.author,
@@ -356,7 +357,6 @@ impl InnerBuilder {
                 batch_coordinator.start()
             )
             .unwrap();
-            i += 1;
         }
 
         let proof_coordinator_cmd_rx = self.proof_coordinator_cmd_rx.take().unwrap();
@@ -390,7 +390,6 @@ impl InnerBuilder {
 
         let metrics_monitor = tokio_metrics::TaskMonitor::new();
         {
-            let metrics_monitor = metrics_monitor.clone();
             spawn_named!("quorum_store_metrics_monitor", async move {
                 for interval in metrics_monitor.intervals() {
                     println!("QuorumStoreWrapper:{:?}", interval);

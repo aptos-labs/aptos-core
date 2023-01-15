@@ -141,14 +141,16 @@ impl ProofCoordinator {
         }
         let mut ret = Ok(());
         let mut proof_changed_to_completed = false;
-        let digest = signed_digest.digest().clone();
+        let digest = signed_digest.digest();
         let my_id = self.peer_id;
-        self.digest_to_proof.entry(digest).and_modify(|state| {
-            ret = state.add_signature(signed_digest);
-            if ret.is_ok() {
-                proof_changed_to_completed = state.ready(validator_verifier, my_id);
-            }
-        });
+        self.digest_to_proof
+            .entry(signed_digest.digest())
+            .and_modify(|state| {
+                ret = state.add_signature(signed_digest);
+                if ret.is_ok() {
+                    proof_changed_to_completed = state.ready(validator_verifier, my_id);
+                }
+            });
         if proof_changed_to_completed {
             let (proof, batch_id, tx) = self
                 .digest_to_proof

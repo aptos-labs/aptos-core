@@ -18,7 +18,7 @@ use tokio::sync::mpsc::channel;
 async fn test_proof_builder_basic() {
     let (signers, verifier) = random_validator_verifier(4, None, true);
     let arc_signers: Vec<Arc<ValidatorSigner>> =
-        signers.clone().into_iter().map(|s| Arc::new(s)).collect();
+        signers.clone().into_iter().map(Arc::new).collect();
     let proof_builder = ProofCoordinator::new(100, signers[0].author());
     let (proof_builder_tx, proof_builder_rx) = channel(100);
     // TODO: check proof_manager_rx
@@ -37,16 +37,10 @@ async fn test_proof_builder_basic() {
         ))
         .await
         .is_ok());
-    for i in 0..arc_signers.len() {
-        let signed_digest = SignedDigest::new(
-            1,
-            digest,
-            LogicalTime::new(1, 20),
-            1,
-            1,
-            arc_signers[i].clone(),
-        )
-        .unwrap();
+    for arc_signer in &arc_signers {
+        let signed_digest =
+            SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signer.clone())
+                .unwrap();
         assert!(proof_builder_tx
             .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
             .await
@@ -84,16 +78,10 @@ async fn test_proof_builder_basic() {
         ))
         .await
         .is_ok());
-    for i in 0..arc_signers.len() {
-        let signed_digest = SignedDigest::new(
-            1,
-            digest,
-            LogicalTime::new(1, 20),
-            1,
-            1,
-            arc_signers[i].clone(),
-        )
-        .unwrap();
+    for arc_signer in &arc_signers {
+        let signed_digest =
+            SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signer.clone())
+                .unwrap();
         assert!(proof_builder_tx
             .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
             .await
