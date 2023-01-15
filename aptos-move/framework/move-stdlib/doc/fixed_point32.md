@@ -69,7 +69,6 @@ decimal.
 
 <a name="0x1_fixed_point32_MAX_U64"></a>
 
-> TODO: This is a basic constant and should be provided somewhere centrally in the framework.
 
 
 <pre><code><b>const</b> <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>: u128 = 18446744073709551615;
