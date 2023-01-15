@@ -47,9 +47,6 @@ pub struct BatchGenerator {
     batch_expiry_round_gap_when_init: Round,
     end_batch_ms: u128,
     last_end_batch_time: Instant,
-    // temp variable for debug the txn seq number too new issue
-    max_batch_id: u64,
-    last_batch_id: u64,
     block_store: Arc<dyn BlockReader + Send + Sync>, // for consensus back pressure
     qs_back_pressure: bool, // quorum store back pressure, get updated from proof manager when pulling for consensus
 }
@@ -93,8 +90,6 @@ impl BatchGenerator {
             batch_expiry_round_gap_when_init,
             end_batch_ms,
             last_end_batch_time: Instant::now(),
-            max_batch_id: 0,
-            last_batch_id: 0,
             block_store,
             qs_back_pressure: false,
         }
@@ -221,50 +216,17 @@ impl BatchGenerator {
     ) {
         match msg {
             Ok((proof, batch_id)) => {
-                if self.max_batch_id >= batch_id && batch_id > 0 {
-                    debug!(
-                        "QS: batch id out of order: Ok max_batch_id {} batch_id {}",
-                        self.max_batch_id, batch_id
-                    );
-                } else {
-                    self.max_batch_id = batch_id;
-                }
-                if self.last_batch_id + 1 != batch_id && batch_id > 0 {
-                    debug!(
-                        "QS: batch id not sequential: Ok last_batch_id {} batch_id {}",
-                        self.last_batch_id, batch_id
-                    );
-                }
-                self.last_batch_id = batch_id;
-
                 debug!(
                     "QS: received proof of store for batch id {}, digest {}",
                     batch_id,
                     proof.digest(),
                 );
-                // Handle batch_id
 
                 counters::LOCAL_POS_COUNT.inc();
             },
             Err(ProofError::Timeout(batch_id)) => {
                 // Quorum store measurements
                 counters::TIMEOUT_BATCHES_COUNT.inc();
-
-                if self.max_batch_id >= batch_id && batch_id > 0 {
-                    debug!(
-                        "QS: batch id out of order: Timeout max_batch_id {} batch_id {}",
-                        self.max_batch_id, batch_id
-                    );
-                } else {
-                    self.max_batch_id = batch_id;
-                }
-                if self.last_batch_id + 1 != batch_id && batch_id > 0 {
-                    debug!(
-                        "QS: batch id not sequential: Timeout last_batch_id {} batch_id {}",
-                        self.last_batch_id, batch_id
-                    );
-                }
-                self.last_batch_id = batch_id;
 
                 debug!(
                     "QS: received timeout for proof of store, batch id = {}",
@@ -282,11 +244,6 @@ impl BatchGenerator {
         mut back_pressure_rx: tokio::sync::mpsc::Receiver<bool>,
         mut interval: Interval,
     ) {
-        // debug!(
-        //     "[QS worker] QuorumStoreWrapper worker for epoch {} starting",
-        //     self.latest_logical_time.epoch(),
-        // );
-
         let mut proofs_in_progress: FuturesUnordered<BoxFuture<'_, _>> = FuturesUnordered::new();
 
         // this is the flag that records whether there is backpressure during last txn pulling from the mempool
