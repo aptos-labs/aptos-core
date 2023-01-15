@@ -269,7 +269,7 @@ mod test {
     use crate::config::PrunerConfig;
 
     #[test]
-    pub fn tset_default_prune_window() {
+    pub fn test_default_prune_window() {
         // Not that these can't be changed, but think twice -- make them safe for mainnet
 
         let config = PrunerConfig::default();
