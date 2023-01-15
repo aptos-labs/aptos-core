@@ -194,7 +194,7 @@ impl BatchGenerator {
                 .send(BatchCoordinatorCommand::EndBatch(
                     serialized_txns,
                     batch_id,
-                    logical_time.clone(),
+                    logical_time,
                     proof_tx,
                 ))
                 .await

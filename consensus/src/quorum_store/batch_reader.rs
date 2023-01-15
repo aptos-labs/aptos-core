@@ -77,11 +77,11 @@ impl QuotaManager {
 
     pub(crate) fn update_quota(&mut self, num_bytes: usize) -> anyhow::Result<StorageMode> {
         if self.memory_balance + num_bytes <= self.memory_quota {
-            self.memory_balance = self.memory_balance + num_bytes;
-            self.db_balance = self.db_balance + num_bytes;
+            self.memory_balance += num_bytes;
+            self.db_balance += num_bytes;
             Ok(StorageMode::MemoryAndPersisted)
         } else if self.db_balance + num_bytes <= self.db_quota {
-            self.db_balance = self.db_balance + num_bytes;
+            self.db_balance += num_bytes;
             Ok(StorageMode::PersistedOnly)
         } else {
             counters::EXCEEDED_STORAGE_QUOTA_COUNT.inc();
@@ -92,11 +92,11 @@ impl QuotaManager {
     pub(crate) fn free_quota(&mut self, num_bytes: usize, storage_mode: StorageMode) {
         match storage_mode {
             StorageMode::PersistedOnly => {
-                self.db_balance = self.db_balance - num_bytes;
+                self.db_balance -= num_bytes;
             },
             StorageMode::MemoryAndPersisted => {
-                self.memory_balance = self.memory_balance - num_bytes;
-                self.db_balance = self.db_balance - num_bytes;
+                self.memory_balance -= num_bytes;
+                self.db_balance -= num_bytes;
             },
         }
     }
@@ -239,9 +239,10 @@ impl BatchReader {
             }
 
             if value.expiration.round() + self.batch_expiry_round_gap_behind_latest_certified
-                    >= self.last_certified_round()
+                >= self.last_certified_round()
                 && value.expiration.round()
-                    <= self.last_certified_round() + self.batch_expiry_round_gap_beyond_latest_certified
+                    <= self.last_certified_round()
+                        + self.batch_expiry_round_gap_beyond_latest_certified
             {
                 if let Some(entry) = self.db_cache.get(&digest) {
                     if entry.expiration.round() >= value.expiration.round() {
@@ -358,7 +359,7 @@ impl BatchReader {
     ) -> oneshot::Receiver<Result<Vec<SignedTransaction>, Error>> {
         let (tx, rx) = oneshot::channel();
 
-        if let Some(value) = self.db_cache.get(&proof.digest()) {
+        if let Some(value) = self.db_cache.get(proof.digest()) {
             if payload_storage_mode(&value) == StorageMode::PersistedOnly {
                 assert!(
                     value.maybe_payload.is_none(),

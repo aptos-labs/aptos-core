@@ -111,7 +111,7 @@ impl BatchCoordinator {
                     batch_id,
                     self.local_fragment_id,
                     fragment_payload,
-                    Some(expiration.clone()),
+                    Some(expiration),
                     self.my_peer_id,
                 );
 
@@ -152,7 +152,7 @@ impl BatchCoordinator {
         let entry = self
             .remote_batch_aggregators
             .entry(source)
-            .or_insert(BatchAggregator::new(self.max_batch_bytes));
+            .or_insert_with(|| BatchAggregator::new(self.max_batch_bytes));
         if let Some(expiration) = fragment.maybe_expiration() {
             counters::DELIVERED_END_BATCH_COUNT.inc();
             // end batch message
@@ -223,7 +223,7 @@ impl BatchCoordinator {
                     let msg = self.handle_append_to_batch(fragment_payload, batch_id);
                     self.network_sender.broadcast_fragment(msg).await;
 
-                    self.local_fragment_id = self.local_fragment_id + 1;
+                    self.local_fragment_id += 1;
                 },
                 BatchCoordinatorCommand::EndBatch(
                     fragment_payload,

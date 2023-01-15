@@ -48,11 +48,11 @@ impl QuorumStoreSender for MockQuorumStoreSender {
             .expect("could not send");
     }
 
-    async fn broadcast_fragment(&mut self, fragment: Fragment) {
-        todo!()
+    async fn broadcast_fragment(&mut self, _fragment: Fragment) {
+        unimplemented!()
     }
 
-    async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore) {
-        todo!()
+    async fn broadcast_proof_of_store(&mut self, _proof_of_store: ProofOfStore) {
+        unimplemented!()
     }
 }

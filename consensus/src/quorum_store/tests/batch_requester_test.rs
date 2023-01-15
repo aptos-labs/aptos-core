@@ -6,7 +6,7 @@ use crate::{
     quorum_store::{
         batch_requester::BatchRequester,
         tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
-        types::{Batch, BatchRequest},
+        types::BatchRequest,
     },
     test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
 };
