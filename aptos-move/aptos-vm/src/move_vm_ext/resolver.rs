@@ -48,4 +48,21 @@ pub trait MoveResolverExt:
                 })
         })
     }
+
+    fn is_resource_group(&self, struct_tag: &StructTag) -> bool {
+        let metadata = self.get_module_metadata(struct_tag.module_id());
+        metadata
+            .and_then(|metadata| {
+                metadata
+                    .struct_attributes
+                    .get(struct_tag.name.as_ident_str().as_str())
+                    .and_then(|attrs| {
+                        attrs
+                            .iter()
+                            .map(|attr| Some(attr.is_resource_group()))
+                            .next()
+                    })
+            })
+            .is_some()
+    }
 }

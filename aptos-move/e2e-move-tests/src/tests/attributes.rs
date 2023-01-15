@@ -5,7 +5,7 @@ use crate::{assert_success, assert_vm_status, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_package_builder::PackageBuilder;
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_binary_format::CompiledModule;
 use move_core_types::{metadata::Metadata, vm_status::StatusCode};
 use serde::Serialize;
@@ -157,7 +157,7 @@ fn test_bad_view_attribute_in_compiled_module() {
 
 #[test]
 fn verify_resource_group_member_fails_when_not_enabled() {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
     let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
     let source = r#"
         module 0xf00d::M {
@@ -180,7 +180,7 @@ fn verify_resource_group_member_fails_when_not_enabled() {
 
 #[test]
 fn verify_resource_groups_fail_when_not_enabled() {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::RESOURCE_GROUPS]);
     let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
     let source = r#"
         module 0xf00d::M {

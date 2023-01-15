@@ -37,12 +37,15 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{SignedTransaction, Transaction, TransactionWithProof, Version},
 };
-use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned};
+use aptos_vm::{
+    data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned},
+    move_vm_ext::MoveResolverExt,
+};
 use futures::{channel::oneshot, SinkExt};
 use itertools::Itertools;
 use move_core_types::language_storage::{ModuleId, StructTag};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     sync::{Arc, RwLock},
 };
 
@@ -300,7 +303,33 @@ impl Context {
         let kvs = resource_iter
             .by_ref()
             .take(limit as usize)
-            .collect::<Result<_>>()?;
+            .collect::<Result<Vec<(StructTag, Vec<u8>)>>>()?;
+
+        // We should be able to do an unwrap here, otherwise the above db read would fail.
+        let resolver = self.state_view_at_version(version)?.into_move_resolver();
+
+        // Extract resources from resource groups and flatten into all resources
+        let kvs = kvs
+            .into_iter()
+            .map(|(key, value)| {
+                if resolver.is_resource_group(&key) {
+                    // An error here means a storage invariant has been violated
+                    bcs::from_bytes::<BTreeMap<StructTag, Vec<u8>>>(&value)
+                        .map(|map| {
+                            map.into_iter()
+                                .map(|(key, value)| (key, value))
+                                .collect::<Vec<_>>()
+                        })
+                        .map_err(|e| e.into())
+                } else {
+                    Ok(vec![(key, value)])
+                }
+            })
+            .collect::<Result<Vec<Vec<(StructTag, Vec<u8>)>>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
+
         let next_key = resource_iter.next().transpose()?.map(|(struct_tag, _v)| {
             StateKey::AccessPath(AccessPath::new(
                 address,

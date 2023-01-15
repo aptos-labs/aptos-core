@@ -32,6 +32,10 @@ module resource_groups_primary::primary {
         exists<Primary>(account)
     }
 
+    fun init_module(owner: &signer) {
+        move_to(owner, Primary { value: 3 });
+    }
+
     #[test(account = @0x3)]
     fun test_multiple(account: &signer) acquires Primary {
         // Do it once to verify normal flow
