@@ -328,7 +328,6 @@ impl InnerBuilder {
         )
         .unwrap();
 
-        // TODO: vector of batch_coordinator_cmd_tx/rx
         let batch_coordinator_cmd_rx = self.batch_coordinator_cmd_rx.take().unwrap();
         let batch_coordinator = BatchCoordinator::new(
             self.epoch,
@@ -341,6 +340,7 @@ impl InnerBuilder {
         );
         spawn_named!("batch_coordinator", batch_coordinator.start()).unwrap();
 
+        let mut i = 0;
         for remote_batch_coordinator_cmd_rx in self.remote_batch_coordinator_cmd_rx {
             let batch_coordinator = BatchCoordinator::new(
                 self.epoch,
@@ -351,8 +351,12 @@ impl InnerBuilder {
                 self.proof_coordinator_cmd_tx.clone(),
                 self.config.max_batch_bytes,
             );
-            // TODO: format #x
-            spawn_named!("batch_coordinator", batch_coordinator.start()).unwrap();
+            spawn_named!(
+                format!("batch_coordinator-{}", i).as_str(),
+                batch_coordinator.start()
+            )
+            .unwrap();
+            i += 1;
         }
 
         let proof_coordinator_cmd_rx = self.proof_coordinator_cmd_rx.take().unwrap();
