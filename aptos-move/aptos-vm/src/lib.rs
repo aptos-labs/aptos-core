@@ -125,13 +125,8 @@ mod verifier;
 pub use crate::aptos_vm::AptosVM;
 use aptos_state_view::StateView;
 use aptos_types::{
-    access_path::AccessPath,
     transaction::{SignedTransaction, Transaction, TransactionOutput, VMValidatorResult},
     vm_status::VMStatus,
-};
-use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::{ResourceKey, StructTag},
 };
 use std::marker::Sync;
 
@@ -157,10 +152,4 @@ pub trait VMExecutor: Send + Sync {
         transactions: Vec<Transaction>,
         state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
-}
-
-/// Get the AccessPath to a resource stored under `address` with type name `tag`
-fn create_access_path(address: AccountAddress, tag: StructTag) -> AccessPath {
-    let resource_tag = ResourceKey::new(address, tag);
-    AccessPath::resource_access_path(resource_tag)
 }
