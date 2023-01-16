@@ -72,9 +72,8 @@ impl<'t> AccountMinter<'t> {
         total_requested_accounts: usize,
     ) -> Result<Vec<LocalAccount>> {
         let mut accounts = vec![];
-        let expected_num_seed_accounts = (total_requested_accounts / 50)
-            .max(1)
-            .min(CREATION_PARALLELISM);
+        let expected_num_seed_accounts =
+            (total_requested_accounts / 50).clamp(1, CREATION_PARALLELISM);
         let num_accounts = total_requested_accounts - accounts.len(); // Only minting extra accounts
         let coins_per_account = (req.expected_max_txns / total_requested_accounts as u64)
             .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn)

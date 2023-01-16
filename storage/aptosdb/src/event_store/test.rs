@@ -302,9 +302,7 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
     // save events to db
     let batch = SchemaBatch::new();
     new_block_events.iter().for_each(|(ver, event)| {
-        store
-            .put_events(*ver as u64, &[event.clone()], &batch)
-            .unwrap();
+        store.put_events(*ver, &[event.clone()], &batch).unwrap();
     });
     store.db.write_schemas(batch);
 

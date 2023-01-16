@@ -20,7 +20,7 @@ use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
 use std::{collections::VecDeque, sync::Arc};
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 pub struct MovingAverage {
     window_millis: u64,
@@ -84,12 +84,7 @@ pub fn bootstrap(
         return None;
     }
 
-    let runtime = Builder::new_multi_thread()
-        .thread_name("indexer")
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[indexer] failed to create runtime");
+    let runtime = aptos_runtimes::spawn_named_runtime("indexer".into(), None);
 
     let indexer_config = config.indexer.clone();
     let node_config = config.clone();
@@ -180,7 +175,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         starting_version_from_db = starting_version_from_db_short,
         "Setting starting version..."
     );
-    tailer.set_fetcher_version(start_version as u64).await;
+    tailer.set_fetcher_version(start_version).await;
 
     info!(processor_name = processor_name, "Starting fetcher...");
     tailer.transaction_fetcher.lock().await.start().await;
@@ -262,7 +257,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
         versions_processed += num_res;
         if emit_every != 0 {
-            let new_base: u64 = versions_processed / (emit_every as u64);
+            let new_base: u64 = versions_processed / emit_every;
             if base != new_base {
                 base = new_base;
                 info!(

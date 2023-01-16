@@ -161,7 +161,7 @@ async fn check_vote_to_elected(swarm: &mut LocalSwarm) -> (Option<u64>, Option<u
     for (_i, event) in info.blocks.iter().enumerate() {
         let previous_block_votes_bitvec: BitVec =
             event.event.previous_block_votes_bitvec().clone().into();
-        if first_vote.is_none() && previous_block_votes_bitvec.is_set(off_index as u16) {
+        if first_vote.is_none() && previous_block_votes_bitvec.is_set(off_index) {
             first_vote = Some(event.event.round());
         }
 

@@ -531,7 +531,7 @@ pub fn build_not_found<S: Display, E: NotFoundError>(
     ledger_info: &LedgerInfo,
 ) -> E {
     E::not_found_with_code(
-        &format!("{} not found by {}", resource, identifier),
+        format!("{} not found by {}", resource, identifier),
         error_code,
         ledger_info,
     )
@@ -539,7 +539,7 @@ pub fn build_not_found<S: Display, E: NotFoundError>(
 
 pub fn json_api_disabled<S: Display, E: ForbiddenError>(identifier: S) -> E {
     E::forbidden_with_code_no_info(
-        &format!(
+        format!(
             "{} with JSON output is disabled on this endpoint",
             identifier
         ),
@@ -549,7 +549,7 @@ pub fn json_api_disabled<S: Display, E: ForbiddenError>(identifier: S) -> E {
 
 pub fn bcs_api_disabled<S: Display, E: ForbiddenError>(identifier: S) -> E {
     E::forbidden_with_code_no_info(
-        &format!(
+        format!(
             "{} with BCS output is disabled on this endpoint",
             identifier
         ),
@@ -559,7 +559,7 @@ pub fn bcs_api_disabled<S: Display, E: ForbiddenError>(identifier: S) -> E {
 
 pub fn api_disabled<S: Display, E: ForbiddenError>(identifier: S) -> E {
     E::forbidden_with_code_no_info(
-        &format!("{} is disabled on this endpoint", identifier),
+        format!("{} is disabled on this endpoint", identifier),
         AptosErrorCode::ApiDisabled,
     )
 }
@@ -599,7 +599,7 @@ pub fn transaction_not_found_by_hash<E: NotFoundError>(
 
 pub fn version_pruned<E: GoneError>(ledger_version: u64, ledger_info: &LedgerInfo) -> E {
     E::gone_with_code(
-        &format!("Ledger version({}) has been pruned", ledger_version),
+        format!("Ledger version({}) has been pruned", ledger_version),
         AptosErrorCode::VersionPruned,
         ledger_info,
     )
@@ -716,7 +716,7 @@ pub fn block_not_found_by_version<E: NotFoundError>(
 
 pub fn block_pruned_by_height<E: GoneError>(block_height: u64, ledger_info: &LedgerInfo) -> E {
     E::gone_with_code(
-        &format!("Block({}) has been pruned", block_height),
+        format!("Block({}) has been pruned", block_height),
         AptosErrorCode::BlockPruned,
         ledger_info,
     )

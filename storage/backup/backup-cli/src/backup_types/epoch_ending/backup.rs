@@ -103,7 +103,7 @@ impl EpochEndingBackupController {
             }
 
             waypoints.push(Self::get_waypoint(&record_bytes, current_epoch)?);
-            chunk_bytes.extend(&(record_bytes.len() as u32).to_be_bytes());
+            chunk_bytes.extend((record_bytes.len() as u32).to_be_bytes());
             chunk_bytes.extend(&record_bytes);
             current_epoch += 1;
         }

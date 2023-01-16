@@ -23,6 +23,10 @@ pub fn use_release() -> bool {
     option_env!("LOCAL_SWARM_NODE_RELEASE").is_some()
 }
 
+pub fn build_consensus_only_node() -> bool {
+    option_env!("CONSENSUS_ONLY_PERF_TEST").is_some()
+}
+
 pub fn metadata() -> Result<Metadata> {
     let output = Command::new("cargo")
         .arg("metadata")
@@ -104,7 +108,7 @@ fn git_rev_parse<R: AsRef<str>>(metadata: &Metadata, rev: R) -> Result<String> {
 // Determine if the worktree is dirty
 fn git_is_worktree_dirty() -> Result<bool> {
     Command::new("git")
-        .args(&["diff-index", "--name-only", "HEAD", "--"])
+        .args(["diff-index", "--name-only", "HEAD", "--"])
         .output()
         .context("Failed to determine if the worktree is dirty")
         .map(|output| !output.stdout.is_empty())
@@ -154,7 +158,11 @@ pub fn git_merge_base<R: AsRef<str>>(rev: R) -> Result<String> {
 
 pub fn cargo_build_common_args() -> Vec<&'static str> {
     let use_release = use_release();
+    let consensus_only = build_consensus_only_node();
     let mut args = vec!["build", "--features=failpoints,indexer"];
+    if consensus_only {
+        args.push("--features=consensus-only-perf-test");
+    }
     if use_release {
         args.push("--release");
     };
@@ -217,7 +225,7 @@ fn checkout_revision(metadata: &Metadata, revision: &str, to: &Path) -> Result<(
         .arg("--format=tar")
         .arg("--output")
         .arg(&archive_file)
-        .arg(&revision)
+        .arg(revision)
         .output()
         .context("Failed to run git archive")?;
     if !output.status.success() {

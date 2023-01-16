@@ -369,7 +369,7 @@ impl TransactionsApi {
         let signed_transactions_batch = self.get_signed_transactions_batch(&ledger_info, data)?;
         if self.context.max_submit_transaction_batch_size() < signed_transactions_batch.len() {
             return Err(SubmitTransactionError::bad_request_with_code(
-                &format!(
+                format!(
                     "Submitted too many transactions: {}, while limit is {}",
                     signed_transactions_batch.len(),
                     self.context.max_submit_transaction_batch_size(),

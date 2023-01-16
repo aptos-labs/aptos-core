@@ -161,7 +161,7 @@ fn validate_arg<S: MoveResolverExt>(
 ) -> Result<(), VMStatus> {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
-    Ok(match ty {
+    match ty {
         Vector(inner) => {
             // get the vector length and iterate over each element
             let mut len = get_len(cursor)?;
@@ -210,7 +210,9 @@ fn validate_arg<S: MoveResolverExt>(
         | MutableReference(_) | TyParam(_) => {
             unreachable!("Validation is only for arguments with String")
         },
-    })
+    };
+
+    Ok(())
 }
 
 // String is a vector of bytes, so both string and vector carry a length in the serialized format.

@@ -146,7 +146,7 @@ pub fn small_order_pk_with_adversarial_message(
                 let mut h: Sha512 = Sha512::new();
                 h.update(R.compress().as_bytes());
                 h.update(pk_bytes);
-                h.update(&msg_bytes);
+                h.update(msg_bytes);
 
                 let k = Scalar::from_hash(h);
 

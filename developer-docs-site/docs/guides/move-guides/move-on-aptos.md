@@ -137,7 +137,7 @@ In our development of the Aptos Core Framework, we have several examples of wher
 
 * A `Token` cannot be directly inserted into another user's account unless they already have some of that `Token`
 * `TokenTransfers` allows a user to explicitly claim a token stored in another user's resource effectively using an access control list to gain that access
-* In `Coin` a user can directly transfer a `Coint<T>` into another user's account as long as the receiving user has already a `CoinStore<Coin<T>>` resource to store that coin.
+* In `Coin` a user can directly transfer a `Coin<T>` into another user's account as long as the receiving user has already a `CoinStore<Coin<T>>` resource to store that coin.
 
 A less rigorous effort on our `Token` may have allowed users to airdrop tokens directly into another users account, which would add additional storage to their accounts as well as make them owners of content that they did not first approve.
 

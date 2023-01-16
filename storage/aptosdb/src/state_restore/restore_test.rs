@@ -179,7 +179,7 @@ proptest! {
                 (Just(btree), Just(batch1_size), (1..=batch1_size))
             })
     ) {
-        let (db, version) = init_mock_store(&all.clone().into_iter().map(|(_, kv)| kv).collect());
+        let (db, version) = init_mock_store(&all.clone().into_values().collect());
         let tree = JellyfishMerkleTree::new(&db);
         let expected_root_hash = tree.get_root_hash(version).unwrap();
         let batch1: Vec<_> = all.clone().into_iter().take(batch1_size).collect();

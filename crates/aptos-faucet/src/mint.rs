@@ -23,7 +23,7 @@ static MINTER_SCRIPT: &[u8] = include_bytes!("minter.mv");
 
 pub fn mint_routes(
     service: Arc<Service>,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     // POST /?amount=25&address=xxx
     // POST /mint?amount=25&address=xxx
     warp::path::end()

@@ -287,7 +287,12 @@ impl<'a> EpochEndingLedgerInfoIter<'a> {
                 if !li.ledger_info().ends_epoch() {
                     None
                 } else {
-                    ensure!(epoch == self.next_epoch, "Epochs are not consecutive.");
+                    ensure!(
+                        epoch == self.next_epoch,
+                        "Epochs are not consecutive. expecting: {}, got: {}",
+                        self.next_epoch,
+                        epoch,
+                    );
                     self.next_epoch += 1;
                     Some(li)
                 }

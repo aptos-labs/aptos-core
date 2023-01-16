@@ -21,14 +21,8 @@ use aptos_storage_service_server::network::{
 use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
-use tokio::runtime::{Builder, Runtime};
+use std::{collections::HashMap, sync::Arc};
+use tokio::runtime::Runtime;
 
 const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1_024;
 
@@ -176,29 +170,10 @@ fn create_network_runtime(network_config: &NetworkConfig) -> Runtime {
     let network_id = network_config.network_id;
     debug!("Creating runtime for network ID: {}", network_id);
 
-    // Create the runtime builder
-    let mut runtime_builder = Builder::new_multi_thread();
-    runtime_builder
-        .disable_lifo_slot()
-        .thread_name_fn(move || {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!(
-                "network-{}-{}",
-                network_id.as_str().chars().take(3).collect::<String>(),
-                id
-            )
-        })
-        .enable_all();
-    if let Some(runtime_threads) = network_config.runtime_threads {
-        runtime_builder.worker_threads(runtime_threads);
-    }
-
-    // Create and return the runtime
-    runtime_builder.build().unwrap_or_else(|error| {
-        panic!(
-            "Failed to start the network runtime for network id: {:?}. Error: {:?}",
-            network_id, error
-        )
-    })
+    // Create the runtime
+    let thread_name = format!(
+        "network-{}",
+        network_id.as_str().chars().take(3).collect::<String>()
+    );
+    aptos_runtimes::spawn_named_runtime(thread_name, network_config.runtime_threads)
 }

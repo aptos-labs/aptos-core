@@ -121,11 +121,7 @@ impl SuccessCriteriaChecker {
 
         if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
             swarm
-                .ensure_healthy_system_metrics(
-                    start_time as i64,
-                    end_time as i64,
-                    system_metrics_threshold,
-                )
+                .ensure_healthy_system_metrics(start_time, end_time, system_metrics_threshold)
                 .await?;
         }
 
@@ -174,7 +170,7 @@ impl SuccessCriteriaChecker {
             let current_gap = if previous_epooch == block.event.epoch() {
                 block.event.round() - previous_round - 1
             } else {
-                (if is_nil { 0 } else { 1 }) + block.event.failed_proposer_indices().len() as u64
+                u64::from(!is_nil) + block.event.failed_proposer_indices().len() as u64
             };
 
             if is_nil {
@@ -212,7 +208,7 @@ impl SuccessCriteriaChecker {
 
         let max_time_gap_secs = Duration::from_micros(max_time_gap).as_secs_f32();
         if max_round_gap > chain_progress_threshold.max_round_gap
-            || max_time_gap_secs > chain_progress_threshold.max_no_progress_secs as f32
+            || max_time_gap_secs > chain_progress_threshold.max_no_progress_secs
         {
             bail!(
                 "Failed chain progress check. Max round gap was {} [limit {}] at version {}. Max no progress secs was {} [limit {}] at version {}.",

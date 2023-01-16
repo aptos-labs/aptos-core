@@ -60,11 +60,15 @@ const sidebars = {
         "guides/install-petra-wallet",
         {
           type: "category",
-          label: "Download Aptos CLI",
-          link: { type: "doc", id: "cli-tools/aptos-cli-tool/install-aptos-cli" },
+          label: "Install Aptos CLI",
+          link: { type: "doc", id: "cli-tools/aptos-cli-tool/install-cli" },
           collapsible: true,
           collapsed: true,
-          items: ["cli-tools/build-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
+          items: [
+            "cli-tools/aptos-cli-tool/install-aptos-cli",
+            "cli-tools/build-aptos-cli",
+            "cli-tools/aptos-cli-tool/use-aptos-cli",
+          ],
         },
         "cli-tools/install-move-prover",
       ],
@@ -100,7 +104,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Develop by Tutorial",
+      label: "Develop with SDKs",
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,

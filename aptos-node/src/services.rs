@@ -22,7 +22,7 @@ const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 
 /// Bootstraps the API and the indexer. Returns the Mempool client
-/// recevier, and both the api and indexer runtimes.
+/// receiver, and both the api and indexer runtimes.
 pub fn bootstrap_api_and_indexer(
     node_config: &NodeConfig,
     aptos_db: Arc<dyn DbReader>,
@@ -98,11 +98,11 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     // Destruct the mempool network handle.
     // TODO: the bootstrap method should be refactored to avoid using large tuples.
     let mut deconstructed_network_handles = vec![];
-    for appplication_network_handle in mempool_network_handles {
+    for application_network_handle in mempool_network_handles {
         deconstructed_network_handles.push((
-            appplication_network_handle.network_id,
-            appplication_network_handle.network_sender,
-            appplication_network_handle.network_events,
+            application_network_handle.network_id,
+            application_network_handle.network_sender,
+            application_network_handle.network_events,
         ))
     }
 

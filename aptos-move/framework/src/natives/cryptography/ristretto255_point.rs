@@ -49,7 +49,7 @@ impl Display for RistrettoPointHandle {
 
 /// The native RistrettoPoint context extension. This needs to be attached to the NativeContextExtensions
 /// value which is passed into session functions, so its accessible from natives of this extension.
-#[derive(Tid)]
+#[derive(Default, Tid)]
 pub struct NativeRistrettoPointContext {
     point_data: RefCell<PointStore>,
 }

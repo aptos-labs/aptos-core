@@ -120,12 +120,10 @@ mod tests {
 
             // Create batch that reaches max bytes
             let bytes_per_string = 11;
-            let num_strings = (MAX_BYTES + 1) / bytes_per_string
-                + if (MAX_BYTES + 1) % bytes_per_string == 0 {
-                    0
-                } else {
-                    1
-                };
+            let mut num_strings = (MAX_BYTES + 1) / bytes_per_string;
+            if (MAX_BYTES + 1) % bytes_per_string != 0 {
+                num_strings += 1;
+            }
             let to_send: Vec<_> = (0..num_strings).map(|i| format!("{:11}", i)).collect();
             to_send.iter().enumerate().for_each(|(i, s)| {
                 // Large batch should not be allowed

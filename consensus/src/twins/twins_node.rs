@@ -46,7 +46,7 @@ use aptos_types::{
 use futures::{channel::mpsc, StreamExt};
 use maplit::hashmap;
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 /// Auxiliary struct that is preparing SMR for the test
 pub struct SMRNode {
@@ -123,16 +123,8 @@ impl SMRNode {
             })
             .unwrap();
 
-        let runtime = Builder::new_multi_thread()
-            .thread_name(format!(
-                "{}-node-{}",
-                twin_id.id,
-                std::thread::current().name().unwrap_or("")
-            ))
-            .disable_lifo_slot()
-            .enable_all()
-            .build()
-            .unwrap();
+        let thread_name = format!("twin-{}", twin_id.id,);
+        let runtime = aptos_runtimes::spawn_named_runtime(thread_name, None);
 
         let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 

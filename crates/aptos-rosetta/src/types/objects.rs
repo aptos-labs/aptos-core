@@ -197,7 +197,6 @@ impl Operation {
         }
     }
 
-    /// TODO: This is experimental and should not be used outside of testing
     pub fn create_stake_pool(
         operation_index: u64,
         status: Option<OperationStatusType>,
@@ -205,6 +204,7 @@ impl Operation {
         operator: Option<AccountAddress>,
         voter: Option<AccountAddress>,
         staked_balance: Option<u64>,
+        commission_percentage: Option<u64>,
     ) -> Operation {
         Operation::new(
             OperationType::InitializeStakePool,
@@ -216,6 +216,7 @@ impl Operation {
                 operator.map(AccountIdentifier::base_account),
                 voter.map(AccountIdentifier::base_account),
                 staked_balance,
+                commission_percentage,
             )),
         )
     }
@@ -415,6 +416,8 @@ pub struct OperationMetadata {
     pub new_voter: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub staked_balance: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commission_percentage: Option<U64>,
 }
 
 impl OperationMetadata {
@@ -450,11 +453,13 @@ impl OperationMetadata {
         new_operator: Option<AccountIdentifier>,
         new_voter: Option<AccountIdentifier>,
         staked_balance: Option<u64>,
+        commission_percentage: Option<u64>,
     ) -> Self {
         OperationMetadata {
             new_operator,
             new_voter,
             staked_balance: staked_balance.map(U64::from),
+            commission_percentage: commission_percentage.map(U64::from),
             ..Default::default()
         }
     }
@@ -1376,6 +1381,7 @@ impl InternalOperation {
                                     new_operator,
                                     new_voter,
                                     staked_balance,
+                                    commission_percentage,
                                     ..
                                 }),
                                 Some(account),
@@ -1398,7 +1404,9 @@ impl InternalOperation {
                                     operator: operator_address,
                                     voter: voter_address,
                                     amount: staked_balance.map(u64::from).unwrap_or_default(),
-                                    commission_percentage: 0,
+                                    commission_percentage: commission_percentage
+                                        .map(u64::from)
+                                        .unwrap_or_default(),
                                     seed: vec![],
                                 }));
                             }

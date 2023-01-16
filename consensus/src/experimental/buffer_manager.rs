@@ -40,9 +40,8 @@ use tokio::time::{Duration, Instant};
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
 pub const LOOP_INTERVAL_MS: u64 = 1500;
 
-pub type ResetAck = ();
-
-pub fn sync_ack_new() -> ResetAck {}
+#[derive(Debug, Default)]
+pub struct ResetAck {}
 
 pub struct ResetRequest {
     pub tx: oneshot::Sender<ResetAck>,
@@ -332,7 +331,7 @@ impl BufferManager {
 
         self.stop = stop;
         self.reset().await;
-        tx.send(sync_ack_new()).unwrap();
+        tx.send(ResetAck::default()).unwrap();
         info!("Reset finishes");
     }
 

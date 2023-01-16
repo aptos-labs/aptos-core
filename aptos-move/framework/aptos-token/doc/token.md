@@ -90,6 +90,17 @@ Checkout our developer doc on our token standard https://aptos.dev/concepts/coin
 -  [Function `get_tokendata_uri`](#0x3_token_get_tokendata_uri)
 -  [Function `get_tokendata_description`](#0x3_token_get_tokendata_description)
 -  [Function `get_tokendata_royalty`](#0x3_token_get_tokendata_royalty)
+-  [Function `get_tokendata_id`](#0x3_token_get_tokendata_id)
+-  [Function `get_tokendata_mutability_config`](#0x3_token_get_tokendata_mutability_config)
+-  [Function `get_token_mutability_maximum`](#0x3_token_get_token_mutability_maximum)
+-  [Function `get_token_mutability_royalty`](#0x3_token_get_token_mutability_royalty)
+-  [Function `get_token_mutability_uri`](#0x3_token_get_token_mutability_uri)
+-  [Function `get_token_mutability_description`](#0x3_token_get_token_mutability_description)
+-  [Function `get_token_mutability_default_properties`](#0x3_token_get_token_mutability_default_properties)
+-  [Function `get_collection_mutability_config`](#0x3_token_get_collection_mutability_config)
+-  [Function `get_collection_mutability_description`](#0x3_token_get_collection_mutability_description)
+-  [Function `get_collection_mutability_uri`](#0x3_token_get_collection_mutability_uri)
+-  [Function `get_collection_mutability_maximum`](#0x3_token_get_collection_mutability_maximum)
 -  [Function `destroy_token_data`](#0x3_token_destroy_token_data)
 -  [Function `destroy_collection_data`](#0x3_token_destroy_collection_data)
 -  [Function `withdraw_with_event_internal`](#0x3_token_withdraw_with_event_internal)
@@ -3872,6 +3883,291 @@ if property_version > 0, return the property value stored at owner's token store
 
     <b>let</b> token_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(all_token_data, token_data_id);
     token_data.royalty
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_tokendata_id"></a>
+
+## Function `get_tokendata_id`
+
+return the token_data_id from the token_id
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_tokendata_id">get_tokendata_id</a>(token_id: <a href="token.md#0x3_token_TokenId">token::TokenId</a>): <a href="token.md#0x3_token_TokenDataId">token::TokenDataId</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_tokendata_id">get_tokendata_id</a>(token_id: <a href="token.md#0x3_token_TokenId">TokenId</a>): <a href="token.md#0x3_token_TokenDataId">TokenDataId</a> {
+    token_id.token_data_id
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_tokendata_mutability_config"></a>
+
+## Function `get_tokendata_mutability_config`
+
+return the mutation setting of the token
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_tokendata_mutability_config">get_tokendata_mutability_config</a>(token_data_id: <a href="token.md#0x3_token_TokenDataId">token::TokenDataId</a>): <a href="token.md#0x3_token_TokenMutabilityConfig">token::TokenMutabilityConfig</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_tokendata_mutability_config">get_tokendata_mutability_config</a>(token_data_id: <a href="token.md#0x3_token_TokenDataId">TokenDataId</a>): <a href="token.md#0x3_token_TokenMutabilityConfig">TokenMutabilityConfig</a> <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <b>let</b> creator_addr = token_data_id.creator;
+    <b>assert</b>!(<b>exists</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_addr), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ECOLLECTIONS_NOT_PUBLISHED">ECOLLECTIONS_NOT_PUBLISHED</a>));
+    <b>let</b> all_token_data = &<b>borrow_global</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_addr).token_data;
+    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(all_token_data, token_data_id), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ETOKEN_DATA_NOT_PUBLISHED">ETOKEN_DATA_NOT_PUBLISHED</a>));
+    <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(all_token_data, token_data_id).mutability_config
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_token_mutability_maximum"></a>
+
+## Function `get_token_mutability_maximum`
+
+return if the token's maximum is mutable
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_token_mutability_maximum">get_token_mutability_maximum</a>(config: &<a href="token.md#0x3_token_TokenMutabilityConfig">token::TokenMutabilityConfig</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_token_mutability_maximum">get_token_mutability_maximum</a>(config: &<a href="token.md#0x3_token_TokenMutabilityConfig">TokenMutabilityConfig</a>): bool {
+    config.maximum
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_token_mutability_royalty"></a>
+
+## Function `get_token_mutability_royalty`
+
+return if the token royalty is mutable with a token mutability config
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_token_mutability_royalty">get_token_mutability_royalty</a>(config: &<a href="token.md#0x3_token_TokenMutabilityConfig">token::TokenMutabilityConfig</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_token_mutability_royalty">get_token_mutability_royalty</a>(config: &<a href="token.md#0x3_token_TokenMutabilityConfig">TokenMutabilityConfig</a>): bool {
+    config.royalty
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_token_mutability_uri"></a>
+
+## Function `get_token_mutability_uri`
+
+return if the token uri is mutable with a token mutability config
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_token_mutability_uri">get_token_mutability_uri</a>(config: &<a href="token.md#0x3_token_TokenMutabilityConfig">token::TokenMutabilityConfig</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_token_mutability_uri">get_token_mutability_uri</a>(config: &<a href="token.md#0x3_token_TokenMutabilityConfig">TokenMutabilityConfig</a>): bool {
+    config.uri
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_token_mutability_description"></a>
+
+## Function `get_token_mutability_description`
+
+return if the token description is mutable with a token mutability config
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_token_mutability_description">get_token_mutability_description</a>(config: &<a href="token.md#0x3_token_TokenMutabilityConfig">token::TokenMutabilityConfig</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_token_mutability_description">get_token_mutability_description</a>(config: &<a href="token.md#0x3_token_TokenMutabilityConfig">TokenMutabilityConfig</a>): bool {
+    config.description
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_token_mutability_default_properties"></a>
+
+## Function `get_token_mutability_default_properties`
+
+return if the tokendata's default properties is mutable with a token mutability config
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_token_mutability_default_properties">get_token_mutability_default_properties</a>(config: &<a href="token.md#0x3_token_TokenMutabilityConfig">token::TokenMutabilityConfig</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_token_mutability_default_properties">get_token_mutability_default_properties</a>(config: &<a href="token.md#0x3_token_TokenMutabilityConfig">TokenMutabilityConfig</a>): bool {
+    config.properties
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_collection_mutability_config"></a>
+
+## Function `get_collection_mutability_config`
+
+return the collection mutation setting
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_mutability_config">get_collection_mutability_config</a>(creator: <b>address</b>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="token.md#0x3_token_CollectionMutabilityConfig">token::CollectionMutabilityConfig</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_mutability_config">get_collection_mutability_config</a>(
+    creator: <b>address</b>,
+    collection_name: String
+): <a href="token.md#0x3_token_CollectionMutabilityConfig">CollectionMutabilityConfig</a> <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <b>assert</b>!(<b>exists</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ECOLLECTIONS_NOT_PUBLISHED">ECOLLECTIONS_NOT_PUBLISHED</a>));
+    <b>let</b> all_collection_data = &<b>borrow_global</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator).collection_data;
+    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(all_collection_data, collection_name), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ECOLLECTION_NOT_PUBLISHED">ECOLLECTION_NOT_PUBLISHED</a>));
+    <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(all_collection_data, collection_name).mutability_config
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_collection_mutability_description"></a>
+
+## Function `get_collection_mutability_description`
+
+return if the collection description is mutable with a collection mutability config
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_mutability_description">get_collection_mutability_description</a>(config: &<a href="token.md#0x3_token_CollectionMutabilityConfig">token::CollectionMutabilityConfig</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_mutability_description">get_collection_mutability_description</a>(config: &<a href="token.md#0x3_token_CollectionMutabilityConfig">CollectionMutabilityConfig</a>): bool {
+    config.description
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_collection_mutability_uri"></a>
+
+## Function `get_collection_mutability_uri`
+
+return if the collection uri is mutable with a collection mutability config
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_mutability_uri">get_collection_mutability_uri</a>(config: &<a href="token.md#0x3_token_CollectionMutabilityConfig">token::CollectionMutabilityConfig</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_mutability_uri">get_collection_mutability_uri</a>(config: &<a href="token.md#0x3_token_CollectionMutabilityConfig">CollectionMutabilityConfig</a>): bool {
+    config.uri
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_get_collection_mutability_maximum"></a>
+
+## Function `get_collection_mutability_maximum`
+
+return if the collection maximum is mutable with collection mutability config
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_mutability_maximum">get_collection_mutability_maximum</a>(config: &<a href="token.md#0x3_token_CollectionMutabilityConfig">token::CollectionMutabilityConfig</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_get_collection_mutability_maximum">get_collection_mutability_maximum</a>(config: &<a href="token.md#0x3_token_CollectionMutabilityConfig">CollectionMutabilityConfig</a>): bool {
+    config.maximum
 }
 </code></pre>
 

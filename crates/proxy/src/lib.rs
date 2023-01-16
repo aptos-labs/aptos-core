@@ -28,6 +28,7 @@ struct NoProxy {
     domains: DomainMatcher,
 }
 
+#[derive(Default)]
 pub struct Proxy {
     http_proxy: Option<String>,
     https_proxy: Option<String>,

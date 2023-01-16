@@ -401,9 +401,8 @@ impl NodeSetup {
     }
 
     pub fn no_next_ordered(&mut self) {
-        match self.ordered_blocks_events.next().now_or_never() {
-            Some(_) => panic!("Unexpected Ordered Blocks Event"),
-            None => {},
+        if self.ordered_blocks_events.next().now_or_never().is_some() {
+            panic!("Unexpected Ordered Blocks Event");
         }
     }
 
@@ -638,7 +637,7 @@ fn vote_on_successful_proposal() {
         assert_eq!(consensus_state.epoch(), 1);
         assert_eq!(consensus_state.last_voted_round(), 1);
         assert_eq!(consensus_state.preferred_round(), 0);
-        assert_eq!(consensus_state.in_validator_set(), true);
+        assert!(consensus_state.in_validator_set());
     });
 }
 
@@ -698,7 +697,7 @@ fn delay_proposal_processing_in_sync_only() {
         assert_eq!(consensus_state.epoch(), 1);
         assert_eq!(consensus_state.last_voted_round(), 1);
         assert_eq!(consensus_state.preferred_round(), 0);
-        assert_eq!(consensus_state.in_validator_set(), true);
+        assert!(consensus_state.in_validator_set());
     });
 }
 
@@ -1221,9 +1220,9 @@ fn recover_on_restart() {
     assert_eq!(consensus_state.epoch(), 1);
     assert_eq!(consensus_state.last_voted_round(), num_proposals);
     assert_eq!(consensus_state.preferred_round(), 0);
-    assert_eq!(consensus_state.in_validator_set(), true);
+    assert!(consensus_state.in_validator_set());
     for (block, _) in data {
-        assert_eq!(node.block_store.block_exists(block.id()), true);
+        assert!(node.block_store.block_exists(block.id()));
     }
 }
 

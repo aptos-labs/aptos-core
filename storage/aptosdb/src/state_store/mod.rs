@@ -712,7 +712,7 @@ impl StateStore {
             .ledger_db
             .iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
         iter.seek(&begin)?;
-        while let Some(item) = iter.next() {
+        for item in iter {
             let (index, _) = item?;
             if index.stale_since_version > end {
                 break;

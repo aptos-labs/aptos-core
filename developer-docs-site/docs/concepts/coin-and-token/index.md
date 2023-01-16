@@ -12,6 +12,8 @@ The documentation in this section comprises the Aptos Token Standard. See the pa
   * [Aptos Token Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md)
   * [Aptos Framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md) containing `coin`
 
+And review the [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) for common use cases.
+
 For digital assets, Aptos provides two Move modules:
 
 ## [Aptos Coin](./aptos-coin.md)

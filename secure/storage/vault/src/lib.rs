@@ -429,9 +429,9 @@ impl Client {
         version: Option<u32>,
     ) -> Result<Ed25519Signature, Error> {
         let data = if let Some(version) = version {
-            json!({ "input": base64::encode(&data), "key_version": version })
+            json!({ "input": base64::encode(data), "key_version": version })
         } else {
-            json!({ "input": base64::encode(&data) })
+            json!({ "input": base64::encode(data) })
         };
 
         let request = self
@@ -706,7 +706,7 @@ pub fn process_transit_sign_response(resp: Response) -> Result<Ed25519Signature,
             .get(2)
             .ok_or_else(|| Error::SerializationError(signature.into()))?;
         Ok(Ed25519Signature::try_from(
-            base64::decode(&signature)?.as_slice(),
+            base64::decode(signature)?.as_slice(),
         )?)
     } else {
         Err(resp.into())
@@ -778,7 +778,7 @@ impl KeyBackup {
     pub fn new(key: &Ed25519PrivateKey) -> Self {
         let mut key_bytes = key.to_bytes().to_vec();
         let pub_key_bytes = key.public_key().to_bytes();
-        key_bytes.extend(&pub_key_bytes);
+        key_bytes.extend(pub_key_bytes);
 
         let now = chrono::Utc::now();
         let time_as_str = now.to_rfc3339();

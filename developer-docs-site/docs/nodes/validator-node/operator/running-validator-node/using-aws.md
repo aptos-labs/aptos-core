@@ -5,7 +5,15 @@ slug: "run-validator-node-using-aws"
 
 # On AWS
 
-This is a step-by-step guide to install an Aptos node on AWS. Follow these steps to configure a validator node and a validator fullnode on separate machines. 
+This is a step-by-step guide to install an Aptos node on Amazon Web Services (AWS). Follow these steps to configure a validator node and a validator fullnode on separate machines. 
+
+:::caution Did you set up your AWS account?
+This guide assumes that you already have AWS account setup.
+:::
+
+:::danger Do you have stale volumes after bumping your deployment's era?
+`era` is a concept relevant only to Kubernetes deployments of an Aptos node. Changing the `era` provides an easy way to wipe your deployment's state. However, this may lead to dangling persistent volumes on validator fullnodes. Confirm the existence of these volumes with `kubectl get pvc` and delete them manually to minimize costs.
+:::
 
 ## Before you proceed
 

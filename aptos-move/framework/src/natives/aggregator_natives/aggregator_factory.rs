@@ -55,7 +55,7 @@ fn native_new_aggregator(
     hasher.update(&num_aggregators_len.to_be_bytes());
     let hash = hasher.finish().to_vec();
     let key = AggregatorHandle(
-        AccountAddress::from_bytes(&hash)
+        AccountAddress::from_bytes(hash)
             .map_err(|_| extension_error("unable to create aggregator key"))?,
     );
 

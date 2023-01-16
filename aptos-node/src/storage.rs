@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-use aptos_backup_service::start_backup_service;
 use aptos_config::{
     config::{
         NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
@@ -13,11 +12,40 @@ use aptos_config::{
 use aptos_db::AptosDB;
 use aptos_executor::db_bootstrapper::maybe_bootstrap;
 use aptos_logger::{debug, info};
-use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_types::waypoint::Waypoint;
 use aptos_vm::AptosVM;
-use std::{fs, path::Path, sync::Arc, time::Instant};
+use std::{fs, net::SocketAddr, path::Path, sync::Arc, time::Instant};
 use tokio::runtime::Runtime;
+
+#[cfg(not(feature = "consensus-only-perf-test"))]
+pub(crate) fn bootstrap_db(
+    aptos_db: AptosDB,
+    backup_service_address: SocketAddr,
+) -> (Arc<AptosDB>, DbReaderWriter, Option<Runtime>) {
+    use aptos_backup_service::start_backup_service;
+
+    let (aptos_db, db_rw) = DbReaderWriter::wrap(aptos_db);
+    let db_backup_service = start_backup_service(backup_service_address, aptos_db.clone());
+    (aptos_db, db_rw, Some(db_backup_service))
+}
+
+/// In consensus-only mode, return a in-memory based [FakeAptosDB] and
+/// do not run the backup service.
+#[cfg(feature = "consensus-only-perf-test")]
+pub(crate) fn bootstrap_db(
+    aptos_db: AptosDB,
+    _backup_service_address: SocketAddr,
+) -> (
+    Arc<aptos_db::fake_aptosdb::FakeAptosDB>,
+    DbReaderWriter,
+    Option<Runtime>,
+) {
+    use aptos_db::fake_aptosdb::FakeAptosDB;
+
+    let (aptos_db, db_rw) = DbReaderWriter::wrap(FakeAptosDB::new(aptos_db));
+    (aptos_db, db_rw, None)
+}
 
 /// Creates a RocksDb checkpoint for the consensus_db, state_sync_db,
 /// ledger_db and state_merkle_db and saves it to the checkpoint_path.
@@ -67,7 +95,7 @@ fn create_rocksdb_checkpoint_and_change_working_dir(
 /// the various handles.
 pub fn initialize_database_and_checkpoints(
     node_config: &mut NodeConfig,
-) -> anyhow::Result<(Arc<AptosDB>, DbReaderWriter, Runtime, Waypoint)> {
+) -> anyhow::Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>, Waypoint)> {
     // If required, create RocksDB checkpoints and change the working directory.
     // This is test-only.
     if let Some(working_dir) = node_config.base.working_dir.clone() {
@@ -76,24 +104,18 @@ pub fn initialize_database_and_checkpoints(
 
     // Open the database
     let instant = Instant::now();
-    let (aptos_db, db_rw) = DbReaderWriter::wrap(
-        AptosDB::open(
-            &node_config.storage.dir(),
-            false, /* readonly */
-            node_config.storage.storage_pruner_config,
-            node_config.storage.rocksdb_configs,
-            node_config.storage.enable_indexer,
-            node_config.storage.buffered_state_target_items,
-            node_config.storage.max_num_nodes_per_lru_cache_shard,
-        )
-        .map_err(|err| anyhow!("DB failed to open {}", err))?,
-    );
-
-    // Create the backup service
-    let backup_service = start_backup_service(
-        node_config.storage.backup_service_address,
-        Arc::clone(&aptos_db),
-    );
+    let aptos_db = AptosDB::open(
+        &node_config.storage.dir(),
+        false, /* readonly */
+        node_config.storage.storage_pruner_config,
+        node_config.storage.rocksdb_configs,
+        node_config.storage.enable_indexer,
+        node_config.storage.buffered_state_target_items,
+        node_config.storage.max_num_nodes_per_lru_cache_shard,
+    )
+    .map_err(|err| anyhow!("DB failed to open {}", err))?;
+    let (aptos_db, db_rw, backup_service) =
+        bootstrap_db(aptos_db, node_config.storage.backup_service_address);
 
     // TODO: handle non-genesis waypoints for state sync!
     // If there's a genesis txn and waypoint, commit it if the result matches.

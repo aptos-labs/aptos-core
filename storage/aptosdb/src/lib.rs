@@ -9,6 +9,8 @@
 //! It relays read/write operations on the physical storage via [`schemadb`] to the underlying
 //! Key-Value storage system, and implements aptos data structures on top of it.
 
+#[cfg(feature = "consensus-only-perf-test")]
+pub mod fake_aptosdb;
 // Used in this and other crates for testing.
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helper;
@@ -1632,6 +1634,16 @@ impl DbWriter for AptosDB {
                     new_root_hash,
                     expected_root_hash,
                 );
+                let current_epoch = self
+                    .ledger_store
+                    .get_latest_ledger_info_option()
+                    .map_or(0, |li| li.ledger_info().next_block_epoch());
+                ensure!(
+                    x.ledger_info().epoch() == current_epoch,
+                    "Gap in epoch history. Trying to put in LedgerInfo in epoch: {}, current epoch: {}",
+                    x.ledger_info().epoch(),
+                    current_epoch,
+                );
 
                 self.ledger_store.put_ledger_info(x, &batch)?;
             }
@@ -1886,7 +1898,7 @@ impl GetRestoreHandler for Arc<AptosDB> {
     }
 }
 
-fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
+pub(crate) fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
 where
     F: FnOnce() -> Result<T>,
 {

@@ -1422,11 +1422,7 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
             println!("No data found for given input");
             return Ok(());
         }
-        let total_stats = stats
-            .iter()
-            .map(|(_k, v)| v.clone())
-            .reduce(|a, b| a + b)
-            .unwrap();
+        let total_stats = stats.values().cloned().reduce(|a, b| a + b).unwrap();
         if print_detailed {
             println!(
                 "Detailed table for all epochs [{}, {}]:",

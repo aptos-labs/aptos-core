@@ -41,7 +41,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 type MempoolNetworkHandle = (
     NetworkId,
@@ -581,12 +581,7 @@ fn start_node_mempool(
             on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
         })
         .unwrap();
-    let runtime = Builder::new_multi_thread()
-        .thread_name("shared-mem")
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[shared mempool] failed to create runtime");
+    let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     start_shared_mempool(
         runtime.handle(),
         &config,

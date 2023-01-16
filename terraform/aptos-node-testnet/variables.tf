@@ -83,8 +83,13 @@ variable "chain_name" {
 }
 
 variable "image_tag" {
-  description = "Docker image tag for Aptos node"
+  description = "Docker image tag for all Aptos workloads, including validators, fullnodes, backup, restore, genesis, and other tooling"
   default     = "devnet"
+}
+
+variable "validator_image_tag" {
+  description = "Docker image tag for validators and fullnodes. If set, overrides var.image_tag for those nodes"
+  default     = ""
 }
 
 ### Helm values

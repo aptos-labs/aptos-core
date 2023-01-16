@@ -95,7 +95,7 @@ proptest! {
             infos
                 .into_iter()
                 .skip(start_version as usize)
-                .take(num_transaction_infos as usize)
+                .take(num_transaction_infos)
                 .collect::<Vec<_>>(),
             iter.collect::<Result<Vec<_>>>().unwrap()
         );

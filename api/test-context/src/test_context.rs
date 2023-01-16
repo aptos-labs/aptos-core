@@ -579,7 +579,7 @@ impl TestContext {
     pub fn get_routes_with_poem(
         &self,
         poem_address: SocketAddr,
-    ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
         warp::path!("v1" / ..).and(reverse_proxy_filter(
             "v1".to_string(),
             format!("http://{}/v1", poem_address),
@@ -643,7 +643,7 @@ impl TestContext {
             .context
             .get_latest_ledger_info_with_signatures()
             .unwrap();
-        let epoch = parent.ledger_info().epoch();
+        let epoch = parent.ledger_info().next_block_epoch();
         let version = parent.ledger_info().version() + (block_size as u64);
         let info = LedgerInfo::new(
             BlockInfo::new(

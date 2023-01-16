@@ -209,6 +209,18 @@ aptos stake request-commission \
   --profile mainnet-operator
 ```
 
+If you run the `aptos stake request-commission` command before the end of the the lockup expiration, the command will initiate unlock for any locked commission earned up until that moment in time.
+
+See example below:
+
+Month 1 Day 29, you call the command, it would initiate unlock for 29 days worth of commission.
+
+Month 2, Day 29, if you call the command again, it would disburse the fully unlocked commission from previous month (29 days worth), and initiate commission unlock for Month 1 Day 30 + Month 2 Day 1-29 (30 days worth).
+
+Month 3, Day 29, if you call the commission again, 30 days of commission would be disbursed, and the a new batch of commission would initiate unlock.
+
+You can call the command multiple times, and the amount you receive depends on the day when you requested commission unlock previously.
+
 ## Frequently used staking operations commands
 
 ### Checking your validator performance

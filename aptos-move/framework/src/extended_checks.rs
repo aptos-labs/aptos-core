@@ -139,7 +139,7 @@ impl<'a> ExtendedChecker<'a> {
             },
             Vector(ety) => {
                 // Vectors are allowed if element type is allowed
-                self.check_transaction_input_type(loc, &**ety)
+                self.check_transaction_input_type(loc, ety)
             },
             Struct(mid, sid, _) if self.is_allowed_input_struct(mid.qualified(*sid)) => {
                 // Specific struct types are allowed

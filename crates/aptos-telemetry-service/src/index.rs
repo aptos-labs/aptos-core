@@ -23,7 +23,9 @@ use warp::{
     reply, Filter, Rejection, Reply,
 };
 
-pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
+pub fn routes(
+    context: Context,
+) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone {
     let v1_api_prefix = warp::path!("api" / "v1" / ..);
 
     let v1_api = v1_api_prefix.and(

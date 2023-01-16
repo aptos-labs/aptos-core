@@ -18,7 +18,6 @@ use std::{
     net::{SocketAddr, ToSocketAddrs},
     thread,
 };
-use tokio::runtime;
 
 // The message displayed when the endpoint is disabled.
 const DISABLED_ENDPOINT_MESSAGE: &str =
@@ -167,12 +166,7 @@ pub fn start_inspection_service(node_config: NodeConfig) {
             }
         });
 
-        let runtime = runtime::Builder::new_current_thread()
-            .thread_name("inspection")
-            .enable_io()
-            .disable_lifo_slot()
-            .build()
-            .unwrap();
+        let runtime = aptos_runtimes::spawn_named_runtime("inspection".into(), None);
         runtime
             .block_on(async {
                 let server = Server::bind(&addr).serve(make_service);

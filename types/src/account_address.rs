@@ -196,7 +196,7 @@ pub fn create_resource_address(address: AccountAddress, seed: &[u8]) -> AccountA
     input.extend(seed);
     input.push(Scheme::DeriveResourceAccountAddress as u8);
     let hash = HashValue::sha3_256_of(&input);
-    AccountAddress::from_bytes(&hash.as_ref()).unwrap()
+    AccountAddress::from_bytes(hash.as_ref()).unwrap()
 }
 
 // Define the Hasher used for hashing AccountAddress types. In order to properly use the

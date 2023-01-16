@@ -22,14 +22,8 @@ use aptos_network::{
 use aptos_storage_interface::DbReader;
 use aptos_vm_validator::vm_validator::{TransactionValidation, VMValidator};
 use futures::channel::mpsc::{self, Receiver, UnboundedSender};
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
-use tokio::runtime::{Builder, Handle, Runtime};
+use std::{collections::HashMap, sync::Arc};
+use tokio::runtime::{Handle, Runtime};
 
 /// Bootstrap of SharedMempool.
 /// Creates a separate Tokio Runtime that runs the following routines:
@@ -121,16 +115,7 @@ pub fn bootstrap(
     mempool_reconfig_events: ReconfigNotificationListener,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> Runtime {
-    let runtime = Builder::new_multi_thread()
-        .thread_name_fn(|| {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("shared-mem-{}", id)
-        })
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[shared mempool] failed to create runtime");
+    let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
     let vm_validator = Arc::new(RwLock::new(VMValidator::new(Arc::clone(&db))));
     start_shared_mempool(

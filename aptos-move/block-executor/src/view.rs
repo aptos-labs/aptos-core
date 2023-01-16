@@ -158,7 +158,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         base_view: &'a S,
         map: &'a MVHashMapView<'a, T::Key, T::Value>,
         txn_idx: TxnIndex,
-    ) -> LatestView<T, S> {
+    ) -> LatestView<'a, T, S> {
         LatestView {
             base_view,
             latest_view: ViewMapKind::MultiVersion(map),
@@ -170,7 +170,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         base_view: &'a S,
         map: &'a BTreeMap<T::Key, T::Value>,
         txn_idx: TxnIndex,
-    ) -> LatestView<T, S> {
+    ) -> LatestView<'a, T, S> {
         LatestView {
             base_view,
             latest_view: ViewMapKind::BTree(map),

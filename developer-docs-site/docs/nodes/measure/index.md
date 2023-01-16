@@ -7,6 +7,6 @@ slug: "measure-index"
 
 You have numerous options for measuring and inspecting the health and performance of your nodes:
 
-- ### [Use the Node Inspection Service](../../nodes/measure/node-inspection-service.md)
-- ### [Use the Node Health Checker](../../nodes/measure/node-health-checker.md)
-- ### [Read the Node Health Checker FAQ](../../nodes/measure/node-health-checker-faq.md)
+- ### [Use the Node Inspection Service](./node-inspection-service.md)
+- ### [Use the Node Health Checker](./node-health-checker.md)
+- ### [Read the Node Health Checker FAQ](./node-health-checker-faq.md)
