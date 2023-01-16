@@ -85,6 +85,16 @@ pub fn get_vm_metadata(vm: &MoveVM, module_id: ModuleId) -> Option<RuntimeModule
     }
 }
 
+/// Extract metadata from the VM, legacy V0 format upgraded to V1
+pub fn get_vm_metadata_v0(vm: &MoveVM, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
+    if let Some(data) = vm.get_module_metadata(module_id, &APTOS_METADATA_KEY) {
+        let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
+        Some(data_v0.upgrade())
+    } else {
+        None
+    }
+}
+
 /// Extract metadata from a compiled module, upgrading V0 to V1 representation as needed.
 pub fn get_module_metadata(module: &CompiledModule) -> Option<RuntimeModuleMetadataV1> {
     if let Some(data) = find_metadata(module, &APTOS_METADATA_KEY_V1) {
