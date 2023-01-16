@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{KnownAttribute, RuntimeModuleMetadataV1};
-use move_binary_format::file_format::AbilitySet;
+use move_binary_format::file_format::{Ability, AbilitySet};
 use move_core_types::{
     account_address::AccountAddress,
     errmap::{ErrorDescription, ErrorMapping},
@@ -188,7 +188,14 @@ impl<'a> ExtendedChecker<'a> {
                     false
                 }
             });
+
             if let Some(Attribute::Apply(_, _, attributes)) = resource_group {
+                if !struct_.get_abilities().has_ability(Ability::Key) {
+                    self.env
+                        .error(&struct_.get_loc(), "resource_group should have key ability");
+                    continue;
+                }
+
                 if attributes.len() != 1 {
                     self.env.error(
                         &struct_.get_loc(),

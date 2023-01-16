@@ -3,7 +3,11 @@
 
 use crate::extended_checks::ResourceGroupScope;
 use aptos_types::{on_chain_config::Features, transaction::AbortInfo};
-use move_binary_format::{normalized::Function, CompiledModule};
+use move_binary_format::{
+    file_format::{Ability, AbilitySet},
+    normalized::{Function, Struct},
+    CompiledModule,
+};
 use move_core_types::{
     errmap::ErrorDescription,
     identifier::Identifier,
@@ -176,6 +180,47 @@ pub fn is_valid_view_function(
     })
 }
 
+pub fn is_valid_resource_group(
+    structs: &BTreeMap<Identifier, Struct>,
+    struct_: &str,
+) -> Result<(), MetadataValidationError> {
+    if let Ok(ident_struct) = Identifier::new(struct_) {
+        if let Some(mod_struct) = structs.get(&ident_struct) {
+            if mod_struct.abilities == AbilitySet::EMPTY
+                && mod_struct.type_parameters.is_empty()
+                && mod_struct.fields.len() == 1
+            {
+                return Ok(());
+            }
+            println!("group {:?}", mod_struct);
+        }
+    }
+
+    Err(MetadataValidationError {
+        key: struct_.to_string(),
+        attribute: KnownAttributeKind::ViewFunction as u16,
+    })
+}
+
+pub fn is_valid_resource_group_member(
+    structs: &BTreeMap<Identifier, Struct>,
+    struct_: &str,
+) -> Result<(), MetadataValidationError> {
+    if let Ok(ident_struct) = Identifier::new(struct_) {
+        if let Some(mod_struct) = structs.get(&ident_struct) {
+            if mod_struct.abilities.has_ability(Ability::Key) {
+                return Ok(());
+            }
+            println!("member {:?}", mod_struct);
+        }
+    }
+
+    Err(MetadataValidationError {
+        key: struct_.to_string(),
+        attribute: KnownAttributeKind::ViewFunction as u16,
+    })
+}
+
 pub fn verify_module_metadata(
     module: &CompiledModule,
     features: &Features,
@@ -205,20 +250,29 @@ pub fn verify_module_metadata(
         }
     }
 
+    let structs = module
+        .struct_defs
+        .iter()
+        .map(|d| Struct::new(module, d))
+        .collect::<BTreeMap<_, _>>();
+
     for (struct_, attrs) in &metadata.struct_attributes {
         for attr in attrs {
-            if features.are_resource_groups_enabled()
-                && ((attr.is_resource_group() && attr.get_resource_group().is_some())
-                    || (attr.is_resource_group_member()
-                        && attr.get_resource_group_member().is_some()))
-            {
-                continue;
-            } else {
-                return Err(MetadataValidationError {
-                    key: struct_.clone(),
-                    attribute: attr.kind,
-                });
+            if features.are_resource_groups_enabled() {
+                if attr.is_resource_group() && attr.get_resource_group().is_some() {
+                    is_valid_resource_group(&structs, struct_)?;
+                    continue;
+                } else if attr.is_resource_group_member()
+                    && attr.get_resource_group_member().is_some()
+                {
+                    is_valid_resource_group_member(&structs, struct_)?;
+                    continue;
+                }
             }
+            return Err(MetadataValidationError {
+                key: struct_.clone(),
+                attribute: attr.kind,
+            });
         }
     }
     Ok(())
