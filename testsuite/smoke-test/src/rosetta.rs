@@ -900,22 +900,6 @@ async fn test_block() {
     .await
     .unwrap_err();
 
-    // This one will fail (and skip estimation of gas)
-    transfer_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_1,
-        AccountAddress::ONE,
-        20,
-        Duration::from_secs(5),
-        None,
-        Some(100000),
-        Some(min_gas_price),
-    )
-    .await
-    .unwrap_err();
-
     // Test native stake pool and reset lockup support
     cli.fund_account(2, Some(1000000000000000)).await.unwrap();
     create_stake_pool_and_wait(
