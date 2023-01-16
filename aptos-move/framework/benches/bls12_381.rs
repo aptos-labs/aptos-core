@@ -468,6 +468,24 @@ pub fn bench_group(c: &mut Criterion) {
             },
         );
 
+        group.bench_function(
+            format!("g1_proj_mul").as_str(),
+            |b| {
+                b.iter_with_setup(
+                    || {
+                        let x1 = ark_bls12_381::Fr::rand(&mut test_rng());
+                        let scalar = ark_bls12_381::Fr::rand(&mut test_rng());
+                        let g = ark_bls12_381::G1Affine::prime_subgroup_generator();
+                        let p1_proj = g.mul(x1);
+                        (p1_proj, scalar)
+                    },
+                    |(p1_proj, k)| {
+                        let _p3 = p1_proj.mul(k.into_repr());
+                    }
+                );
+            },
+        );
+
         group.bench_function(format!("fr_rand * 2 + g1_affine_generator + g1_affine_generator_mul_to_proj + g1_proj_mulassign").as_str(), |b| {
             b.iter(|| {
                 let x1 = ark_bls12_381::Fr::rand(&mut test_rng());
