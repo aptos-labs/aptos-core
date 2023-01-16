@@ -1,9 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
+use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
-use move_core_types::{identifier::Identifier, language_storage::StructTag};
+use move_core_types::{identifier::Identifier, language_storage::StructTag, vm_status::StatusCode};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
@@ -237,4 +238,103 @@ fn test_resource_groups_container_not_enabled() {
         build_options.clone(),
     );
     assert_success!(result);
+}
+
+#[test]
+fn verify_resource_group_upgrades() {
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::RESOURCE_GROUPS], vec![]);
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+
+    // Initial code
+    let source = r#"
+        module 0xf00d::M {
+            #[resource_group_member(group = 0xf00d::M::ResourceGroup)]
+            struct ResourceGroupMember has key { }
+
+            #[resource_group(scope = address)]
+            struct ResourceGroup { }
+
+            #[resource_group(scope = address)]
+            struct ResourceGroupExtra { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_success!(result);
+
+    // Compatible increase on scope
+    let source = r#"
+        module 0xf00d::M {
+            #[resource_group_member(group = 0xf00d::M::ResourceGroup)]
+            struct ResourceGroupMember has key { }
+
+            #[resource_group(scope = global)]
+            struct ResourceGroup { }
+
+            #[resource_group(scope = address)]
+            struct ResourceGroupExtra { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_success!(result);
+
+    // Incompatible decrease on scope
+    let source = r#"
+        module 0xf00d::M {
+            #[resource_group_member(group = 0xf00d::M::ResourceGroup)]
+            struct ResourceGroupMember has key { }
+
+            #[resource_group(scope = module_)]
+            struct ResourceGroup { }
+
+            #[resource_group(scope = address)]
+            struct ResourceGroupExtra { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
+
+    // Removal of ResourceGroupContainer is incompatible
+    let source = r#"
+        module 0xf00d::M {
+            struct ResourceGroupMember has key { }
+
+            #[resource_group(scope = global)]
+            struct ResourceGroup { }
+
+            struct ResourceGroupExtra { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
+
+    // Change of ResourceGroupMember::group is incompatible
+    let source = r#"
+        module 0xf00d::M {
+            #[resource_group_member(group = 0xf00d::M::ResourceGroupExtra)]
+            struct ResourceGroupMember has key { }
+
+            #[resource_group(scope = global)]
+            struct ResourceGroup { }
+
+            #[resource_group(scope = address)]
+            struct ResourceGroupExtra { }
+        }
+        "#;
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package(&account, path.path());
+    assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
 }

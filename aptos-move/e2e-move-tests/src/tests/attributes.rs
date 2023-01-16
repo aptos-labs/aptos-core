@@ -168,8 +168,11 @@ fn verify_resource_group_member_fails_when_not_enabled() {
         kind: 3,
         args: vec!["0xf00d::M::ResourceGroup".to_string()],
     };
-    let (code, metadata) =
-        build_package_and_insert_attribute(source, Some(("ResourceGroupMember", fake_attribute)), None);
+    let (code, metadata) = build_package_and_insert_attribute(
+        source,
+        Some(("ResourceGroupMember", fake_attribute)),
+        None,
+    );
     let result = h.run_transaction_payload(
         &account,
         aptos_stdlib::code_publish_package_txn(metadata, code),
@@ -191,11 +194,8 @@ fn verify_resource_groups_fail_when_not_enabled() {
         kind: 2,
         args: vec!["address".to_string()],
     };
-    let (code, metadata) = build_package_and_insert_attribute(
-        source,
-        Some(("ResourceGroup", fake_attribute)),
-        None,
-    );
+    let (code, metadata) =
+        build_package_and_insert_attribute(source, Some(("ResourceGroup", fake_attribute)), None);
     let result = h.run_transaction_payload(
         &account,
         aptos_stdlib::code_publish_package_txn(metadata, code),
