@@ -615,7 +615,6 @@ impl AptosVM {
                             .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
                     ),
                 )
-                .and_then(|_| session.validate_resource_groups(&modules))
                 .and_then(|_| {
                     self.execute_module_initialization(session, gas_meter, &modules, exists, &[
                         destination,
@@ -666,8 +665,9 @@ impl AptosVM {
             }
             aptos_framework::verify_module_metadata(m, self.0.get_features())
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
-            self.validate_resource_group_upgrade(session, m)?;
         }
+        self.validate_resource_groups(session, modules)?;
+
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
                 "not all registered modules published",
@@ -682,49 +682,91 @@ impl AptosVM {
             .finish(Location::Undefined)
     }
 
-    // Perform upgrade checks on resource grups only -- this doesn't validate that the contents
-    // are correct.
-    // * Acquire all relevant pieces of metadata
-    // * Verify that there are no duplicate attributes, though this should be handled upstream, so
-    //   this becomes more an invariant, duplicate check.
-    // * Ensure that each member has a membership and it does not change
-    // * Ensure that each group has a scope and that it does not become more restrictive
-    fn validate_resource_group_upgrade<S: MoveResolverExt>(
+    /// Perform validation and upgrade checks on resource groups
+    /// * Acquire all relevant pieces of metadata
+    /// * Verify that there are no duplicate attributes.
+    /// * Ensure that each member has a membership and it does not change
+    /// * Ensure that each group has a scope and that it does not become more restrictive
+    /// * For any new members, verify that they are in a valid resource group
+    fn validate_resource_groups<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
-        module: &CompiledModule,
+        modules: &[CompiledModule],
     ) -> Result<(), VMError> {
-        let original_metadata =
-            session
-                .get_data_store()
-                .load_module(&module.self_id())
-                .map(|original_module| {
-                    CompiledModule::deserialize(&original_module).map(|original_module| {
-                        aptos_framework::get_module_metadata(&original_module)
-                    })
-                });
-        let (original_groups, original_members) = if let Ok(Ok(Some(metadata))) = original_metadata
-        {
-            Self::extract_resource_group_metadata(&metadata)?
-        } else {
-            return Ok(());
-        };
+        let mut groups = BTreeMap::new();
+        let mut members = BTreeMap::new();
 
-        let (new_groups, new_members) =
+        for module in modules {
+            let (new_groups, new_members) =
+                Self::validate_module_and_extract_new_entries(session, module)?;
+            groups.insert(module.self_id(), new_groups);
+            members.insert(module.self_id(), new_members);
+        }
+
+        for (module_id, inner_members) in members {
+            for value in inner_members.values() {
+                let value_module_id = value.module_id();
+                if !groups.contains_key(&value_module_id) {
+                    let (inner_groups, _) = Self::extract_resource_group_metadata_from_module(
+                        session,
+                        &value_module_id,
+                    )?;
+                    groups.insert(value.module_id(), inner_groups);
+                }
+
+                let scope = if let Some(inner_group) = groups.get(&value_module_id) {
+                    inner_group
+                        .get(value.name.as_ident_str().as_str())
+                        .ok_or_else(|| {
+                            Self::metadata_validation_error("Invalid resource_group attribute")
+                        })?
+                } else {
+                    return Err(Self::metadata_validation_error("No such resource_group"));
+                };
+
+                if !scope.are_equal_module_ids(&module_id, &value_module_id) {
+                    return Err(
+                        PartialVMError::new(StatusCode::LINKER_ERROR).finish(Location::Undefined)
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Validate resource group metadata on a single module
+    /// * Extract the resource group metadata
+    /// * Verify all changes are compatible upgrades
+    /// * Return any new members to validate correctness and all groups to assist in validation
+    fn validate_module_and_extract_new_entries<S: MoveResolverExt>(
+        session: &mut SessionExt<S>,
+        module: &CompiledModule,
+    ) -> VMResult<(
+        BTreeMap<String, ResourceGroupScope>,
+        BTreeMap<String, StructTag>,
+    )> {
+        let (new_groups, mut new_members) =
             if let Some(metadata) = aptos_framework::get_module_metadata(module) {
                 Self::extract_resource_group_metadata(&metadata)?
             } else {
                 (BTreeMap::new(), BTreeMap::new())
             };
 
+        let (original_groups, original_members) =
+            Self::extract_resource_group_metadata_from_module(session, &module.self_id())?;
+
         for (member, value) in original_members {
-            if Some(&value) != new_members.get(&member) {
+            // We don't need to re-validate new_members above.
+            if Some(&value) != new_members.remove(&member).as_ref() {
                 return Err(Self::metadata_validation_error(
                     "Invalid change in resource_group_member",
                 ));
             }
         }
+
         for (group, value) in original_groups {
+            // We need groups in case there's cross module dependencies
             if let Some(new_value) = new_groups.get(&group) {
                 if value.is_less_strict(new_value) {
                     return Err(Self::metadata_validation_error(
@@ -738,18 +780,39 @@ impl AptosVM {
             }
         }
 
-        Ok(())
+        Ok((new_groups, new_members))
     }
 
+    /// Given a module id extract all resource group metadata
+    fn extract_resource_group_metadata_from_module<S: MoveResolverExt>(
+        session: &mut SessionExt<S>,
+        module_id: &ModuleId,
+    ) -> VMResult<(
+        BTreeMap<String, ResourceGroupScope>,
+        BTreeMap<String, StructTag>,
+    )> {
+        let metadata = session
+            .get_data_store()
+            .load_module(module_id)
+            .map(|module| {
+                CompiledModule::deserialize(&module)
+                    .map(|module| aptos_framework::get_module_metadata(&module))
+            });
+
+        if let Ok(Ok(Some(metadata))) = metadata {
+            Self::extract_resource_group_metadata(&metadata)
+        } else {
+            Ok((BTreeMap::new(), BTreeMap::new()))
+        }
+    }
+
+    /// Given a module id extract all resource group metadata
     fn extract_resource_group_metadata(
         metadata: &RuntimeModuleMetadataV1,
-    ) -> Result<
-        (
-            BTreeMap<String, ResourceGroupScope>,
-            BTreeMap<String, StructTag>,
-        ),
-        VMError,
-    > {
+    ) -> VMResult<(
+        BTreeMap<String, ResourceGroupScope>,
+        BTreeMap<String, StructTag>,
+    )> {
         let mut groups = BTreeMap::new();
         let mut members = BTreeMap::new();
         for (struct_, attrs) in &metadata.struct_attributes {
