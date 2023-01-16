@@ -280,12 +280,21 @@ impl Context {
             prev_state_key,
             version,
         )?;
+        // TODO: Consider rewriting this to consider resource groups:
+        // * If a resource group is found, expand
+        // * Return Option<Result<(PathType, StructTag, Vec<u8>)>>
+        // * Count resources and only include a resource group if it can completely fit
+        // * Get next_key as the first struct_tag not included
         let mut resource_iter = account_iter
             .filter_map(|res| match res {
                 Ok((k, v)) => match k {
                     StateKey::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Resource(struct_tag)) => {
+                                Some(Ok((struct_tag, v.into_bytes())))
+                            }
+                            // TODO: Consider expanding to Path::Resource
+                            Ok(Path::ResourceGroup(struct_tag)) => {
                                 Some(Ok((struct_tag, v.into_bytes())))
                             }
                             Ok(Path::Code(_)) => None,
@@ -357,7 +366,7 @@ impl Context {
                     StateKey::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Code(module_id)) => Some(Ok((module_id, v.into_bytes()))),
-                            Ok(Path::Resource(_)) => None,
+                            Ok(Path::Resource(_)) | Ok(Path::ResourceGroup(_)) => None,
                             Err(e) => Some(Err(anyhow::Error::from(e))),
                         }
                     }

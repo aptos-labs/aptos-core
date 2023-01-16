@@ -111,19 +111,10 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         Self(state_store)
     }
 
-    pub fn get(&self, access_path: &AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
+    pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
         self.0
-            .get_state_value(&StateKey::AccessPath(access_path.clone()))
+            .get_state_value(&StateKey::AccessPath(access_path))
             .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
-    }
-
-    fn get_resource_internal(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
-        let ap = AccessPath::resource_access_path(*address, struct_tag.clone());
-        self.get(&ap).map_err(|e| e.finish(Location::Undefined))
     }
 }
 
@@ -140,7 +131,7 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
         struct_tag: &StructTag,
         resource_group: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
-        let group_data = self.get_resource_internal(address, resource_group)?;
+        let group_data = self.get_resource_group_data(address, resource_group)?;
         if let Some(group_data) = group_data {
             let mut group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
                 .map_err(|_| {
@@ -157,7 +148,8 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
-        self.get_resource_internal(address, struct_tag)
+        let ap = AccessPath::resource_group_access_path(*address, struct_tag.clone());
+        self.get(ap).map_err(|e| e.finish(Location::Undefined))
     }
 }
 
@@ -167,7 +159,7 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         // REVIEW: cache this?
         let ap = AccessPath::from(module_id);
-        self.get(&ap).map_err(|e| e.finish(Location::Undefined))
+        self.get(ap).map_err(|e| e.finish(Location::Undefined))
     }
 }
 
@@ -182,7 +174,8 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         // For our current perf evaluation, the ordering here actually has a substantial impact.
         // This is interesting because resources groups are already cached in the VM and the query
         // should be really fast.
-        let resource = self.get_resource_internal(address, struct_tag);
+        let ap = AccessPath::resource_access_path(*address, struct_tag.clone());
+        let resource = self.get(ap).map_err(|e| e.finish(Location::Undefined));
         if let Ok(Some(_)) = resource {
             resource
         } else if resource.is_err() {
@@ -190,7 +183,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         } else if let Some(resource_group) = self.get_resource_group(struct_tag)? {
             self.get_resource_from_group(address, struct_tag, &resource_group)
         } else {
-            resource
+            Ok(None)
         }
     }
 }
@@ -207,7 +200,7 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
 
 impl<'a, S: StateView> ConfigStorage for StorageAdapter<'a, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
-        self.get(&access_path).ok()?
+        self.get(access_path).ok()?
     }
 }
 

@@ -166,6 +166,7 @@ impl<'a> TableInfoParser<'a> {
                     match path {
                         Path::Code(_) => (),
                         Path::Resource(struct_tag) => self.parse_struct(struct_tag, bytes)?,
+                        Path::ResourceGroup(_struct_tag) => (),
                     }
                 },
                 StateKey::TableItem { handle, .. } => self.parse_table_item(*handle, bytes)?,

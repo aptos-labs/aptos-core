@@ -101,7 +101,7 @@ fn test_resource_groups() {
         primary_tag.clone(),
     );
     assert!(primary.is_none());
-    h.read_resource_raw(&user_addr, group_tag.clone()).unwrap();
+    assert!(h.read_resource_raw(&user_addr, group_tag.clone()).is_none());
     assert!(h
         .read_resource_raw(&user_addr, primary_tag.clone())
         .is_none());
@@ -134,7 +134,7 @@ fn test_resource_groups() {
         )
         .unwrap();
     assert_eq!(primary.value, 11122);
-    h.read_resource_raw(&user_addr, group_tag.clone()).unwrap();
+    assert!(h.read_resource_raw(&user_addr, group_tag.clone()).is_none());
     assert!(h
         .read_resource_raw(&user_addr, primary_tag.clone())
         .is_none());
@@ -167,7 +167,7 @@ fn test_resource_groups() {
         )
         .unwrap();
     assert_eq!(primary.value, 11122);
-    h.read_resource_raw(&user_addr, group_tag.clone()).unwrap();
+    assert!(h.read_resource_raw(&user_addr, group_tag.clone()).is_none());
     assert!(h
         .read_resource_raw(&user_addr, primary_tag.clone())
         .is_none());
@@ -198,7 +198,7 @@ fn test_resource_groups() {
         primary_tag.clone(),
     );
     assert!(primary.is_none());
-    h.read_resource_raw(&user_addr, group_tag.clone()).unwrap();
+    assert!(h.read_resource_raw(&user_addr, group_tag.clone()).is_none());
     assert!(h
         .read_resource_raw(&user_addr, primary_tag.clone())
         .is_none());
@@ -215,6 +215,9 @@ fn test_resource_groups() {
     );
     assert_success!(result);
 
+    assert!(h
+        .read_resource_group(&user_addr, group_tag.clone())
+        .is_none());
     assert!(h.read_resource_raw(&user_addr, group_tag).is_none());
     assert!(h.read_resource_raw(&user_addr, primary_tag).is_none());
     assert!(h.read_resource_raw(&user_addr, secondary_tag).is_none());
