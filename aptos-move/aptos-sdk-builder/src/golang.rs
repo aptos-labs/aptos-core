@@ -45,7 +45,12 @@ pub fn output(
         .cloned()
         .filter(|abi| {
             if let EntryABI::EntryFunction(sf) = abi {
-                sf.module_name().name().as_str() != "code" && sf.name() != "publish_package_txn"
+                sf.module_name().name().as_str() != "code"
+                    && sf.name() != "publish_package_txn"
+                    && sf.module_name().name().as_str() != "aptos_account"
+                    && sf.name() != "batch_transfer"
+                    && sf.module_name().name().as_str() != "aptos_account"
+                    && sf.name() != "batch_transfer_coins"
             } else {
                 true
             }
