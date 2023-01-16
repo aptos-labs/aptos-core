@@ -1430,7 +1430,7 @@ Unlock any accumulated rewards.
 <pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_unlock_rewards">unlock_rewards</a>(contract_address: <b>address</b>) <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
     <a href="vesting.md#0x1_vesting_assert_active_vesting_contract">assert_active_vesting_contract</a>(contract_address);
 
-    <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+    <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>let</b> operator = vesting_contract.staking.operator;
     <b>let</b> (total_active_stake, _, commission_amount) =
         <a href="staking_contract.md#0x1_staking_contract_staking_contract_amounts">staking_contract::staking_contract_amounts</a>(contract_address, operator);

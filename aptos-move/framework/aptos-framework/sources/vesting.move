@@ -415,7 +415,7 @@ module aptos_framework::vesting {
     public entry fun unlock_rewards(contract_address: address) acquires VestingContract {
         assert_active_vesting_contract(contract_address);
 
-        let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
+        let vesting_contract = borrow_global<VestingContract>(contract_address);
         let operator = vesting_contract.staking.operator;
         let (total_active_stake, _, commission_amount) =
             staking_contract::staking_contract_amounts(contract_address, operator);
