@@ -37,6 +37,8 @@ module dao_platform::nft_dao {
     use dao_platform::nft_dao_events::{Self, emit_create_dao_event};
     use std::bcs;
     use std::error;
+    use std::option::Option;
+    use std::option;
     use std::signer;
     use std::string::String;
     use std::string;
@@ -91,6 +93,12 @@ module dao_platform::nft_dao {
     /// Token already used for creating proposal
     const ETOKEN_USED_FOR_CREATING_PROPOSAL: u64 = 16;
 
+    /// DAO already offered for the new admin
+    const EADMIN_ALREADY_OFFERED: u64 = 17;
+
+    /// DAO offer doesn't exist
+    const EADMIN_OFFER_NOT_EXIST: u64 = 18;
+
     /// Constants
     const PROPOSAL_PENDING: u8 = 0;
     const PROPOSAL_RESOLVED_PASSED: u8 = 1;
@@ -113,14 +121,11 @@ module dao_platform::nft_dao {
         dao_signer_capability: SignerCapability,
         /// DAO admin account
         admin: address,
+        /// The pending claims waiting for new admin to claim
+        pending_admin: Option<address>,
     }
 
-    /// This resource stores all the DAO resource addresses that an admin owns
-    struct OwnedDAO has key {
-        daos: vector<address>,
-    }
-
-    /// The collection should only contains NFTs, where all token name only has 1 maximal and immutable
+    /// The collection should only contain globally unique NFTs
     /// The total supply is fixed with the token names.
     struct GovernanceToken has drop, store {
         /// The creator address of this NFT collection
@@ -178,7 +183,20 @@ module dao_platform::nft_dao {
         voting_token_collection_creator: address, // this is the creator address of goverance token
         collection_name: String,
         min_required_proposer_voting_power: u64,
-    ) acquires OwnedDAO {
+    ) {
+        create_dao_internal(admin, name, threshold,voting_duration, voting_token_collection_creator, collection_name, min_required_proposer_voting_power);
+    }
+
+    /// Creator creates a DAO on the platform
+    public fun create_dao_internal(
+        admin: &signer,
+        name: String,
+        threshold: u64,
+        voting_duration: u64,
+        voting_token_collection_creator: address, // this is the creator address of goverance token
+        collection_name: String,
+        min_required_proposer_voting_power: u64,
+    ): address {
 
         // create a resource account
         let seed = bcs::to_bytes(&name);
@@ -201,6 +219,7 @@ module dao_platform::nft_dao {
                 next_proposal_id: 0,
                 dao_signer_capability: res_cap,
                 admin: src_addr,
+                pending_admin: option::none(),
             },
         );
         move_to(
@@ -218,7 +237,6 @@ module dao_platform::nft_dao {
         );
 
         let dao_addr = signer::address_of(&res_signer);
-        add_owned_dao_address(admin, dao_addr);
 
         emit_create_dao_event(
             &res_signer,
@@ -228,8 +246,8 @@ module dao_platform::nft_dao {
             min_required_proposer_voting_power,
             voting_token_collection_creator,
             collection_name,
-            signer::address_of(&res_signer),
-        )
+        );
+        dao_addr
     }
 
 
@@ -402,6 +420,46 @@ module dao_platform::nft_dao {
         )
     }
 
+    /// Offer admin of a DAO to a new admin. The new admin can then claim the offer to be the new admin of the DAO.
+    public entry fun offer_admin(admin: &signer, dao: address, new_admin: address) acquires DAO {
+        assert!(exists<DAO>(dao), error::not_found(EDAO_NOT_EXIST));
+        let admin_addr = signer::address_of(admin);
+        let dao_config = borrow_global_mut<DAO>(dao);
+        assert!(admin_addr == dao_config.admin, error::permission_denied(EINVALID_ADMIN_ACCOUNT));
+
+        assert!(option::is_none(&dao_config.pending_admin), error::invalid_argument(EADMIN_ALREADY_OFFERED));
+        option::fill(&mut dao_config.pending_admin, new_admin);
+        nft_dao_events::emit_admin_offer_event(admin_addr, new_admin, dao);
+    }
+
+    /// Cancel the admin offer
+    public entry fun cancel_admin_offer(admin: &signer, dao: address) acquires DAO {
+        assert!(exists<DAO>(dao), error::not_found(EDAO_NOT_EXIST));
+        let admin_addr = signer::address_of(admin);
+        let dao_config = borrow_global_mut<DAO>(dao);
+        assert!(admin_addr == dao_config.admin, error::permission_denied(EINVALID_ADMIN_ACCOUNT));
+        // DAO offer exists
+        assert!(option::is_some(&dao_config.pending_admin), error::invalid_argument(EADMIN_OFFER_NOT_EXIST));
+        option::extract(&mut dao_config.pending_admin);
+        nft_dao_events::emit_admin_offer_cancel_event(admin_addr, dao);
+    }
+
+    /// Claim DAO's admin from an offer. The new_admin will become the admin of the DAO.
+    public entry fun claim_admin(new_admin: &signer, dao: address) acquires DAO {
+        // DAO offer exists
+        assert!(exists<DAO>(dao), error::not_found(EDAO_NOT_EXIST));
+        let dao_config = borrow_global_mut<DAO>(dao);
+        assert!(option::is_some(&dao_config.pending_admin), error::invalid_argument(EADMIN_OFFER_NOT_EXIST));
+        let target_addr = option::extract(&mut dao_config.pending_admin);
+        let receiver = signer::address_of(new_admin);
+        assert!(target_addr == receiver, error::not_found(EADMIN_OFFER_NOT_EXIST));
+
+        let old_admin = dao_config.admin;
+        // update the DAO's admin address
+        dao_config.admin = receiver;
+        nft_dao_events::emit_admin_claim_event(old_admin, receiver, dao);
+    }
+
     /// DAO creator can quit the platform and claim back his resource account signer capability
     public fun destory_dao_and_reclaim_signer_capability(account: &signer, dao: address): SignerCapability acquires DAO {
         let addr = signer::address_of(account);
@@ -416,7 +474,8 @@ module dao_platform::nft_dao {
             min_required_proposer_voting_power: _,
             next_proposal_id: _,
             dao_signer_capability,
-            admin: _
+            admin: _,
+            pending_admin: _
         } = move_from<DAO>(dao);
        dao_signer_capability
     }
@@ -464,14 +523,6 @@ module dao_platform::nft_dao {
         )
     }
 
-    #[view]
-    /// Get owned DAOs of an admin
-    public fun get_owned_daos(account: address): vector<address> acquires OwnedDAO {
-        assert!(exists<OwnedDAO>(account), error::not_found(EDAO_NOT_EXIST));
-        let owned_dao = borrow_global<OwnedDAO>(account);
-        owned_dao.daos
-    }
-
     // transfer coin from the DAO account to the destination account
     fun transfer_fund<CoinType>(res_acct: &signer, dst: address, amount: u64) {
         deposit_coins(dst, coin::withdraw<CoinType>(res_acct, amount));
@@ -513,24 +564,6 @@ module dao_platform::nft_dao {
         }
     }
 
-    fun add_owned_dao_address(admin: &signer, dao_addr: address) acquires OwnedDAO {
-        let src_addr = signer::address_of(admin);
-        if (!exists<OwnedDAO>(src_addr)) {
-            let daos = vector::empty<address>();
-            vector::push_back(&mut daos, dao_addr);
-            move_to(
-                admin,
-                OwnedDAO {
-                    daos,
-                }
-            );
-        } else {
-            let owned_address = borrow_global_mut<OwnedDAO>(src_addr);
-            assert!(!vector::contains(&owned_address.daos, &dao_addr), error::already_exists(EDAO_ADDRESS_USED));
-            vector::push_back(&mut owned_address.daos, dao_addr);
-        };
-    }
-
     #[test_only]
     public fun create_one_token(
         creator: &signer,
@@ -565,13 +598,8 @@ module dao_platform::nft_dao {
     #[test_only]
     use aptos_framework::aptos_account::transfer_coins;
 
-    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
-    public fun test_e2e_scenario(aptos_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics, OwnedDAO {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
-        account::create_account_for_test(@0x1);
-        account::create_account_for_test(@0xdeaf);
-        account::create_account_for_test(@0xaf);
-
+    #[test_only]
+    public fun setup_voting_token_distribution(creator: &signer, voter: &signer){
         // create an NFT collection
         token::create_collection_and_token(
             creator,
@@ -579,7 +607,7 @@ module dao_platform::nft_dao {
             3,
             1,
             vector::empty(),
-           vector::empty(),
+            vector::empty(),
             vector::empty(),
             vector<bool>[false, false, false],
             vector<bool>[false, false, false, false, false],
@@ -601,10 +629,20 @@ module dao_platform::nft_dao {
         );
         token::direct_transfer(creator, voter, token_id_2, 1);
         token::direct_transfer(creator, voter, token_id_3, 1);
+    }
 
+    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    public fun test_e2e_scenario(aptos_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        account::create_account_for_test(@0x1);
+        account::create_account_for_test(@0xdeaf);
+        account::create_account_for_test(@0xaf);
+
+
+        setup_voting_token_distribution(creator, voter);
         // creator creates a dao
         let creator_addr = signer::address_of(creator);
-        create_dao(
+        let res_acc = create_dao_internal(
             creator,
             string::utf8(b"my_dao"),
             1,
@@ -613,9 +651,6 @@ module dao_platform::nft_dao {
             string::utf8(b"Hello, World"),
             1,
         );
-
-        let owned_dao = get_owned_daos(creator_addr);
-        let res_acc = vector::pop_back(&mut owned_dao);
 
         //
         // Test no_op proposal
@@ -688,5 +723,179 @@ module dao_platform::nft_dao {
         assert!(get_proposal_resolution(1, res_acc) == PROPOSAL_RESOLVED_PASSED, 1);
         // vote get 45 coin transferred to her account after resolving
         assert!(coin::balance<FakeMoney>(signer::address_of(voter)) == 45, 1);
+    }
+
+    #[test(aptos_framework = @0x1, admin = @0xdeaf, new_admin = @0xaf)]
+    public fun test_dao_offer_and_claim(aptos_framework: &signer, admin: &signer, new_admin: &signer) acquires DAO {
+        // admin creates a dao
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        let new_addr = signer::address_of(new_admin);
+        let old_addr = signer::address_of(admin);
+        account::create_account_for_test(@0x1);
+        account::create_account_for_test(new_addr);
+        account::create_account_for_test(old_addr);
+
+        let dao = create_dao_internal(
+            admin,
+            string::utf8(b"my_dao"),
+            1,
+            10,
+            old_addr,
+            string::utf8(b"Hello, World"),
+            1,
+        );
+
+        // admin offers the dao to a new admin
+        offer_admin(admin, dao, new_addr);
+        // new admin claim the dao
+        claim_admin(new_admin, dao);
+        let dao_config = borrow_global_mut<DAO>(dao);
+        assert!(dao_config.admin == new_addr, 1);
+    }
+
+    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    #[expected_failure(abort_code = 65546, location = Self)]
+    public fun test_double_vote(aptos_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        account::create_account_for_test(@0x1);
+        account::create_account_for_test(@0xdeaf);
+        account::create_account_for_test(@0xaf);
+
+        setup_voting_token_distribution(creator, voter);
+        // creator creates a dao
+        let creator_addr = signer::address_of(creator);
+        let res_acc = create_dao_internal(
+            creator,
+            string::utf8(b"my_dao"),
+            1,
+            10,
+            creator_addr,
+            string::utf8(b"Hello, World"),
+            1,
+        );
+
+        create_proposal(
+            creator,
+            res_acc, // resource account address of the nft dao
+            string::utf8(b"Proposal 1"),
+            string::utf8(b"description"),
+            string::utf8(b"no_op"),
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            1,
+            vector<String>[string::utf8(b"Token")],
+            vector<u64>[0],
+        );
+        timestamp::update_global_time_for_test(2000000);
+
+        vote(
+            voter,
+            res_acc,
+            1,
+            true,
+            vector<String>[string::utf8(b"artist2"), string::utf8(b"artist2")],
+            vector<u64>[0, 0],
+        );
+    }
+
+    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    public fun test_resolve_with_no_sufficient_votes(aptos_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        account::create_account_for_test(@0x1);
+        account::create_account_for_test(@0xdeaf);
+        account::create_account_for_test(@0xaf);
+
+
+        setup_voting_token_distribution(creator, voter);
+        // creator creates a dao
+        let creator_addr = signer::address_of(creator);
+        let res_acc = create_dao_internal(
+            creator,
+            string::utf8(b"my_dao"),
+            2,
+            10,
+            creator_addr,
+            string::utf8(b"Hello, World"),
+            1,
+        );
+
+        // creator creates a proposal
+        create_proposal(
+            creator,
+            res_acc, // resource account address of the nft dao
+            string::utf8(b"Proposal 1"),
+            string::utf8(b"description"),
+            string::utf8(b"no_op"),
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            1,
+            vector<String>[string::utf8(b"Token")],
+            vector<u64>[0],
+        );
+        timestamp::update_global_time_for_test(2000000);
+
+        // creator only has 1 token and the threshold requires 2 to resolve
+        vote(
+            creator,
+            res_acc,
+            1,
+            true,
+            vector<String>[string::utf8(b"Token")],
+            vector<u64>[0],
+        );
+        timestamp::update_global_time_for_test(20000000);
+        resolve<FakeMoney>(1, res_acc);
+        assert!(get_proposal_resolution(1, res_acc) == PROPOSAL_RESOLVED_NOT_PASSED, 1);
+    }
+
+    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    #[expected_failure(abort_code = 65543, location = Self)]
+    public fun test_resolve_earlier_than_ending_time(aptos_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        account::create_account_for_test(@0x1);
+        account::create_account_for_test(@0xdeaf);
+        account::create_account_for_test(@0xaf);
+
+
+        setup_voting_token_distribution(creator, voter);
+        // creator creates a dao
+        let creator_addr = signer::address_of(creator);
+        let res_acc = create_dao_internal(
+            creator,
+            string::utf8(b"my_dao"),
+            1,
+            10,
+            creator_addr,
+            string::utf8(b"Hello, World"),
+            1,
+        );
+
+        create_proposal(
+            creator,
+            res_acc, // resource account address of the nft dao
+            string::utf8(b"Proposal 1"),
+            string::utf8(b"description"),
+            string::utf8(b"no_op"),
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            1,
+            vector<String>[string::utf8(b"Token")],
+            vector<u64>[0],
+        );
+        timestamp::update_global_time_for_test(2000000);
+
+        vote(
+            voter,
+            res_acc,
+            1,
+            true,
+            vector<String>[string::utf8(b"artist2"), string::utf8(b"artist3")],
+            vector<u64>[0, 0],
+        );
+        timestamp::update_global_time_for_test(2000001);
+        resolve<FakeMoney>(1, res_acc);
     }
 }

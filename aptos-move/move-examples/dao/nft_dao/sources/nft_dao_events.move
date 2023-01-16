@@ -17,7 +17,6 @@ module dao_platform::nft_dao_events {
         min_proposal_weight: u64,
         governance_token_creator: address,
         governance_token_collection: String,
-        dao_address: address,
     }
 
     struct CreateProposalEvent has drop, store {
@@ -44,11 +43,28 @@ module dao_platform::nft_dao_events {
         result: u8,
     }
 
+    struct AdminOfferEvent has drop, store {
+        new_admin: address,
+        admin: address,
+    }
+
+    struct AdminClaimEvent has drop, store {
+        new_admin: address,
+        admin: address,
+    }
+
+    struct AdminOfferCancelEvent has drop, store {
+        admin: address,
+    }
+
     struct DAOEventStoreV1 has key {
         create_dao_events: EventHandle<CreateDAOEvent>,
         create_proposal_events: EventHandle<CreateProposalEvent>,
         vote_events: EventHandle<VoteEvent>,
         resolve_events: EventHandle<ResolveEvent>,
+        admin_offer_events: EventHandle<AdminOfferEvent>,
+        admin_claim_events: EventHandle<AdminClaimEvent>,
+        admin_offer_cancel_events: EventHandle<AdminOfferCancelEvent>,
         extension: Option<Any>,
     }
 
@@ -59,6 +75,9 @@ module dao_platform::nft_dao_events {
                 create_proposal_events: account::new_event_handle<CreateProposalEvent>(acct),
                 vote_events: account::new_event_handle<VoteEvent>(acct),
                 resolve_events: account::new_event_handle<ResolveEvent>(acct),
+                admin_offer_events: account::new_event_handle<AdminOfferEvent>(acct),
+                admin_claim_events: account::new_event_handle<AdminClaimEvent>(acct),
+                admin_offer_cancel_events: account::new_event_handle<AdminOfferCancelEvent>(acct),
                 extension: option::none<Any>(),
             });
         };
@@ -72,7 +91,6 @@ module dao_platform::nft_dao_events {
         min_proposal_weight: u64,
         governance_token_creator: address,
         governance_token_collection: String,
-        dao_address: address,
     ) acquires DAOEventStoreV1 {
         let event = CreateDAOEvent {
             dao_name,
@@ -81,7 +99,6 @@ module dao_platform::nft_dao_events {
             min_proposal_weight,
             governance_token_creator,
             governance_token_collection,
-            dao_address,
         };
         initialize_dao_event_store(dao);
         let dao_event_store = borrow_global_mut<DAOEventStoreV1>(signer::address_of(dao));
@@ -154,4 +171,43 @@ module dao_platform::nft_dao_events {
             event,
         );
     }
+
+    public(friend) fun emit_admin_offer_event(admin: address, new_admin: address, nft_dao: address) acquires DAOEventStoreV1 {
+        let event = AdminOfferEvent {
+            new_admin,
+            admin,
+        };
+        let dao_event_store = borrow_global_mut<DAOEventStoreV1>(nft_dao);
+
+        event::emit_event<AdminOfferEvent>(
+            &mut dao_event_store.admin_offer_events,
+            event,
+        );
+    }
+
+    public(friend) fun emit_admin_claim_event(admin: address, new_admin: address, nft_dao: address) acquires DAOEventStoreV1 {
+        let event = AdminClaimEvent {
+            new_admin,
+            admin,
+        };
+        let dao_event_store = borrow_global_mut<DAOEventStoreV1>(nft_dao);
+
+        event::emit_event<AdminClaimEvent>(
+            &mut dao_event_store.admin_claim_events,
+            event,
+        );
+    }
+
+    public(friend) fun emit_admin_offer_cancel_event(admin: address, nft_dao: address) acquires DAOEventStoreV1 {
+        let event = AdminOfferCancelEvent {
+            admin,
+        };
+        let dao_event_store = borrow_global_mut<DAOEventStoreV1>(nft_dao);
+
+        event::emit_event<AdminOfferCancelEvent>(
+            &mut dao_event_store.admin_offer_cancel_events,
+            event,
+        );
+    }
+
 }
