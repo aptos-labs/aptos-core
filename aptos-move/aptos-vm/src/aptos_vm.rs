@@ -24,7 +24,7 @@ use aptos_aggregator::{
     transaction::{ChangeSetExt, TransactionOutputExt},
 };
 use aptos_crypto::HashValue;
-use aptos_framework::natives::code::PublishRequest;
+use aptos_framework::{natives::code::PublishRequest, ResourceGroupScope, RuntimeModuleMetadataV1};
 use aptos_gas::{AptosGasMeter, ChangeSetConfigs};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
@@ -52,7 +52,7 @@ use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
@@ -589,7 +589,7 @@ impl AptosVM {
             let modules = self.deserialize_module_bundle(&bundle)?;
 
             // Validate the module bundle
-            self.validate_publish_request(&modules, expected_modules, allowed_deps)?;
+            self.validate_publish_request(session, &modules, expected_modules, allowed_deps)?;
 
             // Check what modules exist before publishing.
             let mut exists = BTreeSet::new();
@@ -634,8 +634,9 @@ impl AptosVM {
     }
 
     /// Validate a publish request.
-    fn validate_publish_request(
+    fn validate_publish_request<S: MoveResolverExt>(
         &self,
+        session: &mut SessionExt<S>,
         modules: &[CompiledModule],
         mut expected_modules: BTreeSet<String>,
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
@@ -664,7 +665,8 @@ impl AptosVM {
                 }
             }
             aptos_framework::verify_module_metadata(m, self.0.get_features())
-                .map_err(|err| Self::metadata_validation_error(&err.to_string()))?
+                .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
+            self.validate_resource_group_upgrade(session, m)?;
         }
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
@@ -678,6 +680,104 @@ impl AptosVM {
         PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
             .with_message(format!("metadata and code bundle mismatch: {}", msg))
             .finish(Location::Undefined)
+    }
+
+    // Perform upgrade checks on resource grups only -- this doesn't validate that the contents
+    // are correct.
+    // * Acquire all relevant pieces of metadata
+    // * Verify that there are no duplicate attributes, though this should be handled upstream, so
+    //   this becomes more an invariant, duplicate check.
+    // * Ensure that each member has a membership and it does not change
+    // * Ensure that each group has a scope and that it does not become more restrictive
+    fn validate_resource_group_upgrade<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        module: &CompiledModule,
+    ) -> Result<(), VMError> {
+        let original_metadata =
+            session
+                .get_data_store()
+                .load_module(&module.self_id())
+                .map(|original_module| {
+                    CompiledModule::deserialize(&original_module).map(|original_module| {
+                        aptos_framework::get_module_metadata(&original_module)
+                    })
+                });
+        let (original_groups, original_members) = if let Ok(Ok(Some(metadata))) = original_metadata
+        {
+            Self::extract_resource_group_metadata(&metadata)?
+        } else {
+            return Ok(());
+        };
+
+        let (new_groups, new_members) =
+            if let Some(metadata) = aptos_framework::get_module_metadata(module) {
+                Self::extract_resource_group_metadata(&metadata)?
+            } else {
+                (BTreeMap::new(), BTreeMap::new())
+            };
+
+        for (member, value) in original_members {
+            if Some(&value) != new_members.get(&member) {
+                return Err(Self::metadata_validation_error(
+                    "Invalid change in resource_group_member",
+                ));
+            }
+        }
+        for (group, value) in original_groups {
+            if let Some(new_value) = new_groups.get(&group) {
+                if value.is_less_strict(new_value) {
+                    return Err(Self::metadata_validation_error(
+                        "Invalid change in resource_group",
+                    ));
+                }
+            } else {
+                return Err(Self::metadata_validation_error(
+                    "Invalid change in resource_group",
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn extract_resource_group_metadata(
+        metadata: &RuntimeModuleMetadataV1,
+    ) -> Result<
+        (
+            BTreeMap<String, ResourceGroupScope>,
+            BTreeMap<String, StructTag>,
+        ),
+        VMError,
+    > {
+        let mut groups = BTreeMap::new();
+        let mut members = BTreeMap::new();
+        for (struct_, attrs) in &metadata.struct_attributes {
+            for attr in attrs {
+                if attr.is_resource_group() {
+                    let group = attr.get_resource_group().ok_or_else(|| {
+                        Self::metadata_validation_error("Invalid resource_group attribute")
+                    })?;
+                    let old = groups.insert(struct_.clone(), group);
+                    if old.is_some() {
+                        return Err(Self::metadata_validation_error(
+                            "Found duplicate resource_group attribute",
+                        ));
+                    }
+                } else if attr.is_resource_group_member() {
+                    let member = attr.get_resource_group_member().ok_or_else(|| {
+                        Self::metadata_validation_error("Invalid resource_group_member attribute")
+                    })?;
+                    let old = members.insert(struct_.clone(), member);
+                    if old.is_some() {
+                        return Err(Self::metadata_validation_error(
+                            "Found duplicate resource_group_member attribute",
+                        ));
+                    }
+                }
+            }
+        }
+        Ok((groups, members))
     }
 
     pub(crate) fn execute_user_transaction<S: MoveResolverExt + StateView>(

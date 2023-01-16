@@ -483,6 +483,7 @@ impl<'a> ExtendedChecker<'a> {
 // ----------------------------------------------------------------------------------
 // Resource Group Container Scope
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum ResourceGroupScope {
     Global,
     Address,
@@ -490,6 +491,14 @@ pub enum ResourceGroupScope {
 }
 
 impl ResourceGroupScope {
+    pub fn is_less_strict(&self, other: &ResourceGroupScope) -> bool {
+        match self {
+            ResourceGroupScope::Global => other != self,
+            ResourceGroupScope::Address => other == &ResourceGroupScope::Module,
+            ResourceGroupScope::Module => false,
+        }
+    }
+
     pub fn are_equal_envs(self, resource: &StructEnv, group: &StructEnv) -> bool {
         match self {
             ResourceGroupScope::Global => true,
@@ -514,7 +523,7 @@ impl ResourceGroupScope {
         match self {
             ResourceGroupScope::Global => "global",
             ResourceGroupScope::Address => "address",
-            ResourceGroupScope::Module => "module",
+            ResourceGroupScope::Module => "module_",
         }
     }
 }
@@ -526,7 +535,7 @@ impl FromStr for ResourceGroupScope {
         match s {
             "global" => Ok(ResourceGroupScope::Global),
             "address" => Ok(ResourceGroupScope::Address),
-            "module" => Ok(ResourceGroupScope::Module),
+            "module_" => Ok(ResourceGroupScope::Module),
             _ => Err(ResourceGroupScopeError(s.to_string())),
         }
     }
