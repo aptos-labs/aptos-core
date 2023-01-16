@@ -17,8 +17,6 @@ pub(crate) mod proof_manager;
 pub(crate) mod quorum_store_builder;
 pub(crate) mod quorum_store_coordinator;
 pub(crate) mod quorum_store_db;
-// TODO: remove allow(dead_code) when quorum store implementation is added
-#[allow(dead_code)]
 pub(crate) mod types;
 pub(crate) mod utils;
 

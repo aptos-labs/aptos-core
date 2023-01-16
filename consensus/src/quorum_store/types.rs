@@ -143,7 +143,7 @@ impl Fragment {
     }
 
     pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
-        if let Some(expiration) = &self.fragment_info.maybe_expiration {
+        if let Some(expiration) = &self.fragment_info.maybe_expiration() {
             if expiration.epoch() != self.fragment_info.epoch {
                 return Err(anyhow::anyhow!(
                     "Epoch mismatch: info: {}, expiration: {}",
@@ -184,7 +184,7 @@ impl Fragment {
     }
 
     pub fn maybe_expiration(&self) -> Option<LogicalTime> {
-        self.fragment_info.maybe_expiration
+        self.fragment_info.maybe_expiration()
     }
 }
 
