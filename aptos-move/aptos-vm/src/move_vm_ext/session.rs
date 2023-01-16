@@ -114,7 +114,8 @@ where
 
     pub fn finish(self) -> VMResult<SessionOutput> {
         let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
-        let change_set = Self::merge_resource_groups(&self.remote, change_set)?;
+        let (change_set, resource_group_change_set) =
+            Self::split_and_merge_resource_groups(&self.remote, change_set)?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -126,6 +127,7 @@ where
 
         Ok(SessionOutput {
             change_set,
+            resource_group_change_set,
             events,
             table_change_set,
             aggregator_change_set,
@@ -192,37 +194,38 @@ where
         Ok(())
     }
 
-    fn merge_resource_groups(
+    // * Separate the resource groups from the non-resource groups
+    // * non-resource groups are kept as is
+    // * resource groups are merged into the correct format as deltas to the source data
+    //   * Remove resource group data from the deltas
+    //   * Attempt to read the existing resource group data or create a new empty container
+    //   * Apply the deltas to the resource group data
+    // The process for translating Move deltas of resource groups to resources is
+    // * Add -- insert element in container
+    //   * If entry exists, Unreachable
+    //   * If group exists, Modify
+    //   * If group doesn't exist, Add
+    // * Modify -- update element in container
+    //   * If group or data doesn't exist, Unreachable
+    //   * Otherwise modify
+    // * Delete -- remove element from container
+    //   * If group or data does't exist, Unreachable
+    //   * If elements remain, Modify
+    //   * Otherwise delete
+    fn split_and_merge_resource_groups(
         remote: &MoveResolverWithVMMetadata<S>,
         change_set: MoveChangeSet,
-    ) -> VMResult<MoveChangeSet> {
+    ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = PartialVMError::new(StatusCode::UNREACHABLE).finish(Location::Undefined);
-        let mut change_set_grouped = MoveChangeSet::new();
+        let mut change_set_filtered = MoveChangeSet::new();
+        let mut resource_group_change_set = MoveChangeSet::new();
+
         for (addr, account_changeset) in change_set.into_inner() {
             let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
-            let mut account_changeset_grouped = AccountChangeSet::new();
             let (modules, resources) = account_changeset.into_inner();
 
-            // * Separate the resource groups from the non-resource groups
-            // * non-resource groups are kept as is
-            // * resource groups are merged into the correct format as deltas to the source data
-            //   * Remove resource group data from the deltas
-            //   * Attempt to read the existing resource group data or create a new empty container
-            //   * Apply the deltas to the resource group data
-            // The process for translating Move deltas of resource groups to resources is
-            // * Add -- insert element in container
-            //   * If entry exists, Unreachable
-            //   * If group exists, Modify
-            //   * If group doesn't exist, Add
-            // * Modify -- update element in container
-            //   * If group or data doesn't exist, Unreachable
-            //   * Otherwise modify
-            // * Delete -- remove element from container
-            //   * If group or data does't exist, Unreachable
-            //   * If elements remain, Modify
-            //   * Otherwise delete
             for (struct_tag, blob_op) in resources {
                 let resource_group = remote
                     .get_resource_group(&struct_tag)
@@ -234,10 +237,16 @@ where
                         .add_resource_op(struct_tag, blob_op)
                         .map_err(|_| common_error.clone())?;
                 } else {
-                    account_changeset_grouped
-                        .add_resource_op(struct_tag, blob_op)
+                    change_set_filtered
+                        .add_resource_op(addr, struct_tag, blob_op)
                         .map_err(|_| common_error.clone())?;
                 }
+            }
+
+            for (name, blob_op) in modules {
+                change_set_filtered
+                    .add_module_op(ModuleId::new(addr, name), blob_op)
+                    .map_err(|_| common_error.clone())?;
             }
 
             for (resource_tag, resources) in resource_groups {
@@ -285,23 +294,13 @@ where
                         bcs::to_bytes(&source_data).map_err(|_| common_error.clone())?,
                     )
                 };
-                account_changeset_grouped
-                    .add_resource_op(resource_tag, op)
+                resource_group_change_set
+                    .add_resource_op(addr, resource_tag, op)
                     .map_err(|_| common_error.clone())?;
             }
-
-            for (name, blob_op) in modules {
-                account_changeset_grouped
-                    .add_module_op(name, blob_op)
-                    .map_err(|_| common_error.clone())?;
-            }
-
-            change_set_grouped
-                .add_account_changeset(addr, account_changeset_grouped)
-                .map_err(|_| common_error.clone())?;
         }
 
-        Ok(change_set_grouped)
+        Ok((change_set_filtered, resource_group_change_set))
     }
 }
 
@@ -321,6 +320,7 @@ impl<'r, 'l, S> DerefMut for SessionExt<'r, 'l, S> {
 
 pub struct SessionOutput {
     pub change_set: MoveChangeSet,
+    pub resource_group_change_set: MoveChangeSet,
     pub events: Vec<MoveEvent>,
     pub table_change_set: TableChangeSet,
     pub aggregator_change_set: AggregatorChangeSet,
@@ -358,6 +358,7 @@ impl SessionOutput {
         use MoveStorageOp::*;
         let Self {
             change_set,
+            resource_group_change_set,
             events,
             table_change_set,
             aggregator_change_set,
@@ -392,6 +393,25 @@ impl SessionOutput {
                     Modify(blob) => WriteOp::Modification(blob),
                 };
 
+                write_set_mut.insert((StateKey::AccessPath(ap), op))
+            }
+        }
+
+        for (addr, account_changeset) in resource_group_change_set.into_inner() {
+            let (_, resources) = account_changeset.into_inner();
+            for (struct_tag, blob_op) in resources {
+                let ap = ap_cache.get_resource_group_path(addr, struct_tag);
+                let op = match blob_op {
+                    Delete => WriteOp::Deletion,
+                    New(blob) => {
+                        if configs.creation_as_modification() {
+                            WriteOp::Modification(blob)
+                        } else {
+                            WriteOp::Creation(blob)
+                        }
+                    },
+                    Modify(blob) => WriteOp::Modification(blob),
+                };
                 write_set_mut.insert((StateKey::AccessPath(ap), op))
             }
         }
@@ -460,6 +480,10 @@ impl SessionOutput {
         // Squash aggregator changes.
         self.aggregator_change_set
             .squash(other.aggregator_change_set)?;
+
+        self.resource_group_change_set
+            .squash(other.resource_group_change_set)
+            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
 
         Ok(())
     }

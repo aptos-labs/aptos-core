@@ -56,11 +56,13 @@ pub struct AccessPath {
 pub enum Path {
     Code(ModuleId),
     Resource(StructTag),
+    ResourceGroup(StructTag),
 }
 
 pub enum PathType {
     Code,
     Resource,
+    ResourceGroup,
 }
 
 impl AccessPath {
@@ -78,6 +80,19 @@ impl AccessPath {
         AccessPath {
             address,
             path: AccessPath::resource_path_vec(type_),
+        }
+    }
+
+    pub fn resource_group_path_vec(tag: StructTag) -> Vec<u8> {
+        bcs::to_bytes(&Path::ResourceGroup(tag)).expect("Unexpected serialization error")
+    }
+
+    /// Convert Accesses into a byte offset which would be used by the storage layer to resolve
+    /// where fields are stored.
+    pub fn resource_group_access_path(address: AccountAddress, type_: StructTag) -> AccessPath {
+        AccessPath {
+            address,
+            path: AccessPath::resource_group_path_vec(type_),
         }
     }
 
@@ -101,6 +116,7 @@ impl AccessPath {
     pub fn get_struct_tag(&self) -> Option<StructTag> {
         match self.get_path() {
             Path::Resource(s) => Some(s),
+            Path::ResourceGroup(s) => Some(s),
             Path::Code(_) => None,
         }
     }
@@ -134,6 +150,7 @@ impl fmt::Display for AccessPath {
             match self.path[0] {
                 p if p == PathType::Resource as u8 => write!(f, "type: Resource, ")?,
                 p if p == PathType::Code as u8 => write!(f, "type: Module, ")?,
+                p if p == PathType::ResourceGroup as u8 => write!(f, "type: ResourceGroup, ")?,
                 tag => write!(f, "type: {:?}, ", tag)?,
             };
             write!(

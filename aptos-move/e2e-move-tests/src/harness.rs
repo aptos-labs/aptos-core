@@ -380,7 +380,8 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
-        self.read_resource_raw(addr, struct_tag)
+        let path = AccessPath::resource_group_access_path(*addr, struct_tag);
+        self.read_state_value(&StateKey::AccessPath(path))
             .map(|data| bcs::from_bytes(&data).unwrap())
     }
 
