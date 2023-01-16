@@ -29,7 +29,7 @@ spec aptos_framework::voting {
         early_resolution_vote_threshold: Option<u128>,
         metadata: SimpleMap<String, vector<u8>>,
     ): u64 {
-        include CreateProposal<ProposalType>{is_multi_step_proposal: false};
+        include CreateProposalAbortsIf<ProposalType>{is_multi_step_proposal: false};
     }
 
     /// The min_vote_threshold lower thanearly_resolution_vote_threshold.
@@ -48,10 +48,10 @@ spec aptos_framework::voting {
         metadata: SimpleMap<String, vector<u8>>,
         is_multi_step_proposal: bool,
     ): u64 {
-        include CreateProposal<ProposalType>;
+        include CreateProposalAbortsIf<ProposalType>;
     }
 
-    spec schema CreateProposal<ProposalType> {
+    spec schema CreateProposalAbortsIf<ProposalType> {
         use aptos_framework::chain_status;
 
         voting_forum_address: address;
@@ -60,7 +60,7 @@ spec aptos_framework::voting {
         early_resolution_vote_threshold: Option<u128>;
         metadata: SimpleMap<String, vector<u8>>;
         is_multi_step_proposal: bool;
-        
+
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal_id = voting_forum.next_proposal_id;
 
@@ -87,7 +87,7 @@ spec aptos_framework::voting {
         should_pass: bool,
     ) {
         use aptos_framework::chain_status;
-        requires chain_status::is_operating(); // Ensures existence of Timestamp 
+        requires chain_status::is_operating(); // Ensures existence of Timestamp
 
         aborts_if !exists<VotingForum<ProposalType>>(voting_forum_address);
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
@@ -101,7 +101,7 @@ spec aptos_framework::voting {
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         let execution_key = std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         aborts_if simple_map::spec_contains_key(proposal.metadata, execution_key) &&
-                  simple_map::spec_get(proposal.metadata, execution_key) != std::bcs::spec_to_bytes(false);
+                  simple_map::spec_get(proposal.metadata, execution_key) != std::bcs::serialize(false);
         aborts_if if (should_pass) { proposal.yes_votes + num_votes > MAX_U128 } else { proposal.no_votes + num_votes > MAX_U128 };
 
         aborts_if !std::string::spec_internal_check_utf8(RESOLVABLE_TIME_METADATA_KEY);
@@ -113,7 +113,7 @@ spec aptos_framework::voting {
     ) {
         use aptos_framework::chain_status;
 
-        requires chain_status::is_operating(); // Ensures existence of Timestamp 
+        requires chain_status::is_operating(); // Ensures existence of Timestamp
 
         // If the proposal is not resolvable, this function aborts.
 
@@ -126,7 +126,7 @@ spec aptos_framework::voting {
         proposal_id: u64,
     ): ProposalType {
         use aptos_framework::chain_status;
-        requires chain_status::is_operating(); // Ensures existence of Timestamp 
+        requires chain_status::is_operating(); // Ensures existence of Timestamp
 
         pragma aborts_if_is_partial;
         include AbortsIfNotContainProposalID<ProposalType>;
@@ -139,7 +139,7 @@ spec aptos_framework::voting {
         next_execution_hash: vector<u8>,
     ) {
         use aptos_framework::chain_status;
-        requires chain_status::is_operating(); // Ensures existence of Timestamp 
+        requires chain_status::is_operating(); // Ensures existence of Timestamp
 
         pragma aborts_if_is_partial;
         include AbortsIfNotContainProposalID<ProposalType>;
@@ -149,7 +149,7 @@ spec aptos_framework::voting {
 
     spec is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool {
         use aptos_framework::chain_status;
-        requires chain_status::is_operating(); // Ensures existence of Timestamp 
+        requires chain_status::is_operating(); // Ensures existence of Timestamp
         include AbortsIfNotContainProposalID<ProposalType>;
     }
 
@@ -162,7 +162,7 @@ spec aptos_framework::voting {
         proposal_id: u64,
     ): u64 {
         use aptos_framework::chain_status;
-        requires chain_status::is_operating(); // Ensures existence of Timestamp 
+        requires chain_status::is_operating(); // Ensures existence of Timestamp
         // Addition of yes_votes and no_votes might overflow.
         pragma addition_overflow_unchecked;
         include AbortsIfNotContainProposalID<ProposalType>;
