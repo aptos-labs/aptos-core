@@ -24,16 +24,13 @@ use aptos_types::{
     transaction::{ChangeSet, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
 };
-use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
-    CompiledModule,
-};
+use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{
         AccountChangeSet, ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp,
     },
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag},
     vm_status::{StatusCode, VMStatus},
 };
 use move_table_extension::{NativeTableContext, TableChange, TableChangeSet};
@@ -139,61 +136,6 @@ where
         ctx.requested_module_bundle.take()
     }
 
-    pub fn validate_resource_groups(&self, modules: &[CompiledModule]) -> VMResult<()> {
-        for module in modules {
-            let metadata = if let Some(metadata) = aptos_framework::get_module_metadata(module) {
-                metadata
-            } else {
-                continue;
-            };
-
-            for attrs in metadata.struct_attributes.values() {
-                let attr =
-                    if let Some(attr) = attrs.iter().find(|attr| attr.is_resource_group_member()) {
-                        attr
-                    } else {
-                        continue;
-                    };
-
-                // This should be validated during loading of data.
-                let group = attr.get_resource_group_member().ok_or_else(|| {
-                    PartialVMError::new(StatusCode::UNREACHABLE).finish(Location::Undefined)
-                })?;
-
-                // Make sure the type is in the module metadata is cached.
-                self.load_type(&TypeTag::Struct(Box::new(group.clone())))?;
-                // This might not exist, in which case, it is a failure.
-                let group_module_metadata = self
-                    .remote
-                    .get_module_metadata(group.module_id())
-                    .ok_or_else(|| {
-                        PartialVMError::new(StatusCode::LINKER_ERROR).finish(Location::Undefined)
-                    })?;
-
-                // This might not exist, in which case, it is a failure.
-                let scope = group_module_metadata
-                    .struct_attributes
-                    .get(group.name.as_str())
-                    .and_then(|container_metadata| {
-                        container_metadata
-                            .iter()
-                            .find(|attr| attr.is_resource_group())
-                    })
-                    .and_then(|container| container.get_resource_group())
-                    .ok_or_else(|| {
-                        PartialVMError::new(StatusCode::LINKER_ERROR).finish(Location::Undefined)
-                    })?;
-
-                if !scope.are_equal_module_ids(&module.self_id(), &group.module_id()) {
-                    return Err(
-                        PartialVMError::new(StatusCode::LINKER_ERROR).finish(Location::Undefined)
-                    );
-                }
-            }
-        }
-        Ok(())
-    }
-
     // * Separate the resource groups from the non-resource groups
     // * non-resource groups are kept as is
     // * resource groups are merged into the correct format as deltas to the source data
@@ -218,7 +160,8 @@ where
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
-        let common_error = PartialVMError::new(StatusCode::UNREACHABLE).finish(Location::Undefined);
+        let common_error = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+            .finish(Location::Undefined);
         let mut change_set_filtered = MoveChangeSet::new();
         let mut resource_group_change_set = MoveChangeSet::new();
 

@@ -499,7 +499,7 @@ impl ResourceGroupScope {
         }
     }
 
-    pub fn are_equal_envs(self, resource: &StructEnv, group: &StructEnv) -> bool {
+    pub fn are_equal_envs(&self, resource: &StructEnv, group: &StructEnv) -> bool {
         match self {
             ResourceGroupScope::Global => true,
             ResourceGroupScope::Address => {
@@ -511,7 +511,7 @@ impl ResourceGroupScope {
         }
     }
 
-    pub fn are_equal_module_ids(self, resource: &ModuleId, group: &ModuleId) -> bool {
+    pub fn are_equal_module_ids(&self, resource: &ModuleId, group: &ModuleId) -> bool {
         match self {
             ResourceGroupScope::Global => true,
             ResourceGroupScope::Address => resource.address() == group.address(),

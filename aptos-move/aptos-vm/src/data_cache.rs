@@ -135,7 +135,8 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
         if let Some(group_data) = group_data {
             let mut group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
                 .map_err(|_| {
-                    PartialVMError::new(StatusCode::UNREACHABLE).finish(Location::Undefined)
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .finish(Location::Undefined)
                 })?;
             Ok(group_data.remove(struct_tag))
         } else {
@@ -171,7 +172,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
-        // For our current perf evaluation, the ordering here actually has a substantial impact.
+        // For our current perf evaluation, the ordering of operations has a substantial impact.
         // This is interesting because resources groups are already cached in the VM and the query
         // should be really fast.
         let ap = AccessPath::resource_access_path(*address, struct_tag.clone());
