@@ -596,3 +596,41 @@ test(
   },
   longTestTimeout,
 );
+
+test.only("submit batch transactions", async () => {
+  const client = new AptosClient(NODE_URL);
+  const faucetClient = getFaucetClient();
+
+  const account1 = new AptosAccount();
+  await faucetClient.fundAccount(account1.address(), 100_000_000);
+
+  const account2 = new AptosAccount();
+  await faucetClient.fundAccount(account2.address(), 0);
+
+  const account3 = new AptosAccount();
+  await faucetClient.fundAccount(account3.address(), 0);
+
+  const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
+
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
+      "0x1::coin",
+      "transfer",
+      [token],
+      [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account2.address())), bcsSerializeUint64(717)],
+    ),
+  );
+
+  const entryFunctionPayload1 = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
+      "0x1::coin",
+      "transfer",
+      [token],
+      [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account3.address())), bcsSerializeUint64(717)],
+    ),
+  );
+
+  const transactions = await client.generateBatchTransactions(account1, [entryFunctionPayload, entryFunctionPayload1]);
+  await client.submitBatchTransactions(transactions);
+  console.log(transactions);
+});
