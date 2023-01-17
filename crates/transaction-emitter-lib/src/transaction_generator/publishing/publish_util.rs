@@ -211,7 +211,7 @@ fn publish_transaction(
     for module in modules {
         let mut module_code: Vec<u8> = vec![];
         module
-            .serialize(&mut module_code)
+            .serialize_for_version(Some(5), &mut module_code)
             .expect("Module must serialize");
         code.push(module_code);
     }
