@@ -32,11 +32,11 @@ fn random_bytes(len: usize) -> Vec<u8> {
         .collect()
 }
 
-fn random_p1() -> blst::blst_p1 {
+fn random_p1() -> blst_p1 {
     let msg = random_bytes(64);
     let dst = random_bytes(64);
     let aug = random_bytes(64);
-    let mut point = blst::blst_p1::default();
+    let mut point = blst_p1::default();
     unsafe { blst::blst_hash_to_g1(&mut point, msg.as_ptr(), msg.len(), dst.as_ptr(), dst.len(), aug.as_ptr(), aug.len()); }
     point
 }
@@ -70,19 +70,68 @@ fn bench_group(c: &mut Criterion) {
 
     group.throughput(Throughput::Elements(1));
 
-    group.bench_function("hash_64_bytes_to_g1", move |b| {
+    group.bench_function("g1_affine_serialize_comp", move |b| {
         b.iter_with_setup(
             || {
-                let msg = random_bytes(64);
-                let dst = random_bytes(64);
-                let aug = random_bytes(64);
-                (msg,dst,aug)
+                random_p1_affine()
             },
-            |(msg,dst,aug)| {
-                let mut point = blst::blst_p1::default();
-                unsafe {
-                    blst::blst_hash_to_g1(&mut point, msg.as_ptr(), msg.len(), dst.as_ptr(), dst.len(), aug.as_ptr(), aug.len());
-                }
+            |p_affine| {
+                let mut out = vec![0_u8; 48];
+                unsafe { blst::blst_p1_affine_compress(out.as_mut_ptr(), &p_affine); }
+            }
+        )
+    });
+
+    group.bench_function("g1_affine_serialize_uncomp", move |b| {
+        b.iter_with_setup(
+            || {
+                random_p1_affine()
+            },
+            |p_affine| {
+                let mut out = vec![0_u8; 96];
+                unsafe { blst::blst_p1_affine_serialize(out.as_mut_ptr(), &p_affine); }
+            }
+        )
+    });
+
+    group.bench_function("g1_proj_serialize", move |b| {
+        b.iter_with_setup(
+            || {
+                random_p1()
+            },
+            |p| {
+                let mut out = vec![0_u8; 144];
+                unsafe { blst::blst_p1_serialize(out.as_mut_ptr(), &p); }
+            }
+        )
+    });
+
+    group.bench_function("g1_affine_deserialize_uncomp", move |b| {
+        b.iter_with_setup(
+            || {
+                let p_affine = random_p1_affine();
+                let mut buf = vec![0_u8; 96];
+                unsafe { blst::blst_p1_affine_serialize(buf.as_mut_ptr(), &p_affine); }
+                buf
+            },
+            |buf| {
+                let mut p_affine = blst::blst_p1_affine::default();
+                unsafe { blst::blst_p1_deserialize(&mut p_affine, buf.as_ptr()); }
+            }
+        )
+    });
+
+    group.bench_function("g1_affine_deserialize_comp", move |b| {
+        b.iter_with_setup(
+            || {
+                let p_affine = random_p1_affine();
+                let mut buf = vec![0_u8; 48];
+                unsafe { blst::blst_p1_affine_compress(buf.as_mut_ptr(), &p_affine); }
+                buf
+            },
+            |buf| {
+                let mut p_affine = blst::blst_p1_affine::default();
+                unsafe { blst::blst_p1_uncompress(&mut p_affine, buf.as_ptr()); }
             }
         )
     });
@@ -95,11 +144,30 @@ fn bench_group(c: &mut Criterion) {
                 (point, scalar_bytes)
             },
             |(point, scalar_bytes)| {
-                let mut out = blst::blst_p1::default();
+                let mut out = blst_p1::default();
                 unsafe { blst::blst_p1_mult(&mut out, &point, scalar_bytes.as_ptr(), 256); }
             }
         )
     });
+
+    for input_byte_length in [64, 1024] {
+        group.bench_function(format!("hash_{input_byte_length}_bytes_to_g1_proj").as_str(), move |b| {
+            b.iter_with_setup(
+                || {
+                    let msg = random_bytes(input_byte_length);
+                    let dst = random_bytes(64);
+                    let aug = random_bytes(64);
+                    (msg,dst,aug)
+                },
+                |(msg,dst,aug)| {
+                    let mut point = blst_p1::default();
+                    unsafe {
+                        blst::blst_hash_to_g1(&mut point, msg.as_ptr(), msg.len(), dst.as_ptr(), dst.len(), aug.as_ptr(), aug.len());
+                    }
+                }
+            )
+        });
+    }
 
     for num_pairs in [1,2,4,8] {
         group.bench_function(format!("{num_pairs}_pairing_product").as_str(), move |b| {
@@ -125,31 +193,12 @@ fn bench_group(c: &mut Criterion) {
         });
     }
 
-    group.bench_function("hash_1024_bytes_to_g1", move |b| {
-        b.iter_with_setup(
-            || {
-                let msg = random_bytes(1024);
-                let dst = random_bytes(64);
-                let aug = random_bytes(64);
-                (msg,dst,aug)
-            },
-            |(msg,dst,aug)| {
-                let mut point = blst::blst_p1::default();
-                unsafe {
-                    blst::blst_hash_to_g1(&mut point, msg.as_ptr(), msg.len(), dst.as_ptr(), dst.len(), aug.as_ptr(), aug.len());
-                }
-            }
-        )
-    });
-
     for scalar_count in [16, 1024] {
         let bench_id = format!("g1_affine_{scalar_count}sm");
         group.bench_function(bench_id.as_str(), move |b| {
             b.iter_with_setup(
                 || {
-                    let p1 = unsafe { unsafe { blst::blst_p1_generator() }.read() };
-                    let p2 = unsafe { unsafe { blst::blst_p2_generator() }.read() };
-                    let points: Vec<blst::blst_p1> = (0..scalar_count).map(|_i| random_p1()).collect();
+                    let points: Vec<blst_p1> = (0..scalar_count).map(|_i| random_p1()).collect();
                     let affine_points = blst::p1_affines::from(points.as_slice());
                     let scalars_bytes = random_bytes(256 * scalar_count);
                     (affine_points, scalars_bytes)

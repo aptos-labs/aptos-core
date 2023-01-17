@@ -27,6 +27,8 @@ use ark_ec::ProjectiveCurve;
 use ark_ff::UniformRand;
 use ark_ff::PrimeField;
 use std::ops::Mul;
+use ark_bls12_381::{Fr, G1Affine};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 struct TestAptosCrypto(String);
@@ -38,28 +40,92 @@ fn random_bytes(len: usize) -> Vec<u8> {
         .collect()
 }
 
-fn random_p1() -> blst::blst_p1 {
-    let msg = random_bytes(64);
-    let dst = random_bytes(64);
-    let aug = random_bytes(64);
-    let mut point = blst_p1::default();
-    unsafe { blst::blst_hash_to_g1(&mut point, msg.as_ptr(), msg.len(), dst.as_ptr(), dst.len(), aug.as_ptr(), aug.len()); }
-    point
-}
-
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("ark_bls12_381");
 
-    group.throughput(Throughput::Elements(1));
+    group.bench_function("fr_serialize", move |b| {
+        b.iter_with_setup(
+            || {
+                Fr::rand(&mut test_rng())
+            },
+            |k| {
+                let mut buf = vec![];
+                k.serialize_uncompressed(&mut buf).unwrap();
+            }
+        )
+    });
+
+    group.bench_function("g1_affine_serialize_uncomp", move |b| {
+        b.iter_with_setup(
+            || {
+                let k = Fr::rand(&mut test_rng());
+                G1Affine::prime_subgroup_generator().mul(k).into_affine()
+            },
+            |p_affine| {
+                let mut buf = vec![];
+                p_affine.serialize_uncompressed(&mut buf).unwrap();
+            }
+        )
+    });
+
+    group.bench_function("g1_affine_deserialize_uncomp", move |b| {
+        b.iter_with_setup(
+            || {
+                let k = Fr::rand(&mut test_rng());
+                let mut buf = vec![];
+                G1Affine::prime_subgroup_generator().mul(k).into_affine().serialize_uncompressed(&mut buf);
+                buf
+            },
+            |buf| {
+                let _p = G1Affine::deserialize_unchecked(buf.as_slice()).unwrap();
+            }
+        )
+    });
 
     group.bench_function("g1_proj_scalar_mul", move |b| {
         b.iter_with_setup(
             || {
+                let p_proj = ark_bls12_381::G1Projective::rand(&mut test_rng());
+                let scalar = Fr::rand(&mut test_rng());
+                (p_proj, scalar)
             },
-            |_| {
-                let p = ark_bls12_381::G1Projective::rand(&mut test_rng());
-                let s = ark_bls12_381::Fr::rand(&mut test_rng());
-                let _ = p.mul(s.into_repr());
+            |(p_proj, scalar)| {
+                let _ = p_proj.mul(scalar.into_repr());
+            }
+        )
+    });
+
+    group.bench_function("g1_proj_add", move |b| {
+        b.iter_with_setup(
+            || {
+                let p_proj_0 = ark_bls12_381::G1Projective::rand(&mut test_rng());
+                let p_proj_1 = ark_bls12_381::G1Projective::rand(&mut test_rng());
+                (p_proj_0, p_proj_1)
+            },
+            |(p_proj_0, p_proj_1)| {
+                let _ = p_proj_0 + p_proj_1;
+            }
+        )
+    });
+
+    group.bench_function("g1_proj_to_affine", move |b| {
+        b.iter_with_setup(
+            || {
+                ark_bls12_381::G1Projective::rand(&mut test_rng())
+            },
+            |p_proj| {
+                let _ = p_proj.into_affine();
+            }
+        )
+    });
+
+    group.bench_function("g1_affine_to_proj", move |b| {
+        b.iter_with_setup(
+            || {
+                G1Affine::prime_subgroup_generator().mul(Fr::rand(&mut test_rng())).into_affine()
+            },
+            |p_affine| {
+                let _ = p_affine.into_projective();
             }
         )
     });
@@ -74,11 +140,11 @@ fn bench_group(c: &mut Criterion) {
                             ..num_pairs)
                             .map(|i| {
                                 let p1 = ark_bls12_381::G1Affine::prime_subgroup_generator()
-                                    .mul(ark_bls12_381::Fr::rand(&mut test_rng()))
+                                    .mul(Fr::rand(&mut test_rng()))
                                     .into_affine();
                                 let p1p = ark_ec::prepare_g1::<ark_bls12_381::Bls12_381>(p1);
                                 let p2 = ark_bls12_381::G2Affine::prime_subgroup_generator()
-                                    .mul(ark_bls12_381::Fr::rand(&mut test_rng()))
+                                    .mul(Fr::rand(&mut test_rng()))
                                     .into_affine();
                                 let p2p = ark_ec::prepare_g2::<ark_bls12_381::Bls12_381>(p2);
                                 (p1p, p2p)

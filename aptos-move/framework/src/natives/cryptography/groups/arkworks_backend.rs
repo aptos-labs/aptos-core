@@ -1229,6 +1229,182 @@ fn element_mul_scalar_internal(
     }
 }
 
+fn ark_g1_affine_to_blst_g1_affine(ark: &ark_bls12_381::G1Affine) -> blst::blst_p1_affine {
+    let mut buf = vec![];
+    ark.serialize_uncompressed(&mut buf).unwrap();
+    let is_inf = (buf[95] & 0x40) != 0;
+    if is_inf {
+        buf[0] |= 0x40;
+        buf[48] = 0;
+        buf[95] = 0;
+    } else {
+        buf.as_mut_slice()[0..48].reverse();
+        buf.as_mut_slice()[48..96].reverse();
+    }
+    let mut ret = blst::blst_p1_affine::default();
+    unsafe { blst::blst_p1_deserialize(&mut ret, buf.as_ptr()); }
+    ret
+}
+
+#[test]
+fn test_ark_g1_affine_to_blst_g1_affine() {
+    // Generator.
+    let expected = unsafe { blst::blst_p1_affine_generator().read() };
+    let actual = ark_g1_affine_to_blst_g1_affine(&ark_bls12_381::G1Affine::prime_subgroup_generator());
+    unsafe { assert!(blst::blst_p1_affine_is_equal(&expected, &actual)); }
+
+    // Generator negated.
+    let mut blst_generator_neg = unsafe { blst::blst_p1_generator().read() };
+    unsafe { blst::blst_p1_cneg(&mut blst_generator_neg, true); }
+    let mut expected = blst::blst_p1_affine::default();
+    unsafe { blst::blst_p1_to_affine(&mut expected, &blst_generator_neg); }
+    let actual = ark_g1_affine_to_blst_g1_affine(&ark_bls12_381::G1Affine::prime_subgroup_generator().neg());
+    unsafe { assert!(blst::blst_p1_affine_is_equal(&expected, &actual)); }
+
+    // Infinity.
+    let blst_generator = unsafe { blst::blst_p1_generator().read() };
+    let scalar_0_bytes = vec![0_u8; 32];
+    let mut blst_inf = blst::blst_p1::default();
+    unsafe { blst::blst_p1_mult(&mut blst_inf, &blst_generator, scalar_0_bytes.as_ptr(), 256); }
+    let mut expected = blst::blst_p1_affine::default();
+    unsafe { blst::blst_p1_to_affine(&mut expected, &blst_inf); }
+    let actual = ark_g1_affine_to_blst_g1_affine(&ark_bls12_381::G1Affine::zero());
+    unsafe { assert!(blst::blst_p1_affine_is_equal(&expected, &actual)); }
+}
+
+fn blst_g1_affine_to_ark_g1_affine(blst_point: &blst::blst_p1_affine) -> ark_bls12_381::G1Affine {
+    let mut buf = vec![0; 96];
+    unsafe { blst::blst_p1_affine_serialize(buf.as_mut_ptr(), blst_point); }
+    let is_inf = (buf[0] & 0x40) != 0;
+    if is_inf {
+        buf[95] |= 0x40;
+        buf[48] = 0x01;
+        buf[0] = 0;
+    } else {
+        buf.as_mut_slice()[0..48].reverse();
+        buf.as_mut_slice()[48..96].reverse();
+    }
+    ark_bls12_381::G1Affine::deserialize_uncompressed(buf.as_slice()).unwrap()
+}
+
+#[test]
+fn test_blst_g1_affine_to_ark_g1_affine() {
+    // Generator.
+    let blst_generator = unsafe { blst::blst_p1_affine_generator().read() };
+    let actual = blst_g1_affine_to_ark_g1_affine(&blst_generator);
+    let expected = ark_bls12_381::G1Affine::prime_subgroup_generator();
+    assert_eq!(expected, actual);
+
+    // Generator negated.
+    let mut blst_generator_neg = unsafe { blst::blst_p1_generator().read() };
+    unsafe { blst::blst_p1_cneg(&mut blst_generator_neg, true); }
+    let mut blst_generator_neg_affine = blst::blst_p1_affine::default();
+    unsafe { blst::blst_p1_to_affine(&mut blst_generator_neg_affine, &blst_generator_neg); }
+    let actual = blst_g1_affine_to_ark_g1_affine(&blst_generator_neg_affine);
+    let expected = ark_bls12_381::G1Affine::prime_subgroup_generator().neg();
+    assert_eq!(expected, actual);
+
+    // Infinity.
+    let blst_generator = unsafe { blst::blst_p1_generator().read() };
+    let scalar_0_bytes = vec![0_u8; 32];
+    let mut blst_inf = blst::blst_p1::default();
+    unsafe { blst::blst_p1_mult(&mut blst_inf, &blst_generator, scalar_0_bytes.as_ptr(), 256); }
+    let mut blst_inf_affine = blst::blst_p1_affine::default();
+    unsafe { blst::blst_p1_to_affine(&mut blst_inf_affine, &blst_inf); }
+    let actual = blst_g1_affine_to_ark_g1_affine(&blst_inf_affine);
+    let expected = ark_bls12_381::G1Affine::zero();
+    assert_eq!(expected, actual);
+
+
+}
+
+fn ark_g2_affine_to_blst_g2_affine(ark: &ark_bls12_381::G2Affine) -> blst::blst_p2_affine {
+    let mut buf = Vec::with_capacity(192);
+    ark.serialize_uncompressed(&mut buf).unwrap();
+    let is_inf = (buf[191] & 0x40) != 0;
+    if is_inf {
+        buf[0] |= 0x40;
+        buf[96] = 0;
+        buf[191] = 0;
+    } else {
+        buf.as_mut_slice()[0..96].reverse();
+        buf.as_mut_slice()[96..192].reverse();
+    }
+    let mut ret = blst::blst_p2_affine::default();
+    unsafe { blst::blst_p2_deserialize(&mut ret, buf.as_ptr()); }
+    ret
+}
+
+#[test]
+fn test_ark_g2_affine_to_blst_g2_affine() {
+    // Generator.
+    let expected = unsafe { blst::blst_p2_affine_generator().read() };
+    let actual = ark_g2_affine_to_blst_g2_affine(&ark_bls12_381::G2Affine::prime_subgroup_generator());
+    unsafe { assert!(blst::blst_p2_affine_is_equal(&expected, &actual)); }
+
+    // Generator negated.
+    let mut blst_generator_neg = unsafe { blst::blst_p2_generator().read() };
+    unsafe { blst::blst_p2_cneg(&mut blst_generator_neg, true); }
+    let mut expected = blst::blst_p2_affine::default();
+    unsafe { blst::blst_p2_to_affine(&mut expected, &blst_generator_neg); }
+    let actual = ark_g2_affine_to_blst_g2_affine(&ark_bls12_381::G2Affine::prime_subgroup_generator().neg());
+    unsafe { assert!(blst::blst_p2_affine_is_equal(&expected, &actual)); }
+
+    // Infinity.
+    let blst_generator = unsafe { blst::blst_p2_generator().read() };
+    let scalar_0_bytes = vec![0_u8; 32];
+    let mut blst_inf = blst::blst_p2::default();
+    unsafe { blst::blst_p2_mult(&mut blst_inf, &blst_generator, scalar_0_bytes.as_ptr(), 256); }
+    let mut expected = blst::blst_p2_affine::default();
+    unsafe { blst::blst_p2_to_affine(&mut expected, &blst_inf); }
+    let actual = ark_g2_affine_to_blst_g2_affine(&ark_bls12_381::G2Affine::zero());
+    unsafe { assert!(blst::blst_p2_affine_is_equal(&expected, &actual)); }
+}
+
+fn blst_g2_affine_to_ark_g2_affine(blst_point: &blst::blst_p2_affine) -> ark_bls12_381::G2Affine {
+    let mut buf = vec![0; 192];
+    unsafe { blst::blst_p2_affine_serialize(buf.as_mut_ptr(), blst_point); }
+    let is_inf = (buf[0] & 0x40) != 0;
+    if is_inf {
+        buf[191] |= 0x40;
+        buf[96] = 0x01;
+        buf[0] = 0;
+    } else {
+        buf.as_mut_slice()[0..96].reverse();
+        buf.as_mut_slice()[96..192].reverse();
+    }
+    ark_bls12_381::G2Affine::deserialize_uncompressed(buf.as_slice()).unwrap()
+}
+
+#[test]
+fn test_blst_g2_affine_to_ark_g2_affine() {
+    // Generator.
+    let blst_generator = unsafe { blst::blst_p2_affine_generator().read() };
+    let actual = blst_g2_affine_to_ark_g2_affine(&blst_generator);
+    let expected = ark_bls12_381::G2Affine::prime_subgroup_generator();
+    assert_eq!(expected, actual);
+
+    // Generator negated.
+    let mut blst_generator_neg = unsafe { blst::blst_p2_generator().read() };
+    unsafe { blst::blst_p2_cneg(&mut blst_generator_neg, true); }
+    let mut blst_generator_neg_affine = blst::blst_p2_affine::default();
+    unsafe { blst::blst_p2_to_affine(&mut blst_generator_neg_affine, &blst_generator_neg); }
+    let actual = blst_g2_affine_to_ark_g2_affine(&blst_generator_neg_affine);
+    let expected = ark_bls12_381::G2Affine::prime_subgroup_generator().neg();
+    assert_eq!(expected, actual);
+
+    // Infinity.
+    let blst_generator = unsafe { blst::blst_p2_generator().read() };
+    let scalar_0_bytes = vec![0_u8; 32];
+    let mut blst_inf = blst::blst_p2::default();
+    unsafe { blst::blst_p2_mult(&mut blst_inf, &blst_generator, scalar_0_bytes.as_ptr(), 256); }
+    let mut blst_inf_affine = blst::blst_p2_affine::default();
+    unsafe { blst::blst_p2_to_affine(&mut blst_inf_affine, &blst_inf); }
+    let actual = blst_g2_affine_to_ark_g2_affine(&blst_inf_affine);
+    let expected = ark_bls12_381::G2Affine::zero();
+    assert_eq!(expected, actual);
+}
+
 fn element_multi_scalar_mul_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -1246,58 +1422,76 @@ fn element_multi_scalar_mul_internal(
     if num_points == num_scalars {
         match type_tag.as_str() {
             "0x1::groups::BLS12_381_G1" => {
-                let points = point_handles.iter().map(|&handle|{
-                    context
+                // Using blst multi-scalar multiplication API for better performance.
+                let blst_points: Vec<blst::blst_p1> = point_handles.iter().map(|&handle|{
+                    let ark_point = context
                         .extensions()
                         .get::<Bls12381Context>()
                         .get_g1_point(handle as usize)
-                });
-                let scalars = scalar_handles.iter().map(|&handle|{
+                        .into_affine();
+                    let blst_g1_affine = ark_g1_affine_to_blst_g1_affine(&ark_point);
+                    let mut blst_g1_proj = blst::blst_p1::default();
+                    unsafe { blst::blst_p1_from_affine(&mut blst_g1_proj, &blst_g1_affine); }
+                    blst_g1_proj
+                }).collect();
+
+                let mut scalar_bytes: Vec<u8> = Vec::with_capacity(32 * num_scalars);
+                for &scalar_handle in scalar_handles.iter() {
+                    let mut buf = Vec::with_capacity(32);
                     context
                         .extensions()
                         .get::<Bls12381Context>()
-                        .get_scalar(handle as usize)
-                });
-
-                let mut result = G1Projective::zero();
-                for (point, scalar) in points.zip(scalars) {
-                    result.add_assign(point.mul(scalar.into_repr()));
+                        .get_scalar(scalar_handle as usize).serialize_uncompressed(&mut buf).unwrap();
+                    scalar_bytes.extend_from_slice(buf.as_slice());
                 }
 
+                let sum = blst::p1_affines::from(blst_points.as_slice()).mult(scalar_bytes.as_slice(), 256);
+                let mut sum_affine = blst::blst_p1_affine::default();
+                unsafe { blst::blst_p1_to_affine(&mut sum_affine, &sum); }
+                let result = blst_g1_affine_to_ark_g1_affine(&sum_affine).into_projective();
                 let handle = context
                     .extensions_mut()
                     .get_mut::<Bls12381Context>()
                     .add_g1_point(result);
                 Ok(NativeResult::ok(
-                    (gas_params.bls12_381.g1_proj_mul + gas_params.bls12_381.g1_proj_add) * NumArgs::from(num_points as u64),
+                    (gas_params.bls12_381.g1_proj_mul + gas_params.bls12_381.g1_proj_add) * NumArgs::from(num_points as u64), //TODO: update gas cost.
                     smallvec![Value::u64(handle as u64)],
                 ))
             }
             "0x1::groups::BLS12_381_G2" => {
-                let points = point_handles.iter().map(|&handle|{
-                    context
+                // Using blst multi-scalar multiplication API for better performance.
+                let blst_points: Vec<blst::blst_p2> = point_handles.iter().map(|&handle|{
+                    let ark_point = context
                         .extensions()
                         .get::<Bls12381Context>()
                         .get_g2_point(handle as usize)
-                });
-                let scalars = scalar_handles.iter().map(|&handle|{
+                        .into_affine();
+                    let blst_g2_affine = ark_g2_affine_to_blst_g2_affine(&ark_point);
+                    let mut blst_g2_proj = blst::blst_p2::default();
+                    unsafe { blst::blst_p2_from_affine(&mut blst_g2_proj, &blst_g2_affine); }
+                    blst_g2_proj
+                }).collect();
+
+                let mut scalar_bytes: Vec<u8> = Vec::with_capacity(32 * num_scalars);
+                for &scalar_handle in scalar_handles.iter() {
+                    let mut buf = Vec::with_capacity(32);
                     context
                         .extensions()
                         .get::<Bls12381Context>()
-                        .get_scalar(handle as usize)
-                });
-
-                let mut result = G2Projective::zero();
-                for (point, scalar) in points.zip(scalars) {
-                    result.add_assign(point.mul(scalar.into_repr()));
+                        .get_scalar(scalar_handle as usize).serialize_uncompressed(&mut buf).unwrap();
+                    scalar_bytes.extend_from_slice(buf.as_slice());
                 }
 
+                let sum = blst::p2_affines::from(blst_points.as_slice()).mult(scalar_bytes.as_slice(), 256);
+                let mut sum_affine = blst::blst_p2_affine::default();
+                unsafe { blst::blst_p2_to_affine(&mut sum_affine, &sum); }
+                let result = blst_g2_affine_to_ark_g2_affine(&sum_affine).into_projective();
                 let handle = context
                     .extensions_mut()
                     .get_mut::<Bls12381Context>()
                     .add_g2_point(result);
                 Ok(NativeResult::ok(
-                    (gas_params.bls12_381.g2_proj_mul + gas_params.bls12_381.g2_proj_add) * NumArgs::from(num_points as u64),
+                    (gas_params.bls12_381.g2_proj_mul + gas_params.bls12_381.g2_proj_add) * NumArgs::from(num_points as u64), //TODO: update gas cost.
                     smallvec![Value::u64(handle as u64)],
                 ))
             }
