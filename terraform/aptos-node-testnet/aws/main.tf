@@ -17,7 +17,7 @@ locals {
 }
 
 module "validator" {
-  source = "../aptos-node/aws"
+  source = "../../aptos-node/aws"
 
   manage_via_tf = var.manage_via_tf
 
@@ -93,7 +93,7 @@ provider "kubernetes" {
 }
 
 locals {
-  genesis_helm_chart_path = "${path.module}/../helm/genesis"
+  genesis_helm_chart_path = "${path.module}/../../helm/genesis"
 }
 
 
