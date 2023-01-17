@@ -23,7 +23,7 @@ use crate::{
     counters,
     logging::NetworkSchema,
     protocols::{
-        health_checker::interface::{HealthCheckData, HealthCheckNetworkInterface},
+        health_checker::interface::HealthCheckNetworkInterface,
         network::{
             Event, NetworkApplicationConfig, NetworkClientConfig, NetworkEvents,
             NetworkServiceConfig,
@@ -45,7 +45,7 @@ use futures::{
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::{collections::hash_map::Entry, time::Duration};
+use std::time::Duration;
 
 pub mod builder;
 mod interface;
@@ -154,13 +154,12 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
 
                     match event {
                         Event::NewPeer(metadata) => {
-                            self.network_interface.health_check_data().insert(
-                                metadata.remote_peer_id,
-                                HealthCheckData::new(self.round)
+                            self.network_interface.create_peer_and_health_data(
+                                metadata.remote_peer_id, self.round
                             );
                         }
                         Event::LostPeer(metadata) => {
-                            self.network_interface.health_check_data().remove(
+                            self.network_interface.remove_peer_and_health_data(
                                 &metadata.remote_peer_id
                             );
                         }
@@ -267,21 +266,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             ping.0,
         );
         // Record Ingress HC here and reset failures.
-        let _ = self
-            .network_interface
-            .health_check_data()
-            .write(peer_id, |entry| {
-                match entry {
-                    Entry::Vacant(..) => {
-                        // Don't do anything if there isn't an entry
-                    },
-                    Entry::Occupied(inner) => {
-                        let data = inner.get_mut();
-                        data.failures = 0;
-                    },
-                };
-                Ok(())
-            });
+        self.network_interface.reset_peer_failures(peer_id);
 
         let _ = res_tx.send(Ok(message.into()));
     }
@@ -306,25 +291,8 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                     );
                     // Update last successful ping to current round.
                     // If it's not in storage, don't bother updating it
-                    let _ = self
-                        .network_interface
-                        .health_check_data()
-                        .write(peer_id, |entry| {
-                            match entry {
-                                Entry::Vacant(..) => {
-                                    // Don't do anything if there isn't an entry
-                                },
-                                Entry::Occupied(inner) => {
-                                    let data = inner.get_mut();
-                                    // Update state if it's a newer round
-                                    if round > data.round {
-                                        data.round = round;
-                                        data.failures = 0;
-                                    }
-                                },
-                            };
-                            Ok(())
-                        });
+                    self.network_interface
+                        .reset_peer_round_state(peer_id, round);
                 } else {
                     warn!(
                         SecurityEvent::InvalidHealthCheckerMsg,
@@ -350,26 +318,8 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                     round,
                     err
                 );
-                let _ = self
-                    .network_interface
-                    .health_check_data()
-                    .write(peer_id, |entry| {
-                        // Don't add in a default in case it's already disconnected
-                        match entry {
-                            Entry::Vacant(..) => {
-                                // Don't do anything if there isn't an entry
-                            },
-                            Entry::Occupied(inner) => {
-                                // If this is the result of an older ping, we ignore it.
-                                // Increment num of failures.
-                                let data = inner.get_mut();
-                                if data.round <= round {
-                                    data.failures += 1;
-                                }
-                            },
-                        }
-                        Ok(())
-                    });
+                self.network_interface
+                    .increment_peer_round_failure(peer_id, round);
 
                 // If the ping failures are now more than
                 // `self.ping_failures_tolerated`, we disconnect from the node.
@@ -377,9 +327,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                 // ConnectivityManager or the remote peer to re-establish the connection.
                 let failures = self
                     .network_interface
-                    .health_check_data()
-                    .read(&peer_id)
-                    .map(|data| data.failures)
+                    .get_peer_failures(peer_id)
                     .unwrap_or(0);
                 if failures > self.ping_failures_tolerated {
                     info!(

@@ -5,17 +5,14 @@ use crate::{
     application::{
         interface::{NetworkClient, NetworkClientInterface},
         storage::PeerMetadataStorage,
-        types::{PeerError, PeerInfo, PeerState},
+        types::{PeerInfo, PeerState},
     },
     transport::ConnectionMetadata,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_types::PeerId;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Clone, Serialize, Deserialize)]
 struct DummyMessage {}
@@ -84,11 +81,12 @@ fn test_interface() {
     );
 
     // Disconnecting / disconnected are not counted in active
-    update_state(
-        peer_metadata_storage.clone(),
-        PeerNetworkId::new(network_id, peer_1),
-        PeerState::Disconnecting,
-    );
+    peer_metadata_storage
+        .update_peer_state(
+            PeerNetworkId::new(network_id, peer_1),
+            PeerState::Disconnecting,
+        )
+        .unwrap();
     assert_eq!(
         2,
         peers(network_client.get_peer_metadata_storage(), network_id).len()
@@ -120,20 +118,4 @@ fn test_interface() {
         0,
         connected_peers(network_client.get_peer_metadata_storage(), network_id).len()
     );
-}
-
-fn update_state(
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
-    peer_network_id: PeerNetworkId,
-    state: PeerState,
-) {
-    peer_metadata_storage
-        .write(peer_network_id, |entry| match entry {
-            Entry::Vacant(..) => Err(PeerError::NotFound),
-            Entry::Occupied(inner) => {
-                inner.get_mut().status = state;
-                Ok(())
-            },
-        })
-        .unwrap()
 }

@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::{
-        storage::PeerMetadataStorage,
-        types::{PeerError, PeerState},
-    },
+    application::{storage::PeerMetadataStorage, types::PeerState},
     peer_manager::{ConnectionNotification, PeerManagerNotification, PeerManagerRequest},
     protocols::{
         direct_send::Message,
@@ -22,11 +19,7 @@ use aptos_netcore::transport::ConnectionOrigin;
 use aptos_types::PeerId;
 use async_trait::async_trait;
 use futures::StreamExt;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// A sender to a node to mock an inbound network message from [`PeerManager`]
 pub type InboundMessageSender =
@@ -90,13 +83,7 @@ impl InboundNetworkHandle {
         // Set the state of the peer as disconnected
         let peer_network_id = PeerNetworkId::new(network_id, conn_metadata.remote_peer_id);
         self.peer_metadata_storage
-            .write(peer_network_id, |entry| match entry {
-                Entry::Vacant(..) => Err(PeerError::NotFound),
-                Entry::Occupied(inner) => {
-                    inner.get_mut().status = PeerState::Disconnected;
-                    Ok(())
-                },
-            })
+            .update_peer_state(peer_network_id, PeerState::Disconnected)
             .unwrap();
 
         // Push the notification of the lost peer
