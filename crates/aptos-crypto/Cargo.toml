@@ -15,7 +15,6 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto-derive = { workspace = true }
-ark-bls12-381 = "0.3.0"
 bcs = { workspace = true }
 blst = { workspace = true }
 bytes = { workspace = true }
@@ -42,6 +41,11 @@ tiny-keccak = { workspace = true }
 x25519-dalek = { workspace = true }
 
 [dev-dependencies]
+ark-bls12-381 = { workspace = true }
+ark-ec = { workspace = true }
+ark-ff = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }
 bitvec = { workspace = true }
 blake2 = { workspace = true }
 blake2-rfc = { workspace = true }
@@ -52,11 +56,6 @@ proptest-derive = { workspace = true }
 serde_json = { workspace = true }
 sha3 = { workspace = true }
 trybuild = { workspace = true }
-ark-bls12-381 = "0.3.0"
-ark-ec = "0.3.0"
-ark-ff = "0.3.0"
-ark-serialize = "0.3.0"
-ark-std = "0.3.0"
 
 [features]
 default = []

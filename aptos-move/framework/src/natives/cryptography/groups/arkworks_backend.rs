@@ -7,6 +7,7 @@ use ark_bls12_381::{Fq12, Fr, G1Projective, G2Projective, Parameters};
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
 use ark_ff::{Field, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+#[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
@@ -22,7 +23,9 @@ use sha2::{Digest, Sha256};
 use smallvec::smallvec;
 use crate::natives::cryptography::groups::abort_codes;
 use crate::natives::cryptography::groups::abort_codes::E_UNKNOWN_GROUP;
-use crate::natives::util::{make_native_from_func, make_test_only_native_from_func};
+use crate::natives::util::make_native_from_func;
+#[cfg(feature = "testing")]
+use crate::natives::util::make_test_only_native_from_func;
 
 #[derive(Debug, Clone)]
 pub struct Bls12381GasParameters {
@@ -1536,6 +1539,7 @@ fn hash_to_bls12381_fr(bytes: &[u8]) -> Fr {
     digest[31] = 0;
     Fr::from_random_bytes(digest.as_slice()).unwrap()
 }
+
 fn hash_to_element_internal(
     _gas_params: &GasParameters,
     context: &mut NativeContext,

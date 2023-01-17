@@ -103,12 +103,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anes"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
-
-[[package]]
 name = "ansi_term"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -428,7 +422,7 @@ dependencies = [
  "arc-swap",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "claims",
- "criterion 0.3.6",
+ "criterion",
  "crossbeam",
  "crossbeam-queue",
  "dashmap",
@@ -648,7 +642,7 @@ dependencies = [
  "blst",
  "byteorder",
  "bytes 1.2.1",
- "criterion 0.3.6",
+ "criterion",
  "curve25519-dalek",
  "digest 0.9.0",
  "ed25519-dalek",
@@ -939,7 +933,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "chrono",
- "criterion 0.3.6",
+ "criterion",
  "indicatif",
  "itertools",
  "jemallocator",
@@ -1159,13 +1153,13 @@ dependencies = [
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "better_any",
  "blake2-rfc",
+ "blst",
  "claims",
  "clap 3.2.23",
  "codespan-reporting",
- "criterion 0.4.0",
+ "criterion",
  "curve25519-dalek",
  "flate2",
- "group",
  "hex",
  "include_dir 0.7.2",
  "itertools",
@@ -2112,7 +2106,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vault-client",
- "criterion 0.3.6",
+ "criterion",
  "once_cell",
  "proptest",
  "rand 0.7.3",
@@ -2147,7 +2141,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-types",
  "bitvec 0.19.6",
- "criterion 0.3.6",
+ "criterion",
  "itertools",
  "once_cell",
  "proptest",
@@ -2530,7 +2524,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-types",
  "aptos-vm",
- "criterion 0.3.6",
+ "criterion",
  "criterion-cpu-time",
  "num_cpus",
  "proptest",
@@ -3721,33 +3715,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fff857943da45f546682664a79488be82e69e43c1a7a2307679ab9afb3a66d2e"
 
 [[package]]
-name = "ciborium"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0c137568cc60b904a7724001b35ce2630fd00d5d84805fbb608ab89509d788f"
-dependencies = [
- "ciborium-io",
- "ciborium-ll",
- "serde 1.0.149",
-]
-
-[[package]]
-name = "ciborium-io"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "346de753af073cc87b52b2083a506b38ac176a44cfb05497b622e27be899b369"
-
-[[package]]
-name = "ciborium-ll"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "213030a2b5a4e0c0892b6652260cf6ccac84827b83a85a534e178e3906c4cf1b"
-dependencies = [
- "ciborium-io",
- "half",
-]
-
-[[package]]
 name = "cipher"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4071,7 +4038,7 @@ dependencies = [
  "atty",
  "cast",
  "clap 2.34.0",
- "criterion-plot 0.4.5",
+ "criterion-plot",
  "csv",
  "itertools",
  "lazy_static 1.4.0",
@@ -4089,38 +4056,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "criterion"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7c76e09c1aae2bc52b3d2f29e13c6572553b30c4aa1b8a49fd70de6412654cb"
-dependencies = [
- "anes",
- "atty",
- "cast",
- "ciborium",
- "clap 3.2.23",
- "criterion-plot 0.5.0",
- "itertools",
- "lazy_static 1.4.0",
- "num-traits 0.2.15",
- "oorandom",
- "plotters",
- "rayon",
- "regex",
- "serde 1.0.149",
- "serde_derive",
- "serde_json",
- "tinytemplate",
- "walkdir",
-]
-
-[[package]]
 name = "criterion-cpu-time"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63aaaf47e457badbcb376c65a49d0f182c317ebd97dc6d1ced94c8e1d09c0f3a"
 dependencies = [
- "criterion 0.3.6",
+ "criterion",
  "libc",
 ]
 
@@ -4129,16 +4070,6 @@ name = "criterion-plot"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2673cc8207403546f45f5fd319a974b1e6983ad1a3ee7e6041650013be041876"
-dependencies = [
- "cast",
- "itertools",
-]
-
-[[package]]
-name = "criterion-plot"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
 dependencies = [
  "cast",
  "itertools",
@@ -4877,16 +4808,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ff"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d013fc25338cc558c5c2cfbad646908fb23591e2404481826742b651c9af7160"
-dependencies = [
- "rand_core 0.6.4",
- "subtle",
-]
-
-[[package]]
 name = "fiat-crypto"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5296,17 +5217,6 @@ checksum = "03bd0e9c2ea26ce269d37016d6b95556bbfa544cbbbdeff40102ac54121c990b"
 dependencies = [
  "similar-asserts",
  "tempfile",
-]
-
-[[package]]
-name = "group"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dfbfb3a6cfbd390d5c9564ab283a0349b9b9fcd46a706c1eb10e0db70bfbac7"
-dependencies = [
- "ff",
- "rand_core 0.6.4",
- "subtle",
 ]
 
 [[package]]
