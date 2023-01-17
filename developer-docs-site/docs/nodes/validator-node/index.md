@@ -64,7 +64,7 @@ To participate in the consensus process in the Aptos mainnet, you must deploy an
 Follow the documents within this section to run a validator node and a validator fullnode in Aptos. Here is a summary of the process:
 
 1. Start by reading the node requirements to get to know the compute, memory and storage resources you need. Note also the internet bandwidth requirements. 
-1. Select a method to deploy your nodes, i.e., use a cloud service or Docker or source code. 
+1. Select a method to deploy your nodes, i.e., use a cloud managed Kubernetes, Docker, or source code.
 1. Generate identity for the nodes. This is the first step in progressively making your nodes secure and ready to be integrated into the Aptos network. 
 1. Using YAML files, configure your nodes with user and network identity. This step enables the nodes to be recognized by other nodes in the Aptos network. Handshaking is possible after this step.  
 1. With the node identity established for the Aptos network, next you install the necessary binaries and locally generate the genesis blob and waypoint files. These will allow the node to be connected to the Aptos network. 
