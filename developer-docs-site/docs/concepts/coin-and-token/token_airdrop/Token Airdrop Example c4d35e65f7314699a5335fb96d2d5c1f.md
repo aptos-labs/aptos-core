@@ -1,10 +1,10 @@
 # Token Airdrop Example
 
-We support different ways of transferring token in our token standard [[link](https://aptos.dev/concepts/coin-and-token/aptos-token#token-transfer)]
+We support different ways of transferring tokens in the [Aptos token standard](../aptos-token.md#token-transfer).
 
-With the 2 step token transfer, airdropping NFTs to the a set of address can be very straight-ward. 
+With the two-step token transfer, airdropping NFTs to a set of addresses can be straightforward. 
 
-After minting a token or using existing token from TokenStore, we can directly offer the token to an receiver address from a whitelisted lists. Compared to the NFT mint [example](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move), we can change the `mint` function to `airdrop` function as below.  It can directly offer the token to a list of addresses 
+After minting a token or using existing tokens from TokenStore, we can directly offer the token to a receiver address from a whitelist. Starting with the [NFT mint example](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move), we can change the `mint` function to an `airdrop` function as below. This function can directly offer the token to a list of addresses:
 
 ```rust
 
