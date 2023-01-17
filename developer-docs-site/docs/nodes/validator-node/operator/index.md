@@ -16,7 +16,7 @@ For participating in the Aptos mainnet, you must deploy both a validator node an
 
 ## Deploy the nodes and register
 
-:::tip Petra on Chrome browser only
+:::tip Petra on Chrome browser
 Although the [Petra wallet](../../../guides/install-petra-wallet.md) is supported only on the Chrome browser, you can also use the Petra extension on [Brave browser](https://brave.com/), [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge).
 :::
 
@@ -24,13 +24,17 @@ Although the [Petra wallet](../../../guides/install-petra-wallet.md) is supporte
 
 **Step 2:** **Deploy the nodes**. Follow the detailed node installation steps provided in [**Running Validator Node**](running-validator-node/index.md) and deploy a validator node and a validator fullnode.
 
+Note that your nodes will not be running correctly (not syncing, not participating in consensus), until they're added to the validator set via [staking pool operations](./shutting-down-nodes.md) (below).
+
 ## Connect to Aptos network
 
 After deploying your nodes, [connect to the Aptos Network](./connect-to-aptos-network.md).
 
 ## Set up staking pool operations
 
-After connecting your nodes to the Aptos network, [establish staking pool operations](./staking-pool-operations.md).
+After connecting your nodes to the Aptos network, [establish staking pool operations](./staking-pool-operations.md) and add your node to the validator set.
+
+Your node will start syncing and participating on consensus.
 
 ## Ensure your nodes are live
 
