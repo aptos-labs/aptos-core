@@ -475,6 +475,36 @@ export class AptosClient {
     });
   }
 
+  async generateBatchTransactions(
+    sender: AptosAccount,
+    payloads: TxnBuilderTypes.TransactionPayload[],
+    extraArgs?: OptionalTransactionArgs,
+    batch_size: number = 10, // api.max_submit_transaction_batch_size config
+  ): Promise<Uint8Array[]> {
+    if (payloads.length > batch_size) {
+      throw new Error("Max submit transaction batch size");
+    }
+    // create a vector of SignedTransactions
+    let transactions = [];
+    for (let i = 0; i < payloads.length; i++) {
+      const rawTransaction = await this.generateRawTransaction(sender.address(), payloads[i], extraArgs);
+      const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
+      transactions.push(bcsTxn);
+    }
+    // TODO - BCS encode the transactions vector as a whole
+    return transactions;
+  }
+
+  @parseApiError
+  async submitBatchTransactions(txnsArray: Uint8Array[]): Promise<Gen.UserTransaction[]> {
+    return this.client.request.request<Gen.UserTransaction[]>({
+      url: "/transactions/batch",
+      method: "POST",
+      body: txnsArray,
+      mediaType: "application/x.aptos.signed_transaction+bcs",
+    });
+  }
+
   /**
    * Queries on-chain transactions. This function will not return pending
    * transactions. For that, use `getTransactionsByHash`.
