@@ -1384,7 +1384,8 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<pre><code><b>include</b> <a href="voting.md#0x1_voting_CreateProposal">CreateProposal</a>&lt;ProposalType&gt;{is_multi_step_proposal: <b>false</b>};
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="voting.md#0x1_voting_CreateProposalAbortsIf">CreateProposalAbortsIf</a>&lt;ProposalType&gt;{is_multi_step_proposal: <b>false</b>};
 </code></pre>
 
 
@@ -1405,16 +1406,17 @@ The next_proposal_id in VotingForum is up to MAX_U64.
 CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
-<pre><code><b>include</b> <a href="voting.md#0x1_voting_CreateProposal">CreateProposal</a>&lt;ProposalType&gt;;
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="voting.md#0x1_voting_CreateProposalAbortsIf">CreateProposalAbortsIf</a>&lt;ProposalType&gt;;
 </code></pre>
 
 
 
 
-<a name="0x1_voting_CreateProposal"></a>
+<a name="0x1_voting_CreateProposalAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="voting.md#0x1_voting_CreateProposal">CreateProposal</a>&lt;ProposalType&gt; {
+<pre><code><b>schema</b> <a href="voting.md#0x1_voting_CreateProposalAbortsIf">CreateProposalAbortsIf</a>&lt;ProposalType&gt; {
     voting_forum_address: <b>address</b>;
     execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
     min_vote_threshold: u128;
@@ -1423,7 +1425,6 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
     is_multi_step_proposal: bool;
     <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>let</b> proposal_id = voting_forum.next_proposal_id;
-    <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>aborts_if</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals,proposal_id);
     <b>aborts_if</b> len(early_resolution_vote_threshold.vec) != 0 && min_vote_threshold &gt; early_resolution_vote_threshold.vec[0];
@@ -1461,7 +1462,7 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
 <b>let</b> execution_key = std::string::spec_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
 <b>aborts_if</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, execution_key) &&
-          <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, execution_key) != std::bcs::spec_to_bytes(<b>false</b>);
+          <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, execution_key) != std::bcs::serialize(<b>false</b>);
 <b>aborts_if</b> <b>if</b> (should_pass) { proposal.yes_votes + num_votes &gt; MAX_U128 } <b>else</b> { proposal.no_votes + num_votes &gt; MAX_U128 };
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>);
 </code></pre>

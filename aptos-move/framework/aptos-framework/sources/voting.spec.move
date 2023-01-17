@@ -29,6 +29,9 @@ spec aptos_framework::voting {
         early_resolution_vote_threshold: Option<u128>,
         metadata: SimpleMap<String, vector<u8>>,
     ): u64 {
+        use aptos_framework::chain_status;
+
+        requires chain_status::is_operating();
         include CreateProposalAbortsIf<ProposalType>{is_multi_step_proposal: false};
     }
 
@@ -48,12 +51,13 @@ spec aptos_framework::voting {
         metadata: SimpleMap<String, vector<u8>>,
         is_multi_step_proposal: bool,
     ): u64 {
+        use aptos_framework::chain_status;
+
+        requires chain_status::is_operating();
         include CreateProposalAbortsIf<ProposalType>;
     }
 
     spec schema CreateProposalAbortsIf<ProposalType> {
-        use aptos_framework::chain_status;
-
         voting_forum_address: address;
         execution_hash: vector<u8>;
         min_vote_threshold: u128;
@@ -63,8 +67,6 @@ spec aptos_framework::voting {
 
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal_id = voting_forum.next_proposal_id;
-
-        requires chain_status::is_operating();
 
         aborts_if !exists<VotingForum<ProposalType>>(voting_forum_address);
         aborts_if table::spec_contains(voting_forum.proposals,proposal_id);
