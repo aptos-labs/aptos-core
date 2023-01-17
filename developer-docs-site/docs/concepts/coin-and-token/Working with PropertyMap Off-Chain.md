@@ -1,22 +1,18 @@
 # Working with PropertyMap Off-Chain
 
-Token module uses property map [module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/property_map.move) to store on-chain properties of token. PropertyMap maps a string key to a property value on-chain, which stores the value in BCS serialized format and its type. Currently, only primitive types (bool, u8, u64, u128, address and String) are supported in property map. 
+Token module uses the [property map module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/property_map.move) to store on-chain properties of tokens. PropertyMap maps a string key to a property value on-chain, which stores the value in Binary Canonical Serialization (BCS) format and its type. Currently, only primitive types (bool, u8, u64, u128, address and String) are supported in property map. 
 
 With both the value and typing, property map can be used to read and write values of different types in a map data structure on-chain. 
 
 ### Read and write property map using TS SDK
 
-Our SDK supports read and write property map from typescript directly. It saves you from knowing the details for BCS serialization. 
+Our TypeScript SDK supports reading and writing property maps from TypeScript directly. It saves you from knowing the details of BCS serialization. 
 
-To generate the BCS serialized data for creating token on-chain, please use `getPropertyValueRaw`
+To generate the BCS data for creating tokens on-chain, use `getPropertyValueRaw`. This method handles the serialization of TypeScript data into BCS format.
 
-This method handle the serialization of typescript data into BCS format.
-
-To read property map returned by API, please use `deserializePropertyMap` , it deserializes the data from API and create TS class property map
+To read property maps returned by API, use `deserializePropertyMap`; it deserializes the data from API and create the TypeScript class property map.
 
 ### Reference:
 
-- TS property map serde for more details [link](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/utils/property_map_serde.ts)
-- Examples using property map serde [link](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/utils/property_map_serde.test.ts)
-
-###
+- [property_map_serde.ts](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/utils/property_map_serde.ts) - TypeScript property map.
+- [property_map_serde.test.ts](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/utils/property_map_serde.test.ts) - Examples using property map serde.
