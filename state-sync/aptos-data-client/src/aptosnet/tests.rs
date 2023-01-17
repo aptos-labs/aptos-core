@@ -43,7 +43,7 @@ use aptos_types::{
 use claims::{assert_err, assert_matches, assert_none};
 use futures::StreamExt;
 use maplit::hashmap;
-use std::{collections::hash_map::Entry, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 fn mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {
     LedgerInfoWithSignatures::new(
@@ -184,13 +184,7 @@ impl MockNetwork {
     /// Updates the state of the given peer
     fn update_peer_state(&mut self, peer: PeerNetworkId, state: PeerState) {
         self.peer_metadata_storage
-            .write(peer, |entry| match entry {
-                Entry::Vacant(..) => panic!("Peer must exist!"),
-                Entry::Occupied(inner) => {
-                    inner.get_mut().status = state;
-                    Ok(())
-                },
-            })
+            .update_peer_state(peer, state)
             .unwrap();
     }
 
