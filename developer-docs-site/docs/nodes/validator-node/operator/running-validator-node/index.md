@@ -25,15 +25,15 @@ The following guides provide step-by-step instructions for running public fullno
 
 ### Connect to Aptos network
 
-After deploying your nodes, [connect to the Aptos Network](./connect-to-aptos-network.md).
+After deploying your nodes, [connect to the Aptos Network](../connect-to-aptos-network.md).
 
 ### Set up staking pool operations
 
-After connecting your nodes to the Aptos network, [establish staking pool operations](./staking-pool-operations.md).
+After connecting your nodes to the Aptos network, [establish staking pool operations](../staking-pool-operations.md).
 
 ## Test Validator node
 
-After your nodes are deployed and configure, make sure they meet [node liveness criteria](./node-liveness-criteria.md).
+After your nodes are deployed and configure, make sure they meet [node liveness criteria](../node-liveness-criteria.md).
 
 ## Install Validator fullnode
 
