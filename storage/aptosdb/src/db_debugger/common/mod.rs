@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{db_options::state_merkle_db_column_families, STATE_MERKLE_DB_NAME};
+use crate::{
+    db_options::{ledger_db_column_families, state_merkle_db_column_families},
+    LEDGER_DB_NAME, STATE_MERKLE_DB_NAME,
+};
 use anyhow::Result;
 use aptos_types::nibble::{nibble_path::NibblePath, Nibble};
 use clap::Parser;
@@ -22,6 +25,34 @@ impl DbDir {
             self.db_dir.join(STATE_MERKLE_DB_NAME).as_path(),
             STATE_MERKLE_DB_NAME,
             state_merkle_db_column_families(),
+        )
+    }
+
+    pub fn open_state_merkle_db_rw(&self) -> Result<aptos_schemadb::DB> {
+        aptos_schemadb::DB::open(
+            self.db_dir.join(STATE_MERKLE_DB_NAME).as_path(),
+            STATE_MERKLE_DB_NAME,
+            state_merkle_db_column_families(),
+            &aptos_schemadb::Options::default(),
+        )
+    }
+
+    #[allow(unused)]
+    pub fn open_ledger_db(&self) -> Result<aptos_schemadb::DB> {
+        aptos_schemadb::DB::open_cf_readonly(
+            &aptos_schemadb::Options::default(),
+            self.db_dir.join(LEDGER_DB_NAME).as_path(),
+            LEDGER_DB_NAME,
+            ledger_db_column_families(),
+        )
+    }
+
+    pub fn open_ledger_db_rw(&self) -> Result<aptos_schemadb::DB> {
+        aptos_schemadb::DB::open(
+            self.db_dir.join(LEDGER_DB_NAME).as_path(),
+            LEDGER_DB_NAME,
+            ledger_db_column_families(),
+            &aptos_schemadb::Options::default(),
         )
     }
 }
