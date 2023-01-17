@@ -65,7 +65,12 @@ pub fn bootstrap_api_and_indexer(
     let indexer_runtime =
         indexer::bootstrap_indexer(node_config, chain_id, aptos_db, mempool_client_sender)?;
 
-    Ok((mempool_client_receiver, api_runtime, indexer_runtime, indexer_grpc))
+    Ok((
+        mempool_client_receiver,
+        api_runtime,
+        indexer_runtime,
+        indexer_grpc,
+    ))
 }
 
 /// Starts consensus and returns the runtime
