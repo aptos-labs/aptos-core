@@ -119,4 +119,6 @@ Docker method has only been tested on Linux, Windows, and Intel macOS. If you ar
 
 Now you have successfully completed setting up your node.
 
+Now proceed to [connecting to the Aptos network](../connect-to-aptos-network.md) and [establishing staking pool operations](../staking-pool-operations.md).
+
 <!-- 1.  Optional: if you need to block an ip address simply add it to the bottom of blocked.ips and reload haproxy -->

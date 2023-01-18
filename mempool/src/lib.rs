@@ -59,6 +59,7 @@
 mod tests;
 pub use shared_mempool::{
     bootstrap, network,
+    network::MempoolSyncMsg,
     types::{
         MempoolClientRequest, MempoolClientSender, MempoolEventsReceiver, QuorumStoreRequest,
         QuorumStoreResponse, SubmissionStatus,

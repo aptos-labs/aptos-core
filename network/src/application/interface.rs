@@ -4,7 +4,7 @@
 use crate::{
     application::{error::Error, storage::PeerMetadataStorage},
     protocols::{
-        network::{Message, NetworkSender},
+        network::{Message, NetworkEvents, NetworkSender},
         wire::handshake::v1::{ProtocolId, ProtocolIdSet},
     },
 };
@@ -71,7 +71,7 @@ pub struct NetworkClient<Message> {
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 }
 
-impl<Message: NetworkMessageTrait> NetworkClient<Message> {
+impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
     pub fn new(
         direct_send_protocols_and_preferences: Vec<ProtocolId>,
         rpc_protocols_and_preferences: Vec<ProtocolId>,
@@ -206,5 +206,22 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         Ok(network_sender
             .send_rpc(peer.peer_id(), rpc_protocol_id, message, rpc_timeout)
             .await?)
+    }
+}
+
+/// A network component that can be used by server applications (e.g., consensus,
+/// state sync and mempool, etc.) to respond to network events and network clients.
+pub struct NetworkServiceEvents<Message> {
+    network_and_events: HashMap<NetworkId, NetworkEvents<Message>>,
+}
+
+impl<Message> NetworkServiceEvents<Message> {
+    pub fn new(network_and_events: HashMap<NetworkId, NetworkEvents<Message>>) -> Self {
+        Self { network_and_events }
+    }
+
+    /// Consumes and returns the network and events map
+    pub fn into_network_and_events(self) -> HashMap<NetworkId, NetworkEvents<Message>> {
+        self.network_and_events
     }
 }

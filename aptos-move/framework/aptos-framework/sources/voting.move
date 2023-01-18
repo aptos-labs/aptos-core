@@ -488,8 +488,8 @@ module aptos_framework::voting {
     }
 
     public fun is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         can_be_resolved_early(proposal) || is_voting_period_over(proposal)
     }
 

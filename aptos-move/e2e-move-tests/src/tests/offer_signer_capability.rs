@@ -29,12 +29,12 @@ fn offer_signer_capability_v2() {
     let account_alice = harness.new_account_with_key_pair();
     let account_bob = harness.new_account_at(AccountAddress::from_hex_literal("0x345").unwrap());
 
-    // This struct fixes sequence number 10, which is what Alice's account is at in this e2e test
+    // This struct fixes sequence number 0, which is what Alice's account is at in this e2e test
     let proof_struct = SignerCapabilityOfferProofChallengeV2 {
         account_address: CORE_CODE_ADDRESS,
         module_name: String::from("account"),
         struct_name: String::from("SignerCapabilityOfferProofChallengeV2"),
-        sequence_number: 10,
+        sequence_number: 0,
         source_address: *account_alice.address(),
         recipient_address: *account_bob.address(),
     };

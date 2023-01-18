@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 16 January 2023
+
+- Documented how to [create and fund accounts](guides/get-test-funds.md) using the Petra Wallet and Aptos command line interface (CLI).
+
 ## 12 January 2023
 
 - Added [Homebrew](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md) support for the Aptos CLI, enabling [easy installation](cli-tools/aptos-cli-tool/index.md) via the macOS, Linux, and Windows Subsystem for Linux (WSL) package manager.

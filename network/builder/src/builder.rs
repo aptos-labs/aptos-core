@@ -34,7 +34,10 @@ use aptos_network::{
     },
     protocols::{
         health_checker::{self, builder::HealthCheckerBuilder},
-        network::{NetworkApplicationConfig, NewNetworkEvents, NewNetworkSender},
+        network::{
+            NetworkApplicationConfig, NetworkClientConfig, NetworkServiceConfig, NewNetworkEvents,
+            NewNetworkSender,
+        },
     },
 };
 use aptos_network_discovery::DiscoveryChangeListener;
@@ -460,16 +463,15 @@ impl NetworkBuilder {
         &mut self,
         config: &NetworkApplicationConfig,
     ) -> (SenderT, EventsT) {
-        (self.add_client(config), self.add_service(config))
+        (
+            self.add_client(&config.network_client_config),
+            self.add_service(&config.network_service_config),
+        )
     }
 
     /// Register a new client application with the network. Return the client
     /// interface for sending messages.
-    // TODO(philiphayes): return new NetworkClient (name TBD) interface?
-    pub fn add_client<SenderT: NewNetworkSender>(
-        &mut self,
-        config: &NetworkApplicationConfig,
-    ) -> SenderT {
+    fn add_client<SenderT: NewNetworkSender>(&mut self, config: &NetworkClientConfig) -> SenderT {
         let (peer_mgr_reqs_tx, connection_reqs_tx) = self.peer_manager_builder.add_client(config);
         SenderT::new(peer_mgr_reqs_tx, connection_reqs_tx)
     }
@@ -477,10 +479,7 @@ impl NetworkBuilder {
     /// Register a new service application with the network. Return the service
     /// interface for handling network requests.
     // TODO(philiphayes): return new NetworkService (name TBD) interface?
-    pub fn add_service<EventsT: NewNetworkEvents>(
-        &mut self,
-        config: &NetworkApplicationConfig,
-    ) -> EventsT {
+    fn add_service<EventsT: NewNetworkEvents>(&mut self, config: &NetworkServiceConfig) -> EventsT {
         let (peer_mgr_reqs_rx, connection_notifs_rx) =
             self.peer_manager_builder.add_service(config);
         EventsT::new(peer_mgr_reqs_rx, connection_notifs_rx)
