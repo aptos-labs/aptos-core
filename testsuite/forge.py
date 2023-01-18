@@ -1186,6 +1186,9 @@ def test(
     # cloud = "gcp"
     # forge_cluster_name = "aptos-forge-0"
     # forge_enable_performance = "true"
+    
+    # force the base image tag to be that of the continuous compat test
+    image_tag = "testnet"
 
     # Initialize all configs
     shell = LocalShell(verbose == "true")
