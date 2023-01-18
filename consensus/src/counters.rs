@@ -346,6 +346,16 @@ pub static NUM_BLOCKS_IN_TREE: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 /// Counter for the number of blocks in the pipeline broken down by stage.
+pub static CONSENSUS_PARTICIPATION_STATUS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_consensus_participation_status",
+        "Counter for consensus participation status, 0 means no participation and 1 otherwise",
+        &["peer_id"]
+    )
+    .unwrap()
+});
+
+/// Counter for the number of blocks in the pipeline broken down by stage.
 pub static NUM_BLOCKS_IN_PIPELINE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_consensus_num_blocks_in_pipeline",
