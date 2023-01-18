@@ -7,7 +7,7 @@ serviceAccount:
   annotations: {}
 
 ingress:
-  enable: true
+  enable: false # do not enable the ingress by default, especially when there is no SSL certificate
   domain:
   acm_certificate:
   aws_tags:
