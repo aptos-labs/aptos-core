@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::TIMER;
-use crate::{proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
+use crate::{metrics::TIMER, proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};

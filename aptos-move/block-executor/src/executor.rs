@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters::{TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS};
 use crate::{
     counters,
+    counters::{TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS},
     errors::*,
     output_delta_resolver::OutputDeltaResolver,
     scheduler::{Scheduler, SchedulerTask, TaskGuard, Version},

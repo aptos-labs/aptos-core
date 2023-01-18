@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters::GET_STATE_VALUE_SECONDS;
 use crate::{
     counters,
+    counters::GET_STATE_VALUE_SECONDS,
     scheduler::{Scheduler, TxnIndex},
     task::{ModulePath, Transaction},
     txn_last_input_output::ReadDescriptor,

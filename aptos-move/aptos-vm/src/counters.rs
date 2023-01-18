@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics_core::{exponential_buckets, register_histogram, register_int_counter, register_int_counter_vec, Histogram, IntCounter, IntCounterVec, IntGauge, register_int_gauge};
+use aptos_metrics_core::{
+    exponential_buckets, register_histogram, register_int_counter, register_int_counter_vec,
+    register_int_gauge, Histogram, IntCounter, IntCounterVec, IntGauge,
+};
 use once_cell::sync::Lazy;
 
 pub static BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
@@ -20,9 +23,8 @@ pub static BLOCK_EXECUTOR_CONCURRENCY: Lazy<IntGauge> = Lazy::new(|| {
         "block_executor_concurrency",
         "Concurrency level for the block executor"
     )
-        .unwrap()
+    .unwrap()
 });
-
 
 pub static BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(

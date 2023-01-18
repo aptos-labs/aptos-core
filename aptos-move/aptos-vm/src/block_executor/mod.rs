@@ -3,10 +3,13 @@
 
 pub(crate) mod vm_wrapper;
 
-use crate::counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS, BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS};
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     block_executor::vm_wrapper::AptosExecutorTask,
+    counters::{
+        BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS,
+    },
     AptosVM,
 };
 use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
