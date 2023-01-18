@@ -327,7 +327,13 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         }
         let table_info = match self.db.get_table_info(handle) {
             Ok(ti) => ti,
-            Err(_) => return Ok(None), // if table item not found return None anyway to avoid crash
+            Err(_) => {
+                aptos_logger::error!(
+                    "Table info not found for handle {:?}, can't decode table item",
+                    handle
+                );
+                return Ok(None); // if table item not found return None anyway to avoid crash
+            },
         };
         let key = self.try_into_move_value(&table_info.key_type, key)?;
         let value = self.try_into_move_value(&table_info.value_type, value)?;
@@ -350,7 +356,13 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         }
         let table_info = match self.db.get_table_info(handle) {
             Ok(ti) => ti,
-            Err(_) => return Ok(None), // if table item not found return None anyway to avoid crash
+            Err(_) => {
+                aptos_logger::error!(
+                    "Table info not found for handle {:?}, can't decode table item",
+                    handle
+                );
+                return Ok(None); // if table item not found return None anyway to avoid crash
+            },
         };
         let key = self.try_into_move_value(&table_info.key_type, key)?;
 
