@@ -7,7 +7,7 @@ use crate::{
     core_mempool::{CoreMempool, TimelineState},
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
-    network::{MempoolNetworkEvents, MempoolSyncMsg},
+    network::MempoolSyncMsg,
     shared_mempool::{
         tasks,
         tasks::process_committed_transactions,
@@ -22,7 +22,10 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
-use aptos_network::{application::interface::NetworkClientInterface, protocols::network::Event};
+use aptos_network::{
+    application::interface::{NetworkClientInterface, NetworkServiceEvents},
+    protocols::network::Event,
+};
 use aptos_types::on_chain_config::OnChainConfigPayload;
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
@@ -41,7 +44,7 @@ use tokio_stream::wrappers::IntervalStream;
 pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
     mut smp: SharedMempool<NetworkClient, TransactionValidator>,
     executor: Handle,
-    network_events: Vec<(NetworkId, MempoolNetworkEvents)>,
+    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
     mut client_events: MempoolEventsReceiver,
     mut quorum_store_requests: mpsc::Receiver<QuorumStoreRequest>,
     mut mempool_listener: MempoolNotificationListener,
@@ -54,12 +57,14 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
         LogEntry::CoordinatorRuntime,
         LogEvent::Start
     ));
-    // Combine `NetworkEvents` for each `NetworkId` into one stream
-    let smp_events: Vec<_> = network_events
+
+    // Transform events to also include the network id
+    let network_events: Vec<_> = network_service_events
+        .into_network_and_events()
         .into_iter()
-        .map(|(network_id, events)| events.map(move |e| (network_id, e)))
+        .map(|(network_id, events)| events.map(move |event| (network_id, event)))
         .collect();
-    let mut events = select_all(smp_events).fuse();
+    let mut events = select_all(network_events).fuse();
     let mut scheduled_broadcasts = FuturesUnordered::new();
 
     // Use a BoundedExecutor to restrict only `workers_available` concurrent
