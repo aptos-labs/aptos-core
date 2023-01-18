@@ -1,46 +1,44 @@
 ---
-title: "How to develop on Aptos for a Hackathon"
-slug: "hackathon-developers-guide"
+title: "Develop on Aptos"
+slug: "developers-index"
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# How to develop on Aptos quickguide
+# Develop on Aptos
 
-If you're looking to build a project on Aptos, this is the guide for you.  This will walk you through the development
-process and how to integrate with the Aptos framework into your project.
+If you're looking to build a project on Aptos, this is your starting point. This page summarizes the development process and links to resources for integrating your project with the Aptos framework.
 
 # Overview
 
-1. [Setting up your development environment](#Setting-up-your-development-environment)
+1. [Setting up your development environment](#set-up-your-development-environment)
 2. 
 
-## Setting up your development environment
-### CLI Tool
-The [Aptos CLI](https://aptos.dev/cli-tools/aptos-cli-tool/) provides a Move compiler, a test framework, and deployment
-and operational tools to interact with the Aptos blockchain.  It's preferred to [install a prebuilt binary](https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli)
-or with [homebrew on Mac](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md)
+## Set up your development environment
+### Install Aptos CLI
+The [Aptos command line interface (CLI)](../cli-tools/aptos-cli-tool/index.md) provides a Move compiler, a test framework, and deployment
+and operational tools to interact with the Aptos blockchain. We recommend downloading [a prebuilt binary](../cli-tools/aptos-cli-tool/install-aptos-cli.md)
+or using the [Homebrew](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md) package manager.
 
-[Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md) demonstrates how the CLI can
-be used to create accounts, transfer coins, publish modules, and more.
+Follow [Using the Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md) to see how the CLI can be used to create accounts, transfer coins, publish modules, and more.
 
-### SDKs
+### Use SDKs
 
 Aptos currently provides three SDKs to access the blockchain:
 1. [Typescript](../sdks/ts-sdk/index.md)
 2. [Python](../sdks/python-sdk.md)
-3. [Rust](../sdks/rust-sSDKs and Toolsdk.md)
+3. [Rust](../sdks/rust-sdk.md)
 
 Additionally, these SDKs are available from the community:
 * TBD Go, Unity, etc.
 
-### Testnet / Mainnet Node Providers
+### Employ testnet and mainnet node providers
 
-These node providers provide testnet and mainnet access
+These node providers offer testnet and mainnet access to Aptos:
 
 * [BlockEden](https://blockeden.xyz/)
-* [Nodereal](https://nodereal.io/)
+* [NodeReal](https://nodereal.io/)
 * [Chainbase](https://chainbase.online/)
 * [BlastAPI](https://blastapi.io/)
   * [Testnet](https://aptos-testnet.public.blastapi.io)
