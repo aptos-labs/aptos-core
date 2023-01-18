@@ -3,26 +3,23 @@
 
 use crate::{
     core_mempool::CoreMempool,
-    network::{MempoolNetworkEvents, MempoolSyncMsg},
+    network::MempoolSyncMsg,
     shared_mempool::{
         coordinator::{coordinator, gc_coordinator, snapshot_job},
         types::{MempoolEventsReceiver, SharedMempool, SharedMempoolNotification},
     },
     QuorumStoreRequest,
 };
-use aptos_config::{config::NodeConfig, network_id::NetworkId};
+use aptos_config::config::NodeConfig;
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::{
-    application::{interface::NetworkClient, storage::PeerMetadataStorage},
-    protocols::{network::NetworkSender, wire::handshake::v1::ProtocolId::MempoolDirectSend},
-};
+use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_storage_interface::DbReader;
 use aptos_vm_validator::vm_validator::{TransactionValidation, VMValidator};
-use futures::channel::mpsc::{self, Receiver, UnboundedSender};
-use std::{collections::HashMap, sync::Arc};
+use futures::channel::mpsc::{Receiver, UnboundedSender};
+use std::sync::Arc;
 use tokio::runtime::{Handle, Runtime};
 
 /// Bootstrap of SharedMempool.
@@ -34,37 +31,18 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
     executor: &Handle,
     config: &NodeConfig,
     mempool: Arc<Mutex<CoreMempool>>,
-    // First element in tuple is the network ID.
-    // See `NodeConfig::is_upstream_peer` for the definition of network ID.
-    mempool_network_handles: Vec<(
-        NetworkId,
-        NetworkSender<MempoolSyncMsg>,
-        MempoolNetworkEvents,
-    )>,
+    network_client: NetworkClient<MempoolSyncMsg>,
+    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
     client_events: MempoolEventsReceiver,
-    quorum_store_requests: mpsc::Receiver<QuorumStoreRequest>,
+    quorum_store_requests: Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener,
     db: Arc<dyn DbReader>,
     validator: Arc<RwLock<TransactionValidator>>,
     subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) where
     TransactionValidator: TransactionValidation + 'static,
 {
-    let mut all_network_events = vec![];
-    let mut network_senders = HashMap::new();
-    for (network_id, network_sender, network_events) in mempool_network_handles.into_iter() {
-        all_network_events.push((network_id, network_events));
-        network_senders.insert(network_id, network_sender);
-    }
-
-    let network_client = NetworkClient::new(
-        vec![MempoolDirectSend],
-        vec![],
-        network_senders,
-        peer_metadata_storage,
-    );
     let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, TransactionValidator> =
         SharedMempool::new(
             mempool.clone(),
@@ -79,7 +57,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
     executor.spawn(coordinator(
         smp,
         executor.clone(),
-        all_network_events,
+        network_service_events,
         client_events,
         quorum_store_requests,
         mempool_listener,
@@ -102,18 +80,12 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
 pub fn bootstrap(
     config: &NodeConfig,
     db: Arc<dyn DbReader>,
-    // The first element in the tuple is the ID of the network that this network is a handle to.
-    // See `NodeConfig::is_upstream_peer` for the definition of network ID.
-    mempool_network_handles: Vec<(
-        NetworkId,
-        NetworkSender<MempoolSyncMsg>,
-        MempoolNetworkEvents,
-    )>,
+    network_client: NetworkClient<MempoolSyncMsg>,
+    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
     client_events: MempoolEventsReceiver,
     quorum_store_requests: Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
@@ -122,7 +94,8 @@ pub fn bootstrap(
         runtime.handle(),
         config,
         mempool,
-        mempool_network_handles,
+        network_client,
+        network_service_events,
         client_events,
         quorum_store_requests,
         mempool_listener,
@@ -130,7 +103,6 @@ pub fn bootstrap(
         db,
         vm_validator,
         vec![],
-        peer_metadata_storage,
     );
     runtime
 }

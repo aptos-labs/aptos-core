@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
-use crate::create_access_path;
 #[allow(unused_imports)]
 use anyhow::Error;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
@@ -55,7 +54,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
-        let ap = create_access_path(*address, struct_tag.clone());
+        let ap = AccessPath::resource_access_path(*address, struct_tag.clone());
         self.get(&ap).map_err(|e| e.finish(Location::Undefined))
     }
 }

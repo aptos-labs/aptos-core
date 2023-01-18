@@ -714,6 +714,10 @@ Maximum number of distributions a stake pool can support.
 
 ## Function `stake_pool_address`
 
+Return the address of the underlying stake pool for the staking contract between the provided staker and
+operator.
+
+This errors out the staking contract with the provided staker and operator doesn't exist.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_stake_pool_address">stake_pool_address</a>(staker: <b>address</b>, operator: <b>address</b>): <b>address</b>
@@ -740,6 +744,10 @@ Maximum number of distributions a stake pool can support.
 
 ## Function `last_recorded_principal`
 
+Return the last recorded principal (the amount that 100% belongs to the staker with commission already paid for)
+for staking contract between the provided staker and operator.
+
+This errors out the staking contract with the provided staker and operator doesn't exist.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_last_recorded_principal">last_recorded_principal</a>(staker: <b>address</b>, operator: <b>address</b>): u64
@@ -766,6 +774,10 @@ Maximum number of distributions a stake pool can support.
 
 ## Function `commission_percentage`
 
+Return percentage of accumulated rewards that will be paid to the operator as commission for staking contract
+between the provided staker and operator.
+
+This errors out the staking contract with the provided staker and operator doesn't exist.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a>(staker: <b>address</b>, operator: <b>address</b>): u64
@@ -792,6 +804,12 @@ Maximum number of distributions a stake pool can support.
 
 ## Function `staking_contract_amounts`
 
+Return a tuple of three numbers:
+1. The total active stake in the underlying stake pool
+2. The total accumulated rewards that haven't had commission paid out
+3. The commission amount owned from those accumulated rewards.
+
+This errors out the staking contract with the provided staker and operator doesn't exist.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_amounts">staking_contract_amounts</a>(staker: <b>address</b>, operator: <b>address</b>): (u64, u64, u64)
@@ -819,6 +837,9 @@ Maximum number of distributions a stake pool can support.
 
 ## Function `pending_distribution_counts`
 
+Return the number of pending distributions (e.g. commission, withdrawals from stakers).
+
+This errors out the staking contract with the provided staker and operator doesn't exist.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_pending_distribution_counts">pending_distribution_counts</a>(staker: <b>address</b>, operator: <b>address</b>): u64
@@ -845,6 +866,7 @@ Maximum number of distributions a stake pool can support.
 
 ## Function `staking_contract_exists`
 
+Return true if the staking contract between the provided staker and operator exists.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_exists">staking_contract_exists</a>(staker: <b>address</b>, operator: <b>address</b>): bool

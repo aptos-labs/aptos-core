@@ -6,7 +6,7 @@
 use aptos_config::network_id::PeerNetworkId;
 use aptos_network::{
     application::{interface::NetworkClientInterface, storage::PeerMetadataStorage},
-    protocols::network::{NetworkApplicationConfig, RpcError},
+    protocols::network::{NetworkClientConfig, RpcError},
     ProtocolId,
 };
 use aptos_peer_monitoring_service_types::{
@@ -74,6 +74,6 @@ impl<NetworkClient: NetworkClientInterface<PeerMonitoringServiceMessage>>
 }
 
 /// Returns a network application config for the peer monitoring client
-pub fn peer_monitoring_client_network_config() -> NetworkApplicationConfig {
-    NetworkApplicationConfig::client([ProtocolId::PeerMonitoringServiceRpc])
+pub fn peer_monitoring_client_network_config() -> NetworkClientConfig {
+    NetworkClientConfig::new(vec![ProtocolId::PeerMonitoringServiceRpc], vec![])
 }

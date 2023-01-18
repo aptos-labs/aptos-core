@@ -320,6 +320,10 @@ pub struct TestPackage {
     #[clap(long, short)]
     pub filter: Option<String>,
 
+    /// A boolean value to skip warnings.
+    #[clap(long, short = 'w')]
+    pub ignore_compile_warnings: bool,
+
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
 
@@ -356,6 +360,7 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestingConfig {
                 filter: self.filter,
                 report_stacktrace_on_abort: true,
+                ignore_compile_warnings: self.ignore_compile_warnings,
                 ..UnitTestingConfig::default_with_bound(None)
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future

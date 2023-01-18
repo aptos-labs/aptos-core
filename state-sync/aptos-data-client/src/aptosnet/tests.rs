@@ -74,6 +74,7 @@ fn mock_storage_summary(version: Version) -> StorageServerSummary {
 }
 
 struct MockNetwork {
+    network_id: NetworkId,
     peer_mgr_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 }
@@ -97,11 +98,12 @@ impl MockNetwork {
         let networks = networks
             .unwrap_or_else(|| vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public]);
         let peer_metadata_storage = PeerMetadataStorage::new(&networks);
+        let client_network_id = NetworkId::Validator;
         let network_client = NetworkClient::new(
             vec![],
             vec![ProtocolId::StorageServiceRpc],
             hashmap! {
-            NetworkId::Validator => network_sender},
+            client_network_id => network_sender},
             peer_metadata_storage.clone(),
         );
 
@@ -123,6 +125,7 @@ impl MockNetwork {
 
         // Create the mock network
         let mock_network = Self {
+            network_id: client_network_id,
             peer_mgr_reqs_rx,
             peer_metadata_storage,
         };
@@ -195,18 +198,24 @@ impl MockNetwork {
     async fn next_request(&mut self) -> Option<NetworkRequest> {
         match self.peer_mgr_reqs_rx.next().await {
             Some(PeerManagerRequest::SendRpc(peer_id, network_request)) => {
-                let protocol = network_request.protocol_id;
+                let peer_network_id = PeerNetworkId::new(self.network_id, peer_id);
+                let protocol_id = network_request.protocol_id;
                 let data = network_request.data;
                 let res_tx = network_request.res_tx;
 
                 let message: StorageServiceMessage = bcs::from_bytes(data.as_ref()).unwrap();
-                let request = match message {
+                let storage_service_request = match message {
                     StorageServiceMessage::Request(request) => request,
                     _ => panic!("unexpected: {:?}", message),
                 };
                 let response_sender = ResponseSender::new(res_tx);
 
-                Some((peer_id, protocol, request, response_sender))
+                Some(NetworkRequest {
+                    peer_network_id,
+                    protocol_id,
+                    storage_service_request,
+                    response_sender,
+                })
             },
             Some(PeerManagerRequest::SendDirectSend(_, _)) => panic!("Unexpected direct send msg"),
             None => None,
@@ -245,28 +254,33 @@ async fn request_works_only_when_data_available() {
     mock_time.advance_async(Duration::from_millis(1_000)).await;
 
     // Receive their request and fulfill it
-    let (peer, protocol, request, response_sender) = mock_network.next_request().await.unwrap();
-    assert_eq!(peer, expected_peer.peer_id());
-    assert_eq!(protocol, ProtocolId::StorageServiceRpc);
-    assert!(request.use_compression);
-    assert_matches!(request.data_request, DataRequest::GetStorageServerSummary);
+    let network_request = mock_network.next_request().await.unwrap();
+    assert_eq!(network_request.peer_network_id, expected_peer);
+    assert_eq!(network_request.protocol_id, ProtocolId::StorageServiceRpc);
+    assert!(network_request.storage_service_request.use_compression);
+    assert_matches!(
+        network_request.storage_service_request.data_request,
+        DataRequest::GetStorageServerSummary
+    );
 
     let summary = mock_storage_summary(200);
     let data_response = DataResponse::StorageServerSummary(summary);
-    response_sender.send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
+    network_request
+        .response_sender
+        .send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
 
     // Let the poller finish processing the response
     tokio::task::yield_now().await;
 
     // Handle the client's transactions request
     tokio::spawn(async move {
-        let (peer, protocol, request, response_sender) = mock_network.next_request().await.unwrap();
+        let network_request = mock_network.next_request().await.unwrap();
 
-        assert_eq!(peer, expected_peer.peer_id());
-        assert_eq!(protocol, ProtocolId::StorageServiceRpc);
-        assert!(request.use_compression);
+        assert_eq!(network_request.peer_network_id, expected_peer);
+        assert_eq!(network_request.protocol_id, ProtocolId::StorageServiceRpc);
+        assert!(network_request.storage_service_request.use_compression);
         assert_matches!(
-            request.data_request,
+            network_request.storage_service_request.data_request,
             DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
                 start_version: 50,
                 end_version: 100,
@@ -277,7 +291,9 @@ async fn request_works_only_when_data_available() {
 
         let data_response =
             DataResponse::TransactionsWithProof(TransactionListWithProof::new_empty());
-        response_sender.send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
+        network_request
+            .response_sender
+            .send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
     });
 
     // The client's request should succeed since a peer finally has advertised
@@ -650,10 +666,12 @@ async fn in_flight_error_handling() {
     let handle = poll_peer(client.clone(), peer, None);
 
     // Respond to the peer poll with an error
-    if let Some((_, _, _, response_sender)) = mock_network.next_request().await {
-        response_sender.send(Err(StorageServiceError::InternalError(
-            "An unexpected error occurred!".into(),
-        )));
+    if let Some(network_request) = mock_network.next_request().await {
+        network_request
+            .response_sender
+            .send(Err(StorageServiceError::InternalError(
+                "An unexpected error occurred!".into(),
+            )));
     }
 
     // Wait for the poller to complete
@@ -991,13 +1009,15 @@ async fn bad_peer_is_eventually_banned_internal() {
 
     // Spawn a handler for both peers.
     tokio::spawn(async move {
-        while let Some((peer, _, _, response_sender)) = mock_network.next_request().await {
-            if peer == good_peer.peer_id() {
+        while let Some(network_request) = mock_network.next_request().await {
+            let peer_network_id = network_request.peer_network_id;
+            let response_sender = network_request.response_sender;
+            if peer_network_id == good_peer {
                 // Good peer responds with good response.
                 let data_response =
                     DataResponse::TransactionsWithProof(TransactionListWithProof::new_empty());
                 response_sender.send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
-            } else if peer == bad_peer.peer_id() {
+            } else if peer_network_id == bad_peer {
                 // Bad peer responds with error.
                 response_sender.send(Err(StorageServiceError::InternalError("".to_string())));
             }
@@ -1060,10 +1080,12 @@ async fn bad_peer_is_eventually_banned_callback() {
 
     // Spawn a handler for both peers.
     tokio::spawn(async move {
-        while let Some((_, _, _, response_sender)) = mock_network.next_request().await {
+        while let Some(network_request) = mock_network.next_request().await {
             let data_response =
                 DataResponse::TransactionsWithProof(TransactionListWithProof::new_empty());
-            response_sender.send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
+            network_request
+                .response_sender
+                .send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
         }
     });
 
@@ -1132,9 +1154,9 @@ async fn compression_mismatch_disabled() {
     mock_time.advance_async(Duration::from_millis(1_000)).await;
 
     // Receive their request and respond
-    let (_, _, _, response_sender) = mock_network.next_request().await.unwrap();
+    let network_request = mock_network.next_request().await.unwrap();
     let data_response = DataResponse::StorageServerSummary(mock_storage_summary(200));
-    response_sender.send(Ok(
+    network_request.response_sender.send(Ok(
         StorageServiceResponse::new(data_response, false).unwrap()
     ));
 
@@ -1143,14 +1165,14 @@ async fn compression_mismatch_disabled() {
 
     // Handle the client's transactions request using compression
     tokio::spawn(async move {
-        let (_, _, request, response_sender) = mock_network.next_request().await.unwrap();
-        assert!(!request.use_compression);
+        let network_request = mock_network.next_request().await.unwrap();
+        assert!(!network_request.storage_service_request.use_compression);
 
         // Compress the response
         let data_response =
             DataResponse::TransactionsWithProof(TransactionListWithProof::new_empty());
         let storage_response = StorageServiceResponse::new(data_response, true).unwrap();
-        response_sender.send(Ok(storage_response));
+        network_request.response_sender.send(Ok(storage_response));
     });
 
     // The client should receive a compressed response and return an error
@@ -1184,23 +1206,25 @@ async fn compression_mismatch_enabled() {
     mock_time.advance_async(Duration::from_millis(1_000)).await;
 
     // Receive their request and respond
-    let (_, _, _, response_sender) = mock_network.next_request().await.unwrap();
+    let network_request = mock_network.next_request().await.unwrap();
     let data_response = DataResponse::StorageServerSummary(mock_storage_summary(200));
-    response_sender.send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
+    network_request
+        .response_sender
+        .send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
 
     // Let the poller finish processing the response
     tokio::task::yield_now().await;
 
     // Handle the client's transactions request without compression
     tokio::spawn(async move {
-        let (_, _, request, response_sender) = mock_network.next_request().await.unwrap();
-        assert!(request.use_compression);
+        let network_request = mock_network.next_request().await.unwrap();
+        assert!(network_request.storage_service_request.use_compression);
 
         // Compress the response
         let data_response =
             DataResponse::TransactionsWithProof(TransactionListWithProof::new_empty());
         let storage_response = StorageServiceResponse::new(data_response, false).unwrap();
-        response_sender.send(Ok(storage_response));
+        network_request.response_sender.send(Ok(storage_response));
     });
 
     // The client should receive a compressed response and return an error
@@ -1234,15 +1258,18 @@ async fn disable_compression() {
     mock_time.advance_async(Duration::from_millis(1_000)).await;
 
     // Receive their request
-    let (peer, protocol, request, response_sender) = mock_network.next_request().await.unwrap();
-    assert_eq!(peer, expected_peer.peer_id());
-    assert_eq!(protocol, ProtocolId::StorageServiceRpc);
-    assert!(!request.use_compression);
-    assert_matches!(request.data_request, DataRequest::GetStorageServerSummary);
+    let network_request = mock_network.next_request().await.unwrap();
+    assert_eq!(network_request.peer_network_id, expected_peer);
+    assert_eq!(network_request.protocol_id, ProtocolId::StorageServiceRpc);
+    assert!(!network_request.storage_service_request.use_compression);
+    assert_matches!(
+        network_request.storage_service_request.data_request,
+        DataRequest::GetStorageServerSummary
+    );
 
     // Fulfill their request
     let data_response = DataResponse::StorageServerSummary(mock_storage_summary(200));
-    response_sender.send(Ok(
+    network_request.response_sender.send(Ok(
         StorageServiceResponse::new(data_response, false).unwrap()
     ));
 
@@ -1251,13 +1278,13 @@ async fn disable_compression() {
 
     // Handle the client's transactions request
     tokio::spawn(async move {
-        let (peer, protocol, request, response_sender) = mock_network.next_request().await.unwrap();
+        let network_request = mock_network.next_request().await.unwrap();
 
-        assert_eq!(peer, expected_peer.peer_id());
-        assert_eq!(protocol, ProtocolId::StorageServiceRpc);
-        assert!(!request.use_compression);
+        assert_eq!(network_request.peer_network_id, expected_peer);
+        assert_eq!(network_request.protocol_id, ProtocolId::StorageServiceRpc);
+        assert!(!network_request.storage_service_request.use_compression);
         assert_matches!(
-            request.data_request,
+            network_request.storage_service_request.data_request,
             DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
                 start_version: 50,
                 end_version: 100,
@@ -1269,7 +1296,7 @@ async fn disable_compression() {
         let data_response =
             DataResponse::TransactionsWithProof(TransactionListWithProof::new_empty());
         let storage_response = StorageServiceResponse::new(data_response, false).unwrap();
-        response_sender.send(Ok(storage_response));
+        network_request.response_sender.send(Ok(storage_response));
     });
 
     // The client's request should succeed since a peer finally has advertised
@@ -1292,27 +1319,34 @@ async fn bad_peer_is_eventually_added_back() {
 
     tokio::spawn(poller.start_poller());
     tokio::spawn(async move {
-        while let Some((_, _, request, response_sender)) = mock_network.next_request().await {
-            match request.data_request {
+        while let Some(network_request) = mock_network.next_request().await {
+            match network_request.storage_service_request.data_request {
                 DataRequest::GetTransactionsWithProof(_) => {
                     let data_response =
                         DataResponse::TransactionsWithProof(TransactionListWithProof::new_empty());
-                    response_sender.send(Ok(StorageServiceResponse::new(
-                        data_response,
-                        request.use_compression,
-                    )
-                    .unwrap()));
+                    network_request
+                        .response_sender
+                        .send(Ok(StorageServiceResponse::new(
+                            data_response,
+                            network_request.storage_service_request.use_compression,
+                        )
+                        .unwrap()));
                 },
                 DataRequest::GetStorageServerSummary => {
                     let data_response =
                         DataResponse::StorageServerSummary(mock_storage_summary(200));
-                    response_sender.send(Ok(StorageServiceResponse::new(
-                        data_response,
-                        request.use_compression,
-                    )
-                    .unwrap()));
+                    network_request
+                        .response_sender
+                        .send(Ok(StorageServiceResponse::new(
+                            data_response,
+                            network_request.storage_service_request.use_compression,
+                        )
+                        .unwrap()));
                 },
-                _ => panic!("unexpected: {:?}", request),
+                _ => panic!(
+                    "Unexpected storage request: {:?}",
+                    network_request.storage_service_request
+                ),
             }
         }
     });

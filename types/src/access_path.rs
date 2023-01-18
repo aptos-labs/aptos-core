@@ -38,7 +38,7 @@
 use crate::{account_address::AccountAddress, state_store::state_key::StateKey};
 use anyhow::{Error, Result};
 use aptos_crypto::hash::HashValue;
-use move_core_types::language_storage::{ModuleId, ResourceKey, StructTag, CODE_TAG, RESOURCE_TAG};
+use move_core_types::language_storage::{ModuleId, StructTag};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -58,6 +58,11 @@ pub enum Path {
     Resource(StructTag),
 }
 
+pub enum PathType {
+    Code,
+    Resource,
+}
+
 impl AccessPath {
     pub fn new(address: AccountAddress, path: Vec<u8>) -> Self {
         AccessPath { address, path }
@@ -69,11 +74,10 @@ impl AccessPath {
 
     /// Convert Accesses into a byte offset which would be used by the storage layer to resolve
     /// where fields are stored.
-    pub fn resource_access_path(key: ResourceKey) -> AccessPath {
-        let path = AccessPath::resource_path_vec(key.type_);
+    pub fn resource_access_path(address: AccountAddress, type_: StructTag) -> AccessPath {
         AccessPath {
-            address: key.address,
-            path,
+            address,
+            path: AccessPath::resource_path_vec(type_),
         }
     }
 
@@ -128,8 +132,8 @@ impl fmt::Display for AccessPath {
         } else {
             write!(f, "AccessPath {{ address: {:x}, ", self.address)?;
             match self.path[0] {
-                RESOURCE_TAG => write!(f, "type: Resource, ")?,
-                CODE_TAG => write!(f, "type: Module, ")?,
+                p if p == PathType::Resource as u8 => write!(f, "type: Resource, ")?,
+                p if p == PathType::Code as u8 => write!(f, "type: Module, ")?,
                 tag => write!(f, "type: {:?}, ", tag)?,
             };
             write!(
