@@ -170,7 +170,7 @@ impl BlockStore {
         back_pressure_limit: Round,
         payload_manager: Arc<PayloadManager>,
     ) -> Self {
-        let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
+        let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert, _) = root;
 
         //verify root is correct
         assert!(
