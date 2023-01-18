@@ -525,6 +525,17 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 
 
 
+<a name="0x1_string_spec_utf8"></a>
+
+
+<pre><code><b>fun</b> <a href="string.md#0x1_string_spec_utf8">spec_utf8</a>(bytes: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="string.md#0x1_string_String">String</a> {
+   <a href="string.md#0x1_string_String">String</a>{bytes}
+}
+</code></pre>
+
+
+
+
 <a name="0x1_string_spec_internal_check_utf8"></a>
 
 
