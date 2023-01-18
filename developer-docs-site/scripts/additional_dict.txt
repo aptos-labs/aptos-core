@@ -87,6 +87,7 @@ Ethereum
 FAQ
 FLAC
 Failover
+failover
 FullNode
 Fullnodes
 GB
@@ -115,6 +116,7 @@ JPG
 JSON
 Jetbrains
 Kubernetes
+kubernetes
 LLVM
 Labs's
 Leaderboard
@@ -131,6 +133,7 @@ MoonCoin
 MoveVM
 MultiEd
 Multinode
+multinode
 Multisignature
 Multisigner
 NFT
