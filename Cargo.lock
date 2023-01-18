@@ -1157,7 +1157,6 @@ dependencies = [
  "claims",
  "clap 3.2.23",
  "codespan-reporting",
- "criterion",
  "curve25519-dalek",
  "flate2",
  "hex",

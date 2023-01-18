@@ -70,7 +70,6 @@ smallvec = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
-criterion = { workspace = true }
 rand.workspace = true
 
 [dev-dependencies]
@@ -89,11 +88,3 @@ testing = []
 
 [lib]
 doctest = false
-
-[[bench]]
-name = "bls12_381"
-harness = false
-
-[[bench]]
-name = "ristretto"
-harness = false
