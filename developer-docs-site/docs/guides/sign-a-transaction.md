@@ -329,5 +329,5 @@ curl -X POST -H "Content-Type: application/x.aptos.signed_transaction+bcs" --dat
 [account]: /concepts/accounts
 [rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/
 [bcs]: https://docs.rs/bcs/latest/bcs/
-[sha3]: https://en.wikipedia.org/wiki/SHA-3
+[SHA3]: https://en.wikipedia.org/wiki/SHA-3
 [ed25519]: https://ed25519.cr.yp.to/
