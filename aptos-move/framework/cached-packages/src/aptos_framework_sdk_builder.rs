@@ -500,6 +500,11 @@ pub enum EntryFunctionCall {
         contract_address: AccountAddress,
     },
 
+    /// Call `distribute` for many vesting contracts.
+    VestingDistributeMany {
+        contract_addresses: Vec<AccountAddress>,
+    },
+
     /// Remove the beneficiary for the given shareholder. All distributions will sent directly to the shareholder
     /// account.
     VestingResetBeneficiary {
@@ -538,6 +543,11 @@ pub enum EntryFunctionCall {
         contract_address: AccountAddress,
     },
 
+    /// Call `unlock_rewards` for many vesting contracts.
+    VestingUnlockRewardsMany {
+        contract_addresses: Vec<AccountAddress>,
+    },
+
     VestingUpdateOperator {
         contract_address: AccountAddress,
         new_operator: AccountAddress,
@@ -557,6 +567,11 @@ pub enum EntryFunctionCall {
     /// Unlock any vested portion of the grant.
     VestingVest {
         contract_address: AccountAddress,
+    },
+
+    /// Call `vest` for many vesting contracts.
+    VestingVestMany {
+        contract_addresses: Vec<AccountAddress>,
     },
 }
 
@@ -839,6 +854,9 @@ impl EntryFunctionCall {
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
             VestingDistribute { contract_address } => vesting_distribute(contract_address),
+            VestingDistributeMany { contract_addresses } => {
+                vesting_distribute_many(contract_addresses)
+            },
             VestingResetBeneficiary {
                 contract_address,
                 shareholder,
@@ -862,6 +880,9 @@ impl EntryFunctionCall {
                 vesting_terminate_vesting_contract(contract_address)
             },
             VestingUnlockRewards { contract_address } => vesting_unlock_rewards(contract_address),
+            VestingUnlockRewardsMany { contract_addresses } => {
+                vesting_unlock_rewards_many(contract_addresses)
+            },
             VestingUpdateOperator {
                 contract_address,
                 new_operator,
@@ -876,6 +897,7 @@ impl EntryFunctionCall {
                 new_voter,
             } => vesting_update_voter(contract_address, new_voter),
             VestingVest { contract_address } => vesting_vest(contract_address),
+            VestingVestMany { contract_addresses } => vesting_vest_many(contract_addresses),
         }
     }
 
@@ -2277,6 +2299,22 @@ pub fn vesting_distribute(contract_address: AccountAddress) -> TransactionPayloa
     ))
 }
 
+/// Call `distribute` for many vesting contracts.
+pub fn vesting_distribute_many(contract_addresses: Vec<AccountAddress>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("distribute_many").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&contract_addresses).unwrap()],
+    ))
+}
+
 /// Remove the beneficiary for the given shareholder. All distributions will sent directly to the shareholder
 /// account.
 pub fn vesting_reset_beneficiary(
@@ -2414,6 +2452,22 @@ pub fn vesting_unlock_rewards(contract_address: AccountAddress) -> TransactionPa
     ))
 }
 
+/// Call `unlock_rewards` for many vesting contracts.
+pub fn vesting_unlock_rewards_many(contract_addresses: Vec<AccountAddress>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("unlock_rewards_many").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&contract_addresses).unwrap()],
+    ))
+}
+
 pub fn vesting_update_operator(
     contract_address: AccountAddress,
     new_operator: AccountAddress,
@@ -2492,6 +2546,22 @@ pub fn vesting_vest(contract_address: AccountAddress) -> TransactionPayload {
         ident_str!("vest").to_owned(),
         vec![],
         vec![bcs::to_bytes(&contract_address).unwrap()],
+    ))
+}
+
+/// Call `vest` for many vesting contracts.
+pub fn vesting_vest_many(contract_addresses: Vec<AccountAddress>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("vest_many").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&contract_addresses).unwrap()],
     ))
 }
 mod decoder {
@@ -3286,6 +3356,16 @@ mod decoder {
         }
     }
 
+    pub fn vesting_distribute_many(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingDistributeMany {
+                contract_addresses: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn vesting_reset_beneficiary(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingResetBeneficiary {
@@ -3366,6 +3446,16 @@ mod decoder {
         }
     }
 
+    pub fn vesting_unlock_rewards_many(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingUnlockRewardsMany {
+                contract_addresses: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn vesting_update_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingUpdateOperator {
@@ -3406,6 +3496,16 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingVest {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn vesting_vest_many(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingVestMany {
+                contract_addresses: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -3683,6 +3783,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::vesting_distribute),
         );
         map.insert(
+            "vesting_distribute_many".to_string(),
+            Box::new(decoder::vesting_distribute_many),
+        );
+        map.insert(
             "vesting_reset_beneficiary".to_string(),
             Box::new(decoder::vesting_reset_beneficiary),
         );
@@ -3711,6 +3815,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::vesting_unlock_rewards),
         );
         map.insert(
+            "vesting_unlock_rewards_many".to_string(),
+            Box::new(decoder::vesting_unlock_rewards_many),
+        );
+        map.insert(
             "vesting_update_operator".to_string(),
             Box::new(decoder::vesting_update_operator),
         );
@@ -3723,5 +3831,9 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::vesting_update_voter),
         );
         map.insert("vesting_vest".to_string(), Box::new(decoder::vesting_vest));
+        map.insert(
+            "vesting_vest_many".to_string(),
+            Box::new(decoder::vesting_vest_many),
+        );
         map
     });
