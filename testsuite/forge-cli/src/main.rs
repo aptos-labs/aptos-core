@@ -491,10 +491,10 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
 
 fn run_consensus_only_three_region_simulation(config: ForgeConfig) -> ForgeConfig {
     config
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(500).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 30000 })
+                .mode(EmitJobMode::ConstTps { tps: 10000 })
                 .txn_expiration_time_secs(5 * 60),
         )
         .with_network_tests(vec![&ThreeRegionSimulationTest {
