@@ -19,7 +19,11 @@ pub struct Features {
 pub enum FeatureFlag {
     CodeDependencyCheck,
     TreatFriendAsPrivate,
+    Sha512AndRipeMd160Natives,
+    AptosStdChainIdNatives,
     VMBinaryFormatV6,
+    MultiEd25519PkValidateV2Natives,
+    Blake2b256Native,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -93,7 +97,15 @@ impl From<FeatureFlag> for AptosFeatureFlag {
         match f {
             FeatureFlag::CodeDependencyCheck => AptosFeatureFlag::CODE_DEPENDENCY_CHECK,
             FeatureFlag::TreatFriendAsPrivate => AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE,
+            FeatureFlag::Sha512AndRipeMd160Natives => {
+                AptosFeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES
+            },
+            FeatureFlag::AptosStdChainIdNatives => AptosFeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
             FeatureFlag::VMBinaryFormatV6 => AptosFeatureFlag::VM_BINARY_FORMAT_V6,
+            FeatureFlag::MultiEd25519PkValidateV2Natives => {
+                AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES
+            },
+            FeatureFlag::Blake2b256Native => AptosFeatureFlag::BLAKE2B_256_NATIVE,
         }
     }
 }
@@ -104,7 +116,15 @@ impl From<AptosFeatureFlag> for FeatureFlag {
         match f {
             AptosFeatureFlag::CODE_DEPENDENCY_CHECK => FeatureFlag::CodeDependencyCheck,
             AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE => FeatureFlag::TreatFriendAsPrivate,
+            AptosFeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES => {
+                FeatureFlag::Sha512AndRipeMd160Natives
+            },
+            AptosFeatureFlag::APTOS_STD_CHAIN_ID_NATIVES => FeatureFlag::AptosStdChainIdNatives,
             AptosFeatureFlag::VM_BINARY_FORMAT_V6 => FeatureFlag::VMBinaryFormatV6,
+            AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES => {
+                FeatureFlag::MultiEd25519PkValidateV2Natives
+            },
+            AptosFeatureFlag::BLAKE2B_256_NATIVE => FeatureFlag::Blake2b256Native,
         }
     }
 }
