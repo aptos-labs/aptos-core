@@ -1,9 +1,10 @@
 ---
 testnet: true
-is_multi_step: false
-framework_release: true
+remote_endpoint: ~
+framework_release:
+  bytecode_version: 5
 gas_schedule:
-  feature_version: 4
+  feature_version: 6
   entries:
     - - instr.nop
       - 200
@@ -21,9 +22,15 @@ gas_schedule:
       - 800
     - - instr.ld_u8
       - 1200
+    - - instr.ld_u16
+      - 1200
+    - - instr.ld_u32
+      - 1200
     - - instr.ld_u64
       - 1200
     - - instr.ld_u128
+      - 1600
+    - - instr.ld_u256
       - 1600
     - - instr.ld_true
       - 1200
@@ -93,9 +100,15 @@ gas_schedule:
       - 200
     - - instr.cast_u8
       - 2400
+    - - instr.cast_u16
+      - 2400
+    - - instr.cast_u32
+      - 2400
     - - instr.cast_u64
       - 2400
     - - instr.cast_u128
+      - 2400
+    - - instr.cast_u256
       - 2400
     - - instr.add
       - 3200
@@ -211,6 +224,16 @@ gas_schedule:
       - 10000
     - - txn.memory_quota
       - 10000000
+    - - txn.free_write_bytes_quota
+      - 1024
+    - - txn.max_bytes_per_write_op
+      - 1048576
+    - - txn.max_bytes_all_write_ops_per_transaction
+      - 10485760
+    - - txn.max_bytes_per_event
+      - 1048576
+    - - txn.max_bytes_all_events_per_transaction
+      - 10485760
     - - move_stdlib.bcs.to_bytes.per_byte_serialized
       - 200
     - - move_stdlib.bcs.to_bytes.failure
@@ -367,6 +390,10 @@ gas_schedule:
       - 3000
     - - aptos_framework.hash.ripemd160.per_byte
       - 50
+    - - aptos_framework.hash.blake2b_256.base
+      - 1750
+    - - aptos_framework.hash.blake2b_256.per_byte
+      - 15
     - - aptos_framework.util.from_bytes.base
       - 6000
     - - aptos_framework.util.from_bytes.per_byte
@@ -423,9 +450,15 @@ gas_schedule:
       - 2000
     - - misc.abs_val.u8
       - 40
+    - - misc.abs_val.u16
+      - 40
+    - - misc.abs_val.u32
+      - 40
     - - misc.abs_val.u64
       - 40
     - - misc.abs_val.u128
+      - 40
+    - - misc.abs_val.u256
       - 40
     - - misc.abs_val.bool
       - 40
@@ -439,21 +472,20 @@ gas_schedule:
       - 40
     - - misc.abs_val.per_u8_packed
       - 1
+    - - misc.abs_val.per_u16_packed
+      - 2
+    - - misc.abs_val.per_u32_packed
+      - 4
     - - misc.abs_val.per_u64_packed
       - 8
     - - misc.abs_val.per_u128_packed
       - 16
+    - - misc.abs_val.per_u256_packed
+      - 32
     - - misc.abs_val.per_bool_packed
       - 1
     - - misc.abs_val.per_address_packed
       - 32
-version:
-  major: 4
-feature_flags:
-  enabled:
-    - code_dependency_check
-    - treat_friend_as_private
-  disabled: []
 consensus_config:
   V1:
     decoupled_execution: true
@@ -471,3 +503,4 @@ consensus_config:
           weight_by_voting_power: true
           use_history_from_previous_epoch_max_count: 5
     max_failed_authors_to_store: 10
+is_multi_step: false
