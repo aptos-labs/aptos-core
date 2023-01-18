@@ -309,6 +309,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-logger",
  "aptos-openapi",
  "aptos-storage-interface",
  "aptos-types",
