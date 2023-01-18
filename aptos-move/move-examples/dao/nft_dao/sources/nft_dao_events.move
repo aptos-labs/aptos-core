@@ -17,6 +17,7 @@ module dao_platform::nft_dao_events {
         min_proposal_weight: u64,
         governance_token_creator: address,
         governance_token_collection: String,
+        admin: address,
     }
 
     struct CreateProposalEvent has drop, store {
@@ -91,6 +92,7 @@ module dao_platform::nft_dao_events {
         min_proposal_weight: u64,
         governance_token_creator: address,
         governance_token_collection: String,
+        admin: address,
     ) acquires DAOEventStoreV1 {
         let event = CreateDAOEvent {
             dao_name,
@@ -99,6 +101,7 @@ module dao_platform::nft_dao_events {
             min_proposal_weight,
             governance_token_creator,
             governance_token_collection,
+            admin,
         };
         initialize_dao_event_store(dao);
         let dao_event_store = borrow_global_mut<DAOEventStoreV1>(signer::address_of(dao));
@@ -209,5 +212,4 @@ module dao_platform::nft_dao_events {
             event,
         );
     }
-
 }

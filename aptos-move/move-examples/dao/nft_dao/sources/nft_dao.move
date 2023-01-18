@@ -13,7 +13,7 @@
 /// 5. Anyone can call the `resolve` to resolve a proposal. A proposal voting duration has to expire and the proposal should have more votes than the minimal required threshold.
 ///
 /// An example of DAO delegation flow
-///  1. the DAO creator can delegate her DAO through `delegate_dao` to another admin address
+///  1. the DAO creator can delegate her DAO through offer_admin, claim_admin to another address
 ///
 /// An example of DAO removal.
 /// 1. The DAO creator can call `reclaim_signer_capability` to remove her DAO from the platform and get back her resource account's signercapability
@@ -43,7 +43,6 @@ module dao_platform::nft_dao {
     use std::string::String;
     use std::string;
     use std::vector;
-
 
     /// This account doesn't have enough voting power
     const EVOTING_POWER_NOT_ENOUGH: u64 = 1;
@@ -84,25 +83,21 @@ module dao_platform::nft_dao {
     /// Proposal with specified id doesn't exist
     const EPRPOSAL_ID_NOT_EXIST: u64 = 13;
 
-    /// DAO already created at this address
-    const EDAO_ADDRESS_USED: u64 = 14;
-
-    /// Already an admin of the DAO
-    const EALREADY_ADMIN_OF_THE_DAO: u64 = 15;
-
     /// Token already used for creating proposal
-    const ETOKEN_USED_FOR_CREATING_PROPOSAL: u64 = 16;
+    const ETOKEN_USED_FOR_CREATING_PROPOSAL: u64 = 14;
 
     /// DAO already offered for the new admin
-    const EADMIN_ALREADY_OFFERED: u64 = 17;
+    const EADMIN_ALREADY_OFFERED: u64 = 15;
 
     /// DAO offer doesn't exist
-    const EADMIN_OFFER_NOT_EXIST: u64 = 18;
+    const EADMIN_OFFER_NOT_EXIST: u64 = 16;
 
     /// Constants
     const PROPOSAL_PENDING: u8 = 0;
     const PROPOSAL_RESOLVED_PASSED: u8 = 1;
     const PROPOSAL_RESOLVED_NOT_PASSED: u8 = 2;
+    const PROPOSAL_RESOLVED_BY_ADMIN: u8 = 3;
+    const PROPOSAL_VETOED_BY_ADMIN: u8 = 4;
 
     struct DAO has key {
         /// Name of the DAO
@@ -246,10 +241,10 @@ module dao_platform::nft_dao {
             min_required_proposer_voting_power,
             voting_token_collection_creator,
             collection_name,
+            src_addr,
         );
         dao_addr
     }
-
 
     /// Only DAO Goverance token holders can create proposal
     public entry fun create_proposal(
@@ -375,43 +370,16 @@ module dao_platform::nft_dao {
         );
     }
 
-    /// Entry function that can be called by anyone
-    public entry fun resolve<CoinType>(proposal_id: u64, nft_dao: address) acquires Proposals, DAO, ProposalVotingStatistics {
-        // validate if proposal is ready to resolve
+    /// Admin can veto an active proposal
+    public entry fun admin_veto_proposal(admin: &signer, proposal_id: u64, nft_dao: address) acquires DAO, Proposals {
         let dao = borrow_global_mut<DAO>(nft_dao);
-
-        // assert the proposal voting ended
+        assert!(dao.admin == signer::address_of(admin), error::permission_denied(EINVALID_ADMIN_ACCOUNT));
+        // assert the proposal is still active
         let proposals = borrow_global_mut<Proposals>(nft_dao);
         let proposal = table::borrow_mut(&mut proposals.proposals, proposal_id);
-        let now = timestamp::now_seconds();
-        assert!(now >= proposal.start_time_sec + dao.voting_duration, error::invalid_argument(EPROPOSAL_ENDED));
-
         // assert the proposal is unresolved yet
         assert!(proposal.resolution == PROPOSAL_PENDING, error::invalid_argument(EPROPOSAL_RESOLVED));
-
-        let proposal_stat = &mut borrow_global_mut<ProposalVotingStatistics>(nft_dao).proposals;
-        let voting_stat = table::borrow_mut(proposal_stat, proposal_id);
-        proposal.final_yes_votes = voting_stat.total_yes;
-        proposal.final_no_votes = voting_stat.total_no;
-        // validate resolve threshold and result
-        let voted = voting_stat.total_no + voting_stat.total_yes;
-        if (voted < dao.resolve_threshold) {
-            // not sufficient token voted
-            proposal.resolution = PROPOSAL_RESOLVED_NOT_PASSED;
-        } else if(voting_stat.total_yes > voting_stat.total_no) {
-            let function_name = proposal.function_name;
-            if (function_name == string::utf8(b"transfer_fund")) {
-                let res_signer =  create_signer_with_capability(&dao.dao_signer_capability);
-                let dst_addr = property_map::read_address(&proposal.function_args, &string::utf8(b"dst"));
-                let amount = property_map::read_u64(&proposal.function_args, &string::utf8(b"amount"));
-                transfer_fund<CoinType>(&res_signer, dst_addr, amount);
-            } else {
-               assert!(function_name == string::utf8(b"no_op"), error::invalid_argument(ENOT_SUPPROTED_FUNCTION));
-            };
-            proposal.resolution = PROPOSAL_RESOLVED_PASSED;
-        } else {
-            proposal.resolution = PROPOSAL_RESOLVED_NOT_PASSED;
-        };
+        proposal.resolution = PROPOSAL_VETOED_BY_ADMIN;
 
         nft_dao_events::emit_resolve_event(
             proposal_id,
@@ -420,7 +388,33 @@ module dao_platform::nft_dao {
         )
     }
 
-    /// Offer admin of a DAO to a new admin. The new admin can then claim the offer to be the new admin of the DAO.
+    /// Anyone can call the resolve function to resolve a proposal.
+    public entry fun resolve<CoinType>(proposal_id: u64, nft_dao: address) acquires Proposals, DAO, ProposalVotingStatistics {
+        let dao = borrow_global<DAO>(nft_dao);
+        // assert the proposal voting ended
+        let proposals = borrow_global<Proposals>(nft_dao);
+        let proposal = table::borrow(&proposals.proposals, proposal_id);
+        let now = timestamp::now_seconds();
+        assert!(now >= proposal.start_time_sec + dao.voting_duration, error::invalid_argument(EPROPOSAL_ENDED));
+        // assert the proposal is unresolved yet
+        assert!(proposal.resolution == PROPOSAL_PENDING, error::invalid_argument(EPROPOSAL_RESOLVED));
+        resolve_internal<CoinType>(option::none(), proposal_id, nft_dao);
+    }
+
+    /// DAO admin can directly resolve a proposal
+    public entry fun admin_resolve<CoinType>(admin: &signer, proposal_id: u64, nft_dao: address) acquires DAO, Proposals, ProposalVotingStatistics {
+        let resolver = signer::address_of(admin);
+        let dao = borrow_global<DAO>(nft_dao);
+        // assert the proposal voting ended
+        let proposals = borrow_global<Proposals>(nft_dao);
+        let proposal = table::borrow(&proposals.proposals, proposal_id);
+        // assert the proposal is unresolved yet
+        assert!(proposal.resolution == PROPOSAL_PENDING, error::invalid_argument(EPROPOSAL_RESOLVED));
+
+        resolve_internal<CoinType>(option::some(resolver), proposal_id, nft_dao);
+    }
+
+    /// Offer admin of a DAO to an new admin. The new admin can then claim the offer to be the new admin of the DAO.
     public entry fun offer_admin(admin: &signer, dao: address, new_admin: address) acquires DAO {
         assert!(exists<DAO>(dao), error::not_found(EDAO_NOT_EXIST));
         let admin_addr = signer::address_of(admin);
@@ -510,7 +504,7 @@ module dao_platform::nft_dao {
 
     #[view]
     /// Unpack the DAO fields
-    public fun unpack_dao(nft_dao: address): (String, u64, address, String, u64, u64, u64) acquires DAO {
+    public fun unpack_dao(nft_dao: address): (String, u64, address, String, u64, u64, u64, address, Option<address>) acquires DAO {
         let dao = borrow_global<DAO>(nft_dao);
         (
             dao.name,
@@ -520,12 +514,63 @@ module dao_platform::nft_dao {
             dao.voting_duration,
             dao.min_required_proposer_voting_power,
             dao.next_proposal_id,
+            dao.admin,
+            dao.pending_admin,
         )
     }
 
-    // transfer coin from the DAO account to the destination account
+    /// Transfer coin from the DAO account to the destination account
     fun transfer_fund<CoinType>(res_acct: &signer, dst: address, amount: u64) {
         deposit_coins(dst, coin::withdraw<CoinType>(res_acct, amount));
+    }
+
+    /// Internal function for executing a DAO's proposal
+    fun execute_proposal<CoinType>(proposal: &Proposal, dao: &DAO){
+        let function_name = proposal.function_name;
+        if (function_name == string::utf8(b"transfer_fund")) {
+            let res_signer =  create_signer_with_capability(&dao.dao_signer_capability);
+            let dst_addr = property_map::read_address(&proposal.function_args, &string::utf8(b"dst"));
+            let amount = property_map::read_u64(&proposal.function_args, &string::utf8(b"amount"));
+            transfer_fund<CoinType>(&res_signer, dst_addr, amount);
+        } else {
+            assert!(function_name == string::utf8(b"no_op"), error::invalid_argument(ENOT_SUPPROTED_FUNCTION));
+        };
+    }
+
+    /// Resolve an proposal
+    fun resolve_internal<CoinType>(resolver: Option<address>, proposal_id: u64, nft_dao: address) acquires DAO, Proposals, ProposalVotingStatistics {
+        // validate if proposal is ready to resolve
+        let dao = borrow_global_mut<DAO>(nft_dao);
+        // assert the proposal voting ended
+        let proposals = borrow_global_mut<Proposals>(nft_dao);
+        let proposal = table::borrow_mut(&mut proposals.proposals, proposal_id);
+
+        let proposal_stat = &mut borrow_global_mut<ProposalVotingStatistics>(nft_dao).proposals;
+        let voting_stat = table::borrow_mut(proposal_stat, proposal_id);
+        proposal.final_yes_votes = voting_stat.total_yes;
+        proposal.final_no_votes = voting_stat.total_no;
+        // validate resolve threshold and result
+        let voted = voting_stat.total_no + voting_stat.total_yes;
+        if (option::is_some(&resolver)) {
+            // only DAO admin can execute the proposal directly
+            assert!(*option::borrow(&resolver) == dao.admin, error::permission_denied(EINVALID_ADMIN_ACCOUNT));
+            execute_proposal<CoinType>(proposal, dao);
+            proposal.resolution = PROPOSAL_RESOLVED_BY_ADMIN;
+        } else if (voted < dao.resolve_threshold) {
+            // not sufficient token voted
+            proposal.resolution = PROPOSAL_RESOLVED_NOT_PASSED;
+        } else if(voting_stat.total_yes > voting_stat.total_no) {
+            execute_proposal<CoinType>(proposal, dao);
+            proposal.resolution = PROPOSAL_RESOLVED_PASSED;
+        } else {
+            proposal.resolution = PROPOSAL_RESOLVED_NOT_PASSED;
+        };
+
+        nft_dao_events::emit_resolve_event(
+            proposal_id,
+            nft_dao,
+            proposal.resolution,
+        )
     }
 
     fun get_proposal_weights(
@@ -897,5 +942,155 @@ module dao_platform::nft_dao {
         );
         timestamp::update_global_time_for_test(2000001);
         resolve<FakeMoney>(1, res_acc);
+    }
+
+    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    public fun test_admin_execute_proposal(aptos_framework: &signer, creator: &signer, voter: &signer)acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        account::create_account_for_test(@0x1);
+        account::create_account_for_test(@0xdeaf);
+        account::create_account_for_test(@0xaf);
+
+
+        setup_voting_token_distribution(creator, voter);
+        // creator creates a dao
+        let creator_addr = signer::address_of(creator);
+        let res_acc = create_dao_internal(
+            creator,
+            string::utf8(b"my_dao"),
+            2,
+            10,
+            creator_addr,
+            string::utf8(b"Hello, World"),
+            1,
+        );
+
+        // creator creates a proposal
+        create_proposal(
+            creator,
+            res_acc, // resource account address of the nft dao
+            string::utf8(b"Proposal 1"),
+            string::utf8(b"description"),
+            string::utf8(b"no_op"),
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            1,
+            vector<String>[string::utf8(b"Token")],
+            vector<u64>[0],
+        );
+        timestamp::update_global_time_for_test(2000000);
+
+        // creator only has 1 token and the threshold requires 2 to resolve
+        vote(
+            creator,
+            res_acc,
+            1,
+            true,
+            vector<String>[string::utf8(b"Token")],
+            vector<u64>[0],
+        );
+        timestamp::update_global_time_for_test(2000010);
+        // admin still can resolve this proposal even when it doesn't have sufficient votes
+        admin_resolve<FakeMoney>(creator,1, res_acc);
+        assert!(get_proposal_resolution(1, res_acc) == PROPOSAL_RESOLVED_BY_ADMIN, 1);
+    }
+
+    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    public fun test_admin_veto_a_proposal(aptos_framework: &signer, creator: &signer, voter: &signer)acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        account::create_account_for_test(@0x1);
+        account::create_account_for_test(@0xdeaf);
+        account::create_account_for_test(@0xaf);
+
+
+        setup_voting_token_distribution(creator, voter);
+        // creator creates a dao
+        let creator_addr = signer::address_of(creator);
+        let res_acc = create_dao_internal(
+            creator,
+            string::utf8(b"my_dao"),
+            1,
+            10,
+            creator_addr,
+            string::utf8(b"Hello, World"),
+            1,
+        );
+
+        // creator creates a proposal
+        create_proposal(
+            creator,
+            res_acc, // resource account address of the nft dao
+            string::utf8(b"Proposal 1"),
+            string::utf8(b"description"),
+            string::utf8(b"no_op"),
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            1,
+            vector<String>[string::utf8(b"Token")],
+            vector<u64>[0],
+        );
+        timestamp::update_global_time_for_test(2000000);
+
+        vote(
+            voter,
+            res_acc,
+            1,
+            true,
+            vector<String>[string::utf8(b"artist2"), string::utf8(b"artist3")],
+            vector<u64>[0, 0],
+        );
+        admin_veto_proposal(creator, 1, res_acc);
+        assert!(get_proposal_resolution(1, res_acc) == PROPOSAL_VETOED_BY_ADMIN, 1);
+    }
+    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    #[expected_failure(abort_code = 65543, location = Self)]
+    public fun test_admin_veto_an_expired_proposal(aptos_framework: &signer, creator: &signer, voter: &signer)acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        account::create_account_for_test(@0x1);
+        account::create_account_for_test(@0xdeaf);
+        account::create_account_for_test(@0xaf);
+
+
+        setup_voting_token_distribution(creator, voter);
+        // creator creates a dao
+        let creator_addr = signer::address_of(creator);
+        let res_acc = create_dao_internal(
+            creator,
+            string::utf8(b"my_dao"),
+            1,
+            10,
+            creator_addr,
+            string::utf8(b"Hello, World"),
+            1,
+        );
+
+        // creator creates a proposal
+        create_proposal(
+            creator,
+            res_acc, // resource account address of the nft dao
+            string::utf8(b"Proposal 1"),
+            string::utf8(b"description"),
+            string::utf8(b"no_op"),
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            1,
+            vector<String>[string::utf8(b"Token")],
+            vector<u64>[0],
+        );
+        timestamp::update_global_time_for_test(2000000);
+
+        vote(
+            voter,
+            res_acc,
+            1,
+            true,
+            vector<String>[string::utf8(b"artist2"), string::utf8(b"artist3")],
+            vector<u64>[0, 0],
+        );
+        timestamp::update_global_time_for_test(400000000);
+        admin_veto_proposal(creator, 1, res_acc);
     }
 }

@@ -167,6 +167,4 @@ fn test_nft_dao_test() {
 
     )]);
     run_tests_for_pkg("dao/nft_dao", named_address);
-
-
 }
