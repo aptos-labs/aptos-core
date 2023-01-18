@@ -3,17 +3,20 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer};
+use crate::{metrics, network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer};
 use anyhow::{format_err, Result};
 use aptos_bitvec::BitVec;
-use aptos_channels::aptos_channel;
-use aptos_config::config::StorageServiceConfig;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_config::{config::StorageServiceConfig, network_id::NetworkId};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_logger::Level;
 use aptos_network::{
+    application::interface::NetworkServiceEvents,
     peer_manager::PeerManagerNotification,
     protocols::{
-        network::NewNetworkEvents, rpc::InboundRpcRequest, wire::handshake::v1::ProtocolId,
+        network::{NetworkEvents, NewNetworkEvents},
+        rpc::InboundRpcRequest,
+        wire::handshake::v1::ProtocolId,
     },
 };
 use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
@@ -65,8 +68,8 @@ use mockall::{
     predicate::{always, eq},
     Sequence,
 };
-use rand::Rng;
-use std::{sync::Arc, time::Duration};
+use rand::{rngs::OsRng, Rng};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::timeout;
 
 /// Various test constants for storage
@@ -1782,7 +1785,8 @@ async fn test_get_epoch_ending_ledger_infos_invalid() {
 /// A wrapper around the inbound network interface/channel for easily sending
 /// mock client requests to a [`StorageServiceServer`].
 struct MockClient {
-    peer_mgr_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+    peer_manager_notifiers:
+        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
 }
 
 impl MockClient {
@@ -1791,31 +1795,50 @@ impl MockClient {
         storage_config: Option<StorageServiceConfig>,
     ) -> (Self, StorageServiceServer<StorageReader>, MockTimeService) {
         initialize_logger();
+
+        // Create the storage reader
         let storage_config = storage_config.unwrap_or_default();
-        let storage = StorageReader::new(
+        let storage_reader = StorageReader::new(
             storage_config,
             Arc::new(db_reader.unwrap_or_else(create_mock_db_reader)),
         );
 
-        let queue_cfg = crate::network::storage_service_network_config(storage_config)
-            .inbound_queue
-            .unwrap();
-        let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) = queue_cfg.build();
-        let (_connection_notifs_tx, connection_notifs_rx) = queue_cfg.build();
-        let network_requests =
-            StorageServiceNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
+        // Setup the networks and the network events
+        let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+        let mut network_and_events = HashMap::new();
+        let mut peer_manager_notifiers = HashMap::new();
+        for network_id in network_ids {
+            let queue_cfg =
+                aptos_channel::Config::new(storage_config.max_network_channel_size as usize)
+                    .queue_style(QueueStyle::FIFO)
+                    .counters(&metrics::PENDING_STORAGE_SERVER_NETWORK_EVENTS);
+            let (peer_manager_notifier, peer_manager_notification_receiver) = queue_cfg.build();
+            let (_, connection_notification_receiver) = queue_cfg.build();
 
+            let network_events = NetworkEvents::new(
+                peer_manager_notification_receiver,
+                connection_notification_receiver,
+            );
+            network_and_events.insert(network_id, network_events);
+            peer_manager_notifiers.insert(network_id, peer_manager_notifier);
+        }
+        let storage_service_network_events =
+            StorageServiceNetworkEvents::new(NetworkServiceEvents::new(network_and_events));
+
+        // Create the storage service
         let executor = tokio::runtime::Handle::current();
         let mock_time_service = TimeService::mock();
         let storage_server = StorageServiceServer::new(
             StorageServiceConfig::default(),
             executor,
-            storage,
+            storage_reader,
             mock_time_service.clone(),
-            network_requests,
+            storage_service_network_events,
         );
 
-        let mock_client = Self { peer_mgr_notifs_tx };
+        let mock_client = Self {
+            peer_manager_notifiers,
+        };
         (mock_client, storage_server, mock_time_service.into_mock())
     }
 
@@ -1835,7 +1858,8 @@ impl MockClient {
         request: StorageServiceRequest,
     ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
         // Create the inbound rpc request
-        let peer_id = PeerId::ZERO;
+        let peer_id = PeerId::random();
+        let network_id = get_random_network_id();
         let protocol_id = ProtocolId::StorageServiceRpc;
         let data = protocol_id
             .to_bytes(&StorageServiceMessage::Request(request))
@@ -1846,11 +1870,13 @@ impl MockClient {
             data: data.into(),
             res_tx,
         };
-        let notif = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
+        let notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
 
         // Push the request up to the storage service
-        self.peer_mgr_notifs_tx
-            .push((peer_id, protocol_id), notif)
+        self.peer_manager_notifiers
+            .get(&network_id)
+            .unwrap()
+            .push((peer_id, protocol_id), notification)
             .unwrap();
 
         res_rx
@@ -2927,6 +2953,18 @@ pub fn initialize_logger() {
         .is_async(false)
         .level(Level::Debug)
         .build();
+}
+
+/// Returns a random network ID
+fn get_random_network_id() -> NetworkId {
+    let mut rng = OsRng;
+    let random_number: u8 = rng.gen();
+    match random_number % 3 {
+        0 => NetworkId::Validator,
+        1 => NetworkId::Vfn,
+        2 => NetworkId::Public,
+        num => panic!("This shouldn't be possible! Got num: {:?}", num),
+    }
 }
 
 /// Creates a mock database reader

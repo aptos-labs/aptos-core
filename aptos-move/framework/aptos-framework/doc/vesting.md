@@ -38,8 +38,11 @@
 -  [Function `create_vesting_schedule`](#0x1_vesting_create_vesting_schedule)
 -  [Function `create_vesting_contract`](#0x1_vesting_create_vesting_contract)
 -  [Function `unlock_rewards`](#0x1_vesting_unlock_rewards)
+-  [Function `unlock_rewards_many`](#0x1_vesting_unlock_rewards_many)
 -  [Function `vest`](#0x1_vesting_vest)
+-  [Function `vest_many`](#0x1_vesting_vest_many)
 -  [Function `distribute`](#0x1_vesting_distribute)
+-  [Function `distribute_many`](#0x1_vesting_distribute_many)
 -  [Function `terminate_vesting_contract`](#0x1_vesting_terminate_vesting_contract)
 -  [Function `admin_withdraw`](#0x1_vesting_admin_withdraw)
 -  [Function `update_operator`](#0x1_vesting_update_operator)
@@ -929,6 +932,16 @@ The length of shareholders and shares lists don't match.
 
 
 
+<a name="0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION"></a>
+
+Zero items were provided to a *_many function.
+
+
+<pre><code><b>const</b> <a href="vesting.md#0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION">EVEC_EMPTY_FOR_MANY_FUNCTION</a>: u64 = 16;
+</code></pre>
+
+
+
 <a name="0x1_vesting_EVESTING_ACCOUNT_HAS_NO_ROLES"></a>
 
 Vesting account has no other management roles beside admin.
@@ -1674,6 +1687,40 @@ Unlock any accumulated rewards.
 
 </details>
 
+<a name="0x1_vesting_unlock_rewards_many"></a>
+
+## Function `unlock_rewards_many`
+
+Call <code>unlock_rewards</code> for many vesting contracts.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_unlock_rewards_many">unlock_rewards_many</a>(contract_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_unlock_rewards_many">unlock_rewards_many</a>(contract_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;) <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
+    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&contract_addresses);
+
+    <b>assert</b>!(len != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION">EVEC_EMPTY_FOR_MANY_FUNCTION</a>));
+
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; len) {
+        <b>let</b> contract_address = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&contract_addresses, i);
+        <a href="vesting.md#0x1_vesting_unlock_rewards">unlock_rewards</a>(contract_address);
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_vesting_vest"></a>
 
 ## Function `vest`
@@ -1747,6 +1794,40 @@ Unlock any vested portion of the grant.
 
 </details>
 
+<a name="0x1_vesting_vest_many"></a>
+
+## Function `vest_many`
+
+Call <code>vest</code> for many vesting contracts.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_vest_many">vest_many</a>(contract_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_vest_many">vest_many</a>(contract_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;) <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
+    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&contract_addresses);
+
+    <b>assert</b>!(len != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION">EVEC_EMPTY_FOR_MANY_FUNCTION</a>));
+
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; len) {
+        <b>let</b> contract_address = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&contract_addresses, i);
+        <a href="vesting.md#0x1_vesting_vest">vest</a>(contract_address);
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_vesting_distribute"></a>
 
 ## Function `distribute`
@@ -1805,6 +1886,40 @@ Distribute any withdrawable stake from the stake pool.
             amount: total_distribution_amount,
         },
     );
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vesting_distribute_many"></a>
+
+## Function `distribute_many`
+
+Call <code>distribute</code> for many vesting contracts.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_distribute_many">distribute_many</a>(contract_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_distribute_many">distribute_many</a>(contract_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;) <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
+    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&contract_addresses);
+
+    <b>assert</b>!(len != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION">EVEC_EMPTY_FOR_MANY_FUNCTION</a>));
+
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; len) {
+        <b>let</b> contract_address = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&contract_addresses, i);
+        <a href="vesting.md#0x1_vesting_distribute">distribute</a>(contract_address);
+        i = i + 1;
+    };
 }
 </code></pre>
 
