@@ -50,8 +50,10 @@ These node providers offer testnet and mainnet access to Aptos:
 
 ### Indexers
 
-We provide an indexer, and multiple other providers also provide indexing services.  The Aptos labs one
-is provided for testnet: https://aptos.dev/guides/indexing/
+Aptos provides an [indexer](../guides/indexing.md), and multiple other providers also provide indexing services.  The Aptos labs one
+is provided for testnet.
+
+You may also run your own [Aptos Indexer Fullnode](../nodes/indexer-fullnode.md).
 
 ### Blockchain Explorer
 
