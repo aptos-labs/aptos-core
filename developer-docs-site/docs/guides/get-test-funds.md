@@ -1,6 +1,6 @@
 ---
 title: "Create and Fund Accounts"
-slug: "getting-started"
+slug: "get-test-funds"
 ---
 
 ## Create and Fund Aptos Accounts
