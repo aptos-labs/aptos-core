@@ -28,7 +28,6 @@ impl DbDir {
         )
     }
 
-    #[allow(unused)]
     pub fn open_ledger_db(&self) -> Result<aptos_schemadb::DB> {
         aptos_schemadb::DB::open_cf_readonly(
             &aptos_schemadb::Options::default(),
