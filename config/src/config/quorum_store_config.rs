@@ -43,7 +43,7 @@ impl Default for QuorumStoreConfig {
             batch_request_num_peers: 2,
             mempool_pulling_interval: 100,
             end_batch_ms: 500,
-            max_batch_counts: 1000,
+            max_batch_counts: 1400,
             max_batch_bytes: 1000000,
             batch_request_timeout_ms: 10000,
             batch_expiry_round_gap_when_init: 100,
@@ -52,7 +52,7 @@ impl Default for QuorumStoreConfig {
             batch_expiry_grace_rounds: 5,
             memory_quota: 100000000,
             db_quota: 10000000000,
-            mempool_txn_pull_max_count: 300,
+            mempool_txn_pull_max_count: 700,
             mempool_txn_pull_max_bytes: 1000000,
             num_nodes_per_worker_handles: 10,
             back_pressure_factor: 1, // back pressure limit for QS is back_pressure_factor * num_validator
