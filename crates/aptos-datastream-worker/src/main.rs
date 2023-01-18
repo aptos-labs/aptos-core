@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_datastream_worker::constants::APTOS_DATASTREAM_WORKER_THREAD_NAME;
-use aptos_datastream_worker::worker::Worker;
+use aptos_datastream_worker::{constants::APTOS_DATASTREAM_WORKER_THREAD_NAME, worker::Worker};
 use tokio::runtime::Builder;
 
 fn main() {

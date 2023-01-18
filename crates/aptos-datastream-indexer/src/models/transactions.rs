@@ -5,15 +5,13 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use crate::schema::transactions;
-use crate::util::u64_to_bigdecimal;
+use crate::{schema::transactions, util::u64_to_bigdecimal};
 use aptos_protos::transaction::v1::{
-    transaction::TransactionType, transaction::TxnData, Transaction as TransactionProto,
-    TransactionInfo,
+    transaction::{TransactionType, TxnData},
+    Transaction as TransactionProto, TransactionInfo,
 };
-use serde::{Deserialize, Serialize};
-
 use aptos_rest_client::aptos_api_types::HexEncodedBytes;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Insertable, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(version))]

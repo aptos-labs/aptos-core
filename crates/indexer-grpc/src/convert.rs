@@ -11,8 +11,7 @@ use aptos_api_types::{
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
-use aptos_protos::transaction::v1 as transaction;
-use aptos_protos::util::timestamp;
+use aptos_protos::{transaction::v1 as transaction, util::timestamp};
 use hex;
 use move_binary_format::file_format::Ability;
 use std::time::Duration;
@@ -199,7 +198,7 @@ pub fn convert_write_set(write_set: &WriteSet) -> transaction::WriteSet {
                     script: Some(convert_script_payload(&sws.script)),
                 });
             (write_set_type, Some(write_set))
-        }
+        },
         WriteSet::DirectWriteSet(dws) => {
             let write_set_type = transaction::write_set::WriteSetType::DirectWriteSet as i32;
 
@@ -209,7 +208,7 @@ pub fn convert_write_set(write_set: &WriteSet) -> transaction::WriteSet {
                     events: convert_events(&dws.events),
                 });
             (write_set_type, Some(write_set))
-        }
+        },
     };
     transaction::WriteSet {
         write_set_type,
@@ -268,7 +267,7 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
         )),
         MoveType::Unparsable(string) => {
             Some(transaction::move_type::Content::Unparsable(string.clone()))
-        }
+        },
     };
     transaction::MoveType {
         r#type: r#type as i32,
@@ -358,7 +357,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
                     },
                 )),
             }
-        }
+        },
         WriteSetChange::WriteModule(write_module) => transaction::WriteSetChange {
             r#type: transaction::write_set_change::Type::WriteModule as i32,
             change: Some(transaction::write_set_change::Change::WriteModule(
@@ -411,7 +410,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
                     },
                 )),
             }
-        }
+        },
     }
 }
 
@@ -520,17 +519,17 @@ pub fn convert_account_signature(
         AccountSignature::Ed25519Signature(_) => transaction::account_signature::Type::Ed25519,
         AccountSignature::MultiEd25519Signature(_) => {
             transaction::account_signature::Type::MultiEd25519
-        }
+        },
     };
     let signature = match account_signature {
         AccountSignature::Ed25519Signature(s) => {
             transaction::account_signature::Signature::Ed25519(convert_ed25519_signature(s))
-        }
+        },
         AccountSignature::MultiEd25519Signature(s) => {
             transaction::account_signature::Signature::MultiEd25519(
                 convert_multi_ed25519_signature(s),
             )
-        }
+        },
     };
     transaction::AccountSignature {
         r#type: r#type as i32,
@@ -549,17 +548,17 @@ pub fn convert_transaction_signature(
         TransactionSignature::Ed25519Signature(_) => transaction::signature::Type::Ed25519,
         TransactionSignature::MultiEd25519Signature(_) => {
             transaction::signature::Type::MultiEd25519
-        }
+        },
         TransactionSignature::MultiAgentSignature(_) => transaction::signature::Type::MultiAgent,
     };
 
     let signature = match signature {
         TransactionSignature::Ed25519Signature(s) => {
             transaction::signature::Signature::Ed25519(convert_ed25519_signature(s))
-        }
+        },
         TransactionSignature::MultiEd25519Signature(s) => {
             transaction::signature::Signature::MultiEd25519(convert_multi_ed25519_signature(s))
-        }
+        },
         TransactionSignature::MultiAgentSignature(s) => {
             transaction::signature::Signature::MultiAgent(transaction::MultiAgentSignature {
                 sender: Some(convert_account_signature(&s.sender)),
@@ -574,7 +573,7 @@ pub fn convert_transaction_signature(
                     .map(convert_account_signature)
                     .collect(),
             })
-        }
+        },
     };
 
     Some(transaction::Signature {
@@ -595,10 +594,10 @@ pub fn convert_transaction(
         Transaction::GenesisTransaction(_) => transaction::transaction::TransactionType::Genesis,
         Transaction::BlockMetadataTransaction(_) => {
             transaction::transaction::TransactionType::BlockMetadata
-        }
+        },
         Transaction::StateCheckpointTransaction(_) => {
             transaction::transaction::TransactionType::StateCheckpoint
-        }
+        },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction is not supported"),
     };
 
@@ -621,7 +620,7 @@ pub fn convert_transaction(
                 }),
                 events: convert_events(&ut.events),
             })
-        }
+        },
         Transaction::GenesisTransaction(gt) => {
             let payload = match &gt.payload {
                 GenesisPayload::WriteSetPayload(wsp) => convert_write_set(&wsp.write_set),
@@ -630,7 +629,7 @@ pub fn convert_transaction(
                 payload: Some(payload),
                 events: convert_events(&gt.events),
             })
-        }
+        },
         Transaction::BlockMetadataTransaction(bm) => {
             timestamp = Some(convert_timestamp_usecs(bm.timestamp.0));
             transaction::transaction::TxnData::BlockMetadata(
@@ -643,12 +642,12 @@ pub fn convert_transaction(
                     round: bm.round.0,
                 },
             )
-        }
+        },
         Transaction::StateCheckpointTransaction(_st) => {
             transaction::transaction::TxnData::StateCheckpoint(
                 transaction::StateCheckpointTransaction {},
             )
-        }
+        },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction not supported"),
     };
 

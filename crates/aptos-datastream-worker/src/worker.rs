@@ -1,21 +1,23 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::constants::{
-    APTOS_DATASTREAM_WORKER_CONFIG_PATH_VAR, CHAIN_ID_REDIS_KEY, REDIS_PROCESS_STATUS,
+use crate::{
+    constants::{
+        APTOS_DATASTREAM_WORKER_CONFIG_PATH_VAR, CHAIN_ID_REDIS_KEY, REDIS_PROCESS_STATUS,
+    },
+    DatastreamWorkerConfig,
 };
-use crate::DatastreamWorkerConfig;
-use deadpool_redis::{redis::cmd, Config, Pool, Runtime};
-use moving_average::MovingAverage;
-
 use aptos_logger::{error, info};
 use aptos_protos::datastream::v1 as datastream;
-use futures;
-use futures::StreamExt;
-use std::path::PathBuf;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
+use deadpool_redis::{redis::cmd, Config, Pool, Runtime};
+use futures::{self, StreamExt};
+use moving_average::MovingAverage;
+use std::{
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
 };
 
 pub fn get_worker_config_file_path() -> String {
@@ -100,7 +102,7 @@ impl Worker {
                             "[Datasteram Worker]Error connecting to indexer"
                         );
                         panic!("[Datastream Worker] Error connecting to indexer: {}", e);
-                    }
+                    },
                 };
             let mut ma = MovingAverage::new(10_000);
             let request = tonic::Request::new(datastream::RawDatastreamRequest {
@@ -134,7 +136,7 @@ impl Worker {
                             e
                         );
                         break;
-                    }
+                    },
                 };
                 match received.response.unwrap() {
                     datastream::raw_datastream_response::Response::Status(status) => {
@@ -154,7 +156,7 @@ impl Worker {
                                         break;
                                     }
                                 }
-                            }
+                            },
                             1 => {
                                 self.next_version
                                     .store(status.end_version.unwrap() + 1, Ordering::SeqCst);
@@ -166,14 +168,14 @@ impl Worker {
                                     .query_async::<_, ()>(&mut conn)
                                     .await
                                     .unwrap();
-                            }
+                            },
                             _ => {
                                 // There might be protobuf inconsistency between server and client.
                                 // Panic to block running.
                                 panic!("[Datastream Worker] Unknown RawDatastreamResponse status type.");
-                            }
+                            },
                         }
-                    }
+                    },
                     datastream::raw_datastream_response::Response::Data(data) => {
                         let batch_start_version =
                             data.transactions.as_slice().first().unwrap().version;
@@ -198,7 +200,7 @@ impl Worker {
                             tps = (ma.avg() * 1000.0) as u64,
                             "[Datastream Worker] Sent batch successfully"
                         );
-                    }
+                    },
                 };
             }
         }

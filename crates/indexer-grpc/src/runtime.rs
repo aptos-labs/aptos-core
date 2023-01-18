@@ -22,8 +22,7 @@ use tokio::{
     sync::mpsc,
 };
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::transport::Server;
-use tonic::{Request, Response, Status};
+use tonic::{transport::Server, Request, Response, Status};
 
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
@@ -108,10 +107,10 @@ impl IndexerStream for IndexerStreamService {
                 Ok(_) => {
                     // TODO: Add request details later
                     info!("[indexer-grpc] Init connection");
-                }
+                },
                 Err(_) => {
                     panic!("[indexer-grpc] Unable to initialize stream");
-                }
+                },
             }
             let mut base: u64 = 0;
             loop {
@@ -122,12 +121,12 @@ impl IndexerStream for IndexerStreamService {
                     match result {
                         Ok(end_version) => {
                             max_version = std::cmp::max(max_version, end_version);
-                        }
+                        },
                         Err(e) => {
                             error!("[indexer-grpc] Error sending to stream: {}", e);
                             is_error = true;
                             break;
-                        }
+                        },
                     }
                 }
                 if is_error {
@@ -153,10 +152,10 @@ impl IndexerStream for IndexerStreamService {
                                 "[indexer-grpc] Sent batch successfully"
                             );
                         }
-                    }
+                    },
                     Err(_) => {
                         panic!("[indexer-grpc] Unable to initialize stream");
-                    }
+                    },
                 }
                 coordinator.current_version = max_version + 1;
             }
