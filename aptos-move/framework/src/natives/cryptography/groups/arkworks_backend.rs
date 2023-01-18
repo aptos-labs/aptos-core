@@ -11,7 +11,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{test_rng, UniformRand};
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
+use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::loaded_data::runtime_types::Type;
 use move_vm_types::natives::function::NativeResult;
@@ -29,8 +29,16 @@ use crate::natives::util::make_test_only_native_from_func;
 
 #[derive(Debug, Clone)]
 pub struct Bls12381GasParameters {
+    pub blst_hash_to_g1_proj_base: InternalGasPerArg,
+    pub blst_hash_to_g1_proj_per_byte: InternalGasPerByte,
+    pub blst_hash_to_g2_proj_base: InternalGasPerArg,
+    pub blst_hash_to_g2_proj_per_byte: InternalGasPerByte,
+    pub blst_g1_proj_to_affine: InternalGasPerArg,
+    pub blst_g1_affine_ser: InternalGasPerArg,
+    pub blst_g2_proj_to_affine: InternalGasPerArg,
+    pub blst_g2_affine_ser: InternalGasPerArg,
     pub fr_add: InternalGas,
-    pub fr_deserialize: InternalGas,
+    pub ark_fr_deser: InternalGasPerArg,
     pub fr_div: InternalGas,
     pub fr_eq: InternalGas,
     pub fr_from_u64: InternalGas,
@@ -47,12 +55,12 @@ pub struct Bls12381GasParameters {
     pub fq12_inv: InternalGas,
     pub fq12_mul: InternalGasPerArg,
     pub fq12_one: InternalGas,
-    pub fq12_pow_fr: InternalGasPerArg,
+    pub ark_fq12_pow_fr: InternalGasPerArg,
     pub fq12_serialize: InternalGas,
     pub fq12_square: InternalGas,
     pub g1_affine_add: InternalGas,
-    pub g1_affine_deserialize_compressed: InternalGas,
-    pub g1_affine_deserialize_uncompressed: InternalGas,
+    pub ark_g1_affine_deser_comp: InternalGasPerArg,
+    pub ark_g1_affine_deser_uncomp: InternalGasPerArg,
     pub g1_affine_eq_proj: InternalGas,
     pub g1_affine_generator: InternalGas,
     pub g1_affine_infinity: InternalGas,
@@ -61,7 +69,7 @@ pub struct Bls12381GasParameters {
     pub g1_affine_serialize_uncompressed: InternalGas,
     pub g1_affine_serialize_compressed: InternalGas,
     pub g1_affine_to_prepared: InternalGasPerArg,
-    pub g1_affine_to_proj: InternalGas,
+    pub ark_g1_affine_to_proj: InternalGasPerArg,
     pub g1_proj_add: InternalGasPerArg,
     pub g1_proj_addassign: InternalGasPerArg,
     pub g1_proj_double: InternalGas,
@@ -77,8 +85,8 @@ pub struct Bls12381GasParameters {
     pub g1_proj_to_affine: InternalGas,
     pub g1_proj_to_prepared: InternalGasPerArg,
     pub g2_affine_add: InternalGas,
-    pub g2_affine_deserialize_compressed: InternalGas,
-    pub g2_affine_deserialize_uncompressed: InternalGas,
+    pub ark_g2_affine_deser_comp: InternalGasPerArg,
+    pub ark_g2_affine_deser_uncomp: InternalGasPerArg,
     pub g2_affine_eq_proj: InternalGas,
     pub g2_affine_generator: InternalGas,
     pub g2_affine_infinity: InternalGas,
@@ -87,7 +95,7 @@ pub struct Bls12381GasParameters {
     pub g2_affine_serialize_compressed: InternalGas,
     pub g2_affine_serialize_uncompressed: InternalGas,
     pub g2_affine_to_prepared: InternalGasPerArg,
-    pub g2_affine_to_proj: InternalGas,
+    pub ark_g2_affine_to_proj: InternalGasPerArg,
     pub g2_proj_add: InternalGasPerArg,
     pub g2_proj_addassign: InternalGasPerArg,
     pub g2_proj_double: InternalGas,
@@ -104,6 +112,21 @@ pub struct Bls12381GasParameters {
     pub g2_proj_to_prepared: InternalGasPerArg,
     pub pairing_product_base: InternalGas,
     pub pairing_product_per_pair: InternalGasPerArg,
+}
+
+impl Bls12381GasParameters {
+    fn blst_hash_to_g1_proj(&self, num_input_bytes: usize) -> InternalGas {
+        self.blst_hash_to_g1_proj_per_byte * NumBytes::from(num_input_bytes as u64) + self.blst_hash_to_g1_proj_base * NumArgs::one()
+    }
+
+    fn blst_hash_to_g2_proj(&self, num_input_bytes: usize) -> InternalGas {
+        self.blst_hash_to_g2_proj_per_byte * NumBytes::from(num_input_bytes as u64) + self.blst_hash_to_g2_proj_base * NumArgs::one()
+    }
+
+    fn sha256(&self, num_input_bytes: usize) -> InternalGas {
+        //TODO
+        InternalGas::zero()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -301,7 +324,7 @@ fn deserialize_element_uncompressed_internal(
     let bytes = pop_arg!(args, Vec<u8>);
     match type_tag.as_str() {
         "0x1::groups::BLS12_381_G1" => {
-            let cost = gas_params.bls12_381.g1_affine_deserialize_uncompressed + gas_params.bls12_381.g1_affine_to_proj;
+            let cost = (gas_params.bls12_381.ark_g1_affine_deser_uncomp + gas_params.bls12_381.ark_g1_affine_to_proj) * NumArgs::one();
             let point = ark_bls12_381::G1Affine::deserialize_uncompressed(bytes.as_slice());
             match point {
                 Ok(point) => {
@@ -323,7 +346,7 @@ fn deserialize_element_uncompressed_internal(
             }
         }
         "0x1::groups::BLS12_381_G2" => {
-            let cost = gas_params.bls12_381.g2_affine_deserialize_uncompressed + gas_params.bls12_381.g2_affine_to_proj;
+            let cost = (gas_params.bls12_381.ark_g2_affine_deser_uncomp + gas_params.bls12_381.ark_g2_affine_to_proj) * NumArgs::one();
             let point = ark_bls12_381::G2Affine::deserialize_uncompressed(bytes.as_slice());
             match point {
                 Ok(point) => {
@@ -345,7 +368,7 @@ fn deserialize_element_uncompressed_internal(
             }
         }
         "0x1::groups::BLS12_381_Gt" => {
-            let cost = (gas_params.bls12_381.fq12_deserialize + gas_params.bls12_381.fq12_pow_fr + gas_params.bls12_381.fq12_eq) * NumArgs::one();
+            let cost = (gas_params.bls12_381.fq12_deserialize + gas_params.bls12_381.ark_fq12_pow_fr + gas_params.bls12_381.fq12_eq) * NumArgs::one();
             let point = Fq12::deserialize(bytes.as_slice());
             match point {
                 Ok(point) => {
@@ -398,7 +421,7 @@ fn deserialize_element_compressed_internal(
     let bytes = pop_arg!(args, Vec<u8>);
     match type_tag.as_str() {
         "0x1::groups::BLS12_381_G1" => {
-            let cost = gas_params.bls12_381.g1_affine_deserialize_compressed + gas_params.bls12_381.g1_affine_to_proj;
+            let cost = (gas_params.bls12_381.ark_g1_affine_deser_comp + gas_params.bls12_381.ark_g1_affine_to_proj) * NumArgs::one();
             match ark_bls12_381::G1Affine::deserialize(bytes.as_slice()) {
                 Ok(point) => {
                     let handle = context
@@ -419,7 +442,7 @@ fn deserialize_element_compressed_internal(
             }
         }
         "0x1::groups::BLS12_381_G2" => {
-            let cost = gas_params.bls12_381.g2_affine_deserialize_compressed + gas_params.bls12_381.g2_affine_to_proj;
+            let cost = (gas_params.bls12_381.ark_g2_affine_deser_comp + gas_params.bls12_381.ark_g2_affine_to_proj) * NumArgs::one();
             let point = ark_bls12_381::G2Affine::deserialize(bytes.as_slice());
             match point {
                 Ok(point) => {
@@ -441,7 +464,7 @@ fn deserialize_element_compressed_internal(
             }
         }
         "0x1::groups::BLS12_381_Gt" => {
-            let cost = (gas_params.bls12_381.fq12_deserialize + gas_params.bls12_381.fq12_pow_fr + gas_params.bls12_381.fq12_eq) * NumArgs::one();
+            let cost = (gas_params.bls12_381.fq12_deserialize + gas_params.bls12_381.ark_fq12_pow_fr + gas_params.bls12_381.fq12_eq) * NumArgs::one();
             let point = Fq12::deserialize(bytes.as_slice());
             match point {
                 Ok(point) => {
@@ -502,13 +525,13 @@ fn deserialize_scalar_internal(
                         .get_mut::<Bls12381Context>()
                         .add_scalar(scalar);
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.fr_deserialize,
+                        gas_params.bls12_381.ark_fr_deser * NumArgs::one(),
                         smallvec![Value::bool(true), Value::u64(handle as u64)],
                     ))
                 }
                 _ => {
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.fr_deserialize,
+                        gas_params.bls12_381.ark_fr_deser * NumArgs::one(),
                         smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 },
@@ -1219,7 +1242,7 @@ fn element_mul_scalar_internal(
                 .get_mut::<Bls12381Context>()
                 .add_gt_point(result);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.fr_to_repr + gas_params.bls12_381.fq12_pow_fr) * NumArgs::one(),
+                (gas_params.bls12_381.fr_to_repr + gas_params.bls12_381.ark_fq12_pow_fr) * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
             ))
         }
@@ -1423,16 +1446,14 @@ fn element_multi_scalar_mul_internal(
         match type_tag.as_str() {
             "0x1::groups::BLS12_381_G1" => {
                 // Using blst multi-scalar multiplication API for better performance.
-                let blst_points: Vec<blst::blst_p1> = point_handles.iter().map(|&handle|{
+                let blst_g1_proj_points: Vec<blst::blst_p1> = point_handles.iter().map(|&handle|{
                     let ark_point = context
                         .extensions()
                         .get::<Bls12381Context>()
                         .get_g1_point(handle as usize)
                         .into_affine();
                     let blst_g1_affine = ark_g1_affine_to_blst_g1_affine(&ark_point);
-                    let mut blst_g1_proj = blst::blst_p1::default();
-                    unsafe { blst::blst_p1_from_affine(&mut blst_g1_proj, &blst_g1_affine); }
-                    blst_g1_proj
+                    blst_g1_affine_to_proj(&blst_g1_affine)
                 }).collect();
 
                 let mut scalar_bytes: Vec<u8> = Vec::with_capacity(32 * num_scalars);
@@ -1445,14 +1466,14 @@ fn element_multi_scalar_mul_internal(
                     scalar_bytes.extend_from_slice(buf.as_slice());
                 }
 
-                let sum = blst::p1_affines::from(blst_points.as_slice()).mult(scalar_bytes.as_slice(), 256);
-                let mut sum_affine = blst::blst_p1_affine::default();
-                unsafe { blst::blst_p1_to_affine(&mut sum_affine, &sum); }
-                let result = blst_g1_affine_to_ark_g1_affine(&sum_affine).into_projective();
+                let sum = blst::p1_affines::from(blst_g1_proj_points.as_slice()).mult(scalar_bytes.as_slice(), 256);
+                let sum_affine = blst_g1_proj_to_affine(&sum);
+                let ark_g1_affine = blst_g1_affine_to_ark_g1_affine(&sum_affine);
+                let ark_g1_proj = ark_g1_affine.into_projective();
                 let handle = context
                     .extensions_mut()
                     .get_mut::<Bls12381Context>()
-                    .add_g1_point(result);
+                    .add_g1_point(ark_g1_proj);
                 Ok(NativeResult::ok(
                     (gas_params.bls12_381.g1_proj_mul + gas_params.bls12_381.g1_proj_add) * NumArgs::from(num_points as u64), //TODO: update gas cost.
                     smallvec![Value::u64(handle as u64)],
@@ -1521,7 +1542,7 @@ fn element_multi_scalar_mul_internal(
                     .get_mut::<Bls12381Context>()
                     .add_gt_point(result);
                 Ok(NativeResult::ok(
-                    (gas_params.bls12_381.fr_to_repr + gas_params.bls12_381.fq12_pow_fr + gas_params.bls12_381.fq12_mul) * NumArgs::from(num_points as u64),
+                    (gas_params.bls12_381.fr_to_repr + gas_params.bls12_381.ark_fq12_pow_fr + gas_params.bls12_381.fq12_mul) * NumArgs::from(num_points as u64),
                     smallvec![Value::u64(handle as u64)],
                 ))
             }
@@ -1532,6 +1553,12 @@ fn element_multi_scalar_mul_internal(
     } else {
         Ok(NativeResult::err(InternalGas::zero(), abort_codes::NUM_ELEMENTS_SHOULD_MATCH_NUM_SCALARS))
     }
+}
+
+fn blst_g1_affine_to_proj(point: &blst::blst_p1_affine) -> blst::blst_p1 {
+    let mut ret = blst::blst_p1::default();
+    unsafe { blst::blst_p1_from_affine(&mut ret, point); }
+    ret
 }
 
 fn element_double_internal(
@@ -1728,14 +1755,40 @@ fn pairing_product_internal(
     }
 }
 
-fn hash_to_bls12381_fr(bytes: &[u8]) -> Fr {
-    let mut digest = Sha256::digest(bytes).to_vec();
-    digest[31] = 0;
-    Fr::from_random_bytes(digest.as_slice()).unwrap()
+fn hash_to_scalar(bytes: &[u8]) -> ark_ff::BigInteger256 {
+    let digest = Sha256::digest(bytes).to_vec();
+    ark_ff::BigInteger256::deserialize_uncompressed(digest.as_slice()).unwrap()
+}
+
+const DST: &str = "";
+const AUG: &str = "";
+
+fn blst_g1_proj_to_affine(point: &blst::blst_p1) -> blst::blst_p1_affine {
+    let mut ret = blst::blst_p1_affine::default();
+    unsafe { blst::blst_p1_to_affine(&mut ret, point); }
+    ret
+}
+
+fn blst_g2_to_affine(point: &blst::blst_p2) -> blst::blst_p2_affine {
+    let mut ret = blst::blst_p2_affine::default();
+    unsafe { blst::blst_p2_to_affine(&mut ret, point); }
+    ret
+}
+
+fn hash_to_blst_g1(bytes: &[u8]) -> blst::blst_p1 {
+    let mut ret = blst::blst_p1::default();
+    unsafe { blst::blst_hash_to_g1(&mut ret, bytes.as_ptr(), bytes.len(), DST.as_ptr(), DST.len(), AUG.as_ptr(), AUG.len()); }
+    ret
+}
+
+fn hash_to_blst_g2(bytes: &[u8]) -> blst::blst_p2 {
+    let mut ret = blst::blst_p2::default();
+    unsafe { blst::blst_hash_to_g2(&mut ret, bytes.as_ptr(), bytes.len(), DST.as_ptr(), DST.len(), AUG.as_ptr(), AUG.len()); }
+    ret
 }
 
 fn hash_to_element_internal(
-    _gas_params: &GasParameters,
+    gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -1747,25 +1800,50 @@ fn hash_to_element_internal(
     let bytes = pop_arg!(args, Vec<u8>);
     match type_tag.as_str() {
         "0x1::groups::BLS12_381_G1" => {
-            //TODO: replace this naive implementation.
-            let x = hash_to_bls12381_fr(bytes.as_slice());
-            let point = G1Projective::prime_subgroup_generator().mul(x.into_repr());
-            let handle = context.extensions_mut().get_mut::<Bls12381Context>().add_g1_point(point);
-            Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::u64(handle as u64)]))
+            let blst_g1_proj = hash_to_blst_g1(bytes.as_slice());
+            let blst_g1_affine = blst_g1_proj_to_affine(&blst_g1_proj);
+            let ark_g1_affine = blst_g1_affine_to_ark_g1_affine(&blst_g1_affine);
+            let ark_g1_proj = ark_g1_affine.into_projective();
+            let handle = context.extensions_mut().get_mut::<Bls12381Context>().add_g1_point(ark_g1_proj);
+            Ok(NativeResult::ok(
+                gas_params.bls12_381.blst_hash_to_g1_proj(bytes.len())
+                    + (
+                        gas_params.bls12_381.blst_g1_proj_to_affine
+                            + gas_params.bls12_381.blst_g1_affine_ser
+                            + gas_params.bls12_381.ark_g1_affine_deser_uncomp
+                            + gas_params.bls12_381.ark_g1_affine_to_proj
+                ) * NumArgs::one(),
+                smallvec![Value::u64(handle as u64)]
+            ))
         }
         "0x1::groups::BLS12_381_G2" => {
-            //TODO: replace this naive implementation.
-            let x = hash_to_bls12381_fr(bytes.as_slice());
-            let point = G2Projective::prime_subgroup_generator().mul(x.into_repr());
-            let handle = context.extensions_mut().get_mut::<Bls12381Context>().add_g2_point(point);
-            Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::u64(handle as u64)]))
+            let blst_g2_proj = hash_to_blst_g2(bytes.as_slice());
+            let blst_g2_affine = blst_g2_to_affine(&blst_g2_proj);
+            let ark_g2_affine = blst_g2_affine_to_ark_g2_affine(&blst_g2_affine);
+            let ark_g2_proj = ark_g2_affine.into_projective();
+            let handle = context.extensions_mut().get_mut::<Bls12381Context>().add_g2_point(ark_g2_proj);
+            Ok(NativeResult::ok(
+                gas_params.bls12_381.blst_hash_to_g2_proj(bytes.len())
+                    + (gas_params.bls12_381.blst_g2_proj_to_affine
+                        + gas_params.bls12_381.blst_g2_affine_ser
+                        + gas_params.bls12_381.ark_g2_affine_deser_uncomp
+                        + gas_params.bls12_381.ark_g2_affine_to_proj
+                ) * NumArgs::one(),
+                smallvec![Value::u64(handle as u64)]
+            ))
         }
         "0x1::groups::BLS12_381_Gt" => {
-            //TODO: replace this naive implementation.
-            let x = hash_to_bls12381_fr(bytes.as_slice());
-            let element = BLS12381_GT_GENERATOR.clone().pow(x.into_repr());
+            let x = hash_to_scalar(bytes.as_slice());
+            let generator = BLS12381_GT_GENERATOR.clone();
+            let element = generator.pow(x);
             let handle = context.extensions_mut().get_mut::<Bls12381Context>().add_gt_point(element);
-            Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::u64(handle as u64)]))
+            Ok(NativeResult::ok(
+                gas_params.bls12_381.sha256(bytes.len())
+                    + (gas_params.bls12_381.ark_fr_deser
+                        + gas_params.bls12_381.ark_fq12_pow_fr
+                    ) * NumArgs::one(),
+                smallvec![Value::u64(handle as u64)])
+            )
         }
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
