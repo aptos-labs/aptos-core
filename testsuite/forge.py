@@ -9,7 +9,6 @@ import re
 import resource
 import sys
 import textwrap
-import time
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
@@ -36,6 +35,7 @@ from forge_wrapper_core.process import Processes, SystemProcesses
 
 from forge_wrapper_core.shell import LocalShell, Shell
 from forge_wrapper_core.time import SystemTime, Time
+from forge_wrapper_core.cluster import Cloud, ForgeCluster, ForgeJob
 
 
 @dataclass
@@ -226,10 +226,6 @@ class ForgeContext:
     forge_namespace: str
     forge_args: Sequence[str]
 
-    # aws related options
-    aws_account_num: Optional[str]
-    aws_region: str
-
     forge_image_tag: str
     image_tag: str
     upgrade_image_tag: str
@@ -239,6 +235,17 @@ class ForgeContext:
 
     github_actions: str
     github_job_url: Optional[str]
+
+    # aws related options
+    aws_account_num: Optional[str]
+    aws_region: Optional[str]
+
+    # gcp related options
+    gcp_project: Optional[str] = None
+    gcp_zone: Optional[str] = None
+
+    # the default cloud is AWS
+    cloud: Cloud = Cloud.AWS
 
     def report(self, result: ForgeResult, outputs: List[ForgeFormatter]) -> None:
         for formatter in outputs:
@@ -673,16 +680,32 @@ class K8sForgeRunner(ForgeRunner):
 
         assert context.aws_account_num is not None, "AWS account number is required"
 
+        # determine the interal image repos based on the context of where the cluster is located
+        if context.cloud == Cloud.AWS:
+            forge_image_repo = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/aptos/forge"
+            validator_node_selector = "eks.amazonaws.com/nodegroup: validators"
+        elif (
+            context.cloud == Cloud.GCP
+        ):  # the GCP project for images is separate than the cluster
+            forge_image_repo = (
+                f"us-west1-docker.pkg.dev/aptos-global/aptos-internal/forge"
+            )
+            validator_node_selector = "" # no selector
+            # TODO: also no NAP node selector yet
+            # TODO: also registries need to be set up such that the default compute service account can access it:  $PROJECT_ID-compute@developer.gserviceaccount.com
+        else:
+            raise Exception(f"Unknown cloud: {context.cloud}")
+
         rendered = template.decode().format(
             FORGE_POD_NAME=forge_pod_name,
             FORGE_IMAGE_TAG=context.forge_image_tag,
             IMAGE_TAG=context.image_tag,
             UPGRADE_IMAGE_TAG=context.upgrade_image_tag,
-            AWS_ACCOUNT_NUM=context.aws_account_num,
-            AWS_REGION=context.aws_region,
+            FORGE_IMAGE_REPO=forge_image_repo,
             FORGE_NAMESPACE=context.forge_namespace,
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
+            VALIDATOR_NODE_SELECTOR=validator_node_selector,
         )
 
         with ForgeResult.with_context(context) as forge_result:
@@ -782,56 +805,12 @@ class K8sForgeRunner(ForgeRunner):
         return forge_result
 
 
-class AwsError(Exception):
-    pass
-
-
 def get_aws_account_num(shell: Shell) -> str:
     caller_id = shell.run(["aws", "sts", "get-caller-identity"])
     return json.loads(caller_id.unwrap()).get("Account")
 
 
-def assert_aws_auth(shell: Shell) -> None:
-    # Simple read command which should fail
-    list_eks_clusters(shell)
-
-
-class ListClusterResult(TypedDict):
-    clusters: List[str]
-
-
-def list_eks_clusters(shell: Shell) -> List[str]:
-    cluster_json = shell.run(["aws", "eks", "list-clusters"]).unwrap()
-    # This type annotation is not enforced, just helpful
-    try:
-        cluster_result: ListClusterResult = json.loads(cluster_json.decode())
-        clusters = []
-        for cluster_name in cluster_result["clusters"]:
-            if cluster_name.startswith("aptos-forge-"):
-                clusters.append(cluster_name)
-        return clusters
-    except Exception as e:
-        raise AwsError("Failed to list eks clusters") from e
-
-
-async def write_cluster_config(
-    shell: Shell, forge_cluster_name: str, temp: str
-) -> None:
-    (
-        await shell.gen_run(
-            [
-                "aws",
-                "eks",
-                "update-kubeconfig",
-                "--name",
-                forge_cluster_name,
-                "--kubeconfig",
-                temp,
-            ]
-        )
-    ).unwrap()
-
-
+# NOTE: this is not used anywhere
 def get_current_cluster_name(shell: Shell) -> str:
     result = shell.run(["kubectl", "config", "current-context"])
     current_context = result.unwrap().decode()
@@ -1126,7 +1105,9 @@ async def run_multiple(
 @envoption("FORGE_COMMENT")
 @envoption("GITHUB_STEP_SUMMARY")
 # cluster auth
+@envoption("CLOUD", "aws")
 @envoption("AWS_REGION", "us-west-2")
+@envoption("GCP_ZONE", "us-central1-c")
 # forge test runner customization
 @envoption("FORGE_RUNNER_MODE", "k8s")
 @envoption("FORGE_CLUSTER_NAME")
@@ -1168,7 +1149,9 @@ def test(
     forge_report: Optional[str],
     forge_pre_comment: Optional[str],
     forge_comment: Optional[str],
+    cloud: str,
     aws_region: str,
+    gcp_zone: str,
     forge_runner_mode: str,
     forge_cluster_name: Optional[str],
     forge_num_validators: Optional[str],
@@ -1198,6 +1181,13 @@ def test(
     test_suites: Tuple[str],
 ) -> None:
     """Run a forge test"""
+
+    ### XXX: hack these arguments to force Forge to run with overrides
+    # cloud = "gcp"
+    # forge_cluster_name = "aptos-forge-0"
+    # forge_enable_performance = "true"
+
+    # Initialize all configs
     shell = LocalShell(verbose == "true")
     git = Git(shell)
     filesystem = LocalFilesystem()
@@ -1206,6 +1196,14 @@ def test(
     context = SystemContext(shell, filesystem, processes, time)
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
+
+    # XXX: manual override testing in CI
+    # # for GCP
+    # forge_cluster_name = "aptos-forge-0"
+    # cloud = "gcp"
+
+    # # for performance
+    # forge_enable_performance = "true"
 
     if not forge_namespace:
         forge_namespace = f"forge-{processes.user()}-{time.epoch()}"
@@ -1267,10 +1265,25 @@ def test(
 
     assert forge_cluster_name, "Forge cluster name is required"
 
+    # cloud
+    if cloud.upper() == "AWS":
+        cloud = Cloud.AWS
+    elif cloud.upper() == "GCP":
+        cloud = Cloud.GCP
+    else:
+        raise Exception(f"Unknown cloud: {cloud}")
+
+    print(f"Using cluster: {forge_cluster_name} in cloud: {cloud.value}")
+    temp = context.filesystem.mkstemp()
+    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud)
+    asyncio.run(forge_cluster.write(context.shell))
+
     # These features and profile flags are set as strings
     enable_failpoints = forge_enable_failpoints == "true"
     enable_performance_profile = forge_enable_performance == "true"
 
+    # In the below, assume that the image is pushed to all registries
+    # across all clouds and supported regions
     assert_provided_image_tags_has_profile_or_features(
         image_tag,
         upgrade_image_tag,
@@ -1343,18 +1356,16 @@ def test(
         test_args=test_args,
     )
 
-    print(f"Using cluster: {forge_cluster_name}")
-    temp = context.filesystem.mkstemp()
-    forge_cluster = ForgeCluster(forge_cluster_name, temp)
-    asyncio.run(forge_cluster.write(context.shell))
-
     forge_context = ForgeContext(
         shell=shell,
         filesystem=filesystem,
         processes=processes,
         time=time,
+        # cluster auth
+        cloud=cloud,
         aws_account_num=aws_account_num,
         aws_region=aws_region,
+        gcp_zone=gcp_zone,
         forge_image_tag=forge_image_tag,
         image_tag=image_tag,
         upgrade_image_tag=upgrade_image_tag,
@@ -1423,84 +1434,6 @@ def test(
                 ]
             )
         ) from e
-
-
-@dataclass
-class ForgeJob:
-    name: str
-    phase: str
-    cluster: ForgeCluster
-
-    @classmethod
-    def from_pod(cls, cluster: ForgeCluster, pod: GetPodsItem) -> ForgeJob:
-        return cls(
-            name=pod["metadata"]["name"],
-            phase=pod["status"]["phase"],
-            cluster=cluster,
-        )
-
-    def running(self):
-        return self.phase == "Running"
-
-    def succeeded(self):
-        return self.phase == "Succeeded"
-
-    def failed(self):
-        return self.phase == "Failed"
-
-
-class GetPodsItemMetadata(TypedDict):
-    name: str
-
-
-class GetPodsItemStatus(TypedDict):
-    phase: str
-
-
-class GetPodsItem(TypedDict):
-    metadata: GetPodsItemMetadata
-    status: GetPodsItemStatus
-
-
-class GetPodsResult(TypedDict):
-    items: List[GetPodsItem]
-
-
-@dataclass
-class ForgeCluster:
-    name: str
-    kubeconf: str
-
-    async def write(self, shell: Shell) -> None:
-        await write_cluster_config(shell, self.name, self.kubeconf)
-
-    async def get_jobs(self, shell: Shell) -> List[ForgeJob]:
-        pod_result = (
-            (
-                await shell.gen_run(
-                    [
-                        "kubectl",
-                        "get",
-                        "pods",
-                        "-n",
-                        "default",
-                        "--kubeconfig",
-                        self.kubeconf,
-                        "-o",
-                        "json",
-                    ]
-                )
-            )
-            .unwrap()
-            .decode()
-        )
-        pods_result: GetPodsResult = json.loads(pod_result)
-        pods = pods_result["items"]
-        return [
-            ForgeJob.from_pod(self, pod)
-            for pod in pods
-            if pod["metadata"]["name"].startswith("forge-")
-        ]
 
 
 async def get_all_forge_jobs(

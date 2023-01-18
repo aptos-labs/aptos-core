@@ -11,7 +11,7 @@ spec:
   serviceAccountName: forge
   containers:
   - name: main
-    image: {AWS_ACCOUNT_NUM}.dkr.ecr.{AWS_REGION}.amazonaws.com/aptos/forge:{FORGE_IMAGE_TAG}
+    image: {FORGE_IMAGE_REPO}:{FORGE_IMAGE_TAG}
     imagePullPolicy: Always
     command:
     - /bin/bash
@@ -19,7 +19,13 @@ spec:
     - |
       ulimit -n 1048576
       {FORGE_ARGS}
-
+    resources:
+      limits:
+        cpu: 15.5
+        memory: 26Gi
+      requests:
+        cpu: 15
+        memory: 26Gi
     env:
     - name: FORGE_TRIGGERED_BY
       value: {FORGE_TRIGGERED_BY}
@@ -52,7 +58,7 @@ spec:
   # schedule on a k8s worker node in the "validators" nodegroup
   # to access more compute
   nodeSelector:
-    eks.amazonaws.com/nodegroup: validators
+    {VALIDATOR_NODE_SELECTOR}
   tolerations:
   - effect: NoExecute
     key: aptos.org/nodepool
