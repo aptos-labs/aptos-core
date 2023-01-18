@@ -633,16 +633,16 @@ impl LeaderReputation {
                     .sum();
 
                 if counter_index == max(CHAIN_HEALTH_WINDOW_SIZES.len() - 2, 0) {
-                    // Only emit this for the for one window value. Currently it is set to 100
+                    // Only emit this for one window value. Currently defaults to 100
                     candidates.iter().for_each(|x| {
                         if participants.contains(x) {
                             CONSENSUS_PARTICIPATION_STATUS
                                 .with_label_values(&[&x.to_string()])
-                                .set(0_i64)
+                                .set(1_i64)
                         } else {
                             CONSENSUS_PARTICIPATION_STATUS
                                 .with_label_values(&[&x.to_string()])
-                                .set(1_i64)
+                                .set(0_i64)
                         }
                     });
                 }
