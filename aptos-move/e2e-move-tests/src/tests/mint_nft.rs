@@ -96,7 +96,7 @@ fn mint_nft_e2e() {
         account_address: resource_address,
         module_name: String::from("create_nft_getting_production_ready"),
         struct_name: String::from("MintProofChallenge"),
-        receiver_account_sequence_number: 10,
+        receiver_account_sequence_number: 0,
         receiver_account_address: *nft_receiver.address(),
         token_data_id,
     };

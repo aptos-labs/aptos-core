@@ -120,9 +120,9 @@ impl MoveHarness {
         let privkey = Ed25519PrivateKey::generate(&mut rng);
         let pubkey = privkey.public_key();
         let acc = Account::with_keypair(privkey, pubkey);
-        let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 10);
+        let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 0);
         self.executor.add_account_data(&data);
-        self.txn_seq_no.insert(*acc.address(), 10);
+        self.txn_seq_no.insert(*acc.address(), 0);
         data.account().clone()
     }
 
