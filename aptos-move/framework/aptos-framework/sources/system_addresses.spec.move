@@ -4,14 +4,20 @@ spec aptos_framework::system_addresses {
         pragma aborts_if_is_strict;
     }
 
-    spec assert_core_resource {
+    spec assert_core_resource(account: &signer) {
         pragma opaque;
         include AbortsIfNotCoreResource { addr: signer::address_of(account) };
     }
 
-    spec assert_core_resource_address {
+    spec assert_core_resource_address(addr: address) {
         pragma opaque;
         include AbortsIfNotCoreResource;
+    }
+
+    spec is_core_resource_address(addr: address): bool {
+        pragma opaque;
+        aborts_if false;
+        ensures result == (addr == @core_resources);
     }
 
     /// Specifies that a function aborts if the account does not have the root address.
@@ -20,7 +26,7 @@ spec aptos_framework::system_addresses {
         aborts_if addr != @core_resources with error::PERMISSION_DENIED;
     }
 
-    spec assert_aptos_framework {
+    spec assert_aptos_framework(account: &signer) {
         pragma opaque;
         include AbortsIfNotAptosFramework;
     }
@@ -35,7 +41,7 @@ spec aptos_framework::system_addresses {
         aborts_if signer::address_of(account) != @aptos_framework with error::PERMISSION_DENIED;
     }
 
-    spec assert_vm {
+    spec assert_vm(account: &signer) {
         pragma opaque;
         include AbortsIfNotVM;
     }

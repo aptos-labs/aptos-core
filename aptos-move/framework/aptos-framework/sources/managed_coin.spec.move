@@ -4,21 +4,21 @@ spec aptos_framework::managed_coin {
         pragma aborts_if_is_strict;
     }
 
-    /// The Capabilities<CoinType> should under the signer.
-    /// The CoinStore<CoinType> should under the signer.
-    /// Account should not be frozen and sufficient balance.
     spec burn<CoinType>(
         account: &signer,
         amount: u64,
     ) {
         use aptos_std::type_info;
-        //TODO: there are Complex aborts conditions because of the 'sub' function in the 'burn' function of the 'coin' module.
+        // TODO: Unspecified 'optional_aggregator::sub()' used in 'coin::burn()'.
         pragma aborts_if_is_partial;
         let account_addr = signer::address_of(account);
+        // Resource Capabilities<CoinType> should exists in the signer address.
         aborts_if !exists<Capabilities<CoinType>>(account_addr);
         let coin_store = global<coin::CoinStore<CoinType>>(account_addr);
         let balance = coin_store.coin.value;
+        // Resource CoinStore<CoinType> should exists in the signer.
         aborts_if !exists<coin::CoinStore<CoinType>>(account_addr);
+        // Account should not be frozen and should have sufficient balance.
         aborts_if coin_store.frozen;
         aborts_if balance < amount;
 
@@ -47,7 +47,7 @@ spec aptos_framework::managed_coin {
         ensures exists<Capabilities<CoinType>>(signer::address_of(account));
     }
 
-    /// The Capabilities<CoinType> should not be exist under the signer.
+    /// The Capabilities<CoinType> should not exist in the signer address.
     /// The `dst_addr` should not be frozen.
     spec mint<CoinType>(
         account: &signer,
