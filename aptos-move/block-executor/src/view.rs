@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters::GET_STATE_VALUE_SECONDS;
 use crate::{
     counters,
     scheduler::{Scheduler, TxnIndex},
@@ -104,7 +105,7 @@ impl<
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     match self.scheduler.wait_for_dependency(txn_idx, dep_idx) {
                         Some(dep_condition) => {
-                            counters::DEPENDENCY_SUSPEND_COUNT.inc();
+                            let _timer = counters::DEPENDENCY_WAIT_SECOND.start_timer();
                             // Wait on a condition variable corresponding to the encountered
                             // read dependency. Once the dep_idx finishes re-execution, scheduler
                             // will mark the dependency as resolved, and then the txn_idx will be
@@ -183,6 +184,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
     type Key = T::Key;
 
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        let _timer = GET_STATE_VALUE_SECONDS.start_timer();
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => match map.read(state_key, self.txn_idx) {
                 ReadResult::Value(v) => Ok(v.extract_raw_bytes()),
