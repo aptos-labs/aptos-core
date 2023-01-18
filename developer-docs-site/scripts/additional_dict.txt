@@ -37,6 +37,7 @@ CPUs
 ChainID
 CoinStore
 CoinType
+Concat
 Ctrl
 DAO
 DApps
@@ -160,6 +161,7 @@ PropertyMap
 Prover
 PyPi
 Quickstart
+RawTransaction
 README
 READMEs
 RPC
@@ -176,6 +178,7 @@ STM
 SYNACK
 Scalable
 SeaLevel
+SignedTransaction
 SignMessagePayload
 SignerCap
 Skylake
