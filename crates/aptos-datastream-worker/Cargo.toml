@@ -25,3 +25,4 @@ serde = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
+warp = { workspace = true }

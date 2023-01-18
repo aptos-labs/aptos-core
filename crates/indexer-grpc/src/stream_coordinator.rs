@@ -87,6 +87,7 @@ impl IndexerStreamCoordinator {
                         response: Some(raw_datastream_response::Response::Data(
                             TransactionsOutput {
                                 transactions: chunk.to_vec(),
+                                ..TransactionsOutput::default()
                             },
                         )),
                     };

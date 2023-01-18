@@ -15,7 +15,7 @@ use moving_average::MovingAverage;
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
 };
@@ -29,10 +29,12 @@ pub struct Worker {
     pub config: DatastreamWorkerConfig,
     /// Next version to process. It is used to determine the starting version of the next batch.
     pub next_version: Arc<AtomicU64>,
+    pub retry_count: Arc<AtomicU64>,
+    worker_status: Arc<AtomicBool>,
 }
 
 impl Worker {
-    pub async fn new() -> Self {
+    pub async fn new(worker_status: Arc<AtomicBool>) -> Self {
         let config_path = get_worker_config_file_path();
         let config = DatastreamWorkerConfig::load(PathBuf::from(config_path)).unwrap();
         let redis_address = match &config.redis_address {
@@ -51,11 +53,13 @@ impl Worker {
             Some(num) => num,
             _ => 0_u64,
         }));
-
+        let retry_count = Arc::new(AtomicU64::new(0_u64));
         Self {
             redis_pool,
             config,
             next_version: starting_version,
+            retry_count,
+            worker_status,
         }
     }
 
@@ -94,14 +98,34 @@ impl Worker {
                 ))
                 .await
                 {
-                    Ok(client) => client,
-                    Err(e) => {
+                    Ok(client) => {
+                        // Resets the retry count.
+                        self.retry_count.store(0, Ordering::SeqCst);
+                        // Ready to use the worker.
+                        self.worker_status.store(true, Ordering::SeqCst);
+                        client
+                    },
+                    Err(_e) => {
+                        // It's possible that Node is not ready when connecting. Retry.
                         error!(
                             indexer_address = self.config.indexer_address,
                             indexer_port = self.config.indexer_port,
-                            "[Datasteram Worker]Error connecting to indexer"
+                            "[Datasteram Worker]Error connecting to indexer",
                         );
-                        panic!("[Datastream Worker] Error connecting to indexer: {}", e);
+                        // TODO: Add a exponential backoff.
+                        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                        self.retry_count.fetch_add(1, Ordering::SeqCst);
+                        if self.retry_count.load(Ordering::SeqCst) > 20 {
+                            error!(
+                                indexer_address = self.config.indexer_address,
+                                indexer_port = self.config.indexer_port,
+                                "[Datasteram Worker] Exceeded the retry limit to connecting to node."
+                            );
+
+                            self.worker_status.store(false, Ordering::SeqCst);
+                            panic!("[Datastream Worker] Exceeded the retry limit to connecting to node. Quitting...");
+                        }
+                        continue;
                     },
                 };
             let mut ma = MovingAverage::new(10_000);

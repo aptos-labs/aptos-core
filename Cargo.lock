@@ -788,6 +788,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tokio",
  "tonic",
+ "warp",
 ]
 
 [[package]]
