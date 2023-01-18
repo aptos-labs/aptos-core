@@ -306,7 +306,7 @@ const signedTransaction: SignedTransaction = {
 ### Step 4. Serializing SignedTransaction
 
 :::note
-This step is not shown in the flow diagram in the [Overiew](#overview) section.
+This step is not shown in the flow diagram in the [Overview](#overview) section.
 :::
 
 Serializing SignedTransaction into bytes with BCS.
