@@ -48,26 +48,22 @@ impl Transaction {
                 TxnData::BlockMetadata(bm) => {
                     num_events = bm.events.len() as i64;
                     // No payload for BlockMetadata Txn.
-                }
+                },
                 TxnData::User(user) => match &user.request {
-                    Some(p) => match p.payload {
-                        Some(ref transaction_payload) => {
+                    Some(p) => {
+                        if let Some(ref transaction_payload) = p.payload {
                             payload = Some(serde_json::to_value(transaction_payload).unwrap());
                         }
-                        None => {}
                     },
-                    None => {}
+                    None => {},
                 },
                 TxnData::Genesis(genesis) => {
-                    match genesis.payload {
-                        Some(ref transaction_payload) => {
-                            payload = Some(serde_json::to_value(transaction_payload).unwrap());
-                        }
-                        None => {}
+                    if let Some(ref transaction_payload) = genesis.payload {
+                        payload = Some(serde_json::to_value(transaction_payload).unwrap());
                     }
                     num_events = genesis.events.len() as i64;
-                }
-                TxnData::StateCheckpoint(_) => {}
+                },
+                TxnData::StateCheckpoint(_) => {},
             }
         }
         Self::from_transaction_info(

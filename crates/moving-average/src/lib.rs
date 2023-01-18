@@ -56,6 +56,6 @@ impl MovingAverage {
     }
 
     pub fn sum(&self) -> u64 {
-        self.sum as u64
+        self.sum
     }
 }

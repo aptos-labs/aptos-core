@@ -52,7 +52,7 @@ pub fn bootstrap_api_and_indexer(
 
     // Creates the indexer grpc runtime
     let indexer_grpc = match bootstrap_indexer_grpc(
-        &node_config,
+        node_config,
         chain_id,
         aptos_db.clone(),
         mempool_client_sender.clone(),

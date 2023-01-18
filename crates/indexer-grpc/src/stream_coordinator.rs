@@ -146,7 +146,7 @@ impl IndexerStreamCoordinator {
         let mut retries = 0;
         loop {
             match context.get_transactions(
-                batch.start_version as u64,
+                batch.start_version,
                 batch.num_transactions_to_fetch,
                 ledger_version,
             ) {
@@ -196,7 +196,7 @@ impl IndexerStreamCoordinator {
         // Enrich data with block metadata
         let (_, _, block_event) = context
             .db
-            .get_block_info_by_version(first_version as u64)
+            .get_block_info_by_version(first_version)
             .unwrap_or_else(|_| {
                 panic!(
                     "Could not get block_info for start version {}",
@@ -322,7 +322,7 @@ impl IndexerStreamCoordinator {
 
     pub fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
         let info = self.context.get_latest_ledger_info_wrapped()?;
-        self.highest_known_version = info.ledger_version.0 as u64;
+        self.highest_known_version = info.ledger_version.0;
         Ok(())
     }
 
