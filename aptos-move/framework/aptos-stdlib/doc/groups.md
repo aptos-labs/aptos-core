@@ -8,6 +8,7 @@
 -  [Struct `BLS12_381_G1`](#0x1_groups_BLS12_381_G1)
 -  [Struct `BLS12_381_G2`](#0x1_groups_BLS12_381_G2)
 -  [Struct `BLS12_381_Gt`](#0x1_groups_BLS12_381_Gt)
+-  [Struct `BLS12_381_Fr`](#0x1_groups_BLS12_381_Fr)
 -  [Struct `Scalar`](#0x1_groups_Scalar)
 -  [Struct `Element`](#0x1_groups_Element)
 -  [Constants](#@Constants_0)
@@ -85,10 +86,8 @@ There exists a bilinear mapping from <code>(<a href="groups.md#0x1_groups_BLS12_
 
 A <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> is an integer between 0 and <code>r-1</code>.
 
-Functions <code><a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> and <code><a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>
-assume a 32-byte little-endian encoding of a <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>.
-
 An <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> represents an element in group <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code>.
+Scalar multiplication on <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> requires a <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code>.
 
 Functions <code><a href="groups.md#0x1_groups_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> and <code><a href="groups.md#0x1_groups_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>
 assume a 96-byte encoding <code>[b_0, ..., b_95]</code> for <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;</code>, with the following rules.
@@ -142,12 +141,8 @@ The prime order <code>r</code> of <code><a href="groups.md#0x1_groups_BLS12_381_
 The identity of <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code> is the point at infinity.
 There exists a bilinear mapping from <code>(<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>, <a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>)</code> to <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code>.
 
-A <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> is an integer between 0 and <code>r-1</code>.
-
-Functions <code><a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> and <code><a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>
-assume a 32-byte little-endian encoding of a <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>.
-
 An <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> is an element in group <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code>.
+Scalar multiplication on <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> requires a <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code>.
 
 Functions <code><a href="groups.md#0x1_groups_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> and <code><a href="groups.md#0x1_groups_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>
 assume a 192-byte encoding <code>[b_0, ..., b_191]</code> of an <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code>, with the following rules.
@@ -209,12 +204,8 @@ The order <code>r</code> of <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BL
 The identity of <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code> is 1.
 There exists a bilinear mapping from <code>(<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>, <a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>)</code> to <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code>.
 
-A <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> is an integer between 0 and <code>r-1</code>.
-
-Functions <code><a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> and <code><a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>
-assume a 32-byte little-endian encoding of a <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>.
-
 An <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> is an element in group <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code>.
+Scalar multiplication on <code><a href="groups.md#0x1_groups_Element">Element</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> requires a <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code>.
 
 Functions <code><a href="groups.md#0x1_groups_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> and <code><a href="groups.md#0x1_groups_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>,
 as well as <code>serialize_element_ompressed&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> and <code><a href="groups.md#0x1_groups_deserialize_element_compressed">deserialize_element_compressed</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>,
@@ -225,6 +216,37 @@ assume a 576-byte encoding <code>[b_0, ..., b_575]</code> of an <code><a href="g
 
 
 <pre><code><b>struct</b> <a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_groups_BLS12_381_Fr"></a>
+
+## Struct `BLS12_381_Fr`
+
+The scalar field for groups <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code>, <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code> and <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code>.
+A <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code> is an integer between 0 and <code>r-1</code> where <code>r</code> is the order of <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code>/<code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code>/<code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code>.
+Functions <code><a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code> and <code><a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code>
+assume a 32-byte little-endian encoding of a <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>.
+
+
+<pre><code><b>struct</b> <a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>
 </code></pre>
 
 
@@ -408,7 +430,7 @@ Compute the product of multiple pairing.
 Convert a u64 to a scalar.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_from_u64">scalar_from_u64</a>&lt;G&gt;(value: u64): <a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_from_u64">scalar_from_u64</a>&lt;S&gt;(value: u64): <a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;
 </code></pre>
 
 
@@ -417,10 +439,10 @@ Convert a u64 to a scalar.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_from_u64">scalar_from_u64</a>&lt;G&gt;(value: u64): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_from_u64">scalar_from_u64</a>&lt;S&gt;(value: u64): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt; {
-        handle: <a href="groups.md#0x1_groups_scalar_from_u64_internal">scalar_from_u64_internal</a>&lt;G&gt;(value)
+    <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
+        handle: <a href="groups.md#0x1_groups_scalar_from_u64_internal">scalar_from_u64_internal</a>&lt;S&gt;(value)
     }
 }
 </code></pre>
@@ -436,7 +458,7 @@ Convert a u64 to a scalar.
 Compute <code>-x</code> for scalar <code>x</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_neg">scalar_neg</a>&lt;G&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_neg">scalar_neg</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;
 </code></pre>
 
 
@@ -445,10 +467,10 @@ Compute <code>-x</code> for scalar <code>x</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_neg">scalar_neg</a>&lt;G&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_neg">scalar_neg</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt; {
-        handle: <a href="groups.md#0x1_groups_scalar_neg_internal">scalar_neg_internal</a>&lt;G&gt;(x.handle)
+    <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
+        handle: <a href="groups.md#0x1_groups_scalar_neg_internal">scalar_neg_internal</a>&lt;S&gt;(x.handle)
     }
 }
 </code></pre>
@@ -464,7 +486,7 @@ Compute <code>-x</code> for scalar <code>x</code>.
 Compute <code>x + y</code> for scalar <code>x</code> and <code>y</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_add">scalar_add</a>&lt;G&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;, y: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_add">scalar_add</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;
 </code></pre>
 
 
@@ -473,10 +495,10 @@ Compute <code>x + y</code> for scalar <code>x</code> and <code>y</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_add">scalar_add</a>&lt;G&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;, y: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_add">scalar_add</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt; {
-        handle: <a href="groups.md#0x1_groups_scalar_add_internal">scalar_add_internal</a>&lt;G&gt;(x.handle, y.handle)
+    <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
+        handle: <a href="groups.md#0x1_groups_scalar_add_internal">scalar_add_internal</a>&lt;S&gt;(x.handle, y.handle)
     }
 }
 </code></pre>
@@ -492,7 +514,7 @@ Compute <code>x + y</code> for scalar <code>x</code> and <code>y</code>.
 Compute <code>x * y</code> for scalar <code>x</code> and <code>y</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_mul">scalar_mul</a>&lt;G&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;, y: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_mul">scalar_mul</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;
 </code></pre>
 
 
@@ -501,10 +523,10 @@ Compute <code>x * y</code> for scalar <code>x</code> and <code>y</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_mul">scalar_mul</a>&lt;G&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;, y: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_mul">scalar_mul</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt; {
-        handle: <a href="groups.md#0x1_groups_scalar_mul_internal">scalar_mul_internal</a>&lt;G&gt;(x.handle, y.handle)
+    <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
+        handle: <a href="groups.md#0x1_groups_scalar_mul_internal">scalar_mul_internal</a>&lt;S&gt;(x.handle, y.handle)
     }
 }
 </code></pre>
@@ -520,7 +542,7 @@ Compute <code>x * y</code> for scalar <code>x</code> and <code>y</code>.
 Compute <code>x^(-1)</code> for scalar <code>x</code>, if defined.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_inv">scalar_inv</a>&lt;G&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_inv">scalar_inv</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;&gt;
 </code></pre>
 
 
@@ -529,11 +551,11 @@ Compute <code>x^(-1)</code> for scalar <code>x</code>, if defined.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_inv">scalar_inv</a>&lt;G&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;): Option&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_inv">scalar_inv</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): Option&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;&gt; {
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <b>let</b> (succeeded, handle) = <a href="groups.md#0x1_groups_scalar_inv_internal">scalar_inv_internal</a>&lt;G&gt;(x.handle);
+    <b>let</b> (succeeded, handle) = <a href="groups.md#0x1_groups_scalar_inv_internal">scalar_inv_internal</a>&lt;S&gt;(x.handle);
     <b>if</b> (succeeded) {
-        <b>let</b> scalar = <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt; { handle };
+        <b>let</b> scalar = <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; { handle };
         std::option::some(scalar)
     } <b>else</b> {
         std::option::none()
@@ -552,7 +574,7 @@ Compute <code>x^(-1)</code> for scalar <code>x</code>, if defined.
 Check if <code>x == y</code> for scalar <code>x</code> and <code>y</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_eq">scalar_eq</a>&lt;G&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;, y: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_eq">scalar_eq</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): bool
 </code></pre>
 
 
@@ -561,9 +583,9 @@ Check if <code>x == y</code> for scalar <code>x</code> and <code>y</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_eq">scalar_eq</a>&lt;G&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;, y: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_eq">scalar_eq</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): bool {
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <a href="groups.md#0x1_groups_scalar_eq_internal">scalar_eq_internal</a>&lt;G&gt;(x.handle, y.handle)
+    <a href="groups.md#0x1_groups_scalar_eq_internal">scalar_eq_internal</a>&lt;S&gt;(x.handle, y.handle)
 }
 </code></pre>
 
@@ -718,7 +740,7 @@ Compute <code>2P</code> for group element <code>P</code>.
 Compute <code>k*P</code> for scalar <code>k</code> and group element <code>P</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_scalar_mul">element_scalar_mul</a>&lt;G&gt;(scalar_k: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;, element_p: &<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_scalar_mul">element_scalar_mul</a>&lt;G, S&gt;(scalar_k: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;, element_p: &<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -727,10 +749,10 @@ Compute <code>k*P</code> for scalar <code>k</code> and group element <code>P</co
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_scalar_mul">element_scalar_mul</a>&lt;G&gt;(scalar_k: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;, element_p: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_scalar_mul">element_scalar_mul</a>&lt;G, S&gt;(scalar_k: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;, element_p: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
-        handle: <a href="groups.md#0x1_groups_element_mul_internal">element_mul_internal</a>&lt;G&gt;(scalar_k.handle, element_p.handle)
+        handle: <a href="groups.md#0x1_groups_element_mul_internal">element_mul_internal</a>&lt;G, S&gt;(scalar_k.handle, element_p.handle)
     }
 }
 </code></pre>
@@ -774,7 +796,7 @@ Hash bytes to a group element.
 Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> for a list of scalars <code>k[]</code> and a list of group elements <code>P[]</code>, both of size <code>n</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul">element_multi_scalar_mul</a>&lt;G&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;&gt;, elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul">element_multi_scalar_mul</a>&lt;G, S&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;&gt;, elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -783,7 +805,7 @@ Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> for a list of scalars <code>k[]
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul">element_multi_scalar_mul</a>&lt;G&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;&gt;, elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul">element_multi_scalar_mul</a>&lt;G, S&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;&gt;, elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
 
     <b>let</b> num_scalars = std::vector::length(scalars);
@@ -803,7 +825,7 @@ Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> for a list of scalars <code>k[]
     };
 
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
-        handle: <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G&gt;(scalar_handles, element_handles)
+        handle: <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(scalar_handles, element_handles)
     }
 
 }
@@ -820,7 +842,7 @@ Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> for a list of scalars <code>k[]
 Scalar deserialization.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;G&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;S&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;&gt;
 </code></pre>
 
 
@@ -829,11 +851,11 @@ Scalar deserialization.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;G&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;S&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;&gt; {
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <b>let</b> (succeeded, handle) = <a href="groups.md#0x1_groups_deserialize_scalar_internal">deserialize_scalar_internal</a>&lt;G&gt;(*bytes);
+    <b>let</b> (succeeded, handle) = <a href="groups.md#0x1_groups_deserialize_scalar_internal">deserialize_scalar_internal</a>&lt;S&gt;(*bytes);
     <b>if</b> (succeeded) {
-        <b>let</b> scalar = <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt; {
+        <b>let</b> scalar = <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
             handle
         };
         std::option::some(scalar)
@@ -854,7 +876,7 @@ Scalar deserialization.
 Scalar serialization.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;G&gt;(scalar: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;S&gt;(scalar: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -863,9 +885,9 @@ Scalar serialization.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;G&gt;(scalar: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;S&gt;(scalar: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
-    <a href="groups.md#0x1_groups_serialize_scalar_internal">serialize_scalar_internal</a>&lt;G&gt;(scalar.handle)
+    <a href="groups.md#0x1_groups_serialize_scalar_internal">serialize_scalar_internal</a>&lt;S&gt;(scalar.handle)
 }
 </code></pre>
 
@@ -1471,7 +1493,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_element_mul_internal">element_mul_internal</a>&lt;G&gt;(scalar_handle: u64, element_handle: u64): u64
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_element_mul_internal">element_mul_internal</a>&lt;G, S&gt;(scalar_handle: u64, element_handle: u64): u64
 </code></pre>
 
 
@@ -1480,7 +1502,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_element_mul_internal">element_mul_internal</a>&lt;G&gt;(scalar_handle: u64, element_handle: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_element_mul_internal">element_mul_internal</a>&lt;G, S&gt;(scalar_handle: u64, element_handle: u64): u64;
 </code></pre>
 
 
@@ -1581,7 +1603,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
 </code></pre>
 
 
@@ -1590,7 +1612,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
 </code></pre>
 
 

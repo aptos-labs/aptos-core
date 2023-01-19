@@ -16,10 +16,8 @@ module aptos_std::groups {
     ///
     /// A `Scalar<BLS12_381_G1>` is an integer between 0 and `r-1`.
     ///
-    /// Functions `deserialize_scalar<BLS12_381_G1>` and `serialize_scalar<BLS12_381_G1>`
-    /// assume a 32-byte little-endian encoding of a `Scalar<BLS12_381_G1>`.
-    ///
     /// An `Element<BLS12_381_G1>` represents an element in group `BLS12_381_G1`.
+    /// Scalar multiplication on `Element<BLS12_381_G1>` requires a `Scalar<BLS12_381_Fr>`.
     ///
     /// Functions `serialize_element_uncompressed<BLS12_381_G1>` and `deserialize_element_uncompressed<BLS12_381_G1>`
     /// assume a 96-byte encoding `[b_0, ..., b_95]` for `Element<BLS12_381_G1>`, with the following rules.
@@ -48,12 +46,8 @@ module aptos_std::groups {
     /// The identity of `BLS12_381_G2` is the point at infinity.
     /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
     ///
-    /// A `Scalar<BLS12_381_G2>` is an integer between 0 and `r-1`.
-    ///
-    /// Functions `deserialize_scalar<BLS12_381_G2>` and `serialize_scalar<BLS12_381_G2>`
-    /// assume a 32-byte little-endian encoding of a `Scalar<BLS12_381_G2>`.
-    ///
     /// An `Element<BLS12_381_G2>` is an element in group `BLS12_381_G2`.
+    /// Scalar multiplication on `Element<BLS12_381_G2>` requires a `Scalar<BLS12_381_Fr>`.
     ///
     /// Functions `serialize_element_uncompressed<BLS12_381_G2>` and `deserialize_element_uncompressed<BLS12_381_G2>`
     /// assume a 192-byte encoding `[b_0, ..., b_191]` of an `Element<BLS12_381_G2>`, with the following rules.
@@ -90,12 +84,8 @@ module aptos_std::groups {
     /// The identity of `BLS12_381_G2` is 1.
     /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
     ///
-    /// A `Scalar<BLS12_381_G2>` is an integer between 0 and `r-1`.
-    ///
-    /// Functions `deserialize_scalar<BLS12_381_Gt>` and `serialize_scalar<BLS12_381_Gt>`
-    /// assume a 32-byte little-endian encoding of a `Scalar<BLS12_381_Gt>`.
-    ///
     /// An `Element<BLS12_381_Gt>` is an element in group `BLS12_381_Gt`.
+    /// Scalar multiplication on `Element<BLS12_381_Gt>` requires a `Scalar<BLS12_381_Fr>`.
     ///
     /// Functions `serialize_element_uncompressed<BLS12_381_Gt>` and `deserialize_element_uncompressed<BLS12_381_Gt>`,
     /// as well as `serialize_element_ompressed<BLS12_381_Gt>` and `deserialize_element_compressed<BLS12_381_Gt>`,
@@ -104,6 +94,12 @@ module aptos_std::groups {
     ///     - `[b_0, ..., b_575]` is a concatenation of 12 encoded `Fq` elements: `c_000, c_001, c_010, c_011, c_020, c_021, c_100, c_101, c_110, c_111, c_120, c_121`.
     ///     - Every `c_ijk` uses a 48-byte little-endian encoding.
     struct BLS12_381_Gt {}
+
+    /// The scalar field for groups `BLS12_381_G1`, `BLS12_381_G2` and `BLS12_381_Gt`.
+    /// A `Scalar<BLS12_381_Fr>` is an integer between 0 and `r-1` where `r` is the order of `BLS12_381_G1`/`BLS12_381_G2`/`BLS12_381_Gt`.
+    /// Functions `deserialize_scalar<BLS12_381_Fr>` and `serialize_scalar<BLS12_381_Fr>`
+    /// assume a 32-byte little-endian encoding of a `Scalar<BLS12_381_Gt>`.
+    struct BLS12_381_Fr {}
 
     /// This struct represents an integer between 0 and `r-1`, where `r` is the order of group `G`.
     struct Scalar<phantom G> has copy, drop {
@@ -144,43 +140,43 @@ module aptos_std::groups {
     }
 
     /// Convert a u64 to a scalar.
-    public fun scalar_from_u64<G>(value: u64): Scalar<G> {
+    public fun scalar_from_u64<S>(value: u64): Scalar<S> {
         abort_if_feature_disabled();
-        Scalar<G> {
-            handle: scalar_from_u64_internal<G>(value)
+        Scalar<S> {
+            handle: scalar_from_u64_internal<S>(value)
         }
     }
 
     /// Compute `-x` for scalar `x`.
-    public fun scalar_neg<G>(x: &Scalar<G>): Scalar<G> {
+    public fun scalar_neg<S>(x: &Scalar<S>): Scalar<S> {
         abort_if_feature_disabled();
-        Scalar<G> {
-            handle: scalar_neg_internal<G>(x.handle)
+        Scalar<S> {
+            handle: scalar_neg_internal<S>(x.handle)
         }
     }
 
     /// Compute `x + y` for scalar `x` and `y`.
-    public fun scalar_add<G>(x: &Scalar<G>, y: &Scalar<G>): Scalar<G> {
+    public fun scalar_add<S>(x: &Scalar<S>, y: &Scalar<S>): Scalar<S> {
         abort_if_feature_disabled();
-        Scalar<G> {
-            handle: scalar_add_internal<G>(x.handle, y.handle)
+        Scalar<S> {
+            handle: scalar_add_internal<S>(x.handle, y.handle)
         }
     }
 
     /// Compute `x * y` for scalar `x` and `y`.
-    public fun scalar_mul<G>(x: &Scalar<G>, y: &Scalar<G>): Scalar<G> {
+    public fun scalar_mul<S>(x: &Scalar<S>, y: &Scalar<S>): Scalar<S> {
         abort_if_feature_disabled();
-        Scalar<G> {
-            handle: scalar_mul_internal<G>(x.handle, y.handle)
+        Scalar<S> {
+            handle: scalar_mul_internal<S>(x.handle, y.handle)
         }
     }
 
     /// Compute `x^(-1)` for scalar `x`, if defined.
-    public fun scalar_inv<G>(x: &Scalar<G>): Option<Scalar<G>> {
+    public fun scalar_inv<S>(x: &Scalar<S>): Option<Scalar<S>> {
         abort_if_feature_disabled();
-        let (succeeded, handle) = scalar_inv_internal<G>(x.handle);
+        let (succeeded, handle) = scalar_inv_internal<S>(x.handle);
         if (succeeded) {
-            let scalar = Scalar<G> { handle };
+            let scalar = Scalar<S> { handle };
             std::option::some(scalar)
         } else {
             std::option::none()
@@ -188,9 +184,9 @@ module aptos_std::groups {
     }
 
     /// Check if `x == y` for scalar `x` and `y`.
-    public fun scalar_eq<G>(x: &Scalar<G>, y: &Scalar<G>): bool {
+    public fun scalar_eq<S>(x: &Scalar<S>, y: &Scalar<S>): bool {
         abort_if_feature_disabled();
-        scalar_eq_internal<G>(x.handle, y.handle)
+        scalar_eq_internal<S>(x.handle, y.handle)
     }
 
     /// Get the identity of group `G`.
@@ -234,10 +230,10 @@ module aptos_std::groups {
     }
 
     /// Compute `k*P` for scalar `k` and group element `P`.
-    public fun element_scalar_mul<G>(scalar_k: &Scalar<G>, element_p: &Element<G>): Element<G> {
+    public fun element_scalar_mul<G, S>(scalar_k: &Scalar<S>, element_p: &Element<G>): Element<G> {
         abort_if_feature_disabled();
         Element<G> {
-            handle: element_mul_internal<G>(scalar_k.handle, element_p.handle)
+            handle: element_mul_internal<G, S>(scalar_k.handle, element_p.handle)
         }
     }
 
@@ -250,7 +246,7 @@ module aptos_std::groups {
     }
 
     /// Compute `k[0]*P[0]+...+k[n-1]*P[n-1]` for a list of scalars `k[]` and a list of group elements `P[]`, both of size `n`.
-    public fun element_multi_scalar_mul<G>(scalars: &vector<Scalar<G>>, elements: &vector<Element<G>>): Element<G> {
+    public fun element_multi_scalar_mul<G, S>(scalars: &vector<Scalar<S>>, elements: &vector<Element<G>>): Element<G> {
         abort_if_feature_disabled();
 
         let num_scalars = std::vector::length(scalars);
@@ -270,17 +266,17 @@ module aptos_std::groups {
         };
 
         Element<G> {
-            handle: element_multi_scalar_mul_internal<G>(scalar_handles, element_handles)
+            handle: element_multi_scalar_mul_internal<G, S>(scalar_handles, element_handles)
         }
 
     }
 
     /// Scalar deserialization.
-    public fun deserialize_scalar<G>(bytes: &vector<u8>): Option<Scalar<G>> {
+    public fun deserialize_scalar<S>(bytes: &vector<u8>): Option<Scalar<S>> {
         abort_if_feature_disabled();
-        let (succeeded, handle) = deserialize_scalar_internal<G>(*bytes);
+        let (succeeded, handle) = deserialize_scalar_internal<S>(*bytes);
         if (succeeded) {
-            let scalar = Scalar<G> {
+            let scalar = Scalar<S> {
                 handle
             };
             std::option::some(scalar)
@@ -290,9 +286,9 @@ module aptos_std::groups {
     }
 
     /// Scalar serialization.
-    public fun serialize_scalar<G>(scalar: &Scalar<G>): vector<u8> {
+    public fun serialize_scalar<S>(scalar: &Scalar<S>): vector<u8> {
         abort_if_feature_disabled();
-        serialize_scalar_internal<G>(scalar.handle)
+        serialize_scalar_internal<S>(scalar.handle)
     }
 
     /// Group element serialization with an uncompressed format.
@@ -358,10 +354,10 @@ module aptos_std::groups {
 
     #[test_only]
     /// Generate a random scalar.
-    public fun random_scalar<G>(): Scalar<G> {
+    public fun random_scalar<S>(): Scalar<S> {
         abort_if_feature_disabled();
-        Scalar<G> {
-            handle: random_scalar_internal<G>()
+        Scalar<S> {
+            handle: random_scalar_internal<S>()
         }
     }
 
@@ -389,12 +385,12 @@ module aptos_std::groups {
     native fun is_prime_order_internal<G>(): bool;
     native fun group_order_internal<G>(): vector<u8>;
     native fun group_generator_internal<G>(): u64;
-    native fun element_mul_internal<G>(scalar_handle: u64, element_handle: u64): u64;
+    native fun element_mul_internal<G, S>(scalar_handle: u64, element_handle: u64): u64;
     native fun element_double_internal<G>(element_handle: u64): u64;
     native fun element_neg_internal<G>(handle: u64): u64;
     native fun serialize_element_uncompressed_internal<G>(handle: u64): vector<u8>;
     native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
-    native fun element_multi_scalar_mul_internal<G>(scalar_handles: vector<u64>, element_handles: vector<u64>): u64;
+    native fun element_multi_scalar_mul_internal<G, S>(scalar_handles: vector<u64>, element_handles: vector<u64>): u64;
     native fun pairing_product_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
     native fun hash_to_element_internal<G>(bytes: vector<u8>): u64;
     #[test_only]
@@ -410,31 +406,31 @@ module aptos_std::groups {
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_G1>(), 1);
 
         // Scalar encoding/decoding.
-        let scalar_7 = scalar_from_u64<BLS12_381_G1>(7);
-        let scalar_7_another = std::option::extract(&mut deserialize_scalar<BLS12_381_G1>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
+        let scalar_7 = scalar_from_u64<BLS12_381_Fr>(7);
+        let scalar_7_another = std::option::extract(&mut deserialize_scalar<BLS12_381_Fr>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
         assert!(scalar_eq(&scalar_7, &scalar_7_another), 1);
         assert!( x"0700000000000000000000000000000000000000000000000000000000000000" == serialize_scalar(&scalar_7), 1);
-        assert!(std::option::is_none(&deserialize_scalar<BLS12_381_G1>(&x"ffff")), 1);
+        assert!(std::option::is_none(&deserialize_scalar<BLS12_381_Fr>(&x"ffff")), 1);
 
         // Scalar negation.
         let scalar_minus_7 = scalar_neg(&scalar_7);
         assert!(x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == serialize_scalar(&scalar_minus_7), 1);
 
         // Scalar addition.
-        let scalar_9 = scalar_from_u64<BLS12_381_G1>(9);
-        let scalar_2 = scalar_from_u64<BLS12_381_G1>(2);
+        let scalar_9 = scalar_from_u64<BLS12_381_Fr>(9);
+        let scalar_2 = scalar_from_u64<BLS12_381_Fr>(2);
         let scalar_2_calc = scalar_add(&scalar_minus_7, &scalar_9);
         assert!(scalar_eq(&scalar_2, &scalar_2_calc), 1);
 
         // Scalar multiplication.
         let scalar_63_calc = scalar_mul(&scalar_7, &scalar_9);
-        let scalar_63 = scalar_from_u64<BLS12_381_G1>(63);
+        let scalar_63 = scalar_from_u64<BLS12_381_Fr>(63);
         assert!(scalar_eq(&scalar_63, &scalar_63_calc), 1);
 
         // Scalar inversion.
         let scalar_7_inv_calc = std::option::extract(&mut scalar_inv(&scalar_7));
         assert!(scalar_eq(&scalar_9, &scalar_mul(&scalar_63, &scalar_7_inv_calc)), 1);
-        let scalar_0 = scalar_from_u64<BLS12_381_G1>(0);
+        let scalar_0 = scalar_from_u64<BLS12_381_Fr>(0);
         assert!(std::option::is_none(&scalar_inv(&scalar_0)), 1);
 
         // Point encoding/decoding.
@@ -479,10 +475,10 @@ module aptos_std::groups {
         assert!(element_eq(&point_2g, &point_2g_calc), 1);
 
         // Multi-scalar multiplication.
-        let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_G1>(14), &point_g);
-        let scalar_1 = scalar_from_u64<BLS12_381_G1>(1);
-        let scalar_2 = scalar_from_u64<BLS12_381_G1>(2);
-        let scalar_3 = scalar_from_u64<BLS12_381_G1>(3);
+        let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(14), &point_g);
+        let scalar_1 = scalar_from_u64<BLS12_381_Fr>(1);
+        let scalar_2 = scalar_from_u64<BLS12_381_Fr>(2);
+        let scalar_3 = scalar_from_u64<BLS12_381_Fr>(3);
         let point_2g = element_scalar_mul(&scalar_2, &point_g);
         let point_3g = element_scalar_mul(&scalar_3, &point_g);
         let scalars = vector[scalar_1, scalar_2, scalar_3];
@@ -492,7 +488,7 @@ module aptos_std::groups {
 
         // Hash to group.
         let point = hash_to_element<BLS12_381_G1>(x"1234");
-        assert!(element_eq(&group_identity<BLS12_381_G1>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_G1>(0), &point)), 1);
+        assert!(element_eq(&group_identity<BLS12_381_G1>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(0), &point)), 1);
     }
 
     #[test(fx = @std)]
@@ -503,31 +499,31 @@ module aptos_std::groups {
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_G2>(), 1);
 
         // Scalar encoding/decoding.
-        let scalar_7 = scalar_from_u64<BLS12_381_G2>(7);
-        let scalar_7_another = std::option::extract(&mut deserialize_scalar<BLS12_381_G2>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
+        let scalar_7 = scalar_from_u64<BLS12_381_Fr>(7);
+        let scalar_7_another = std::option::extract(&mut deserialize_scalar<BLS12_381_Fr>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
         assert!(scalar_eq(&scalar_7, &scalar_7_another), 1);
         assert!( x"0700000000000000000000000000000000000000000000000000000000000000" == serialize_scalar(&scalar_7), 1);
-        assert!(std::option::is_none(&deserialize_scalar<BLS12_381_G1>(&x"ffff")), 1);
+        assert!(std::option::is_none(&deserialize_scalar<BLS12_381_Fr>(&x"ffff")), 1);
 
         // Scalar negation.
         let scalar_minus_7 = scalar_neg(&scalar_7);
         assert!(x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == serialize_scalar(&scalar_minus_7), 1);
 
         // Scalar addition.
-        let scalar_9 = scalar_from_u64<BLS12_381_G2>(9);
-        let scalar_2 = scalar_from_u64<BLS12_381_G2>(2);
+        let scalar_9 = scalar_from_u64<BLS12_381_Fr>(9);
+        let scalar_2 = scalar_from_u64<BLS12_381_Fr>(2);
         let scalar_2_calc = scalar_add(&scalar_minus_7, &scalar_9);
         assert!(scalar_eq(&scalar_2, &scalar_2_calc), 1);
 
         // Scalar multiplication.
         let scalar_63_calc = scalar_mul(&scalar_7, &scalar_9);
-        let scalar_63 = scalar_from_u64<BLS12_381_G2>(63);
+        let scalar_63 = scalar_from_u64<BLS12_381_Fr>(63);
         assert!(scalar_eq(&scalar_63, &scalar_63_calc), 1);
 
         // Scalar inversion.
         let scalar_7_inv_calc = std::option::extract(&mut scalar_inv(&scalar_7));
         assert!(scalar_eq(&scalar_9, &scalar_mul(&scalar_63, &scalar_7_inv_calc)), 1);
-        let scalar_0 = scalar_from_u64<BLS12_381_G2>(0);
+        let scalar_0 = scalar_from_u64<BLS12_381_Fr>(0);
         assert!(std::option::is_none(&scalar_inv(&scalar_0)), 1);
 
         // Point encoding/decoding.
@@ -572,10 +568,10 @@ module aptos_std::groups {
         assert!(element_eq(&point_2g, &point_2g_calc), 1);
 
         // Multi-scalar multiplication.
-        let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_G2>(14), &point_g);
-        let scalar_1 = scalar_from_u64<BLS12_381_G2>(1);
-        let scalar_2 = scalar_from_u64<BLS12_381_G2>(2);
-        let scalar_3 = scalar_from_u64<BLS12_381_G2>(3);
+        let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(14), &point_g);
+        let scalar_1 = scalar_from_u64<BLS12_381_Fr>(1);
+        let scalar_2 = scalar_from_u64<BLS12_381_Fr>(2);
+        let scalar_3 = scalar_from_u64<BLS12_381_Fr>(3);
         let point_2g = element_scalar_mul(&scalar_2, &point_g);
         let point_3g = element_scalar_mul(&scalar_3, &point_g);
         let scalars = vector[scalar_1, scalar_2, scalar_3];
@@ -585,7 +581,7 @@ module aptos_std::groups {
 
         // Hash to group.
         let point = hash_to_element<BLS12_381_G2>(x"1234");
-        assert!(element_eq(&group_identity<BLS12_381_G2>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_G2>(0), &point)), 1);
+        assert!(element_eq(&group_identity<BLS12_381_G2>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(0), &point)), 1);
     }
 
     #[test(fx = @std)]
@@ -596,31 +592,31 @@ module aptos_std::groups {
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_Gt>(), 1);
 
         // Scalar encoding/decoding.
-        let scalar_7 = scalar_from_u64<BLS12_381_Gt>(7);
-        let scalar_7_another = std::option::extract(&mut deserialize_scalar<BLS12_381_Gt>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
+        let scalar_7 = scalar_from_u64<BLS12_381_Fr>(7);
+        let scalar_7_another = std::option::extract(&mut deserialize_scalar<BLS12_381_Fr>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
         assert!(scalar_eq(&scalar_7, &scalar_7_another), 1);
         assert!( x"0700000000000000000000000000000000000000000000000000000000000000" == serialize_scalar(&scalar_7), 1);
-        assert!(std::option::is_none(&deserialize_scalar<BLS12_381_G1>(&x"ffff")), 1);
+        assert!(std::option::is_none(&deserialize_scalar<BLS12_381_Fr>(&x"ffff")), 1);
 
         // Scalar negation.
         let scalar_minus_7 = scalar_neg(&scalar_7);
         assert!(x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == serialize_scalar(&scalar_minus_7), 1);
 
         // Scalar addition.
-        let scalar_9 = scalar_from_u64<BLS12_381_Gt>(9);
-        let scalar_2 = scalar_from_u64<BLS12_381_Gt>(2);
+        let scalar_9 = scalar_from_u64<BLS12_381_Fr>(9);
+        let scalar_2 = scalar_from_u64<BLS12_381_Fr>(2);
         let scalar_2_calc = scalar_add(&scalar_minus_7, &scalar_9);
         assert!(scalar_eq(&scalar_2, &scalar_2_calc), 1);
 
         // Scalar multiplication.
         let scalar_63_calc = scalar_mul(&scalar_7, &scalar_9);
-        let scalar_63 = scalar_from_u64<BLS12_381_Gt>(63);
+        let scalar_63 = scalar_from_u64<BLS12_381_Fr>(63);
         assert!(scalar_eq(&scalar_63, &scalar_63_calc), 1);
 
         // Scalar inversion.
         let scalar_7_inv_calc = std::option::extract(&mut scalar_inv(&scalar_7));
         assert!(scalar_eq(&scalar_9, &scalar_mul(&scalar_63, &scalar_7_inv_calc)), 1);
-        let scalar_0 = scalar_from_u64<BLS12_381_Gt>(0);
+        let scalar_0 = scalar_from_u64<BLS12_381_Fr>(0);
         assert!(std::option::is_none(&scalar_inv(&scalar_0)), 1);
 
         // Point encoding/decoding.
@@ -666,10 +662,10 @@ module aptos_std::groups {
         assert!(element_eq(&point_2g, &point_2g_calc), 1);
 
         // Multi-scalar multiplication.
-        let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_Gt>(14), &point_g);
-        let scalar_1 = scalar_from_u64<BLS12_381_Gt>(1);
-        let scalar_2 = scalar_from_u64<BLS12_381_Gt>(2);
-        let scalar_3 = scalar_from_u64<BLS12_381_Gt>(3);
+        let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(14), &point_g);
+        let scalar_1 = scalar_from_u64<BLS12_381_Fr>(1);
+        let scalar_2 = scalar_from_u64<BLS12_381_Fr>(2);
+        let scalar_3 = scalar_from_u64<BLS12_381_Fr>(3);
         let point_2g = element_scalar_mul(&scalar_2, &point_g);
         let point_3g = element_scalar_mul(&scalar_3, &point_g);
         let scalars = vector[scalar_1, scalar_2, scalar_3];
@@ -679,7 +675,7 @@ module aptos_std::groups {
 
         // Hash to group.
         let point = hash_to_element<BLS12_381_Gt>(x"1234");
-        assert!(element_eq(&group_identity<BLS12_381_Gt>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_Gt>(0), &point)), 1);
+        assert!(element_eq(&group_identity<BLS12_381_Gt>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(0), &point)), 1);
     }
 
     #[test(fx = @std)]
@@ -687,16 +683,16 @@ module aptos_std::groups {
         std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
         // Single pairing.
         let gt_point_1 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
-            &element_scalar_mul(&scalar_from_u64(5), &group_generator<BLS12_381_G1>()),
-            &element_scalar_mul(&scalar_from_u64(7), &group_generator<BLS12_381_G2>()),
+            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(5), &group_generator<BLS12_381_G1>()),
+            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(7), &group_generator<BLS12_381_G2>()),
         );
         let gt_point_2 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
-            &element_scalar_mul(&scalar_from_u64(1), &group_generator()),
-            &element_scalar_mul(&scalar_from_u64(35), &group_generator()),
+            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(1), &group_generator()),
+            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(35), &group_generator()),
         );
         let gt_point_3 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
-            &element_scalar_mul(&scalar_from_u64(35), &group_generator<BLS12_381_G1>()),
-            &element_scalar_mul(&scalar_from_u64(1), &group_generator<BLS12_381_G2>()),
+            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(35), &group_generator<BLS12_381_G1>()),
+            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(1), &group_generator<BLS12_381_G2>()),
         );
         assert!(element_eq(&gt_point_1, &gt_point_2), 1);
         assert!(element_eq(&gt_point_1, &gt_point_3), 1);
@@ -705,23 +701,21 @@ module aptos_std::groups {
         let g1_point = random_element<BLS12_381_G1>();
         let g2_point = random_element<BLS12_381_G2>();
         // e(k1*P1, k2*P2)
-        let k1 = random_scalar<BLS12_381_G1>();
-        let k2 = random_scalar<BLS12_381_G2>();
+        let k1 = random_scalar<BLS12_381_Fr>();
+        let k2 = random_scalar<BLS12_381_Fr>();
         let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_scalar_mul(&k1, &g1_point), &element_scalar_mul(&k2,&g2_point));
         // e(P1,P2)^(k1*k2)
-        let k1_for_gt = std::option::extract(&mut deserialize_scalar<BLS12_381_Gt>(&serialize_scalar(&k1)));
-        let k2_for_gt = std::option::extract(&mut deserialize_scalar<BLS12_381_Gt>(&serialize_scalar(&k2)));
-        let gt_element_another = element_scalar_mul(&scalar_mul(&k1_for_gt, &k2_for_gt), &pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point, &g2_point));
+        let gt_element_another = element_scalar_mul(&scalar_mul(&k1, &k2), &pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point, &g2_point));
         assert!(element_eq(&gt_element, &gt_element_another), 1);
 
         // Multiple pairing.
         let g1_point_1 = group_generator<BLS12_381_G1>();
         let g2_point_1 = group_generator<BLS12_381_G2>();
-        let g1_point_2 = element_scalar_mul(&scalar_from_u64<BLS12_381_G1>(5), &g1_point_1);
-        let g2_point_2 = element_scalar_mul(&scalar_from_u64<BLS12_381_G2>(2), &g2_point_1);
-        let g1_point_3 = element_scalar_mul(&scalar_from_u64<BLS12_381_G1>(20), &g1_point_1);
-        let g2_point_3 = element_scalar_mul(&scalar_from_u64<BLS12_381_G2>(5), &g2_point_1);
-        let expected = element_scalar_mul(&scalar_from_u64<BLS12_381_Gt>(111), &pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point_1, &g2_point_1));
+        let g1_point_2 = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(5), &g1_point_1);
+        let g2_point_2 = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(2), &g2_point_1);
+        let g1_point_3 = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(20), &g1_point_1);
+        let g2_point_3 = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(5), &g2_point_1);
+        let expected = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(111), &pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point_1, &g2_point_1));
         let actual = pairing_product<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&vector[g1_point_1, g1_point_2, g1_point_3], &vector[g2_point_1, g2_point_2, g2_point_3]);
         assert!(element_eq(&expected, &actual), 1);
     }
@@ -742,8 +736,8 @@ module aptos_std::groups {
         std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
         // Attempt an invalid pairing: (G2, G1) -> Gt
         pairing<BLS12_381_G2, BLS12_381_G1, BLS12_381_Gt>(
-            &element_scalar_mul(&scalar_from_u64(7), &group_generator<BLS12_381_G2>()),
-            &element_scalar_mul(&scalar_from_u64(5), &group_generator<BLS12_381_G1>()),
+            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(7), &group_generator<BLS12_381_G2>()),
+            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(5), &group_generator<BLS12_381_G1>()),
         );
     }
 }

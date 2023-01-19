@@ -522,7 +522,7 @@ fn deserialize_scalar_internal(
         .to_string();
     let bytes = pop_arg!(args, Vec<u8>);
     match type_tag.as_str() {
-        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Fr" => {
             let scalar = Fr::deserialize_uncompressed(bytes.as_slice());
             match scalar {
                 Ok(scalar) => {
@@ -561,7 +561,7 @@ fn serialize_scalar_internal(
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Fr" => {
             let mut buf = vec![];
             context
                 .extensions()
@@ -591,7 +591,7 @@ fn scalar_from_u64_internal(
         .to_string();
     let value = pop_arg!(args, u64);
     match type_tag.as_str() {
-        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Fr" => {
             let handle = context
                 .extensions_mut()
                 .get_mut::<Bls12381Context>()
@@ -620,7 +620,7 @@ fn scalar_add_internal(
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Fr" => {
             let scalar_1 = context
                 .extensions()
                 .get::<Bls12381Context>()
@@ -658,7 +658,7 @@ fn scalar_mul_internal(
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Fr" => {
             let scalar_1 = context
                 .extensions()
                 .get::<Bls12381Context>()
@@ -695,7 +695,7 @@ fn scalar_neg_internal(
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Fr" => {
             let result = context
                 .extensions()
                 .get::<Bls12381Context>()
@@ -728,7 +728,7 @@ fn scalar_inv_internal(
         .to_string();
     let handle = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Fr" => {
             let op_result = context
                 .extensions()
                 .get::<Bls12381Context>()
@@ -773,7 +773,7 @@ fn scalar_eq_internal(
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match type_tag.as_str() {
-        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Fr" => {
             let scalar_1 = context
                 .extensions()
                 .get::<Bls12381Context>()
@@ -971,7 +971,7 @@ fn random_scalar_internal(
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
     match type_tag.as_str() {
-        "0x1::groups::BLS12_381_G1" | "0x1::groups::BLS12_381_G2" | "0x1::groups::BLS12_381_Gt" => {
+        "0x1::groups::BLS12_381_Fr" => {
             let r = Fr::rand(&mut test_rng());
             let handle = context
                 .extensions_mut()
@@ -1188,14 +1188,17 @@ fn element_mul_scalar_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    assert_eq!(1, ty_args.len());
-    let type_tag = context
+    assert_eq!(2, ty_args.len());
+    let group_type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let scalar_type_tag = context
+        .type_to_type_tag(ty_args.get(1).unwrap())?
         .to_string();
     let point_handle = pop_arg!(args, u64) as usize;
     let scalar_handle = pop_arg!(args, u64) as usize;
-    match type_tag.as_str() {
-        "0x1::groups::BLS12_381_G1" => {
+    match (group_type_tag.as_str(), scalar_type_tag.as_str()) {
+        ("0x1::groups::BLS12_381_G1", "0x1::groups::BLS12_381_Fr") => {
             let point = context
                 .extensions()
                 .get::<Bls12381Context>()
@@ -1214,7 +1217,7 @@ fn element_mul_scalar_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::groups::BLS12_381_G2" => {
+        ("0x1::groups::BLS12_381_G2", "0x1::groups::BLS12_381_Fr") => {
             let point = context
                 .extensions()
                 .get::<Bls12381Context>()
@@ -1233,7 +1236,7 @@ fn element_mul_scalar_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        "0x1::groups::BLS12_381_Gt" => {
+        ("0x1::groups::BLS12_381_Gt", "0x1::groups::BLS12_381_Fr") => {
             let point = context
                 .extensions()
                 .get::<Bls12381Context>()
@@ -1440,17 +1443,20 @@ fn element_multi_scalar_mul_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    assert_eq!(1, ty_args.len());
-    let type_tag = context
+    assert_eq!(2, ty_args.len());
+    let group_type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
+        .to_string();
+    let scalar_type_tag = context
+        .type_to_type_tag(ty_args.get(1).unwrap())?
         .to_string();
     let point_handles = pop_arg!(args, Vec<u64>);
     let num_points = point_handles.len();
     let scalar_handles = pop_arg!(args, Vec<u64>);
     let num_scalars = scalar_handles.len();
     if num_points == num_scalars {
-        match type_tag.as_str() {
-            "0x1::groups::BLS12_381_G1" => {
+        match (group_type_tag.as_str(), scalar_type_tag.as_str()) {
+            ("0x1::groups::BLS12_381_G1", "0x1::groups::BLS12_381_Fr") => {
                 // Using blst multi-scalar multiplication API for better performance.
                 let blst_g1_proj_points: Vec<blst::blst_p1> = point_handles.iter().map(|&handle|{
                     let ark_point = context
@@ -1485,7 +1491,7 @@ fn element_multi_scalar_mul_internal(
                     smallvec![Value::u64(handle as u64)],
                 ))
             }
-            "0x1::groups::BLS12_381_G2" => {
+            ("0x1::groups::BLS12_381_G2", "0x1::groups::BLS12_381_Fr") => {
                 // Using blst multi-scalar multiplication API for better performance.
                 let blst_points: Vec<blst::blst_p2> = point_handles.iter().map(|&handle|{
                     let ark_point = context
@@ -1522,7 +1528,7 @@ fn element_multi_scalar_mul_internal(
                     smallvec![Value::u64(handle as u64)],
                 ))
             }
-            "0x1::groups::BLS12_381_Gt" => {
+            ("0x1::groups::BLS12_381_Gt", "0x1::groups::BLS12_381_Fr") => {
                 let elements = point_handles.iter().map(|&handle|{
                     context
                         .extensions()
