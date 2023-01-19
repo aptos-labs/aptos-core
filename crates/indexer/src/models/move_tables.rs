@@ -56,6 +56,11 @@ impl TableItem {
         transaction_version: i64,
         transaction_block_height: i64,
     ) -> (Self, CurrentTableItem) {
+        let (decoded_key, decoded_value) = match write_table_item.data.as_ref() {
+            Some(decoded) => (decoded.key.clone(), Some(decoded.value.clone())),
+            None => (serde_json::Value::Null, None),
+        };
+
         (
             Self {
                 transaction_version,
@@ -63,16 +68,16 @@ impl TableItem {
                 transaction_block_height,
                 key: write_table_item.key.to_string(),
                 table_handle: standardize_address(&write_table_item.handle.to_string()),
-                decoded_key: write_table_item.data.as_ref().unwrap().key.clone(),
-                decoded_value: Some(write_table_item.data.as_ref().unwrap().value.clone()),
+                decoded_key: decoded_key.clone(),
+                decoded_value: decoded_value.clone(),
                 is_deleted: false,
             },
             CurrentTableItem {
                 table_handle: standardize_address(&write_table_item.handle.to_string()),
                 key_hash: hash_str(&write_table_item.key.to_string()),
                 key: write_table_item.key.to_string(),
-                decoded_key: write_table_item.data.as_ref().unwrap().key.clone(),
-                decoded_value: Some(write_table_item.data.as_ref().unwrap().value.clone()),
+                decoded_key,
+                decoded_value,
                 last_transaction_version: transaction_version,
                 is_deleted: false,
             },
@@ -85,17 +90,11 @@ impl TableItem {
         transaction_version: i64,
         transaction_block_height: i64,
     ) -> (Self, CurrentTableItem) {
-        let decoded_key = delete_table_item
-            .data
-            .as_ref()
-            .unwrap_or_else(|| {
-                panic!(
-                    "Could not extract data from DeletedTableItem '{:?}'",
-                    delete_table_item
-                )
-            })
-            .key
-            .clone();
+        let decoded_key = match delete_table_item.data.as_ref() {
+            Some(decoded) => decoded.key.clone(),
+            None => serde_json::Value::Null,
+        };
+
         (
             Self {
                 transaction_version,

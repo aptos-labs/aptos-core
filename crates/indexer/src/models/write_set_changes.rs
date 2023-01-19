@@ -122,6 +122,11 @@ impl WriteSetChange {
                     transaction_version,
                     transaction_block_height,
                 );
+                let table_metadata = match table_item.data.as_ref() {
+                    Some(_) => Some(TableMetadata::from_write_table_item(table_item)),
+                    None => None,
+                };
+
                 (
                     Self {
                         transaction_version,
@@ -131,11 +136,7 @@ impl WriteSetChange {
                         address: String::default(),
                         index,
                     },
-                    WriteSetChangeDetail::Table(
-                        ti,
-                        cti,
-                        Some(TableMetadata::from_write_table_item(table_item)),
-                    ),
+                    WriteSetChangeDetail::Table(ti, cti, table_metadata),
                 )
             },
             APIWriteSetChange::DeleteTableItem(table_item) => {

@@ -90,7 +90,10 @@ impl CollectionData {
         table_handle_to_owner: &TableHandleToOwner,
         conn: &mut PgPoolConnection,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionData)>> {
-        let table_item_data = table_item.data.as_ref().unwrap();
+        let table_item_data = match table_item.data.as_ref() {
+            Some(decoded) => decoded,
+            None => return Ok(None),
+        };
 
         let maybe_collection_data = match TokenWriteSet::from_table_item_type(
             table_item_data.value_type.as_str(),

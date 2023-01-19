@@ -238,8 +238,10 @@ impl Token {
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
     ) -> anyhow::Result<Option<(Self, Option<TokenOwnership>, Option<CurrentTokenOwnership>)>> {
-        let table_item_data = table_item.data.as_ref().unwrap();
-
+        let table_item_data = match table_item.data.as_ref() {
+            Some(decoded) => decoded,
+            None => return Ok(None),
+        };
         let maybe_token = match TokenWriteSet::from_table_item_type(
             table_item_data.value_type.as_str(),
             &table_item_data.value,
@@ -296,8 +298,10 @@ impl Token {
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
     ) -> anyhow::Result<Option<(Self, Option<TokenOwnership>, Option<CurrentTokenOwnership>)>> {
-        let table_item_data = table_item.data.as_ref().unwrap();
-
+        let table_item_data = match table_item.data.as_ref() {
+            Some(decoded) => decoded,
+            None => return Ok(None),
+        };
         let maybe_token_id = match TokenWriteSet::from_table_item_type(
             table_item_data.key_type.as_str(),
             &table_item_data.key,
