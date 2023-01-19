@@ -5,6 +5,7 @@ use std::any::Any;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use ark_ec::{PairingEngine, ProjectiveCurve};
+use ark_ff::PrimeField;
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
@@ -13,6 +14,7 @@ use move_vm_types::loaded_data::runtime_types::Type;
 use move_vm_types::natives::function::NativeResult;
 use move_vm_types::pop_arg;
 use move_vm_types::values::{Reference, Struct, StructRef, Value};
+use num_traits::One;
 use smallvec::smallvec;
 use crate::natives::util::make_native_from_func;
 
@@ -138,6 +140,7 @@ fn pairing(
     let handle_0 = get_handle(pop_arg!(args, StructRef))?;
     match (g1_type_tag.as_str(), g2_type_tag.as_str(), gt_type_tag.as_str()) {
         ("0x1::algebra::BLS12_381_G1", "0x1::algebra::BLS12_381_G2", "0x1::algebra::BLS12_381_Gt") => {
+            let x = ark_bls12_381::Fr::one().into_repr();
             let q = context.extensions().get::<AlgebraContext>().borrow(&g1_type_tag, handle_0).unwrap();
             let element_0 = q.downcast_ref::<ark_bls12_381::G1Projective>().unwrap();
             let p = context.extensions().get::<AlgebraContext>().borrow(&g2_type_tag, handle_1).unwrap();
