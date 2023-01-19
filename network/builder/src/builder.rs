@@ -24,7 +24,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::tcp::TCPBufferCfg;
 use aptos_network::{
-    application::storage::PeerMetadataStorage,
+    application::storage::PeersAndMetadata,
     connectivity_manager::{builder::ConnectivityManagerBuilder, ConnectivityRequest},
     constants::MAX_MESSAGE_SIZE,
     logging::NetworkSchema,
@@ -72,7 +72,7 @@ pub struct NetworkBuilder {
     connectivity_manager_builder: Option<ConnectivityManagerBuilder>,
     health_checker_builder: Option<HealthCheckerBuilder>,
     peer_manager_builder: PeerManagerBuilder,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl NetworkBuilder {
@@ -82,7 +82,7 @@ impl NetworkBuilder {
     pub fn new(
         chain_id: ChainId,
         trusted_peers: Arc<RwLock<PeerSet>>,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         network_context: NetworkContext,
         time_service: TimeService,
         listen_address: NetworkAddress,
@@ -104,7 +104,7 @@ impl NetworkBuilder {
             network_context,
             time_service.clone(),
             listen_address,
-            peer_metadata_storage.clone(),
+            peers_and_metadata.clone(),
             trusted_peers,
             authentication_mode,
             network_channel_size,
@@ -127,7 +127,7 @@ impl NetworkBuilder {
             connectivity_manager_builder: None,
             health_checker_builder: None,
             peer_manager_builder,
-            peer_metadata_storage,
+            peers_and_metadata,
         }
     }
 
@@ -139,14 +139,14 @@ impl NetworkBuilder {
         time_service: TimeService,
         listen_address: NetworkAddress,
         authentication_mode: AuthenticationMode,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> NetworkBuilder {
         let mutual_authentication = matches!(authentication_mode, AuthenticationMode::Mutual(_));
 
         let mut builder = NetworkBuilder::new(
             chain_id,
             trusted_peers.clone(),
-            peer_metadata_storage,
+            peers_and_metadata,
             network_context,
             time_service,
             listen_address,
@@ -183,7 +183,7 @@ impl NetworkBuilder {
         config: &NetworkConfig,
         time_service: TimeService,
         mut reconfig_subscription_service: Option<&mut EventSubscriptionService>,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> NetworkBuilder {
         let peer_id = config.peer_id();
         let identity_key = config.identity_key();
@@ -202,7 +202,7 @@ impl NetworkBuilder {
         let mut network_builder = NetworkBuilder::new(
             chain_id,
             trusted_peers.clone(),
-            peer_metadata_storage,
+            peers_and_metadata,
             network_context,
             time_service,
             config.listen_address.clone(),
@@ -447,7 +447,7 @@ impl NetworkBuilder {
             ping_failures_tolerated,
             hc_network_tx,
             hc_network_rx,
-            self.peer_metadata_storage.clone(),
+            self.peers_and_metadata.clone(),
         ));
         debug!(
             NetworkSchema::new(&self.network_context),

@@ -56,6 +56,12 @@ impl Error {
     }
 }
 
+impl From<aptos_storage_service_client::Error> for Error {
+    fn from(error: aptos_storage_service_client::Error) -> Self {
+        Self::UnexpectedErrorEncountered(error.to_string())
+    }
+}
+
 impl From<aptos_storage_service_types::responses::Error> for Error {
     fn from(error: aptos_storage_service_types::responses::Error) -> Self {
         Self::InvalidResponse(error.to_string())
