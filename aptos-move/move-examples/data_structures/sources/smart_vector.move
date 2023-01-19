@@ -163,7 +163,15 @@ module aptos_framework::smart_vector {
         if (i < inline_len) {
             vector::remove(&mut v.inline_vec, i)
         } else {
-            big_vector::remove(vector::borrow_mut(&mut v.big_vec, 0), i - inline_len)
+            let big_vec_wrapper = &mut v.big_vec;
+            let big_vec = vector::pop_back(big_vec_wrapper);
+            let val = big_vector::remove(&mut big_vec, i - inline_len);
+            if (big_vector::is_empty(&big_vec)) {
+                big_vector::destroy_empty(big_vec)
+            } else {
+                vector::push_back(big_vec_wrapper, big_vec);
+            };
+            val
         }
     }
 
@@ -228,29 +236,49 @@ module aptos_framework::smart_vector {
     /// Reverse the order of the elements in the vector v in-place.
     /// Disclaimer: This function may be costly. Use it at your own discretion.
     public fun reverse<T: store>(v: &mut SmartVector<T>) {
+        let inline_len = vector::length(&v.inline_vec);
         let i = 0;
-        let len = length(v);
-        let half_len = len / 2;
-        let k = 0;
-        while (k < half_len) {
-            swap(v, i + k, len - 1 - k);
-            k = k + 1;
-        }
+        let new_inline_vec = vector[];
+        // Push the last `inline_len` elements into a temp vector.
+        while (i < inline_len) {
+            vector::push_back(&mut new_inline_vec, pop_back(v));
+            i = i + 1;
+        };
+        vector::reverse(&mut new_inline_vec);
+        // Reverse the big_vector left if exists.
+        if (!vector::is_empty(&v.big_vec)) {
+            big_vector::reverse(vector::borrow_mut(&mut v.big_vec, 0));
+        };
+        // Mem::swap the two vectors.
+        let temp_vec = vector[];
+        while (!vector::is_empty(&mut v.inline_vec)) {
+            vector::push_back(&mut temp_vec, vector::pop_back(&mut v.inline_vec));
+        };
+        vector::reverse(&mut temp_vec);
+        while (!vector::is_empty(&mut new_inline_vec)) {
+            vector::push_back(&mut v.inline_vec, vector::pop_back(&mut new_inline_vec));
+        };
+        vector::destroy_empty(new_inline_vec);
+        // Push the rest elements originally left in inline_vector back to the end of the smart vector.
+        while (!vector::is_empty(&mut temp_vec)) {
+            push_back(v, vector::pop_back(&mut temp_vec));
+        };
+        vector::destroy_empty(temp_vec);
     }
 
     /// Return `(true, i)` if `val` is in the vector `v` at index `i`.
     /// Otherwise, returns `(false, 0)`.
     /// Disclaimer: This function may be costly. Use it at your own discretion.
     public fun index_of<T>(v: &SmartVector<T>, val: &T): (bool, u64) {
-        let i = 0;
-        let len = length(v);
-        while (i < len) {
-            if (borrow(v, i) == val) {
-                return (true, i)
-            };
-            i = i + 1;
-        };
-        (false, 0)
+        let (found, i) = vector::index_of(&v.inline_vec, val);
+        if (found) {
+            (true, i)
+        } else if (!vector::is_empty(&v.big_vec)) {
+            let (found, i) = big_vector::index_of(vector::borrow(&v.big_vec, 0), val);
+            (found, i + vector::length(&v.inline_vec))
+        } else {
+            (false, 0)
+        }
     }
 
     /// Return true if `val` is in the vector `v`.
@@ -458,6 +486,22 @@ module aptos_framework::smart_vector {
             assert!(found && idx == i, 0);
             i = i + 1;
         };
+        destroy(v);
+    }
+
+    #[test]
+    fun smart_vector_broken_invariant() {
+        let v = empty_with_config(4, 4);
+
+        push_back(&mut v, 1);
+        push_back(&mut v, 1);
+        push_back(&mut v, 1);
+        push_back(&mut v, 1);
+
+        push_back(&mut v, 1);
+        remove(&mut v, 4);
+        push_back(&mut v, 1);
+        assert!(vector::length(&v.big_vec) < 2, 0);
         destroy(v);
     }
 }
