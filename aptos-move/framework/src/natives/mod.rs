@@ -3,6 +3,7 @@
 
 pub mod account;
 pub mod aggregator_natives;
+pub mod algebra;
 pub mod any;
 pub mod code;
 pub mod cryptography;
@@ -35,6 +36,7 @@ pub mod status {
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub account: account::GasParameters,
+    pub algebra: algebra::GasParameters,
     pub groups: groups::GasParameters,
     pub ed25519: ed25519::GasParameters,
     pub bls12381: cryptography::bls12381::GasParameters,
@@ -57,6 +59,9 @@ impl GasParameters {
             account: account::GasParameters {
                 create_address: account::CreateAddressGasParameters { base: 0.into() },
                 create_signer: account::CreateSignerGasParameters { base: 0.into() },
+            },
+            algebra: algebra::GasParameters{
+                base: 0.into(),
             },
             bls12381: cryptography::bls12381::GasParameters {
                 base: 0.into(),
@@ -291,6 +296,7 @@ pub fn all_natives(
     }
 
     add_natives_from_module!("account", account::make_all(gas_params.account.clone()));
+    add_natives_from_module!("algebra", algebra::make_all(gas_params.algebra.clone()));
     add_natives_from_module!("groups", groups::make_all(gas_params.groups.clone()));
     add_natives_from_module!("ed25519", ed25519::make_all(gas_params.ed25519.clone()));
     add_natives_from_module!("genesis", account::make_all(gas_params.account));

@@ -19,6 +19,7 @@ use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
 use std::ops::Deref;
+use aptos_framework::natives::algebra::AlgebraContext;
 
 pub struct MoveVmExt {
     inner: MoveVM,
@@ -75,6 +76,7 @@ impl MoveVmExt {
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(Bls12381Context::new());
+        extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
         let script_hash = match session_id {
