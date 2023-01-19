@@ -205,6 +205,7 @@ UB
 UI
 UIs
 URI
+uri
 Upgradeable
 Uptime
 VFN
@@ -298,6 +299,7 @@ invariants
 io
 ip
 ips
+IPFS
 isConnected
 jsx
 kickstart
