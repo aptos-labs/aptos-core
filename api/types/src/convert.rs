@@ -328,7 +328,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         let table_info = match self.db.get_table_info(handle) {
             Ok(ti) => ti,
             Err(_) => {
-                aptos_logger::error!(
+                aptos_logger::warn!(
                     "Table info not found for handle {:?}, can't decode table item",
                     handle
                 );
@@ -357,7 +357,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         let table_info = match self.db.get_table_info(handle) {
             Ok(ti) => ti,
             Err(_) => {
-                aptos_logger::error!(
+                aptos_logger::warn!(
                     "Table info not found for handle {:?}, can't decode table item",
                     handle
                 );
