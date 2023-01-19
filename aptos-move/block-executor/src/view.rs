@@ -184,7 +184,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
     type Key = T::Key;
 
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<Vec<u8>>> {
-        let _timer = GET_STATE_VALUE_SECONDS.start_timer();
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => match map.read(state_key, self.txn_idx) {
                 ReadResult::Value(v) => Ok(v.extract_raw_bytes()),
