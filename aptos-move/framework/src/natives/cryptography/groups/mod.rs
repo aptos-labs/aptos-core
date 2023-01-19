@@ -1805,13 +1805,16 @@ fn hash_to_element_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    assert_eq!(1, ty_args.len());
-    let type_tag = context
+    assert_eq!(2, ty_args.len());
+    let hasher_type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
         .to_string();
+    let group_type_tag = context
+        .type_to_type_tag(ty_args.get(1).unwrap())?
+        .to_string();
     let bytes = pop_arg!(args, Vec<u8>);
-    match type_tag.as_str() {
-        "0x1::groups::BLS12_381_G1" => {
+    match (hasher_type_tag.as_str(), group_type_tag.as_str()) {
+        ("0x1::groups::SHA256", "0x1::groups::BLS12_381_G1") => {
             let blst_g1_proj = hash_to_blst_g1(bytes.as_slice());
             let blst_g1_affine = blst_g1_proj_to_affine(&blst_g1_proj);
             let ark_g1_affine = blst_g1_affine_to_ark_g1_affine(&blst_g1_affine);
@@ -1828,7 +1831,7 @@ fn hash_to_element_internal(
                 smallvec![Value::u64(handle as u64)]
             ))
         }
-        "0x1::groups::BLS12_381_G2" => {
+        ("0x1::groups::SHA256", "0x1::groups::BLS12_381_G2") => {
             let blst_g2_proj = hash_to_blst_g2(bytes.as_slice());
             let blst_g2_affine = blst_g2_to_affine(&blst_g2_proj);
             let ark_g2_affine = blst_g2_affine_to_ark_g2_affine(&blst_g2_affine);
@@ -1843,19 +1846,6 @@ fn hash_to_element_internal(
                 ) * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)]
             ))
-        }
-        "0x1::groups::BLS12_381_Gt" => {
-            let x = hash_to_scalar(bytes.as_slice());
-            let generator = BLS12381_GT_GENERATOR.clone();
-            let element = generator.pow(x);
-            let handle = context.extensions_mut().get_mut::<Bls12381Context>().add_gt_point(element);
-            Ok(NativeResult::ok(
-                gas_params.bls12_381.sha256(bytes.len())
-                    + (gas_params.bls12_381.ark_fr_deser
-                    + gas_params.bls12_381.ark_fq12_pow_fr
-                ) * NumArgs::one(),
-                smallvec![Value::u64(handle as u64)])
-            )
         }
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))

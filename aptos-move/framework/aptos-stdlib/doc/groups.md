@@ -9,6 +9,7 @@
 -  [Struct `BLS12_381_G2`](#0x1_groups_BLS12_381_G2)
 -  [Struct `BLS12_381_Gt`](#0x1_groups_BLS12_381_Gt)
 -  [Struct `BLS12_381_Fr`](#0x1_groups_BLS12_381_Fr)
+-  [Struct `SHA256`](#0x1_groups_SHA256)
 -  [Struct `Scalar`](#0x1_groups_Scalar)
 -  [Struct `Element`](#0x1_groups_Element)
 -  [Constants](#@Constants_0)
@@ -247,6 +248,33 @@ assume a 32-byte little-endian encoding of a <code><a href="groups.md#0x1_groups
 
 
 <pre><code><b>struct</b> <a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_groups_SHA256"></a>
+
+## Struct `SHA256`
+
+
+
+<pre><code><b>struct</b> <a href="groups.md#0x1_groups_SHA256">SHA256</a>
 </code></pre>
 
 
@@ -768,7 +796,7 @@ Compute <code>k*P</code> for scalar <code>k</code> and group element <code>P</co
 Hash bytes to a group element.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_hash_to_element">hash_to_element</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_hash_to_element">hash_to_element</a>&lt;H, G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -777,10 +805,10 @@ Hash bytes to a group element.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_hash_to_element">hash_to_element</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_hash_to_element">hash_to_element</a>&lt;H, G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
     <a href="groups.md#0x1_groups_abort_if_feature_disabled">abort_if_feature_disabled</a>();
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
-        handle: <a href="groups.md#0x1_groups_hash_to_element_internal">hash_to_element_internal</a>&lt;G&gt;(bytes)
+        handle: <a href="groups.md#0x1_groups_hash_to_element_internal">hash_to_element_internal</a>&lt;H, G&gt;(bytes)
     }
 }
 </code></pre>
@@ -1647,7 +1675,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_hash_to_element_internal">hash_to_element_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_hash_to_element_internal">hash_to_element_internal</a>&lt;H, G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
@@ -1656,7 +1684,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_hash_to_element_internal">hash_to_element_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_hash_to_element_internal">hash_to_element_internal</a>&lt;H, G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 

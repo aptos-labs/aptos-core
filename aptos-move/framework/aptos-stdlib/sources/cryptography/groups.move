@@ -101,6 +101,8 @@ module aptos_std::groups {
     /// assume a 32-byte little-endian encoding of a `Scalar<BLS12_381_Gt>`.
     struct BLS12_381_Fr {}
 
+    struct SHA256 {}
+
     /// This struct represents an integer between 0 and `r-1`, where `r` is the order of group `G`.
     struct Scalar<phantom G> has copy, drop {
         handle: u64
@@ -238,10 +240,10 @@ module aptos_std::groups {
     }
 
     /// Hash bytes to a group element.
-    public fun hash_to_element<G>(bytes: vector<u8>): Element<G> {
+    public fun hash_to_element<H, G>(bytes: vector<u8>): Element<G> {
         abort_if_feature_disabled();
         Element<G> {
-            handle: hash_to_element_internal<G>(bytes)
+            handle: hash_to_element_internal<H, G>(bytes)
         }
     }
 
@@ -392,7 +394,7 @@ module aptos_std::groups {
     native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
     native fun element_multi_scalar_mul_internal<G, S>(scalar_handles: vector<u64>, element_handles: vector<u64>): u64;
     native fun pairing_product_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
-    native fun hash_to_element_internal<G>(bytes: vector<u8>): u64;
+    native fun hash_to_element_internal<H, G>(bytes: vector<u8>): u64;
     #[test_only]
     native fun random_element_internal<G>(): u64;
     #[test_only]
@@ -487,7 +489,7 @@ module aptos_std::groups {
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
 
         // Hash to group.
-        let point = hash_to_element<BLS12_381_G1>(x"1234");
+        let point = hash_to_element<SHA256, BLS12_381_G1>(x"1234");
         assert!(element_eq(&group_identity<BLS12_381_G1>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(0), &point)), 1);
     }
 
@@ -580,7 +582,7 @@ module aptos_std::groups {
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
 
         // Hash to group.
-        let point = hash_to_element<BLS12_381_G2>(x"1234");
+        let point = hash_to_element<SHA256, BLS12_381_G2>(x"1234");
         assert!(element_eq(&group_identity<BLS12_381_G2>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(0), &point)), 1);
     }
 
@@ -672,10 +674,6 @@ module aptos_std::groups {
         let points = vector[point_g, point_2g, point_3g];
         let point_14g_calc = element_multi_scalar_mul(&scalars, &points);
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
-
-        // Hash to group.
-        let point = hash_to_element<BLS12_381_Gt>(x"1234");
-        assert!(element_eq(&group_identity<BLS12_381_Gt>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(0), &point)), 1);
     }
 
     #[test(fx = @std)]
