@@ -3,7 +3,6 @@
 
 use crate::{
     counters,
-    counters::GET_STATE_VALUE_SECONDS,
     scheduler::{Scheduler, TxnIndex},
     task::{ModulePath, Transaction},
     txn_last_input_output::ReadDescriptor,
