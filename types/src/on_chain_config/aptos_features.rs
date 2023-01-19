@@ -10,7 +10,12 @@ use serde::{Deserialize, Serialize};
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
     TREAT_FRIEND_AS_PRIVATE = 2,
+    SHA_512_AND_RIPEMD_160_NATIVES = 3,
+    APTOS_STD_CHAIN_ID_NATIVES = 4,
     VM_BINARY_FORMAT_V6 = 5,
+    //COLLECT_AND_DISTRIBUTE_GAS_FEES = 6,
+    MULTI_ED25519_PK_VALIDATE_V2_NATIVES = 7,
+    BLAKE2B_256_NATIVE = 8,
 }
 
 /// Representation of features on chain as a bitset.
