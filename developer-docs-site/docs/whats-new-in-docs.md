@@ -7,6 +7,12 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 18 January 2023
+
+- Added a section explaining the nuances of [batch signing](guides/sign-a-transaction.md#batch-signing) to Create a Signed Transaction.
+
+- Enhanced [validator node setup documentation](nodes/validator-node/operator/index.md) to ensure operators first [deploy the nodes](nodes/validator-node/operator/running-validator-node/index.md), then [connect to the Aptos network](nodes/validator-node/operator/connect-to-aptos-network.md), and finally [establish staking pool operations](nodes/validator-node/operator/staking-pool-operations.md).
+
 ## 16 January 2023
 
 - Documented how to [create and fund accounts](guides/get-test-funds.md) using the Petra Wallet and Aptos command line interface (CLI).
