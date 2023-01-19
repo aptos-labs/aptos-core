@@ -79,6 +79,7 @@ pub struct CallCustomModulesCreator {
 impl CallCustomModulesCreator {
     pub async fn new(
         txn_factory: TransactionFactory,
+        init_txn_factory: TransactionFactory,
         accounts: &mut [LocalAccount],
         txn_executor: &dyn TransactionExecutor,
         entry_point: EntryPoints,
@@ -91,7 +92,7 @@ impl CallCustomModulesCreator {
         let mut packages = Vec::new();
         for account in accounts.iter_mut().take(num_modules) {
             let package = package_handler.pick_package(&mut rng, account);
-            let txn = package.publish_transaction(account, &txn_factory);
+            let txn = package.publish_transaction(account, &init_txn_factory);
             requests.push(txn);
             packages.push(package);
         }

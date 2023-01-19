@@ -27,7 +27,7 @@ use aptos_sdk::{
 };
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
-use rand::{rngs::StdRng, seq::IteratorRandom};
+use rand::{rngs::StdRng, seq::IteratorRandom, Rng};
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
@@ -41,8 +41,7 @@ use std::{
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
 // Max is 100k TPS for a full day.
-const MAX_TXNS: u64 = 100_000_000_000;
-const MINT_GAS_FEE_MULTIPLIER: u64 = 10;
+const MAX_TXNS: u64 = 10_000_000_000;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -157,7 +156,7 @@ impl EmitJobMode {
     }
 }
 
-/// total coins consumed are less than 2 * max_txns * expected_gas_per_txn,
+/// total coins consumed are less than 2 * max_txns * expected_gas_per_txn * gas_price,
 /// which is by default 100000000000 * 100000, but can be overriden.
 #[derive(Clone, Debug)]
 pub struct EmitJobRequest {
@@ -165,8 +164,10 @@ pub struct EmitJobRequest {
     mode: EmitJobMode,
 
     gas_price: u64,
+    max_gas_per_txn: u64,
     reuse_accounts: bool,
     mint_to_root: bool,
+    init_gas_price_multiplier: u64,
 
     transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
 
@@ -188,8 +189,10 @@ impl Default for EmitJobRequest {
                 mempool_backlog: 3000,
             },
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,
+            max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             reuse_accounts: false,
             mint_to_root: false,
+            init_gas_price_multiplier: 10,
             transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
             txn_expiration_time_secs: 60,
             max_transactions_per_account: 20,
@@ -213,6 +216,16 @@ impl EmitJobRequest {
 
     pub fn gas_price(mut self, gas_price: u64) -> Self {
         self.gas_price = gas_price;
+        self
+    }
+
+    pub fn max_gas_per_txn(mut self, max_gas_per_txn: u64) -> Self {
+        self.max_gas_per_txn = max_gas_per_txn;
+        self
+    }
+
+    pub fn init_gas_price_multiplier(mut self, init_gas_price_multiplier: u64) -> Self {
+        self.init_gas_price_multiplier = init_gas_price_multiplier;
         self
     }
 
@@ -461,14 +474,20 @@ impl TxnEmitter {
             .txn_factory
             .clone()
             .with_transaction_expiration_time(mode_params.txn_expiration_time_secs)
-            .with_gas_unit_price(req.gas_price);
-
+            .with_gas_unit_price(req.gas_price)
+            .with_max_gas_amount(req.max_gas_per_txn);
+        let init_txn_factory = txn_factory
+            .clone()
+            .with_gas_unit_price(req.gas_price * req.init_gas_price_multiplier);
+        let seed = self.rng.gen();
+        info!(
+            "AccountMinter Seed (can be passed in to reuse accounts): {:?}",
+            seed
+        );
         let mut account_minter = AccountMinter::new(
             root_account,
-            txn_factory
-                .clone()
-                .with_gas_unit_price(req.gas_price * MINT_GAS_FEE_MULTIPLIER),
-            StdRng::from_rng(self.rng.clone()).unwrap(),
+            init_txn_factory.clone(),
+            StdRng::from_seed(seed),
         );
         let txn_executor = RestApiTransactionExecutor {
             rest_clients: req.rest_clients.clone(),
@@ -486,6 +505,7 @@ impl TxnEmitter {
             &mut all_accounts,
             &txn_executor,
             &txn_factory,
+            &init_txn_factory,
             stats.clone(),
         )
         .await;
