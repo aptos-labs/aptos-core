@@ -1,10 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::{
-    config::{NodeConfig, StateSyncConfig, StorageServiceConfig},
-    network_id::NetworkId,
-};
+use crate::network::ApplicationNetworkInterfaces;
+use aptos_config::config::{NodeConfig, StateSyncConfig, StorageServiceConfig};
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_data_streaming_service::{
@@ -15,11 +13,7 @@ use aptos_event_notifications::{EventSubscriptionService, ReconfigNotificationLi
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_infallible::RwLock;
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::{
-    application::{interface::NetworkClient, storage::PeerMetadataStorage},
-    protocols::network::NetworkSender,
-    ProtocolId,
-};
+use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_state_sync_driver::{
     driver_factory::{DriverFactory, StateSyncRuntimes},
     metadata_storage::PersistentMetadataStorage,
@@ -33,7 +27,7 @@ use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
 use aptos_types::{on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint};
 use aptos_vm::AptosVM;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 /// Creates the event subscription service and two reconfiguration
@@ -78,9 +72,7 @@ pub fn create_event_subscription_service(
 /// Sets up all state sync runtimes and return the notification endpoints
 pub fn start_state_sync_and_get_notification_handles(
     node_config: &NodeConfig,
-    storage_service_server_network_handles: Vec<StorageServiceNetworkEvents>,
-    storage_client_network_senders: HashMap<NetworkId, NetworkSender<StorageServiceMessage>>,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    storage_network_interfaces: ApplicationNetworkInterfaces<StorageServiceMessage>,
     waypoint: Waypoint,
     event_subscription_service: EventSubscriptionService,
     db_rw: DbReaderWriter,
@@ -89,19 +81,20 @@ pub fn start_state_sync_and_get_notification_handles(
     MempoolNotificationListener,
     ConsensusNotifier,
 )> {
+    // Get the network client and events
+    let network_client = storage_network_interfaces.network_client;
+    let network_service_events = storage_network_interfaces.network_service_events;
+
     // Start the state sync storage service
     let storage_service_runtime = setup_state_sync_storage_service(
         node_config.state_sync.storage_service,
-        storage_service_server_network_handles,
+        network_service_events,
         &db_rw,
     )?;
 
     // Start the data client
-    let (aptos_data_client, aptos_data_client_runtime) = setup_aptos_data_client(
-        node_config,
-        storage_client_network_senders,
-        peer_metadata_storage,
-    )?;
+    let (aptos_data_client, aptos_data_client_runtime) =
+        setup_aptos_data_client(node_config, network_client)?;
 
     // Start the data streaming service
     let (streaming_service_client, streaming_service_runtime) =
@@ -174,17 +167,10 @@ fn setup_data_streaming_service(
 /// Sets up the aptos data client runtime
 fn setup_aptos_data_client(
     node_config: &NodeConfig,
-    network_senders: HashMap<NetworkId, NetworkSender<StorageServiceMessage>>,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    network_client: NetworkClient<StorageServiceMessage>,
 ) -> anyhow::Result<(AptosNetDataClient, Runtime)> {
     // Create the storage service client
-    let network_client = NetworkClient::new(
-        vec![],
-        vec![ProtocolId::StorageServiceRpc],
-        network_senders,
-        peer_metadata_storage,
-    );
-    let network_client = StorageServiceClient::new(network_client);
+    let storage_service_client = StorageServiceClient::new(network_client);
 
     // Create a new runtime for the data client
     let aptos_data_client_runtime = aptos_runtimes::spawn_named_runtime("data-client".into(), None);
@@ -195,7 +181,7 @@ fn setup_aptos_data_client(
         node_config.base.clone(),
         node_config.state_sync.storage_service,
         TimeService::real(),
-        network_client,
+        storage_service_client,
         Some(aptos_data_client_runtime.handle().clone()),
     );
     aptos_data_client_runtime.spawn(data_summary_poller.start_poller());
@@ -206,24 +192,22 @@ fn setup_aptos_data_client(
 /// Sets up the state sync storage service runtime
 fn setup_state_sync_storage_service(
     config: StorageServiceConfig,
-    network_handles: Vec<StorageServiceNetworkEvents>,
+    network_service_events: NetworkServiceEvents<StorageServiceMessage>,
     db_rw: &DbReaderWriter,
 ) -> anyhow::Result<Runtime> {
     // Create a new state sync storage service runtime
     let storage_service_runtime = aptos_runtimes::spawn_named_runtime("stor-server".into(), None);
 
-    // Spawn all state sync storage service servers on the same runtime
+    // Spawn the state sync storage service servers on the runtime
     let storage_reader = StorageReader::new(config, Arc::clone(&db_rw.reader));
-    for events in network_handles {
-        let service = StorageServiceServer::new(
-            config,
-            storage_service_runtime.handle().clone(),
-            storage_reader.clone(),
-            TimeService::real(),
-            events,
-        );
-        storage_service_runtime.spawn(service.start());
-    }
+    let service = StorageServiceServer::new(
+        config,
+        storage_service_runtime.handle().clone(),
+        storage_reader,
+        TimeService::real(),
+        StorageServiceNetworkEvents::new(network_service_events),
+    );
+    storage_service_runtime.spawn(service.start());
 
     Ok(storage_service_runtime)
 }

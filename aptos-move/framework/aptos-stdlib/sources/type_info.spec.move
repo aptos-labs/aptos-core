@@ -12,7 +12,7 @@ spec aptos_std::type_info {
     }
 
     spec chain_id(): u8 {
-        // TODO: Requires the bit operation support to specify the aborts_if condition.
+        aborts_if !features::spec_is_enabled(features::APTOS_STD_CHAIN_ID_NATIVES);
         ensures result == spec_chain_id_internal();
     }
 

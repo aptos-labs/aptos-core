@@ -47,7 +47,7 @@ use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, Genes
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, ResourceKey, TypeTag},
+    language_storage::{ModuleId, TypeTag},
     move_resource::MoveResource,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -288,7 +288,7 @@ impl FakeExecutor {
     }
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
-        let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()));
+        let ap = AccessPath::resource_access_path(*addr, T::struct_tag());
         let data_blob = TStateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
             .expect("account must exist in data store")
             .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
