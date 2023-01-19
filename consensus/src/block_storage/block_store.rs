@@ -212,7 +212,7 @@ impl BlockStore {
         );
 
         let executed_root_block = ExecutedBlock::new(
-            root_block,
+            *root_block,
             // Create a dummy state_compute_result with necessary fields filled in.
             result,
         );
