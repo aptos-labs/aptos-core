@@ -36,7 +36,7 @@ module aptos_std::algebra {
     // Group operations.
     native public fun group_add<G>(element_1: &G, element_2: &G): G;
     native public fun group_equal<G>(element_1: &G, element_2: &G): bool;
-    native public fun group_generator<G>(): Option<G>;
+    native public fun group_generator<G>(): G;
     native public fun group_identity<G>(): G;
     native public fun group_multi_scalar_mul<G>(element: &vector<G>, scalar: &vector<vector<u8>>): G;
     native public fun group_neg<G>(): G;
@@ -47,8 +47,8 @@ module aptos_std::algebra {
 
     #[test]
     fun test_BLS12_381_G1() {
-        let g1_gen = std::option::extract(&mut group_generator<BLS12_381_G1>());
-        let g2_gen = std::option::extract(&mut group_generator<BLS12_381_G2>());
+        let g1_gen = group_generator<BLS12_381_G1>();
+        let g2_gen = group_generator<BLS12_381_G1>();
         let fr_5 = field_element_from_u64<BLS12_381_Fr>(5);
         let fr_7 = field_element_from_u64<BLS12_381_Fr>(7);
         let scalar_5 = scalar_from_field_element<BLS12_381_Fr>(&fr_5);
