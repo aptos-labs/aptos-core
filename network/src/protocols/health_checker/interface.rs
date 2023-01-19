@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::{
-        error::Error,
-        interface::NetworkClientInterface,
-        types::{PeerError, PeerState},
-    },
+    application::{error::Error, interface::NetworkClientInterface, metadata::ConnectionState},
     protocols::{
         health_checker::{HealthCheckerMsg, HealthCheckerNetworkEvents},
         network::Event,
@@ -63,7 +59,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg>>
     /// Note: This removes the peer outright for now until we add GCing, and historical state management
     pub async fn disconnect_peer(&mut self, peer_network_id: PeerNetworkId) -> Result<(), Error> {
         // Possibly already disconnected, but try anyways
-        let _ = self.update_peer_state(peer_network_id, PeerState::Disconnecting);
+        let _ = self.update_connection_state(peer_network_id, ConnectionState::Disconnecting);
         let result = self
             .network_client
             .disconnect_from_peer(peer_network_id)
@@ -75,16 +71,15 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg>>
         result
     }
 
-    /// Update state of peer globally
-    fn update_peer_state(
+    /// Update connection state of peer globally
+    fn update_connection_state(
         &self,
         peer_network_id: PeerNetworkId,
-        state: PeerState,
-    ) -> Result<(), PeerError> {
+        state: ConnectionState,
+    ) -> Result<(), Error> {
         self.network_client
-            .get_peer_metadata_storage()
-            .update_peer_state(peer_network_id, state)
-            .map_err(|_| PeerError::NotFound)
+            .get_peers_and_metadata()
+            .update_connection_state(peer_network_id, state)
     }
 
     /// Creates and saves new peer health data for the specified peer

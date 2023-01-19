@@ -19,7 +19,7 @@ use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
     application::{
         interface::{NetworkClient, NetworkServiceEvents},
-        storage::PeerMetadataStorage,
+        storage::PeersAndMetadata,
     },
     peer_manager::{
         conn_notifs_channel, ConnectionNotification, ConnectionRequestSender,
@@ -326,7 +326,7 @@ pub struct Node {
     /// Subscriber for mempool events
     subscriber: UnboundedReceiver<SharedMempoolNotification>,
     /// Global peer connection data
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 /// Reimplement `NodeInfoTrait` for simplicity
@@ -351,7 +351,7 @@ impl NodeInfoTrait for Node {
 impl Node {
     /// Sets up a single node by starting up mempool and any network handles
     pub fn new(node: NodeInfo, config: NodeConfig) -> Node {
-        let (network_interfaces, network_client, network_service_events, peer_metadata_storage) =
+        let (network_interfaces, network_client, network_service_events, peers_and_metadata) =
             setup_node_network_interfaces(&node);
         let (mempool, runtime, subscriber) =
             start_node_mempool(config, network_client, network_service_events);
@@ -362,7 +362,7 @@ impl Node {
             network_interfaces,
             runtime: Arc::new(runtime),
             subscriber,
-            peer_metadata_storage,
+            peers_and_metadata,
         }
     }
 
@@ -388,19 +388,23 @@ impl Node {
     /// Notifies the `Node` of a `new_peer`
     pub fn send_new_peer_event(
         &mut self,
-        new_peer: PeerNetworkId,
+        peer_network_id: PeerNetworkId,
         peer_role: PeerRole,
         origin: ConnectionOrigin,
     ) {
-        let mut metadata =
-            ConnectionMetadata::mock_with_role_and_origin(new_peer.peer_id(), peer_role, origin);
+        let mut metadata = ConnectionMetadata::mock_with_role_and_origin(
+            peer_network_id.peer_id(),
+            peer_role,
+            origin,
+        );
         metadata
             .application_protocols
             .insert(ProtocolId::MempoolDirectSend);
         let notif = ConnectionNotification::NewPeer(metadata.clone(), NetworkContext::mock());
-        self.peer_metadata_storage
-            .insert_connection(new_peer.network_id(), metadata);
-        self.send_connection_event(new_peer.network_id(), notif);
+        self.peers_and_metadata
+            .insert_connection_metadata(peer_network_id, metadata)
+            .unwrap();
+        self.send_connection_event(peer_network_id.network_id(), notif);
     }
 
     /// Sends a connection event, and waits for the notification to arrive
@@ -515,11 +519,11 @@ fn setup_node_network_interfaces(
     HashMap<NetworkId, NodeNetworkInterface>,
     NetworkClient<MempoolSyncMsg>,
     NetworkServiceEvents<MempoolSyncMsg>,
-    Arc<PeerMetadataStorage>,
+    Arc<PeersAndMetadata>,
 ) {
-    // Create the peer metadata storage
+    // Create the peers and metadata
     let network_ids = node.supported_networks();
-    let peer_metadata_storage = PeerMetadataStorage::new(&network_ids);
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
 
     // Create the network interfaces
     let mut network_senders = HashMap::new();
@@ -539,7 +543,7 @@ fn setup_node_network_interfaces(
         vec![MempoolDirectSend],
         vec![],
         network_senders,
-        peer_metadata_storage.clone(),
+        peers_and_metadata.clone(),
     );
     let network_service_events = NetworkServiceEvents::new(network_and_events);
 
@@ -547,7 +551,7 @@ fn setup_node_network_interfaces(
         network_interfaces,
         network_client,
         network_service_events,
-        peer_metadata_storage,
+        peers_and_metadata,
     )
 }
 

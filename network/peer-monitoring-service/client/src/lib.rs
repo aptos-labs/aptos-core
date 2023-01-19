@@ -5,7 +5,7 @@
 
 use aptos_config::network_id::PeerNetworkId;
 use aptos_network::{
-    application::{interface::NetworkClientInterface, storage::PeerMetadataStorage},
+    application::{interface::NetworkClientInterface, storage::PeersAndMetadata},
     protocols::network::{NetworkClientConfig, RpcError},
     ProtocolId,
 };
@@ -68,8 +68,8 @@ impl<NetworkClient: NetworkClientInterface<PeerMonitoringServiceMessage>>
         }
     }
 
-    pub fn get_peer_metadata_storage(&self) -> Arc<PeerMetadataStorage> {
-        self.network_client.get_peer_metadata_storage()
+    pub fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
+        self.network_client.get_peers_and_metadata()
     }
 }
 

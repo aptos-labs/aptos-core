@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::{error::Error, storage::PeerMetadataStorage},
+    application::{error::Error, storage::PeersAndMetadata},
     protocols::{
         network::{Message, NetworkEvents, NetworkSender},
         wire::handshake::v1::{ProtocolId, ProtocolIdSet},
@@ -39,8 +39,13 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
     // TODO: support disconnect reasons.
     async fn disconnect_from_peer(&self, _peer: PeerNetworkId) -> Result<(), Error>;
 
-    /// Returns a handle to the global `PeerMetadataStorage`
-    fn get_peer_metadata_storage(&self) -> Arc<PeerMetadataStorage>;
+    /// Returns a list of available peers (i.e., those that are
+    /// currently connected and support the relevant protocols
+    /// for the client).
+    fn get_available_peers(&self) -> Result<Vec<PeerNetworkId>, Error>;
+
+    /// Returns a handle to the global `PeersAndMetadata` container
+    fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata>;
 
     /// Sends the given message to the specified peer. Note: this
     /// method does not guarantee message delivery or handle responses.
@@ -68,7 +73,7 @@ pub struct NetworkClient<Message> {
     direct_send_protocols_and_preferences: Vec<ProtocolId>, // Protocols are sorted by preference (highest to lowest)
     rpc_protocols_and_preferences: Vec<ProtocolId>, // Protocols are sorted by preference (highest to lowest)
     network_senders: HashMap<NetworkId, NetworkSender<Message>>,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
@@ -76,13 +81,13 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
         direct_send_protocols_and_preferences: Vec<ProtocolId>,
         rpc_protocols_and_preferences: Vec<ProtocolId>,
         network_senders: HashMap<NetworkId, NetworkSender<Message>>,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         Self {
             direct_send_protocols_and_preferences,
             rpc_protocols_and_preferences,
             network_senders,
-            peer_metadata_storage,
+            peers_and_metadata,
         }
     }
 
@@ -92,19 +97,19 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
         network_id: &NetworkId,
     ) -> Result<&NetworkSender<Message>, Error> {
         self.network_senders.get(network_id).ok_or_else(|| {
-            Error::UnexpectedError(format!("Unknown network ID specified: {:?}", network_id))
+            Error::UnexpectedError(format!(
+                "Unknown network ID specified for sender: {:?}",
+                network_id
+            ))
         })
     }
 
     /// Identify the supported protocols from the specified peer's connection
     fn get_supported_protocols(&self, peer: &PeerNetworkId) -> Result<ProtocolIdSet, Error> {
-        let peer_metadata_storage = self.get_peer_metadata_storage();
-        peer_metadata_storage
-            .read(*peer)
-            .map(|peer_info| peer_info.active_connection.application_protocols)
-            .ok_or_else(|| {
-                Error::UnexpectedError(format!("Peer info not found for peer: {:?}", peer))
-            })
+        let peers_and_metadata = self.get_peers_and_metadata();
+        peers_and_metadata
+            .get_metadata_for_peer(*peer)
+            .map(|peer_metadata| peer_metadata.get_supported_protocols())
     }
 
     /// Selects the preferred protocol for the specified peer. The preferred protocols
@@ -142,8 +147,19 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         Ok(network_sender.disconnect_peer(peer.peer_id()).await?)
     }
 
-    fn get_peer_metadata_storage(&self) -> Arc<PeerMetadataStorage> {
-        self.peer_metadata_storage.clone()
+    fn get_available_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
+        let supported_protocol_ids: Vec<ProtocolId> = self
+            .direct_send_protocols_and_preferences
+            .iter()
+            .chain(self.rpc_protocols_and_preferences.iter())
+            .cloned()
+            .collect();
+        self.peers_and_metadata
+            .get_connected_supported_peers(&supported_protocol_ids)
+    }
+
+    fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
+        self.peers_and_metadata.clone()
     }
 
     fn send_to_peer(&self, message: Message, peer: PeerNetworkId) -> Result<(), Error> {

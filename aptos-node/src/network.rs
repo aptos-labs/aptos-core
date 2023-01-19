@@ -13,7 +13,7 @@ use aptos_mempool::network::MempoolSyncMsg;
 use aptos_network::{
     application::{
         interface::{NetworkClient, NetworkServiceEvents},
-        storage::PeerMetadataStorage,
+        storage::PeersAndMetadata,
     },
     protocols::network::{
         NetworkApplicationConfig, NetworkClientConfig, NetworkEvents, NetworkSender,
@@ -153,8 +153,8 @@ pub fn setup_networks_and_get_interfaces(
     // Gather all network configs and network ids
     let (network_configs, network_ids) = extract_network_configs_and_ids(node_config);
 
-    // Create the global peer metadata storage
-    let peer_metadata_storage = PeerMetadataStorage::new(&network_ids);
+    // Create the global peers and metadata
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
 
     // Create each network and register the application handles
     let mut network_runtimes = vec![];
@@ -175,7 +175,7 @@ pub fn setup_networks_and_get_interfaces(
             &network_config,
             TimeService::real(),
             Some(event_subscription_service),
-            peer_metadata_storage.clone(),
+            peers_and_metadata.clone(),
         );
 
         // Register consensus (both client and server) with the network
@@ -226,7 +226,7 @@ pub fn setup_networks_and_get_interfaces(
             consensus_network_handle,
             mempool_network_handles,
             storage_service_network_handles,
-            peer_metadata_storage,
+            peers_and_metadata,
         );
 
     (
@@ -272,7 +272,7 @@ fn transform_network_handles_into_interfaces(
     consensus_network_handle: Option<ApplicationNetworkHandle<ConsensusMsg>>,
     mempool_network_handles: Vec<ApplicationNetworkHandle<MempoolSyncMsg>>,
     storage_service_network_handles: Vec<ApplicationNetworkHandle<StorageServiceMessage>>,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,
@@ -282,18 +282,18 @@ fn transform_network_handles_into_interfaces(
         create_network_interfaces(
             vec![consensus_network_handle],
             consensus_network_configuration(),
-            peer_metadata_storage.clone(),
+            peers_and_metadata.clone(),
         )
     });
     let mempool_interfaces = create_network_interfaces(
         mempool_network_handles,
         mempool_network_configuration(),
-        peer_metadata_storage.clone(),
+        peers_and_metadata.clone(),
     );
     let storage_service_interfaces = create_network_interfaces(
         storage_service_network_handles,
         storage_service_network_configuration(node_config),
-        peer_metadata_storage,
+        peers_and_metadata,
     );
 
     (
@@ -310,7 +310,7 @@ fn create_network_interfaces<
 >(
     network_handles: Vec<ApplicationNetworkHandle<T>>,
     network_application_config: NetworkApplicationConfig,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> ApplicationNetworkInterfaces<T> {
     // Gather the network senders and events
     let mut network_senders = HashMap::new();
@@ -327,7 +327,7 @@ fn create_network_interfaces<
         network_client_config.direct_send_protocols_and_preferences,
         network_client_config.rpc_protocols_and_preferences,
         network_senders,
-        peer_metadata_storage,
+        peers_and_metadata,
     );
 
     // Create the network service events
