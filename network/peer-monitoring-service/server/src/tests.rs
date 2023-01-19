@@ -14,10 +14,7 @@ use aptos_config::{
 use aptos_logger::Level;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
-    application::{
-        storage::PeerMetadataStorage,
-        types::{PeerInfo, PeerState},
-    },
+    application::{metadata::ConnectionState, storage::PeersAndMetadata},
     peer_manager::PeerManagerNotification,
     protocols::{
         network::NewNetworkEvents,
@@ -55,7 +52,7 @@ async fn test_get_server_protocol_version() {
 #[tokio::test]
 async fn test_get_connected_peers() {
     // Create the peer monitoring client and server
-    let (mut mock_client, service, peer_metadata_storage) = MockClient::new();
+    let (mut mock_client, service, peers_and_metadata) = MockClient::new();
     tokio::spawn(service.start());
 
     // Process a request to fetch the connected peers
@@ -80,8 +77,9 @@ async fn test_get_connected_peers() {
         ProtocolIdSet::empty(),
         PeerRole::Unknown,
     );
-    let peer_info = PeerInfo::new(connection_metadata);
-    peer_metadata_storage.insert(peer_network_id, peer_info);
+    peers_and_metadata
+        .insert_connection_metadata(peer_network_id, connection_metadata)
+        .unwrap();
 
     // Process a request to fetch the connected peers
     let request = PeerMonitoringServiceRequest::GetConnectedPeers;
@@ -91,15 +89,17 @@ async fn test_get_connected_peers() {
     let mut connected_peers = HashMap::new();
     connected_peers.insert(
         peer_network_id,
-        peer_metadata_storage.read(peer_network_id).unwrap(),
+        peers_and_metadata
+            .get_metadata_for_peer(peer_network_id)
+            .unwrap(),
     );
     let expected_response =
         PeerMonitoringServiceResponse::ConnectedPeers(ConnectedPeersResponse { connected_peers });
     assert_eq!(response, expected_response);
 
     // Disconnect the peer
-    peer_metadata_storage
-        .update_peer_state(peer_network_id, PeerState::Disconnected)
+    peers_and_metadata
+        .update_connection_state(peer_network_id, ConnectionState::Disconnected)
         .unwrap();
 
     // Process a request to fetch the connected peers
@@ -120,7 +120,7 @@ struct MockClient {
 }
 
 impl MockClient {
-    fn new() -> (Self, PeerMonitoringServiceServer, Arc<PeerMetadataStorage>) {
+    fn new() -> (Self, PeerMonitoringServiceServer, Arc<PeersAndMetadata>) {
         initialize_logger();
 
         // Create the peer monitoring service event stream
@@ -139,13 +139,13 @@ impl MockClient {
         );
 
         // Create the peer monitoring server
-        let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
+        let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
         let executor = tokio::runtime::Handle::current();
         let peer_monitoring_server = PeerMonitoringServiceServer::new(
             peer_monitoring_service_config,
             executor,
             network_request_stream,
-            peer_metadata_storage.clone(),
+            peers_and_metadata.clone(),
         );
 
         // Create the mock client
@@ -154,7 +154,7 @@ impl MockClient {
         };
 
         // Return the client and server
-        (mock_client, peer_monitoring_server, peer_metadata_storage)
+        (mock_client, peer_monitoring_server, peers_and_metadata)
     }
 
     async fn send_request(
