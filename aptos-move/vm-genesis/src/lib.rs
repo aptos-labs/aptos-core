@@ -399,7 +399,13 @@ fn initialize(
 }
 
 fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
-    let features: Vec<u64> = vec![1, 2, 5];
+    let features: Vec<FeatureFlag> = vec![
+        FeatureFlag::CODE_DEPENDENCY_CHECK,
+        FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
+        FeatureFlag::VM_BINARY_FORMAT_V6,
+        FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES,
+    ];
+    let features: Vec<u64> = features.into_iter().map(|f| f as u64).collect();
 
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(bcs::to_bytes(&features).unwrap());
