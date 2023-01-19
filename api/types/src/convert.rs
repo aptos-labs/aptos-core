@@ -329,7 +329,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             Ok(ti) => ti,
             Err(_) => {
                 aptos_logger::warn!(
-                    "Table info not found for handle {:?}, can't decode table item",
+                    "Table info not found for handle {:?}, can't decode table item. OK for simulation",
                     handle
                 );
                 return Ok(None); // if table item not found return None anyway to avoid crash
@@ -358,7 +358,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             Ok(ti) => ti,
             Err(_) => {
                 aptos_logger::warn!(
-                    "Table info not found for handle {:?}, can't decode table item",
+                    "Table info not found for handle {:?}, can't decode table item. OK for simulation",
                     handle
                 );
                 return Ok(None); // if table item not found return None anyway to avoid crash
