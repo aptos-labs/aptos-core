@@ -296,7 +296,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.67, rate(versioned_view_get_state_val_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / 16 ) ",
+          "expr": "quantile(0.67, rate(versioned_view_get_state_val_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / 24 ) ",
           "hide": false,
           "legendFormat": "block_stm_storage_read",
           "range": true,
@@ -314,11 +314,20 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.67, rate(aptos_storage_interface_timer_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", name=\"async_proof_fetcher_fetch\"}[$interval]) / 16 )",
+          "expr": "quantile(0.67, rate(aptos_storage_interface_timer_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", name=\"async_proof_fetcher_fetch\"}[$interval]) / 24 )",
           "hide": false,
           "legendFormat": "async_proof_fetcher_fetch",
           "range": true,
           "refId": "E"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.67, rate(aptos_storage_api_latency_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", api_name=\"get_state_value_by_version\"}[$interval]) / 24 ) ",
+          "hide": false,
+          "legendFormat": "get_state_val_api",
+          "range": true,
+          "refId": "B"
         }
       ],
       "thresholds": [],
@@ -339,7 +348,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "description": "p50, p95 and p99 of the time spent to execute a block",
+      "description": "",
       "editable": false,
       "error": false,
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
@@ -358,7 +367,7 @@
         "max": false,
         "min": false,
         "rightSide": false,
-        "show": false,
+        "show": true,
         "total": false,
         "values": false
       },
@@ -380,32 +389,68 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.67, rate(consensus_duration_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op='execute_block'}[$interval]) )",
+          "expr": "quantile(0.67, rate(aptos_executor_vm_execute_block_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) )",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "block_execution_time",
+          "legendFormat": "vm_execution_time",
           "range": true,
           "refId": "C"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.67, rate(executor_dependency_wait_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / 16 ) ",
+          "expr": "quantile(0.67, rate(executor_dependency_wait_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / 24 ) ",
           "hide": false,
           "legendFormat": "executor_dependency_wait",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.67, rate(block_executor_executor_init_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / 24 ) ",
+          "hide": false,
+          "legendFormat": "executor_init",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.67, rate(block_executor_task_validate_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / 24 ) ",
+          "hide": false,
+          "legendFormat": "task_validate",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.67, rate(block_executor_task_execute_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / 24 ) ",
+          "hide": false,
+          "legendFormat": "task_execute",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.67, rate(block_executor_signature_verification_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])) ",
+          "hide": false,
+          "legendFormat": "signature_verification",
+          "range": true,
+          "refId": "F"
         }
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Dependency wait",
+      "title": "BlockSTM insights",
       "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
       "type": "graph",
       "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
       "yaxes": [
-        { "format": "s", "logBase": 1, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
+        { "$$hashKey": "object:314", "format": "s", "logBase": 1, "show": true },
+        { "$$hashKey": "object:315", "format": "short", "logBase": 1, "show": true }
       ],
       "yaxis": { "align": false }
     },
@@ -1845,8 +1890,8 @@
         "multiFormat": "",
         "name": "interval",
         "options": [
-          { "selected": true, "text": "auto", "value": "$__auto_interval_interval" },
-          { "selected": false, "text": "1m", "value": "1m" },
+          { "selected": false, "text": "auto", "value": "$__auto_interval_interval" },
+          { "selected": true, "text": "1m", "value": "1m" },
           { "selected": false, "text": "5m", "value": "5m" },
           { "selected": false, "text": "10m", "value": "10m" },
           { "selected": false, "text": "30m", "value": "30m" },
@@ -1875,6 +1920,6 @@
   "timezone": "",
   "title": "Execution",
   "uid": "execution",
-  "version": 21,
+  "version": 29,
   "weekStart": ""
 }

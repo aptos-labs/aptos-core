@@ -192,16 +192,16 @@ impl CliCommand<Vec<ProposalSummary>> for ListProposals {
 pub struct VerifyProposal {
     /// The id of the onchain proposal
     #[clap(long)]
-    proposal_id: u64,
+    pub(crate) proposal_id: u64,
 
     #[clap(flatten)]
     pub(crate) compile_proposal_args: CompileScriptFunction,
     #[clap(flatten)]
-    rest_options: RestOptions,
+    pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
-    profile: ProfileOptions,
+    pub(crate) profile: ProfileOptions,
     #[clap(flatten)]
-    prompt_options: PromptOptions,
+    pub(crate) prompt_options: PromptOptions,
 }
 
 #[async_trait]
@@ -279,6 +279,9 @@ pub struct SubmitProposal {
     #[clap(long)]
     pub(crate) metadata_path: Option<PathBuf>,
 
+    #[clap(long, default_value = "false")]
+    pub(crate) is_multi_step: bool,
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
@@ -310,15 +313,26 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
             self.txn_options.prompt_options,
         )?;
 
-        let txn = self
-            .txn_options
-            .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
-                self.pool_address_args.pool_address,
-                script_hash.to_vec(),
-                self.metadata_url.to_string().as_bytes().to_vec(),
-                metadata_hash.to_hex().as_bytes().to_vec(),
-            ))
-            .await?;
+        let txn: Transaction = if self.is_multi_step {
+            self.txn_options
+                .submit_transaction(aptos_stdlib::aptos_governance_create_proposal_v2(
+                    self.pool_address_args.pool_address,
+                    script_hash.to_vec(),
+                    self.metadata_url.to_string().as_bytes().to_vec(),
+                    metadata_hash.to_hex().as_bytes().to_vec(),
+                    true,
+                ))
+                .await?
+        } else {
+            self.txn_options
+                .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
+                    self.pool_address_args.pool_address,
+                    script_hash.to_vec(),
+                    self.metadata_url.to_string().as_bytes().to_vec(),
+                    metadata_hash.to_hex().as_bytes().to_vec(),
+                ))
+                .await?
+        };
         let txn_summary = TransactionSummary::from(&txn);
         if let Transaction::UserTransaction(inner) = txn {
             // Find event with proposal id
@@ -416,7 +430,7 @@ struct CreateProposalEvent {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct ProposalSubmissionSummary {
+pub struct ProposalSubmissionSummary {
     proposal_id: Option<u64>,
     #[serde(flatten)]
     transaction: TransactionSummary,
@@ -642,7 +656,6 @@ pub struct ExecuteProposal {
     /// Proposal Id being executed
     #[clap(long)]
     pub(crate) proposal_id: u64,
-
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
@@ -671,7 +684,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     }
 }
 
-/// Execute a proposal that has passed voting requirements
+/// Compile a specified script.
 #[derive(Parser)]
 pub struct CompileScriptFunction {
     /// Path to the Move script for the proposal
@@ -800,18 +813,53 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             release.generate_script_proposal(account, output)?;
             // If we're generating a multi-step proposal
         } else {
-            release.generate_script_proposal_multi_step(account, output, next_execution_hash)?;
+            let next_execution_hash_bytes = hex::decode(next_execution_hash)?;
+            release.generate_script_proposal_multi_step(
+                account,
+                output,
+                next_execution_hash_bytes,
+            )?;
         };
         Ok(())
+    }
+}
+
+/// Generate execution hash for a specified script.
+#[derive(Parser)]
+pub struct GenerateExecutionHash {
+    #[clap(long)]
+    pub script_path: Option<PathBuf>,
+}
+
+impl GenerateExecutionHash {
+    pub fn generate_hash(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
+        CompileScriptFunction {
+            script_path: self.script_path.clone(),
+            compiled_script_path: None,
+            framework_package_args: FrameworkPackageArgs {
+                framework_git_rev: None,
+                framework_local_dir: Option::from(
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("..")
+                        .join("..")
+                        .join("aptos-move")
+                        .join("framework")
+                        .join("aptos-framework"),
+                ),
+                skip_fetch_latest_git_deps: false,
+            },
+            bytecode_version: None,
+        }
+        .compile("execution_hash", PromptOptions::yes())
     }
 }
 
 /// Response for `verify proposal`
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VerifyProposalResponse {
-    verified: bool,
-    computed_hash: String,
-    onchain_hash: String,
+    pub verified: bool,
+    pub computed_hash: String,
+    pub onchain_hash: String,
 }
 
 /// Voting forum onchain type
