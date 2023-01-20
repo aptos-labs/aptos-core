@@ -57,7 +57,7 @@ pub static TASK_EXECUTE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static DEPENDENCY_WAIT_SECOND: Lazy<Histogram> = Lazy::new(|| {
+pub static DEPENDENCY_WAIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_execution_dependency_wait",
         "The time spent in waiting for dependency in Block STM",
