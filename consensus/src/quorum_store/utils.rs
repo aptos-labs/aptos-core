@@ -339,13 +339,16 @@ impl ProofQueue {
                 match self
                     .digest_proof
                     .get(digest)
-                    .expect("Entry for unexpired digest must exist")
                 {
-                    Some(_) => {
-                        remaining_local_proof_size += 1;
+                    Some(entry) => {
+                        if let Some(_) = entry {
+                            remaining_local_proof_size += 1;
+                        }
+                        // Otherwise proof was already committed, skip.
                     },
-                    None => {}, // Proof was already committed, skip.
+                    None => {}, // It is possible that the proof entry in digest_proof was already removed when draining the digest_queue but local_digest_queue is not drained yet.
                 }
+
             }
         }
         counters::NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK
