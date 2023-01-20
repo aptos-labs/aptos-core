@@ -90,9 +90,13 @@ impl IncrementalProofState {
     }
 
     fn send_timeout(self) {
-        self.ret_tx
+        if self
+            .ret_tx
             .send(Err(ProofError::Timeout(self.batch_id)))
-            .expect("Unable to send the timeout a proof of store");
+            .is_err()
+        {
+            debug!("Failed to send timeout for batch {}", self.batch_id);
+        }
     }
 }
 
@@ -170,8 +174,9 @@ impl ProofCoordinator {
             counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
 
             // TODO: just send back an ack
-            tx.send(Ok((proof.clone(), batch_id)))
-                .expect("Unable to send the proof of store");
+            if tx.send(Ok((proof.clone(), batch_id))).is_err() {
+                debug!("Failed to send back completion for batch {}", batch_id);
+            }
 
             Ok(Some(proof))
         } else {
