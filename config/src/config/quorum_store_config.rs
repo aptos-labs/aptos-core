@@ -4,7 +4,6 @@
 use aptos_types::block_info::Round;
 use serde::{Deserialize, Serialize};
 
-// TODO: change to appropriately signed integers.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct QuorumStoreConfig {
@@ -30,8 +29,6 @@ pub struct QuorumStoreConfig {
     pub db_quota: usize,
     pub mempool_txn_pull_max_count: u64,
     pub mempool_txn_pull_max_bytes: u64,
-    // the number of network_listener workers = # validators/this number
-    pub num_nodes_per_worker_handles: usize,
     pub back_pressure_local_batch_num: usize,
     pub num_workers_for_remote_fragments: usize,
 }
@@ -55,7 +52,6 @@ impl Default for QuorumStoreConfig {
             db_quota: 10000000000,
             mempool_txn_pull_max_count: 300,
             mempool_txn_pull_max_bytes: 1000000,
-            num_nodes_per_worker_handles: 10,
             // QS will be backpressured if the remaining local batches is more than this number
             back_pressure_local_batch_num: 10,
             // number of batch coordinators to handle QS Fragment messages, should be >= 1
