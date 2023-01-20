@@ -1247,7 +1247,7 @@ fn dns_name(addr: &str) -> DnsName {
     DnsName::try_from(addr.to_string()).unwrap()
 }
 
-struct ValidatorNodeKeys {
+pub struct ValidatorNodeKeys {
     account_private_key: Ed25519PrivateKey,
     network_private_key: x25519::PrivateKey,
     consensus_private_key: bls12381::PrivateKey,
@@ -1275,7 +1275,7 @@ impl ValidatorNodeKeys {
     }
 }
 
-async fn init_validator_account(
+pub async fn init_validator_account(
     cli: &mut CliTestFramework,
     keygen: &mut KeyGen,
     amount: Option<u64>,

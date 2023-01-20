@@ -16,16 +16,26 @@ For participating in the Aptos mainnet, you must deploy both a validator node an
 
 ## Deploy the nodes and register
 
-### Detailed steps
-
-:::tip Petra on Chrome browser only
-The [Petra wallet](/docs/guides/install-petra-wallet.md) is supported only on the Chrome browser. You can also use Petra extension on [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge).
+:::tip Petra on Chrome browser
+Although the [Petra wallet](../../../guides/install-petra-wallet.md) is supported only on the Chrome browser, you can also use the Petra extension on [Brave browser](https://brave.com/), [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge).
 :::
 
-**Step 1:** Before you proceed, read the [**Node Requirements**](/docs/nodes/validator-node/operator/node-requirements.md) and make sure that your hardware, storage and network resources satisfy the node requirements.
+**Step 1:** Read the [**Node Requirements**](./node-requirements.md) and make sure that your hardware, storage and network resources satisfy the node requirements.
 
 **Step 2:** **Deploy the nodes**. Follow the detailed node installation steps provided in [**Running Validator Node**](running-validator-node/index.md) and deploy a validator node and a validator fullnode.
 
+Note that your nodes will not be running correctly (not syncing, not participating in consensus), until they're added to the validator set via [staking pool operations](./shutting-down-nodes.md) (below).
+
 ## Connect to Aptos network
 
-See [Connecting to Aptos Network](/nodes/validator-node/operator/connect-to-aptos-network) for detailed steps.
+After deploying your nodes, [connect to the Aptos Network](./connect-to-aptos-network.md).
+
+## Set up staking pool operations
+
+After connecting your nodes to the Aptos network, [establish staking pool operations](./staking-pool-operations.md) and add your node to the validator set.
+
+Your node will start syncing and participating on consensus.
+
+## Ensure your nodes are live
+
+After your nodes are deployed and configure, make sure they meet [node liveness criteria](./node-liveness-criteria.md).

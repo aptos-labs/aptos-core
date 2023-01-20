@@ -3,17 +3,23 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer};
+use crate::{metrics, network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer};
 use anyhow::{format_err, Result};
 use aptos_bitvec::BitVec;
-use aptos_channels::aptos_channel;
-use aptos_config::config::StorageServiceConfig;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_config::{
+    config::StorageServiceConfig,
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_logger::Level;
 use aptos_network::{
+    application::interface::NetworkServiceEvents,
     peer_manager::PeerManagerNotification,
     protocols::{
-        network::NewNetworkEvents, rpc::InboundRpcRequest, wire::handshake::v1::ProtocolId,
+        network::{NetworkEvents, NewNetworkEvents},
+        rpc::InboundRpcRequest,
+        wire::handshake::v1::ProtocolId,
     },
 };
 use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
@@ -65,8 +71,8 @@ use mockall::{
     predicate::{always, eq},
     Sequence,
 };
-use rand::Rng;
-use std::{sync::Arc, time::Duration};
+use rand::{rngs::OsRng, Rng};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::timeout;
 
 /// Various test constants for storage
@@ -553,6 +559,107 @@ async fn test_get_new_transactions_epoch_change() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_get_new_transactions_different_networks() {
+    // Test small and large chunk sizes
+    let max_transaction_chunk_size = StorageServiceConfig::default().max_transaction_chunk_size;
+    for chunk_size in [100, max_transaction_chunk_size] {
+        // Test event inclusion
+        for include_events in [true, false] {
+            // Create test data
+            let highest_version = 45576;
+            let highest_epoch = 43;
+            let lowest_version = 4566;
+            let peer_version_1 = highest_version - chunk_size;
+            let peer_version_2 = highest_version - (chunk_size - 10);
+            let highest_ledger_info =
+                create_test_ledger_info_with_sigs(highest_epoch, highest_version);
+            let transaction_list_with_proof_1 = create_transaction_list_with_proof(
+                peer_version_1 + 1,
+                highest_version,
+                highest_version,
+                include_events,
+            );
+            let transaction_list_with_proof_2 = create_transaction_list_with_proof(
+                peer_version_2 + 1,
+                highest_version,
+                highest_version,
+                include_events,
+            );
+
+            // Create the mock db reader
+            let mut db_reader =
+                create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+            expect_get_transactions(
+                &mut db_reader,
+                peer_version_1 + 1,
+                highest_version - peer_version_1,
+                highest_version,
+                include_events,
+                transaction_list_with_proof_1.clone(),
+            );
+            expect_get_transactions(
+                &mut db_reader,
+                peer_version_2 + 1,
+                highest_version - peer_version_2,
+                highest_version,
+                include_events,
+                transaction_list_with_proof_2.clone(),
+            );
+
+            // Create the storage client and server
+            let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader), None);
+            tokio::spawn(service.start());
+
+            // Send a request to subscribe to new transactions for peer 1
+            let peer_id = PeerId::random();
+            let peer_network_1 = PeerNetworkId::new(NetworkId::Public, peer_id);
+            let mut response_receiver_1 = get_new_transactions_with_proof_for_peer(
+                &mut mock_client,
+                peer_version_1,
+                highest_epoch,
+                include_events,
+                Some(peer_network_1),
+            )
+            .await;
+
+            // Send a request to subscribe to new transactions for peer 2
+            let peer_network_2 = PeerNetworkId::new(NetworkId::Vfn, peer_id);
+            let mut response_receiver_2 = get_new_transactions_with_proof_for_peer(
+                &mut mock_client,
+                peer_version_2,
+                highest_epoch,
+                include_events,
+                Some(peer_network_2),
+            )
+            .await;
+
+            // Verify no subscription response has been received yet
+            assert_none!(response_receiver_1.try_recv().unwrap());
+            assert_none!(response_receiver_2.try_recv().unwrap());
+
+            // Elapse enough time to force the subscription thread to work
+            wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+
+            // Verify a response is received and that it contains the correct data for both peers
+            verify_new_transactions_with_proof(
+                &mut mock_client,
+                response_receiver_1,
+                transaction_list_with_proof_1,
+                highest_ledger_info.clone(),
+            )
+            .await;
+            verify_new_transactions_with_proof(
+                &mut mock_client,
+                response_receiver_2,
+                transaction_list_with_proof_2,
+                highest_ledger_info,
+            )
+            .await;
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_get_new_transactions_max_chunk() {
     // Test event inclusion
     for include_events in [true, false] {
@@ -654,6 +761,91 @@ async fn test_get_new_transaction_outputs() {
             &mut mock_client,
             response_receiver,
             output_list_with_proof,
+            highest_ledger_info,
+        )
+        .await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_new_transaction_outputs_different_networks() {
+    // Test small and large chunk sizes
+    let max_output_chunk_size = StorageServiceConfig::default().max_transaction_output_chunk_size;
+    for chunk_size in [100, max_output_chunk_size] {
+        // Create test data
+        let highest_version = 5060;
+        let highest_epoch = 30;
+        let lowest_version = 101;
+        let peer_version_1 = highest_version - chunk_size;
+        let peer_version_2 = highest_version - (chunk_size - 50);
+        let highest_ledger_info = create_test_ledger_info_with_sigs(highest_epoch, highest_version);
+        let output_list_with_proof_1 =
+            create_output_list_with_proof(peer_version_1 + 1, highest_version, highest_version);
+        let output_list_with_proof_2 =
+            create_output_list_with_proof(peer_version_2 + 1, highest_version, highest_version);
+
+        // Create the mock db reader
+        let mut db_reader =
+            create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+        expect_get_transaction_outputs(
+            &mut db_reader,
+            peer_version_1 + 1,
+            highest_version - peer_version_1,
+            highest_version,
+            output_list_with_proof_1.clone(),
+        );
+        expect_get_transaction_outputs(
+            &mut db_reader,
+            peer_version_2 + 1,
+            highest_version - peer_version_2,
+            highest_version,
+            output_list_with_proof_2.clone(),
+        );
+
+        // Create the storage client and server
+        let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader), None);
+        tokio::spawn(service.start());
+
+        // Send a request to subscribe to new transaction outputs for peer 1
+        let peer_id = PeerId::random();
+        let peer_network_1 = PeerNetworkId::new(NetworkId::Validator, peer_id);
+        let mut response_receiver_1 = get_new_outputs_with_proof_for_peer(
+            &mut mock_client,
+            peer_version_1,
+            highest_epoch,
+            Some(peer_network_1),
+        )
+        .await;
+
+        // Send a request to subscribe to new transaction outputs for peer 2
+        let peer_network_2 = PeerNetworkId::new(NetworkId::Vfn, peer_id);
+        let mut response_receiver_2 = get_new_outputs_with_proof_for_peer(
+            &mut mock_client,
+            peer_version_2,
+            highest_epoch,
+            Some(peer_network_2),
+        )
+        .await;
+
+        // Verify no subscription response has been received yet
+        assert_none!(response_receiver_1.try_recv().unwrap());
+        assert_none!(response_receiver_2.try_recv().unwrap());
+
+        // Elapse enough time to force the subscription thread to work
+        wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+
+        // Verify a response is received and that it contains the correct data
+        verify_new_transaction_outputs_with_proof(
+            &mut mock_client,
+            response_receiver_1,
+            output_list_with_proof_1,
+            highest_ledger_info.clone(),
+        )
+        .await;
+        verify_new_transaction_outputs_with_proof(
+            &mut mock_client,
+            response_receiver_2,
+            output_list_with_proof_2,
             highest_ledger_info,
         )
         .await;
@@ -853,6 +1045,150 @@ async fn test_get_new_transactions_or_outputs() {
                     response_receiver,
                     None,
                     Some(output_list_with_proof),
+                    highest_ledger_info,
+                )
+                .await;
+            }
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_new_transactions_or_outputs_different_network() {
+    // Test small and large chunk sizes
+    let max_output_chunk_size = StorageServiceConfig::default().max_transaction_output_chunk_size;
+    for chunk_size in [100, max_output_chunk_size] {
+        // Test fallback to transaction syncing
+        for fallback_to_transactions in [false, true] {
+            // Create test data
+            let highest_version = 5060;
+            let highest_epoch = 30;
+            let lowest_version = 101;
+            let peer_version_1 = highest_version - chunk_size;
+            let peer_version_2 = highest_version - (chunk_size - 50);
+            let highest_ledger_info =
+                create_test_ledger_info_with_sigs(highest_epoch, highest_version);
+            let output_list_with_proof_1 =
+                create_output_list_with_proof(peer_version_1 + 1, highest_version, highest_version);
+            let output_list_with_proof_2 =
+                create_output_list_with_proof(peer_version_2 + 1, highest_version, highest_version);
+            let transaction_list_with_proof = create_transaction_list_with_proof(
+                highest_version,
+                highest_version,
+                highest_version,
+                false,
+            ); // Creates a small transaction list
+
+            // Create the mock db reader
+            let mut db_reader =
+                create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+            expect_get_transaction_outputs(
+                &mut db_reader,
+                peer_version_1 + 1,
+                highest_version - peer_version_1,
+                highest_version,
+                output_list_with_proof_1.clone(),
+            );
+            expect_get_transaction_outputs(
+                &mut db_reader,
+                peer_version_2 + 1,
+                highest_version - peer_version_2,
+                highest_version,
+                output_list_with_proof_2.clone(),
+            );
+            if fallback_to_transactions {
+                expect_get_transactions(
+                    &mut db_reader,
+                    peer_version_1 + 1,
+                    highest_version - peer_version_1,
+                    highest_version,
+                    false,
+                    transaction_list_with_proof.clone(),
+                );
+                expect_get_transactions(
+                    &mut db_reader,
+                    peer_version_2 + 1,
+                    highest_version - peer_version_2,
+                    highest_version,
+                    false,
+                    transaction_list_with_proof.clone(),
+                );
+            }
+
+            // Create the storage client and server
+            let storage_config = configure_network_chunk_limit(
+                fallback_to_transactions,
+                &output_list_with_proof_1,
+                &transaction_list_with_proof,
+            );
+            let (mut mock_client, service, mock_time) =
+                MockClient::new(Some(db_reader), Some(storage_config));
+            tokio::spawn(service.start());
+
+            // Send a request to subscribe to new transactions or outputs for peer 1
+            let peer_id = PeerId::random();
+            let peer_network_1 = PeerNetworkId::new(NetworkId::Public, peer_id);
+            let mut response_receiver_1 = get_new_transactions_or_outputs_with_proof_for_peer(
+                &mut mock_client,
+                peer_version_1,
+                highest_epoch,
+                false,
+                0, // Outputs cannot be reduced and will fallback to transactions
+                Some(peer_network_1),
+            )
+            .await;
+
+            // Send a request to subscribe to new transactions or outputs for peer 1
+            let peer_network_2 = PeerNetworkId::new(NetworkId::Validator, peer_id);
+            let mut response_receiver_2 = get_new_transactions_or_outputs_with_proof_for_peer(
+                &mut mock_client,
+                peer_version_2,
+                highest_epoch,
+                false,
+                0, // Outputs cannot be reduced and will fallback to transactions
+                Some(peer_network_2),
+            )
+            .await;
+
+            // Verify no subscription response has been received yet
+            assert_none!(response_receiver_1.try_recv().unwrap());
+            assert_none!(response_receiver_2.try_recv().unwrap());
+
+            // Elapse enough time to force the subscription thread to work
+            wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+
+            // Verify a response is received and that it contains the correct data
+            if fallback_to_transactions {
+                verify_new_transactions_or_outputs_with_proof(
+                    &mut mock_client,
+                    response_receiver_1,
+                    Some(transaction_list_with_proof.clone()),
+                    None,
+                    highest_ledger_info.clone(),
+                )
+                .await;
+                verify_new_transactions_or_outputs_with_proof(
+                    &mut mock_client,
+                    response_receiver_2,
+                    Some(transaction_list_with_proof),
+                    None,
+                    highest_ledger_info,
+                )
+                .await;
+            } else {
+                verify_new_transactions_or_outputs_with_proof(
+                    &mut mock_client,
+                    response_receiver_1,
+                    None,
+                    Some(output_list_with_proof_1.clone()),
+                    highest_ledger_info.clone(),
+                )
+                .await;
+                verify_new_transactions_or_outputs_with_proof(
+                    &mut mock_client,
+                    response_receiver_2,
+                    None,
+                    Some(output_list_with_proof_2.clone()),
                     highest_ledger_info,
                 )
                 .await;
@@ -1782,7 +2118,8 @@ async fn test_get_epoch_ending_ledger_infos_invalid() {
 /// A wrapper around the inbound network interface/channel for easily sending
 /// mock client requests to a [`StorageServiceServer`].
 struct MockClient {
-    peer_mgr_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+    peer_manager_notifiers:
+        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
 }
 
 impl MockClient {
@@ -1791,31 +2128,51 @@ impl MockClient {
         storage_config: Option<StorageServiceConfig>,
     ) -> (Self, StorageServiceServer<StorageReader>, MockTimeService) {
         initialize_logger();
+
+        // Create the storage reader
         let storage_config = storage_config.unwrap_or_default();
-        let storage = StorageReader::new(
+        let storage_reader = StorageReader::new(
             storage_config,
             Arc::new(db_reader.unwrap_or_else(create_mock_db_reader)),
         );
 
-        let queue_cfg = crate::network::storage_service_network_config(storage_config)
-            .inbound_queue
-            .unwrap();
-        let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) = queue_cfg.build();
-        let (_connection_notifs_tx, connection_notifs_rx) = queue_cfg.build();
-        let network_requests =
-            StorageServiceNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
+        // Setup the networks and the network events
+        let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+        let mut network_and_events = HashMap::new();
+        let mut peer_manager_notifiers = HashMap::new();
+        for network_id in network_ids {
+            let queue_cfg =
+                aptos_channel::Config::new(storage_config.max_network_channel_size as usize)
+                    .queue_style(QueueStyle::FIFO)
+                    .counters(&metrics::PENDING_STORAGE_SERVER_NETWORK_EVENTS);
+            let (peer_manager_notifier, peer_manager_notification_receiver) = queue_cfg.build();
+            let (_, connection_notification_receiver) = queue_cfg.build();
 
+            let network_events = NetworkEvents::new(
+                peer_manager_notification_receiver,
+                connection_notification_receiver,
+            );
+            network_and_events.insert(network_id, network_events);
+            peer_manager_notifiers.insert(network_id, peer_manager_notifier);
+        }
+        let storage_service_network_events =
+            StorageServiceNetworkEvents::new(NetworkServiceEvents::new(network_and_events));
+
+        // Create the storage service
         let executor = tokio::runtime::Handle::current();
         let mock_time_service = TimeService::mock();
         let storage_server = StorageServiceServer::new(
             StorageServiceConfig::default(),
             executor,
-            storage,
+            storage_reader,
             mock_time_service.clone(),
-            network_requests,
+            storage_service_network_events,
         );
 
-        let mock_client = Self { peer_mgr_notifs_tx };
+        // Return the client and service
+        let mock_client = Self {
+            peer_manager_notifiers,
+        };
         (mock_client, storage_server, mock_time_service.into_mock())
     }
 
@@ -1824,18 +2181,21 @@ impl MockClient {
         &mut self,
         request: StorageServiceRequest,
     ) -> Result<StorageServiceResponse, StorageServiceError> {
-        let receiver = self.send_request(request).await;
+        let receiver = self.send_request(request, None, None).await;
         self.wait_for_response(receiver).await
     }
 
     /// Send the specified storage request and return the receiver on which to
     /// expect a result.
-    async fn send_request(
+    pub async fn send_request(
         &mut self,
         request: StorageServiceRequest,
+        peer_id: Option<AccountAddress>,
+        network_id: Option<NetworkId>,
     ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
         // Create the inbound rpc request
-        let peer_id = PeerId::ZERO;
+        let peer_id = peer_id.unwrap_or_else(PeerId::random);
+        let network_id = network_id.unwrap_or_else(get_random_network_id);
         let protocol_id = ProtocolId::StorageServiceRpc;
         let data = protocol_id
             .to_bytes(&StorageServiceMessage::Request(request))
@@ -1846,11 +2206,13 @@ impl MockClient {
             data: data.into(),
             res_tx,
         };
-        let notif = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
+        let notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
 
         // Push the request up to the storage service
-        self.peer_mgr_notifs_tx
-            .push((peer_id, protocol_id), notif)
+        self.peer_manager_notifiers
+            .get(&network_id)
+            .unwrap()
+            .push((peer_id, protocol_id), notification)
             .unwrap();
 
         res_rx
@@ -2418,13 +2780,29 @@ async fn get_new_outputs_with_proof(
     known_version: u64,
     known_epoch: u64,
 ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
+    get_new_outputs_with_proof_for_peer(mock_client, known_version, known_epoch, None).await
+}
+
+/// Creates and sends a request for new transaction outputs for the specified peer
+async fn get_new_outputs_with_proof_for_peer(
+    mock_client: &mut MockClient,
+    known_version: u64,
+    known_epoch: u64,
+    peer_network_id: Option<PeerNetworkId>,
+) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
+    // Create the data request
     let data_request =
         DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
             known_version,
             known_epoch,
         });
     let storage_request = StorageServiceRequest::new(data_request, true);
-    mock_client.send_request(storage_request).await
+
+    // Send the request
+    let (peer_id, network_id) = extract_peer_and_network_id(peer_network_id);
+    mock_client
+        .send_request(storage_request, peer_id, network_id)
+        .await
 }
 
 /// Creates and sends a request for new transactions
@@ -2434,13 +2812,37 @@ async fn get_new_transactions_with_proof(
     known_epoch: u64,
     include_events: bool,
 ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
+    get_new_transactions_with_proof_for_peer(
+        mock_client,
+        known_version,
+        known_epoch,
+        include_events,
+        None,
+    )
+    .await
+}
+
+/// Creates and sends a request for new transactions for the specified peer
+async fn get_new_transactions_with_proof_for_peer(
+    mock_client: &mut MockClient,
+    known_version: u64,
+    known_epoch: u64,
+    include_events: bool,
+    peer_network_id: Option<PeerNetworkId>,
+) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
+    // Create the data request
     let data_request = DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
         known_version,
         known_epoch,
         include_events,
     });
     let storage_request = StorageServiceRequest::new(data_request, true);
-    mock_client.send_request(storage_request).await
+
+    // Send the request
+    let (peer_id, network_id) = extract_peer_and_network_id(peer_network_id);
+    mock_client
+        .send_request(storage_request, peer_id, network_id)
+        .await
 }
 
 /// Creates and sends a request for new transactions or outputs
@@ -2451,6 +2853,27 @@ async fn get_new_transactions_or_outputs_with_proof(
     include_events: bool,
     max_num_output_reductions: u64,
 ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
+    get_new_transactions_or_outputs_with_proof_for_peer(
+        mock_client,
+        known_version,
+        known_epoch,
+        include_events,
+        max_num_output_reductions,
+        None,
+    )
+    .await
+}
+
+/// Creates and sends a request for new transactions or outputs for the specified peer
+async fn get_new_transactions_or_outputs_with_proof_for_peer(
+    mock_client: &mut MockClient,
+    known_version: u64,
+    known_epoch: u64,
+    include_events: bool,
+    max_num_output_reductions: u64,
+    peer_network_id: Option<PeerNetworkId>,
+) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
+    // Create the data request
     let data_request = DataRequest::GetNewTransactionsOrOutputsWithProof(
         NewTransactionsOrOutputsWithProofRequest {
             known_version,
@@ -2460,7 +2883,26 @@ async fn get_new_transactions_or_outputs_with_proof(
         },
     );
     let storage_request = StorageServiceRequest::new(data_request, true);
-    mock_client.send_request(storage_request).await
+
+    // Send the request
+    let (peer_id, network_id) = extract_peer_and_network_id(peer_network_id);
+    mock_client
+        .send_request(storage_request, peer_id, network_id)
+        .await
+}
+
+/// Extracts the peer and network ids from an optional peer network id
+fn extract_peer_and_network_id(
+    peer_network_id: Option<PeerNetworkId>,
+) -> (Option<AccountAddress>, Option<NetworkId>) {
+    if let Some(peer_network_id) = peer_network_id {
+        (
+            Some(peer_network_id.peer_id()),
+            Some(peer_network_id.network_id()),
+        )
+    } else {
+        (None, None)
+    }
 }
 
 /// Sends the given storage request to the given client
@@ -2927,6 +3369,18 @@ pub fn initialize_logger() {
         .is_async(false)
         .level(Level::Debug)
         .build();
+}
+
+/// Returns a random network ID
+fn get_random_network_id() -> NetworkId {
+    let mut rng = OsRng;
+    let random_number: u8 = rng.gen();
+    match random_number % 3 {
+        0 => NetworkId::Validator,
+        1 => NetworkId::Vfn,
+        2 => NetworkId::Public,
+        num => panic!("This shouldn't be possible! Got num: {:?}", num),
+    }
 }
 
 /// Creates a mock database reader

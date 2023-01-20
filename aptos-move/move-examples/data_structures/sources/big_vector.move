@@ -115,11 +115,31 @@ module aptos_std::big_vector {
     public fun remove<T>(v: &mut BigVector<T>, i: u64): T {
         let len = length(v);
         assert!(i < len, error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
-        while (i + 1 < len) {
-            swap(v, i, i + 1);
-            i = i + 1;
+        let num_buckets = table_with_length::length(&v.buckets);
+        let cur_bucket_index = i / v.bucket_size + 1;
+        let cur_bucket = table_with_length::borrow_mut(&mut v.buckets, cur_bucket_index - 1);
+        let res = vector::remove(cur_bucket, i % v.bucket_size);
+        move cur_bucket;
+        while (cur_bucket_index < num_buckets) {
+            // remove one element from the start of current vector
+            let cur_bucket = table_with_length::borrow_mut(&mut v.buckets, cur_bucket_index);
+            let t = vector::remove(cur_bucket, 0);
+            move cur_bucket;
+            // and put it at the end of the last one
+            let prev_bucket = table_with_length::borrow_mut(&mut v.buckets, cur_bucket_index - 1);
+            vector::push_back(prev_bucket, t);
+            cur_bucket_index = cur_bucket_index + 1;
         };
-        pop_back(v)
+
+        // Shrink the table if the last vector is empty.
+        let last_bucket = table_with_length::borrow_mut(&mut v.buckets, num_buckets - 1);
+        if (vector::is_empty(last_bucket)) {
+            move last_bucket;
+            vector::destroy_empty(table_with_length::remove(&mut v.buckets, num_buckets - 1));
+        };
+        v.end_index = v.end_index - 1;
+
+        res
     }
 
     /// Swap the `i`th element of the vector `v` with the last element and then pop the vector.
@@ -176,26 +196,56 @@ module aptos_std::big_vector {
     /// Reverse the order of the elements in the vector v in-place.
     /// Disclaimer: This function is costly. Use it at your own discretion.
     public fun reverse<T>(v: &mut BigVector<T>) {
-        let len = length(v);
-        let half_len = len / 2;
-        let k = 0;
-        while (k < half_len) {
-            swap(v, k, len - 1 - k);
-            k = k + 1;
-        }
+        let new_buckets = vector[];
+        let push_bucket = vector[];
+        let num_buckets = table_with_length::length(&v.buckets);
+        let num_buckets_left = num_buckets;
+
+        while (num_buckets_left > 0) {
+            let pop_bucket = table_with_length::remove(&mut v.buckets, num_buckets_left - 1);
+            let pop_bucket_length = vector::length(&pop_bucket);
+            let i = 0;
+            while(i < pop_bucket_length){
+                vector::push_back(&mut push_bucket, vector::pop_back(&mut pop_bucket));
+                if (vector::length(&push_bucket) == v.bucket_size) {
+                    vector::push_back(&mut new_buckets, push_bucket);
+                    push_bucket = vector[];
+                };
+                i = i + 1;
+            };
+            vector::destroy_empty(pop_bucket);
+            num_buckets_left = num_buckets_left - 1;
+        };
+
+        if(vector::length(&push_bucket) > 0) {
+            vector::push_back(&mut new_buckets, push_bucket);
+        } else {
+            vector::destroy_empty(push_bucket);
+        };
+
+        vector::reverse(&mut new_buckets);
+        let i = 0;
+        assert!(table_with_length::length(&v.buckets) == 0, 0);
+        while(i < num_buckets) {
+            table_with_length::add(&mut v.buckets, i, vector::pop_back(&mut new_buckets));
+            i = i + 1;
+        };
+        vector::destroy_empty(new_buckets);
     }
 
     /// Return the index of the first occurrence of an element in v that is equal to e. Returns (true, index) if such an
     /// element was found, and (false, 0) otherwise.
     /// Disclaimer: This function is costly. Use it at your own discretion.
     public fun index_of<T>(v: &BigVector<T>, val: &T): (bool, u64) {
-        let i = 0;
-        let len = length(v);
-        while (i < len) {
-            if (borrow(v, i) == val) {
-                return (true, i)
+        let num_buckets = table_with_length::length(&v.buckets);
+        let bucket_index = 0;
+        while (bucket_index < num_buckets) {
+            let cur = table_with_length::borrow(&v.buckets, bucket_index);
+            let (found, i) = vector::index_of(cur, val);
+            if (found) {
+                return (true, bucket_index*v.bucket_size + i)
             };
-            i = i + 1;
+            bucket_index = bucket_index + 1;
         };
         (false, 0)
     }
