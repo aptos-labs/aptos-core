@@ -976,7 +976,6 @@ impl EpochManager {
         mut round_timeout_sender_rx: aptos_channels::Receiver<Round>,
         mut network_receivers: NetworkReceivers,
     ) {
-        debug!("QS: Initial start");
         // initial start of the processor
         self.await_reconfig_notification().await;
         loop {
