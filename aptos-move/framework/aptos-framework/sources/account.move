@@ -924,6 +924,31 @@ module aptos_framework::account {
         assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
     }
 
+    #[test(bob = @0x345)]
+    public entry fun test_get_signer_cap_and_is_signer_cap(bob: signer) acquires Account {
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+
+        assert!(is_signer_capability_offered(alice_addr), 0);
+        assert!(get_signer_capability_offer_for(alice_addr) == bob_addr, 0);
+    }
+    
+
     #[test(bob = @0x345, charlie = @0x567)]
     #[expected_failure(abort_code = 393230, location = Self)]
     public entry fun test_invalid_check_signer_capability_and_create_authorized_signer(bob: signer, charlie: signer) acquires Account {
