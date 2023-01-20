@@ -1,3 +1,0 @@
-files:
-  - source: /developer-docs-site/docs/**/*.m*
-    translation: /developer-docs-site/translations/%locale%/%original_path%/%original_file_name%

@@ -1,5 +1,0 @@
-{
-  "message": "Invalid transaction: Type: Validation Code: INVALID_SIGNATURE",
-  "error_code": "vm_error",
-  "vm_error_code": 1
-}
