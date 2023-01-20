@@ -9,16 +9,27 @@ use crate::{
     },
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, sample, sample::SampleRate};
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::network_address::NetworkAddress;
 use async_trait::async_trait;
+use futures_util::StreamExt;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use tokio::{runtime::Handle, task::JoinHandle};
 
 /// A simple definition to handle all the trait bounds for messages.
 // TODO: we should remove the duplication across the different files
 pub trait NetworkMessageTrait: Clone + Message + Send + Sync + 'static {}
 impl<T: Clone + Message + Send + Sync + 'static> NetworkMessageTrait for T {}
+
+/// A simple enum to represent the different types of messages
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum MessageType {
+    DirectSendMessage,
+    RpcMessage,
+}
 
 /// A simple interface offered by the networking stack to each client application (e.g., consensus,
 /// state sync, mempool, etc.). This interface provides basic support for sending messages,
@@ -74,6 +85,12 @@ pub struct NetworkClient<Message> {
     rpc_protocols_and_preferences: Vec<ProtocolId>, // Protocols are sorted by preference (highest to lowest)
     network_senders: HashMap<NetworkId, NetworkSender<Message>>,
     peers_and_metadata: Arc<PeersAndMetadata>,
+
+    // A simple cache of preferred protocols for each peer. This avoids
+    // having to perform redundant computation each time we need to send
+    // a message. The cache is invalidated periodically and rebuilt lazily.
+    preferred_protocol_for_peer_cache:
+        Arc<RwLock<HashMap<(PeerNetworkId, MessageType), ProtocolId>>>,
 }
 
 impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
@@ -88,7 +105,39 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
             rpc_protocols_and_preferences,
             network_senders,
             peers_and_metadata,
+            preferred_protocol_for_peer_cache: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    /// Spawns the thread that periodically invalidates the
+    /// preferred protocol cache so that it can be refreshed.
+    /// This is required to support peers who change their
+    /// preferred/supported protocols and reconnect to us.
+    pub fn spawn_preferred_protocol_cache_invalidator(
+        &self,
+        cache_invalidation_frequency_secs: u64,
+        time_service: TimeService,
+        runtime: Handle,
+    ) -> JoinHandle<()> {
+        let preferred_protocol_for_peer_cache = self.preferred_protocol_for_peer_cache.clone();
+
+        // Spawn the cache invalidator thread
+        runtime.spawn(async move {
+            // Create a ticker for the invalidation interval
+            let duration = Duration::from_secs(cache_invalidation_frequency_secs);
+            let ticker = time_service.interval(duration);
+            futures::pin_mut!(ticker);
+
+            info!("Starting the preferred protocol cache invalidator!");
+            loop {
+                // Wait for the next round before polling
+                ticker.next().await;
+
+                // Invalidate the cache
+                trace!("Clearing the preferred protocol cache!");
+                preferred_protocol_for_peer_cache.write().clear();
+            }
+        })
     }
 
     /// Returns the network sender for the specified network ID
@@ -117,10 +166,38 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
     fn get_preferred_protocol_for_peer(
         &self,
         peer: &PeerNetworkId,
+        message_type: MessageType,
+    ) -> Result<ProtocolId, Error> {
+        // Check if we've already cached the protocol for the peer
+        let cache_key = (*peer, message_type);
+        if let Some(preferred_protocol) = self
+            .preferred_protocol_for_peer_cache
+            .read()
+            .get(&cache_key)
+        {
+            return Ok(*preferred_protocol);
+        }
+
+        // Otherwise, calculate the preferred protocol and update the cache before returning
+        let all_protocols = match message_type {
+            MessageType::DirectSendMessage => &self.direct_send_protocols_and_preferences,
+            MessageType::RpcMessage => &self.rpc_protocols_and_preferences,
+        };
+        let preferred_protocol = self.calculate_preferred_protocol_for_peer(peer, all_protocols)?;
+        let _ = self
+            .preferred_protocol_for_peer_cache
+            .write()
+            .insert(cache_key, preferred_protocol);
+        Ok(preferred_protocol)
+    }
+
+    /// Calculates the preferred protocol for the specified peer. The preferred
+    /// protocols should be sorted from most to least preferable.
+    fn calculate_preferred_protocol_for_peer(
+        &self,
+        peer: &PeerNetworkId,
         preferred_protocols: &[ProtocolId],
     ) -> Result<ProtocolId, Error> {
-        // TODO: we need to provide a caching mechanism to avoid recomputing this!
-
         let protocols_supported_by_peer = self.get_supported_protocols(peer)?;
         for protocol in preferred_protocols {
             if protocols_supported_by_peer.contains(*protocol) {
@@ -132,6 +209,15 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
             Peer: {:?}, supported protocols: {:?}",
             peer, protocols_supported_by_peer
         )))
+    }
+
+    /// Returns a handle to the preferred protocol for peer cache.
+    /// Only required for testing.
+    #[cfg(test)]
+    pub fn get_preferred_protocol_for_peer_cache(
+        &self,
+    ) -> &RwLock<HashMap<(PeerNetworkId, MessageType), ProtocolId>> {
+        &self.preferred_protocol_for_peer_cache
     }
 }
 
@@ -166,8 +252,8 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
 
     fn send_to_peer(&self, message: Message, peer: PeerNetworkId) -> Result<(), Error> {
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
-        let direct_send_protocol_id = self
-            .get_preferred_protocol_for_peer(&peer, &self.direct_send_protocols_and_preferences)?;
+        let direct_send_protocol_id =
+            self.get_preferred_protocol_for_peer(&peer, MessageType::DirectSendMessage)?;
         Ok(network_sender.send_to(peer.peer_id(), direct_send_protocol_id, message)?)
     }
 
@@ -176,9 +262,7 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         let mut peers_per_protocol = HashMap::new();
         let mut peers_without_a_protocol = vec![];
         for peer in peers {
-            match self
-                .get_preferred_protocol_for_peer(peer, &self.direct_send_protocols_and_preferences)
-            {
+            match self.get_preferred_protocol_for_peer(peer, MessageType::DirectSendMessage) {
                 Ok(protocol) => peers_per_protocol
                     .entry(protocol)
                     .or_insert_with(Vec::new)
@@ -220,7 +304,7 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
     ) -> Result<Message, Error> {
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
         let rpc_protocol_id =
-            self.get_preferred_protocol_for_peer(&peer, &self.rpc_protocols_and_preferences)?;
+            self.get_preferred_protocol_for_peer(&peer, MessageType::RpcMessage)?;
         Ok(network_sender
             .send_rpc(peer.peer_id(), rpc_protocol_id, message, rpc_timeout)
             .await?)

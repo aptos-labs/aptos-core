@@ -15,9 +15,12 @@ use aptos_network::{
         interface::{NetworkClient, NetworkServiceEvents},
         storage::PeersAndMetadata,
     },
-    protocols::network::{
-        NetworkApplicationConfig, NetworkClientConfig, NetworkEvents, NetworkSender,
-        NetworkServiceConfig,
+    protocols::{
+        health_checker::builder::CACHE_INVALIDATION_FREQUENCY_SECS,
+        network::{
+            NetworkApplicationConfig, NetworkClientConfig, NetworkEvents, NetworkSender,
+            NetworkServiceConfig,
+        },
     },
     ProtocolId,
 };
@@ -176,6 +179,7 @@ pub fn setup_networks_and_get_interfaces(
             TimeService::real(),
             Some(event_subscription_service),
             peers_and_metadata.clone(),
+            runtime.handle().clone(),
         );
 
         // Register consensus (both client and server) with the network
@@ -223,6 +227,7 @@ pub fn setup_networks_and_get_interfaces(
     let (consensus_interfaces, mempool_interfaces, storage_service_interfaces) =
         transform_network_handles_into_interfaces(
             node_config,
+            &network_runtimes,
             consensus_network_handle,
             mempool_network_handles,
             storage_service_network_handles,
@@ -269,6 +274,7 @@ fn register_client_and_service_with_network<T: Serialize + for<'de> Deserialize<
 /// be used by the applications themselves.
 fn transform_network_handles_into_interfaces(
     node_config: &NodeConfig,
+    network_runtimes: &[Runtime],
     consensus_network_handle: Option<ApplicationNetworkHandle<ConsensusMsg>>,
     mempool_network_handles: Vec<ApplicationNetworkHandle<MempoolSyncMsg>>,
     storage_service_network_handles: Vec<ApplicationNetworkHandle<StorageServiceMessage>>,
@@ -280,17 +286,20 @@ fn transform_network_handles_into_interfaces(
 ) {
     let consensus_interfaces = consensus_network_handle.map(|consensus_network_handle| {
         create_network_interfaces(
+            network_runtimes,
             vec![consensus_network_handle],
             consensus_network_configuration(),
             peers_and_metadata.clone(),
         )
     });
     let mempool_interfaces = create_network_interfaces(
+        network_runtimes,
         mempool_network_handles,
         mempool_network_configuration(),
         peers_and_metadata.clone(),
     );
     let storage_service_interfaces = create_network_interfaces(
+        network_runtimes,
         storage_service_network_handles,
         storage_service_network_configuration(node_config),
         peers_and_metadata,
@@ -308,10 +317,16 @@ fn transform_network_handles_into_interfaces(
 fn create_network_interfaces<
     T: Serialize + for<'de> Deserialize<'de> + Send + Sync + Clone + 'static,
 >(
+    network_runtimes: &[Runtime],
     network_handles: Vec<ApplicationNetworkHandle<T>>,
     network_application_config: NetworkApplicationConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> ApplicationNetworkInterfaces<T> {
+    // Verify we have at least one runtime, otherwise we can't create the client
+    let network_runtime = network_runtimes
+        .first()
+        .expect("At least one network runtime is required to create the network client!");
+
     // Gather the network senders and events
     let mut network_senders = HashMap::new();
     let mut network_and_events = HashMap::new();
@@ -321,13 +336,18 @@ fn create_network_interfaces<
         network_and_events.insert(network_id, network_handle.network_events);
     }
 
-    // Create the network client
+    // Create the network client and spawn the cache invalidator
     let network_client_config = network_application_config.network_client_config;
     let network_client = NetworkClient::new(
         network_client_config.direct_send_protocols_and_preferences,
         network_client_config.rpc_protocols_and_preferences,
         network_senders,
         peers_and_metadata,
+    );
+    network_client.spawn_preferred_protocol_cache_invalidator(
+        CACHE_INVALIDATION_FREQUENCY_SECS,
+        TimeService::real(),
+        network_runtime.handle().clone(),
     );
 
     // Create the network service events

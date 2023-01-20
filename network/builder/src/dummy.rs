@@ -30,7 +30,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 const TEST_RPC_PROTOCOL: ProtocolId = ProtocolId::ConsensusRpcBcs;
 const TEST_DIRECT_SEND_PROTOCOL: ProtocolId = ProtocolId::ConsensusDirectSendBcs;
@@ -109,6 +109,7 @@ pub fn setup_network() -> DummyNetwork {
         listener_addr,
         authentication_mode,
         peers_and_metadata.clone(),
+        Handle::current(),
     );
 
     let (listener_sender, mut listener_events) =
@@ -145,6 +146,7 @@ pub fn setup_network() -> DummyNetwork {
         dialer_addr,
         authentication_mode,
         peers_and_metadata.clone(),
+        Handle::current(),
     );
 
     let (dialer_sender, mut dialer_events) =

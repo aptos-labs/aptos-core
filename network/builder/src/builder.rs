@@ -73,6 +73,7 @@ pub struct NetworkBuilder {
     health_checker_builder: Option<HealthCheckerBuilder>,
     peer_manager_builder: PeerManagerBuilder,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    network_runtime: Handle,
 }
 
 impl NetworkBuilder {
@@ -83,6 +84,7 @@ impl NetworkBuilder {
         chain_id: ChainId,
         trusted_peers: Arc<RwLock<PeerSet>>,
         peers_and_metadata: Arc<PeersAndMetadata>,
+        network_runtime: Handle,
         network_context: NetworkContext,
         time_service: TimeService,
         listen_address: NetworkAddress,
@@ -128,6 +130,7 @@ impl NetworkBuilder {
             health_checker_builder: None,
             peer_manager_builder,
             peers_and_metadata,
+            network_runtime,
         }
     }
 
@@ -140,6 +143,7 @@ impl NetworkBuilder {
         listen_address: NetworkAddress,
         authentication_mode: AuthenticationMode,
         peers_and_metadata: Arc<PeersAndMetadata>,
+        network_runtime: Handle,
     ) -> NetworkBuilder {
         let mutual_authentication = matches!(authentication_mode, AuthenticationMode::Mutual(_));
 
@@ -147,6 +151,7 @@ impl NetworkBuilder {
             chain_id,
             trusted_peers.clone(),
             peers_and_metadata,
+            network_runtime,
             network_context,
             time_service,
             listen_address,
@@ -184,6 +189,7 @@ impl NetworkBuilder {
         time_service: TimeService,
         mut reconfig_subscription_service: Option<&mut EventSubscriptionService>,
         peers_and_metadata: Arc<PeersAndMetadata>,
+        network_runtime: Handle,
     ) -> NetworkBuilder {
         let peer_id = config.peer_id();
         let identity_key = config.identity_key();
@@ -203,6 +209,7 @@ impl NetworkBuilder {
             chain_id,
             trusted_peers.clone(),
             peers_and_metadata,
+            network_runtime,
             network_context,
             time_service,
             config.listen_address.clone(),
@@ -448,6 +455,7 @@ impl NetworkBuilder {
             hc_network_tx,
             hc_network_rx,
             self.peers_and_metadata.clone(),
+            self.network_runtime.clone(),
         ));
         debug!(
             NetworkSchema::new(&self.network_context),

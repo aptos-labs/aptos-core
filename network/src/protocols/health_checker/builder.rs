@@ -19,6 +19,11 @@ use maplit::hashmap;
 use std::{sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 
+// TODO: remove this entire service once the peer monitoring service exists!
+
+// TODO: make this configurable once the configs have been cleaned up
+pub const CACHE_INVALIDATION_FREQUENCY_SECS: u64 = 120; // 2 minutes
+
 pub struct HealthCheckerBuilder {
     service: Option<HealthChecker<NetworkClient<HealthCheckerMsg>>>,
 }
@@ -33,6 +38,7 @@ impl HealthCheckerBuilder {
         network_sender: NetworkSender<HealthCheckerMsg>,
         network_rx: HealthCheckerNetworkEvents,
         peers_and_metadata: Arc<PeersAndMetadata>,
+        network_runtime: Handle,
     ) -> Self {
         let network_senders = hashmap! {network_context.network_id() => network_sender};
         let network_client = NetworkClient::new(
@@ -40,6 +46,11 @@ impl HealthCheckerBuilder {
             vec![HealthCheckerRpc],
             network_senders,
             peers_and_metadata,
+        );
+        network_client.spawn_preferred_protocol_cache_invalidator(
+            CACHE_INVALIDATION_FREQUENCY_SECS,
+            TimeService::real(),
+            network_runtime,
         );
         let service = HealthChecker::new(
             network_context,

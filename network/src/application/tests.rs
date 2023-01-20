@@ -4,7 +4,7 @@
 use crate::{
     application::{
         error::Error,
-        interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
+        interface::{MessageType, NetworkClient, NetworkClientInterface, NetworkServiceEvents},
         metadata::{ConnectionState, PeerMetadata},
         storage::PeersAndMetadata,
     },
@@ -21,33 +21,39 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_time_service::TimeService;
 use aptos_types::PeerId;
 use futures::channel::oneshot;
 use futures_util::StreamExt;
+use rand::Rng;
+use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc, time::Duration};
-use tokio::time::timeout;
+use tokio::{
+    runtime::Handle,
+    time::{timeout, Instant},
+};
 
-// Useful test constants for timeouts
+// Useful test constants
+const CACHE_INVALIDATION_FREQUENCY_SECS: u64 = 1;
+const CACHE_INVALIDATION_TIMEOUT_SECS: u64 = 30;
 const MAX_CHANNEL_TIMEOUT_SECS: u64 = 1;
 const MAX_MESSAGE_TIMEOUT_SECS: u64 = 2;
 
 /// Represents a test message sent across the network
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct DummyMessage {
-    pub message_contents: Option<u64>, // Dummy contents for verification
+    pub message_contents: u64, // Dummy contents for verification
 }
 
 impl DummyMessage {
     pub fn new(message_contents: u64) -> Self {
-        Self {
-            message_contents: Some(message_contents),
-        }
+        Self { message_contents }
     }
 
-    pub fn new_empty() -> Self {
+    pub fn new_random() -> Self {
         Self {
-            message_contents: None,
+            message_contents: OsRng.gen(),
         }
     }
 }
@@ -381,7 +387,7 @@ fn test_peers_and_metadata_cache_hit() {
     }
     check_connected_supported_peers_cache_length(&peers_and_metadata, 1);
 
-    // Manually overwrite the data in the cache and verify it is used
+    // Manually overwrite the data in the cache
     let new_connected_supported_peers = vec![
         PeerNetworkId::new(NetworkId::Validator, PeerId::random()),
         PeerNetworkId::new(NetworkId::Public, PeerId::random()),
@@ -727,11 +733,11 @@ async fn test_network_client_missing_network_sender() {
     // Verify that sending a message to a peer without a network sender fails
     let bad_peer_network_id = PeerNetworkId::new(NetworkId::Vfn, PeerId::random());
     network_client
-        .send_to_peer(DummyMessage::new_empty(), bad_peer_network_id)
+        .send_to_peer(DummyMessage::new_random(), bad_peer_network_id)
         .unwrap_err();
     network_client
         .send_to_peer_rpc(
-            DummyMessage::new_empty(),
+            DummyMessage::new_random(),
             Duration::from_secs(MAX_MESSAGE_TIMEOUT_SECS),
             bad_peer_network_id,
         )
@@ -740,7 +746,7 @@ async fn test_network_client_missing_network_sender() {
 
     // Verify that sending a message to all peers without a network simply logs the errors
     network_client
-        .send_to_peers(DummyMessage::new_empty(), &[bad_peer_network_id])
+        .send_to_peers(DummyMessage::new_random(), &[bad_peer_network_id])
         .unwrap();
 }
 
@@ -781,11 +787,11 @@ async fn test_network_client_senders_no_matching_protocols() {
 
     // Verify that sending a message to a peer without a matching protocol fails
     network_client
-        .send_to_peer(DummyMessage::new_empty(), peer_network_id_1)
+        .send_to_peer(DummyMessage::new_random(), peer_network_id_1)
         .unwrap_err();
     network_client
         .send_to_peer_rpc(
-            DummyMessage::new_empty(),
+            DummyMessage::new_random(),
             Duration::from_secs(MAX_MESSAGE_TIMEOUT_SECS),
             peer_network_id_2,
         )
@@ -951,16 +957,12 @@ async fn test_network_client_network_senders_rpc() {
     let dummy_message = DummyMessage::new(999);
     let rpc_timeout = Duration::from_secs(MAX_MESSAGE_TIMEOUT_SECS);
     for peer_network_id in [peer_network_id_1, peer_network_id_2] {
-        let network_client = network_client.clone();
-        let dummy_message = dummy_message.clone();
-
-        // We need to spawn this on a separate thread, otherwise we'll block waiting for the response
-        tokio::spawn(async move {
-            network_client
-                .send_to_peer_rpc(dummy_message.clone(), rpc_timeout, peer_network_id)
-                .await
-                .unwrap()
-        });
+        send_rpc_to_peer(
+            network_client.clone(),
+            dummy_message.clone(),
+            rpc_timeout,
+            peer_network_id,
+        );
     }
     wait_for_network_event(
         peer_network_id_1,
@@ -984,6 +986,487 @@ async fn test_network_client_network_senders_rpc() {
         dummy_message,
     )
     .await;
+}
+
+#[tokio::test]
+async fn test_network_client_preferred_protocols_cache() {
+    // Test direct and RPC message types
+    for message_type in [MessageType::DirectSendMessage, MessageType::RpcMessage] {
+        // Create the peers and metadata container
+        let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
+        let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+        // Create two peers and initialize the connection metadata
+        let (peer_network_id_1, _) = create_peer_and_connection(
+            NetworkId::Validator,
+            vec![ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc],
+            peers_and_metadata.clone(),
+        );
+        let (peer_network_id_2, _) = create_peer_and_connection(
+            NetworkId::Vfn,
+            vec![
+                ProtocolId::ConsensusDirectSendCompressed,
+                ProtocolId::ConsensusRpcJson,
+                ProtocolId::ConsensusRpcBcs,
+                ProtocolId::ConsensusRpcCompressed,
+            ],
+            peers_and_metadata.clone(),
+        );
+
+        // Create a network client with network senders
+        let (
+            network_senders,
+            network_events,
+            mut outbound_request_receivers,
+            mut inbound_request_senders,
+        ) = create_network_sender_and_events(&network_ids);
+        let (network_client, time_service) = create_client_with_cache_invalidator(
+            &peers_and_metadata,
+            network_senders,
+            vec![
+                ProtocolId::MempoolDirectSend,
+                ProtocolId::ConsensusDirectSendCompressed,
+            ],
+            vec![
+                ProtocolId::ConsensusRpcBcs,
+                ProtocolId::ConsensusRpcCompressed,
+                ProtocolId::StorageServiceRpc,
+            ],
+        );
+
+        // Extract the network and events
+        let mut network_and_events = network_events.into_network_and_events();
+        let mut validator_network_events =
+            network_and_events.remove(&NetworkId::Validator).unwrap();
+        let mut vfn_network_events = network_and_events.remove(&NetworkId::Vfn).unwrap();
+
+        // Verify the preferred protocols cache is empty
+        check_preferred_protocols_cache_length(&network_client, 0);
+
+        // Send a message to peer 1 and verify the cache is updated
+        let expected_protocol_id = match message_type {
+            MessageType::DirectSendMessage => ProtocolId::MempoolDirectSend,
+            MessageType::RpcMessage => ProtocolId::StorageServiceRpc,
+        };
+        send_message_and_check_preferred_protocols_cache(
+            &network_client,
+            &mut outbound_request_receivers,
+            &mut inbound_request_senders,
+            &mut validator_network_events,
+            &peer_network_id_1,
+            message_type,
+            expected_protocol_id,
+        )
+        .await;
+
+        // Verify the preferred protocols cache contains 1 entry
+        check_preferred_protocols_cache_length(&network_client, 1);
+
+        // Send a message to peer 2 and verify the cache is updated
+        let expected_protocol_id = match message_type {
+            MessageType::DirectSendMessage => ProtocolId::ConsensusDirectSendCompressed,
+            MessageType::RpcMessage => ProtocolId::ConsensusRpcBcs,
+        };
+        send_message_and_check_preferred_protocols_cache(
+            &network_client,
+            &mut outbound_request_receivers,
+            &mut inbound_request_senders,
+            &mut vfn_network_events,
+            &peer_network_id_2,
+            message_type,
+            expected_protocol_id,
+        )
+        .await;
+
+        // Verify the preferred protocols cache contains 2 entries
+        check_preferred_protocols_cache_length(&network_client, 2);
+
+        // Elapse enough time to force the cache invalidator to work
+        wait_for_cache_invalidation(&network_client, &time_service).await;
+
+        // Send multiple messages to peer 2 and verify the cache is updated
+        for _ in 0..10 {
+            send_message_and_check_preferred_protocols_cache(
+                &network_client,
+                &mut outbound_request_receivers,
+                &mut inbound_request_senders,
+                &mut vfn_network_events,
+                &peer_network_id_2,
+                message_type,
+                expected_protocol_id,
+            )
+            .await;
+        }
+
+        // Verify the preferred protocols cache contains 1 entry
+        check_preferred_protocols_cache_length(&network_client, 1);
+
+        // Elapse enough time to force the cache invalidator to work
+        wait_for_cache_invalidation(&network_client, &time_service).await;
+    }
+}
+
+#[tokio::test]
+async fn test_network_client_preferred_protocols_cache_broadcast() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    // Create three peers and initialize the connection metadata
+    let (peer_network_id_1, _) = create_peer_and_connection(
+        NetworkId::Validator,
+        vec![
+            ProtocolId::MempoolDirectSend,
+            ProtocolId::StateSyncDirectSend,
+        ],
+        peers_and_metadata.clone(),
+    );
+    let (peer_network_id_2, _) = create_peer_and_connection(
+        NetworkId::Vfn,
+        vec![
+            ProtocolId::ConsensusDirectSendCompressed,
+            ProtocolId::ConsensusDirectSendBcs,
+            ProtocolId::ConsensusDirectSendJson,
+        ],
+        peers_and_metadata.clone(),
+    );
+    let (peer_network_id_3, _) = create_peer_and_connection(
+        NetworkId::Public,
+        vec![ProtocolId::ConsensusDirectSendBcs],
+        peers_and_metadata.clone(),
+    );
+
+    // Create a network client with network senders
+    let (network_senders, _network_events, _outbound_request_receivers, _inbound_request_senders) =
+        create_network_sender_and_events(&network_ids);
+    let (network_client, time_service) = create_client_with_cache_invalidator(
+        &peers_and_metadata,
+        network_senders,
+        vec![
+            ProtocolId::StateSyncDirectSend,
+            ProtocolId::MempoolDirectSend,
+            ProtocolId::ConsensusDirectSendJson,
+            ProtocolId::ConsensusDirectSendCompressed,
+            ProtocolId::ConsensusDirectSendBcs,
+        ],
+        vec![],
+    );
+
+    // Verify the preferred protocols cache is empty
+    check_preferred_protocols_cache_length(&network_client, 0);
+
+    // Send a message to the peers
+    let all_peers = vec![peer_network_id_1, peer_network_id_2, peer_network_id_3];
+    network_client
+        .send_to_peers(DummyMessage::new_random(), &all_peers)
+        .unwrap();
+
+    // Verify the cache is updated correctly
+    check_preferred_protocols_cache_length(&network_client, 3);
+    let expected_protocol_ids = vec![
+        ProtocolId::StateSyncDirectSend,
+        ProtocolId::ConsensusDirectSendJson,
+        ProtocolId::ConsensusDirectSendBcs,
+    ];
+    for (i, expected_protocol_id) in expected_protocol_ids.into_iter().enumerate() {
+        let peer_network_id = all_peers.get(i).unwrap();
+        check_preferred_protocol_cache_entry(
+            &network_client,
+            peer_network_id,
+            MessageType::DirectSendMessage,
+            &expected_protocol_id,
+        );
+    }
+
+    // Elapse enough time to force the cache invalidator to work
+    wait_for_cache_invalidation(&network_client, &time_service).await;
+
+    // Send multiple messages to peer 1 and peer 3
+    for _ in 0..10 {
+        network_client
+            .send_to_peers(DummyMessage::new_random(), &[
+                peer_network_id_1,
+                peer_network_id_3,
+            ])
+            .unwrap();
+    }
+
+    // Verify the cache is updated correctly
+    check_preferred_protocols_cache_length(&network_client, 2);
+    check_preferred_protocol_cache_entry(
+        &network_client,
+        &peer_network_id_1,
+        MessageType::DirectSendMessage,
+        &ProtocolId::StateSyncDirectSend,
+    );
+    check_preferred_protocol_cache_entry(
+        &network_client,
+        &peer_network_id_3,
+        MessageType::DirectSendMessage,
+        &ProtocolId::ConsensusDirectSendBcs,
+    );
+
+    // Elapse enough time to force the cache invalidator to work
+    wait_for_cache_invalidation(&network_client, &time_service).await;
+}
+
+#[tokio::test]
+async fn test_network_client_preferred_protocols_cache_mixed() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    // Create three peers and initialize the connection metadata
+    let (peer_network_id_1, _) = create_peer_and_connection(
+        NetworkId::Validator,
+        vec![
+            ProtocolId::ConsensusDirectSendBcs,
+            ProtocolId::ConsensusRpcBcs,
+        ],
+        peers_and_metadata.clone(),
+    );
+    let (peer_network_id_2, _) = create_peer_and_connection(
+        NetworkId::Vfn,
+        vec![ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc],
+        peers_and_metadata.clone(),
+    );
+    let (peer_network_id_3, _) = create_peer_and_connection(
+        NetworkId::Public,
+        vec![
+            ProtocolId::ConsensusDirectSendCompressed,
+            ProtocolId::ConsensusRpcCompressed,
+        ],
+        peers_and_metadata.clone(),
+    );
+
+    // Create a network client with network senders
+    let (
+        network_senders,
+        network_events,
+        mut outbound_request_receivers,
+        mut inbound_request_senders,
+    ) = create_network_sender_and_events(&network_ids);
+    let (network_client, time_service) = create_client_with_cache_invalidator(
+        &peers_and_metadata,
+        network_senders,
+        vec![
+            ProtocolId::ConsensusDirectSendBcs,
+            ProtocolId::MempoolDirectSend,
+            ProtocolId::ConsensusDirectSendCompressed,
+        ],
+        vec![
+            ProtocolId::ConsensusRpcBcs,
+            ProtocolId::StorageServiceRpc,
+            ProtocolId::ConsensusRpcCompressed,
+        ],
+    );
+
+    // Extract the network and events
+    let mut network_and_events = network_events.into_network_and_events();
+    let validator_network_events = network_and_events.remove(&NetworkId::Validator).unwrap();
+    let vfn_network_events = network_and_events.remove(&NetworkId::Vfn).unwrap();
+    let public_network_events = network_and_events.remove(&NetworkId::Public).unwrap();
+
+    // Send an individual direct send message to all peers and check the cache
+    let all_peers = vec![peer_network_id_1, peer_network_id_2, peer_network_id_3];
+    let mut all_network_events = vec![
+        validator_network_events,
+        vfn_network_events,
+        public_network_events,
+    ];
+    let expected_protocol_ids = vec![
+        ProtocolId::ConsensusDirectSendBcs,
+        ProtocolId::MempoolDirectSend,
+        ProtocolId::ConsensusDirectSendCompressed,
+    ];
+    for (i, expected_protocol_id) in expected_protocol_ids.into_iter().enumerate() {
+        let peer_network_id = all_peers.get(i).unwrap();
+        let network_events = all_network_events.get_mut(i).unwrap();
+        send_message_and_check_preferred_protocols_cache(
+            &network_client,
+            &mut outbound_request_receivers,
+            &mut inbound_request_senders,
+            network_events,
+            peer_network_id,
+            MessageType::DirectSendMessage,
+            expected_protocol_id,
+        )
+        .await;
+    }
+    check_preferred_protocols_cache_length(&network_client, 3);
+
+    // Send an individual RPC message to the first two peers and check the cache
+    let expected_rpc_protocol_ids =
+        vec![ProtocolId::ConsensusRpcBcs, ProtocolId::StorageServiceRpc];
+    for (i, expected_protocol_id) in expected_rpc_protocol_ids.into_iter().enumerate() {
+        let peer_network_id = all_peers.get(i).unwrap();
+        let network_events = all_network_events.get_mut(i).unwrap();
+        send_message_and_check_preferred_protocols_cache(
+            &network_client,
+            &mut outbound_request_receivers,
+            &mut inbound_request_senders,
+            network_events,
+            peer_network_id,
+            MessageType::RpcMessage,
+            expected_protocol_id,
+        )
+        .await;
+    }
+    check_preferred_protocols_cache_length(&network_client, 5);
+
+    // Send multiple RPC messages to peer 3 and verify the cache is valid
+    for _ in 0..10 {
+        let public_network_events = all_network_events.get_mut(2).unwrap();
+        send_message_and_check_preferred_protocols_cache(
+            &network_client,
+            &mut outbound_request_receivers,
+            &mut inbound_request_senders,
+            public_network_events,
+            &peer_network_id_3,
+            MessageType::RpcMessage,
+            ProtocolId::ConsensusRpcCompressed,
+        )
+        .await;
+    }
+    check_preferred_protocols_cache_length(&network_client, 6);
+
+    // Send a message to all the peers and verify the cache hasn't changed
+    network_client
+        .send_to_peers(DummyMessage::new_random(), &all_peers)
+        .unwrap();
+    check_preferred_protocols_cache_length(&network_client, 6);
+
+    // Elapse enough time to force the cache invalidator to work
+    wait_for_cache_invalidation(&network_client, &time_service).await;
+
+    // Send a message to all the peers and verify the cache is updated
+    network_client
+        .send_to_peers(DummyMessage::new_random(), &all_peers)
+        .unwrap();
+    check_preferred_protocols_cache_length(&network_client, 3);
+}
+
+#[tokio::test]
+async fn test_network_client_preferred_protocols_cache_update() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    // Create two peers and initialize the connection metadata
+    let (peer_network_id_1, _) = create_peer_and_connection(
+        NetworkId::Validator,
+        vec![
+            ProtocolId::ConsensusDirectSendBcs,
+            ProtocolId::ConsensusRpcBcs,
+        ],
+        peers_and_metadata.clone(),
+    );
+    let (peer_network_id_2, _) = create_peer_and_connection(
+        NetworkId::Vfn,
+        vec![ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc],
+        peers_and_metadata.clone(),
+    );
+
+    // Create a network client with network senders
+    let (
+        network_senders,
+        network_events,
+        mut outbound_request_receivers,
+        mut inbound_request_senders,
+    ) = create_network_sender_and_events(&network_ids);
+    let (network_client, time_service) = create_client_with_cache_invalidator(
+        &peers_and_metadata,
+        network_senders,
+        vec![
+            ProtocolId::ConsensusDirectSendBcs,
+            ProtocolId::MempoolDirectSend,
+        ],
+        vec![ProtocolId::ConsensusRpcBcs, ProtocolId::StorageServiceRpc],
+    );
+
+    // Extract the network and events
+    let mut network_and_events = network_events.into_network_and_events();
+    let mut validator_network_events = network_and_events.remove(&NetworkId::Validator).unwrap();
+    let mut vfn_network_events = network_and_events.remove(&NetworkId::Vfn).unwrap();
+
+    // Manually overwrite the data in the cache
+    update_preferred_protocols_cache(
+        &network_client,
+        peer_network_id_1,
+        MessageType::DirectSendMessage,
+        ProtocolId::StateSyncDirectSend,
+    );
+    update_preferred_protocols_cache(
+        &network_client,
+        peer_network_id_2,
+        MessageType::DirectSendMessage,
+        ProtocolId::ConsensusDirectSendCompressed,
+    );
+    check_preferred_protocols_cache_length(&network_client, 2);
+
+    // Send messages to the two peers and verify the correct protocols are used
+    send_message_and_check_preferred_protocols_cache(
+        &network_client,
+        &mut outbound_request_receivers,
+        &mut inbound_request_senders,
+        &mut validator_network_events,
+        &peer_network_id_1,
+        MessageType::DirectSendMessage,
+        ProtocolId::StateSyncDirectSend,
+    )
+    .await;
+    send_message_and_check_preferred_protocols_cache(
+        &network_client,
+        &mut outbound_request_receivers,
+        &mut inbound_request_senders,
+        &mut vfn_network_events,
+        &peer_network_id_2,
+        MessageType::DirectSendMessage,
+        ProtocolId::ConsensusDirectSendCompressed,
+    )
+    .await;
+
+    // Send multiple messages to the two peers and verify the advertised protocols are used
+    for _ in 0..10 {
+        // Elapse enough time to force the cache invalidator to work
+        wait_for_cache_invalidation(&network_client, &time_service).await;
+
+        // Send the messages to the peers
+        send_message_and_check_preferred_protocols_cache(
+            &network_client,
+            &mut outbound_request_receivers,
+            &mut inbound_request_senders,
+            &mut validator_network_events,
+            &peer_network_id_1,
+            MessageType::DirectSendMessage,
+            ProtocolId::ConsensusDirectSendBcs,
+        )
+        .await;
+        send_message_and_check_preferred_protocols_cache(
+            &network_client,
+            &mut outbound_request_receivers,
+            &mut inbound_request_senders,
+            &mut vfn_network_events,
+            &peer_network_id_2,
+            MessageType::DirectSendMessage,
+            ProtocolId::MempoolDirectSend,
+        )
+        .await;
+    }
+    check_preferred_protocols_cache_length(&network_client, 2);
+}
+
+/// Updates the preferred protocols cache with the given data entry
+fn update_preferred_protocols_cache(
+    network_client: &NetworkClient<DummyMessage>,
+    peer_network_id: PeerNetworkId,
+    message_type: MessageType,
+    expected_protocol_id: ProtocolId,
+) {
+    network_client
+        .get_preferred_protocol_for_peer_cache()
+        .write()
+        .insert((peer_network_id, message_type), expected_protocol_id);
 }
 
 /// Verifies that the available peers are correct
@@ -1077,10 +1560,131 @@ fn compare_vectors_ignore_order<T: Clone + Debug + Ord>(
     assert_eq!(vector_1, vector_2);
 }
 
+/// Sends an RPC message to the specified peer. We spawn this on a
+/// separate thread, otherwise we'll block waiting for the response.
+fn send_rpc_to_peer(
+    network_client: NetworkClient<DummyMessage>,
+    message: DummyMessage,
+    rpc_timeout: Duration,
+    peer_network_id: PeerNetworkId,
+) {
+    tokio::spawn(async move {
+        network_client
+            .send_to_peer_rpc(message, rpc_timeout, peer_network_id)
+            .await
+            .unwrap()
+    });
+}
+
+/// Sends a message to the specified peer and verifies that
+/// the preferred protocols cache contains the expected entry.
+async fn send_message_and_check_preferred_protocols_cache(
+    network_client: &NetworkClient<DummyMessage>,
+    outbound_request_receivers: &mut HashMap<
+        NetworkId,
+        aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+    >,
+    inbound_request_senders: &mut HashMap<
+        NetworkId,
+        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+    >,
+    network_events: &mut NetworkEvents<DummyMessage>,
+    peer_network_id: &PeerNetworkId,
+    message_type: MessageType,
+    protocol_id: ProtocolId,
+) {
+    // Send a simple message to the peer based on the message type
+    let dummy_message = DummyMessage::new_random();
+    match message_type {
+        MessageType::DirectSendMessage => {
+            // Send the message
+            network_client
+                .send_to_peer(dummy_message.clone(), *peer_network_id)
+                .unwrap();
+
+            // Wait for the network event
+            wait_for_network_event(
+                *peer_network_id,
+                outbound_request_receivers,
+                inbound_request_senders,
+                network_events,
+                false,
+                Some(protocol_id),
+                None,
+                dummy_message,
+            )
+            .await;
+        },
+        MessageType::RpcMessage => {
+            // Send the message
+            let rpc_timeout = Duration::from_secs(MAX_MESSAGE_TIMEOUT_SECS);
+            send_rpc_to_peer(
+                network_client.clone(),
+                dummy_message.clone(),
+                rpc_timeout,
+                *peer_network_id,
+            );
+
+            // Wait for the network event
+            wait_for_network_event(
+                *peer_network_id,
+                outbound_request_receivers,
+                inbound_request_senders,
+                network_events,
+                true,
+                None,
+                Some(protocol_id),
+                dummy_message,
+            )
+            .await;
+        },
+    }
+
+    // Verify the cache has been updated
+    check_preferred_protocol_cache_entry(
+        network_client,
+        peer_network_id,
+        message_type,
+        &protocol_id,
+    );
+}
+
+/// Verifies that the preferred protocol cache contains
+/// the expected entry.
+fn check_preferred_protocol_cache_entry(
+    network_client: &NetworkClient<DummyMessage>,
+    peer_network_id: &PeerNetworkId,
+    message_type: MessageType,
+    expected_protocol_id: &ProtocolId,
+) {
+    let cache_key = &(*peer_network_id, message_type);
+    let preferred_protocols_cache = network_client
+        .get_preferred_protocol_for_peer_cache()
+        .read();
+    assert_eq!(
+        preferred_protocols_cache.get(cache_key).unwrap(),
+        expected_protocol_id
+    );
+}
+
+/// Verifies that the preferred protocols for peer cache length is correct
+fn check_preferred_protocols_cache_length(
+    network_client: &NetworkClient<DummyMessage>,
+    expected_length: usize,
+) {
+    assert_eq!(
+        network_client
+            .get_preferred_protocol_for_peer_cache()
+            .read()
+            .len(),
+        expected_length
+    );
+}
+
 /// Returns an aptos channel for testing
 fn create_aptos_channel<K: Eq + Hash + Clone, T>(
 ) -> (aptos_channel::Sender<K, T>, aptos_channel::Receiver<K, T>) {
-    aptos_channel::new(QueueStyle::FIFO, 10, None)
+    aptos_channel::new(QueueStyle::FIFO, 100, None)
 }
 
 /// Creates a set of network senders and events for the specified
@@ -1130,6 +1734,33 @@ fn create_network_sender_and_events(
         outbound_request_receivers,
         inbound_request_senders,
     )
+}
+
+/// Creates a new network client with the given protocols
+/// and spawns the cache invalidator.
+fn create_client_with_cache_invalidator(
+    peers_and_metadata: &Arc<PeersAndMetadata>,
+    network_senders: HashMap<NetworkId, NetworkSender<DummyMessage>>,
+    direct_send_protocols_and_preferences: Vec<ProtocolId>,
+    rpc_protocols_and_preferences: Vec<ProtocolId>,
+) -> (NetworkClient<DummyMessage>, TimeService) {
+    // Create the client
+    let network_client: NetworkClient<DummyMessage> = NetworkClient::new(
+        direct_send_protocols_and_preferences,
+        rpc_protocols_and_preferences,
+        network_senders,
+        peers_and_metadata.clone(),
+    );
+
+    // Spawn the cache invalidator
+    let time_service = TimeService::mock();
+    network_client.spawn_preferred_protocol_cache_invalidator(
+        CACHE_INVALIDATION_FREQUENCY_SECS,
+        time_service.clone(),
+        Handle::current(),
+    );
+
+    (network_client, time_service)
 }
 
 /// Creates a new peer and connection metadata using the
@@ -1196,6 +1827,46 @@ fn update_connection_metadata(
         .unwrap();
 }
 
+/// Advances enough time that the cache invalidator is able to refresh
+async fn wait_for_cache_invalidation(
+    network_client: &NetworkClient<DummyMessage>,
+    time_service: &TimeService,
+) {
+    // Verify the cache is not empty
+    assert!(!network_client
+        .get_preferred_protocol_for_peer_cache()
+        .read()
+        .is_empty());
+
+    // Wait until the cache invalidator runs, or times out
+    let timer = Instant::now();
+    loop {
+        // If the cache invalidator has executed, we're done
+        if network_client
+            .get_preferred_protocol_for_peer_cache()
+            .read()
+            .is_empty()
+        {
+            return;
+        }
+
+        // Elapse enough time to force the cache invalidator to run
+        let cache_invalidation_duration = Duration::from_secs(CACHE_INVALIDATION_FREQUENCY_SECS);
+        time_service
+            .clone()
+            .into_mock()
+            .advance_async(cache_invalidation_duration)
+            .await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // If we've hit the timeout, something has gone wrong!
+        let loop_duration = timer.elapsed();
+        if loop_duration > Duration::from_secs(CACHE_INVALIDATION_TIMEOUT_SECS) {
+            panic!("The cache invalidator doesn't appear to be running!");
+        }
+    }
+}
+
 /// Waits for a network event on the expected channels and
 /// verifies the message contents.
 async fn wait_for_network_event(
@@ -1257,9 +1928,9 @@ async fn wait_for_network_event(
             let inbound_request_sender = inbound_request_senders.get_mut(&expected_network_id).unwrap();
             inbound_request_sender.push((expected_peer_id, protocol_id), peer_manager_notification).unwrap();
         }
-        Err(elapsed) => panic!(
+        Err(_) => panic!(
             "Timed out while waiting to receive a message on the outbound receivers channel. Elapsed: {:?}",
-            elapsed
+            channel_wait_time
         ),
     }
 

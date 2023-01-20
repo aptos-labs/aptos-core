@@ -45,7 +45,7 @@ pub enum ProtocolId {
     ConsensusRpcBcs = 0,
     ConsensusDirectSendBcs = 1,
     MempoolDirectSend = 2,
-    StateSyncDirectSend = 3,
+    StateSyncDirectSend = 3, // Currently unused
     DiscoveryDirectSend = 4, // Currently unused
     HealthCheckerRpc = 5,
     ConsensusDirectSendJson = 6, // Json provides flexibility for backwards compatible upgrade
