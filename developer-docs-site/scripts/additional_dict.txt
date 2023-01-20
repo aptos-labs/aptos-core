@@ -365,6 +365,7 @@ schema
 schemas
 sdk
 sdks
+sft
 sharded
 sharding
 signAndSubmitTransaction
