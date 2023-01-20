@@ -11,4 +11,5 @@ You have numerous options for testing your work on Aptos locally.
 - ### [Run a Local Testnet with Aptos CLI](./using-cli-to-run-a-local-testnet.md)
 - ### [Run a Local Testnet with Validator](./run-a-local-testnet.md)
 - ### [Run a Local Multinode Network](../../guides/running-a-local-multi-node-network.md)
+- ### [Run a Validator Localnet with Indexer](./localnet-indexer.md)
 

@@ -5,7 +5,13 @@ slug: "indexer-fullnode"
 
 # Run an Aptos Indexer
 
+<<<<<<< HEAD
 This document describes how to operate an indexer fullnode on the Aptos network. To understand and ingest the indexer data in your app, see [Use the Aptos Indexer](../guides/indexing.md).
+=======
+This document describes how to run an [indexer fullnode](https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer) on the Aptos network. See [Run Validator Localnet with Indexer](./local-testnet/localnet-indexer.md) to run an Aptos indexer locally.
+
+See the [Indexing](/guides/indexing.md) guide that describes the indexing concept and provides the available options for the indexing service on the Aptos blockchain.
+>>>>>>> 9541002e9f (Add Indexer Localnet setup doc, move Develop Locally to Nodes section)
 
 :::danger On macOS with Apple silicon only
 The below installation steps are verified only on macOS with Apple silicon. They might require minor tweaking when running on other builds.
