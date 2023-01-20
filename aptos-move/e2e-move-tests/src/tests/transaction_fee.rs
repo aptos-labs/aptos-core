@@ -12,8 +12,7 @@ use aptos_types::{
     transaction::{SignedTransaction, TransactionArgument},
 };
 
-/// Helper which creates transactions that send transfers between 2 accounts.
-// TODO: Generate workload using account universe and p2p.
+/// Creates transactions that send transfers between 2 accounts.
 fn p2p_txns_for_test(
     harness: &mut MoveHarness,
     peer1: &Account,
@@ -22,25 +21,31 @@ fn p2p_txns_for_test(
 ) -> Vec<SignedTransaction> {
     let mut result = vec![];
     (0..num_txn_pairs).for_each(|_| {
-        // Make transfers both ways to ensure that balances stay the same.
+        // For these tests we do not care about what these transactions do, as
+        // long as they are charged gas. Therefore, make transfers both ways to
+        // ensure that balances stay the same.
         result.push(harness.create_transaction_payload(
             peer1,
-            aptos_stdlib::aptos_coin_transfer(*peer1.address(), 10),
+            aptos_stdlib::aptos_coin_transfer(*peer2.address(), 10),
         ));
         result.push(harness.create_transaction_payload(
             peer2,
-            aptos_stdlib::aptos_coin_transfer(*peer2.address(), 10),
+            aptos_stdlib::aptos_coin_transfer(*peer1.address(), 10),
         ));
     });
     result
 }
 
+/// Compiles the script at the given package and returns it as a signed
+/// transaction.
 fn create_script(
     harness: &mut MoveHarness,
     package_name: &str,
     sender: &Account,
     args: Vec<TransactionArgument>,
 ) -> SignedTransaction {
+    // Each script has to live in their own package, and there is no real
+    // workaround here but to compile all packages separately.
     let package = aptos_framework::BuiltPackage::build(
         common::test_dir_path(format!("transaction_fee.data/{}", package_name).as_str()),
         aptos_framework::BuildOptions::default(),
@@ -52,8 +57,6 @@ fn create_script(
 
 fn test_fee_collection_and_distribution(burn_percentage: u8) {
     let mut harness = MoveHarness::new();
-
-    // Dummy accounts.
     let alice = harness.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
     let bob = harness.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
 
@@ -70,11 +73,13 @@ fn test_fee_collection_and_distribution(burn_percentage: u8) {
 
     let supply_before = harness.executor.read_coin_supply().unwrap();
 
+    // Run a single block and record how much gas it costs. Since fee collection
+    // is enabled, this amount is stored in aggregatable coin.
     let txns = p2p_txns_for_test(&mut harness, &alice, &bob, 1000);
     let gas_used = harness.run_block_with_metadata(*validator.address(), vec![], txns);
 
     // Make sure we call `new_block_with_metadata` to drain aggregatable coin.
-    // Calling just `new_epoch` will not work because we fast-forward without
+    // Simply calling `new_epoch` will not work because we fast-forward without
     // draining!
     harness.new_block_with_metadata(*validator.address(), vec![]);
 
@@ -86,10 +91,9 @@ fn test_fee_collection_and_distribution(burn_percentage: u8) {
         0
     );
 
-    harness.new_epoch();
-
     // On the new epoch, the collected fees are processed and added to the stake
     // pool.
+    harness.new_epoch();
     let collected_amount = gas_used - burnt_amount;
     stake_amount += rewards_per_epoch + collected_amount;
     assert_eq!(
@@ -99,33 +103,35 @@ fn test_fee_collection_and_distribution(burn_percentage: u8) {
 }
 
 #[test]
+/// A simple test that does not check any edge cases and instead simply checks
+/// if the calculations for the burnt/collected amounts match.
 fn test_fee_collection_and_distribution_for_burn_percentages() {
-    // Test multiple burn percentages including the corner cases of 0 and 100.
+    // Test multiple burn percentages including the cases of 0 and 100.
     for burn_percentage in [100, 75, 25, 0] {
         test_fee_collection_and_distribution(burn_percentage)
     }
 }
 
 #[test]
-fn test_end_to_end_flow() {
-    // Set-up.
+fn test_initialize_and_enable_fee_collection_and_distribution() {
     let mut harness = MoveHarness::new();
-
-    // Dummy accounts.
     let alice = harness.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
     let bob = harness.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
 
-    // Initialize core resources and a validator.
+    // Create a core resources account so that we can send imitations of
+    // accepted proposal scripts.
     let core_resources =
         harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
-    let validator = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
+
+    // Initialize a validator.
     let rewards_per_epoch = 285;
     let mut stake_amount = 25_000_000;
+    let validator = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
     assert_success!(setup_staking(&mut harness, &validator, stake_amount));
     harness.new_epoch();
 
     // Create transactions to initialize resources for gas fees collection &
-    // distribution and enable/disable it.
+    // distribution and enable it.
     let burn_percentage = 0;
     let init_script = create_script(
         &mut harness,
@@ -134,7 +140,6 @@ fn test_end_to_end_flow() {
         vec![TransactionArgument::U8(burn_percentage)],
     );
     let enable_script = create_script(&mut harness, "enable_collection", &core_resources, vec![]);
-    // let disable_script = create_script(&mut harness, "disable_collection", &core_resources, vec![]);
 
     // Create a block of transactions such that:
     //   1. First 10 transactions are p2p.
@@ -142,7 +147,6 @@ fn test_end_to_end_flow() {
     //   3. Another 10 transactions are p2p.
     //   4. A single transaction enabling fees collection.
     //   5. Remaining transactions are p2p (should end up being Retry).
-
     let mut txns = p2p_txns_for_test(&mut harness, &alice, &bob, 20);
     txns.insert(10, init_script);
     txns.insert(21, enable_script);
@@ -158,11 +162,11 @@ fn test_end_to_end_flow() {
         stake_amount
     );
 
-    // In the prvious block, the fee was only collected for the last script
+    // In the previous block, the fee was only collected for the last script
     // transaction which enabled the feature. In this block, we drain
     // aggregatable coin and try to assign the fee to the validator. Since the
     // proposer is not set (when feature flag was enabled), the fee is simply
-    // burnt and the stake pool should remain the same.
+    // burnt and the stake pool should have the same value.
     harness.new_block_with_metadata(*validator.address(), vec![]);
     let supply_after = harness.executor.read_coin_supply().unwrap();
     assert_eq!(
@@ -174,13 +178,17 @@ fn test_end_to_end_flow() {
         stake_amount
     );
 
-    // Normal flow.
-    let txns = p2p_txns_for_test(&mut harness, &alice, &bob, 100);
+    // While fees collection is enabled,
     let supply_before = harness.executor.read_coin_supply().unwrap();
+    let txns = p2p_txns_for_test(&mut harness, &alice, &bob, 100);
     let gas_used = harness.run_block_with_metadata(*validator.address(), vec![], txns);
-    let burnt_amount = (burn_percentage as u64) * gas_used / 100;
+
+    // Run an empty block to drain the aggregatable coin. Fees are assigned to
+    // validators and therefore the total supply changes only becoase some
+    // percentage was burnt.
     harness.new_block_with_metadata(*validator.address(), vec![]);
     let supply_after = harness.executor.read_coin_supply().unwrap();
+    let burnt_amount = (burn_percentage as u64) * gas_used / 100;
     assert_eq!(
         supply_after.abs_diff(supply_before - burnt_amount as u128),
         0

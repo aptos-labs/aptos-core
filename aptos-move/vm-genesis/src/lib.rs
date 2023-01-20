@@ -403,7 +403,6 @@ fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
         FeatureFlag::CODE_DEPENDENCY_CHECK,
         FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
         FeatureFlag::VM_BINARY_FORMAT_V6,
-        FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES,
     ];
     let features: Vec<u64> = features.into_iter().map(|f| f as u64).collect();
 
@@ -584,13 +583,19 @@ fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePa
         });
 
     // Call the initialize function with the metadata.
-    exec_function(session, CODE_MODULE_NAME, "initialize", vec![], vec![
-        MoveValue::Signer(CORE_CODE_ADDRESS)
-            .simple_serialize()
-            .unwrap(),
-        MoveValue::Signer(addr).simple_serialize().unwrap(),
-        bcs::to_bytes(pack.package_metadata()).unwrap(),
-    ]);
+    exec_function(
+        session,
+        CODE_MODULE_NAME,
+        "initialize",
+        vec![],
+        vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS)
+                .simple_serialize()
+                .unwrap(),
+            MoveValue::Signer(addr).simple_serialize().unwrap(),
+            bcs::to_bytes(pack.package_metadata()).unwrap(),
+        ],
+    );
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
