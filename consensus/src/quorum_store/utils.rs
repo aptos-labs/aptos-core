@@ -8,8 +8,10 @@ use crate::{
         types::{BatchId, SerializedTransaction},
     },
 };
-use aptos_consensus_types::common::{Round, TransactionSummary};
-use aptos_consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
+use aptos_consensus_types::{
+    common::{Round, TransactionSummary},
+    proof_of_store::{LogicalTime, ProofOfStore},
+};
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
