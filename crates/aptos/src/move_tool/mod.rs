@@ -481,6 +481,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             named_addresses: move_options.named_addresses(),
             docgen_options: Some(docgen_options),
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
+            bytecode_version: move_options.bytecode_version,
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
