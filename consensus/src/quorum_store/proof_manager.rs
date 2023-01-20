@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::batch_reader::BatchReader;
 use crate::{
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{counters, utils::ProofQueue},
@@ -14,7 +15,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -31,6 +32,7 @@ pub struct ProofManager {
     back_pressure_local_batch_limit: usize,
     remaining_proof_num: usize,
     remaining_local_proof_num: usize,
+    batch_reader: Arc<BatchReader>,
 }
 
 impl ProofManager {
@@ -38,6 +40,7 @@ impl ProofManager {
         epoch: u64,
         back_pressure_limit: usize,
         back_pressure_local_batch_limit: usize,
+        batch_reader: Arc<BatchReader>,
     ) -> Self {
         Self {
             proofs_for_consensus: ProofQueue::new(),
@@ -46,6 +49,7 @@ impl ProofManager {
             back_pressure_local_batch_limit,
             remaining_proof_num: 0,
             remaining_local_proof_num: 0,
+            batch_reader,
         }
     }
 
@@ -81,7 +85,7 @@ impl ProofManager {
         self.proofs_for_consensus.mark_committed(digests);
     }
 
-    pub(crate) fn handle_proposal_request(&mut self, msg: BlockProposalCommand) {
+    pub(crate) async fn handle_proposal_request(&mut self, msg: BlockProposalCommand) {
         match msg {
             // TODO: check what max_txns consensus is using
             BlockProposalCommand::GetBlockRequest(round, max_txns, max_bytes, filter, callback) => {
@@ -94,12 +98,19 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let proof_block = self.proofs_for_consensus.pull_proofs(
-                    &excluded_proofs,
-                    LogicalTime::new(self.latest_logical_time.epoch(), round),
-                    max_txns,
-                    max_bytes,
-                );
+                let curr_time = aptos_infallible::duration_since_epoch();
+
+                let proof_block = self
+                    .proofs_for_consensus
+                    .pull_proofs(
+                        &excluded_proofs,
+                        LogicalTime::new(self.latest_logical_time.epoch(), round),
+                        max_txns,
+                        max_bytes,
+                        self.batch_reader.clone(),
+                        curr_time,
+                    )
+                    .await;
                 self.remaining_local_proof_num = self
                     .proofs_for_consensus
                     .clean_local_proofs(LogicalTime::new(self.latest_logical_time.epoch(), round));
@@ -144,7 +155,7 @@ impl ProofManager {
 
             tokio::select! {
                 Some(msg) = proposal_rx.next() => {
-                    self.handle_proposal_request(msg);
+                    self.handle_proposal_request(msg).await;
 
                     let updated_back_pressure = self.qs_back_pressure();
                     if updated_back_pressure != back_pressure {

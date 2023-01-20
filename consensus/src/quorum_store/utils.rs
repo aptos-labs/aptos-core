@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::batch_reader::BatchReader;
 use crate::{
     monitor,
     quorum_store::{
@@ -16,7 +17,10 @@ use aptos_logger::debug;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use chrono::Utc;
-use futures::channel::{mpsc::Sender, oneshot};
+use futures::{
+    channel::{mpsc::Sender, oneshot},
+    Future,
+};
 use std::{
     cmp::Reverse,
     collections::{
@@ -25,6 +29,7 @@ use std::{
     },
     hash::Hash,
     mem,
+    sync::Arc,
     time::Duration,
 };
 use tokio::time::timeout;
@@ -251,12 +256,14 @@ impl ProofQueue {
 
     // gets excluded and iterates over the vector returning non excluded or expired entries.
     // return the vector of pulled PoS, and the size of the remaining PoS
-    pub(crate) fn pull_proofs(
+    pub(crate) async fn pull_proofs(
         &mut self,
         excluded_proofs: &HashSet<HashValue>,
         current_time: LogicalTime,
         max_txns: u64,
         max_bytes: u64,
+        batch_reader: Arc<BatchReader>,
+        curr_time: Duration,
     ) -> Vec<ProofOfStore> {
         let num_expired = self
             .digest_queue
@@ -295,13 +302,24 @@ impl ProofQueue {
                     .expect("Entry for unexpired digest must exist")
                 {
                     Some(proof) => {
-                        cur_bytes += proof.info().num_bytes;
-                        cur_txns += proof.info().num_txns;
-                        if cur_bytes > max_bytes || cur_txns > max_txns {
-                            // Exceeded the limit for requested bytes or number of transactions.
-                            break;
+                        match batch_reader.get_batch_optimistic(proof.clone()).await {
+                            Some(txns) => {
+                                let mut unexpired = 0;
+                                txns.iter().for_each(|txn| {
+                                    if txn.expiration_timestamp_secs() < curr_time.as_secs() {
+                                        unexpired += 1;
+                                    }
+                                });
+                                cur_bytes += proof.info().num_bytes;
+                                cur_txns += unexpired;
+                                if cur_bytes > max_bytes || cur_txns > max_txns {
+                                    // Exceeded the limit for requested bytes or number of transactions.
+                                    break;
+                                }
+                                ret.push(proof.clone());
+                            },
+                            None => {},
                         }
-                        ret.push(proof.clone());
                     },
                     None => {}, // Proof was already committed, skip.
                 }
