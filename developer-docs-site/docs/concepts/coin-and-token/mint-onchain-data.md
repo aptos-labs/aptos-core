@@ -1,6 +1,6 @@
 ---
 title: "Mint FTs with On-Chain Data"
-id: "silver-coin"
+id: "onchain-data"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';

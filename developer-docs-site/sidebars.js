@@ -144,10 +144,10 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "concepts/coin-and-token/aptos-token-overview",
+        "concepts/coin-and-token/aptos-token-comparison",
         "tutorials/your-first-nft",
         "guides/move-guides/mint-nft-cli",
-        "concepts/coin-and-token/mint-onchain-data",
+        "concepts/coin-and-token/onchain-data",
       ],
     },
     {

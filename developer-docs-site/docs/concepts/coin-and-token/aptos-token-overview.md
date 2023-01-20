@@ -1,6 +1,6 @@
 ---
-title: "Aptos Token Comparison"
-id: "aptos-token-overview"
+title: "Compare Aptos Tokens"
+id: "aptos-token-comparison"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
