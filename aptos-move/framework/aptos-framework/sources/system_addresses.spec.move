@@ -34,7 +34,7 @@ spec aptos_framework::system_addresses {
     spec assert_framework_reserved_address(account: &signer) {
         aborts_if !is_framework_reserved_address(signer::address_of(account));
     }
-    
+
     /// Specifies that a function aborts if the account does not have the aptos framework address.
     spec schema AbortsIfNotAptosFramework {
         account: signer;
