@@ -100,7 +100,7 @@ impl BatchGenerator {
         }
     }
 
-    async fn handle_scheduled_pull(
+    pub(crate) async fn handle_scheduled_pull(
         &mut self,
         end_batch_when_back_pressure: bool,
     ) -> Option<ProofCompletedChannel> {

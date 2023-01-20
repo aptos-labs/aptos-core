@@ -15,21 +15,21 @@ use std::sync::Arc;
 use tokio::sync::mpsc::channel;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_proof_builder_basic() {
+async fn test_proof_coordinator_basic() {
     let (signers, verifier) = random_validator_verifier(4, None, true);
     let arc_signers: Vec<Arc<ValidatorSigner>> =
         signers.clone().into_iter().map(Arc::new).collect();
-    let proof_builder = ProofCoordinator::new(100, signers[0].author());
-    let (proof_builder_tx, proof_builder_rx) = channel(100);
+    let proof_coordinator = ProofCoordinator::new(100, signers[0].author());
+    let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     // TODO: check proof_manager_rx
     let (proof_manager_tx, _proof_manager_rx) = channel(100);
-    tokio::spawn(proof_builder.start(proof_builder_rx, proof_manager_tx, verifier.clone()));
+    tokio::spawn(proof_coordinator.start(proof_coordinator_rx, proof_manager_tx, verifier.clone()));
 
     let digest = compute_digest_from_signed_transaction(create_vec_signed_transactions(100));
     let signed_digest_info = SignedDigestInfo::new(digest, LogicalTime::new(1, 20), 1, 1);
     let (proof_tx, proof_rx) = oneshot::channel();
 
-    assert!(proof_builder_tx
+    assert!(proof_coordinator_tx
         .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info.clone(),
             0,
@@ -41,7 +41,7 @@ async fn test_proof_builder_basic() {
         let signed_digest =
             SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signer.clone())
                 .unwrap();
-        assert!(proof_builder_tx
+        assert!(proof_coordinator_tx
             .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
             .await
             .is_ok());
@@ -55,7 +55,7 @@ async fn test_proof_builder_basic() {
 
     // check that error path
     let (proof_tx, proof_rx) = oneshot::channel();
-    assert!(proof_builder_tx
+    assert!(proof_coordinator_tx
         .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info.clone(),
             4,
@@ -70,7 +70,7 @@ async fn test_proof_builder_basic() {
 
     // check same digest after expiration
     let (proof_tx, proof_rx) = oneshot::channel();
-    assert!(proof_builder_tx
+    assert!(proof_coordinator_tx
         .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info.clone(),
             4,
@@ -82,7 +82,7 @@ async fn test_proof_builder_basic() {
         let signed_digest =
             SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signer.clone())
                 .unwrap();
-        assert!(proof_builder_tx
+        assert!(proof_coordinator_tx
             .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
             .await
             .is_ok());
@@ -94,7 +94,7 @@ async fn test_proof_builder_basic() {
 
     // check wrong signatures
     let (proof_tx, proof_rx) = oneshot::channel();
-    assert!(proof_builder_tx
+    assert!(proof_coordinator_tx
         .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info,
             10,
@@ -112,7 +112,7 @@ async fn test_proof_builder_basic() {
             arc_signers[1].clone(),
         )
         .unwrap();
-        assert!(proof_builder_tx
+        assert!(proof_coordinator_tx
             .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
             .await
             .is_ok());
