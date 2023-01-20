@@ -139,7 +139,6 @@ const sidebars = {
         "concepts/base-gas",
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",
-        "guides/move-guides/mint-nft-cli",
         "guides/move-guides/upgrading-move-code",
       ],
     },
@@ -148,7 +147,7 @@ const sidebars = {
       label: "Create NFTs",
       collapsible: true,
       collapsed: true,
-      items: [ "concepts/coin-and-token/aptos-token-overview", "tutorials/your-first-nft", "concepts/coin-and-token/silver-coin"],
+      items: [ "concepts/coin-and-token/aptos-token-overview", "tutorials/your-first-nft", "guides/move-guides/mint-nft-cli", "concepts/coin-and-token/silver-coin"],
     },
     {
       type: "category",
