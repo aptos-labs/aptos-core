@@ -1102,7 +1102,7 @@ module aptos_framework::account {
     }
 
     #[test(bob = @0x345, charlie = @0x567, framework = @aptos_framework)]
-    #[expected_failure(abort_code = 393234, location = Self)]
+    #[expected_failure(abort_code = 393235, location = Self)]
     public entry fun test_invalid_revoke_rotation_capability(bob: signer, charlie: signer, framework: signer) acquires Account {
         chain_id::initialize_for_test(&framework, 4);
         let (alice_sk, alice_pk) = ed25519::generate_keys();
