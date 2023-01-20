@@ -109,11 +109,7 @@ const sidebars = {
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
-      items: [
-        "tutorials/first-transaction",
-        "tutorials/first-dapp",
-        "tutorials/first-coin",
-      ],
+      items: ["tutorials/first-transaction", "tutorials/first-dapp", "tutorials/first-coin"],
     },
     {
       type: "category",
@@ -147,7 +143,12 @@ const sidebars = {
       label: "Create NFTs",
       collapsible: true,
       collapsed: true,
-      items: [ "concepts/coin-and-token/aptos-token-overview", "tutorials/your-first-nft", "guides/move-guides/mint-nft-cli", "concepts/coin-and-token/silver-coin"],
+      items: [
+        "concepts/coin-and-token/aptos-token-overview",
+        "tutorials/your-first-nft",
+        "guides/move-guides/mint-nft-cli",
+        "concepts/coin-and-token/mint-onchain-data",
+      ],
     },
     {
       type: "category",
