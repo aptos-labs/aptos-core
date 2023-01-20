@@ -56,9 +56,7 @@ impl HealthCheckerBuilder {
 
     pub fn start(&mut self, executor: &Handle) {
         if let Some(service) = self.service.take() {
-            if let Err(e) = spawn_named!("[Network] HC", executor, service.start()) {
-                debug!("QS: spawn_named [Network] HC error {:?}", e);
-            }
+            spawn_named!("[Network] HC", executor, service.start()).unwrap();
         }
     }
 }

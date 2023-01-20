@@ -421,58 +421,52 @@ impl BatchReader {
             network_sender.clone(),
         );
 
-        // TODO: experiment / decide on the parameter for generating the interval duration (i.e. "/2").
-        // TODO: changed because we need to be able to shutdown fast-ish, not in 5 seconds
         let mut interval = time::interval(Duration::from_millis(100));
 
         loop {
-            // TODO: shutdown?
             tokio::select! {
                 biased;
 
                 _ = interval.tick() => {
                     batch_requester.handle_timeouts().await;
-            if self.shutdown_flag.load(Ordering::Relaxed) {
-            break;
-            }
+                    if self.shutdown_flag.load(Ordering::Relaxed) {
+                        break;
+                    }
                 },
 
                 Some(cmd) = batch_reader_rx.recv() => {
                     match cmd {
-            BatchReaderCommand::GetBatchForPeer(digest, peer_id) => {
-                if let Some(value) = self.db_cache.get(&digest) {
-
-            match payload_storage_mode(&value) {
-                StorageMode::PersistedOnly => {
-                    assert!(value.maybe_payload.is_none(),
-                                            "BatchReader payload and storage kind mismatch");
-                    self.batch_store_tx
-                    .send(BatchStoreCommand::BatchRequest(digest, peer_id, None))
-                    .await
-                    .expect("Failed to send to BatchStore"); // TODO: I think we have a race here. Batch store can stop before batch reader.
-                },
-            StorageMode::MemoryAndPersisted => {
-                let batch = Batch::new(
-                    self.my_peer_id,
-                    self.epoch(),
-                    digest,
-                    value.maybe_payload.clone().expect("BatchReader payload and storage kind mismatch"),
-                    );
-                    network_sender.send_batch(batch, vec![peer_id]).await;
-            }
-                    } // TODO: consider returning Nack
-                }
-            }
+                        BatchReaderCommand::GetBatchForPeer(digest, peer_id) => {
+                            if let Some(value) = self.db_cache.get(&digest) {
+                                match payload_storage_mode(&value) {
+                                    StorageMode::PersistedOnly => {
+                                        assert!(value.maybe_payload.is_none(), "BatchReader payload and storage kind mismatch");
+                                        if self.batch_store_tx.send(BatchStoreCommand::BatchRequest(digest, peer_id, None)).await.is_err() {
+                                            debug!("Failed to send request to BatchStore");
+                                        }
+                                    },
+                                    StorageMode::MemoryAndPersisted => {
+                                        let batch = Batch::new(
+                                            self.my_peer_id,
+                                            self.epoch(),
+                                            digest,
+                                            value.maybe_payload.clone().expect("BatchReader payload and storage kind mismatch"),
+                                        );
+                                        network_sender.send_batch(batch, vec![peer_id]).await;
+                                    },
+                                } // TODO: consider returning Nack
+                            }
+                        },
                         BatchReaderCommand::GetBatchForSelf(proof, ret_tx) => {
                             batch_requester
                                 .add_request(*proof.digest(), proof.shuffled_signers(&verifier), ret_tx)
                                 .await;
-                        }
+                        },
                         BatchReaderCommand::BatchResponse(digest, payload) => {
                             batch_requester.serve_request(digest, payload);
-                        }
+                        },
                     }
-                }
+                },
             }
         }
 
