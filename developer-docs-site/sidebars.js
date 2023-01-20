@@ -111,7 +111,6 @@ const sidebars = {
       collapsed: true,
       items: [
         "tutorials/first-transaction",
-        "tutorials/your-first-nft",
         "tutorials/first-dapp",
         "tutorials/first-coin",
       ],
@@ -146,7 +145,14 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Aptos Wallet Adapter",
+      label: "Create NFTs",
+      collapsible: true,
+      collapsed: true,
+      items: [ "concepts/coin-and-token/aptos-token-overview", "tutorials/your-first-nft", "concepts/coin-and-token/silver-coin"],
+    },
+    {
+      type: "category",
+      label: "Implement Wallet Adapter",
       link: { type: "doc", id: "concepts/wallet-adapter-concept" },
       collapsible: true,
       collapsed: true,
