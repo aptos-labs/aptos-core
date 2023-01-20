@@ -1,0 +1,7 @@
+*~
+*.swp
+**/.terraform/
+target/
+!target/libra-node-builder/libra-node
+**/*Dockerfile
+docker/update_or_build.sh

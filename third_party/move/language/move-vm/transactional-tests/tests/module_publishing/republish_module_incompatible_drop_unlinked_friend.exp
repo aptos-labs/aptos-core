@@ -1,0 +1,10 @@
+processed 3 tasks
+
+task 2 'publish'. lines 14-21:
+Error: Unable to publish module '00000000000000000000000000000042::M'. Got VMError: {
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

@@ -1,0 +1,115 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "devtools/x",
+    "devtools/x-core",
+    "devtools/x-lint",
+    "language/benchmarks",
+    "language/documentation/examples/diem-framework/crates/cli",
+    "language/documentation/examples/diem-framework/crates/crypto",
+    "language/documentation/examples/diem-framework/crates/crypto-derive",
+    "language/documentation/examples/diem-framework/crates/natives",
+    "language/evm/exec-utils",
+    "language/evm/extract-ethereum-abi",
+    "language/evm/move-ethereum-abi",
+    "language/evm/move-to-yul",
+    "language/extensions/async/move-async-vm",
+    "language/extensions/move-table-extension",
+    "language/move-analyzer",
+    "language/move-binary-format",
+    "language/move-binary-format/serializer-tests",
+    "language/move-borrow-graph",
+    "language/move-bytecode-verifier",
+    "language/move-bytecode-verifier/bytecode-verifier-tests",
+    "language/move-bytecode-verifier/fuzz",
+    "language/move-bytecode-verifier/invalid-mutations",
+    "language/move-bytecode-verifier/transactional-tests",
+    "language/move-command-line-common",
+    "language/move-compiler",
+    "language/move-compiler/transactional-tests",
+    "language/move-core/types",
+    "language/move-ir/types",
+    "language/move-ir-compiler",
+    "language/move-ir-compiler/move-bytecode-source-map",
+    "language/move-ir-compiler/move-ir-to-bytecode",
+    "language/move-ir-compiler/move-ir-to-bytecode/syntax",
+    "language/move-ir-compiler/transactional-tests",
+    "language/move-model",
+    "language/move-prover",
+    "language/move-prover/boogie-backend",
+    "language/move-prover/bytecode",
+    "language/move-prover/interpreter",
+    "language/move-prover/interpreter/crypto",
+    "language/move-prover/interpreter-testsuite",
+    "language/move-prover/lab",
+    "language/move-prover/move-abigen",
+    "language/move-prover/move-docgen",
+    "language/move-prover/move-errmapgen",
+    "language/move-prover/mutation",
+    "language/move-prover/test-utils",
+    "language/move-prover/tools/spec-flatten",
+    "language/move-stdlib",
+    "language/move-symbol-pool",
+    "language/move-vm/integration-tests",
+    "language/move-vm/paranoid-tests",
+    "language/move-vm/runtime",
+    "language/move-vm/test-utils",
+    "language/move-vm/transactional-tests",
+    "language/move-vm/types",
+    "language/testing-infra/module-generation",
+    "language/testing-infra/test-generation",
+    "language/testing-infra/transactional-test-runner",
+    "language/tools/move-bytecode-utils",
+    "language/tools/move-bytecode-viewer",
+    "language/tools/move-cli",
+    "language/tools/move-coverage",
+    "language/tools/move-disassembler",
+    "language/tools/move-explain",
+    "language/tools/move-package",
+    "language/tools/move-resource-viewer",
+    "language/tools/move-unit-test",
+    "language/tools/read-write-set",
+    "language/tools/read-write-set/dynamic",
+    "language/tools/read-write-set/types",
+]
+
+# NOTE: default-members is the complete list of binaries that form the "production Move codebase". These members should
+# never include crates that require fuzzing features or test features. These are the crates we want built with no extra
+# test-only code included.
+#
+# For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
+default-members = [
+    "language/evm/extract-ethereum-abi",
+    "language/evm/move-to-yul",
+    "language/move-analyzer",
+    "language/move-ir-compiler",
+    "language/move-prover",
+    "language/move-prover/lab",
+    "language/move-prover/mutation",
+    "language/move-prover/tools/spec-flatten",
+    "language/move-compiler",
+    "language/move-stdlib",
+    "language/tools/move-disassembler",
+    "language/tools/move-bytecode-viewer",
+    "language/tools/move-cli",
+    "language/tools/move-coverage",
+    "language/tools/move-unit-test",
+]
+
+# Dependencies that should be kept in sync through the whole workspace
+[workspace.dependencies]
+bcs = "0.1.4"
+
+[profile.bench]
+debug = true
+
+[profile.dev]
+debug = true
+
+# use release settings to reduce memory pressure in the linking step in CI
+[profile.ci]
+inherits = "test"
+debug = 0 # for saving disk space during linking
+incremental = false
+codegen-units = 16

@@ -1,0 +1,76 @@
+name: daily
+
+on:
+  schedule:
+    - cron: "14 14 * * *"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      AUDIT_SUMMARY_FILE: /tmp/summary
+    steps:
+      - uses: actions/checkout@v2.4.0
+        with:
+          ref: ${{ matrix.target-branch }}
+      - uses: ./.github/actions/build-setup
+      - name: install cargo-audit
+        run: cargo install --force cargo-audit
+      - name: audit crates
+        # List of ignored RUSTSEC
+        # 1. RUSTSEC-2021-0073 - Not impacted.
+        # 2. RUSTSEC-2021-0072 - Not impacted.
+        # 3. RUSTSEC-2020-0071 - Not impacted (chronotope/chrono#578).
+        run: |
+          cargo audit --color never --ignore RUSTSEC-2021-0073 --ignore RUSTSEC-2021-0072 --ignore RUSTSEC-2020-0071 > $AUDIT_SUMMARY_FILE
+      - name: set issue body content
+        if: ${{ failure() }}
+        env:
+          JOB_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: |
+          echo "ISSUE_BODY<<EOF" >> $GITHUB_ENV
+          echo "Found RUSTSEC in dependencies in job ${JOB_URL}" >> $GITHUB_ENV
+          echo "\`\`\`" >> $GITHUB_ENV
+          head -100 $AUDIT_SUMMARY_FILE >> $GITHUB_ENV
+          echo "\`\`\`" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      - uses: diem/actions/create-issue@faadd16607b77dfa2231a8f366883e01717b3225
+        if: ${{ failure() }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          title: "RUSTSEC in dependencies in branch ${{ matrix.target-branch }}"
+          body: ${{ env.ISSUE_BODY }}
+          labels: "dependecies"
+      - uses: ./.github/actions/build-teardown
+
+  prover-inconsistency-test:
+    runs-on: ubuntu-latest
+    env:
+      MESSAGE_PAYLOAD_FILE: /tmp/message
+    strategy:
+      fail-fast: false
+      matrix:
+        target-branch: [main]
+    steps:
+      - uses: actions/checkout@v2.4.0
+        with:
+          ref: ${{ matrix.target-branch }}
+      - uses: ./.github/actions/build-setup
+      - uses: actions/cache@v2.1.6
+        with:
+          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
+          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: "crates-${{ runner.os }}"
+      - name: Run the prover tests with the inconsistency check and other nightly checks
+        shell: bash
+        run: |
+          cd /opt/git/diem/
+          set -o pipefail
+          MVP_TEST_INCONSISTENCY=1 cargo test -p move-prover --release 2>&1 | tee -a $MESSAGE_PAYLOAD_FILE
+          MVP_TEST_FEATURE=cvc5 cargo test -p move-prover --release 2>&1 | tee -a $MESSAGE_PAYLOAD_FILE
+      - uses: ./.github/actions/slack-file
+        with:
+          webhook: ${{ secrets.WEBHOOK_MOVE_PROVER }}
+          payload-file: ${{ env.MESSAGE_PAYLOAD_FILE }}
+        if: ${{ failure() }}
+      - uses: ./.github/actions/build-teardown

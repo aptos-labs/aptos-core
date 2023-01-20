@@ -1,0 +1,48 @@
+# When the release is published, this workflow is automatically triggered,
+# the move-related binaries are automatically packaged, and uploaded to
+# the release's Assets
+
+name: Release asset bot
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+jobs:
+  build:
+    name: Build release asset
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - ubuntu-latest
+          - ubuntu-18.04
+          - macos-latest
+          - windows-latest
+    runs-on: ${{matrix.platform}}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: install rust toolchain
+        uses: actions-rs/toolchain@v1
+      - name: build for ${{ matrix.platform }}
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: package move asset
+        run: bash ./scripts/package_asset.sh ${{ matrix.platform }}
+
+      - name: upload move asset
+        if: ${{ github.event_name == 'release'}}
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./move-${{ matrix.platform }}.zip
+          asset_name: move-${{ matrix.platform }}.zip
+          asset_content_type: application/zip

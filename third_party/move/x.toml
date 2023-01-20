@@ -1,0 +1,202 @@
+[grcov.installer]
+version = "0.8.2"
+
+[system-tests]
+
+
+[cargo.sccache]
+bucket = "ci-artifacts.diem.com"
+prefix = "sccache/diem/"
+public = true
+region = "us-west-2"
+endpoint = "https://s3-us-west-2.amazonaws.com"
+required-cargo-home = "/opt/cargo/"
+required-git-home = "/opt/git/diem"
+envs = [
+   #To debug sccache uncomment the two lines below.
+   #["SCCACHE_ERROR_LOG","/tmp/sccache_log"],
+   #["SCCACHE_LOG", "sccache::compiler::compiler=trace,rusoto_core::request=trace"],
+]
+
+[cargo.sccache.installer]
+version = "0.2.16-alpha.0"
+git = "https://github.com/diem/sccache.git"
+git-rev = "ef50d87a58260c30767520045e242ccdbdb965af"
+features = [ "s3" ]
+
+[fix]
+
+[clippy]
+allowed = [
+    # Deriving Arbitrary often causes this warning to show up.
+    "clippy::unit_arg",
+    "clippy::mixed_read_write_in_expression",
+    "clippy::new-without-default",
+    "clippy::rc_buffer",
+    "clippy::upper_case_acronyms",
+    "clippy::len-without-is-empty",
+    "clippy::from-iter-instead-of-collect",
+    "clippy::while-let-on-iterator",
+    "clippy::bool-assert-comparison",
+    "clippy::needless-collect",
+    "clippy::enum-variant-names",
+    "clippy::self-named-constructors",
+]
+warn = [
+    "clippy::wildcard_dependencies",
+]
+
+# This follows the same syntax as CargoOptionsSummary in guppy.
+[summaries.default]
+resolver = "2"
+include-dev = false
+initials-platform = "standard"
+
+[summaries.default.target-platform]
+triple = "x86_64-unknown-linux-gnu"
+target-features = "all"
+
+[summaries.default.host-platform]
+triple = "x86_64-unknown-linux-gnu"
+target-features = "all"
+
+[summaries.full]
+version = "v2"
+include-dev = true
+initials-platform = "standard"
+# Don't set target or host platforms, or omitted packages, for the full set.
+
+[workspace]
+
+# Regex for allowed characters in paths. Regex must have ^ and $ anchors.
+allowed-paths = "^([a-zA-Z0-9._\\-/@:]|-)+$"
+
+whitespace-exceptions = [
+    ".github/actions/*/dist/*",
+    "**/*.exp",
+    "**/*.errmap",
+    "**/*.abi",
+]
+
+[workspace.enforced-attributes]
+authors = ["Diem Association <opensource@diem.com>"]
+license = "Apache-2.0"
+
+[workspace.banned-deps.direct]
+lazy_static = "use once_cell::sync::Lazy instead"
+
+[workspace.banned-deps.default-build]
+criterion = "criterion is only for benchmarks"
+proptest = "proptest is only for testing and fuzzing"
+
+[workspace.direct-dep-dups]
+allow = [
+]
+
+[workspace.overlay]
+features = ["failpoints", "fuzzing"]
+
+# This is a list of test-only members. These are workspace members that do not form part of the main
+# Diem production codebase, and are only used to verify correctness and/or performance.
+#
+# *** IMPORTANT ***
+#
+# Published developer tools (e.g. Move compiler) ARE part of the production Move codebase.
+# They should be listed in the root Cargo.toml's default-members, not here!
+#
+# Before adding a new crate to this list, ensure that it is *actually* test-only. If not, add it
+# (or a crate that depends on it) to the root Cargo.toml's default-members list!
+#
+# For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
+[workspace.test-only]
+members = [
+    # Please keep this list in alphabetical order!
+
+    "bytecode-interpreter-testsuite",
+    "bytecode-verifier-libfuzzer",
+    "bytecode-verifier-tests",
+    "bytecode-verifier-transactional-tests",
+    "df-cli",
+    "diem-crypto",
+    "diem-crypto-derive",
+    "diem-framework-natives",
+    "invalid-mutations",
+    "language-benchmarks",
+    "module-generation",
+     # TODO: remove this here once the crate is used in code. There is currently not other way to do this.
+     # The code style direction to mark this crate as pulished doesn't work, because nothing in the repo
+     # is ready for publication and dependencies aren't marked like this.
+    "move-async-vm",
+    "move-compiler-transactional-tests",
+    "move-explain",
+    "move-ir-compiler-transactional-tests",
+    "move-vm-paranoid-tests",
+    "move-prover-test-utils",
+    "move-transactional-test-runner",
+    "move-vm-integration-tests",
+    "move-vm-transactional-tests",
+    "evm-exec-utils",
+    "serializer-tests",
+    "test-generation",
+    "x",
+    "x-core",
+    "x-lint",
+
+    # Please keep this list in alphabetical order!
+]
+
+# Interesting subsets of the workspace, These are used for generating and
+# checking dependency summaries.
+
+[subsets.release]
+root-members = [
+]
+
+# ---
+# Determinator rules
+# ---
+
+# CI-related files. TODO: maybe have separate rules for local and CI?
+[[determinator.path-rule]]
+globs = [".github/**/*", "codecov.yml"]
+mark-changed = "all"
+
+# Core devtools files.
+[[determinator.path-rule]]
+globs = [".config/nextest.toml", "scripts/dev_setup.sh", "x.toml"]
+mark-changed = "all"
+
+[[determinator.path-rule]]
+# Ignore non-code dirs
+globs = ["assets/**/*", "docker/**/*", "language/documentation/**/*", "scripts/**/*"]
+mark-changed = []
+
+[[determinator.path-rule]]
+# Ignore *.md documentation
+globs = ["*.md"]
+mark-changed = []
+
+[[determinator.path-rule]]
+# Ignore files in the examples for EVM (for now)
+globs = ["language/evm/examples/**/*", "language/evm/stdlib/**/*", "language/evm/hardhat-examples/**/*", "language/evm/hardhat-move/**/*"]
+mark-changed = []
+
+[[determinator.path-rule]]
+# Ignore files in the language/evm/examples tree (for now)
+globs = ["language/extensions/async/examples/**/*"]
+mark-changed = []
+
+[[determinator.path-rule]]
+# Ignore files in the language/evm/examples tree (for now)
+globs = ["language/extensions/async/move-async-lib/**/*"]
+mark-changed = []
+
+[[determinator.path-rule]]
+# On changes to files related to VS Code, build the move-analyzer package.
+globs = [".vscode/**/*", "language/move-analyzer/editors/code/**/*.json"]
+mark-changed = ["move-analyzer"]
+
+[[determinator.package-rule]]
+# x controls the build process, so if it changes, build everything.
+on-affected = ["x"]
+mark-changed = "all"
