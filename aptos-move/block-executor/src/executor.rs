@@ -10,8 +10,10 @@ use crate::{
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
+use aptos_logger::debug;
 use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_state_view::TStateView;
+use aptos_types::write_set::WriteOp;
 use num_cpus;
 use once_cell::sync::Lazy;
 use std::{collections::btree_map::BTreeMap, marker::PhantomData};
@@ -78,7 +80,7 @@ where
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
-        let mut apply_updates = |output: &<E as ExecutorTask>::Output| {
+        let mut apply_updates = |output: &E::Output| {
             // First, apply writes.
             let write_version = (idx_to_execute, incarnation);
             for (k, v) in output.get_writes().into_iter() {
@@ -225,18 +227,18 @@ where
         }
     }
 
-    pub fn execute_transactions_parallel(
+    pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-    ) -> Result<(Vec<E::Output>, OutputDeltaResolver<T::Key, T::Value>), E::Error> {
+    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_data_cache = MVHashMap::new();
 
         if signature_verified_block.is_empty() {
-            return Ok((vec![], OutputDeltaResolver::new(versioned_data_cache)));
+            return Ok(vec![]);
         }
 
         let num_txns = signature_verified_block.len();
@@ -259,7 +261,6 @@ where
         });
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.
-        let num_txns = scheduler.num_txn_to_execute();
         let mut final_results = Vec::with_capacity(num_txns);
 
         let maybe_err = if last_input_output.module_publishing_may_race() {
@@ -293,20 +294,23 @@ where
             Some(err) => Err(err),
             None => {
                 final_results.resize_with(num_txns, E::Output::skip_output);
-                Ok((
-                    final_results,
-                    OutputDeltaResolver::new(versioned_data_cache),
-                ))
+                let delta_resolver: OutputDeltaResolver<T> =
+                    OutputDeltaResolver::new(versioned_data_cache);
+                // TODO: parallelize when necessary.
+                Ok(final_results
+                    .into_iter()
+                    .zip(delta_resolver.resolve(base_view, num_txns).into_iter())
+                    .collect())
             },
         }
     }
 
-    pub fn execute_transactions_sequential(
+    pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<Vec<E::Output>, E::Error> {
+    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
         let mut data_map = BTreeMap::new();
@@ -347,6 +351,44 @@ where
         }
 
         ret.resize_with(num_txns, E::Output::skip_output);
-        Ok(ret)
+        Ok(ret.into_iter().map(|out| (out, vec![])).collect())
+    }
+
+    pub fn execute_block(
+        &self,
+        executor_arguments: E::Argument,
+        signature_verified_block: Vec<T>,
+        base_view: &S,
+    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
+        let mut ret = if self.concurrency_level > 1 {
+            self.execute_transactions_parallel(
+                executor_arguments,
+                &signature_verified_block,
+                base_view,
+            )
+        } else {
+            self.execute_transactions_sequential(
+                executor_arguments,
+                &signature_verified_block,
+                base_view,
+            )
+        };
+
+        if matches!(ret, Err(Error::ModulePathReadWrite)) {
+            debug!("[Execution]: Module read & written, sequential fallback");
+
+            ret = self.execute_transactions_sequential(
+                executor_arguments,
+                &signature_verified_block,
+                base_view,
+            )
+        }
+
+        RAYON_EXEC_POOL.spawn(move || {
+            // Explicit async drops.
+            drop(signature_verified_block);
+        });
+
+        ret
     }
 }

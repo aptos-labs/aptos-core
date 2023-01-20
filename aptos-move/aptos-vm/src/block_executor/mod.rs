@@ -12,14 +12,11 @@ use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutput
 use aptos_block_executor::{
     errors::Error,
     executor::{BlockExecutor, RAYON_EXEC_POOL},
-    output_delta_resolver::OutputDeltaResolver,
     task::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
-    view::ResolvedData,
 };
-use aptos_logger::debug;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
@@ -28,7 +25,6 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 use rayon::prelude::*;
-use std::collections::HashMap;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -45,10 +41,6 @@ impl AptosTransactionOutput {
 
     pub fn into(self) -> TransactionOutputExt {
         self.0
-    }
-
-    pub fn as_ref(&self) -> &TransactionOutputExt {
-        &self.0
     }
 }
 
@@ -86,48 +78,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
-    fn process_parallel_block_output<S: StateView>(
-        results: Vec<AptosTransactionOutput>,
-        delta_resolver: OutputDeltaResolver<StateKey, WriteOp>,
-        state_view: &S,
-    ) -> Vec<TransactionOutput> {
-        // TODO: MVHashmap, and then delta resolver should track aggregator base values.
-        let mut aggregator_base_values: HashMap<StateKey, anyhow::Result<ResolvedData>> =
-            HashMap::new();
-        for res in results.iter() {
-            for (key, _) in res.as_ref().delta_change_set().iter() {
-                if !aggregator_base_values.contains_key(key) {
-                    aggregator_base_values.insert(key.clone(), state_view.get_state_value(key));
-                }
-            }
-        }
-
-        let materialized_deltas =
-            delta_resolver.resolve(aggregator_base_values.into_iter().collect(), results.len());
-
-        results
-            .into_iter()
-            .zip(materialized_deltas.into_iter())
-            .map(|(res, delta_writes)| {
-                res.into()
-                    .output_with_delta_writes(WriteSetMut::new(delta_writes))
-            })
-            .collect()
-    }
-
-    fn process_sequential_block_output(
-        results: Vec<AptosTransactionOutput>,
-    ) -> Vec<TransactionOutput> {
-        results
-            .into_iter()
-            .map(|res| {
-                let (deltas, output) = res.into().into();
-                debug_assert!(deltas.is_empty(), "[Execution] Deltas must be materialized");
-                output
-            })
-            .collect()
-    }
-
     pub fn execute_block<S: StateView + Sync>(
         transactions: Vec<Transaction>,
         state_view: &S,
@@ -140,6 +90,7 @@ impl BlockAptosVM {
             RAYON_EXEC_POOL.install(|| {
                 transactions
                     .into_par_iter()
+                    .with_min_len(25)
                     .map(preprocess_transaction::<AptosVM>)
                     .collect()
             });
@@ -148,33 +99,21 @@ impl BlockAptosVM {
             concurrency_level,
         );
 
-        let mut ret = if concurrency_level > 1 {
-            executor
-                .execute_transactions_parallel(state_view, &signature_verified_block, state_view)
-                .map(|(results, delta_resolver)| {
-                    Self::process_parallel_block_output(results, delta_resolver, state_view)
+        let ret = executor
+            .execute_block(state_view, signature_verified_block, state_view)
+            .map(|results| {
+                // Process the outputs in parallel, combining delta writes with other writes.
+                RAYON_EXEC_POOL.install(|| {
+                    results
+                        .into_par_iter()
+                        .map(|(output, delta_writes)| {
+                            output      // AptosTransactionOutput
+                            .into()     // TransactionOutputExt
+                            .output_with_delta_writes(WriteSetMut::new(delta_writes))
+                        })
+                        .collect()
                 })
-        } else {
-            executor
-                .execute_transactions_sequential(state_view, &signature_verified_block, state_view)
-                .map(Self::process_sequential_block_output)
-        };
-
-        if ret == Err(Error::ModulePathReadWrite) {
-            debug!("[Execution]: Module read & written, sequential fallback");
-
-            ret = executor
-                .execute_transactions_sequential(state_view, &signature_verified_block, state_view)
-                .map(Self::process_sequential_block_output);
-        }
-
-        // Explicit async drop. Happens here because we can't currently move to
-        // BlockExecutor due to the Module publishing fallback. TODO: fix after
-        // module publishing fallback is removed.
-        RAYON_EXEC_POOL.spawn(move || {
-            // Explicit async drops.
-            drop(signature_verified_block);
-        });
+            });
 
         match ret {
             Ok(outputs) => Ok(outputs),
