@@ -44,6 +44,7 @@ impl QuorumStoreBuilder {
     pub fn init_payload_manager(
         &mut self,
     ) -> (
+        Option<Arc<BatchReader>>,
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
@@ -53,13 +54,19 @@ impl QuorumStoreBuilder {
         }
     }
 
-    pub fn start(self, block_store: Arc<BlockStore>) -> Option<Sender<CoordinatorCommand>> {
+    pub fn start(
+        self,
+        block_store: Arc<BlockStore>,
+        batch_reader: Option<Arc<BatchReader>>,
+    ) -> Option<Sender<CoordinatorCommand>> {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => {
                 inner.start();
                 None
             },
-            QuorumStoreBuilder::InQuorumStore(inner) => Some(inner.start(block_store)),
+            QuorumStoreBuilder::InQuorumStore(inner) => {
+                Some(inner.start(block_store, batch_reader))
+            },
         }
     }
 }
@@ -86,10 +93,11 @@ impl DirectMempoolInnerBuilder {
     fn init_payload_manager(
         &mut self,
     ) -> (
+        Option<Arc<BatchReader>>,
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
-        (Arc::from(PayloadManager::DirectMempool), None)
+        (None, Arc::from(PayloadManager::DirectMempool), None)
     }
 
     fn start(self) {
@@ -280,6 +288,7 @@ impl InnerBuilder {
     fn spawn_quorum_store_wrapper(
         mut self,
         block_store: Arc<dyn BlockReader + Send + Sync>,
+        batch_reader: Option<Arc<BatchReader>>,
     ) -> Sender<CoordinatorCommand> {
         let quorum_store_storage = self.quorum_store_storage.as_ref().unwrap().clone();
 
@@ -366,8 +375,11 @@ impl InnerBuilder {
         );
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
-        let proof_manager =
-            ProofManager::new(self.epoch, self.config.back_pressure_local_batch_num);
+        let proof_manager = ProofManager::new(
+            self.epoch,
+            self.config.back_pressure_local_batch_num,
+            batch_reader.expect("batch reader must be available"),
+        );
         spawn_named!(
             "proof_manager",
             proof_manager.start(
@@ -394,6 +406,7 @@ impl InnerBuilder {
     fn init_payload_manager(
         &mut self,
     ) -> (
+        Option<Arc<BatchReader>>,
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
@@ -404,6 +417,7 @@ impl InnerBuilder {
         let batch_reader = self.spawn_quorum_store();
 
         (
+            Some(batch_reader.clone()),
             Arc::from(PayloadManager::InQuorumStore(
                 batch_reader,
                 // TODO: remove after splitting out clean requests
@@ -413,7 +427,11 @@ impl InnerBuilder {
         )
     }
 
-    fn start(self, block_store: Arc<BlockStore>) -> Sender<CoordinatorCommand> {
-        self.spawn_quorum_store_wrapper(block_store)
+    fn start(
+        self,
+        block_store: Arc<BlockStore>,
+        batch_reader: Option<Arc<BatchReader>>,
+    ) -> Sender<CoordinatorCommand> {
+        self.spawn_quorum_store_wrapper(block_store, batch_reader)
     }
 }
