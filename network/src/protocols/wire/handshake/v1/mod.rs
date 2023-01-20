@@ -199,7 +199,7 @@ impl fmt::Display for ProtocolId {
 /// These sets are sent over-the-wire in the initial [`HandshakeMsg`] to other
 /// AptosNet peers in order to negotiate the set of common supported protocols for
 /// use on a new AptosNet connection.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ProtocolIdSet(aptos_bitvec::BitVec);
 

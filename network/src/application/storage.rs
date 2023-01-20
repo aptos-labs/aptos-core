@@ -6,6 +6,7 @@ use crate::{
         error::Error,
         metadata::{ConnectionState, PeerMetadata},
     },
+    protocols::wire::handshake::v1::ProtocolIdSet,
     transport::{ConnectionId, ConnectionMetadata},
     ProtocolId,
 };
@@ -24,6 +25,11 @@ use std::{
 #[derive(Debug)]
 pub struct PeersAndMetadata {
     peers_and_metadata: HashMap<NetworkId, RwLock<HashMap<PeerId, PeerMetadata>>>,
+
+    // A simple cache of connected supported peers per protocol id set. This avoids
+    // having to perform redundant computation each time `get_connected_supported_peers()`
+    // is called. The entire cache is invalidated whenever a peer's state changes.
+    connected_support_peers_cache: RwLock<HashMap<ProtocolIdSet, Vec<PeerNetworkId>>>,
 }
 
 impl PeersAndMetadata {
@@ -31,6 +37,7 @@ impl PeersAndMetadata {
         // Create the container
         let mut peers_and_metadata = PeersAndMetadata {
             peers_and_metadata: HashMap::new(),
+            connected_support_peers_cache: RwLock::new(HashMap::new()),
         };
 
         // Initialize each network mapping
@@ -43,25 +50,29 @@ impl PeersAndMetadata {
         Arc::new(peers_and_metadata)
     }
 
-    // TODO: cache this for frequent uses
     /// Returns all connected peers that support at least one of
-    /// the given protocols.
+    /// the given protocols. We expect this to be called very
+    /// frequently.
     pub fn get_connected_supported_peers(
         &self,
         protocol_ids: &[ProtocolId],
     ) -> Result<Vec<PeerNetworkId>, Error> {
-        let mut connected_supported_peers = Vec::new();
-        for network_id in self.get_registered_networks() {
-            let peer_metadata = self.get_peer_metadata_for_network(&network_id)?;
-            for (peer_id, peer_metadata) in peer_metadata.read().iter() {
-                if peer_metadata.is_connected() && peer_metadata.supports_any_protocol(protocol_ids)
-                {
-                    let peer_network_id = PeerNetworkId::new(network_id, *peer_id);
-                    connected_supported_peers.push(peer_network_id);
-                }
-            }
+        // Check if we've already cached the peers for the given protocols
+        let protocol_id_set = ProtocolIdSet::from_iter(protocol_ids);
+        if let Some(connected_support_peers) = self
+            .connected_support_peers_cache
+            .read()
+            .get(&protocol_id_set)
+        {
+            return Ok(connected_support_peers.clone());
         }
 
+        // Otherwise, calculate the peers and update the cache before returning
+        let connected_supported_peers = self.calculate_connected_supported_peers(protocol_ids)?;
+        let _ = self
+            .connected_support_peers_cache
+            .write()
+            .insert(protocol_id_set, connected_supported_peers.clone());
         Ok(connected_supported_peers)
     }
 
@@ -71,8 +82,8 @@ impl PeersAndMetadata {
     ) -> Result<HashMap<PeerNetworkId, PeerMetadata>, Error> {
         let mut connected_peers_and_metadata = HashMap::new();
         for network_id in self.get_registered_networks() {
-            let peer_metadata = self.get_peer_metadata_for_network(&network_id)?;
-            for (peer_id, peer_metadata) in peer_metadata.read().iter() {
+            let peer_metadata_for_network = self.get_peer_metadata_for_network(&network_id)?;
+            for (peer_id, peer_metadata) in peer_metadata_for_network.read().iter() {
                 if peer_metadata.is_connected() {
                     let peer_network_id = PeerNetworkId::new(network_id, *peer_id);
                     connected_peers_and_metadata.insert(peer_network_id, peer_metadata.clone());
@@ -93,8 +104,9 @@ impl PeersAndMetadata {
         &self,
         peer_network_id: PeerNetworkId,
     ) -> Result<PeerMetadata, Error> {
-        let peer_metadata = self.get_peer_metadata_for_network(&peer_network_id.network_id())?;
-        peer_metadata
+        let peer_metadata_for_network =
+            self.get_peer_metadata_for_network(&peer_network_id.network_id())?;
+        peer_metadata_for_network
             .read()
             .get(&peer_network_id.peer_id())
             .cloned()
@@ -113,6 +125,10 @@ impl PeersAndMetadata {
         peer_network_id: PeerNetworkId,
         connection_metadata: ConnectionMetadata,
     ) -> Result<(), Error> {
+        // Clear the connected support peers cache as we're updating peers and metadata
+        self.clear_connected_supported_peers_cache();
+
+        // Update the connection metadata
         let peer_metadata_for_network =
             self.get_peer_metadata_for_network(&peer_network_id.network_id())?;
         peer_metadata_for_network
@@ -133,6 +149,10 @@ impl PeersAndMetadata {
         peer_network_id: PeerNetworkId,
         connection_state: ConnectionState,
     ) -> Result<(), Error> {
+        // Clear the connected support peers cache as we're updating peers and metadata
+        self.clear_connected_supported_peers_cache();
+
+        // Update the connection state
         let peer_metadata_for_network =
             self.get_peer_metadata_for_network(&peer_network_id.network_id())?;
         if let Some(peer_metadata) = peer_metadata_for_network
@@ -158,9 +178,12 @@ impl PeersAndMetadata {
         peer_network_id: PeerNetworkId,
         connection_id: ConnectionId,
     ) -> Result<PeerMetadata, Error> {
+        // Clear the connected support peers cache as we're updating peers and metadata
+        self.clear_connected_supported_peers_cache();
+
+        // Attempt to remove the peer metadata
         let peer_metadata_for_network =
             self.get_peer_metadata_for_network(&peer_network_id.network_id())?;
-
         if let Entry::Occupied(entry) = peer_metadata_for_network
             .write()
             .entry(peer_network_id.peer_id())
@@ -196,5 +219,40 @@ impl PeersAndMetadata {
                 network_id
             ))
         })
+    }
+
+    /// Calculates the connected supported peers for the given
+    /// set of protocols.
+    fn calculate_connected_supported_peers(
+        &self,
+        protocol_ids: &[ProtocolId],
+    ) -> Result<Vec<PeerNetworkId>, Error> {
+        let mut connected_supported_peers = Vec::new();
+        for network_id in self.get_registered_networks() {
+            let peer_metadata_for_network = self.get_peer_metadata_for_network(&network_id)?;
+            for (peer_id, peer_metadata) in peer_metadata_for_network.read().iter() {
+                if peer_metadata.is_connected() && peer_metadata.supports_any_protocol(protocol_ids)
+                {
+                    let peer_network_id = PeerNetworkId::new(network_id, *peer_id);
+                    connected_supported_peers.push(peer_network_id);
+                }
+            }
+        }
+
+        Ok(connected_supported_peers)
+    }
+
+    /// Clears the connected supported peers cache and erases all cached data
+    fn clear_connected_supported_peers_cache(&self) {
+        self.connected_support_peers_cache.write().clear();
+    }
+
+    /// Returns a handle to the connected supported peers cache.
+    /// Only required for testing.
+    #[cfg(test)]
+    pub fn get_connected_supported_peers_cache(
+        &self,
+    ) -> &RwLock<HashMap<ProtocolIdSet, Vec<PeerNetworkId>>> {
+        &self.connected_support_peers_cache
     }
 }

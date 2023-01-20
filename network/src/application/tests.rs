@@ -192,6 +192,403 @@ fn test_peers_and_metadata_simple_errors() {
 }
 
 #[test]
+fn test_peers_and_metadata_cache() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    // Verify the connected supported peers cache is empty
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Attempt to get connected supported peers and verify the cache is updated
+    let protocol_ids_1 = [ProtocolId::MempoolDirectSend, ProtocolId::ConsensusRpcBcs];
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids_1, vec![]);
+    check_connected_supported_peers_cache(&peers_and_metadata, &protocol_ids_1, vec![]);
+
+    // Create a new peer and initialize the connection metadata
+    let (peer_network_id_1, mut connection_1) = create_peer_and_connection(
+        NetworkId::Validator,
+        protocol_ids_1.to_vec(),
+        peers_and_metadata.clone(),
+    );
+
+    // Verify the connected supported peers cache has been reset
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Get the connected supported peers and verify the cache has been updated
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids_1, vec![
+        peer_network_id_1,
+    ]);
+    check_connected_supported_peers_cache(&peers_and_metadata, &protocol_ids_1, vec![
+        peer_network_id_1,
+    ]);
+
+    // Create a new peer and initialize the connection metadata
+    let (peer_network_id_2, _) = create_peer_and_connection(
+        NetworkId::Vfn,
+        protocol_ids_1.to_vec(),
+        peers_and_metadata.clone(),
+    );
+
+    // Verify the connected supported peers cache has been reset
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify we now have two supported peers for the same protocol ID set
+    let both_peers = vec![peer_network_id_1, peer_network_id_2];
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids_1, both_peers);
+
+    // Update the connection metadata for peer 1 (with a new set of supported protocols)
+    let protocol_ids_2 = [ProtocolId::StorageServiceRpc];
+    connection_1.application_protocols = ProtocolIdSet::from_iter(protocol_ids_2);
+    update_connection_metadata(&peers_and_metadata, peer_network_id_1, connection_1);
+
+    // Verify the connected supported peers cache has been reset
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify we now have only one peer for the new protocol ID set
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids_2, vec![
+        peer_network_id_1,
+    ]);
+    check_connected_supported_peers_cache(&peers_and_metadata, &protocol_ids_2, vec![
+        peer_network_id_1,
+    ]);
+
+    // Verify we now have only one peer for the old protocol ID set
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids_1, vec![
+        peer_network_id_2,
+    ]);
+    check_connected_supported_peers_cache(&peers_and_metadata, &protocol_ids_1, vec![
+        peer_network_id_2,
+    ]);
+}
+
+#[test]
+fn test_peers_and_metadata_cache_connection_states() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    // Create a new peer and initialize the connection metadata
+    let protocol_ids = [ProtocolId::MempoolDirectSend, ProtocolId::ConsensusRpcBcs];
+    let (peer_network_id_1, connection_1) = create_peer_and_connection(
+        NetworkId::Validator,
+        protocol_ids.to_vec(),
+        peers_and_metadata.clone(),
+    );
+
+    // Verify the connected supported peers cache has been reset
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Get the connected supported peers and verify the cache has been updated
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, vec![peer_network_id_1]);
+    check_connected_supported_peers_cache(&peers_and_metadata, &protocol_ids, vec![
+        peer_network_id_1,
+    ]);
+
+    // Create a new peer and initialize the connection metadata
+    let (peer_network_id_2, _) = create_peer_and_connection(
+        NetworkId::Vfn,
+        protocol_ids.to_vec(),
+        peers_and_metadata.clone(),
+    );
+
+    // Verify the connected supported peers cache has been reset
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify we now have two supported peers for the same protocol ID set
+    let both_peers = vec![peer_network_id_1, peer_network_id_2];
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, both_peers.clone());
+
+    // Disconnect peer 2 and verify the cache is reset
+    disconnect_peer(&peers_and_metadata, peer_network_id_2);
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify we now have only one peer for the protocol ID set
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, vec![peer_network_id_1]);
+    check_connected_supported_peers_cache(&peers_and_metadata, &protocol_ids, vec![
+        peer_network_id_1,
+    ]);
+
+    // Reconnect peer 2 and verify the cache is reset
+    connect_peer(&peers_and_metadata, peer_network_id_2);
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify we now have two supported peers for the same protocol ID set
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, both_peers.clone());
+
+    // Mark peer 1 as disconnecting and verify the cache is reset
+    mark_peer_disconnecting(&peers_and_metadata, peer_network_id_1);
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify we now have only one peer for the protocol ID set
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, vec![peer_network_id_2]);
+    check_connected_supported_peers_cache(&peers_and_metadata, &protocol_ids, vec![
+        peer_network_id_2,
+    ]);
+
+    // Reconnect peer 1 and verify the cache is reset
+    connect_peer(&peers_and_metadata, peer_network_id_1);
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify we now have two supported peers for the same protocol ID set
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, both_peers);
+
+    // Remove peer metadata for peer 1 and verify the cache is reset
+    remove_peer_metadata(
+        &peers_and_metadata,
+        peer_network_id_1,
+        connection_1.connection_id.get_inner(),
+    )
+    .unwrap();
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify the connected supported peers
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, vec![peer_network_id_2]);
+    check_connected_supported_peers_cache(&peers_and_metadata, &protocol_ids, vec![
+        peer_network_id_2,
+    ]);
+}
+
+#[test]
+fn test_peers_and_metadata_cache_hit() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    // Verify the connected supported peers cache is empty
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Create a new peer and initialize the connection metadata
+    let protocol_ids = [ProtocolId::ConsensusRpcBcs];
+    let (peer_network_id_1, _) = create_peer_and_connection(
+        NetworkId::Vfn,
+        protocol_ids.to_vec(),
+        peers_and_metadata.clone(),
+    );
+
+    // Verify the connected supported peers cache has been reset
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Get the connected supported peers and verify the cache is updated
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, vec![peer_network_id_1]);
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 1);
+
+    // Repeatedly get the connected supported peers and verify the response
+    for _ in 0..10 {
+        check_connected_supported_peers(&peers_and_metadata, &protocol_ids, vec![
+            peer_network_id_1,
+        ]);
+    }
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 1);
+
+    // Manually overwrite the data in the cache and verify it is used
+    let new_connected_supported_peers = vec![
+        PeerNetworkId::new(NetworkId::Validator, PeerId::random()),
+        PeerNetworkId::new(NetworkId::Public, PeerId::random()),
+    ];
+    let protocol_id_set = ProtocolIdSet::from_iter(protocol_ids);
+    peers_and_metadata
+        .get_connected_supported_peers_cache()
+        .write()
+        .insert(protocol_id_set, new_connected_supported_peers.clone());
+
+    // Repeatedly get the connected supported peers and verify the response
+    for _ in 0..10 {
+        check_connected_supported_peers(
+            &peers_and_metadata,
+            &protocol_ids,
+            new_connected_supported_peers.clone(),
+        );
+    }
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 1);
+}
+
+#[test]
+fn test_peers_and_metadata_cache_protocol_ordering() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    // Attempt to get connected supported peers and verify the cache is updated
+    let protocol_ids = [
+        ProtocolId::ConsensusRpcBcs,
+        ProtocolId::ConsensusRpcJson,
+        ProtocolId::MempoolDirectSend,
+    ];
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, vec![]);
+    check_connected_supported_peers_cache(&peers_and_metadata, &protocol_ids, vec![]);
+
+    // Create a new peer and initialize the connection metadata
+    let (peer_network_id_1, _) = create_peer_and_connection(
+        NetworkId::Public,
+        protocol_ids.to_vec(),
+        peers_and_metadata.clone(),
+    );
+
+    // Verify the connected supported peers cache has been reset
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Get the connected supported peers and verify the cache has been updated
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, vec![peer_network_id_1]);
+    check_connected_supported_peers_cache(&peers_and_metadata, &protocol_ids, vec![
+        peer_network_id_1,
+    ]);
+
+    // Create another peer, but with the same protocol ids in reverse order
+    let reverse_protocol_ids = [
+        ProtocolId::MempoolDirectSend,
+        ProtocolId::ConsensusRpcJson,
+        ProtocolId::ConsensusRpcBcs,
+    ];
+    let (peer_network_id_2, _) = create_peer_and_connection(
+        NetworkId::Vfn,
+        reverse_protocol_ids.to_vec(),
+        peers_and_metadata.clone(),
+    );
+
+    // Verify the connected supported peers cache has been reset
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify we now have two supported peers for the same protocol ID set
+    let both_peers = vec![peer_network_id_1, peer_network_id_2];
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &reverse_protocol_ids,
+        both_peers.clone(),
+    );
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, both_peers);
+
+    // Verify there's only one entry in the cache
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 1);
+
+    // Create another peer, but with the same protocol ids in a different order
+    let shuffled_protocol_ids = [
+        ProtocolId::ConsensusRpcJson,
+        ProtocolId::MempoolDirectSend,
+        ProtocolId::ConsensusRpcBcs,
+    ];
+    let (peer_network_id_3, _) = create_peer_and_connection(
+        NetworkId::Validator,
+        shuffled_protocol_ids.to_vec(),
+        peers_and_metadata.clone(),
+    );
+
+    // Verify the connected supported peers cache has been reset
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify we now have three supported peers for the same protocol ID set
+    let all_peers = vec![peer_network_id_1, peer_network_id_2, peer_network_id_3];
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &shuffled_protocol_ids,
+        all_peers.clone(),
+    );
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &reverse_protocol_ids,
+        all_peers.clone(),
+    );
+    check_connected_supported_peers(&peers_and_metadata, &protocol_ids, all_peers);
+
+    // Verify there's still only one entry in the cache
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 1);
+}
+
+#[test]
+fn test_peers_and_metadata_cache_protocol_overlap() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    // Create a new peer and initialize the connection metadata
+    let peer_protocols_1 = [ProtocolId::ConsensusRpcBcs];
+    let (peer_network_id_1, _) = create_peer_and_connection(
+        NetworkId::Public,
+        peer_protocols_1.to_vec(),
+        peers_and_metadata.clone(),
+    );
+
+    // Get the connected supported peers and verify the cache has been updated
+    let supported_protocols = [
+        ProtocolId::ConsensusRpcBcs,
+        ProtocolId::StorageServiceRpc,
+        ProtocolId::MempoolDirectSend,
+    ];
+    check_connected_supported_peers(&peers_and_metadata, &supported_protocols, vec![
+        peer_network_id_1,
+    ]);
+    check_connected_supported_peers_cache(&peers_and_metadata, &supported_protocols, vec![
+        peer_network_id_1,
+    ]);
+
+    // Create another peer, but with different protocol support
+    let peer_protocols_2 = [ProtocolId::StorageServiceRpc, ProtocolId::HealthCheckerRpc];
+    let (peer_network_id_2, connection_2) = create_peer_and_connection(
+        NetworkId::Vfn,
+        peer_protocols_2.to_vec(),
+        peers_and_metadata.clone(),
+    );
+
+    // Verify the connected supported peers cache has been reset
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify we now have two supported peers for the supported protocol set
+    let both_peers = vec![peer_network_id_1, peer_network_id_2];
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &supported_protocols,
+        both_peers.clone(),
+    );
+    check_connected_supported_peers(&peers_and_metadata, &supported_protocols, both_peers);
+
+    // Verify there's only one entry in the cache
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 1);
+
+    // Create another peer, but with different protocol support
+    let peer_protocols_3 = [ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc];
+    let (peer_network_id_3, _) = create_peer_and_connection(
+        NetworkId::Validator,
+        peer_protocols_3.to_vec(),
+        peers_and_metadata.clone(),
+    );
+
+    // Verify the connected supported peers cache has been reset
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+
+    // Verify we now have three supported peers for the supported protocol set
+    let all_peers = vec![peer_network_id_1, peer_network_id_2, peer_network_id_3];
+    check_connected_supported_peers(&peers_and_metadata, &supported_protocols, all_peers);
+
+    // Verify there's still only one entry in the cache
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 1);
+
+    // Verify individual protocol supports
+    check_connected_supported_peers(&peers_and_metadata, &peer_protocols_1, vec![
+        peer_network_id_1,
+    ]);
+    check_connected_supported_peers(&peers_and_metadata, &peer_protocols_2, vec![
+        peer_network_id_2,
+        peer_network_id_3,
+    ]);
+    check_connected_supported_peers(&peers_and_metadata, &peer_protocols_3, vec![
+        peer_network_id_2,
+        peer_network_id_3,
+    ]);
+
+    // Verify there's now four entries in the cache
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 4);
+
+    // Remove peer metadata for peer 2 and verify the cache is reset
+    remove_peer_metadata(
+        &peers_and_metadata,
+        peer_network_id_2,
+        connection_2.connection_id.get_inner(),
+    )
+    .unwrap();
+    check_connected_supported_peers_cache_length(&peers_and_metadata, 0);
+}
+
+#[test]
 fn test_network_client_available_peers() {
     // Create the peers and metadata container
     let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
@@ -631,6 +1028,41 @@ fn check_connected_supported_peers(
     let connected_and_supported_peers = peers_and_metadata
         .get_connected_supported_peers(protocol_ids)
         .unwrap();
+    compare_vectors_ignore_order(connected_and_supported_peers, expected_peers);
+}
+
+/// Verifies that the connected and supported peer cache length is correct
+fn check_connected_supported_peers_cache_length(
+    peers_and_metadata: &Arc<PeersAndMetadata>,
+    expected_length: usize,
+) {
+    assert_eq!(
+        peers_and_metadata
+            .get_connected_supported_peers_cache()
+            .read()
+            .len(),
+        expected_length
+    );
+}
+
+/// Verifies that the connected and supported peer cache is valid
+fn check_connected_supported_peers_cache(
+    peers_and_metadata: &Arc<PeersAndMetadata>,
+    protocol_ids: &[ProtocolId],
+    expected_peers: Vec<PeerNetworkId>,
+) {
+    // Get the cache
+    let connected_supported_peers_cache = peers_and_metadata
+        .get_connected_supported_peers_cache()
+        .read();
+
+    // Verify an entry is found and that it is valid
+    let protocol_ids = ProtocolIdSet::from_iter(protocol_ids);
+    assert!(connected_supported_peers_cache.contains_key(&protocol_ids));
+    let connected_and_supported_peers = connected_supported_peers_cache
+        .get(&protocol_ids)
+        .unwrap()
+        .clone();
     compare_vectors_ignore_order(connected_and_supported_peers, expected_peers);
 }
 

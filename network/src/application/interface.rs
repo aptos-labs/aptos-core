@@ -119,6 +119,8 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
         peer: &PeerNetworkId,
         preferred_protocols: &[ProtocolId],
     ) -> Result<ProtocolId, Error> {
+        // TODO: we need to provide a caching mechanism to avoid recomputing this!
+
         let protocols_supported_by_peer = self.get_supported_protocols(peer)?;
         for protocol in preferred_protocols {
             if protocols_supported_by_peer.contains(*protocol) {
