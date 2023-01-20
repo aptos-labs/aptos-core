@@ -519,15 +519,6 @@ impl EpochManager {
         }
         self.round_manager_tx = None;
 
-        if let Some(mut quorum_store_coordinator_tx) = self.quorum_store_coordinator_tx.take() {
-            let (ack_tx, ack_rx) = oneshot::channel();
-            quorum_store_coordinator_tx
-                .send(CoordinatorCommand::Shutdown(ack_tx))
-                .await
-                .expect("Could not send shutdown indicator to QuorumStore");
-            ack_rx.await.expect("Failed to stop QuorumStore");
-        }
-
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.buffer_manager_msg_tx = None;
         if let Some(mut tx) = self.buffer_manager_reset_tx.take() {
@@ -545,6 +536,15 @@ impl EpochManager {
 
         // Shutdown the block retrieval task by dropping the sender
         self.block_retrieval_tx = None;
+
+        if let Some(mut quorum_store_coordinator_tx) = self.quorum_store_coordinator_tx.take() {
+            let (ack_tx, ack_rx) = oneshot::channel();
+            quorum_store_coordinator_tx
+                .send(CoordinatorCommand::Shutdown(ack_tx))
+                .await
+                .expect("Could not send shutdown indicator to QuorumStore");
+            ack_rx.await.expect("Failed to stop QuorumStore");
+        }
     }
 
     async fn start_recovery_manager(
