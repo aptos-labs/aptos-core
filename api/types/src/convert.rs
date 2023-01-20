@@ -325,7 +325,16 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         if !self.db.indexer_enabled() {
             return Ok(None);
         }
-        let table_info = self.db.get_table_info(handle).unwrap();
+        let table_info = match self.db.get_table_info(handle) {
+            Ok(ti) => ti,
+            Err(_) => {
+                aptos_logger::warn!(
+                    "Table info not found for handle {:?}, can't decode table item. OK for simulation",
+                    handle
+                );
+                return Ok(None); // if table item not found return None anyway to avoid crash
+            },
+        };
         let key = self.try_into_move_value(&table_info.key_type, key)?;
         let value = self.try_into_move_value(&table_info.value_type, value)?;
 
@@ -345,7 +354,16 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         if !self.db.indexer_enabled() {
             return Ok(None);
         }
-        let table_info = self.db.get_table_info(handle).unwrap();
+        let table_info = match self.db.get_table_info(handle) {
+            Ok(ti) => ti,
+            Err(_) => {
+                aptos_logger::warn!(
+                    "Table info not found for handle {:?}, can't decode table item. OK for simulation",
+                    handle
+                );
+                return Ok(None); // if table item not found return None anyway to avoid crash
+            },
+        };
         let key = self.try_into_move_value(&table_info.key_type, key)?;
 
         Ok(Some(DeletedTableData {

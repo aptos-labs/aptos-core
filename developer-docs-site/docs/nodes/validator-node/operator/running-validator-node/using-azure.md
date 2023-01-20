@@ -199,4 +199,6 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
     node1-aptos-node-0-validator-0                1/1     Running   0          4h30m
     ```
 
-Now you have successfully completed setting up your node. Make sure that you have set up one machine to run a validator node and a second machine to run a validator fullnode.
+You have successfully completed setting up your node. Make sure that you have set up one machine to run a validator node and a second machine to run a validator fullnode.
+
+Now proceed to [connecting to the Aptos network](../connect-to-aptos-network.md) and [establishing staking pool operations](../staking-pool-operations.md).

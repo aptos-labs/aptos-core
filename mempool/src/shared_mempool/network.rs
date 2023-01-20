@@ -14,7 +14,6 @@ use crate::{
         },
     },
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{MempoolConfig, PeerRole, RoleType},
     network_id::PeerNetworkId,
@@ -24,9 +23,7 @@ use aptos_logger::prelude::*;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
     application::{error::Error, interface::NetworkClientInterface, storage::LockingHashMap},
-    protocols::network::{NetworkApplicationConfig, NetworkEvents},
     transport::ConnectionMetadata,
-    ProtocolId,
 };
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use aptos_vm_validator::vm_validator::TransactionValidation;
@@ -61,24 +58,6 @@ pub enum MempoolSyncMsg {
         /// A backpressure signal from the recipient when it is overwhelmed (e.g., mempool is full).
         backoff: bool,
     },
-}
-
-/// The interface from Network to Mempool layer.
-///
-/// `MempoolNetworkEvents` is a `Stream` of `PeerManagerNotification` where the
-/// raw `Bytes` direct-send and rpc messages are deserialized into
-/// `MempoolMessage` types. `MempoolNetworkEvents` is a thin wrapper around an
-/// `channel::Receiver<PeerManagerNotification>`.
-pub type MempoolNetworkEvents = NetworkEvents<MempoolSyncMsg>;
-
-/// Returns a network application config for the mempool client and service
-pub fn mempool_network_config(max_broadcasts_per_peer: usize) -> NetworkApplicationConfig {
-    NetworkApplicationConfig::client_and_service(
-        [ProtocolId::MempoolDirectSend],
-        aptos_channel::Config::new(max_broadcasts_per_peer)
-            .queue_style(QueueStyle::KLAST)
-            .counters(&counters::PENDING_MEMPOOL_NETWORK_EVENTS),
-    )
 }
 
 #[derive(Debug, Error)]

@@ -89,6 +89,8 @@ module aptos_framework::vesting {
     const EROLE_NOT_FOUND: u64 = 14;
     /// Account is not admin or does not have the required role to take this action.
     const EPERMISSION_DENIED: u64 = 15;
+    /// Zero items were provided to a *_many function.
+    const EVEC_EMPTY_FOR_MANY_FUNCTION: u64 = 16;
 
     /// Maximum number of shareholders a vesting pool can support.
     const MAXIMUM_SHAREHOLDERS: u64 = 30;
@@ -542,6 +544,20 @@ module aptos_framework::vesting {
         unlock_stake(vesting_contract, accumulated_rewards);
     }
 
+    /// Call `unlock_rewards` for many vesting contracts.
+    public entry fun unlock_rewards_many(contract_addresses: vector<address>) acquires VestingContract {
+        let len = vector::length(&contract_addresses);
+
+        assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
+
+        let i = 0;
+        while (i < len) {
+            let contract_address = *vector::borrow(&contract_addresses, i);
+            unlock_rewards(contract_address);
+            i = i + 1;
+        };
+    }
+
     /// Unlock any vested portion of the grant.
     public entry fun vest(contract_address: address) acquires VestingContract {
         // Unlock all rewards first, if any.
@@ -595,6 +611,20 @@ module aptos_framework::vesting {
         );
     }
 
+    /// Call `vest` for many vesting contracts.
+    public entry fun vest_many(contract_addresses: vector<address>) acquires VestingContract {
+        let len = vector::length(&contract_addresses);
+
+        assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
+
+        let i = 0;
+        while (i < len) {
+            let contract_address = *vector::borrow(&contract_addresses, i);
+            vest(contract_address);
+            i = i + 1;
+        };
+    }
+
     /// Distribute any withdrawable stake from the stake pool.
     public entry fun distribute(contract_address: address) acquires VestingContract {
         assert_active_vesting_contract(contract_address);
@@ -638,6 +668,20 @@ module aptos_framework::vesting {
                 amount: total_distribution_amount,
             },
         );
+    }
+
+    /// Call `distribute` for many vesting contracts.
+    public entry fun distribute_many(contract_addresses: vector<address>) acquires VestingContract {
+        let len = vector::length(&contract_addresses);
+
+        assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
+
+        let i = 0;
+        while (i < len) {
+            let contract_address = *vector::borrow(&contract_addresses, i);
+            distribute(contract_address);
+            i = i + 1;
+        };
     }
 
     /// Terminate the vesting contract and send all funds back to the withdrawal address.

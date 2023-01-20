@@ -10,7 +10,10 @@ use crate::{
         conn_notifs_channel, ConnectionRequest, ConnectionRequestSender, PeerManager,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::{network::NetworkApplicationConfig, wire::handshake::v1::ProtocolIdSet},
+    protocols::{
+        network::{NetworkClientConfig, NetworkServiceConfig},
+        wire::handshake::v1::ProtocolIdSet,
+    },
     transport::{self, AptosNetTransport, Connection, APTOS_TCP_TRANSPORT},
     ProtocolId,
 };
@@ -57,8 +60,9 @@ struct TransportContext {
 }
 
 impl TransportContext {
-    fn add_protocols(&mut self, protocols: &ProtocolIdSet) {
-        self.supported_protocols = self.supported_protocols.union(protocols);
+    fn add_protocols(&mut self, protocols: &Vec<ProtocolId>) {
+        let protocol_id_set = ProtocolIdSet::from_iter(protocols);
+        self.supported_protocols = self.supported_protocols.union(&protocol_id_set);
     }
 }
 
@@ -426,9 +430,15 @@ impl PeerManagerBuilder {
     /// the outbound channels into network.
     pub fn add_client(
         &mut self,
-        config: &NetworkApplicationConfig,
+        config: &NetworkClientConfig,
     ) -> (PeerManagerRequestSender, ConnectionRequestSender) {
-        self.transport_context().add_protocols(&config.protocols);
+        // Register the direct send and rpc protocols
+        self.transport_context()
+            .add_protocols(&config.direct_send_protocols_and_preferences);
+        self.transport_context()
+            .add_protocols(&config.rpc_protocols_and_preferences);
+
+        // Create the context and return the request senders
         let pm_context = self.peer_manager_context();
         (
             PeerManagerRequestSender::new(pm_context.pm_reqs_tx.clone()),
@@ -439,20 +449,26 @@ impl PeerManagerBuilder {
     /// Register a service for handling some protocols.
     pub fn add_service(
         &mut self,
-        config: &NetworkApplicationConfig,
+        config: &NetworkServiceConfig,
     ) -> (
         aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         conn_notifs_channel::Receiver,
     ) {
-        self.transport_context().add_protocols(&config.protocols);
+        // Register the direct send and rpc protocols
+        self.transport_context()
+            .add_protocols(&config.direct_send_protocols_and_preferences);
+        self.transport_context()
+            .add_protocols(&config.rpc_protocols_and_preferences);
 
-        let (network_notifs_tx, network_notifs_rx) = config
-            .inbound_queue
-            .expect("Requires a service config")
-            .build();
+        // Create the context and register the protocols
+        let (network_notifs_tx, network_notifs_rx) = config.inbound_queue_config.build();
         let pm_context = self.peer_manager_context();
-        for protocol in config.protocols.iter() {
-            pm_context.add_upstream_handler(protocol, network_notifs_tx.clone());
+        for protocol in config
+            .direct_send_protocols_and_preferences
+            .iter()
+            .chain(&config.rpc_protocols_and_preferences)
+        {
+            pm_context.add_upstream_handler(*protocol, network_notifs_tx.clone());
         }
         let connection_notifs_rx = pm_context.add_connection_event_listener();
 

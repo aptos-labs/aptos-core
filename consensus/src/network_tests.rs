@@ -486,7 +486,10 @@ mod tests {
     };
     use aptos_crypto::HashValue;
     use aptos_network::{
-        application::{interface::NetworkClient, storage::PeerMetadataStorage},
+        application::{
+            interface::{NetworkClient, NetworkServiceEvents},
+            storage::PeerMetadataStorage,
+        },
         protocols::{
             direct_send::Message,
             network,
@@ -591,13 +594,11 @@ mod tests {
                 peer_metadata_storage.clone(),
             );
             let consensus_network_client = ConsensusNetworkClient::new(network_client);
-            let network_events = NetworkEvents::new(consensus_rx, conn_status_rx);
 
             let twin_id = TwinId {
                 id: peer_id,
                 author: *peer,
             };
-
             playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
             let (self_sender, self_receiver) = aptos_channels::new_test(8);
@@ -607,7 +608,12 @@ mod tests {
                 self_sender,
                 validator_verifier.clone(),
             );
-            let (task, receiver) = NetworkTask::new(network_events, self_receiver);
+
+            let network_events = NetworkEvents::new(consensus_rx, conn_status_rx);
+            let network_service_events =
+                NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
+            let (task, receiver) = NetworkTask::new(network_service_events, self_receiver);
+
             receivers.push(receiver);
             runtime.handle().spawn(task.start());
             nodes.push(node);
@@ -700,13 +706,10 @@ mod tests {
                 ProtocolId::ConsensusRpcJson,
             ]);
 
-            let network_events = NetworkEvents::new(consensus_rx, conn_status_rx);
-
             let twin_id = TwinId {
                 id: peer_id,
                 author: *peer,
             };
-
             playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
             let (self_sender, self_receiver) = aptos_channels::new_test(8);
@@ -716,7 +719,12 @@ mod tests {
                 self_sender,
                 validator_verifier.clone(),
             );
-            let (task, receiver) = NetworkTask::new(network_events, self_receiver);
+
+            let network_events = NetworkEvents::new(consensus_rx, conn_status_rx);
+            let network_service_events =
+                NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
+            let (task, receiver) = NetworkTask::new(network_service_events, self_receiver);
+
             senders.push(consensus_network_client);
             receivers.push(receiver);
             runtime.handle().spawn(task.start());
@@ -777,9 +785,12 @@ mod tests {
         let (connection_notifs_tx, connection_notifs_rx) =
             aptos_channel::new(QueueStyle::FIFO, 8, None);
         let network_events = NetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
+        let network_service_events =
+            NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
         let (self_sender, self_receiver) = aptos_channels::new_test(8);
 
-        let (network_task, mut network_receivers) = NetworkTask::new(network_events, self_receiver);
+        let (network_task, mut network_receivers) =
+            NetworkTask::new(network_service_events, self_receiver);
 
         let peer_id = PeerId::random();
         let protocol_id = ProtocolId::ConsensusDirectSendBcs;
