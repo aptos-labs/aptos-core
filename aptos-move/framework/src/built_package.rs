@@ -57,6 +57,7 @@ pub struct BuildOptions {
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
+    pub bytecode_version: Option<u32>,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -75,6 +76,7 @@ impl Default for BuildOptions {
             // This is false by default, because it could accidentally pull new dependencies
             // while in a test (and cause some havoc)
             skip_fetch_latest_git_deps: false,
+            bytecode_version: None,
         }
     }
 }
@@ -208,7 +210,11 @@ impl BuiltPackage {
     pub fn extract_code(&self) -> Vec<Vec<u8>> {
         self.package
             .root_modules()
-            .map(|unit_with_source| unit_with_source.unit.serialize(None))
+            .map(|unit_with_source| {
+                unit_with_source
+                    .unit
+                    .serialize(self.options.bytecode_version)
+            })
             .collect()
     }
 
@@ -240,7 +246,11 @@ impl BuiltPackage {
     pub fn extract_script_code(&self) -> Vec<Vec<u8>> {
         self.package
             .scripts()
-            .map(|unit_with_source| unit_with_source.unit.serialize(None))
+            .map(|unit_with_source| {
+                unit_with_source
+                    .unit
+                    .serialize(self.options.bytecode_version)
+            })
             .collect()
     }
 

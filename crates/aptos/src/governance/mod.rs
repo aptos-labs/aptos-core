@@ -767,10 +767,11 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             next_execution_hash,
         } = self;
         let package_path = move_options.get_package_path()?;
-        let options = included_artifacts.build_options(
+        let mut options = included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
         );
+        options.bytecode_version = move_options.bytecode_version;
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
 
