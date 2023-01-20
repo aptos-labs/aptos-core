@@ -19,6 +19,7 @@ MAX_U64 = 2**64 - 1
 MAX_U128 = 2**128 - 1
 MAX_U256 = 2**256 - 1
 
+
 class Deserializer:
     _input: io.BytesIO
     _length: int

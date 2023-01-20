@@ -43,6 +43,8 @@ pub enum DataClientRequest {
     StateValuesWithProof(StateValuesWithProofRequest),
     TransactionsWithProof(TransactionsWithProofRequest),
     TransactionOutputsWithProof(TransactionOutputsWithProofRequest),
+    NewTransactionsOrOutputsWithProof(NewTransactionsOrOutputsWithProofRequest),
+    TransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest),
 }
 
 impl DataClientRequest {
@@ -56,6 +58,8 @@ impl DataClientRequest {
             Self::StateValuesWithProof(_) => "state_values_with_proof",
             Self::TransactionsWithProof(_) => "transactions_with_proof",
             Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
+            Self::NewTransactionsOrOutputsWithProof(_) => "new_transactions_or_outputs_with_proof",
+            Self::TransactionsOrOutputsWithProof(_) => "transactions_or_outputs_with_proof",
         }
     }
 }
@@ -78,6 +82,14 @@ pub struct EpochEndingLedgerInfosRequest {
 /// A client request for fetching new transactions with proofs.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NewTransactionsWithProofRequest {
+    pub known_version: Version,
+    pub known_epoch: Epoch,
+    pub include_events: bool,
+}
+
+/// A client request for fetching new transactions or outputs with proofs.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NewTransactionsOrOutputsWithProofRequest {
     pub known_version: Version,
     pub known_epoch: Epoch,
     pub include_events: bool,
@@ -111,6 +123,15 @@ pub struct TransactionOutputsWithProofRequest {
     pub start_version: Version,
     pub end_version: Version,
     pub proof_version: Version,
+}
+
+/// A client request for fetching transaction or outputs with proofs.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransactionsOrOutputsWithProofRequest {
+    pub start_version: Version,
+    pub end_version: Version,
+    pub proof_version: Version,
+    pub include_events: bool,
 }
 
 /// A pending client response where data has been requested from the

@@ -34,6 +34,30 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
+    /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
+    /// An account can delegate its rotation capability to only one other address at one time. If the account
+    /// has an existing rotation capability offer, calling this function will update the rotation capability offer with
+    /// the new `recipient_address`.
+    /// Here, `rotation_capability_sig_bytes` signature indicates that this key rotation is authorized by the account owner,
+    /// and prevents the classic "time-of-check time-of-use" attack.
+    /// For example, users usually rely on what the wallet displays to them as the transaction's outcome. Consider a contract that with 50% probability
+    /// (based on the current timestamp in Move), rotates somebody's key. The wallet might be unlucky and get an outcome where nothing is rotated,
+    /// incorrectly telling the user nothing bad will happen. But when the transaction actually gets executed, the attacker gets lucky and
+    /// the execution path triggers the account key rotation.
+    /// We prevent such attacks by asking for this extra signature authorizing the key rotation.
+    ///
+    /// @param rotation_capability_sig_bytes is the signature by the account owner's key on `RotationCapabilityOfferProofChallengeV2`.
+    /// @param account_scheme is the scheme of the account (ed25519 or multi_ed25519).
+    /// @param account_public_key_bytes is the public key of the account owner.
+    /// @param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing rotation capability
+    /// offer, calling this function will replace the previous `recipient_address` upon successful verification.
+    AccountOfferRotationCapability {
+        rotation_capability_sig_bytes: Vec<u8>,
+        account_scheme: u8,
+        account_public_key_bytes: Vec<u8>,
+        recipient_address: AccountAddress,
+    },
+
     /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its signer capability to only one other address at one time.
     /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallengeV2` signed by the account owner's key
@@ -50,6 +74,17 @@ pub enum EntryFunctionCall {
         recipient_address: AccountAddress,
     },
 
+    /// Revoke any rotation capability offer in the specified account.
+    AccountRevokeAnyRotationCapability {},
+
+    /// Revoke any signer capability offer in the specified account.
+    AccountRevokeAnySignerCapability {},
+
+    /// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
+    AccountRevokeRotationCapability {
+        to_be_revoked_address: AccountAddress,
+    },
+
     /// Revoke the account owner's signer capability offer for `to_be_revoked_address` (i.e., the address that
     /// has a signer capability offer from `account` but will be revoked in this function).
     AccountRevokeSignerCapability {
@@ -63,10 +98,27 @@ pub enum EntryFunctionCall {
     /// - the second signature `cap_update_table` refers to the signature by the new key (that the account owner wants to rotate to) on a
     /// valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
     /// `OriginatingAddress` map with the new address mapping <new_address, originating_address>.
-    /// To verify signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
+    /// To verify these two signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
     /// to verify `cap_rotate_key`, and `to_scheme` and `to_public_key_bytes` to verify `cap_update_table`.
     /// A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.
     /// `originating address` refers to an account's original/first address.
+    ///
+    /// Here is an example attack if we don't ask for the second signature `cap_update_table`:
+    /// Alice has rotated her account addr_a to new_addr_a. As a result, the following entry is created, to help Alice when recovering her wallet:
+    /// OriginatingAddress[new_addr_a] -> addr_a
+    /// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
+    /// (Fortunately, she still has her secret key new_sk_a associated with her new address new_addr_a, so she can do this.)
+    ///
+    /// But Bob likes to mess with Alice.
+    /// Bob creates an account addr_b and maliciously rotates it to Alice's new address new_addr_a. Since we are no longer checking a PoK,
+    /// Bob can easily do this.
+    ///
+    /// Now, the table will be updated to make Alice's new address point to Bob's address: OriginatingAddress[new_addr_a] -> addr_b.
+    /// When Alice recovers her account, her wallet will display the attacker's address (Bob's) addr_b as her address.
+    /// Now Alice will give addr_b to everyone to pay her, but the money will go to Bob.
+    ///
+    /// Because we ask for a valid `cap_update_table`, this kind of attack is not possible. Bob would not have the secret key of Alice's address
+    /// to rotate his address to Alice's address in the first place.
     AccountRotateAuthenticationKey {
         from_scheme: u8,
         from_public_key_bytes: Vec<u8>,
@@ -76,12 +128,47 @@ pub enum EntryFunctionCall {
         cap_update_table: Vec<u8>,
     },
 
+    AccountRotateAuthenticationKeyWithRotationCapability {
+        rotation_cap_offerer_address: AccountAddress,
+        new_scheme: u8,
+        new_public_key_bytes: Vec<u8>,
+        cap_update_table: Vec<u8>,
+    },
+
+    /// Batch version of APT transfer.
+    AptosAccountBatchTransfer {
+        recipients: Vec<AccountAddress>,
+        amounts: Vec<u64>,
+    },
+
+    /// Batch version of transfer_coins.
+    AptosAccountBatchTransferCoins {
+        coin_type: TypeTag,
+        recipients: Vec<AccountAddress>,
+        amounts: Vec<u64>,
+    },
+
     /// Basic account creation methods.
     AptosAccountCreateAccount {
         auth_key: AccountAddress,
     },
 
+    /// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
+    AptosAccountSetAllowDirectCoinTransfers {
+        allow: bool,
+    },
+
+    /// Convenient function to transfer APT to a recipient account that might not exist.
+    /// This would create the recipient account first, which also registers it to receive APT, before transferring.
     AptosAccountTransfer {
+        to: AccountAddress,
+        amount: u64,
+    },
+
+    /// Convenient function to transfer a custom CoinType to a recipient account that might not exist.
+    /// This would create the recipient account first and register it to receive the CoinType, before transferring.
+    AptosAccountTransferCoins {
+        coin_type: TypeTag,
         to: AccountAddress,
         amount: u64,
     },
@@ -413,6 +500,11 @@ pub enum EntryFunctionCall {
         contract_address: AccountAddress,
     },
 
+    /// Call `distribute` for many vesting contracts.
+    VestingDistributeMany {
+        contract_addresses: Vec<AccountAddress>,
+    },
+
     /// Remove the beneficiary for the given shareholder. All distributions will sent directly to the shareholder
     /// account.
     VestingResetBeneficiary {
@@ -451,6 +543,11 @@ pub enum EntryFunctionCall {
         contract_address: AccountAddress,
     },
 
+    /// Call `unlock_rewards` for many vesting contracts.
+    VestingUnlockRewardsMany {
+        contract_addresses: Vec<AccountAddress>,
+    },
+
     VestingUpdateOperator {
         contract_address: AccountAddress,
         new_operator: AccountAddress,
@@ -471,6 +568,11 @@ pub enum EntryFunctionCall {
     VestingVest {
         contract_address: AccountAddress,
     },
+
+    /// Call `vest` for many vesting contracts.
+    VestingVestMany {
+        contract_addresses: Vec<AccountAddress>,
+    },
 }
 
 impl EntryFunctionCall {
@@ -478,6 +580,17 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
+            AccountOfferRotationCapability {
+                rotation_capability_sig_bytes,
+                account_scheme,
+                account_public_key_bytes,
+                recipient_address,
+            } => account_offer_rotation_capability(
+                rotation_capability_sig_bytes,
+                account_scheme,
+                account_public_key_bytes,
+                recipient_address,
+            ),
             AccountOfferSignerCapability {
                 signer_capability_sig_bytes,
                 account_scheme,
@@ -489,6 +602,11 @@ impl EntryFunctionCall {
                 account_public_key_bytes,
                 recipient_address,
             ),
+            AccountRevokeAnyRotationCapability {} => account_revoke_any_rotation_capability(),
+            AccountRevokeAnySignerCapability {} => account_revoke_any_signer_capability(),
+            AccountRevokeRotationCapability {
+                to_be_revoked_address,
+            } => account_revoke_rotation_capability(to_be_revoked_address),
             AccountRevokeSignerCapability {
                 to_be_revoked_address,
             } => account_revoke_signer_capability(to_be_revoked_address),
@@ -507,14 +625,42 @@ impl EntryFunctionCall {
                 cap_rotate_key,
                 cap_update_table,
             ),
+            AccountRotateAuthenticationKeyWithRotationCapability {
+                rotation_cap_offerer_address,
+                new_scheme,
+                new_public_key_bytes,
+                cap_update_table,
+            } => account_rotate_authentication_key_with_rotation_capability(
+                rotation_cap_offerer_address,
+                new_scheme,
+                new_public_key_bytes,
+                cap_update_table,
+            ),
+            AptosAccountBatchTransfer {
+                recipients,
+                amounts,
+            } => aptos_account_batch_transfer(recipients, amounts),
+            AptosAccountBatchTransferCoins {
+                coin_type,
+                recipients,
+                amounts,
+            } => aptos_account_batch_transfer_coins(coin_type, recipients, amounts),
             AptosAccountCreateAccount { auth_key } => aptos_account_create_account(auth_key),
+            AptosAccountSetAllowDirectCoinTransfers { allow } => {
+                aptos_account_set_allow_direct_coin_transfers(allow)
+            },
             AptosAccountTransfer { to, amount } => aptos_account_transfer(to, amount),
+            AptosAccountTransferCoins {
+                coin_type,
+                to,
+                amount,
+            } => aptos_account_transfer_coins(coin_type, to, amount),
             AptosCoinClaimMintCapability {} => aptos_coin_claim_mint_capability(),
             AptosCoinDelegateMintCapability { to } => aptos_coin_delegate_mint_capability(to),
             AptosCoinMint { dst_addr, amount } => aptos_coin_mint(dst_addr, amount),
             AptosGovernanceAddApprovedScriptHashScript { proposal_id } => {
                 aptos_governance_add_approved_script_hash_script(proposal_id)
-            }
+            },
             AptosGovernanceCreateProposal {
                 stake_pool,
                 execution_hash,
@@ -617,7 +763,7 @@ impl EntryFunctionCall {
                 proof_of_possession,
             } => {
                 stake_rotate_consensus_key(pool_address, new_consensus_pubkey, proof_of_possession)
-            }
+            },
             StakeSetDelegatedVoter { new_voter } => stake_set_delegated_voter(new_voter),
             StakeSetOperator { new_operator } => stake_set_operator(new_operator),
             StakeUnlock { amount } => stake_unlock(amount),
@@ -633,7 +779,7 @@ impl EntryFunctionCall {
             StakeWithdraw { withdraw_amount } => stake_withdraw(withdraw_amount),
             StakingContractAddStake { operator, amount } => {
                 staking_contract_add_stake(operator, amount)
-            }
+            },
             StakingContractCreateStakingContract {
                 operator,
                 voter,
@@ -649,10 +795,10 @@ impl EntryFunctionCall {
             ),
             StakingContractDistribute { staker, operator } => {
                 staking_contract_distribute(staker, operator)
-            }
+            },
             StakingContractRequestCommission { staker, operator } => {
                 staking_contract_request_commission(staker, operator)
-            }
+            },
             StakingContractResetLockup { operator } => staking_contract_reset_lockup(operator),
             StakingContractSwitchOperator {
                 old_operator,
@@ -670,7 +816,7 @@ impl EntryFunctionCall {
             StakingContractUnlockRewards { operator } => staking_contract_unlock_rewards(operator),
             StakingContractUnlockStake { operator, amount } => {
                 staking_contract_unlock_stake(operator, amount)
-            }
+            },
             StakingContractUpdateVoter {
                 operator,
                 new_voter,
@@ -681,10 +827,10 @@ impl EntryFunctionCall {
             } => staking_proxy_set_operator(old_operator, new_operator),
             StakingProxySetStakePoolOperator { new_operator } => {
                 staking_proxy_set_stake_pool_operator(new_operator)
-            }
+            },
             StakingProxySetStakePoolVoter { new_voter } => {
                 staking_proxy_set_stake_pool_voter(new_voter)
-            }
+            },
             StakingProxySetStakingContractOperator {
                 old_operator,
                 new_operator,
@@ -708,6 +854,9 @@ impl EntryFunctionCall {
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
             VestingDistribute { contract_address } => vesting_distribute(contract_address),
+            VestingDistributeMany { contract_addresses } => {
+                vesting_distribute_many(contract_addresses)
+            },
             VestingResetBeneficiary {
                 contract_address,
                 shareholder,
@@ -729,8 +878,11 @@ impl EntryFunctionCall {
             } => vesting_set_management_role(contract_address, role, role_holder),
             VestingTerminateVestingContract { contract_address } => {
                 vesting_terminate_vesting_contract(contract_address)
-            }
+            },
             VestingUnlockRewards { contract_address } => vesting_unlock_rewards(contract_address),
+            VestingUnlockRewardsMany { contract_addresses } => {
+                vesting_unlock_rewards_many(contract_addresses)
+            },
             VestingUpdateOperator {
                 contract_address,
                 new_operator,
@@ -745,6 +897,7 @@ impl EntryFunctionCall {
                 new_voter,
             } => vesting_update_voter(contract_address, new_voter),
             VestingVest { contract_address } => vesting_vest(contract_address),
+            VestingVestMany { contract_addresses } => vesting_vest_many(contract_addresses),
         }
     }
 
@@ -763,6 +916,48 @@ impl EntryFunctionCall {
             None
         }
     }
+}
+
+/// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
+/// An account can delegate its rotation capability to only one other address at one time. If the account
+/// has an existing rotation capability offer, calling this function will update the rotation capability offer with
+/// the new `recipient_address`.
+/// Here, `rotation_capability_sig_bytes` signature indicates that this key rotation is authorized by the account owner,
+/// and prevents the classic "time-of-check time-of-use" attack.
+/// For example, users usually rely on what the wallet displays to them as the transaction's outcome. Consider a contract that with 50% probability
+/// (based on the current timestamp in Move), rotates somebody's key. The wallet might be unlucky and get an outcome where nothing is rotated,
+/// incorrectly telling the user nothing bad will happen. But when the transaction actually gets executed, the attacker gets lucky and
+/// the execution path triggers the account key rotation.
+/// We prevent such attacks by asking for this extra signature authorizing the key rotation.
+///
+/// @param rotation_capability_sig_bytes is the signature by the account owner's key on `RotationCapabilityOfferProofChallengeV2`.
+/// @param account_scheme is the scheme of the account (ed25519 or multi_ed25519).
+/// @param account_public_key_bytes is the public key of the account owner.
+/// @param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing rotation capability
+/// offer, calling this function will replace the previous `recipient_address` upon successful verification.
+pub fn account_offer_rotation_capability(
+    rotation_capability_sig_bytes: Vec<u8>,
+    account_scheme: u8,
+    account_public_key_bytes: Vec<u8>,
+    recipient_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("offer_rotation_capability").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&rotation_capability_sig_bytes).unwrap(),
+            bcs::to_bytes(&account_scheme).unwrap(),
+            bcs::to_bytes(&account_public_key_bytes).unwrap(),
+            bcs::to_bytes(&recipient_address).unwrap(),
+        ],
+    ))
 }
 
 /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
@@ -799,6 +994,56 @@ pub fn account_offer_signer_capability(
     ))
 }
 
+/// Revoke any rotation capability offer in the specified account.
+pub fn account_revoke_any_rotation_capability() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("revoke_any_rotation_capability").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Revoke any signer capability offer in the specified account.
+pub fn account_revoke_any_signer_capability() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("revoke_any_signer_capability").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
+pub fn account_revoke_rotation_capability(
+    to_be_revoked_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("revoke_rotation_capability").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&to_be_revoked_address).unwrap()],
+    ))
+}
+
 /// Revoke the account owner's signer capability offer for `to_be_revoked_address` (i.e., the address that
 /// has a signer capability offer from `account` but will be revoked in this function).
 pub fn account_revoke_signer_capability(
@@ -825,10 +1070,27 @@ pub fn account_revoke_signer_capability(
 /// - the second signature `cap_update_table` refers to the signature by the new key (that the account owner wants to rotate to) on a
 /// valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
 /// `OriginatingAddress` map with the new address mapping <new_address, originating_address>.
-/// To verify signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
+/// To verify these two signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
 /// to verify `cap_rotate_key`, and `to_scheme` and `to_public_key_bytes` to verify `cap_update_table`.
 /// A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.
 /// `originating address` refers to an account's original/first address.
+///
+/// Here is an example attack if we don't ask for the second signature `cap_update_table`:
+/// Alice has rotated her account addr_a to new_addr_a. As a result, the following entry is created, to help Alice when recovering her wallet:
+/// OriginatingAddress[new_addr_a] -> addr_a
+/// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
+/// (Fortunately, she still has her secret key new_sk_a associated with her new address new_addr_a, so she can do this.)
+///
+/// But Bob likes to mess with Alice.
+/// Bob creates an account addr_b and maliciously rotates it to Alice's new address new_addr_a. Since we are no longer checking a PoK,
+/// Bob can easily do this.
+///
+/// Now, the table will be updated to make Alice's new address point to Bob's address: OriginatingAddress[new_addr_a] -> addr_b.
+/// When Alice recovers her account, her wallet will display the attacker's address (Bob's) addr_b as her address.
+/// Now Alice will give addr_b to everyone to pay her, but the money will go to Bob.
+///
+/// Because we ask for a valid `cap_update_table`, this kind of attack is not possible. Bob would not have the secret key of Alice's address
+/// to rotate his address to Alice's address in the first place.
 pub fn account_rotate_authentication_key(
     from_scheme: u8,
     from_public_key_bytes: Vec<u8>,
@@ -858,6 +1120,76 @@ pub fn account_rotate_authentication_key(
     ))
 }
 
+pub fn account_rotate_authentication_key_with_rotation_capability(
+    rotation_cap_offerer_address: AccountAddress,
+    new_scheme: u8,
+    new_public_key_bytes: Vec<u8>,
+    cap_update_table: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("rotate_authentication_key_with_rotation_capability").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&rotation_cap_offerer_address).unwrap(),
+            bcs::to_bytes(&new_scheme).unwrap(),
+            bcs::to_bytes(&new_public_key_bytes).unwrap(),
+            bcs::to_bytes(&cap_update_table).unwrap(),
+        ],
+    ))
+}
+
+/// Batch version of APT transfer.
+pub fn aptos_account_batch_transfer(
+    recipients: Vec<AccountAddress>,
+    amounts: Vec<u64>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_account").to_owned(),
+        ),
+        ident_str!("batch_transfer").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&recipients).unwrap(),
+            bcs::to_bytes(&amounts).unwrap(),
+        ],
+    ))
+}
+
+/// Batch version of transfer_coins.
+pub fn aptos_account_batch_transfer_coins(
+    coin_type: TypeTag,
+    recipients: Vec<AccountAddress>,
+    amounts: Vec<u64>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_account").to_owned(),
+        ),
+        ident_str!("batch_transfer_coins").to_owned(),
+        vec![coin_type],
+        vec![
+            bcs::to_bytes(&recipients).unwrap(),
+            bcs::to_bytes(&amounts).unwrap(),
+        ],
+    ))
+}
+
 /// Basic account creation methods.
 pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -874,6 +1206,24 @@ pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayl
     ))
 }
 
+/// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
+pub fn aptos_account_set_allow_direct_coin_transfers(allow: bool) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_account").to_owned(),
+        ),
+        ident_str!("set_allow_direct_coin_transfers").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&allow).unwrap()],
+    ))
+}
+
+/// Convenient function to transfer APT to a recipient account that might not exist.
+/// This would create the recipient account first, which also registers it to receive APT, before transferring.
 pub fn aptos_account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -885,6 +1235,27 @@ pub fn aptos_account_transfer(to: AccountAddress, amount: u64) -> TransactionPay
         ),
         ident_str!("transfer").to_owned(),
         vec![],
+        vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
+    ))
+}
+
+/// Convenient function to transfer a custom CoinType to a recipient account that might not exist.
+/// This would create the recipient account first and register it to receive the CoinType, before transferring.
+pub fn aptos_account_transfer_coins(
+    coin_type: TypeTag,
+    to: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_account").to_owned(),
+        ),
+        ident_str!("transfer_coins").to_owned(),
+        vec![coin_type],
         vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
     ))
 }
@@ -1928,6 +2299,22 @@ pub fn vesting_distribute(contract_address: AccountAddress) -> TransactionPayloa
     ))
 }
 
+/// Call `distribute` for many vesting contracts.
+pub fn vesting_distribute_many(contract_addresses: Vec<AccountAddress>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("distribute_many").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&contract_addresses).unwrap()],
+    ))
+}
+
 /// Remove the beneficiary for the given shareholder. All distributions will sent directly to the shareholder
 /// account.
 pub fn vesting_reset_beneficiary(
@@ -2065,6 +2452,22 @@ pub fn vesting_unlock_rewards(contract_address: AccountAddress) -> TransactionPa
     ))
 }
 
+/// Call `unlock_rewards` for many vesting contracts.
+pub fn vesting_unlock_rewards_many(contract_addresses: Vec<AccountAddress>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("unlock_rewards_many").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&contract_addresses).unwrap()],
+    ))
+}
+
 pub fn vesting_update_operator(
     contract_address: AccountAddress,
     new_operator: AccountAddress,
@@ -2145,8 +2548,39 @@ pub fn vesting_vest(contract_address: AccountAddress) -> TransactionPayload {
         vec![bcs::to_bytes(&contract_address).unwrap()],
     ))
 }
+
+/// Call `vest` for many vesting contracts.
+pub fn vesting_vest_many(contract_addresses: Vec<AccountAddress>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("vest_many").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&contract_addresses).unwrap()],
+    ))
+}
 mod decoder {
     use super::*;
+    pub fn account_offer_rotation_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountOfferRotationCapability {
+                rotation_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
+                account_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
+                account_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                recipient_address: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn account_offer_signer_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -2156,6 +2590,38 @@ mod decoder {
                 account_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
                 account_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
                 recipient_address: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn account_revoke_any_rotation_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountRevokeAnyRotationCapability {})
+        } else {
+            None
+        }
+    }
+
+    pub fn account_revoke_any_signer_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountRevokeAnySignerCapability {})
+        } else {
+            None
+        }
+    }
+
+    pub fn account_revoke_rotation_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountRevokeRotationCapability {
+                to_be_revoked_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -2191,6 +2657,48 @@ mod decoder {
         }
     }
 
+    pub fn account_rotate_authentication_key_with_rotation_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountRotateAuthenticationKeyWithRotationCapability {
+                    rotation_cap_offerer_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    new_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    new_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    cap_update_table: bcs::from_bytes(script.args().get(3)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_account_batch_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosAccountBatchTransfer {
+                recipients: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amounts: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_account_batch_transfer_coins(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosAccountBatchTransferCoins {
+                coin_type: script.ty_args().get(0)?.clone(),
+                recipients: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amounts: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_account_create_account(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountCreateAccount {
@@ -2201,9 +2709,33 @@ mod decoder {
         }
     }
 
+    pub fn aptos_account_set_allow_direct_coin_transfers(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosAccountSetAllowDirectCoinTransfers {
+                allow: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_account_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountTransfer {
+                to: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_account_transfer_coins(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosAccountTransferCoins {
+                coin_type: script.ty_args().get(0)?.clone(),
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
@@ -2824,6 +3356,16 @@ mod decoder {
         }
     }
 
+    pub fn vesting_distribute_many(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingDistributeMany {
+                contract_addresses: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn vesting_reset_beneficiary(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingResetBeneficiary {
@@ -2904,6 +3446,16 @@ mod decoder {
         }
     }
 
+    pub fn vesting_unlock_rewards_many(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingUnlockRewardsMany {
+                contract_addresses: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn vesting_update_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingUpdateOperator {
@@ -2949,6 +3501,16 @@ mod decoder {
             None
         }
     }
+
+    pub fn vesting_vest_many(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingVestMany {
+                contract_addresses: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
 }
 
 type EntryFunctionDecoderMap = std::collections::HashMap<
@@ -2964,8 +3526,24 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
+            "account_offer_rotation_capability".to_string(),
+            Box::new(decoder::account_offer_rotation_capability),
+        );
+        map.insert(
             "account_offer_signer_capability".to_string(),
             Box::new(decoder::account_offer_signer_capability),
+        );
+        map.insert(
+            "account_revoke_any_rotation_capability".to_string(),
+            Box::new(decoder::account_revoke_any_rotation_capability),
+        );
+        map.insert(
+            "account_revoke_any_signer_capability".to_string(),
+            Box::new(decoder::account_revoke_any_signer_capability),
+        );
+        map.insert(
+            "account_revoke_rotation_capability".to_string(),
+            Box::new(decoder::account_revoke_rotation_capability),
         );
         map.insert(
             "account_revoke_signer_capability".to_string(),
@@ -2976,12 +3554,32 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_rotate_authentication_key),
         );
         map.insert(
+            "account_rotate_authentication_key_with_rotation_capability".to_string(),
+            Box::new(decoder::account_rotate_authentication_key_with_rotation_capability),
+        );
+        map.insert(
+            "aptos_account_batch_transfer".to_string(),
+            Box::new(decoder::aptos_account_batch_transfer),
+        );
+        map.insert(
+            "aptos_account_batch_transfer_coins".to_string(),
+            Box::new(decoder::aptos_account_batch_transfer_coins),
+        );
+        map.insert(
             "aptos_account_create_account".to_string(),
             Box::new(decoder::aptos_account_create_account),
         );
         map.insert(
+            "aptos_account_set_allow_direct_coin_transfers".to_string(),
+            Box::new(decoder::aptos_account_set_allow_direct_coin_transfers),
+        );
+        map.insert(
             "aptos_account_transfer".to_string(),
             Box::new(decoder::aptos_account_transfer),
+        );
+        map.insert(
+            "aptos_account_transfer_coins".to_string(),
+            Box::new(decoder::aptos_account_transfer_coins),
         );
         map.insert(
             "aptos_coin_claim_mint_capability".to_string(),
@@ -3185,6 +3783,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::vesting_distribute),
         );
         map.insert(
+            "vesting_distribute_many".to_string(),
+            Box::new(decoder::vesting_distribute_many),
+        );
+        map.insert(
             "vesting_reset_beneficiary".to_string(),
             Box::new(decoder::vesting_reset_beneficiary),
         );
@@ -3213,6 +3815,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::vesting_unlock_rewards),
         );
         map.insert(
+            "vesting_unlock_rewards_many".to_string(),
+            Box::new(decoder::vesting_unlock_rewards_many),
+        );
+        map.insert(
             "vesting_update_operator".to_string(),
             Box::new(decoder::vesting_update_operator),
         );
@@ -3225,5 +3831,9 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::vesting_update_voter),
         );
         map.insert("vesting_vest".to_string(), Box::new(decoder::vesting_vest));
+        map.insert(
+            "vesting_vest_many".to_string(),
+            Box::new(decoder::vesting_vest_many),
+        );
         map
     });

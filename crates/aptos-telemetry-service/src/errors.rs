@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fmt::{self, Debug};
-
 use aptos_crypto::noise::NoiseError;
 use aptos_rest_client::error::RestError;
 use aptos_types::{chain_id::ChainId, PeerId};
@@ -11,6 +9,7 @@ use gcp_bigquery_client::{
     error::BQError,
     model::table_data_insert_all_response_insert_errors::TableDataInsertAllResponseInsertErrors,
 };
+use std::fmt::{self, Debug};
 use thiserror::Error as ThisError;
 use warp::{http::StatusCode, reject::Reject};
 

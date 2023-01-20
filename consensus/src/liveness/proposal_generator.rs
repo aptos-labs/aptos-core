@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{
+    proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
+};
 use crate::{
     block_storage::BlockReader, counters::CHAIN_HEALTH_BACKOFF_TRIGGERED,
     state_replication::PayloadClient, util::time_service::TimeService,
@@ -10,18 +13,12 @@ use aptos_config::config::ChainHealthBackoffValues;
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockData,
-    common::{Author, Round},
+    common::{Author, Payload, PayloadFilter, Round},
     quorum_cert::QuorumCert,
 };
 use aptos_logger::{error, sample, sample::SampleRate, warn};
-
-use aptos_consensus_types::common::{Payload, PayloadFilter};
 use futures::future::BoxFuture;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
-
-use super::{
-    proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
-};
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
@@ -311,7 +308,7 @@ impl ProposalGenerator {
         include_cur_round: bool,
         proposer_election: &mut UnequivocalProposerElection,
     ) -> Vec<(Round, Author)> {
-        let end_round = round + (if include_cur_round { 1 } else { 0 });
+        let end_round = round + u64::from(include_cur_round);
         let mut failed_authors = Vec::new();
         let start = std::cmp::max(
             previous_round + 1,

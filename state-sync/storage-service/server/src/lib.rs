@@ -3,31 +3,34 @@
 
 #![forbid(unsafe_code)]
 
-use crate::metrics::increment_network_frame_overflow;
 use crate::{
     logging::{LogEntry, LogSchema},
-    metrics::{increment_counter, start_timer, LRU_CACHE_HIT, LRU_CACHE_PROBE},
+    metrics::{
+        increment_counter, increment_network_frame_overflow, start_timer, LRU_CACHE_HIT,
+        LRU_CACHE_PROBE,
+    },
     network::{ResponseSender, StorageServiceNetworkEvents},
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::config::StorageServiceConfig;
+use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_network::ProtocolId;
 use aptos_storage_interface::DbReader;
-use aptos_storage_service_types::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest, StorageServiceRequest,
-    TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
-    TransactionsWithProofRequest,
+use aptos_storage_service_types::{
+    requests::{
+        DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest,
+        StorageServiceRequest, TransactionOutputsWithProofRequest,
+        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+    },
+    responses::{
+        CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, ServerProtocolVersion,
+        StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof,
+    },
+    Result, StorageServiceError,
 };
-use aptos_storage_service_types::responses::{
-    CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, ServerProtocolVersion,
-    StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof,
-};
-use aptos_storage_service_types::{Result, StorageServiceError};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
-    account_address::AccountAddress,
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
@@ -46,7 +49,7 @@ use thiserror::Error;
 use tokio::runtime::Handle;
 
 mod logging;
-mod metrics;
+pub mod metrics;
 pub mod network;
 
 #[cfg(test)]
@@ -149,7 +152,7 @@ impl DataSubscriptionRequest {
                     start_version,
                     end_version,
                 })
-            }
+            },
             DataRequest::GetNewTransactionsWithProof(request) => {
                 DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
                     proof_version: target_version,
@@ -157,7 +160,7 @@ impl DataSubscriptionRequest {
                     end_version,
                     include_events: request.include_events,
                 })
-            }
+            },
             DataRequest::GetNewTransactionsOrOutputsWithProof(request) => {
                 DataRequest::GetTransactionsOrOutputsWithProof(
                     TransactionsOrOutputsWithProofRequest {
@@ -168,7 +171,7 @@ impl DataSubscriptionRequest {
                         max_num_output_reductions: request.max_num_output_reductions,
                     },
                 )
-            }
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         };
         let storage_request =
@@ -202,11 +205,11 @@ impl DataSubscriptionRequest {
         match &self.request.data_request {
             DataRequest::GetNewTransactionOutputsWithProof(_) => {
                 config.max_transaction_output_chunk_size
-            }
+            },
             DataRequest::GetNewTransactionsWithProof(_) => config.max_transaction_chunk_size,
             DataRequest::GetNewTransactionsOrOutputsWithProof(_) => {
                 config.max_transaction_output_chunk_size
-            }
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -235,7 +238,7 @@ pub struct StorageServiceServer<T> {
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
 
     // A set of active subscriptions for peers waiting for new data
-    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
 
     // An LRU cache for commonly requested data items. This is separate
     // from the cached storage summary because these responses should
@@ -344,7 +347,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                             error!(LogSchema::new(LogEntry::SubscriptionRefresh)
                                 .error(&Error::UnexpectedErrorEncountered(error.to_string())));
                             continue;
-                        }
+                        },
                     };
 
                     // Remove and handle the ready subscriptions
@@ -381,14 +384,16 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         self.spawn_subscription_handler().await;
 
         // Handle the storage requests
-        while let Some(request) = self.network_requests.next().await {
+        while let Some(network_request) = self.network_requests.next().await {
             // Log the request
-            let (peer, protocol, request, response_sender) = request;
+            let peer_network_id = network_request.peer_network_id;
+            let protocol_id = network_request.protocol_id;
+            let storage_service_request = network_request.storage_service_request;
             trace!(LogSchema::new(LogEntry::ReceivedStorageRequest)
-                .request(&request)
+                .request(&storage_service_request)
                 .message(&format!(
                     "Received storage request. Peer: {:?}, protocol: {:?}.",
-                    peer, protocol,
+                    peer_network_id, protocol_id,
                 )));
 
             // All handler methods are currently CPU-bound and synchronous
@@ -409,10 +414,10 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                         time_service,
                     )
                     .process_request_and_respond(
-                        peer,
-                        protocol,
-                        request,
-                        response_sender,
+                        peer_network_id,
+                        protocol_id,
+                        storage_service_request,
+                        network_request.response_sender,
                     );
                 })
                 .await;
@@ -425,11 +430,11 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 /// alongside the ledger info at the target version for the peer.
 fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
-    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
     lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     storage: T,
     time_service: TimeService,
-) -> Result<Vec<(AccountAddress, LedgerInfoWithSignatures)>, Error> {
+) -> Result<Vec<(PeerNetworkId, LedgerInfoWithSignatures)>, Error> {
     // Fetch the latest storage summary and highest synced version
     let latest_storage_summary = cached_storage_server_summary.read().clone();
     let highest_synced_ledger_info = match latest_storage_summary.data_summary.synced_ledger_info {
@@ -467,7 +472,7 @@ fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
 /// Gets the epoch ending ledger info at the given epoch
 fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
-    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
     epoch: u64,
     lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     protocol: ProtocolId,
@@ -505,7 +510,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
                         "Empty change proof found!".into(),
                     ))
                 }
-            }
+            },
             data_response => Err(Error::StorageErrorEncountered(format!(
                 "Failed to get epoch ending ledger info! Got: {:?}",
                 data_response
@@ -522,7 +527,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
 fn notify_peer_of_new_data<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     config: StorageServiceConfig,
-    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
     lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     storage: T,
     time_service: TimeService,
@@ -551,13 +556,13 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                             transactions_with_proof,
                             target_ledger_info.clone(),
                         ))
-                    }
+                    },
                     Ok(DataResponse::TransactionOutputsWithProof(outputs_with_proof)) => {
                         DataResponse::NewTransactionOutputsWithProof((
                             outputs_with_proof,
                             target_ledger_info.clone(),
                         ))
-                    }
+                    },
                     Ok(DataResponse::TransactionsOrOutputsWithProof((
                         transactions_with_proof,
                         outputs_with_proof,
@@ -577,20 +582,20 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                                 "Failed to get a transaction or output response for peer!".into(),
                             ));
                         }
-                    }
+                    },
                     data_response => {
                         return Err(Error::UnexpectedErrorEncountered(format!(
                             "Failed to get appropriate data response for peer! Got: {:?}",
                             data_response
                         )))
-                    }
+                    },
                 },
                 response => {
                     return Err(Error::UnexpectedErrorEncountered(format!(
                         "Failed to fetch missing data for peer! {:?}",
                         response
                     )))
-                }
+                },
             };
             let storage_response =
                 match StorageServiceResponse::new(transformed_data_response, use_compression) {
@@ -600,7 +605,7 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                             "Failed to create transformed response! Error: {:?}",
                             error
                         )));
-                    }
+                    },
                 };
 
             // If the storage response has overflown the network frame size
@@ -626,7 +631,7 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                 subscription.response_sender,
             );
             Ok(())
-        }
+        },
         Err(error) => Err(error),
     }
 }
@@ -663,7 +668,7 @@ fn refresh_cached_storage_summary<T: StorageReaderInterface>(
 /// Removes all expired data subscriptions
 fn remove_expired_data_subscriptions(
     config: StorageServiceConfig,
-    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
 ) {
     data_subscriptions.lock().retain(|_, data_subscription| {
         !data_subscription.is_expired(config.max_subscription_period_ms)
@@ -676,7 +681,7 @@ fn remove_expired_data_subscriptions(
 #[derive(Clone)]
 pub struct Handler<T> {
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
-    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
     lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     storage: T,
     time_service: TimeService,
@@ -685,7 +690,7 @@ pub struct Handler<T> {
 impl<T: StorageReaderInterface> Handler<T> {
     pub fn new(
         cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
-        data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+        data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
         lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
         storage: T,
         time_service: TimeService,
@@ -703,26 +708,31 @@ impl<T: StorageReaderInterface> Handler<T> {
     /// request directly.
     pub fn process_request_and_respond(
         &self,
-        peer: AccountAddress,
-        protocol: ProtocolId,
+        peer_network_id: PeerNetworkId,
+        protocol_id: ProtocolId,
         request: StorageServiceRequest,
         response_sender: ResponseSender,
     ) {
         // Update the request count
         increment_counter(
             &metrics::STORAGE_REQUESTS_RECEIVED,
-            protocol,
+            protocol_id,
             request.get_label(),
         );
 
         // Handle any data subscriptions
         if request.data_request.is_data_subscription_request() {
-            self.handle_subscription_request(peer, protocol, request, response_sender);
+            self.handle_subscription_request(
+                peer_network_id,
+                protocol_id,
+                request,
+                response_sender,
+            );
             return;
         }
 
         // Process the request and return the response to the client
-        let response = self.process_request(protocol, request.clone());
+        let response = self.process_request(protocol_id, request.clone());
         self.send_response(request, response, response_sender);
     }
 
@@ -745,12 +755,12 @@ impl<T: StorageReaderInterface> Handler<T> {
                 let data_response = self.get_server_protocol_version();
                 StorageServiceResponse::new(data_response, request.use_compression)
                     .map_err(|error| error.into())
-            }
+            },
             DataRequest::GetStorageServerSummary => {
                 let data_response = self.get_storage_server_summary();
                 StorageServiceResponse::new(data_response, request.use_compression)
                     .map_err(|error| error.into())
-            }
+            },
             _ => self.process_cachable_request(protocol, &request),
         };
 
@@ -772,7 +782,7 @@ impl<T: StorageReaderInterface> Handler<T> {
                     Error::InvalidRequest(error) => Err(StorageServiceError::InvalidRequest(error)),
                     error => Err(StorageServiceError::InternalError(error.to_string())),
                 }
-            }
+            },
             Ok(response) => {
                 // The request was successful
                 increment_counter(
@@ -781,7 +791,7 @@ impl<T: StorageReaderInterface> Handler<T> {
                     response.get_label(),
                 );
                 Ok(response)
-            }
+            },
         }
     }
 
@@ -799,14 +809,14 @@ impl<T: StorageReaderInterface> Handler<T> {
     /// Handles the given data subscription request
     pub fn handle_subscription_request(
         &self,
-        peer: AccountAddress,
-        protocol: ProtocolId,
+        peer_network_id: PeerNetworkId,
+        protocol_id: ProtocolId,
         request: StorageServiceRequest,
         response_sender: ResponseSender,
     ) {
         // Create the subscription request
         let subscription_request = DataSubscriptionRequest::new(
-            protocol,
+            protocol_id,
             request,
             response_sender,
             self.time_service.clone(),
@@ -815,7 +825,7 @@ impl<T: StorageReaderInterface> Handler<T> {
         // Store the subscription for when there is new data
         self.data_subscriptions
             .lock()
-            .insert(peer, subscription_request);
+            .insert(peer_network_id, subscription_request);
     }
 
     /// Processes a storage service request for which the response
@@ -837,22 +847,22 @@ impl<T: StorageReaderInterface> Handler<T> {
         let data_response = match &request.data_request {
             DataRequest::GetStateValuesWithProof(request) => {
                 self.get_state_value_chunk_with_proof(request)
-            }
+            },
             DataRequest::GetEpochEndingLedgerInfos(request) => {
                 self.get_epoch_ending_ledger_infos(request)
-            }
+            },
             DataRequest::GetNumberOfStatesAtVersion(version) => {
                 self.get_number_of_states_at_version(*version)
-            }
+            },
             DataRequest::GetTransactionOutputsWithProof(request) => {
                 self.get_transaction_outputs_with_proof(request)
-            }
+            },
             DataRequest::GetTransactionsWithProof(request) => {
                 self.get_transactions_with_proof(request)
-            }
+            },
             DataRequest::GetTransactionsOrOutputsWithProof(request) => {
                 self.get_transactions_or_outputs_with_proof(request)
-            }
+            },
             _ => Err(Error::UnexpectedErrorEncountered(format!(
                 "Received an unexpected request: {:?}",
                 request
@@ -1490,10 +1500,10 @@ fn log_storage_response(
                     }
                 );
             }
-        }
+        },
         Err(storage_error) => {
             let storage_error = format!("{:?}", storage_error);
             debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&storage_error));
-        }
+        },
     };
 }

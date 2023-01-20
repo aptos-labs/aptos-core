@@ -3,9 +3,8 @@
 
 use crate::{error::QuorumStoreError, monitor, state_replication::PayloadClient};
 use anyhow::Result;
-use aptos_consensus_types::common::Round;
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter},
+    common::{Payload, PayloadFilter, Round},
     request_response::{ConsensusResponse, PayloadRequest},
 };
 use aptos_logger::prelude::*;
@@ -72,7 +71,7 @@ impl QuorumStoreClient {
         ) {
             Err(_) => {
                 Err(anyhow::anyhow!("[consensus] did not receive GetBlockResponse on time").into())
-            }
+            },
             Ok(resp) => match resp.map_err(anyhow::Error::from)?? {
                 ConsensusResponse::GetBlockResponse(payload) => Ok(payload),
             },

@@ -4,14 +4,14 @@
 //! This module provides common utilities for the DB pruner.
 
 use crate::{
-    pruner::{ledger_store::ledger_store_pruner::LedgerPruner, state_store::StateMerklePruner},
+    pruner::{
+        ledger_store::ledger_store_pruner::LedgerPruner,
+        state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+    },
     EventStore, StateStore, TransactionStore,
 };
-
-use crate::pruner::state_store::generics::StaleNodeIndexSchemaTrait;
 use aptos_jellyfish_merkle::StaleNodeIndex;
-use aptos_schemadb::schema::KeyCodec;
-use aptos_schemadb::DB;
+use aptos_schemadb::{schema::KeyCodec, DB};
 use std::sync::Arc;
 
 /// A utility function to instantiate the state pruner

@@ -3,24 +3,24 @@
 
 use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, wait_stateful_set, Create, GenesisConfigFn, K8sApi, K8sNode, NodeConfigFn,
-    Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
-    FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
+    nodes_healthcheck, wait_stateful_set, Create, GenesisConfigFn, Get, K8sApi, K8sNode,
+    NodeConfigFn, Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME,
+    DEFAULT_ROOT_KEY, FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
     GENESIS_HELM_CHART_PATH, GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN,
     MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS,
     VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
-use anyhow::{bail, format_err};
-use aptos_logger::info;
+use anyhow::{anyhow, bail, format_err};
+use aptos_logger::{info, warn};
 use aptos_sdk::types::PeerId;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
     batch::{v1::Job, v1beta1::CronJob},
-    core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod},
+    core::v1::{ConfigMap, Namespace, PersistentVolume, PersistentVolumeClaim, Pod, Secret},
 };
 use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, PostParams},
+    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, Patch, PatchParams, PostParams},
     client::Client as K8sClient,
     Config, Error as KubeError,
 };
@@ -75,7 +75,7 @@ async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &s
                         ])
                         .status()
                         .expect("Failed to tail genesis logs");
-                }
+                },
                 None => info!("Genesis completed running"),
             }
             info!("Genesis status: {:?}", status);
@@ -83,7 +83,7 @@ async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &s
                 Some(_) => {
                     info!("Genesis done");
                     Ok(())
-                }
+                },
                 None => bail!("Genesis did not succeed"),
             }
         })
@@ -119,11 +119,11 @@ async fn wait_node_haproxy(
                         }
                         info!("Deployment {} has no status", deployment_name);
                         bail!("Deployment not ready");
-                    }
+                    },
                     Err(e) => {
                         info!("Failed to get deployment: {}", e);
                         bail!("Failed to get deployment: {}", e);
-                    }
+                    },
                 }
             }
             Ok(())
@@ -173,10 +173,10 @@ async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
         either::Left(list) => {
             let names: Vec<_> = list.iter().map(Meta::name).collect();
             info!("Deleting collection of {}: {:?}", name, names);
-        }
+        },
         either::Right(status) => {
             info!("Deleted collection of {}: status={:?}", name, status);
-        }
+        },
     }
 
     Ok(())
@@ -224,7 +224,7 @@ pub(crate) fn delete_all_chaos(kube_namespace: &str) -> Result<()> {
     info!("{:?}", delete_networkchaos);
     let delete_networkchaos_output = Command::new(KUBECTL_BIN)
         .stdout(Stdio::inherit())
-        .args(&delete_networkchaos)
+        .args(delete_networkchaos)
         .output()
         .expect("failed to delete all NetworkChaos");
     if !delete_networkchaos_output.status.success() {
@@ -267,11 +267,11 @@ async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
                     } else {
                         bail!(api_err);
                     }
-                }
+                },
                 Err(e) => bail!(e),
             };
             delete_k8s_resources(client, "default").await?;
-        }
+        },
         s if s.starts_with("forge") => {
             let namespaces: Api<Namespace> = Api::all(client);
             namespaces
@@ -279,13 +279,13 @@ async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
                 .await?
                 .map_left(|namespace| info!("Deleting namespace {}: {:?}", s, namespace.status))
                 .map_right(|status| info!("Deleted namespace {}: {:?}", s, status));
-        }
+        },
         _ => {
             bail!(
                 "Invalid kubernetes namespace provided: {}. Use forge-*",
                 kube_namespace
             );
-        }
+        },
     }
 
     Ok(())
@@ -408,6 +408,85 @@ fn get_node_default_helm_path() -> String {
     }
 }
 
+pub async fn reset_persistent_volumes(kube_client: &K8sClient) -> Result<()> {
+    let pv_api: Api<PersistentVolume> = Api::all(kube_client.clone());
+    let pvs = pv_api
+        .list(&ListParams::default())
+        .await?
+        .items
+        .into_iter()
+        .filter(|pv| {
+            if let Some(status) = &pv.status {
+                if let Some(phase) = &status.phase {
+                    if phase == "Released" {
+                        return true;
+                    }
+                }
+            }
+            false
+        })
+        .collect::<Vec<PersistentVolume>>();
+
+    for pv in &pvs {
+        let name = pv.metadata.name.clone().expect("Must have name!");
+        info!("Changing pv {} from Released to Available.", name);
+        let patch = serde_json::json!({
+            "spec": {
+                "claimRef": null
+            }
+        });
+        pv_api
+            .patch(&name, &PatchParams::default(), &Patch::Merge(&patch))
+            .await?;
+    }
+
+    Ok(())
+}
+
+pub async fn check_persistent_volumes(
+    kube_client: K8sClient,
+    num_requested_pvs: usize,
+    existing_db_tag: String,
+) -> Result<()> {
+    info!("Trying to get {} PVs.", num_requested_pvs);
+    let pv_api: Api<PersistentVolume> = Api::all(kube_client.clone());
+    let list_params = ListParams::default();
+    let pvs = pv_api
+        .list(&list_params)
+        .await?
+        .items
+        .into_iter()
+        .filter(|pv| {
+            if let Some(labels) = &pv.metadata.labels {
+                if let Some(tag) = labels.get(&"tag".to_string()) {
+                    if tag == &existing_db_tag {
+                        if let Some(status) = &pv.status {
+                            if let Some(phase) = &status.phase {
+                                if phase == "Available" {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        })
+        .collect::<Vec<PersistentVolume>>();
+
+    if pvs.len() < num_requested_pvs {
+        return Err(anyhow!(
+            "Could not find enough PVs, requested: {}, available: {}.",
+            num_requested_pvs,
+            pvs.len()
+        ));
+    }
+
+    info!("Found enough PVs.");
+
+    Ok(())
+}
+
 pub async fn install_testnet_resources(
     kube_namespace: String,
     num_validators: usize,
@@ -527,8 +606,8 @@ pub fn construct_node_helm_values(
     value["imageTag"] = image_tag.clone().into();
     value["chain"]["era"] = era.into();
     value["haproxy"]["enabled"] = enable_haproxy.into();
-    value["labels"]["forge-namespace"] = kube_namespace.into();
-    value["labels"]["forge-image-tag"] = image_tag.into();
+    value["labels"]["forge-namespace"] = make_k8s_label(kube_namespace).into();
+    value["labels"]["forge-image-tag"] = make_k8s_label(image_tag).into();
     if let Some(config_fn) = node_helm_config_fn {
         (config_fn)(&mut value);
     }
@@ -561,8 +640,8 @@ pub fn construct_genesis_helm_values(
     value["genesis"]["validator"]["internal_host_suffix"] = validator_internal_host_suffix.into();
     value["genesis"]["validator"]["key_seed"] = FORGE_KEY_SEED.into();
     value["genesis"]["fullnode"]["internal_host_suffix"] = fullnode_internal_host_suffix.into();
-    value["labels"]["forge-namespace"] = kube_namespace.into();
-    value["labels"]["forge-image-tag"] = genesis_image_tag.into();
+    value["labels"]["forge-namespace"] = make_k8s_label(kube_namespace).into();
+    value["labels"]["forge-image-tag"] = make_k8s_label(genesis_image_tag).into();
 
     if let Some(config_fn) = genesis_helm_config_fn {
         (config_fn)(&mut value);
@@ -642,7 +721,7 @@ fn get_helm_status(helm_release_name: &str) -> Result<Value> {
     ];
     info!("{:?}", status_args);
     let raw_helm_values = Command::new(HELM_BIN)
-        .args(&status_args)
+        .args(status_args)
         .output()
         .unwrap_or_else(|_| panic!("Failed to helm status {}", helm_release_name));
 
@@ -722,6 +801,54 @@ async fn create_namespace(
                 &kube_namespace_name, api_err
             )));
         }
+    }
+    Ok(())
+}
+
+pub async fn create_pyroscope_secret(kube_namespace: String) -> Result<()> {
+    let kube_client = create_k8s_client().await;
+    let kube_namespace_name = kube_namespace.clone();
+    let default_secrets_api = Arc::new(K8sApi::<Secret>::from_client(
+        kube_client.clone(),
+        Some("default".to_string()),
+    ));
+    let namespace_secrets_api = Arc::new(K8sApi::<Secret>::from_client(
+        kube_client.clone(),
+        Some(kube_namespace_name.to_string()),
+    ));
+    // load in the secret from namespace and copy it to the new namespace
+    if let Ok(secret) = default_secrets_api.get("pyroscope").await {
+        info!("Secret pyroscope exists, continuing with it");
+        let pyroscope_secret_data = secret.data.clone();
+        let namespaced_pyroscope_secret = Secret {
+            metadata: ObjectMeta {
+                name: Some("pyroscope".to_string()),
+                ..ObjectMeta::default()
+            },
+            data: pyroscope_secret_data,
+            string_data: None,
+            type_: None,
+        };
+        if let Err(KubeError::Api(api_err)) = namespace_secrets_api
+            .create(&PostParams::default(), &namespaced_pyroscope_secret)
+            .await
+        {
+            if api_err.code == 409 {
+                info!(
+                    "Secret pyroscope already exists in namespace {}, continuing with it",
+                    &kube_namespace_name
+                );
+            } else {
+                return Err(format_err!(
+                    "Failed to create secret pyroscope in namespace {}: {:?}",
+                    &kube_namespace_name,
+                    api_err
+                ));
+            }
+        }
+    } else {
+        warn!("Secret pyroscope does not exist. This test run will not be profiled");
+        // do not exit with an error, but throw a warning
     }
     Ok(())
 }
@@ -914,6 +1041,12 @@ fn check_namespace_for_cleanup(
     false
 }
 
+/// Ensures that the label is at most 64 characters to meet k8s
+/// label length requirements.
+pub fn make_k8s_label(value: String) -> String {
+    value.get(..63).unwrap_or(&value).to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -953,7 +1086,7 @@ mod tests {
         let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(401));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
         match result {
-            Err(ApiError::FinalError(_)) => {}
+            Err(ApiError::FinalError(_)) => {},
             _ => panic!("Expected final error"),
         }
     }
@@ -1026,7 +1159,7 @@ labels:
         let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(403));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
         match result {
-            Err(ApiError::RetryableError(_)) => {}
+            Err(ApiError::RetryableError(_)) => {},
             _ => panic!("Expected retryable error"),
         }
     }

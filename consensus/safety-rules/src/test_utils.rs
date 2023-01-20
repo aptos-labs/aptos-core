@@ -5,12 +5,13 @@ use crate::{
     persistent_safety_storage::PersistentSafetyStorage, serializer::SerializerService, SafetyRules,
     TSafetyRules,
 };
-use aptos_consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use aptos_consensus_types::{
     block::Block,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    timeout_2chain::{
+        TwoChainTimeout, TwoChainTimeoutCertificate, TwoChainTimeoutWithPartialSignatures,
+    },
     vote::Vote,
     vote_data::VoteData,
     vote_proposal::VoteProposal,
@@ -154,7 +155,7 @@ pub fn make_proposal_with_parent_and_overrides(
                 next_epoch_state,
             );
             LedgerInfo::new(commit_block_info, vote_data.hash())
-        }
+        },
         None => LedgerInfo::new(BlockInfo::empty(), vote_data.hash()),
     };
 

@@ -1,20 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{
+    context::{ClientTuple, Context, JsonWebTokenService, PeerStoreTuple},
+    index, CustomEventConfig, TelemetryServiceConfig,
+};
+use aptos_crypto::{x25519, Uniform};
+use aptos_rest_client::aptos_api_types::mime_types;
 use rand::SeedableRng;
 use reqwest::header::AUTHORIZATION;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use warp::http::header::CONTENT_TYPE;
-use warp::http::Response;
-use warp::hyper::body::Bytes;
-
-use crate::context::{ClientTuple, JsonWebTokenService, PeerStoreTuple};
-use crate::CustomEventConfig;
-use crate::{context::Context, index, TelemetryServiceConfig};
-
-use aptos_crypto::{x25519, Uniform};
-use aptos_rest_client::aptos_api_types::mime_types;
+use warp::{
+    http::{header::CONTENT_TYPE, Response},
+    hyper::body::Bytes,
+};
 
 pub async fn new_test_context() -> TestContext {
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);

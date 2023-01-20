@@ -1,13 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::payload_manager::PayloadManager;
 use crate::{
     error::StateSyncError,
     experimental::{
         buffer_manager::{OrderedBlocks, ResetAck, ResetRequest},
         errors::Error,
     },
+    payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
 };
 use anyhow::Result;

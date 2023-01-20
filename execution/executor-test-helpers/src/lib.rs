@@ -11,11 +11,10 @@ use aptos_crypto::{
 use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
 use aptos_executor_types::StateComputeResult;
 use aptos_storage_interface::DbReaderWriter;
-use aptos_types::ledger_info::generate_ledger_info_with_sig;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     test_helpers::transaction_test_helpers::get_test_signed_txn,
     transaction::{Transaction, TransactionPayload},
     validator_signer::ValidatorSigner,

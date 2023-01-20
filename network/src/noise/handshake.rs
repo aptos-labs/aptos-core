@@ -143,6 +143,14 @@ pub struct NoiseUpgrader {
 }
 
 impl NoiseUpgrader {
+    /// The client message consist of the prologue + a noise message with a timestamp as payload.
+    const CLIENT_MESSAGE_SIZE: usize =
+        Self::PROLOGUE_SIZE + noise::handshake_init_msg_len(AntiReplayTimestamps::TIMESTAMP_SIZE);
+    /// The prologue is the client's peer_id and the remote's expected public key.
+    const PROLOGUE_SIZE: usize = PeerId::LENGTH + x25519::PUBLIC_KEY_SIZE;
+    /// The server's message contains no payload.
+    const SERVER_MESSAGE_SIZE: usize = noise::handshake_resp_msg_len(0);
+
     /// Create a new NoiseConfig with the provided keypair and authentication mode.
     pub fn new(
         network_context: NetworkContext,
@@ -180,27 +188,17 @@ impl NoiseUpgrader {
                 };
                 self.upgrade_outbound(socket, remote_public_key, AntiReplayTimestamps::now)
                     .await?
-            }
+            },
             ConnectionOrigin::Inbound => {
                 let (socket, _peer_id, _) = self.upgrade_inbound(socket).await?;
                 socket
-            }
+            },
         };
 
         // return remote public key with a socket including the noise stream
         let remote_public_key = socket.get_remote_static();
         Ok((remote_public_key, socket))
     }
-
-    /// The prologue is the client's peer_id and the remote's expected public key.
-    const PROLOGUE_SIZE: usize = PeerId::LENGTH + x25519::PUBLIC_KEY_SIZE;
-
-    /// The client message consist of the prologue + a noise message with a timestamp as payload.
-    const CLIENT_MESSAGE_SIZE: usize =
-        Self::PROLOGUE_SIZE + noise::handshake_init_msg_len(AntiReplayTimestamps::TIMESTAMP_SIZE);
-
-    /// The server's message contains no payload.
-    const SERVER_MESSAGE_SIZE: usize = noise::handshake_resp_msg_len(0);
 
     /// Perform an outbound protocol upgrade on this connection.
     ///
@@ -352,18 +350,18 @@ impl NoiseUpgrader {
                 match trusted_peers.read().get(&remote_peer_id) {
                     Some(peer) => {
                         Self::authenticate_inbound(remote_peer_short, peer, &remote_public_key)
-                    }
+                    },
                     None => Err(NoiseHandshakeError::UnauthenticatedClient(
                         remote_peer_short,
                         remote_peer_id,
                     )),
                 }
-            }
+            },
             HandshakeAuthMode::MaybeMutual(trusted_peers) => {
                 match trusted_peers.read().get(&remote_peer_id) {
                     Some(peer) => {
                         Self::authenticate_inbound(remote_peer_short, peer, &remote_public_key)
-                    }
+                    },
                     None => {
                         // if not, verify that their peerid is constructed correctly from their public key
                         let derived_remote_peer_id =
@@ -379,9 +377,9 @@ impl NoiseUpgrader {
                         } else {
                             Ok(PeerRole::Unknown)
                         }
-                    }
+                    },
                 }
-            }
+            },
         }?;
 
         // if on a mutually authenticated network,

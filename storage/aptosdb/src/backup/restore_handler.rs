@@ -1,11 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::db_metadata::{DbMetadataKey, DbMetadataSchema};
-use crate::state_restore::StateSnapshotRestore;
 use crate::{
-    backup::restore_utils, event_store::EventStore, ledger_store::LedgerStore,
-    state_store::StateStore, transaction_store::TransactionStore, AptosDB,
+    backup::restore_utils,
+    db_metadata::{DbMetadataKey, DbMetadataSchema},
+    event_store::EventStore,
+    ledger_store::LedgerStore,
+    state_restore::StateSnapshotRestore,
+    state_store::StateStore,
+    transaction_store::TransactionStore,
+    AptosDB,
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;

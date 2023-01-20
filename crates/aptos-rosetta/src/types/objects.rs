@@ -5,18 +5,16 @@
 //!
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
-use crate::common::native_coin_tag;
-use crate::construction::{
-    parse_create_stake_pool_operation, parse_reset_lockup_operation, parse_set_operator_operation,
-    parse_set_voter_operation,
-};
-use crate::types::move_types::*;
 use crate::{
-    common::{is_native_coin, native_coin},
+    common::{is_native_coin, native_coin, native_coin_tag},
+    construction::{
+        parse_create_stake_pool_operation, parse_reset_lockup_operation,
+        parse_set_operator_operation, parse_set_voter_operation,
+    },
     error::ApiResult,
     types::{
-        AccountIdentifier, BlockIdentifier, Error, OperationIdentifier, OperationStatus,
-        OperationStatusType, OperationType, TransactionIdentifier,
+        move_types::*, AccountIdentifier, BlockIdentifier, Error, OperationIdentifier,
+        OperationStatus, OperationStatusType, OperationType, TransactionIdentifier,
     },
     ApiError, RosettaContext,
 };
@@ -24,21 +22,22 @@ use anyhow::anyhow;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 use aptos_logger::warn;
-use aptos_rest_client::aptos_api_types::TransactionOnChainData;
-use aptos_rest_client::aptos_api_types::U64;
-use aptos_types::account_config::{AccountResource, CoinStoreResource, WithdrawEvent};
-use aptos_types::contract_event::ContractEvent;
-use aptos_types::stake_pool::{SetOperatorEvent, StakePool};
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::transaction::{EntryFunction, TransactionPayload};
-use aptos_types::write_set::{WriteOp, WriteSet};
-use aptos_types::{account_address::AccountAddress, event::EventKey};
+use aptos_rest_client::aptos_api_types::{TransactionOnChainData, U64};
+use aptos_types::{
+    account_address::AccountAddress,
+    account_config::{AccountResource, CoinStoreResource, WithdrawEvent},
+    contract_event::ContractEvent,
+    event::EventKey,
+    stake_pool::{SetOperatorEvent, StakePool},
+    state_store::state_key::StateKey,
+    transaction::{EntryFunction, TransactionPayload},
+    write_set::{WriteOp, WriteSet},
+};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::{
-    collections::HashMap,
+    cmp::Ordering,
+    collections::{BTreeMap, HashMap},
     convert::TryFrom,
     fmt::{Display, Formatter},
     hash::Hash,
@@ -198,7 +197,6 @@ impl Operation {
         }
     }
 
-    /// TODO: This is experimental and should not be used outside of testing
     pub fn create_stake_pool(
         operation_index: u64,
         status: Option<OperationStatusType>,
@@ -206,6 +204,7 @@ impl Operation {
         operator: Option<AccountAddress>,
         voter: Option<AccountAddress>,
         staked_balance: Option<u64>,
+        commission_percentage: Option<u64>,
     ) -> Operation {
         Operation::new(
             OperationType::InitializeStakePool,
@@ -217,6 +216,7 @@ impl Operation {
                 operator.map(AccountIdentifier::base_account),
                 voter.map(AccountIdentifier::base_account),
                 staked_balance,
+                commission_percentage,
             )),
         )
     }
@@ -392,7 +392,7 @@ impl std::cmp::Ord for Operation {
                         .cmp(&other.operation_identifier.index),
                     order => order,
                 }
-            }
+            },
             (Some(_), None) => Ordering::Less,
             (None, Some(_)) => Ordering::Greater,
             (None, None) => Ordering::Equal,
@@ -416,6 +416,8 @@ pub struct OperationMetadata {
     pub new_voter: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub staked_balance: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commission_percentage: Option<U64>,
 }
 
 impl OperationMetadata {
@@ -451,11 +453,13 @@ impl OperationMetadata {
         new_operator: Option<AccountIdentifier>,
         new_voter: Option<AccountIdentifier>,
         staked_balance: Option<u64>,
+        commission_percentage: Option<u64>,
     ) -> Self {
         OperationMetadata {
             new_operator,
             new_voter,
             staked_balance: staked_balance.map(U64::from),
+            commission_percentage: commission_percentage.map(U64::from),
             ..Default::default()
         }
     }
@@ -592,7 +596,7 @@ impl Transaction {
         let (txn_type, maybe_user_txn, txn_info, events) = match &txn.transaction {
             UserTransaction(user_txn) => {
                 (TransactionType::User, Some(user_txn), txn.info, txn.events)
-            }
+            },
             GenesisTransaction(_) => (TransactionType::Genesis, None, txn.info, txn.events),
             BlockMetadata(_) => (TransactionType::BlockMetadata, None, txn.info, txn.events),
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
@@ -695,12 +699,12 @@ fn parse_failed_operations_from_txn_payload(
                         )
                     }
                 }
-            }
+            },
             (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNCTION) => {
                 // We could add a create here as well, but we don't know if it will actually happen
                 operations =
                     parse_transfer_from_txn_payload(inner, native_coin(), sender, operation_index)
-            }
+            },
             (AccountAddress::ONE, ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                 if let Some(Ok(address)) = inner
                     .args()
@@ -716,7 +720,7 @@ fn parse_failed_operations_from_txn_payload(
                 } else {
                     warn!("Failed to parse create account {:?}", inner);
                 }
-            }
+            },
             (
                 AccountAddress::ONE,
                 STAKING_CONTRACT_MODULE,
@@ -731,7 +735,7 @@ fn parse_failed_operations_from_txn_payload(
                 } else {
                     warn!("Failed to parse set operator {:?}", inner);
                 }
-            }
+            },
             (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_VOTER_FUNCTION) => {
                 if let Ok(mut ops) =
                     parse_set_voter_operation(sender, inner.ty_args(), inner.args())
@@ -742,7 +746,7 @@ fn parse_failed_operations_from_txn_payload(
                 } else {
                     warn!("Failed to parse set voter {:?}", inner);
                 }
-            }
+            },
             (AccountAddress::ONE, STAKING_CONTRACT_MODULE, RESET_LOCKUP_FUNCTION) => {
                 if let Ok(mut ops) =
                     parse_reset_lockup_operation(sender, inner.ty_args(), inner.args())
@@ -753,7 +757,7 @@ fn parse_failed_operations_from_txn_payload(
                 } else {
                     warn!("Failed to parse reset lockup {:?}", inner);
                 }
-            }
+            },
             (AccountAddress::ONE, STAKING_CONTRACT_MODULE, CREATE_STAKING_CONTRACT_FUNCTION) => {
                 if let Ok(mut ops) =
                     parse_create_stake_pool_operation(sender, inner.ty_args(), inner.args())
@@ -764,10 +768,10 @@ fn parse_failed_operations_from_txn_payload(
                 } else {
                     warn!("Failed to parse create staking pool {:?}", inner);
                 }
-            }
+            },
             _ => {
                 // If we don't recognize the transaction payload, then we can't parse operations
-            }
+            },
         }
     }
     operations
@@ -834,11 +838,11 @@ async fn parse_operations_from_write_set(
             } else {
                 return Ok(vec![]);
             }
-        }
+        },
         _ => {
             // Ignore all but access path
             return Ok(vec![]);
-        }
+        },
     };
 
     let data = match write_op {
@@ -856,7 +860,7 @@ async fn parse_operations_from_write_set(
     ) {
         (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE, 0) => {
             parse_account_resource_changes(version, address, data, maybe_sender, operation_index)
-        }
+        },
         (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE, 0) => {
             parse_stake_pool_resource_changes(
                 server_context,
@@ -866,11 +870,11 @@ async fn parse_operations_from_write_set(
                 events,
                 operation_index,
             )
-        }
+        },
         (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE, 0) => {
             parse_staking_contract_resource_changes(address, data, events, operation_index, changes)
                 .await
-        }
+        },
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_params.first() {
                 // TODO: This will need to be updated to support more coins
@@ -894,11 +898,11 @@ async fn parse_operations_from_write_set(
                 );
                 Ok(vec![])
             }
-        }
+        },
         _ => {
             // Any unknown type will just skip the operations
             Ok(vec![])
-        }
+        },
     }
 }
 
@@ -1377,6 +1381,7 @@ impl InternalOperation {
                                     new_operator,
                                     new_voter,
                                     staked_balance,
+                                    commission_percentage,
                                     ..
                                 }),
                                 Some(account),
@@ -1399,11 +1404,13 @@ impl InternalOperation {
                                     operator: operator_address,
                                     voter: voter_address,
                                     amount: staked_balance.map(u64::from).unwrap_or_default(),
-                                    commission_percentage: 0,
+                                    commission_percentage: commission_percentage
+                                        .map(u64::from)
+                                        .unwrap_or_default(),
                                     seed: vec![],
                                 }));
                             }
-                        }
+                        },
                         Ok(OperationType::CreateAccount) => {
                             if let (
                                 Some(OperationMetadata {
@@ -1418,7 +1425,7 @@ impl InternalOperation {
                                     new_account: account.account_address()?,
                                 }));
                             }
-                        }
+                        },
                         Ok(OperationType::SetOperator) => {
                             if let (
                                 Some(OperationMetadata {
@@ -1441,7 +1448,7 @@ impl InternalOperation {
                                     new_operator: new_operator.account_address()?,
                                 }));
                             }
-                        }
+                        },
                         Ok(OperationType::SetVoter) => {
                             if let (
                                 Some(OperationMetadata {
@@ -1463,7 +1470,7 @@ impl InternalOperation {
                                     new_voter: new_voter.account_address()?,
                                 }));
                             }
-                        }
+                        },
                         Ok(OperationType::ResetLockup) => {
                             if let (Some(OperationMetadata { operator, .. }), Some(account)) =
                                 (&operation.metadata, &operation.account)
@@ -1480,8 +1487,8 @@ impl InternalOperation {
                                     operator,
                                 }));
                             }
-                        }
-                        _ => {}
+                        },
+                        _ => {},
                     }
                 }
 
@@ -1490,7 +1497,7 @@ impl InternalOperation {
                     "Unrecognized single operation {:?}",
                     operations
                 ))))
-            }
+            },
             2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
             _ => Err(ApiError::InvalidOperations(Some(format!(
                 "Unrecognized operation combination {:?}",
@@ -1525,7 +1532,7 @@ impl InternalOperation {
                     aptos_stdlib::aptos_account_transfer(transfer.receiver, transfer.amount.0),
                     transfer.sender,
                 )
-            }
+            },
             InternalOperation::SetOperator(set_operator) => {
                 if set_operator.old_operator.is_none() {
                     return Err(ApiError::InvalidInput(Some(
@@ -1539,7 +1546,7 @@ impl InternalOperation {
                     ),
                     set_operator.owner,
                 )
-            }
+            },
             InternalOperation::SetVoter(set_voter) => {
                 if set_voter.operator.is_none() {
                     return Err(ApiError::InvalidInput(Some(
@@ -1553,7 +1560,7 @@ impl InternalOperation {
                     ),
                     set_voter.owner,
                 )
-            }
+            },
             InternalOperation::InitializeStakePool(init_stake_pool) => (
                 aptos_stdlib::staking_contract_create_staking_contract(
                     init_stake_pool.operator,

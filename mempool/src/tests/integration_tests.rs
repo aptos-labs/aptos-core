@@ -167,7 +167,7 @@ async fn test_skip_ack_rebroadcast() {
         .await;
 }
 
-/// Tests when a node gets disconnected.  Node should pick up after the second sending
+/// Tests when a node gets disconnected. Node should pick up after the second sending
 /// TODO: also add an outbound test to ensure it'll broadcast all transactions again
 #[tokio::test]
 async fn test_interrupt_in_sync_inbound() {

@@ -4,8 +4,7 @@ use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCre
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 use async_trait::async_trait;
 use futures::future::join_all;
-use rand::prelude::StdRng;
-use rand::Rng;
+use rand::{prelude::StdRng, Rng};
 use rand_core::{OsRng, SeedableRng};
 
 pub struct TxnMixGenerator {

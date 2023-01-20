@@ -14,7 +14,6 @@ module std::fixed_point32 {
     /// decimal.
     struct FixedPoint32 has copy, drop, store { value: u64 }
 
-    ///> TODO: This is a basic constant and should be provided somewhere centrally in the framework.
     const MAX_U64: u128 = 18446744073709551615;
 
     /// The denominator provided was zero
@@ -121,8 +120,8 @@ module std::fixed_point32 {
     spec schema CreateFromRationalAbortsIf {
         numerator: u64;
         denominator: u64;
-        let scaled_numerator = numerator << 64;
-        let scaled_denominator = denominator << 32;
+        let scaled_numerator = (numerator as u128)<< 64;
+        let scaled_denominator = (denominator as u128) << 32;
         let quotient = scaled_numerator / scaled_denominator;
         aborts_if scaled_denominator == 0 with EDENOMINATOR;
         aborts_if quotient == 0 && scaled_numerator != 0 with ERATIO_OUT_OF_RANGE;

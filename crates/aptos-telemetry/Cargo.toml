@@ -25,6 +25,7 @@ aptos-mempool = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-network = { workspace = true }
 aptos-node-resource-metrics = { workspace = true }
+aptos-runtimes = { workspace = true }
 aptos-state-sync-driver = { workspace = true }
 aptos-telemetry-service = { workspace = true }
 aptos-types = { workspace = true }

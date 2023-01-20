@@ -93,6 +93,11 @@ variable "num_extra_instance" {
   description = "Number of extra instances to add into node pool"
 }
 
+variable "instance_disk_size_gb" {
+  default     = 100
+  description = "Disk size for fullnode instance"
+}
+
 variable "image_tag" {
   default     = "devnet"
   description = "Docker image tag to use for the fullnode"

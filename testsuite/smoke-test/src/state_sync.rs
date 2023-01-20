@@ -3,7 +3,7 @@
 
 use crate::{
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
-    test_utils::{create_and_fund_account, transfer_and_reconfig, transfer_coins},
+    test_utils::{create_and_fund_account, transfer_and_maybe_reconfig, transfer_coins},
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
 use aptos_forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
@@ -108,6 +108,70 @@ async fn test_full_node_bootstrap_outputs_exponential_backoff() {
         .state_sync
         .state_sync_driver
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
+    vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
+
+    // Create the fullnode
+    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
+
+    // Test the ability of the fullnode to sync
+    test_full_node_sync(vfn_peer_id, &mut swarm, true).await;
+}
+
+#[tokio::test]
+async fn test_full_node_bootstrap_transactions_or_outputs() {
+    // Create a validator swarm of 1 validator node with a small network limit
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.storage_service.max_network_chunk_bytes = 5 * 1024;
+        }))
+        .build()
+        .await;
+
+    // Create a fullnode config that uses transactions or outputs to sync
+    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::ExecuteOrApplyFromGenesis;
+    vfn_config
+        .state_sync
+        .state_sync_driver
+        .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs;
+    vfn_config
+        .state_sync
+        .aptos_data_client
+        .max_num_output_reductions = 1;
+    vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
+
+    // Create the fullnode
+    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
+
+    // Test the ability of the fullnode to sync
+    test_full_node_sync(vfn_peer_id, &mut swarm, true).await;
+}
+
+#[tokio::test]
+async fn test_full_node_bootstrap_snapshot_transactions_or_outputs() {
+    // Create a validator swarm of 1 validator node with a small network limit
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.storage_service.max_network_chunk_bytes = 300 * 1024;
+        }))
+        .build()
+        .await;
+
+    // Create a fullnode config that uses snapshot syncing and transactions or outputs
+    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::DownloadLatestStates;
+    vfn_config
+        .state_sync
+        .state_sync_driver
+        .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs;
+    vfn_config
+        .state_sync
+        .aptos_data_client
+        .max_num_output_reductions = 2;
     vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
 
     // Create the fullnode
@@ -416,6 +480,30 @@ async fn test_validator_bootstrap_transactions() {
     test_validator_sync(&mut swarm, 1).await;
 }
 
+#[tokio::test]
+async fn test_validator_bootstrap_transactions_or_outputs() {
+    // Create a swarm of 4 validators using transaction or output syncing
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::ExecuteOrApplyFromGenesis;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs;
+            config.state_sync.storage_service.max_network_chunk_bytes = 10 * 1024;
+            config
+                .state_sync
+                .aptos_data_client
+                .max_num_output_reductions = 1;
+            config.state_sync.aptos_data_client.response_timeout_ms = 1;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the validators to sync
+    test_validator_sync(&mut swarm, 1).await;
+}
+
 #[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
 #[tokio::test]
 async fn test_validator_bootstrap_transactions_network_limit() {
@@ -672,7 +760,7 @@ async fn execute_transactions(
 
     let transaction_factory = swarm.chain_info().transaction_factory();
     if execute_epoch_changes {
-        transfer_and_reconfig(
+        transfer_and_maybe_reconfig(
             client,
             &transaction_factory,
             swarm.chain_info().root_account,

@@ -45,6 +45,7 @@ impl RemoteService for ThreadService {
     fn server_address(&self) -> SocketAddr {
         self.server_addr
     }
+
     fn network_timeout_ms(&self) -> u64 {
         self.network_timeout
     }

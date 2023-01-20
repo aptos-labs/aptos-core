@@ -89,7 +89,7 @@ impl Tailer {
                     "Chain id matches! Continue to index...",
                 );
                 Ok(chain_id as u64)
-            }
+            },
             None => {
                 info!(
                     processor_name = self.processor.name(),
@@ -105,7 +105,7 @@ impl Tailer {
                 )
                 .context(r#"Error updating chain_id!"#)
                 .map(|_| new_chain_id as u64)
-            }
+            },
         }
     }
 
@@ -297,7 +297,7 @@ pub async fn await_tasks<T: Debug>(tasks: Vec<JoinHandle<T>>) -> Vec<T> {
             Ok(_) => results.push(result.unwrap()),
             Err(err) => {
                 panic!("Error joining task: {:?}", err);
-            }
+            },
         }
     }
     results

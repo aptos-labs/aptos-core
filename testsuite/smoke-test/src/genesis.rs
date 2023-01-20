@@ -16,8 +16,12 @@ use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use regex::Regex;
-use std::time::Instant;
-use std::{fs, process::Command, str::FromStr, time::Duration};
+use std::{
+    fs,
+    process::Command,
+    str::FromStr,
+    time::{Duration, Instant},
+};
 
 fn update_node_config_restart(validator: &mut LocalNode, mut config: NodeConfig) {
     validator.stop();

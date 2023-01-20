@@ -172,13 +172,13 @@ fn test_epoch_ending_stream_engine() {
     match StreamEngine::new(&stream_request, &global_data_summary.advertised_data).unwrap() {
         StreamEngine::EpochEndingStreamEngine(stream_engine) => {
             assert_eq!(stream_engine.end_epoch, 1000);
-        }
+        },
         unexpected_engine => {
             panic!(
                 "Expected epoch ending stream engine but got {:?}",
                 unexpected_engine
             );
-        }
+        },
     }
 }
 
@@ -261,7 +261,7 @@ fn create_epoch_ending_stream_engine(start_epoch: u64, end_epoch: u64) -> EpochE
                 "Expected epoch ending stream engine but got {:?}",
                 unexpected_engine
             );
-        }
+        },
     }
 }
 

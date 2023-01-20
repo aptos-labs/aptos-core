@@ -91,7 +91,7 @@ resource "google_container_node_pool" "fullnodes" {
   node_config {
     machine_type    = var.machine_type
     image_type      = "COS_CONTAINERD"
-    disk_size_gb    = 100
+    disk_size_gb    = var.instance_disk_size_gb
     service_account = google_service_account.gke.email
     tags            = ["fullnodes"]
 

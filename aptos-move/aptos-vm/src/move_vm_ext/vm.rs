@@ -14,8 +14,9 @@ use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_table_extension::NativeTableContext;
-use move_vm_runtime::config::VMConfig;
-use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
+use move_vm_runtime::{
+    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+};
 use std::ops::Deref;
 
 pub struct MoveVmExt {
@@ -103,16 +104,18 @@ impl Deref for MoveVmExt {
     }
 }
 
-pub fn verifier_config(treat_friend_as_private: bool) -> VerifierConfig {
+pub fn verifier_config(_treat_friend_as_private: bool) -> VerifierConfig {
     VerifierConfig {
         max_loop_depth: Some(5),
-        treat_friend_as_private,
         max_generic_instantiation_length: Some(32),
         max_function_parameters: Some(128),
         max_basic_blocks: Some(1024),
         max_value_stack_size: 1024,
         max_type_nodes: Some(256),
-        max_dependency_depth: 256,
+        max_dependency_depth: Some(256),
         max_push_size: Some(10000),
+        max_struct_definitions: None,
+        max_fields_in_struct: None,
+        max_function_definitions: None,
     }
 }

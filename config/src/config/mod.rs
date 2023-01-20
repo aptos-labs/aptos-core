@@ -7,7 +7,7 @@ use aptos_types::{waypoint::Waypoint, PeerId};
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt, fs,
     fs::File,
     io::{Read, Write},
@@ -159,7 +159,7 @@ impl WaypointConfig {
                         error
                     )
                 }))
-            }
+            },
             WaypointConfig::FromStorage(backend) => {
                 let storage: Storage = backend.into();
                 let waypoint = storage
@@ -167,7 +167,7 @@ impl WaypointConfig {
                     .expect("Unable to read waypoint")
                     .value;
                 Some(waypoint)
-            }
+            },
             WaypointConfig::None => None,
         };
         waypoint.expect("waypoint should be present")
@@ -181,7 +181,7 @@ impl WaypointConfig {
                     .get::<Waypoint>(aptos_global_constants::GENESIS_WAYPOINT)
                     .expect("Unable to read waypoint")
                     .value
-            }
+            },
             _ => self.waypoint(),
         }
     }
@@ -355,7 +355,7 @@ impl NodeConfig {
                         self.indexer.starting_version
                     );
                     self.indexer.starting_version
-                }
+                },
             },
         };
 
@@ -398,22 +398,12 @@ impl NodeConfig {
             )?;
         }
 
-        let mut network_ids = HashSet::new();
         if let Some(network) = &mut self.validator_network {
             network.load_validator_network()?;
             network.mutual_authentication = true; // This should always be the default for validators
-            network_ids.insert(network.network_id);
         }
         for network in &mut self.full_node_networks {
             network.load_fullnode_network()?;
-
-            // Check a validator network is not included in a list of full-node networks
-            let network_id = network.network_id;
-            invariant(
-                !matches!(network_id, NetworkId::Validator),
-                "Included a validator network in full_node_networks".into(),
-            )?;
-            network_ids.insert(network_id);
         }
         Ok(self)
     }
@@ -598,13 +588,12 @@ mod test {
     }
 
     #[test]
-    // TODO(joshlind): once the 'matches' crate becomes stable, clean this test up!
     fn verify_parse_role_error_on_invalid_role() {
         let invalid_role_type = "this is not a valid role type";
-        match RoleType::from_str(invalid_role_type) {
-            Err(ParseRoleError(_)) => { /* the expected error was thrown! */ }
-            _ => panic!("A ParseRoleError should have been thrown on the invalid role type!"),
-        }
+        assert!(matches!(
+            RoleType::from_str(invalid_role_type),
+            Err(ParseRoleError(_))
+        ));
     }
 
     #[test]
@@ -616,5 +605,16 @@ mod test {
         let contents = std::include_str!("test_data/safety_rules.yaml");
         SafetyRulesConfig::parse(contents)
             .unwrap_or_else(|e| panic!("Error in safety_rules.yaml: {}", e));
+    }
+
+    #[test]
+    fn validate_invalid_network_id() {
+        let mut config = NodeConfig::default_for_public_full_node();
+        let network = config.full_node_networks.iter_mut().next().unwrap();
+        network.network_id = NetworkId::Validator;
+        assert!(matches!(
+            config.validate_network_configs(),
+            Err(Error::InvariantViolation(_))
+        ));
     }
 }

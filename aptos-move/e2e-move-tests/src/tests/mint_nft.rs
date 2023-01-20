@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
-use aptos_crypto::ed25519::Ed25519Signature;
-use aptos_crypto::SigningKey;
-use aptos_types::state_store::table::TableHandle;
+use aptos_crypto::{ed25519::Ed25519Signature, SigningKey};
 use aptos_types::{
-    account_address::create_resource_address, account_address::AccountAddress, event::EventHandle,
-    state_store::state_key::StateKey,
+    account_address::{create_resource_address, AccountAddress},
+    event::EventHandle,
+    state_store::{state_key::StateKey, table::TableHandle},
 };
 use move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
@@ -97,7 +96,7 @@ fn mint_nft_e2e() {
         account_address: resource_address,
         module_name: String::from("create_nft_getting_production_ready"),
         struct_name: String::from("MintProofChallenge"),
-        receiver_account_sequence_number: 10,
+        receiver_account_sequence_number: 0,
         receiver_account_address: *nft_receiver.address(),
         token_data_id,
     };

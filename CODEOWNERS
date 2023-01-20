@@ -24,6 +24,9 @@
 /aptos-move/block-executor/ @gelash @zekun000 @sasha8
 /aptos-move/vm-genesis/ @davidiw @movekevin
 
+# Owner for aptos node (just to prevent things from becoming out of hand, again :D)
+/aptos-node/ @joshlind
+
 # Owner for logger config
 /config/src/config/logger_config.rs @markuze
 
@@ -81,8 +84,8 @@
 # Owners for mempool.
 /mempool/ @bchocho
 
-# Owners for the `Network Stack`
-/networking @markuze
+# Owners for the network and all its subdirectories.
+/network/ @markuze @joshlind
 
 # Owners for the `/state-sync` directory and all its subdirectories.
 /state-sync/ @joshlind

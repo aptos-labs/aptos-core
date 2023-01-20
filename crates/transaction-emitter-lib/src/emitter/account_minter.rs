@@ -1,14 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::emitter::wait_for_single_account_sequence;
 use crate::{
-    emitter::{RETRY_POLICY, SEND_AMOUNT},
+    emitter::{wait_for_single_account_sequence, RETRY_POLICY, SEND_AMOUNT},
     query_sequence_number, EmitJobRequest, EmitModeParams,
 };
 use anyhow::{anyhow, format_err, Context, Result};
-use aptos::common::types::EncodingType;
-use aptos::common::utils::prompt_yes;
+use aptos::common::{types::EncodingType, utils::prompt_yes};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
@@ -30,9 +28,12 @@ use core::{
 use futures::StreamExt;
 use rand::{rngs::StdRng, seq::SliceRandom};
 use rand_core::SeedableRng;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    path::Path,
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
+};
 
 #[derive(Debug)]
 pub struct AccountMinter<'t> {
@@ -53,6 +54,7 @@ impl<'t> AccountMinter<'t> {
             rng,
         }
     }
+
     /// workflow of create accounts:
     /// 1. Use given source_account as the money source
     /// 1a. Optionally, and if it is root account, mint balance to that account
@@ -70,9 +72,8 @@ impl<'t> AccountMinter<'t> {
         total_requested_accounts: usize,
     ) -> Result<Vec<LocalAccount>> {
         let mut accounts = vec![];
-        let expected_num_seed_accounts = (total_requested_accounts / 50)
-            .max(1)
-            .min(CREATION_PARALLELISM);
+        let expected_num_seed_accounts =
+            (total_requested_accounts / 50).clamp(1, CREATION_PARALLELISM);
         let num_accounts = total_requested_accounts - accounts.len(); // Only minting extra accounts
         let coins_per_account = (req.expected_max_txns / total_requested_accounts as u64)
             .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn)
@@ -495,7 +496,7 @@ pub async fn execute_and_wait_transactions(
                     client.path_prefix_string(), e, txns.len(), txns.first()
                 );
                 return Err(format_err!("{:?}", e));
-            }
+            },
             Ok(result) => result.into_inner(),
         };
         let mut failures = results

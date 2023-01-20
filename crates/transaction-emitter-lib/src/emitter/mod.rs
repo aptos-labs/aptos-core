@@ -5,33 +5,6 @@ pub mod account_minter;
 pub mod stats;
 pub mod submission_worker;
 
-use again::RetryPolicy;
-use anyhow::{anyhow, ensure, format_err, Result};
-use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
-use aptos_infallible::RwLock;
-use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
-use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{
-    move_types::account_address::AccountAddress,
-    transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
-};
-use futures::future::{try_join_all, FutureExt};
-use itertools::zip;
-use once_cell::sync::Lazy;
-use rand::seq::IteratorRandom;
-use rand_core::SeedableRng;
-use std::{
-    cmp::{max, min},
-    collections::{HashMap, HashSet},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::{Duration, Instant},
-};
-use tokio::{runtime::Handle, task::JoinHandle, time};
-
 use crate::{
     args::TransactionType,
     emitter::{
@@ -43,11 +16,36 @@ use crate::{
         account_generator::AccountGeneratorCreator,
         nft_mint_and_transfer::NFTMintAndTransferGeneratorCreator,
         p2p_transaction_generator::P2PTransactionGeneratorCreator,
-        transaction_mix_generator::TxnMixGeneratorCreator, TransactionGeneratorCreator,
+        publish_modules::PublishPackageCreator, transaction_mix_generator::TxnMixGeneratorCreator,
+        TransactionGeneratorCreator,
     },
 };
-use aptos_sdk::transaction_builder::aptos_stdlib;
-use rand::rngs::StdRng;
+use again::RetryPolicy;
+use anyhow::{anyhow, ensure, format_err, Result};
+use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
+use aptos_infallible::RwLock;
+use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::{
+    move_types::account_address::AccountAddress,
+    transaction_builder::{aptos_stdlib, TransactionFactory},
+    types::{transaction::SignedTransaction, LocalAccount},
+};
+use futures::future::{try_join_all, FutureExt};
+use itertools::zip;
+use once_cell::sync::Lazy;
+use rand::{rngs::StdRng, seq::IteratorRandom};
+use rand_core::SeedableRng;
+use std::{
+    cmp::{max, min},
+    collections::{HashMap, HashSet},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
+};
+use tokio::{runtime::Handle, task::JoinHandle, time};
 
 // Max is 100k TPS for a full day.
 const MAX_TXNS: u64 = 100_000_000_000;
@@ -257,7 +255,7 @@ impl EmitJobRequest {
                     check_account_sequence_only_once_fraction: 0.0,
                     check_account_sequence_sleep_millis: 300,
                 }
-            }
+            },
             EmitJobMode::ConstTps { tps } => {
                 // We are going to create ConstTps (open-loop) txn-emitter, by:
                 // - having a single worker handle a single account, with:
@@ -333,7 +331,7 @@ impl EmitJobRequest {
                     check_account_sequence_only_once_fraction: 1.0 - sample_latency_fraction,
                     check_account_sequence_sleep_millis: 300,
                 }
-            }
+            },
         }
     }
 }
@@ -458,6 +456,11 @@ impl TxnEmitter {
                     )
                     .await,
                 ),
+                TransactionType::PublishPackage => Box::new(PublishPackageCreator::new(
+                    self.from_rng(),
+                    txn_factory.clone(),
+                    req.gas_price,
+                )),
             };
             txn_generator_creator_mix.push((txn_generator_creator, weight));
         }
@@ -613,7 +616,7 @@ async fn wait_for_single_account_sequence(
                 if sequence_number >= account.sequence_number() {
                     return Ok(());
                 }
-            }
+            },
             Err(e) => {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(60)),
@@ -624,7 +627,7 @@ async fn wait_for_single_account_sequence(
                         e
                     )
                 );
-            }
+            },
         }
     }
     Err(anyhow!(
@@ -690,7 +693,7 @@ async fn wait_for_accounts_sequence(
                     );
                     break;
                 }
-            }
+            },
             Err(e) => {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(60)),
@@ -701,7 +704,7 @@ async fn wait_for_accounts_sequence(
                         e
                     )
                 );
-            }
+            },
         }
 
         if aptos_infallible::duration_since_epoch().as_secs() >= txn_expiration_ts_secs + 240 {
@@ -756,7 +759,7 @@ fn update_seq_num_and_get_num_expired(
                     } else {
                         None
                     }
-                }
+                },
                 None => {
                     debug!(
                         "Couldn't fetch sequence_number for {}, expected {}, setting to {}",
@@ -766,7 +769,7 @@ fn update_seq_num_and_get_num_expired(
                     );
                     *account.sequence_number_mut() -= transactions_per_account as u64;
                     Some(transactions_per_account)
-                }
+                },
             },
         )
         .sum()

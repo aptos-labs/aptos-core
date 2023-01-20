@@ -1,66 +1,80 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account::key_rotation::LookupAddress;
-use crate::account::{
-    create::{CreateAccount, DEFAULT_FUNDED_COINS},
-    fund::FundWithFaucet,
-    key_rotation::{RotateKey, RotateSummary},
-    list::{ListAccount, ListQuery},
-    transfer::{TransferCoins, TransferSummary},
+use crate::{
+    account::{
+        create::{CreateAccount, DEFAULT_FUNDED_COINS},
+        fund::FundWithFaucet,
+        key_rotation::{LookupAddress, RotateKey, RotateSummary},
+        list::{ListAccount, ListQuery},
+        transfer::{TransferCoins, TransferSummary},
+    },
+    common::{
+        init::{InitTool, Network},
+        types::{
+            account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
+            EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
+            MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs, PrivateKeyInputOptions,
+            PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs, SaveFile,
+            TransactionOptions, TransactionSummary,
+        },
+        utils::write_to_file,
+    },
+    governance::{
+        CompileScriptFunction, ProposalSubmissionSummary, SubmitProposal, SubmitVote,
+        VerifyProposal, VerifyProposalResponse,
+    },
+    move_tool::{
+        ArgWithType, CompilePackage, DownloadPackage, FrameworkPackageArgs, IncludedArtifacts,
+        IncludedArtifactsArgs, InitPackage, MemberId, PublishPackage, RunFunction, RunScript,
+        TestPackage,
+    },
+    node::{
+        AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator,
+        JoinValidatorSet, LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs,
+        ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake, StakePoolResult,
+        UpdateConsensusKey, UpdateValidatorNetworkAddresses, ValidatorConfig,
+        ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
+    },
+    op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey},
+    stake::{
+        AddStake, IncreaseLockup, InitializeStakeOwner, SetDelegatedVoter, SetOperator,
+        UnlockStake, WithdrawStake,
+    },
+    CliCommand,
 };
-use crate::common::init::{InitTool, Network};
-use crate::common::types::{
-    account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
-    EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-    MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
-    PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
-};
-
-use crate::common::utils::write_to_file;
-
-use crate::governance::CompileScriptFunction;
-use crate::move_tool::{
-    ArgWithType, CompilePackage, DownloadPackage, FrameworkPackageArgs, IncludedArtifacts,
-    IncludedArtifactsArgs, InitPackage, MemberId, PublishPackage, RunFunction, RunScript,
-    TestPackage,
-};
-use crate::node::{
-    AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator, JoinValidatorSet,
-    LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
-    ShowValidatorStake, StakePoolResult, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
-    ValidatorConfig, ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
-};
-use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
-use crate::stake::{
-    AddStake, IncreaseLockup, InitializeStakeOwner, SetDelegatedVoter, SetOperator, UnlockStake,
-    WithdrawStake,
-};
-use crate::CliCommand;
 use aptos_config::config::Peer;
-use aptos_crypto::ed25519::Ed25519PublicKey;
-use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
+use aptos_crypto::{
+    bls12381,
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    x25519, PrivateKey,
+};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
-use aptos_rest_client::aptos_api_types::{IdentifierWrapper, MoveStructTag};
-use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
-use aptos_sdk::move_types::account_address::AccountAddress;
-use aptos_sdk::move_types::identifier::Identifier;
-use aptos_sdk::move_types::language_storage::ModuleId;
+use aptos_rest_client::{
+    aptos_api_types::{IdentifierWrapper, MoveStructTag, MoveType},
+    Transaction,
+};
+use aptos_sdk::move_types::{
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+};
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::ValidatorSet;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
-use std::{collections::BTreeMap, mem, path::PathBuf, str::FromStr, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    mem,
+    path::PathBuf,
+    str::FromStr,
+    time::Duration,
+};
 use tempfile::TempDir;
 use thiserror::__private::PathAsDisplay;
-
 #[cfg(feature = "cli-framework-test-move")]
 use thiserror::__private::PathAsDisplay;
-
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -378,14 +392,7 @@ impl CliTestFramework {
         amount: u64,
     ) -> CliTypedResult<Vec<TransactionSummary>> {
         AddStake {
-            txn_options: self.transaction_options(
-                index,
-                // TODO(greg): revisit after fixing gas estimation
-                Some(GasOptions {
-                    gas_unit_price: Some(1),
-                    max_gas: Some(10000),
-                }),
-            ),
+            txn_options: self.transaction_options(index, None),
             amount,
         }
         .execute()
@@ -409,7 +416,7 @@ impl CliTestFramework {
         &self,
         index: usize,
         amount: u64,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
         WithdrawStake {
             node_op_options: self.transaction_options(index, None),
             amount,
@@ -552,14 +559,7 @@ impl CliTestFramework {
         operator_index: Option<usize>,
     ) -> CliTypedResult<TransactionSummary> {
         InitializeStakeOwner {
-            txn_options: self.transaction_options(
-                owner_index,
-                // TODO(greg): revisit after fixing gas estimation
-                Some(GasOptions {
-                    gas_unit_price: Some(1),
-                    max_gas: Some(100000),
-                }),
-            ),
+            txn_options: self.transaction_options(owner_index, None),
             initial_stake_amount,
             operator_address: operator_index.map(|idx| self.account_id(idx)),
             voter_address: voter_index.map(|idx| self.account_id(idx)),
@@ -629,7 +629,7 @@ impl CliTestFramework {
                 _ => {
                     sleep(Duration::from_millis(500)).await;
                     result = self.list_account(index, ListQuery::Balance).await;
-                }
+                },
             };
         }
 
@@ -825,6 +825,7 @@ impl CliTestFramework {
             instruction_execution_bound: 100_000,
             move_options: self.move_options(account_strs),
             filter: filter.map(|str| str.to_string()),
+            ignore_compile_warnings: false,
         }
         .execute()
         .await
@@ -928,9 +929,36 @@ impl CliTestFramework {
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
+                bytecode_version: None,
             },
             args: Vec::new(),
             type_args: Vec::new(),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn run_script_with_script_path(
+        &self,
+        index: usize,
+        script_path: &str,
+        args: Vec<ArgWithType>,
+        type_args: Vec<MoveType>,
+    ) -> CliTypedResult<TransactionSummary> {
+        RunScript {
+            txn_options: self.transaction_options(index, None),
+            compile_proposal_args: CompileScriptFunction {
+                script_path: Some(script_path.parse().unwrap()),
+                compiled_script_path: None,
+                framework_package_args: FrameworkPackageArgs {
+                    framework_git_rev: None,
+                    framework_local_dir: Some(Self::aptos_framework_dir()),
+                    skip_fetch_latest_git_deps: false,
+                },
+                bytecode_version: None,
+            },
+            args,
+            type_args,
         }
         .execute()
         .await
@@ -1030,6 +1058,79 @@ impl CliTestFramework {
 
     pub fn account_id(&self, index: usize) -> AccountAddress {
         *self.account_addresses.get(index).unwrap()
+    }
+
+    pub async fn create_proposal(
+        &mut self,
+        index: usize,
+        metadata_url: &str,
+        script_path: PathBuf,
+        pool_address: AccountAddress,
+        is_multi_step: bool,
+    ) -> CliTypedResult<ProposalSubmissionSummary> {
+        SubmitProposal {
+            metadata_url: Url::parse(metadata_url).unwrap(),
+            pool_address_args: PoolAddressArgs { pool_address },
+            txn_options: self.transaction_options(index, None),
+            is_multi_step,
+            compile_proposal_args: CompileScriptFunction {
+                script_path: Some(script_path),
+                compiled_script_path: None,
+                framework_package_args: FrameworkPackageArgs {
+                    framework_git_rev: None,
+                    framework_local_dir: Some(Self::aptos_framework_dir()),
+                    skip_fetch_latest_git_deps: false,
+                },
+                bytecode_version: None,
+            },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn vote(
+        &self,
+        index: usize,
+        proposal_id: u64,
+        yes: bool,
+        no: bool,
+        pool_addresses: Vec<AccountAddress>,
+    ) {
+        SubmitVote {
+            proposal_id,
+            yes,
+            no,
+            pool_addresses,
+            txn_options: self.transaction_options(index, None),
+        }
+        .execute()
+        .await
+        .expect("Successfully voted.");
+    }
+
+    pub async fn verify_proposal(
+        &self,
+        proposal_id: u64,
+        script_path: &str,
+    ) -> CliTypedResult<VerifyProposalResponse> {
+        VerifyProposal {
+            proposal_id,
+            compile_proposal_args: CompileScriptFunction {
+                script_path: Some(script_path.parse().unwrap()),
+                compiled_script_path: None,
+                framework_package_args: FrameworkPackageArgs {
+                    framework_git_rev: None,
+                    framework_local_dir: Some(Self::aptos_framework_dir()),
+                    skip_fetch_latest_git_deps: false,
+                },
+                bytecode_version: None,
+            },
+            rest_options: self.rest_options(),
+            profile: Default::default(),
+            prompt_options: PromptOptions::yes(),
+        }
+        .execute()
+        .await
     }
 }
 

@@ -7,9 +7,11 @@
 //! when enough votes (or timeout votes) have been observed.
 //! Votes are automatically dropped when the structure goes out of scope.
 
-use aptos_consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use aptos_consensus_types::{
-    common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+    common::Author,
+    quorum_cert::QuorumCert,
+    timeout_2chain::{TwoChainTimeoutCertificate, TwoChainTimeoutWithPartialSignatures},
+    vote::Vote,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
@@ -149,10 +151,10 @@ impl PendingVotes {
                                 vote.vote_data().clone(),
                                 ledger_info_with_sig,
                             )))
-                        }
+                        },
                         Err(e) => VoteReceptionResult::ErrorAggregatingSignature(e),
                     }
-                }
+                },
 
                 // not enough votes
                 Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
@@ -164,7 +166,7 @@ impl PendingVotes {
                         error, vote
                     );
                     return VoteReceptionResult::ErrorAddingVote(error);
-                }
+                },
             };
 
         //
@@ -182,10 +184,10 @@ impl PendingVotes {
                     return match partial_tc.aggregate_signatures(validator_verifier) {
                         Ok(tc_with_sig) => {
                             VoteReceptionResult::New2ChainTimeoutCertificate(Arc::new(tc_with_sig))
-                        }
+                        },
                         Err(e) => VoteReceptionResult::ErrorAggregatingTimeoutCertificate(e),
                     };
-                }
+                },
                 Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
                 Err(error) => {
                     error!(
@@ -193,7 +195,7 @@ impl PendingVotes {
                         error, vote
                     );
                     return VoteReceptionResult::ErrorAddingVote(error);
-                }
+                },
             };
 
             // Echo timeout if receive f+1 timeout message.
@@ -354,10 +356,10 @@ mod tests {
         match pending_votes.insert_vote(&vote_data_2_author_2, &validator) {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 assert!(qc.ledger_info().check_voting_power(&validator).is_ok());
-            }
+            },
             _ => {
                 panic!("No QC formed.");
-            }
+            },
         };
     }
 
@@ -405,10 +407,10 @@ mod tests {
         match pending_votes.insert_vote(&vote1_author_1, &validator) {
             VoteReceptionResult::EchoTimeout(voting_power) => {
                 assert_eq!(voting_power, 2);
-            }
+            },
             _ => {
                 panic!("Should echo timeout");
-            }
+            },
         };
 
         let li2 = random_ledger_info();
@@ -431,10 +433,10 @@ mod tests {
                             .iter()
                     )
                     .is_ok());
-            }
+            },
             _ => {
                 panic!("Should form TC");
-            }
+            },
         };
     }
 }

@@ -23,8 +23,8 @@ use rand::Rng;
 use std::collections::HashMap;
 
 fn save(store: &EventStore, version: Version, events: &[ContractEvent]) -> HashValue {
-    let mut batch = SchemaBatch::new();
-    let root_hash = store.put_events(version, events, &mut batch).unwrap();
+    let batch = SchemaBatch::new();
+    let root_hash = store.put_events(version, events, &batch).unwrap();
     store.db.write_schemas(batch).unwrap();
 
     root_hash
@@ -35,9 +35,9 @@ fn test_put_empty() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.event_store;
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     assert_eq!(
-        store.put_events(0, &[], &mut batch).unwrap(),
+        store.put_events(0, &[], &batch).unwrap(),
         *ACCUMULATOR_PLACEHOLDER_HASH
     );
 }
@@ -177,9 +177,9 @@ fn test_index_get_impl(event_batches: Vec<Vec<ContractEvent>>) {
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.event_store;
 
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     event_batches.iter().enumerate().for_each(|(ver, events)| {
-        store.put_events(ver as u64, events, &mut batch).unwrap();
+        store.put_events(ver as u64, events, &batch).unwrap();
     });
     store.db.write_schemas(batch);
     let ledger_version_plus_one = event_batches.len() as u64;
@@ -300,11 +300,9 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
     assert!(store.get_last_version_before_timestamp(1000, 2000).is_err());
 
     // save events to db
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     new_block_events.iter().for_each(|(ver, event)| {
-        store
-            .put_events(*ver as u64, &[event.clone()], &mut batch)
-            .unwrap();
+        store.put_events(*ver, &[event.clone()], &batch).unwrap();
     });
     store.db.write_schemas(batch);
 

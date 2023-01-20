@@ -187,7 +187,7 @@ impl BlockInfo {
     /// and it is not empty
     pub fn is_ordered_only(&self) -> bool {
         *self != BlockInfo::empty()
-            && self.next_epoch_state == None
+            && self.next_epoch_state.is_none()
             && self.executed_state_id == *ACCUMULATOR_PLACEHOLDER_HASH
             && self.version == 0
     }

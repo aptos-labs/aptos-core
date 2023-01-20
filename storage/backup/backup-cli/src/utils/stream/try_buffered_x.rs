@@ -65,7 +65,7 @@ where
         // Attempt to pull the next value from the in_progress_queue
         match this.in_progress_queue.poll_next_unpin(cx) {
             x @ Poll::Pending | x @ Poll::Ready(Some(_)) => return x,
-            Poll::Ready(None) => {}
+            Poll::Ready(None) => {},
         }
 
         // If more values are still coming from the stream, we're not done yet

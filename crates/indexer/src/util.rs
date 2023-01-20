@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // use crate::models::property_map::PropertyMap;
+use crate::models::property_map::PropertyMap;
 use aptos_api_types::Address;
 use bigdecimal::{BigDecimal, Signed, ToPrimitive, Zero};
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use sha2::Digest;
-
-use crate::models::property_map::PropertyMap;
 
 // 9999-12-31 23:59:59, this is the max supported by Google BigQuery
 pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799;
@@ -69,19 +68,19 @@ fn recurse_remove_null_bytes_from_json(sub_json: &mut Value) {
             for item in array {
                 recurse_remove_null_bytes_from_json(item);
             }
-        }
+        },
         Value::Object(object) => {
             for (_key, value) in object {
                 recurse_remove_null_bytes_from_json(value);
             }
-        }
+        },
         Value::String(str) => {
             if !str.is_empty() {
                 let replacement = string_null_byte_replacement(str);
                 *str = replacement;
             }
-        }
-        _ => {}
+        },
+        _ => {},
     }
 }
 
@@ -168,11 +167,9 @@ mod tests {
 
     #[test]
     fn test_parse_timestamp() {
-        let current_year = chrono::offset::Utc::now().year();
-
         let ts = parse_timestamp(1649560602763949, 1);
         assert_eq!(ts.timestamp(), 1649560602);
-        assert_eq!(ts.year(), current_year);
+        assert_eq!(ts.year(), 2022);
 
         let ts2 = parse_timestamp_secs(600000000000000, 2);
         assert_eq!(ts2.year(), 9999);

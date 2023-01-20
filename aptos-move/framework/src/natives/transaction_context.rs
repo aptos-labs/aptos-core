@@ -9,9 +9,7 @@ use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{collections::VecDeque, fmt::Debug, sync::Arc};
 
 /// The native transaction context extension. This needs to be attached to the
 /// NativeContextExtensions value which is passed into session functions, so its accessible from
@@ -56,10 +54,9 @@ fn native_get_script_hash(
 ) -> PartialVMResult<NativeResult> {
     let transaction_context = context.extensions().get::<NativeTransactionContext>();
 
-    Ok(NativeResult::ok(
-        gas_params.base,
-        smallvec![Value::vector_u8(transaction_context.script_hash.clone())],
-    ))
+    Ok(NativeResult::ok(gas_params.base, smallvec![
+        Value::vector_u8(transaction_context.script_hash.clone())
+    ]))
 }
 
 pub fn make_native_get_script_hash(gas_params: GetScriptHashGasParameters) -> NativeFunction {

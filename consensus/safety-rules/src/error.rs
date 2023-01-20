@@ -82,11 +82,11 @@ impl From<aptos_secure_storage::Error> for Error {
                     "A permission error was thrown: {:?}. Maybe the storage token needs to be renewed?",
                     error
                 );
-            }
+            },
             aptos_secure_storage::Error::KeyVersionNotFound(_, _)
             | aptos_secure_storage::Error::KeyNotSet(_) => {
                 Self::SecureStorageMissingDataError(error.to_string())
-            }
+            },
             _ => Self::SecureStorageUnexpectedError(error.to_string()),
         }
     }

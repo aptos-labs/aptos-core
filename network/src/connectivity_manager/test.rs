@@ -205,7 +205,7 @@ impl TestHarness {
             ConnectionRequest::DisconnectPeer(p, result_tx) => {
                 assert_eq!(peer_id, p);
                 result_tx.send(result).unwrap();
-            }
+            },
             request => panic!(
                 "Unexpected ConnectionRequest, expected DisconnectPeer: {:?}",
                 request
@@ -244,7 +244,7 @@ impl TestHarness {
             ConnectionRequest::DialPeer(peer_id, address, result_tx) => {
                 result_tx.send(result).unwrap();
                 (peer_id, address)
-            }
+            },
             request => panic!(
                 "Unexpected ConnectionRequest, expected DialPeer: {:?}",
                 request

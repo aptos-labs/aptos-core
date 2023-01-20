@@ -189,6 +189,7 @@ module std::option {
     }
     spec swap_or_fill {
         pragma opaque;
+        aborts_if false;
         ensures result == old(t);
         ensures borrow(t) == e;
     }

@@ -1,0 +1,8 @@
+# This file adds LF and newline support at the end of files
+# for many editors automatically including Github
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+end_of_line = lf
+insert_final_newline = true

@@ -109,6 +109,7 @@ pub struct LevelParseError;
 
 impl FromStr for Level {
     type Err = LevelParseError;
+
     fn from_str(level: &str) -> Result<Level, Self::Err> {
         LOG_LEVEL_NAMES
             .iter()

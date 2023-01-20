@@ -39,6 +39,7 @@ futures = { workspace = true }
 futures-util = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
+maplit = { workspace = true }
 once_cell = { workspace = true }
 pin-project = { workspace = true }
 proptest ={ workspace = true, optional = true }
@@ -60,7 +61,6 @@ aptos-netcore = { workspace = true, features = ["testing"] }
 aptos-proptest-helpers = { workspace = true }
 aptos-time-service = { workspace = true, features = ["testing"] }
 aptos-types = { workspace = true, features = ["fuzzing"] }
-maplit = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand_core = { workspace = true }

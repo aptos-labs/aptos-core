@@ -18,6 +18,7 @@ runs:
       with:
         create_credentials_file: false
         token_format: "access_token"
+        access_token_lifetime: 5400 # setting this to 1.5h since sometimes docker builds (special performance builds etc.) take that long. Default is 1h.
         workload_identity_provider: ${{ inputs.GCP_WORKLOAD_IDENTITY_PROVIDER }}
         service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
 

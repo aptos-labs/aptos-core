@@ -38,6 +38,6 @@ async fn main() -> Result<()> {
             .generate_release_proposal_scripts(output_dir.as_path()),
         Commands::WriteDefault { output_path } => {
             aptos_release_builder::ReleaseConfig::default().save_config(output_path.as_path())
-        }
+        },
     }
 }

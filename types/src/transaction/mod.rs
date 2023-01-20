@@ -40,18 +40,17 @@ mod module;
 mod script;
 mod transaction_argument;
 
+use crate::state_store::{state_key::StateKey, state_value::StateValue};
 #[cfg(any(test, feature = "fuzzing"))]
 pub use change_set::NoOpChangeSetChecker;
 pub use change_set::{ChangeSet, CheckChangeSet};
 pub use module::{Module, ModuleBundle};
+use move_core_types::vm_status::AbortLocation;
+use once_cell::sync::OnceCell;
 pub use script::{
     ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,
     TypeArgumentABI,
 };
-
-use crate::state_store::{state_key::StateKey, state_value::StateValue};
-use move_core_types::vm_status::AbortLocation;
-use once_cell::sync::OnceCell;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
@@ -324,6 +323,7 @@ impl RawTransaction {
             self.chain_id,
         )
     }
+
     /// Return the sender of this transaction.
     pub fn sender(&self) -> AccountAddress {
         self.sender
@@ -635,6 +635,7 @@ impl TransactionWithProof {
             proof,
         }
     }
+
     /// Verifies the transaction with the proof, both carried by `self`.
     ///
     /// A few things are ensured if no error is raised:
@@ -802,7 +803,7 @@ impl From<VMStatus> for TransactionStatus {
             Ok(recorded) => match recorded {
                 KeptVMStatus::MiscellaneousError => {
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
-                }
+                },
                 _ => TransactionStatus::Keep(recorded.into()),
             },
             Err(code) => TransactionStatus::Discard(code),
@@ -1500,7 +1501,7 @@ impl Transaction {
         match self {
             Transaction::UserTransaction(user_txn) => {
                 user_txn.format_for_client(get_transaction_name)
-            }
+            },
             // TODO: display proper information for client
             Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
             // TODO: display proper information for client

@@ -97,7 +97,7 @@ impl Opt {
                     level
                 );
                 level
-            }
+            },
             Some(level) => level,
         }
     }
@@ -171,7 +171,7 @@ fn main() {
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
             );
-        }
+        },
         Command::RunExecutor {
             blocks,
             data_dir,
@@ -185,7 +185,7 @@ fn main() {
                 opt.verify_sequence_numbers,
                 opt.pruner_opt.pruner_config(),
             );
-        }
+        },
         Command::AddAccounts {
             data_dir,
             checkpoint_dir,
@@ -201,6 +201,6 @@ fn main() {
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
             );
-        }
+        },
     }
 }

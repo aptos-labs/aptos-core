@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Duration;
-
 use super::Test;
-use crate::success_criteria::{SuccessCriteria, SuccessCriteriaChecker};
-use crate::{CoreContext, Result, Swarm, TestReport};
+use crate::{
+    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
+    CoreContext, Result, Swarm, TestReport,
+};
 use aptos_transaction_emitter_lib::{EmitJobRequest, TxnStats};
+use std::time::Duration;
 use tokio::runtime::Runtime;
 
 /// The testing interface which defines a test written with full control over an existing network.

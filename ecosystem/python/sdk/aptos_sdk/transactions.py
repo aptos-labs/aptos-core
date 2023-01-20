@@ -299,15 +299,15 @@ class ScriptArgument:
         serializer.u8(self.variant)
         if self.variant == ScriptArgument.U8:
             serializer.u8(self.value)
-        if self.variant == ScriptArgument.U16:
+        elif self.variant == ScriptArgument.U16:
             serializer.u16(self.value)
-        if self.variant == ScriptArgument.U32:
+        elif self.variant == ScriptArgument.U32:
             serializer.u32(self.value)
         elif self.variant == ScriptArgument.U64:
             serializer.u64(self.value)
         elif self.variant == ScriptArgument.U128:
             serializer.u128(self.value)
-        if self.variant == ScriptArgument.U256:
+        elif self.variant == ScriptArgument.U256:
             serializer.u256(self.value)
         elif self.variant == ScriptArgument.ADDRESS:
             serializer.struct(self.value)
@@ -316,7 +316,7 @@ class ScriptArgument:
         elif self.variant == ScriptArgument.BOOL:
             serializer.bool(self.value)
         else:
-            raise Exception("Invalid variant")
+            raise Exception(f"Invalid ScriptArgument variant {self.variant}")
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ScriptArgument):

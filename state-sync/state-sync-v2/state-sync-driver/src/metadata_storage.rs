@@ -109,7 +109,7 @@ impl PersistentMetadataStorage {
             Some(metadata_value) => {
                 let MetadataValue::StateSnapshotSync(snapshot_progress) = metadata_value;
                 Ok(Some(snapshot_progress))
-            }
+            },
             None => Ok(None),
         }
     }
@@ -130,7 +130,7 @@ impl PersistentMetadataStorage {
                 } else {
                     Ok(snapshot_progress)
                 }
-            }
+            },
             None => Err(Error::StorageError(
                 "No state snapshot progress was found!".into(),
             )),

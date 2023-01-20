@@ -202,9 +202,7 @@ module marketplace::marketplace_auction_example {
         );
 
         // initialized coin store when listing
-        if (!coin::is_account_registered<CoinType>(signer::address_of(owner))) {
-            coin::register<CoinType>(owner);
-        };
+        coin::register<CoinType>(owner);
 
         let auctions = borrow_global_mut<Auctions<CoinType>>(@marketplace);
         event::emit_event<ListingEvent>(

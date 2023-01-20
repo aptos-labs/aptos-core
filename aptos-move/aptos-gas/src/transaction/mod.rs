@@ -99,30 +99,30 @@ crate::params::define_gas_parameters!(
             "write_data.per_byte_in_val",
             10_000
         ],
-        [memory_quota: AbstractValueSize, optional "memory_quota", 10_000_000],
+        [memory_quota: AbstractValueSize, { 1.. => "memory_quota" }, 10_000_000],
         [
             free_write_bytes_quota: NumBytes,
-            optional "free_write_bytes_quota",
+            { 5.. => "free_write_bytes_quota" },
             1024, // 1KB free per state write
         ],
         [
             max_bytes_per_write_op: NumBytes,
-            optional "max_bytes_per_write_op",
+            { 5.. => "max_bytes_per_write_op" },
             1 << 20, // a single state item is 1MB max
         ],
         [
             max_bytes_all_write_ops_per_transaction: NumBytes,
-            optional "max_bytes_all_write_ops_per_transaction",
+            { 5.. => "max_bytes_all_write_ops_per_transaction" },
             10 << 20, // all write ops from a single transaction are 10MB max
         ],
         [
             max_bytes_per_event: NumBytes,
-            optional "max_bytes_per_event",
+            { 5.. => "max_bytes_per_event" },
             1 << 20, // a single event is 1MB max
         ],
         [
             max_bytes_all_events_per_transaction: NumBytes,
-            optional "max_bytes_all_events_per_transaction",
+            { 5.. => "max_bytes_all_events_per_transaction"},
             10 << 20, // all events from a single transaction are 10MB max
         ],
     ]

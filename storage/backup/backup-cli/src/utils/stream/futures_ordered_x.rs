@@ -141,7 +141,7 @@ impl<Fut: Future> Stream for FuturesOrderedX<Fut> {
                     } else {
                         this.queued_outputs.push(output)
                     }
-                }
+                },
                 None => return Poll::Ready(None),
             }
         }

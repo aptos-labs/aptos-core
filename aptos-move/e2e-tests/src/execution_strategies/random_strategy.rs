@@ -33,6 +33,7 @@ impl RandomizedStrategy {
 
 impl PartitionStrategy for RandomizedStrategy {
     type Txn = SignedTransaction;
+
     fn partition(&mut self, mut block: Block<Self::Txn>) -> Vec<Block<SignedTransaction>> {
         let mut blocks = vec![];
         while !block.is_empty() {
@@ -64,8 +65,9 @@ impl RandomExecutor {
 }
 
 impl Executor for RandomExecutor {
-    type Txn = SignedTransaction;
     type BlockResult = VMStatus;
+    type Txn = SignedTransaction;
+
     fn execute_block(&mut self, block: Block<Self::Txn>) -> ExecutorResult<Self::BlockResult> {
         let blocks = self.strategy.partition(block);
         let mut results = vec![];

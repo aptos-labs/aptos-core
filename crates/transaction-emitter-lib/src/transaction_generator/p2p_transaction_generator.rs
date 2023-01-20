@@ -78,7 +78,7 @@ impl P2PTransactionGenerator {
                     txn_factory,
                     self.gas_price,
                 )
-            }
+            },
             InvalidTransactionType::Sender => self.gen_single_txn(
                 &mut invalid_account,
                 receiver,
@@ -109,7 +109,7 @@ impl P2PTransactionGenerator {
                     let random_index = rng.gen_range(0, reqs.len());
                     reqs[random_index].clone()
                 }
-            }
+            },
         }
     }
 }

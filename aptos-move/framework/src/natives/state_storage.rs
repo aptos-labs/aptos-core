@@ -1,11 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::vm_status::StatusCode;
+use aptos_types::{state_store::state_storage_usage::StateStorageUsage, vm_status::StatusCode};
 use better_any::{Tid, TidAble};
-use move_binary_format::errors::PartialVMError;
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
@@ -14,8 +12,7 @@ use move_vm_types::{
     values::{Struct, Value},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 /// Ability to reveal the state storage utilization info.
 pub trait StateStorageUsageResolver {
@@ -64,13 +61,12 @@ fn native_get_usage(
             .with_message(format!("Failed to get state storage usage: {}", err))
     })?;
 
-    Ok(NativeResult::ok(
-        gas_params.base_cost,
-        smallvec![Value::struct_(Struct::pack(vec![
+    Ok(NativeResult::ok(gas_params.base_cost, smallvec![
+        Value::struct_(Struct::pack(vec![
             Value::u64(usage.items() as u64),
             Value::u64(usage.bytes() as u64),
-        ]))],
-    ))
+        ]))
+    ]))
 }
 
 pub fn make_native_get_usage(gas_params: GetUsageGasParameters) -> NativeFunction {

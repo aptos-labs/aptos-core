@@ -1,21 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::smoke_test_environment::new_local_swarm_with_aptos;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_forge::Swarm;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_rest_client::aptos_api_types::{MoveModuleId, TransactionData};
 use aptos_sdk::move_types::language_storage::StructTag;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::account_config::{AccountResource, CORE_CODE_ADDRESS};
-use aptos_types::on_chain_config::GasScheduleV2;
-use aptos_types::transaction::authenticator::AuthenticationKey;
-use aptos_types::transaction::{SignedTransaction, Transaction};
-use std::convert::TryFrom;
-use std::str::FromStr;
-
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use aptos_types::{
+    account_address::AccountAddress,
+    account_config::{AccountResource, CORE_CODE_ADDRESS},
+    on_chain_config::GasScheduleV2,
+    transaction::{authenticator::AuthenticationKey, SignedTransaction, Transaction},
+};
+use std::{convert::TryFrom, str::FromStr};
 
 #[tokio::test]
 async fn test_get_index() {
@@ -78,8 +77,12 @@ async fn test_gas_estimation() {
         .await
         .unwrap()
         .into_inner();
-    let gas_params =
-        AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map()).unwrap();
+    let feaure_version = gas_schedule.feature_version;
+    let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
+        &gas_schedule.to_btree_map(),
+        feaure_version,
+    )
+    .unwrap();
 
     // No transactions should always return 1 as the estimated gas
     assert_eq!(

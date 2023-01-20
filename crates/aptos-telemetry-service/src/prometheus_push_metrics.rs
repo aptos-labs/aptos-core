@@ -5,11 +5,11 @@ use crate::{
     auth::with_auth,
     constants::MAX_CONTENT_LENGTH,
     context::Context,
+    debug, error,
     errors::{MetricsIngestError, ServiceError},
     metrics::METRICS_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType},
 };
-use crate::{debug, error};
 use aptos_types::chain_id::ChainId;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use tokio::time::Instant;
@@ -20,14 +20,11 @@ pub fn metrics_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("push-metrics")
         .and(warp::post())
         .and(context.clone().filter())
-        .and(with_auth(
-            context,
-            vec![
-                NodeType::Validator,
-                NodeType::ValidatorFullNode,
-                NodeType::PublicFullNode,
-            ],
-        ))
+        .and(with_auth(context, vec![
+            NodeType::Validator,
+            NodeType::ValidatorFullNode,
+            NodeType::PublicFullNode,
+        ]))
         .and(warp::header::optional(CONTENT_ENCODING.as_str()))
         .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
         .and(warp::body::bytes())
@@ -39,14 +36,11 @@ pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ingest" / "metrics")
         .and(warp::post())
         .and(context.clone().filter())
-        .and(with_auth(
-            context,
-            vec![
-                NodeType::Validator,
-                NodeType::ValidatorFullNode,
-                NodeType::PublicFullNode,
-            ],
-        ))
+        .and(with_auth(context, vec![
+            NodeType::Validator,
+            NodeType::ValidatorFullNode,
+            NodeType::PublicFullNode,
+        ]))
         .and(warp::header::optional(CONTENT_ENCODING.as_str()))
         .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
         .and(warp::body::bytes())
@@ -113,7 +107,7 @@ pub async fn handle_metrics_ingest(
                         );
                         return Err(());
                     }
-                }
+                },
                 Err(err) => {
                     METRICS_INGEST_BACKEND_REQUEST_DURATION
                         .with_label_values(&[name, "Unknown"])
@@ -123,7 +117,7 @@ pub async fn handle_metrics_ingest(
                         name, err
                     );
                     return Err(());
-                }
+                },
             }
             Ok(())
         });
@@ -170,15 +164,12 @@ fn claims_to_extra_labels(claims: &Claims, common_name: Option<&String>) -> Vec<
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
-    use crate::tests::test_context;
-    use crate::MetricsClient;
-
     use super::*;
+    use crate::{tests::test_context, MetricsClient};
     use aptos_types::{chain_id::ChainId, PeerId};
     use httpmock::MockServer;
     use reqwest::Url;
+    use std::str::FromStr;
 
     #[test]
     fn verify_labels() {
@@ -193,16 +184,13 @@ mod test {
             },
             Some(&String::from("test_name")),
         );
-        assert_eq!(
-            claims,
-            vec![
-                "role=validator",
-                "metrics_source=telemetry-service",
-                "chain_name=25",
-                "namespace=telemetry-service",
-                "kubernetes_pod_name=peer_id:test_name//0x1",
-            ]
-        );
+        assert_eq!(claims, vec![
+            "role=validator",
+            "metrics_source=telemetry-service",
+            "chain_name=25",
+            "namespace=telemetry-service",
+            "kubernetes_pod_name=peer_id:test_name//0x1",
+        ]);
 
         let claims = claims_to_extra_labels(
             &super::Claims {
@@ -215,16 +203,13 @@ mod test {
             },
             None,
         );
-        assert_eq!(
-            claims,
-            vec![
-                "role=validator",
-                "metrics_source=telemetry-service",
-                "chain_name=25",
-                "namespace=telemetry-service",
-                "kubernetes_pod_name=peer_id:0x1",
-            ]
-        );
+        assert_eq!(claims, vec![
+            "role=validator",
+            "metrics_source=telemetry-service",
+            "chain_name=25",
+            "namespace=telemetry-service",
+            "kubernetes_pod_name=peer_id:0x1",
+        ]);
     }
 
     #[tokio::test]

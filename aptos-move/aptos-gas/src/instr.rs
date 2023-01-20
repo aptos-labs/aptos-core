@@ -29,11 +29,11 @@ crate::params::define_gas_parameters!(
         // stack
         [pop: InternalGas, "pop", 40 * MUL],
         [ld_u8: InternalGas, "ld_u8", 60 * MUL],
-        [ld_u16: InternalGas, optional "ld_u16", 60 * MUL],
-        [ld_u32: InternalGas, optional "ld_u32", 60 * MUL],
+        [ld_u16: InternalGas, { 5.. => "ld_u16" }, 60 * MUL],
+        [ld_u32: InternalGas, { 5.. => "ld_u32" }, 60 * MUL],
         [ld_u64: InternalGas, "ld_u64", 60 * MUL],
         [ld_u128: InternalGas, "ld_u128", 80 * MUL],
-        [ld_u256: InternalGas, optional "ld_u256", 80 * MUL],
+        [ld_u256: InternalGas, { 5.. => "ld_u256" }, 80 * MUL],
         [ld_true: InternalGas, "ld_true", 60 * MUL],
         [ld_false: InternalGas, "ld_false", 60 * MUL],
         [ld_const_base: InternalGas, "ld_const.base", 650 * MUL],
@@ -69,7 +69,7 @@ crate::params::define_gas_parameters!(
         // call
         [call_base: InternalGas, "call.base", 1000 * MUL],
         [call_per_arg: InternalGasPerArg, "call.per_arg", 100 * MUL],
-        [call_per_local: InternalGasPerArg, optional "call.per_local", 100 * MUL],
+        [call_per_local: InternalGasPerArg, { 1.. => "call.per_local" }, 100 * MUL],
         [call_generic_base: InternalGas, "call_generic.base", 1000 * MUL],
         [
             call_generic_per_ty_arg: InternalGasPerArg,
@@ -81,7 +81,7 @@ crate::params::define_gas_parameters!(
             "call_generic.per_arg",
             100 * MUL
         ],
-        [call_generic_per_local: InternalGasPerArg, optional "call_generic.per_local", 100 * MUL],
+        [call_generic_per_local: InternalGasPerArg, { 1.. => "call_generic.per_local" }, 100 * MUL],
         // struct
         [pack_base: InternalGas, "pack.base", 220 * MUL],
         [pack_per_field: InternalGasPerArg, "pack.per_field", 40 * MUL],
@@ -110,11 +110,11 @@ crate::params::define_gas_parameters!(
         [freeze_ref: InternalGas, "freeze_ref", 10 * MUL],
         // casting
         [cast_u8: InternalGas, "cast_u8", 120 * MUL],
-        [cast_u16: InternalGas, optional "cast_u16", 120 * MUL],
-        [cast_u32: InternalGas, optional "cast_u32", 120 * MUL],
+        [cast_u16: InternalGas, { 5.. => "cast_u16" }, 120 * MUL],
+        [cast_u32: InternalGas, { 5.. => "cast_u32" }, 120 * MUL],
         [cast_u64: InternalGas, "cast_u64", 120 * MUL],
         [cast_u128: InternalGas, "cast_u128", 120 * MUL],
-        [cast_u256: InternalGas, optional "cast_u256", 120 * MUL],
+        [cast_u256: InternalGas, { 5.. => "cast_u256" }, 120 * MUL],
         // arithmetic
         [add: InternalGas, "add", 160 * MUL],
         [sub: InternalGas, "sub", 160 * MUL],

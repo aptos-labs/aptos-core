@@ -36,7 +36,7 @@ impl AccessPathCache for BTreeAccessPathCache {
             btree_map::Entry::Vacant(entry) => {
                 let v = entry.key().access_vector();
                 entry.insert(v).clone()
-            }
+            },
             btree_map::Entry::Occupied(entry) => entry.get().clone(),
         };
         AccessPath::new(addr, access_vec)
@@ -47,7 +47,7 @@ impl AccessPathCache for BTreeAccessPathCache {
             btree_map::Entry::Vacant(entry) => {
                 let v = entry.key().access_vector();
                 entry.insert(v).clone()
-            }
+            },
             btree_map::Entry::Occupied(entry) => entry.get().clone(),
         };
         AccessPath::new(address, access_vec)

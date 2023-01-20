@@ -119,7 +119,7 @@ impl TokenOwnership {
                     table_handle_to_owner
                 );
                 (None, None, None)
-            }
+            },
         };
 
         Ok(Some((

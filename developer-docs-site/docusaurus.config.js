@@ -5,7 +5,6 @@ const lightCodeTheme = require("prism-react-renderer/themes/github");
 const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 
 const codeInjector = require("./src/remark/code-injector");
-const contributors = require("./src/remark/contributors");
 
 const { ProvidePlugin } = require("webpack");
 
@@ -35,7 +34,7 @@ const config = {
           sidebarPath: require.resolve("./sidebars.js"),
           sidebarCollapsible: false,
           editUrl: "https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/",
-          remarkPlugins: [codeInjector, math, contributors],
+          remarkPlugins: [codeInjector, math],
           path: "docs",
           rehypePlugins: [katex],
         },
@@ -134,13 +133,8 @@ const config = {
               },
               {
                 type: "doc",
-                label: "Develop by Tutorial",
+                label: "Develop with SDKs",
                 docId: "tutorials/index",
-              },
-              {
-                type: "doc",
-                label: "Use Aptos SDKs",
-                docId: "sdks/index",
               },
               {
                 type: "doc",
@@ -192,7 +186,7 @@ const config = {
             position: "left",
             items: [
               {
-                label: "Find Nodes",
+                label: "Understand Nodes",
                 type: "doc",
                 docId: "nodes/nodes-landing",
               },
@@ -205,6 +199,11 @@ const config = {
                 label: "Install FullNodes",
                 type: "doc",
                 docId: "nodes/full-node/index",
+              },
+              {
+                label: "Measure Nodes",
+                type: "doc",
+                docId: "nodes/measure/index",
               },
               {
                 label: "Configure Nodes",
@@ -224,17 +223,9 @@ const config = {
                 docId: "nodes/aptos-api-spec",
               },
               {
-                href: "https://aptos-labs.github.io/ts-sdk-doc/",
-                label: "TypeScript SDK",
-              },
-              {
-                href: "https://pypi.org/project/aptos-sdk/",
-                label: "Python SDK",
-              },
-              {
-                label: "Rust SDK",
+                label: "Aptos SDKs",
                 type: "doc",
-                docId: "sdks/rust-sdk",
+                docId: "sdks/index",
               },
               {
                 label: "Move References",

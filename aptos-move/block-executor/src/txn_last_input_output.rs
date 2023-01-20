@@ -21,7 +21,7 @@ use std::{
 
 type TxnInput<K> = Vec<ReadDescriptor<K>>;
 type TxnOutput<T, E> = ExecutionStatus<T, Error<E>>;
-type KeySet<T> = HashSet<<<T as TransactionOutput>::T as Transaction>::Key>;
+type KeySet<T> = HashSet<<<T as TransactionOutput>::Txn as Transaction>::Key>;
 
 /// Information about the read which is used by validation.
 #[derive(Clone, PartialEq)]

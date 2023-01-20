@@ -3,12 +3,11 @@
 
 use crate::add_accounts_impl;
 use aptos_config::{
-    config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG},
+    config::{
+        PrunerConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+    },
     utils::get_genesis_txn,
-};
-
-use aptos_config::config::{
-    PrunerConfig, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_db::AptosDB;
 use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};

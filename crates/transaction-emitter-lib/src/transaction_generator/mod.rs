@@ -7,6 +7,8 @@ use async_trait::async_trait;
 pub mod account_generator;
 pub mod nft_mint_and_transfer;
 pub mod p2p_transaction_generator;
+pub mod publish_modules;
+mod publishing;
 pub mod transaction_mix_generator;
 
 pub trait TransactionGenerator: Sync + Send {

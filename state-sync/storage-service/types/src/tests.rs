@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::requests::TransactionsOrOutputsWithProofRequest;
 use crate::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest,
-        TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+        TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+        TransactionsWithProofRequest,
     },
     responses::{CompleteDataRange, DataSummary, ProtocolMetadata},
     Epoch, StorageServiceRequest,

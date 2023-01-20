@@ -3,6 +3,8 @@
 
 use crate::DiscoveryError;
 use aptos_config::config::PeerSet;
+#[cfg(test)]
+use aptos_logger::spawn_named;
 use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
 use futures::Stream;
 use std::{
@@ -11,9 +13,6 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-
-#[cfg(test)]
-use aptos_logger::spawn_named;
 
 pub struct FileStream {
     file_path: PathBuf,

@@ -3,8 +3,10 @@
 
 #![forbid(unsafe_code)]
 
-use aptos_storage_service_types::responses::TransactionOrOutputListWithProof;
-use aptos_storage_service_types::{responses::CompleteDataRange, Epoch};
+use aptos_storage_service_types::{
+    responses::{CompleteDataRange, TransactionOrOutputListWithProof},
+    Epoch,
+};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,

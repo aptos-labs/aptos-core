@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_state_view::{StateView, StateViewId};
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::write_set::{WriteOp, WriteSet};
+use aptos_state_view::{StateViewId, TStateView};
+use aptos_types::{
+    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
+    write_set::{WriteOp, WriteSet},
+};
 
 pub struct DeltaStateView<'a, 'b, S> {
     base: &'a S,
@@ -18,10 +19,12 @@ impl<'a, 'b, S> DeltaStateView<'a, 'b, S> {
     }
 }
 
-impl<'a, 'b, S> StateView for DeltaStateView<'a, 'b, S>
+impl<'a, 'b, S> TStateView for DeltaStateView<'a, 'b, S>
 where
-    S: StateView,
+    S: TStateView<Key = StateKey>,
 {
+    type Key = StateKey;
+
     fn id(&self) -> StateViewId {
         self.base.id()
     }

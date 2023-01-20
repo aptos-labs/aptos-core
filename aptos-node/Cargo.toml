@@ -18,6 +18,7 @@ aptos-api = { workspace = true }
 aptos-backup-service = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-cached-packages = { workspace = true }
+aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
 aptos-consensus = { workspace = true }
 aptos-consensus-notifications = { workspace = true }
@@ -39,12 +40,14 @@ aptos-mempool = { workspace = true }
 aptos-mempool-notifications = { workspace = true }
 aptos-network = { workspace = true }
 aptos-network-builder = { workspace = true }
+aptos-runtimes = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-state-sync-driver = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-storage-service-client = { workspace = true }
 aptos-storage-service-server = { workspace = true }
+aptos-storage-service-types = { workspace = true }
 aptos-telemetry = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-time-service = { workspace = true }
@@ -55,8 +58,10 @@ clap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+maplit = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+serde = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 
@@ -69,3 +74,4 @@ assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-clone
 failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
 indexer = ["aptos-indexer"]
 check-vm-features = []
+consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-mempool/consensus-only-perf-test", "aptos-db/consensus-only-perf-test"]

@@ -607,21 +607,6 @@ The number of new events created does not exceed MAX_U64.
 
 
 
-
-<a name="0x1_block_NewEventHandle"></a>
-
-
-<pre><code><b>schema</b> <a href="block.md#0x1_block_NewEventHandle">NewEventHandle</a> {
-    aptos_framework: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
-    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
-    <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
-    <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 2 &gt; <a href="block.md#0x1_block_MAX_U64">MAX_U64</a>;
-}
-</code></pre>
-
-
-
 <a name="@Specification_1_update_epoch_interval_microsecs"></a>
 
 ### Function `update_epoch_interval_microsecs`
@@ -692,6 +677,8 @@ The BlockResource existed under the @aptos_framework.
 <b>requires</b> <a href="timestamp.md#0x1_timestamp">timestamp</a> &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
 <b>requires</b> (proposer == @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == <a href="timestamp.md#0x1_timestamp">timestamp</a>);
 <b>requires</b> (proposer != @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &lt; <a href="timestamp.md#0x1_timestamp">timestamp</a>);
+<b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
+<b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 

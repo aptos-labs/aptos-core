@@ -60,10 +60,10 @@ pub fn set_up(
     let store = &db.ledger_store;
 
     // Write LIs to DB.
-    let mut batch = SchemaBatch::new();
+    let batch = SchemaBatch::new();
     ledger_infos_with_sigs
         .iter()
-        .map(|info| store.put_ledger_info(info, &mut batch))
+        .map(|info| store.put_ledger_info(info, &batch))
         .collect::<Result<Vec<_>>>()
         .unwrap();
     store.db.write_schemas(batch).unwrap();

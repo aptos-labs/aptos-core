@@ -10,14 +10,16 @@ use aptos_types::{
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use get_if_addrs::get_if_addrs;
-use rand::seq::SliceRandom;
-use rand::SeedableRng;
-use std::fs::{File, OpenOptions};
-use std::io::Seek;
-use std::net::{TcpListener, TcpStream};
-use std::ops::Range;
-use std::time::Duration;
-use std::{env, fs, thread};
+use rand::{seq::SliceRandom, SeedableRng};
+use std::{
+    env, fs,
+    fs::{File, OpenOptions},
+    io::Seek,
+    net::{TcpListener, TcpStream},
+    ops::Range,
+    thread,
+    time::Duration,
+};
 
 const MAX_PORT_RETRIES: u16 = 1000;
 // Using non-ephemeral ports, to avoid conflicts with OS-selected ports (i.e., bind on port 0)
@@ -57,7 +59,7 @@ impl PortCounterFiles {
 
 impl Drop for PortCounterFiles {
     fn drop(&mut self) {
-        fs::remove_file(&lock_path()).unwrap();
+        fs::remove_file(lock_path()).unwrap();
     }
 }
 
@@ -128,14 +130,14 @@ fn get_unique_port() -> u16 {
             } else {
                 counter
             }
-        }
+        },
         Err(_) => {
             warn!(
                 "Unable to read port counter from file {}, starting from 0",
                 counter_path()
             );
             0
-        }
+        },
     };
     let (port, updated_counter) = bind_port_from_counter(global_counter);
 
@@ -155,23 +157,23 @@ fn open_counter_file() -> PortCounterFiles {
             .read(true)
             .write(true)
             .create_new(true)
-            .open(&lock_path())
+            .open(lock_path())
         {
             Ok(lock_file) => match OpenOptions::new()
                 .read(true)
                 .write(true)
                 .create(true)
-                .open(&counter_path())
+                .open(counter_path())
             {
                 Ok(counter_file) => return PortCounterFiles::new(counter_file, lock_file),
                 Err(_) => {
                     panic!("Could not read {}", counter_path());
-                }
+                },
             },
             Err(_) => {
                 info!("Lock could not be acquired, attempt {}", i);
                 thread::sleep(Duration::from_millis(100));
-            }
+            },
         }
     }
     panic!("Could not acquire lock to: {}", lock_path());
@@ -188,14 +190,14 @@ fn bind_port_from_counter(mut counter: u16) -> (u16, u16) {
         match try_bind(Some(port)) {
             Ok(port) => {
                 return (port, counter);
-            }
+            },
             Err(_) => {
                 info!(
                     "Conflicting port: {}, on count {} and attempt {}",
                     port, counter, attempt
                 );
                 continue;
-            }
+            },
         }
     }
 

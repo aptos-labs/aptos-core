@@ -1,24 +1,28 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::accounts::Account;
-use crate::context::Context;
-use crate::failpoint::fail_point_poem;
-use crate::page::Page;
-use crate::response::BadRequestError;
-use crate::response::{
-    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
+use crate::{
+    accept_type::AcceptType,
+    accounts::Account,
+    context::Context,
+    failpoint::fail_point_poem,
+    page::Page,
+    response::{
+        BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
+        InternalError,
+    },
+    ApiTags,
 };
-use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     verify_field_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper, LedgerInfo,
     MoveStructTag, VerifyInputWithRecursion, VersionedEvent, U64,
 };
 use aptos_types::event::EventKey;
-use poem_openapi::param::Query;
-use poem_openapi::{param::Path, OpenApi};
+use poem_openapi::{
+    param::{Path, Query},
+    OpenApi,
+};
 use std::sync::Arc;
 
 pub struct EventsApi {
@@ -180,10 +184,10 @@ impl EventsApi {
                     })?;
 
                 BasicResponse::try_from_json((events, &latest_ledger_info, BasicResponseStatus::Ok))
-            }
+            },
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((events, &latest_ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 }

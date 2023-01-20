@@ -1,7 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{debug, error};
+use crate::{
+    debug, error,
+    errors::ValidatorCacheUpdateError,
+    metrics::{VALIDATOR_SET_UPDATE_FAILED_COUNT, VALIDATOR_SET_UPDATE_SUCCESS_COUNT},
+    types::common::EpochedPeerStore,
+};
 use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_infallible::RwLock;
 use aptos_rest_client::Response;
@@ -11,12 +16,6 @@ use aptos_types::{
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time;
 use url::Url;
-
-use crate::{
-    errors::ValidatorCacheUpdateError,
-    metrics::{VALIDATOR_SET_UPDATE_FAILED_COUNT, VALIDATOR_SET_UPDATE_SUCCESS_COUNT},
-    types::common::EpochedPeerStore,
-};
 
 #[derive(Clone)]
 pub struct PeerSetCacheUpdater {
@@ -60,7 +59,7 @@ impl PeerSetCacheUpdater {
                         .with_label_values(&[&chain_id.to_string()])
                         .inc();
                     debug!("validator set update successful for chain id {}", chain_id);
-                }
+                },
                 Err(err) => {
                     VALIDATOR_SET_UPDATE_FAILED_COUNT
                         .with_label_values(&[&chain_id.to_string(), &err.to_string()])
@@ -69,7 +68,7 @@ impl PeerSetCacheUpdater {
                         "validator set update error for chain id {}: {:?}",
                         chain_id, err
                     );
-                }
+                },
             }
         }
     }

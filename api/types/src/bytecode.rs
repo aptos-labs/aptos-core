@@ -1,8 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::borrow::Borrow;
-
+use crate::{
+    move_types::{
+        MoveAbility, MoveFunctionGenericTypeParam, MoveStruct, MoveStructField,
+        MoveStructGenericTypeParam,
+    },
+    MoveFunction, MoveStructTag, MoveType,
+};
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     file_format::{
@@ -13,14 +18,7 @@ use move_binary_format::{
     },
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
-
-use crate::{
-    move_types::{
-        MoveAbility, MoveFunctionGenericTypeParam, MoveStruct, MoveStructField,
-        MoveStructGenericTypeParam,
-    },
-    MoveFunction, MoveStructTag, MoveType,
-};
+use std::borrow::Borrow;
 
 pub trait Bytecode {
     fn module_handle_at(&self, idx: ModuleHandleIndex) -> &ModuleHandle;
@@ -78,7 +76,7 @@ pub trait Bytecode {
             SignatureToken::Struct(v) => MoveType::Struct(self.new_move_struct_tag(v, &[])),
             SignatureToken::StructInstantiation(shi, type_params) => {
                 MoveType::Struct(self.new_move_struct_tag(shi, type_params))
-            }
+            },
             SignatureToken::TypeParameter(i) => MoveType::GenericTypeParam { index: *i },
             SignatureToken::Reference(t) => MoveType::Reference {
                 mutable: false,

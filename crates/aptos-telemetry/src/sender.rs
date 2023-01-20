@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{self, increment_log_ingest_failures_by, increment_log_ingest_successes_by};
-
+use anyhow::{anyhow, Error};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::{
     noise::{self, NoiseConfig},
@@ -16,8 +16,6 @@ use aptos_telemetry_service::types::{
     telemetry::TelemetryDump,
 };
 use aptos_types::{chain_id::ChainId, PeerId};
-
-use anyhow::{anyhow, Error};
 use flate2::{write::GzEncoder, Compression};
 use prometheus::{default_registry, Registry};
 use reqwest::{header::CONTENT_ENCODING, RequestBuilder, Response, StatusCode};
@@ -138,7 +136,7 @@ impl TelemetrySender {
                             .unwrap_or_else(|_| "empty body".to_string()),
                     ))
                 }
-            }
+            },
         }
     }
 
@@ -159,11 +157,11 @@ impl TelemetrySender {
                 Ok(_) => {
                     increment_log_ingest_successes_by(batch.len() as u64);
                     debug!("Sent log of length: {}", len);
-                }
+                },
                 Err(error) => {
                     increment_log_ingest_failures_by(batch.len() as u64);
                     debug!("Failed send log of length: {} with error: {}", len, error);
-                }
+                },
             }
         } else {
             debug!("Failed json serde of batch: {:?}", batch);
@@ -196,11 +194,11 @@ impl TelemetrySender {
             Ok(_) => {
                 metrics::increment_telemetry_service_successes(&event_name);
                 debug!("Custom metrics with name {} sent successfully.", event_name);
-            }
+            },
             Err(e) => {
                 metrics::increment_telemetry_service_failures(&event_name);
                 debug!("Failed to send custom metrics: {}", e);
-            }
+            },
         }
     }
 
@@ -229,7 +227,7 @@ impl TelemetrySender {
                 let token = self.authenticate().await?;
                 *self.auth_context.token.write() = Some(token.clone());
                 Ok(token)
-            }
+            },
         }
     }
 
@@ -244,7 +242,7 @@ impl TelemetrySender {
             Ok(response) => {
                 let response_payload = response.json::<IndexResponse>().await?;
                 Ok(response_payload.public_key)
-            }
+            },
             Err(err) => Err(anyhow!("Error getting server public key. {}", err)),
         }
     }
@@ -257,7 +255,7 @@ impl TelemetrySender {
                 let public_key = self.get_public_key_from_server().await?;
                 *self.auth_context.server_public_key.lock() = Some(public_key);
                 Ok(public_key)
-            }
+            },
         }
     }
 
@@ -321,7 +319,7 @@ impl TelemetrySender {
                     err,
                 );
                 Err(anyhow!("error {}", err))
-            }
+            },
         }?;
 
         let (response_payload, _) = noise_config
@@ -350,12 +348,12 @@ impl TelemetrySender {
                 Err(e) => {
                     debug!("Unable to check chain access {}", e);
                     true
-                }
+                },
             },
             Err(e) => {
                 debug!("Unable to check chain access {}", e);
                 true
-            }
+            },
         }
     }
 
@@ -373,12 +371,12 @@ impl TelemetrySender {
                 Err(e) => {
                     debug!("Unable to get telemetry log env: {}", e);
                     None
-                }
+                },
             },
             Err(e) => {
                 debug!("Unable to check chain access {}", e);
                 None
-            }
+            },
         }
     }
 }
@@ -386,18 +384,16 @@ impl TelemetrySender {
 #[cfg(test)]
 mod tests {
 
-    use std::{
-        collections::BTreeMap,
-        time::{SystemTime, UNIX_EPOCH},
-    };
-
-    use crate::metrics::{APTOS_TELEMETRY_SERVICE_FAILURE, APTOS_TELEMETRY_SERVICE_SUCCESS};
-
     use super::*;
+    use crate::metrics::{APTOS_TELEMETRY_SERVICE_FAILURE, APTOS_TELEMETRY_SERVICE_SUCCESS};
     use aptos_crypto::Uniform;
     use aptos_telemetry_service::types::telemetry::TelemetryEvent;
     use httpmock::MockServer;
     use prometheus::{register_int_counter_vec_with_registry, Registry};
+    use std::{
+        collections::BTreeMap,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     #[tokio::test]
     async fn test_server_public_key() {
@@ -420,16 +416,16 @@ mod tests {
 
         // Should call the server once and cache the key
         assert_eq!(mock.hits(), 1);
-        assert_eq!(result1.is_ok(), true);
+        assert!(result1.is_ok());
         assert_eq!(result1.unwrap(), private_key.public_key());
-        assert_eq!(result2.is_ok(), true);
+        assert!(result2.is_ok());
         assert_eq!(result2.unwrap(), private_key.public_key());
 
         client.reset_token();
 
         let result3 = client.server_public_key().await;
         assert_eq!(mock.hits(), 2);
-        assert_eq!(result3.is_ok(), true);
+        assert!(result3.is_ok());
         assert_eq!(result3.unwrap(), private_key.public_key());
     }
 

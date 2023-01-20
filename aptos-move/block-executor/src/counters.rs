@@ -13,11 +13,21 @@ pub static MODULE_PUBLISHING_FALLBACK_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of speculative transaction re-executions due to a failed validation .
+/// Count of speculative transaction re-executions due to a failed validation.
 pub static SPECULATIVE_ABORT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_execution_speculative_abort_count",
         "Number of speculative aborts in parallel execution (leading to re-execution)"
+    )
+    .unwrap()
+});
+
+/// Count of times a transaction got suspended due to an estimated r/w dependency.
+pub static DEPENDENCY_SUSPEND_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_execution_dependency_suspend_count",
+        "Count write estimates encountered when reading in parallel execution \
+        (typically leading to a suspension / waiting)"
     )
     .unwrap()
 });

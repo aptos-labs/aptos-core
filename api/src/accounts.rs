@@ -1,36 +1,37 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::context::Context;
-use crate::failpoint::fail_point_poem;
-use crate::page::determine_limit;
-use crate::response::{
-    account_not_found, resource_not_found, struct_field_not_found, BadRequestError,
-    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
+use crate::{
+    accept_type::AcceptType,
+    context::Context,
+    failpoint::fail_point_poem,
+    page::determine_limit,
+    response::{
+        account_not_found, resource_not_found, struct_field_not_found, BadRequestError,
+        BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
+    },
+    ApiTags,
 };
-use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode,
     MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
 };
-use aptos_types::access_path::AccessPath;
-use aptos_types::account_config::AccountResource;
-use aptos_types::event::EventHandle;
-use aptos_types::event::EventKey;
-use aptos_types::state_store::state_key::StateKey;
-use move_core_types::value::MoveValue;
-use move_core_types::{
-    identifier::Identifier,
-    language_storage::{ResourceKey, StructTag},
-    move_resource::MoveStructType,
+use aptos_types::{
+    access_path::AccessPath,
+    account_config::AccountResource,
+    event::{EventHandle, EventKey},
+    state_store::state_key::StateKey,
 };
-use poem_openapi::param::Query;
-use poem_openapi::{param::Path, OpenApi};
-use std::collections::BTreeMap;
-use std::convert::TryInto;
-use std::sync::Arc;
+use move_core_types::{
+    identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
+    value::MoveValue,
+};
+use poem_openapi::{
+    param::{Path, Query},
+    OpenApi,
+};
+use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
 
 /// API for accounts, their associated resources, and modules
 pub struct AccountsApi {
@@ -246,10 +247,10 @@ impl Account {
     }
 
     pub fn get_account_resource(&self) -> Result<Vec<u8>, BasicErrorWith404> {
-        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
+        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(
             self.address.into(),
             AccountResource::struct_tag(),
-        )));
+        ));
 
         let state_value = self.context.get_state_value_poem(
             &state_key,
@@ -317,7 +318,7 @@ impl Account {
                     BasicResponseStatus::Ok,
                 ))
                 .map(|v| v.with_cursor(next_state_key))
-            }
+            },
             AcceptType::Bcs => {
                 // Put resources in a BTreeMap to ensure they're ordered the same every time
                 let resources: BTreeMap<StructTag, Vec<u8>> = resources.into_iter().collect();
@@ -327,7 +328,7 @@ impl Account {
                     BasicResponseStatus::Ok,
                 ))
                 .map(|v| v.with_cursor(next_state_key))
-            }
+            },
         }
     }
 
@@ -389,7 +390,7 @@ impl Account {
                     BasicResponseStatus::Ok,
                 ))
                 .map(|v| v.with_cursor(next_state_key))
-            }
+            },
             AcceptType::Bcs => {
                 // Sort modules by name
                 let modules: BTreeMap<MoveModuleId, Vec<u8>> = modules
@@ -402,7 +403,7 @@ impl Account {
                     BasicResponseStatus::Ok,
                 ))
                 .map(|v| v.with_cursor(next_state_key))
-            }
+            },
         }
     }
 
@@ -473,10 +474,10 @@ impl Account {
         &self,
         struct_tag: &StructTag,
     ) -> Result<Vec<(Identifier, MoveValue)>, BasicErrorWith404> {
-        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
+        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(
             self.address.into(),
             struct_tag.clone(),
-        )));
+        ));
         let state_value_bytes = self
             .context
             .db

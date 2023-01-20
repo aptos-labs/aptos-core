@@ -192,15 +192,15 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
                     ))
                 })?;
                 self.save_params.save_key(&private_key, "x25519")
-            }
+            },
             KeyType::Ed25519 => {
                 let private_key = keygen.generate_ed25519_private_key();
                 self.save_params.save_key(&private_key, "ed25519")
-            }
+            },
             KeyType::Bls12381 => {
                 let private_key = keygen.generate_bls12381_private_key();
                 self.save_params.save_bls_key(&private_key, "bls12381")
-            }
+            },
         }
     }
 }

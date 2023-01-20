@@ -28,7 +28,7 @@ Refer to our [Coding Guidelines](https://github.com/aptos-labs/aptos-core/blob/m
 
 ### Documentation
 
-Aptos Core's developer website is also open source (the code can be found in this [repository](https://github.com/aptos-labs/aptos-core/blob/main/developers-docs-sitee/)).  It is built using [Docusaurus](https://docusaurus.io/):
+Aptos Core's developer website is also open source (the code can be found in this [repository](https://github.com/aptos-labs/aptos-core/tree/main/developers-docs-site/).  It is built using [Docusaurus](https://docusaurus.io/):
 
 If you know Markdown, you can already contribute! How to contribute can be found in the [website repo](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md).
 
@@ -37,10 +37,11 @@ If you know Markdown, you can already contribute! How to contribute can be found
 Changes to the project are proposed through pull requests. The general pull request workflow is as follows:
 
 1. Fork the repo and create a topic branch off of `main`.
-2. If you have added code that should be tested, add unit tests.
-3. If you have changed APIs, update the documentation. Make sure the documentation builds.
-4. Ensure all tests and lints pass on each and every commit that is part of your pull request. `cargo fmt && cargo xclippy`
-5. Submit your pull request.
+2. Locally run `./scripts/dev_setup.sh` to ensure you have all development dependencies required for our workflows.
+3. If you have added code that should be tested, add unit tests.
+4. If you have changed APIs, update the documentation. Make sure the documentation builds.
+5. Ensure all tests and lints pass on each and every commit that is part of your pull request using `./scripts/rust_lint.sh`
+6. Submit your pull request.
 
 ## Authoring Clean Commits
 

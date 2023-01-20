@@ -268,6 +268,8 @@ AggregatorFactory existed under the @aptos_framework when Creating a new aggrega
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result.limit == limit;
 </code></pre>
 
 

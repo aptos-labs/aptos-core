@@ -13,13 +13,13 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_crypto::hash::HashValue;
-use aptos_types::write_set::WriteSet;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoWithProof},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
+    write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};

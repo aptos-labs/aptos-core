@@ -7,7 +7,6 @@ use aptos_api_types::Address;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::LocalAccount;
 use serde_json::json;
-
 use std::convert::TryInto;
 
 #[tokio::test]

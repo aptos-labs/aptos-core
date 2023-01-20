@@ -1,22 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
+use crate::{
+    emitter::{account_minter::create_and_fund_account_request, RETRY_POLICY},
+    transaction_generator::{TransactionGenerator, TransactionGeneratorCreator},
+};
+use aptos_infallible::Mutex;
+use aptos_logger::{info, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib::aptos_token_stdlib, TransactionFactory},
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{account_address::AccountAddress, transaction::SignedTransaction, LocalAccount},
 };
-use std::collections::HashMap;
-
-use crate::emitter::{account_minter::create_and_fund_account_request, RETRY_POLICY};
-use aptos_infallible::Mutex;
-use aptos_logger::{info, warn};
-use aptos_sdk::types::account_address::AccountAddress;
 use async_trait::async_trait;
-use rand::rngs::StdRng;
-use rand::thread_rng;
-use std::{sync::Arc, time::Duration};
+use rand::{rngs::StdRng, thread_rng};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 const INITIAL_NFT_BALANCE: u64 = 50_000;
 
@@ -75,35 +73,37 @@ impl TransactionGenerator for NFTMintAndTransfer {
                 .cloned()
                 .unwrap_or(false);
             for i in 0..transactions_per_account {
-                requests.push(if account_funded {
-                    create_nft_transfer_request(
-                        account,
-                        &self.faucet_account,
-                        self.creator_address,
-                        &self.collection_name,
-                        &self.token_name,
-                        &self.txn_factory,
-                        if i != transactions_per_account - 1 {
-                            1
-                        } else {
-                            INITIAL_NFT_BALANCE + 1 - transactions_per_account as u64
-                        },
-                    )
-                } else {
-                    create_nft_transfer_request(
-                        &mut self.faucet_account,
-                        account,
-                        self.creator_address,
-                        &self.collection_name,
-                        &self.token_name,
-                        &self.txn_factory,
-                        if i != transactions_per_account - 1 {
-                            1
-                        } else {
-                            INITIAL_NFT_BALANCE + 1 - transactions_per_account as u64
-                        },
-                    )
-                });
+                requests.push(
+                    if account_funded {
+                        create_nft_transfer_request(
+                            account,
+                            &self.faucet_account,
+                            self.creator_address,
+                            &self.collection_name,
+                            &self.token_name,
+                            &self.txn_factory,
+                            if i != transactions_per_account - 1 {
+                                1
+                            } else {
+                                INITIAL_NFT_BALANCE + 1 - transactions_per_account as u64
+                            },
+                        )
+                    } else {
+                        create_nft_transfer_request(
+                            &mut self.faucet_account,
+                            account,
+                            self.creator_address,
+                            &self.collection_name,
+                            &self.token_name,
+                            &self.txn_factory,
+                            if i != transactions_per_account - 1 {
+                                1
+                            } else {
+                                INITIAL_NFT_BALANCE + 1 - transactions_per_account as u64
+                            },
+                        )
+                    },
+                );
             }
             self.account_funded
                 .insert(account.address(), !account_funded);
@@ -153,7 +153,7 @@ pub async fn initialize_nft_collection(
                 );
                 *root_account.sequence_number_mut() = account.sequence_number;
             }
-        }
+        },
         Err(e) => warn!(
             "[{}] Couldn't check account sequence number due to {:?}",
             rest_client.path_prefix_string(),

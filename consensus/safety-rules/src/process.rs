@@ -7,7 +7,6 @@ use crate::{
     safety_rules_manager,
 };
 use aptos_config::config::{SafetyRulesConfig, SafetyRulesService};
-
 use std::net::SocketAddr;
 
 pub struct Process {

@@ -898,6 +898,7 @@ because it's 0 for "none" or 1 for "some".
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <b>old</b>(t);
 <b>ensures</b> <a href="option.md#0x1_option_borrow">borrow</a>(t) == e;
 </code></pre>

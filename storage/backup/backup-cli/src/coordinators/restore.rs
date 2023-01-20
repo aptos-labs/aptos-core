@@ -86,11 +86,11 @@ impl RestoreCoordinator {
         ret
     }
 
-    async fn run_impl(self) -> Result<()> {
+    async fn run_impl(mut self) -> Result<()> {
         // N.b.
         // The coordinator now focuses on doing one procedure, ignoring the combination of options
         // supported before:
-        //   1. a most recent state snapshot
+        //   1. a most recent state snapshot before --target-version
         //   2. a only transaction and its output, at the state snapshot version
         //   3. the epoch history from 0 up until the latest closed epoch preceding the state
         //      snapshot version.
@@ -141,6 +141,7 @@ impl RestoreCoordinator {
                     .ok_or_else(|| anyhow!("No usable state snapshot."))?
             };
         let version = state_snapshot_backup.version;
+        self.global_opt.target_version = version;
         let epoch_ending_backups = metadata_view.select_epoch_ending_backups(version)?;
         let transaction_backup = metadata_view
             .select_transaction_backups(version, version)?
@@ -184,7 +185,7 @@ impl RestoreCoordinator {
             self.global_opt,
             self.storage,
             txn_manifests,
-            Some(version + 1),
+            None,
             epoch_history,
             vec![],
         )

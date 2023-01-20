@@ -4,10 +4,11 @@
 use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_framework::natives::code::{PackageRegistry, UpgradePolicy};
 use aptos_package_builder::PackageBuilder;
-use aptos_types::account_address::{create_resource_address, AccountAddress};
-use aptos_types::on_chain_config::FeatureFlag;
-use move_core_types::parser::parse_struct_tag;
-use move_core_types::vm_status::StatusCode;
+use aptos_types::{
+    account_address::{create_resource_address, AccountAddress},
+    on_chain_config::FeatureFlag,
+};
+use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use rstest::rstest;
 use serde::{Deserialize, Serialize};
 

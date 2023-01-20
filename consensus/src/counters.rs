@@ -346,6 +346,16 @@ pub static NUM_BLOCKS_IN_TREE: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 /// Counter for the number of blocks in the pipeline broken down by stage.
+pub static CONSENSUS_PARTICIPATION_STATUS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_consensus_participation_status",
+        "Counter for consensus participation status, 0 means no participation and 1 otherwise",
+        &["peer_id"]
+    )
+    .unwrap()
+});
+
+/// Counter for the number of blocks in the pipeline broken down by stage.
 pub static NUM_BLOCKS_IN_PIPELINE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_consensus_num_blocks_in_pipeline",
@@ -486,6 +496,16 @@ pub static ROUND_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_round_manager_msgs_count",
         "Counters(queued,dequeued,dropped) related to consensus channel",
+        &["state"]
+    )
+    .unwrap()
+});
+
+/// Counters(queued,dequeued,dropped) related to quorum store channel
+pub static QUORUM_STORE_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_quorum_store_channel_msgs_count",
+        "Counters(queued,dequeued,dropped) related to quorum store channel",
         &["state"]
     )
     .unwrap()

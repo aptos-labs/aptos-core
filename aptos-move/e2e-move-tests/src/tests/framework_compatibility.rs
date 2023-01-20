@@ -22,9 +22,9 @@ fn can_upgrade_framework_on_testnet() {
 
 fn publish(acc: &Account, h: &mut MoveHarness, path: &str) {
     match h.publish_package(acc, &common::framework_dir_path(path)) {
-        TransactionStatus::Keep(ExecutionStatus::Success) => {}
+        TransactionStatus::Keep(ExecutionStatus::Success) => {},
         s => {
             panic!("cannot publish `{}`: {:?}", path, s)
-        }
+        },
     }
 }

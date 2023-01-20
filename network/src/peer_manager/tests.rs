@@ -167,10 +167,10 @@ async fn assert_peer_disconnected_event(
             assert_eq!(*actual_reason, reason);
             assert_eq!(actual_metadata.origin, origin);
             peer_manager.handle_connection_event(connection_event);
-        }
+        },
         event => {
             panic!("Expected a LostPeer event, received: {:?}", event);
-        }
+        },
     }
 }
 

@@ -145,7 +145,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
         let feedback_label = match notification_and_feedback {
             Some(notification_and_feedback) => {
                 notification_and_feedback.notification_feedback.get_label()
-            }
+            },
             None => TERMINATE_NO_FEEDBACK,
         };
         metrics::increment_counter(&metrics::TERMINATE_DATA_STREAM, feedback_label);
@@ -215,10 +215,10 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
         // Store the data stream internally
         if self.data_streams.insert(stream_id, data_stream).is_some() {
-            panic!(
+            return Err(Error::UnexpectedErrorEncountered(format!(
                 "Duplicate data stream found! This should not occur! ID: {:?}",
                 stream_id,
-            );
+            )));
         }
         info!(LogSchema::new(LogEntry::HandleStreamRequest)
             .stream_id(stream_id)
@@ -301,7 +301,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
         let global_data_summary = self.global_data_summary.clone();
 
         // If there was a send failure, terminate the stream
-        let data_stream = self.get_data_stream(data_stream_id);
+        let data_stream = self.get_data_stream(data_stream_id)?;
         if data_stream.send_failure() {
             info!(
                 (LogSchema::new(LogEntry::TerminateStream)
@@ -348,15 +348,16 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
     /// Returns the data stream associated with the given `data_stream_id`.
     /// Note: this method assumes the caller has already verified the stream exists.
-    fn get_data_stream(&mut self, data_stream_id: &DataStreamId) -> &mut DataStream<T> {
-        self.data_streams
-            .get_mut(data_stream_id)
-            .unwrap_or_else(|| {
-                panic!(
-                    "Expected a data stream with ID: {:?}, but found None!",
-                    data_stream_id
-                )
-            })
+    fn get_data_stream(
+        &mut self,
+        data_stream_id: &DataStreamId,
+    ) -> Result<&mut DataStream<T>, Error> {
+        self.data_streams.get_mut(data_stream_id).ok_or_else(|| {
+            Error::UnexpectedErrorEncountered(format!(
+                "Expected a data stream with ID: {:?}, but found None!",
+                data_stream_id
+            ))
+        })
     }
 }
 
@@ -381,20 +382,24 @@ fn verify_optimal_chunk_sizes(optimal_chunk_sizes: &OptimalChunkSizes) -> Result
 /// the internal state of the object.
 #[cfg(test)]
 mod streaming_service_tests {
-    use crate::data_stream::{DataStreamId, DataStreamListener};
-    use crate::error::Error;
-    use crate::streaming_client::{
-        GetAllStatesRequest, NotificationAndFeedback, NotificationFeedback, StreamRequest,
-        StreamRequestMessage, TerminateStreamRequest,
+    use crate::{
+        data_stream::{DataStreamId, DataStreamListener},
+        error::Error,
+        streaming_client::{
+            GetAllStatesRequest, NotificationAndFeedback, NotificationFeedback, StreamRequest,
+            StreamRequestMessage, TerminateStreamRequest,
+        },
+        tests,
+        tests::utils::MIN_ADVERTISED_STATES,
     };
-    use crate::tests;
-    use crate::tests::utils::MIN_ADVERTISED_STATES;
-    use futures::channel::oneshot;
-    use futures::channel::oneshot::Receiver;
-    use futures::FutureExt;
-    use futures::StreamExt;
-    use std::ops::Add;
-    use std::time::{Duration, Instant};
+    use futures::{
+        channel::{oneshot, oneshot::Receiver},
+        FutureExt, StreamExt,
+    };
+    use std::{
+        ops::Add,
+        time::{Duration, Instant},
+    };
     use tokio::time::timeout;
 
     const MAX_STREAM_WAIT_SECS: u64 = 60;

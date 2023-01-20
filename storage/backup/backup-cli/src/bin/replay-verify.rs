@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_backup_cli::utils::ReplayConcurrencyLevelOpt;
 use aptos_backup_cli::{
     coordinators::replay_verify::ReplayVerifyCoordinator,
     metadata::cache::MetadataCacheOpt,
     storage::StorageOpt,
-    utils::{ConcurrentDownloadsOpt, RocksdbOpt, TrustedWaypointOpt},
+    utils::{ConcurrentDownloadsOpt, ReplayConcurrencyLevelOpt, RocksdbOpt, TrustedWaypointOpt},
 };
 use aptos_config::config::{
     BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,

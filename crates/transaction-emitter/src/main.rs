@@ -61,13 +61,13 @@ pub async fn main() -> Result<()> {
                 stats.rate(Duration::from_secs(args.emit_args.duration))
             );
             Ok(())
-        }
+        },
         TxnEmitterCommand::Diag(args) => {
             let cluster = Cluster::try_from_cluster_args(&args.cluster_args)
                 .await
                 .context("Failed to build cluster")?;
             diag(&cluster).await.context("Diag failed")?;
             Ok(())
-        }
+        },
     }
 }

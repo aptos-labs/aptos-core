@@ -57,7 +57,7 @@ impl Corpus {
             Ok(registry) => registry,
             Err(error) => {
                 panic!("{}:{}", error, error.explanation());
-            }
+            },
         }
     }
 

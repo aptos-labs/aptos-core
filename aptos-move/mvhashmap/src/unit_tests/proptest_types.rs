@@ -103,7 +103,7 @@ where
                                     Err(_) => return ExpectedOutput::Failure,
                                     Ok(i) => return ExpectedOutput::Resolved(i),
                                 }
-                            }
+                            },
                             None => match v {
                                 Value(Some(w)) => return ExpectedOutput::Value(w.clone()),
                                 Value(None) => return ExpectedOutput::Deleted,
@@ -114,7 +114,7 @@ where
                                 if a.merge_onto(*d).is_err() {
                                     return ExpectedOutput::Failure;
                                 }
-                            }
+                            },
                             None => acc = Some(*d),
                         },
                     }
@@ -124,7 +124,7 @@ where
                     Some(d) => ExpectedOutput::Unresolved(d),
                     None => ExpectedOutput::NotInMap,
                 }
-            }
+            },
         }
     }
 }
@@ -170,7 +170,7 @@ where
             Operator::Read => None,
             Operator::Insert(_) | Operator::Remove | Operator::Update(_) => {
                 Some((key.clone(), idx))
-            }
+            },
         })
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
@@ -209,7 +209,7 @@ where
                                                 "{:?}",
                                                 idx
                                             );
-                                        }
+                                        },
                                         Value(None) => {
                                             assert_eq!(
                                                 baseline,
@@ -217,22 +217,22 @@ where
                                                 "{:?}",
                                                 idx
                                             );
-                                        }
+                                        },
                                     }
                                     break;
-                                }
+                                },
                                 Ok(Resolved(v)) => {
                                     assert_eq!(baseline, ExpectedOutput::Resolved(v), "{:?}", idx);
                                     break;
-                                }
+                                },
                                 Err(NotFound) => {
                                     assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
                                     break;
-                                }
+                                },
                                 Err(DeltaApplicationFailure) => {
                                     assert_eq!(baseline, ExpectedOutput::Failure, "{:?}", idx);
                                     break;
-                                }
+                                },
                                 Err(Unresolved(d)) => {
                                     assert_eq!(
                                         baseline,
@@ -241,7 +241,7 @@ where
                                         idx
                                     );
                                     break;
-                                }
+                                },
                                 Err(Dependency(_i)) => (),
                             }
                             retry_attempts += 1;
@@ -250,13 +250,13 @@ where
                             }
                             std::thread::sleep(std::time::Duration::from_millis(100));
                         }
-                    }
+                    },
                     Operator::Remove => {
                         map.add_write(key, (idx, 1), Value(None));
-                    }
+                    },
                     Operator::Insert(v) => {
                         map.add_write(key, (idx, 1), Value(Some(v.clone())));
-                    }
+                    },
                     Operator::Update(delta) => map.add_delta(key, idx, *delta),
                 }
             })

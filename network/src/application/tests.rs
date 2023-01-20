@@ -3,61 +3,85 @@
 
 use crate::{
     application::{
-        interface::NetworkInterface,
-        storage::{LockingHashMap, PeerMetadataStorage},
-        types::{PeerError, PeerState},
+        interface::{NetworkClient, NetworkClientInterface},
+        storage::PeerMetadataStorage,
+        types::{PeerError, PeerInfo, PeerState},
     },
-    protocols::health_checker::HealthCheckerMsg,
     transport::ConnectionMetadata,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_types::PeerId;
-use std::{collections::hash_map::Entry, sync::Arc};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    sync::Arc,
+};
 
-#[derive(Clone)]
-struct DummySender {}
+#[derive(Clone, Serialize, Deserialize)]
+struct DummyMessage {}
 
-/// Dummy network so we can test the interfaces
-struct DummyNetworkInterface {
+/// Retrieve only connected peers
+fn connected_peers(
     peer_metadata_storage: Arc<PeerMetadataStorage>,
+    network_id: NetworkId,
+) -> HashMap<PeerNetworkId, PeerInfo> {
+    filtered_peers(peer_metadata_storage, network_id, |(_, peer_info)| {
+        peer_info.status == PeerState::Connected
+    })
 }
 
-impl NetworkInterface<HealthCheckerMsg, DummySender> for DummyNetworkInterface {
-    type AppDataKey = PeerId;
-    type AppData = ();
+/// Filter peers with according `filter`
+fn filtered_peers<F: FnMut(&(&PeerId, &PeerInfo)) -> bool>(
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    network_id: NetworkId,
+    filter: F,
+) -> HashMap<PeerNetworkId, PeerInfo> {
+    peer_metadata_storage.read_filtered(network_id, filter)
+}
 
-    fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
-        &self.peer_metadata_storage
-    }
-
-    fn sender(&self) -> DummySender {
-        DummySender {}
-    }
-
-    fn app_data(&self) -> &LockingHashMap<PeerId, ()> {
-        unimplemented!()
-    }
+/// Retrieve PeerInfo for the node
+fn peers(
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    network_id: NetworkId,
+) -> HashMap<PeerNetworkId, PeerInfo> {
+    peer_metadata_storage.read_all(network_id)
 }
 
 #[test]
 fn test_interface() {
-    let network_id = NetworkId::Validator;
     let peer_metadata_storage = PeerMetadataStorage::test();
-    let interface = DummyNetworkInterface {
-        peer_metadata_storage: peer_metadata_storage.clone(),
-    };
+    let network_client: NetworkClient<DummyMessage> = NetworkClient::new(
+        vec![],
+        vec![],
+        HashMap::new(),
+        peer_metadata_storage.clone(),
+    );
+
+    let network_id = NetworkId::Validator;
     let peer_1 = PeerId::random();
     let peer_2 = PeerId::random();
-    assert_eq!(0, interface.peers(network_id).len());
-    assert_eq!(0, interface.connected_peers(network_id).len());
+    assert_eq!(
+        0,
+        peers(network_client.get_peer_metadata_storage(), network_id).len()
+    );
+    assert_eq!(
+        0,
+        connected_peers(network_client.get_peer_metadata_storage(), network_id).len()
+    );
 
     // Insert 2 connections, and we should have two active peers
     let connection_1 = ConnectionMetadata::mock(peer_1);
     let connection_2 = ConnectionMetadata::mock(peer_2);
     peer_metadata_storage.insert_connection(network_id, connection_1);
     peer_metadata_storage.insert_connection(network_id, connection_2.clone());
-    assert_eq!(2, interface.peers(network_id).len());
-    assert_eq!(2, interface.connected_peers(network_id).len());
+    assert_eq!(
+        2,
+        peers(network_client.get_peer_metadata_storage(), network_id).len()
+    );
+    assert_eq!(
+        2,
+        connected_peers(network_client.get_peer_metadata_storage(), network_id).len()
+    );
 
     // Disconnecting / disconnected are not counted in active
     update_state(
@@ -65,19 +89,37 @@ fn test_interface() {
         PeerNetworkId::new(network_id, peer_1),
         PeerState::Disconnecting,
     );
-    assert_eq!(2, interface.peers(network_id).len());
-    assert_eq!(1, interface.connected_peers(network_id).len());
+    assert_eq!(
+        2,
+        peers(network_client.get_peer_metadata_storage(), network_id).len()
+    );
+    assert_eq!(
+        1,
+        connected_peers(network_client.get_peer_metadata_storage(), network_id).len()
+    );
 
     // Removing a connection with a different connection id doesn't remove it from storage
     let different_connection_2 = ConnectionMetadata::mock(peer_2);
     peer_metadata_storage.remove_connection(network_id, &different_connection_2);
-    assert_eq!(2, interface.peers(network_id).len());
-    assert_eq!(1, interface.connected_peers(network_id).len());
+    assert_eq!(
+        2,
+        peers(network_client.get_peer_metadata_storage(), network_id).len()
+    );
+    assert_eq!(
+        1,
+        connected_peers(network_client.get_peer_metadata_storage(), network_id).len()
+    );
 
     // Removing the same connection id removes it
     peer_metadata_storage.remove_connection(network_id, &connection_2);
-    assert_eq!(1, interface.peers(network_id).len());
-    assert_eq!(0, interface.connected_peers(network_id).len());
+    assert_eq!(
+        1,
+        peers(network_client.get_peer_metadata_storage(), network_id).len()
+    );
+    assert_eq!(
+        0,
+        connected_peers(network_client.get_peer_metadata_storage(), network_id).len()
+    );
 }
 
 fn update_state(
@@ -91,7 +133,7 @@ fn update_state(
             Entry::Occupied(inner) => {
                 inner.get_mut().status = state;
                 Ok(())
-            }
+            },
         })
         .unwrap()
 }

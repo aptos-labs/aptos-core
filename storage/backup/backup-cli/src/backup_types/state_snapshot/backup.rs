@@ -23,8 +23,7 @@ use bytes::Bytes;
 use clap::Parser;
 use once_cell::sync::Lazy;
 use std::{convert::TryInto, str::FromStr, sync::Arc};
-use tokio::io::AsyncWriteExt;
-use tokio::time::Instant;
+use tokio::{io::AsyncWriteExt, time::Instant};
 
 #[derive(Parser)]
 pub struct StateSnapshotBackupOpt {
@@ -116,7 +115,7 @@ impl StateSnapshotBackupController {
             }
 
             current_idx += 1;
-            chunk_bytes.extend(&(record_bytes.len() as u32).to_be_bytes());
+            chunk_bytes.extend((record_bytes.len() as u32).to_be_bytes());
             chunk_bytes.extend(&record_bytes);
             prev_record_bytes = record_bytes;
         }

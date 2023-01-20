@@ -226,7 +226,7 @@ The Aptos network is comprised of nodes of three types: validator node, validato
             </div>
             <small>Manage your validator node's disk space by controlling the pruning settings. Proceed with caution.</small>
           </a>
-          <a href="/nodes/node-health-checker/index" class="list-group-item">
+          <a href="/nodes/measure/node-health-checker" class="list-group-item">
             <div class="d-flex w-100 justify-content-between align-items-start">
               <h4 class="mb-1">Node health checker</h4>
             </div>
