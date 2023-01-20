@@ -1,0 +1,28 @@
+processed 5 tasks
+
+task 2 'publish'. lines 18-23:
+Error: Unable to publish module '00000000000000000000000000000042::A'. Got VMError: {
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 3 'publish'. lines 25-45:
+Error: Unable to publish module '00000000000000000000000000000042::A'. Got VMError: {
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 4 'run'. lines 47-47:
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
