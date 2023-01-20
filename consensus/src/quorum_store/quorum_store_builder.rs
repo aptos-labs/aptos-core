@@ -151,7 +151,6 @@ impl InnerBuilder {
         verifier: ValidatorVerifier,
         backend: SecureBackend,
         quorum_store_storage_path: PathBuf,
-        num_workers_for_fragment: usize,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
@@ -175,7 +174,7 @@ impl InnerBuilder {
             );
         let mut remote_batch_coordinator_cmd_tx = Vec::new();
         let mut remote_batch_coordinator_cmd_rx = Vec::new();
-        for _ in 0..num_workers_for_fragment {
+        for _ in 0..config.num_workers_for_remote_fragments {
             let (batch_coordinator_cmd_tx, batch_coordinator_cmd_rx) =
                 tokio::sync::mpsc::channel(config.channel_size);
             remote_batch_coordinator_cmd_tx.push(batch_coordinator_cmd_tx);
@@ -373,11 +372,8 @@ impl InnerBuilder {
         .unwrap();
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
-        let proof_manager = ProofManager::new(
-            self.epoch,
-            self.config.back_pressure_factor * self.verifier.len(),
-            self.config.back_pressure_local_batch_num,
-        );
+        let proof_manager =
+            ProofManager::new(self.epoch, self.config.back_pressure_local_batch_num);
         spawn_named!(
             "proof_manager",
             proof_manager.start(

@@ -65,8 +65,7 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
                         .with_label_values(&["success"])
                         .inc();
                 },
-                TransactionStatus::Discard(status) => {
-                    debug!("QS: discard status {:?}", status);
+                TransactionStatus::Discard(_) => {
                     counters::COMMITTED_TXNS_COUNT
                         .with_label_values(&["failed"])
                         .inc();
@@ -124,10 +123,6 @@ impl BlockStore {
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
-        debug!(
-            "QS: number of block in storage in a new epoch {}",
-            blocks.len()
-        );
         let block_store = block_on(Self::build(
             root,
             root_metadata,

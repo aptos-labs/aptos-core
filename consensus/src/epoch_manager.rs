@@ -43,7 +43,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{ConsensusConfig, NodeConfig, QuorumStoreConfig};
+use aptos_config::config::{ConsensusConfig, NodeConfig};
 use aptos_consensus_types::{
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
@@ -123,9 +123,6 @@ pub struct EpochManager {
     block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
     quorum_store_storage_path: PathBuf,
-    // number of network_listener workers to handle QS Fragment messages, should be >= 1
-    // the total number of network workers is num_network_workers_for_fragment+2
-    num_network_workers_for_fragment: usize,
     quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     quorum_store_coordinator_tx: Option<Sender<CoordinatorCommand>>,
 }
@@ -167,7 +164,6 @@ impl EpochManager {
             epoch_state: None,
             block_retrieval_tx: None,
             quorum_store_storage_path: node_config.storage.dir(),
-            num_network_workers_for_fragment: 2,
             quorum_store_msg_tx: None,
             quorum_store_coordinator_tx: None,
         }
@@ -628,19 +624,12 @@ impl EpochManager {
         // Start QuorumStore
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
-        // TODO: connect
-        // let (commit_tx, commit_rx) = mpsc::channel(self.config.intra_consensus_channel_buffer_size);
-
-        // TODO: grab config.
-        // TODO: think about these numbers
-        // LANDING QS TODO: move to config file
-        let config = QuorumStoreConfig::default();
 
         let mut quorum_store_builder = if self.quorum_store_enabled {
             QuorumStoreBuilder::InQuorumStore(InnerBuilder::new(
                 self.epoch(),
                 self.author,
-                config,
+                self.config.quorum_store_configs.clone(),
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
@@ -649,7 +638,6 @@ impl EpochManager {
                 epoch_state.verifier.clone(),
                 self.config.safety_rules.backend.clone(),
                 self.quorum_store_storage_path.clone(),
-                self.num_network_workers_for_fragment,
             ))
         } else {
             QuorumStoreBuilder::DirectMempool(DirectMempoolInnerBuilder::new(

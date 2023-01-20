@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::block_info::Round;
+use serde::{Deserialize, Serialize};
 
 // TODO: change to appropriately signed integers.
-#[derive(Clone)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct QuorumStoreConfig {
     pub channel_size: usize,
     pub proof_timeout_ms: usize,
@@ -30,9 +32,8 @@ pub struct QuorumStoreConfig {
     pub mempool_txn_pull_max_bytes: u64,
     // the number of network_listener workers = # validators/this number
     pub num_nodes_per_worker_handles: usize,
-    // when the remaining certified batches in the quorum store is > back_pressure_factor * num of validators, backpressure quorum store
-    pub back_pressure_factor: usize,
     pub back_pressure_local_batch_num: usize,
+    pub num_workers_for_remote_fragments: usize,
 }
 
 impl Default for QuorumStoreConfig {
@@ -55,8 +56,10 @@ impl Default for QuorumStoreConfig {
             mempool_txn_pull_max_count: 300,
             mempool_txn_pull_max_bytes: 1000000,
             num_nodes_per_worker_handles: 10,
-            back_pressure_factor: 1, // back pressure limit for QS is back_pressure_factor * num_validator
-            back_pressure_local_batch_num: 10, // QS will be backpressured if the remaining local batches is more than this number
+            // QS will be backpressured if the remaining local batches is more than this number
+            back_pressure_local_batch_num: 10,
+            // number of batch coordinators to handle QS Fragment messages, should be >= 1
+            num_workers_for_remote_fragments: 2,
         }
     }
 }

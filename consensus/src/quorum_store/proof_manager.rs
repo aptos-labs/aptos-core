@@ -27,24 +27,16 @@ pub enum ProofManagerCommand {
 pub struct ProofManager {
     proofs_for_consensus: ProofQueue,
     latest_logical_time: LogicalTime,
-    back_pressure_limit: usize,
     back_pressure_local_batch_limit: usize,
-    remaining_proof_num: usize,
     remaining_local_proof_num: usize,
 }
 
 impl ProofManager {
-    pub fn new(
-        epoch: u64,
-        back_pressure_limit: usize,
-        back_pressure_local_batch_limit: usize,
-    ) -> Self {
+    pub fn new(epoch: u64, back_pressure_local_batch_limit: usize) -> Self {
         Self {
             proofs_for_consensus: ProofQueue::new(),
             latest_logical_time: LogicalTime::new(epoch, 0),
-            back_pressure_limit,
             back_pressure_local_batch_limit,
-            remaining_proof_num: 0,
             remaining_local_proof_num: 0,
         }
     }
