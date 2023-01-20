@@ -147,7 +147,6 @@ impl ProofManager {
                     }
                 },
                 Some(msg) = proof_rx.recv() => {
-                    // TODO: why not update back_pressure stats on each message
                     match msg {
                         ProofManagerCommand::Shutdown(ack_tx) => {
                             ack_tx
@@ -164,7 +163,7 @@ impl ProofManager {
                         ProofManagerCommand::CommitNotification(logical_time, digests) => {
                             self.handle_commit_notification(logical_time, digests);
 
-                            // update the backpressure upon new commmit round
+                            // update the backpressure upon new commit round
                             self.remaining_local_proof_num = self.proofs_for_consensus.clean_local_proofs(logical_time);
                             let updated_back_pressure = self.qs_back_pressure();
                             if updated_back_pressure != back_pressure {

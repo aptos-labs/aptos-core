@@ -196,21 +196,12 @@ impl BatchCoordinator {
                     self.epoch
                 );
             }
-        } else {
-            debug!("QS: fragment no expiration");
-            // debug!(
-            //     "QS: got append_batch message from {:?} batch_id {}, fragment_id {}",
-            //     source,
-            //     fragment.fragment_info.batch_id(),
-            //     fragment.fragment_info.fragment_id()
-            // );
-            if let Err(e) = entry.append_transactions(
-                fragment.batch_id(),
-                fragment.fragment_id(),
-                fragment.into_transactions(),
-            ) {
-                debug!("Could not append batch from {:?}, error {:?}", source, e);
-            }
+        } else if let Err(e) = entry.append_transactions(
+            fragment.batch_id(),
+            fragment.fragment_id(),
+            fragment.into_transactions(),
+        ) {
+            debug!("Could not append batch from {:?}, error {:?}", source, e);
         }
     }
 
@@ -218,7 +209,6 @@ impl BatchCoordinator {
         while let Some(command) = self.command_rx.recv().await {
             match command {
                 BatchCoordinatorCommand::Shutdown(ack_tx) => {
-                    // TODO: make sure this works
                     ack_tx
                         .send(())
                         .expect("Failed to send shutdown ack to QuorumStoreCoordinator");

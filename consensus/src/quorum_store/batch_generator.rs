@@ -52,8 +52,10 @@ pub struct BatchGenerator {
     batch_expiry_round_gap_when_init: Round,
     end_batch_ms: u128,
     last_end_batch_time: Instant,
-    block_store: Arc<dyn BlockReader + Send + Sync>, // for consensus back pressure
-    qs_back_pressure: bool, // quorum store back pressure, get updated from proof manager when pulling for consensus
+    // for consensus back pressure
+    block_store: Arc<dyn BlockReader + Send + Sync>,
+    // quorum store back pressure, get updated from proof manager
+    qs_back_pressure: bool,
 }
 
 impl BatchGenerator {
