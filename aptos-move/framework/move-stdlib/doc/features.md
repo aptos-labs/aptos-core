@@ -23,10 +23,10 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `multi_ed25519_pk_validate_v2_enabled`](#0x1_features_multi_ed25519_pk_validate_v2_enabled)
 -  [Function `get_blake2b_256_feature`](#0x1_features_get_blake2b_256_feature)
 -  [Function `blake2b_256_enabled`](#0x1_features_blake2b_256_enabled)
--  [Function `get_generic_groups_feature`](#0x1_features_get_generic_groups_feature)
--  [Function `generic_groups_enabled`](#0x1_features_generic_groups_enabled)
--  [Function `get_groth16_feature`](#0x1_features_get_groth16_feature)
--  [Function `groth16_enabled`](#0x1_features_groth16_enabled)
+-  [Function `get_generic_group_basic_operations_feature`](#0x1_features_get_generic_group_basic_operations_feature)
+-  [Function `generic_group_basic_operations_enabled`](#0x1_features_generic_group_basic_operations_enabled)
+-  [Function `get_bls12_381_groups_feature`](#0x1_features_get_bls12_381_groups_feature)
+-  [Function `bls12_381_groups_enabled`](#0x1_features_bls12_381_groups_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -102,6 +102,15 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_BLS12_381_GROUPS"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_BLS12_381_GROUPS">BLS12_381_GROUPS</a>: u64 = 10;
+</code></pre>
+
+
+
 <a name="0x1_features_CODE_DEPENDENCY_CHECK"></a>
 
 Whether validation of package dependencies is enabled, and the related native function is
@@ -135,20 +144,11 @@ The provided signer has not a framework address.
 
 
 
-<a name="0x1_features_GENERIC_GROUPS"></a>
+<a name="0x1_features_GENERIC_GROUP_BASIC_OPERATIONS"></a>
 
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_GENERIC_GROUPS">GENERIC_GROUPS</a>: u64 = 9;
-</code></pre>
-
-
-
-<a name="0x1_features_GROTH16"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_GROTH16">GROTH16</a>: u64 = 10;
+<pre><code><b>const</b> <a href="features.md#0x1_features_GENERIC_GROUP_BASIC_OPERATIONS">GENERIC_GROUP_BASIC_OPERATIONS</a>: u64 = 9;
 </code></pre>
 
 
@@ -524,13 +524,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_generic_groups_feature"></a>
+<a name="0x1_features_get_generic_group_basic_operations_feature"></a>
 
-## Function `get_generic_groups_feature`
+## Function `get_generic_group_basic_operations_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_groups_feature">get_generic_groups_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_group_basic_operations_feature">get_generic_group_basic_operations_feature</a>(): u64
 </code></pre>
 
 
@@ -539,20 +539,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_groups_feature">get_generic_groups_feature</a>(): u64 { <a href="features.md#0x1_features_GENERIC_GROUPS">GENERIC_GROUPS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_group_basic_operations_feature">get_generic_group_basic_operations_feature</a>(): u64 { <a href="features.md#0x1_features_GENERIC_GROUP_BASIC_OPERATIONS">GENERIC_GROUP_BASIC_OPERATIONS</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_generic_groups_enabled"></a>
+<a name="0x1_features_generic_group_basic_operations_enabled"></a>
 
-## Function `generic_groups_enabled`
+## Function `generic_group_basic_operations_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_groups_enabled">generic_groups_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_group_basic_operations_enabled">generic_group_basic_operations_enabled</a>(): bool
 </code></pre>
 
 
@@ -561,8 +561,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_groups_enabled">generic_groups_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GENERIC_GROUPS">GENERIC_GROUPS</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_group_basic_operations_enabled">generic_group_basic_operations_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GENERIC_GROUP_BASIC_OPERATIONS">GENERIC_GROUP_BASIC_OPERATIONS</a>)
 }
 </code></pre>
 
@@ -570,13 +570,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_groth16_feature"></a>
+<a name="0x1_features_get_bls12_381_groups_feature"></a>
 
-## Function `get_groth16_feature`
+## Function `get_bls12_381_groups_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_groth16_feature">get_groth16_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12_381_groups_feature">get_bls12_381_groups_feature</a>(): u64
 </code></pre>
 
 
@@ -585,20 +585,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_groth16_feature">get_groth16_feature</a>(): u64 { <a href="features.md#0x1_features_GROTH16">GROTH16</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12_381_groups_feature">get_bls12_381_groups_feature</a>(): u64 { <a href="features.md#0x1_features_BLS12_381_GROUPS">BLS12_381_GROUPS</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_groth16_enabled"></a>
+<a name="0x1_features_bls12_381_groups_enabled"></a>
 
-## Function `groth16_enabled`
+## Function `bls12_381_groups_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_groth16_enabled">groth16_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_groups_enabled">bls12_381_groups_enabled</a>(): bool
 </code></pre>
 
 
@@ -607,8 +607,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_groth16_enabled">groth16_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GROTH16">GROTH16</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_groups_enabled">bls12_381_groups_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLS12_381_GROUPS">BLS12_381_GROUPS</a>)
 }
 </code></pre>
 

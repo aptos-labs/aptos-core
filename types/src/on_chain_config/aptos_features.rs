@@ -11,6 +11,8 @@ pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
     TREAT_FRIEND_AS_PRIVATE = 2,
     VM_BINARY_FORMAT_V6 = 5,
+    GENERIC_GROUP_BASIC_OPERATIONS = 9,
+    BLS12_381_GROUPS = 10,
 }
 
 /// Representation of features on chain as a bitset.
@@ -39,6 +41,16 @@ impl Features {
         let byte_index = (val / 8) as usize;
         let bit_mask = 1 << (val % 8);
         byte_index < self.features.len() && (self.features[byte_index] & bit_mask != 0)
+    }
+
+    pub fn enable(&mut self, flag: FeatureFlag) {
+        let bit_id = flag as usize;
+        let byte_id = bit_id / 8;
+        if self.features.len() < byte_id + 1 {
+            self.features.resize(byte_id + 1, 0);
+        }
+        self.features[byte_id] |= 1 << (bit_id % 8);
+
     }
 }
 

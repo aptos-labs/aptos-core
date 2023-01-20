@@ -115,7 +115,6 @@ module aptos_std::groups {
 
     /// Perform a pairing.
     public fun pairing<G1,G2,Gt>(element_1: &Element<G1>, element_2: &Element<G2>): Element<Gt> {
-        abort_if_feature_disabled();
         Element<Gt> {
             handle: pairing_product_internal<G1,G2,Gt>(vector[element_1.handle], vector[element_2.handle])
         }
@@ -123,7 +122,6 @@ module aptos_std::groups {
 
     /// Compute the product of multiple pairing.
     public fun pairing_product<G1, G2, Gt>(g1_elements: &vector<Element<G1>>, g2_elements: &vector<Element<G2>>): Element<Gt> {
-        abort_if_feature_disabled();
         let num_g1 = std::vector::length(g1_elements);
         let num_g2 = std::vector::length(g2_elements);
         assert!(num_g1 == num_g2, std::error::invalid_argument(1));
@@ -143,7 +141,6 @@ module aptos_std::groups {
 
     /// Convert a u64 to a scalar.
     public fun scalar_from_u64<S>(value: u64): Scalar<S> {
-        abort_if_feature_disabled();
         Scalar<S> {
             handle: scalar_from_u64_internal<S>(value)
         }
@@ -151,7 +148,6 @@ module aptos_std::groups {
 
     /// Compute `-x` for scalar `x`.
     public fun scalar_neg<S>(x: &Scalar<S>): Scalar<S> {
-        abort_if_feature_disabled();
         Scalar<S> {
             handle: scalar_neg_internal<S>(x.handle)
         }
@@ -159,7 +155,6 @@ module aptos_std::groups {
 
     /// Compute `x + y` for scalar `x` and `y`.
     public fun scalar_add<S>(x: &Scalar<S>, y: &Scalar<S>): Scalar<S> {
-        abort_if_feature_disabled();
         Scalar<S> {
             handle: scalar_add_internal<S>(x.handle, y.handle)
         }
@@ -167,7 +162,6 @@ module aptos_std::groups {
 
     /// Compute `x * y` for scalar `x` and `y`.
     public fun scalar_mul<S>(x: &Scalar<S>, y: &Scalar<S>): Scalar<S> {
-        abort_if_feature_disabled();
         Scalar<S> {
             handle: scalar_mul_internal<S>(x.handle, y.handle)
         }
@@ -175,7 +169,6 @@ module aptos_std::groups {
 
     /// Compute `x^(-1)` for scalar `x`, if defined.
     public fun scalar_inv<S>(x: &Scalar<S>): Option<Scalar<S>> {
-        abort_if_feature_disabled();
         let (succeeded, handle) = scalar_inv_internal<S>(x.handle);
         if (succeeded) {
             let scalar = Scalar<S> { handle };
@@ -187,13 +180,11 @@ module aptos_std::groups {
 
     /// Check if `x == y` for scalar `x` and `y`.
     public fun scalar_eq<S>(x: &Scalar<S>, y: &Scalar<S>): bool {
-        abort_if_feature_disabled();
         scalar_eq_internal<S>(x.handle, y.handle)
     }
 
     /// Get the identity of group `G`.
     public fun group_identity<G>(): Element<G> {
-        abort_if_feature_disabled();
         Element<G> {
             handle: group_identity_internal<G>()
         }
@@ -201,7 +192,6 @@ module aptos_std::groups {
 
     /// Get the generator of group `G`.
     public fun group_generator<G>(): Element<G> {
-        abort_if_feature_disabled();
         Element<G> {
             handle: group_generator_internal<G>()
         }
@@ -209,7 +199,6 @@ module aptos_std::groups {
 
     /// Compute `-P` for group element `P`.
     public fun element_neg<G>(element_p: &Element<G>): Element<G> {
-        abort_if_feature_disabled();
         Element<G> {
             handle: element_neg_internal<G>(element_p.handle)
         }
@@ -217,7 +206,6 @@ module aptos_std::groups {
 
     /// Compute `P + Q` for group element `P` and `Q`.
     public fun element_add<G>(element_p: &Element<G>, element_q: &Element<G>): Element<G> {
-        abort_if_feature_disabled();
         Element<G> {
             handle: element_add_internal<G>(element_p.handle, element_q.handle)
         }
@@ -225,7 +213,6 @@ module aptos_std::groups {
 
     /// Compute `2P` for group element `P`.
     public fun element_double<G>(element_p: &Element<G>): Element<G> {
-        abort_if_feature_disabled();
         Element<G> {
             handle: element_double_internal<G>(element_p.handle)
         }
@@ -233,7 +220,6 @@ module aptos_std::groups {
 
     /// Compute `k*P` for scalar `k` and group element `P`.
     public fun element_scalar_mul<G, S>(scalar_k: &Scalar<S>, element_p: &Element<G>): Element<G> {
-        abort_if_feature_disabled();
         Element<G> {
             handle: element_mul_internal<G, S>(scalar_k.handle, element_p.handle)
         }
@@ -241,7 +227,6 @@ module aptos_std::groups {
 
     /// Hash bytes to a group element.
     public fun hash_to_element<H, G>(bytes: vector<u8>): Element<G> {
-        abort_if_feature_disabled();
         Element<G> {
             handle: hash_to_element_internal<H, G>(bytes)
         }
@@ -249,8 +234,6 @@ module aptos_std::groups {
 
     /// Compute `k[0]*P[0]+...+k[n-1]*P[n-1]` for a list of scalars `k[]` and a list of group elements `P[]`, both of size `n`.
     public fun element_multi_scalar_mul<G, S>(scalars: &vector<Scalar<S>>, elements: &vector<Element<G>>): Element<G> {
-        abort_if_feature_disabled();
-
         let num_scalars = std::vector::length(scalars);
         let scalar_handles = vector[];
         let i = 0;
@@ -275,7 +258,6 @@ module aptos_std::groups {
 
     /// Scalar deserialization.
     public fun deserialize_scalar<S>(bytes: &vector<u8>): Option<Scalar<S>> {
-        abort_if_feature_disabled();
         let (succeeded, handle) = deserialize_scalar_internal<S>(*bytes);
         if (succeeded) {
             let scalar = Scalar<S> {
@@ -289,25 +271,21 @@ module aptos_std::groups {
 
     /// Scalar serialization.
     public fun serialize_scalar<S>(scalar: &Scalar<S>): vector<u8> {
-        abort_if_feature_disabled();
         serialize_scalar_internal<S>(scalar.handle)
     }
 
     /// Group element serialization with an uncompressed format.
     public fun serialize_element_uncompressed<G>(element: &Element<G>): vector<u8> {
-        abort_if_feature_disabled();
         serialize_element_uncompressed_internal<G>(element.handle)
     }
 
     /// Group element serialization with a compressed format.
     public fun serialize_element_compressed<G>(element: &Element<G>): vector<u8> {
-        abort_if_feature_disabled();
         serialize_element_compressed_internal<G>(element.handle)
     }
 
     /// Group element deserialization with an uncompressed format.
     public fun deserialize_element_uncompressed<G>(bytes: vector<u8>): Option<Element<G>> {
-        abort_if_feature_disabled();
         let (succ, handle) = deserialize_element_uncompressed_internal<G>(bytes);
         if (succ) {
             std::option::some(Element<G> { handle })
@@ -318,7 +296,6 @@ module aptos_std::groups {
 
     /// Group element deserialization with a compressed format.
     public fun deserialize_element_compressed<G>(bytes: vector<u8>): Option<Element<G>> {
-        abort_if_feature_disabled();
         let (succ, handle) = deserialize_element_compressed_internal<G>(bytes);
         if (succ) {
             std::option::some(Element<G> { handle })
@@ -329,26 +306,22 @@ module aptos_std::groups {
 
     /// Check if `P == Q` for group elements `P` and `Q`.
     public fun element_eq<G>(element_p: &Element<G>, element_q: &Element<G>): bool {
-        abort_if_feature_disabled();
         element_eq_internal<G>(element_p.handle, element_q.handle)
     }
 
     /// Check if group `G` has a prime order.
     public fun is_prime_order<G>(): bool {
-        abort_if_feature_disabled();
         is_prime_order_internal<G>()
     }
 
     /// Get the order of group `G`, little-endian encoded as a byte string.
     public fun group_order<G>(): vector<u8> {
-        abort_if_feature_disabled();
         group_order_internal<G>()
     }
 
     #[test_only]
     /// Generate a random group element.
     public fun random_element<G>(): Element<G> {
-        abort_if_feature_disabled();
         Element<G> {
             handle: random_element_internal<G>()
         }
@@ -357,16 +330,9 @@ module aptos_std::groups {
     #[test_only]
     /// Generate a random scalar.
     public fun random_scalar<S>(): Scalar<S> {
-        abort_if_feature_disabled();
         Scalar<S> {
             handle: random_scalar_internal<S>()
         }
-    }
-
-    fun abort_if_feature_disabled() {
-        if (!std::features::generic_groups_enabled()) {
-            abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-        };
     }
 
     // Native functions.
@@ -400,9 +366,8 @@ module aptos_std::groups {
     #[test_only]
     native fun random_scalar_internal<G>(): u64;
 
-    #[test(fx = @std)]
-    fun test_bls12_381_g1(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
+    #[test]
+    fun test_bls12_381_g1() {
         // Group info.
         assert!(is_prime_order<BLS12_381_G1>(), 1);
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_G1>(), 1);
@@ -493,9 +458,8 @@ module aptos_std::groups {
         assert!(element_eq(&group_identity<BLS12_381_G1>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(0), &point)), 1);
     }
 
-    #[test(fx = @std)]
-    fun test_bls12_381_g2(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
+    #[test]
+    fun test_bls12_381_g2() {
         // Group info.
         assert!(is_prime_order<BLS12_381_G2>(), 1);
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_G2>(), 1);
@@ -586,9 +550,8 @@ module aptos_std::groups {
         assert!(element_eq(&group_identity<BLS12_381_G2>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(0), &point)), 1);
     }
 
-    #[test(fx = @std)]
-    fun test_bls12_381_gt(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
+    #[test]
+    fun test_bls12_381_gt() {
         // Group info.
         assert!(is_prime_order<BLS12_381_Gt>(), 1);
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_Gt>(), 1);
@@ -676,9 +639,8 @@ module aptos_std::groups {
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
     }
 
-    #[test(fx = @std)]
-    fun test_bls12381_pairing(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
+    #[test]
+    fun test_bls12381_pairing() {
         // Single pairing.
         let gt_point_1 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
             &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(5), &group_generator<BLS12_381_G1>()),
@@ -721,17 +683,15 @@ module aptos_std::groups {
     #[test_only]
     struct UnknownGroup {}
 
-    #[test(fx = @std)]
+    #[test]
     #[expected_failure(abort_code = E_UNKNOWN_GROUP, location = Self)]
-    fun test_unknown_group(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
+    fun test_unknown_group() {
         let _ = group_order<UnknownGroup>();
     }
 
-    #[test(fx = @std)]
+    #[test]
     #[expected_failure(abort_code = E_UNKNOWN_PAIRING, location = Self)]
-    fun test_unknown_pairing(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature()], vector[]);
+    fun test_unknown_pairing() {
         // Attempt an invalid pairing: (G2, G1) -> Gt
         pairing<BLS12_381_G2, BLS12_381_G1, BLS12_381_Gt>(
             &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(7), &group_generator<BLS12_381_G2>()),

@@ -562,6 +562,7 @@ impl FakeExecutor {
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
                 self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
                 self.chain_id,
+                self.features.clone()
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -613,6 +614,7 @@ impl FakeExecutor {
                 .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             self.chain_id,
+            self.features.clone(),
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);

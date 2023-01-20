@@ -111,16 +111,16 @@ module std::features {
         is_enabled(BLAKE2B_256_NATIVE)
     }
 
-    const GENERIC_GROUPS: u64 = 9;
-    public fun get_generic_groups_feature(): u64 { GENERIC_GROUPS }
-    public fun generic_groups_enabled(): bool acquires Features {
-        is_enabled(GENERIC_GROUPS)
+    const GENERIC_GROUP_BASIC_OPERATIONS: u64 = 9;
+    public fun get_generic_group_basic_operations_feature(): u64 { GENERIC_GROUP_BASIC_OPERATIONS }
+    public fun generic_group_basic_operations_enabled(): bool acquires Features {
+        is_enabled(GENERIC_GROUP_BASIC_OPERATIONS)
     }
 
-    const GROTH16: u64 = 10;
-    public fun get_groth16_feature(): u64 { GROTH16 }
-    public fun groth16_enabled(): bool acquires Features {
-        is_enabled(GROTH16)
+    const BLS12_381_GROUPS: u64 = 10;
+    public fun get_bls12_381_groups_feature(): u64 { BLS12_381_GROUPS }
+    public fun bls12_381_groups_enabled(): bool acquires Features {
+        is_enabled(BLS12_381_GROUPS)
     }
 
     // ============================================================================================

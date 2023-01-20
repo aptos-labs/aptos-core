@@ -11,7 +11,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
 use better_any::{Tid, TidAble};
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::loaded_data::runtime_types::Type;
@@ -22,13 +22,15 @@ use num_traits::{One, Zero};
 use once_cell::sync::Lazy;
 use sha2::{Digest, Sha256};
 use smallvec::smallvec;
-use crate::natives::cryptography::groups::abort_codes::E_UNKNOWN_GROUP;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
+use crate::natives::cryptography::groups::abort_codes::NOT_IMPLEMENTED;
+use crate::natives::cryptography::groups::API::SerializeElementCompressed;
 use crate::natives::util::make_native_from_func;
 #[cfg(feature = "testing")]
 use crate::natives::util::make_test_only_native_from_func;
 
 pub mod abort_codes {
-    pub const E_UNKNOWN_GROUP: u64 = 2;
+    pub const NOT_IMPLEMENTED: u64 = 2;
     pub const E_UNKNOWN_PAIRING: u64 = 3;
     pub const NUM_ELEMENTS_SHOULD_MATCH_NUM_SCALARS: u64 = 4;
 }
@@ -142,6 +144,7 @@ pub struct GasParameters {
 
 #[derive(Tid)]
 pub struct Bls12381Context {
+    features: Features,
     fr_store: Vec<Fr>,
     g1_point_store: Vec<G1Projective>,
     g2_point_store: Vec<G2Projective>,
@@ -149,13 +152,18 @@ pub struct Bls12381Context {
 }
 
 impl Bls12381Context {
-    pub fn new() -> Self {
+    pub fn new(features: Features) -> Self {
         Self {
             fr_store: vec![],
             g1_point_store: vec![],
             g2_point_store: vec![],
             gt_point_store: vec![],
+            features,
         }
+    }
+
+    pub fn is_feature_enabled(&self, flag: FeatureFlag) -> bool {
+        self.features.is_enabled(flag)
     }
 
     pub fn add_scalar(&mut self, scalar: Fr) -> usize {
@@ -205,17 +213,19 @@ fn serialize_element_uncompressed_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
+    if !context.extensions().get::<Bls12381Context>().is_feature_enabled(FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS) {
+        return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
+    }
     assert_eq!(1, ty_args.len());
     let type_tag = context
-        .type_to_type_tag(ty_args.get(0).unwrap())?
-        .to_string();
+    .type_to_type_tag(ty_args.get(0).unwrap())?
+    .to_string();
     let handle = pop_arg!(args, u64) as usize;
+
     match type_tag.as_str() {
         "0x1::groups::BLS12_381_G1" => {
             let mut buf = vec![];
-            context
-                .extensions()
-                .get::<Bls12381Context>()
+            context.extensions().get::<Bls12381Context>()
                 .get_g1_point(handle)
                 .into_affine()
                 .serialize_uncompressed(&mut buf)
@@ -227,9 +237,7 @@ fn serialize_element_uncompressed_internal(
         }
         "0x1::groups::BLS12_381_G2" => {
             let mut buf = vec![];
-            context
-                .extensions()
-                .get::<Bls12381Context>()
+            context.extensions().get::<Bls12381Context>()
                 .get_g2_point(handle)
                 .into_affine()
                 .serialize_uncompressed(&mut buf)
@@ -241,9 +249,7 @@ fn serialize_element_uncompressed_internal(
         }
         "0x1::groups::BLS12_381_Gt" => {
             let mut buf = vec![];
-            context
-                .extensions()
-                .get::<Bls12381Context>()
+            context.extensions().get::<Bls12381Context>()
                 .get_gt_point(handle)
                 .serialize_uncompressed(&mut buf)
                 .unwrap();
@@ -253,7 +259,7 @@ fn serialize_element_uncompressed_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -264,6 +270,9 @@ fn serialize_element_compressed_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
+    if context.extensions().get::<Bls12381Context>().features.is_enabled(FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS) {
+        return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
+    }
     assert_eq!(1, ty_args.len());
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
@@ -312,7 +321,7 @@ fn serialize_element_compressed_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -323,6 +332,9 @@ fn deserialize_element_uncompressed_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
+    if !context.extensions().get::<Bls12381Context>().features.is_enabled(FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS) {
+        return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
+    }
     assert_eq!(1, ty_args.len());
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
@@ -409,7 +421,7 @@ fn deserialize_element_uncompressed_internal(
             }
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -420,6 +432,10 @@ fn deserialize_element_compressed_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
+    if !context.extensions().get::<Bls12381Context>().features.is_enabled(FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS) {
+        return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
+    }
+
     assert_eq!(1, ty_args.len());
     let type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
@@ -505,7 +521,7 @@ fn deserialize_element_compressed_internal(
             }
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -544,7 +560,7 @@ fn deserialize_scalar_internal(
             }
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -574,7 +590,7 @@ fn serialize_scalar_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -602,7 +618,7 @@ fn scalar_from_u64_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -640,7 +656,7 @@ fn scalar_add_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -678,7 +694,7 @@ fn scalar_mul_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -711,7 +727,7 @@ fn scalar_neg_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -755,7 +771,7 @@ fn scalar_inv_internal(
             }
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -790,7 +806,7 @@ fn scalar_eq_internal(
         _ => {
             Ok(NativeResult::err(
                 gas_params.bls12_381.fr_eq,
-                E_UNKNOWN_GROUP,
+                NOT_IMPLEMENTED,
             ))
         }
     }
@@ -843,7 +859,7 @@ fn group_identity_internal(
         _ => {
             Ok(NativeResult::err(
                 InternalGas::zero(),
-                E_UNKNOWN_GROUP,
+                NOT_IMPLEMENTED,
             ))
         }
     }
@@ -905,7 +921,7 @@ fn group_generator_internal(
         _ => {
             Ok(NativeResult::err(
                 InternalGas::zero(),
-                E_UNKNOWN_GROUP,
+                NOT_IMPLEMENTED,
             ))
         }
     }
@@ -931,7 +947,7 @@ fn group_order_internal(
         _ => {
             Ok(NativeResult::err(
                 InternalGas::zero(),
-                E_UNKNOWN_GROUP,
+                NOT_IMPLEMENTED,
             ))
         }
     }
@@ -955,7 +971,7 @@ fn is_prime_order_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -985,7 +1001,7 @@ fn random_scalar_internal(
         _ => {
             Ok(NativeResult::err(
                 InternalGas::zero(),
-                E_UNKNOWN_GROUP,
+                NOT_IMPLEMENTED,
             ))
         }
     }
@@ -1039,7 +1055,7 @@ fn random_element_internal(
         _ => {
             Ok(NativeResult::err(
                 InternalGas::zero(),
-                E_UNKNOWN_GROUP,
+                NOT_IMPLEMENTED,
             ))
         }
     }
@@ -1101,7 +1117,7 @@ fn element_eq_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -1177,7 +1193,7 @@ fn element_add_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -1256,7 +1272,7 @@ fn element_mul_scalar_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -1559,7 +1575,7 @@ fn element_multi_scalar_mul_internal(
                 ))
             }
             _ => {
-                Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+                Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
             }
         }
     } else {
@@ -1631,7 +1647,7 @@ fn element_double_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -1694,7 +1710,7 @@ fn element_neg_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -1848,7 +1864,78 @@ fn hash_to_element_internal(
             ))
         }
         _ => {
-            Ok(NativeResult::err(InternalGas::zero(), E_UNKNOWN_GROUP))
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        }
+    }
+}
+
+fn uber(
+    api_name: API,
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    if !context.extensions().get::<Bls12381Context>().is_feature_enabled(FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS) {
+        return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
+    }
+
+    match api_name {
+        SerializeElementCompressed => {
+            assert_eq!(1, ty_args.len());
+            let type_tag = context
+                .type_to_type_tag(ty_args.get(0).unwrap())?
+                .to_string();
+            let handle = pop_arg!(args, u64) as usize;
+            match type_tag.as_str() {
+                "0x1::groups::BLS12_381_G1" => {
+                    let mut buf = vec![];
+                    context
+                        .extensions()
+                        .get::<Bls12381Context>()
+                        .get_g1_point(handle)
+                        .into_affine()
+                        .serialize(&mut buf)
+                        .unwrap();
+                    Ok(NativeResult::ok(
+                        gas_params.bls12_381.g1_proj_to_affine + gas_params.bls12_381.g1_affine_serialize_compressed,
+                        smallvec![Value::vector_u8(buf)],
+                    ))
+                }
+                "0x1::groups::BLS12_381_G2" => {
+                    let mut buf = vec![];
+                    context
+                        .extensions()
+                        .get::<Bls12381Context>()
+                        .get_g2_point(handle)
+                        .into_affine()
+                        .serialize(&mut buf)
+                        .unwrap();
+                    Ok(NativeResult::ok(
+                        gas_params.bls12_381.g2_proj_to_affine + gas_params.bls12_381.g2_affine_serialize_compressed,
+                        smallvec![Value::vector_u8(buf)],
+                    ))
+                }
+                "0x1::groups::BLS12_381_Gt" => {
+                    let mut buf = vec![];
+                    context
+                        .extensions()
+                        .get::<Bls12381Context>()
+                        .get_gt_point(handle)
+                        .serialize(&mut buf)
+                        .unwrap();
+                    Ok(NativeResult::ok(
+                        gas_params.bls12_381.fq12_serialize,
+                        smallvec![Value::vector_u8(buf)],
+                    ))
+                }
+                _ => {
+                    Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+                }
+            }
+        }
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
 }
@@ -1864,7 +1951,7 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         ),
         (
             "serialize_element_compressed_internal",
-            make_native_from_func(gas_params.clone(), serialize_element_compressed_internal),
+            make_native_from_func(gas_params.clone(), |x,y,z,w| uber(SerializeElementCompressed, x,y,z,w)),
         ),
         (
             "deserialize_element_uncompressed_internal",
@@ -1973,4 +2060,8 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     ]);
 
     crate::natives::helpers::make_module_natives(natives)
+}
+
+enum API {
+    SerializeElementCompressed
 }

@@ -32,7 +32,6 @@ module aptos_std::groth16 {
 
     /// Create a new Groth16 verifying key.
     public fun new_vk<G1,G2,Gt>(alpha_g1: groups::Element<G1>, beta_g2: groups::Element<G2>, gamma_g2: groups::Element<G2>, delta_g2: groups::Element<G2>, gamma_abc_g1: vector<groups::Element<G1>>): VerifyingKey<G1,G2,Gt> {
-        abort_if_feature_disabled();
         VerifyingKey {
             alpha_g1,
             beta_g2,
@@ -44,7 +43,6 @@ module aptos_std::groth16 {
 
     /// Create a new pre-processed Groth16 verifying key.
     public fun new_pvk<G1,G2,Gt>(alpha_g1_beta_g2: groups::Element<Gt>, gamma_g2_neg: groups::Element<G2>, delta_g2_neg: groups::Element<G2>, gamma_abc_g1: vector<groups::Element<G1>>): PreparedVerifyingKey<G1,G2,Gt> {
-        abort_if_feature_disabled();
         PreparedVerifyingKey {
             alpha_g1_beta_g2,
             gamma_g2_neg,
@@ -55,7 +53,6 @@ module aptos_std::groth16 {
 
     /// Pre-process a Groth16 verification key `vk` for faster verification.
     public fun prepare_verifying_key<G1,G2,Gt>(vk: &VerifyingKey<G1,G2,Gt>): PreparedVerifyingKey<G1,G2,Gt> {
-        abort_if_feature_disabled();
         PreparedVerifyingKey {
             alpha_g1_beta_g2: groups::pairing<G1,G2,Gt>(&vk.alpha_g1, &vk.beta_g2),
             gamma_g2_neg: groups::element_neg(&vk.gamma_g2),
@@ -66,13 +63,11 @@ module aptos_std::groth16 {
 
     /// Create a Groth16 proof.
     public fun new_proof<G1,G2,Gt>(a: groups::Element<G1>, b: groups::Element<G2>, c: groups::Element<G1>): Proof<G1,G2,Gt> {
-        abort_if_feature_disabled();
         Proof { a, b, c }
     }
 
     /// Verify a Groth16 proof.
     public fun verify_proof<G1,G2,Gt,S>(vk: &VerifyingKey<G1,G2,Gt>, public_inputs: &vector<groups::Scalar<S>>, proof: &Proof<G1,G2,Gt>): bool {
-        abort_if_feature_disabled();
         let left = groups::pairing<G1,G2,Gt>(&proof.a, &proof.b);
         let right_1 = groups::pairing<G1,G2,Gt>(&vk.alpha_g1, &vk.beta_g2);
 
@@ -94,7 +89,6 @@ module aptos_std::groth16 {
 
     /// Verify a Groth16 proof `proof` against the public inputs `public_inputs` with a prepared verification key `pvk`.
     public fun verify_proof_with_pvk<G1,G2,Gt,S>(pvk: &PreparedVerifyingKey<G1,G2,Gt>, public_inputs: &vector<groups::Scalar<S>>, proof: &Proof<G1,G2,Gt>): bool {
-        abort_if_feature_disabled();
         let scalars: vector<groups::Scalar<S>> = vector[groups::scalar_from_u64<S>(1)];
         std::vector::append(&mut scalars, *public_inputs);
         let g1_elements: vector<groups::Element<G1>> = vector[proof.a, groups::element_multi_scalar_mul(&scalars, &pvk.gamma_abc_g1), proof.c];
@@ -103,15 +97,8 @@ module aptos_std::groth16 {
         groups::element_eq(&pvk.alpha_g1_beta_g2, &groups::pairing_product<G1,G2,Gt>(&g1_elements, &g2_elements))
     }
 
-    fun abort_if_feature_disabled() {
-        if (!std::features::groth16_enabled()) {
-            abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-        };
-    }
-
-    #[test(fx = @std)]
-    fun test_verify_mimc_proof(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature(), std::features::get_groth16_feature()], vector[]);
+    #[test]
+    fun test_verify_mimc_proof() {
         let gamma_abc_g1: vector<groups::Element<BLS12_381_G1>> = vector[
             std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"00192808ef3f352b15066066b5784284ad310194591851848b9ca5099b7bd35d818a7902e4ec148b244d97c553599d0d0c961ac300485ea9d75a4251b7e54d9b9f2467cff599c19f399a0098f9ce6b88497c3f8e9cde85c9b4cdbf2cbc429118")),
             std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"cdd8b7ce59d13e8f29e7d7083b619feb96e38f0e520c46403be8df7ec7d4025b7e24aadb947528e057b5117cabe62012c8e331dc103e205add7ecdd52d109dd2a56e5e990921b5e1b3aeb724e5b8069011b7589e7ef42d975d0711d51f806e19")),
@@ -140,9 +127,8 @@ module aptos_std::groth16 {
         assert!(verify_proof_with_pvk(&pvk, &public_inputs, &proof), 1);
     }
 
-    #[test(fx = @std)]
-    fun test_verify_mimc_proof_with_pvk(fx: signer) {
-        std::features::change_feature_flags(&fx, vector[std::features::get_generic_groups_feature(), std::features::get_groth16_feature()], vector[]);
+    #[test]
+    fun test_verify_mimc_proof_with_pvk() {
         let gamma_abc_g1: vector<groups::Element<BLS12_381_G1>> = vector[
             std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"00192808ef3f352b15066066b5784284ad310194591851848b9ca5099b7bd35d818a7902e4ec148b244d97c553599d0d0c961ac300485ea9d75a4251b7e54d9b9f2467cff599c19f399a0098f9ce6b88497c3f8e9cde85c9b4cdbf2cbc429118")),
             std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_G1>(x"cdd8b7ce59d13e8f29e7d7083b619feb96e38f0e520c46403be8df7ec7d4025b7e24aadb947528e057b5117cabe62012c8e331dc103e205add7ecdd52d109dd2a56e5e990921b5e1b3aeb724e5b8069011b7589e7ef42d975d0711d51f806e19")),

@@ -23,6 +23,7 @@ use aptos_vm::{
 };
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
+use aptos_types::on_chain_config::Features;
 
 pub struct AptosDebugger {
     debugger: Arc<dyn AptosValidatorInterface + Send>,
@@ -161,6 +162,7 @@ impl AptosDebugger {
             true,
             true,
             ChainId::test().id(),
+            Features::default(),
         )
         .unwrap();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
