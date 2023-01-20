@@ -185,4 +185,6 @@ SyslogIdentifier=aptos-node
 WantedBy=multi-user.target
 ```
 
-Now you have completed setting up your node.
+You have completed setting up your node.
+
+Now proceed to [connecting to the Aptos network](../connect-to-aptos-network.md) and [establishing staking pool operations](../staking-pool-operations.md).

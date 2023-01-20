@@ -46,7 +46,7 @@ module aptos_framework::vesting {
     use aptos_std::simple_map::{Self, SimpleMap};
 
     use aptos_framework::account::{Self, SignerCapability, new_event_handle};
-    use aptos_framework::aptos_account::assert_account_is_registered_for_apt;
+    use aptos_framework::aptos_account::{Self, assert_account_is_registered_for_apt};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::event::{EventHandle, emit_event};
@@ -89,6 +89,8 @@ module aptos_framework::vesting {
     const EROLE_NOT_FOUND: u64 = 14;
     /// Account is not admin or does not have the required role to take this action.
     const EPERMISSION_DENIED: u64 = 15;
+    /// Zero items were provided to a *_many function.
+    const EVEC_EMPTY_FOR_MANY_FUNCTION: u64 = 16;
 
     /// Maximum number of shareholders a vesting pool can support.
     const MAXIMUM_SHAREHOLDERS: u64 = 30;
@@ -112,7 +114,7 @@ module aptos_framework::vesting {
         schedule: vector<FixedPoint32>,
         // When the vesting should start.
         start_timestamp_secs: u64,
-        // How long each vesting period is. For example 1 month.
+        // In seconds. How long each vesting period is. For example 1 month.
         period_duration: u64,
         // Last vesting period, 1-indexed. For example if 2 months have passed, the last vesting period, if distribution
         // was requested, would be 2. Default value is 0 which means there have been no vesting periods yet.
@@ -243,31 +245,68 @@ module aptos_framework::vesting {
         amount: u64,
     }
 
+    #[view]
+    /// Return the address of the underlying stake pool (separate resource account) of the vesting contract.
+    ///
+    /// This errors out if the vesting contract with the provided address doesn't exist.
     public fun stake_pool_address(vesting_contract_address: address): address acquires VestingContract {
         assert_vesting_contract_exists(vesting_contract_address);
         borrow_global<VestingContract>(vesting_contract_address).staking.pool_address
     }
 
+    #[view]
+    /// Return the vesting start timestamp (in seconds) of the vesting contract.
+    /// Vesting will start at this time, and once a full period has passed, the first vest will become unlocked.
+    ///
+    /// This errors out if the vesting contract with the provided address doesn't exist.
     public fun vesting_start_secs(vesting_contract_address: address): u64 acquires VestingContract {
         assert_vesting_contract_exists(vesting_contract_address);
         borrow_global<VestingContract>(vesting_contract_address).vesting_schedule.start_timestamp_secs
     }
 
+    #[view]
+    /// Return the duration of one vesting period (in seconds).
+    /// Each vest is released after one full period has started, starting from the specified start_timestamp_secs.
+    ///
+    /// This errors out if the vesting contract with the provided address doesn't exist.
+    public fun period_duration_secs(vesting_contract_address: address): u64 acquires VestingContract {
+        assert_vesting_contract_exists(vesting_contract_address);
+        borrow_global<VestingContract>(vesting_contract_address).vesting_schedule.period_duration
+    }
+
+    #[view]
+    /// Return the remaining grant, consisting of unvested coins that have not been distributed to shareholders.
+    /// Prior to start_timestamp_secs, the remaining grant will always be equal to the original grant.
+    /// Once vesting has started, and vested tokens are distributed, the remaining grant will decrease over time,
+    /// according to the vesting schedule.
+    ///
+    /// This errors out if the vesting contract with the provided address doesn't exist.
     public fun remaining_grant(vesting_contract_address: address): u64 acquires VestingContract {
         assert_vesting_contract_exists(vesting_contract_address);
         borrow_global<VestingContract>(vesting_contract_address).remaining_grant
     }
 
+    #[view]
+    /// Return the beneficiary account of the specified shareholder in a vesting contract.
+    /// This is the same as the shareholder address by default and only different if it's been explicitly set.
+    ///
+    /// This errors out if the vesting contract with the provided address doesn't exist.
     public fun beneficiary(vesting_contract_address: address, shareholder: address): address acquires VestingContract {
         assert_vesting_contract_exists(vesting_contract_address);
         get_beneficiary(borrow_global<VestingContract>(vesting_contract_address), shareholder)
     }
 
+    #[view]
+    /// Return the percentage of accumulated rewards that is paid to the operator as commission.
+    ///
+    /// This errors out if the vesting contract with the provided address doesn't exist.
     public fun operator_commission_percentage(vesting_contract_address: address): u64 acquires VestingContract {
         assert_vesting_contract_exists(vesting_contract_address);
         borrow_global<VestingContract>(vesting_contract_address).staking.commission_percentage
     }
 
+    #[view]
+    /// Return all the vesting contracts a given address is an admin of.
     public fun vesting_contracts(admin: address): vector<address> acquires AdminStore {
         if (!exists<AdminStore>(admin)) {
             vector::empty<address>()
@@ -276,14 +315,101 @@ module aptos_framework::vesting {
         }
     }
 
+    #[view]
+    /// Return the operator who runs the validator for the vesting contract.
+    ///
+    /// This errors out if the vesting contract with the provided address doesn't exist.
     public fun operator(vesting_contract_address: address): address acquires VestingContract {
         assert_vesting_contract_exists(vesting_contract_address);
         borrow_global<VestingContract>(vesting_contract_address).staking.operator
     }
 
+    #[view]
+    /// Return the voter who will be voting on on-chain governance proposals on behalf of the vesting contract's stake
+    /// pool.
+    ///
+    /// This errors out if the vesting contract with the provided address doesn't exist.
     public fun voter(vesting_contract_address: address): address acquires VestingContract {
         assert_vesting_contract_exists(vesting_contract_address);
         borrow_global<VestingContract>(vesting_contract_address).staking.voter
+    }
+
+    #[view]
+    /// Return the vesting contract's vesting schedule. The core schedule is represented as a list of u64-based
+    /// fractions, where the rightmmost 32 bits can be divided by 2^32 to get the fraction, and anything else is the
+    /// whole number.
+    ///
+    /// For example 3/48, or 0.0625, will be represented as 268435456. The fractional portion would be
+    /// 268435456 / 2^32 = 0.0625. Since there are fewer than 32 bits, the whole number portion is effectively 0.
+    /// So 268435456 = 0.0625.
+    ///
+    /// This errors out if the vesting contract with the provided address doesn't exist.
+    public fun vesting_schedule(vesting_contract_address: address): VestingSchedule acquires VestingContract {
+        assert_vesting_contract_exists(vesting_contract_address);
+        borrow_global<VestingContract>(vesting_contract_address).vesting_schedule
+    }
+
+    #[view]
+    /// Return the total accumulated rewards that have not been distributed to shareholders of the vesting contract.
+    /// This excludes any unpaid commission that the operator has not collected.
+    ///
+    /// This errors out if the vesting contract with the provided address doesn't exist.
+    public fun total_accumulated_rewards(vesting_contract_address: address): u64 acquires VestingContract {
+        assert_active_vesting_contract(vesting_contract_address);
+
+        let vesting_contract = borrow_global<VestingContract>(vesting_contract_address);
+        let (total_active_stake, _, commission_amount) =
+            staking_contract::staking_contract_amounts(vesting_contract_address, vesting_contract.staking.operator);
+        total_active_stake - vesting_contract.remaining_grant - commission_amount
+    }
+
+    #[view]
+    /// Return the accumulated rewards that have not been distributed to the provided shareholder. Caller can also pass
+    /// the beneficiary address instead of shareholder address.
+    ///
+    /// This errors out if the vesting contract with the provided address doesn't exist.
+    public fun accumulated_rewards(
+        vesting_contract_address: address, shareholder_or_beneficiary: address): u64 acquires VestingContract {
+        assert_active_vesting_contract(vesting_contract_address);
+
+        let total_accumulated_rewards = total_accumulated_rewards(vesting_contract_address);
+        let shareholder = shareholder(vesting_contract_address, shareholder_or_beneficiary);
+        let vesting_contract = borrow_global<VestingContract>(vesting_contract_address);
+        let shares = pool_u64::shares(&vesting_contract.grant_pool, shareholder);
+        pool_u64::shares_to_amount_with_total_coins(&vesting_contract.grant_pool, shares, total_accumulated_rewards)
+    }
+
+    #[view]
+    /// Return the list of all shareholders in the vesting contract.
+    public fun shareholders(vesting_contract_address: address): vector<address> acquires VestingContract {
+        assert_active_vesting_contract(vesting_contract_address);
+
+        let vesting_contract = borrow_global<VestingContract>(vesting_contract_address);
+        pool_u64::shareholders(&vesting_contract.grant_pool)
+    }
+
+    #[view]
+    /// Return the shareholder address given the beneficiary address in a given vesting contract. If there are multiple
+    /// shareholders with the same beneficiary address, only the first shareholder is returned.
+    ///
+    /// This returns 0x0 if no shareholder is found for the given beneficiary.
+    public fun shareholder(vesting_contract_address: address, beneficiary: address): address acquires VestingContract {
+        assert_active_vesting_contract(vesting_contract_address);
+
+        let shareholders = &shareholders(vesting_contract_address);
+        let vesting_contract = borrow_global<VestingContract>(vesting_contract_address);
+        let i = 0;
+        let len = vector::length(shareholders);
+        while (i < len) {
+            let shareholder = *vector::borrow(shareholders, i);
+            // This will still return the shareholder if shareholder == beneficiary.
+            if (beneficiary == get_beneficiary(vesting_contract, shareholder)) {
+                return shareholder
+            };
+            i = i + 1;
+        };
+
+        @0x0
     }
 
     /// Create a vesting schedule with the given schedule of distributions, a vesting start time and period duration.
@@ -413,15 +539,23 @@ module aptos_framework::vesting {
 
     /// Unlock any accumulated rewards.
     public entry fun unlock_rewards(contract_address: address) acquires VestingContract {
-        assert_active_vesting_contract(contract_address);
-
+        let accumulated_rewards = total_accumulated_rewards(contract_address);
         let vesting_contract = borrow_global<VestingContract>(contract_address);
-        let operator = vesting_contract.staking.operator;
-        let (total_active_stake, _, commission_amount) =
-            staking_contract::staking_contract_amounts(contract_address, operator);
-        // Accumulated rewards, excluding unpaid commission, that entirely belongs to the shareholders.
-        let accumulated_rewards = total_active_stake - vesting_contract.remaining_grant - commission_amount;
         unlock_stake(vesting_contract, accumulated_rewards);
+    }
+
+    /// Call `unlock_rewards` for many vesting contracts.
+    public entry fun unlock_rewards_many(contract_addresses: vector<address>) acquires VestingContract {
+        let len = vector::length(&contract_addresses);
+
+        assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
+
+        let i = 0;
+        while (i < len) {
+            let contract_address = *vector::borrow(&contract_addresses, i);
+            unlock_rewards(contract_address);
+            i = i + 1;
+        };
     }
 
     /// Unlock any vested portion of the grant.
@@ -477,6 +611,20 @@ module aptos_framework::vesting {
         );
     }
 
+    /// Call `vest` for many vesting contracts.
+    public entry fun vest_many(contract_addresses: vector<address>) acquires VestingContract {
+        let len = vector::length(&contract_addresses);
+
+        assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
+
+        let i = 0;
+        while (i < len) {
+            let contract_address = *vector::borrow(&contract_addresses, i);
+            vest(contract_address);
+            i = i + 1;
+        };
+    }
+
     /// Distribute any withdrawable stake from the stake pool.
     public entry fun distribute(contract_address: address) acquires VestingContract {
         assert_active_vesting_contract(contract_address);
@@ -500,14 +648,14 @@ module aptos_framework::vesting {
             let amount = pool_u64::shares_to_amount_with_total_coins(grant_pool, shares, total_distribution_amount);
             let share_of_coins = coin::extract(&mut coins, amount);
             let recipient_address = get_beneficiary(vesting_contract, shareholder);
-            coin::deposit(recipient_address, share_of_coins);
+            aptos_account::deposit_coins(recipient_address, share_of_coins);
 
             i = i + 1;
         };
 
         // Send any remaining "dust" (leftover due to rounding error) to the withdrawal address.
         if (coin::value(&coins) > 0) {
-            coin::deposit(vesting_contract.withdrawal_address, coins);
+            aptos_account::deposit_coins(vesting_contract.withdrawal_address, coins);
         } else {
             coin::destroy_zero(coins);
         };
@@ -520,6 +668,20 @@ module aptos_framework::vesting {
                 amount: total_distribution_amount,
             },
         );
+    }
+
+    /// Call `distribute` for many vesting contracts.
+    public entry fun distribute_many(contract_addresses: vector<address>) acquires VestingContract {
+        let len = vector::length(&contract_addresses);
+
+        assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
+
+        let i = 0;
+        while (i < len) {
+            let contract_address = *vector::borrow(&contract_addresses, i);
+            distribute(contract_address);
+            i = i + 1;
+        };
     }
 
     /// Terminate the vesting contract and send all funds back to the withdrawal address.
@@ -562,7 +724,7 @@ module aptos_framework::vesting {
             coin::destroy_zero(coins);
             return
         };
-        coin::deposit(vesting_contract.withdrawal_address, coins);
+        aptos_account::deposit_coins(vesting_contract.withdrawal_address, coins);
 
         emit_event(
             &mut vesting_contract.admin_withdraw_events,

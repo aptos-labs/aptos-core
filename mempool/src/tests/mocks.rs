@@ -3,7 +3,6 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::MempoolNetworkEvents,
     shared_mempool::start_shared_mempool,
     MempoolClientSender, QuorumStoreRequest,
 };
@@ -17,9 +16,15 @@ use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListen
 use aptos_infallible::{Mutex, RwLock};
 use aptos_mempool_notifications::{self, MempoolNotifier};
 use aptos_network::{
-    application::storage::PeerMetadataStorage,
+    application::{
+        interface::{NetworkClient, NetworkServiceEvents},
+        storage::PeerMetadataStorage,
+    },
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{NetworkSender, NewNetworkEvents, NewNetworkSender},
+    protocols::{
+        network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
+        wire::handshake::v1::ProtocolId::MempoolDirectSend,
+    },
 };
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use aptos_types::{
@@ -30,6 +35,7 @@ use aptos_vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
 };
 use futures::channel::mpsc;
+use maplit::hashmap;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -108,7 +114,7 @@ impl MockSharedMempool {
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
-        let network_events = MempoolNetworkEvents::new(network_notifs_rx, conn_notifs_rx);
+        let network_events = NetworkEvents::new(network_notifs_rx, conn_notifs_rx);
         let (ac_client, client_events) = mpsc::channel(1_024);
         let (quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
         let (mempool_notifier, mempool_listener) =
@@ -123,14 +129,23 @@ impl MockSharedMempool {
                 on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
             })
             .unwrap();
-        let network_handles = vec![(NetworkId::Validator, network_sender, network_events)];
         let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
+        let network_senders = hashmap! {NetworkId::Validator => network_sender};
+        let network_client = NetworkClient::new(
+            vec![MempoolDirectSend],
+            vec![],
+            network_senders,
+            peer_metadata_storage,
+        );
+        let network_and_events = hashmap! {NetworkId::Validator => network_events};
+        let network_service_events = NetworkServiceEvents::new(network_and_events);
 
         start_shared_mempool(
             handle,
             &config,
             mempool.clone(),
-            network_handles,
+            network_client,
+            network_service_events,
             client_events,
             quorum_store_receiver,
             mempool_listener,
@@ -138,7 +153,6 @@ impl MockSharedMempool {
             db.reader.clone(),
             Arc::new(RwLock::new(validator)),
             vec![],
-            peer_metadata_storage,
         );
 
         (ac_client, mempool, quorum_store_sender, mempool_notifier)
