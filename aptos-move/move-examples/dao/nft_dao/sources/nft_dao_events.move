@@ -58,6 +58,26 @@ module dao_platform::nft_dao_events {
         admin: address,
     }
 
+    struct DAONameChangeEvent has drop, store {
+        old_name: String,
+        new_name: String,
+    }
+
+    struct DAOThresholdChangeEvent has drop, store {
+        old_threshold: u64,
+        new_threshold: u64,
+    }
+
+    struct DAOVoteDurationChangeEvent has drop, store {
+        old_duration: u64,
+        new_duration: u64,
+    }
+
+    struct DAOReqiredVotingPowerChangeEvent has drop, store {
+        old_power: u64,
+        new_power: u64,
+    }
+
     struct DAOEventStoreV1 has key {
         create_dao_events: EventHandle<CreateDAOEvent>,
         create_proposal_events: EventHandle<CreateProposalEvent>,
@@ -66,6 +86,10 @@ module dao_platform::nft_dao_events {
         admin_offer_events: EventHandle<AdminOfferEvent>,
         admin_claim_events: EventHandle<AdminClaimEvent>,
         admin_offer_cancel_events: EventHandle<AdminOfferCancelEvent>,
+        change_name_events: EventHandle<DAONameChangeEvent>,
+        change_threshold_events: EventHandle<DAOThresholdChangeEvent>,
+        change_duration_events: EventHandle<DAOVoteDurationChangeEvent>,
+        change_voting_power_events: EventHandle<DAOReqiredVotingPowerChangeEvent>,
         extension: Option<Any>,
     }
 
@@ -79,6 +103,10 @@ module dao_platform::nft_dao_events {
                 admin_offer_events: account::new_event_handle<AdminOfferEvent>(acct),
                 admin_claim_events: account::new_event_handle<AdminClaimEvent>(acct),
                 admin_offer_cancel_events: account::new_event_handle<AdminOfferCancelEvent>(acct),
+                change_name_events: account::new_event_handle<DAONameChangeEvent>(acct),
+                change_threshold_events: account::new_event_handle<DAOThresholdChangeEvent>(acct),
+                change_duration_events: account::new_event_handle<DAOVoteDurationChangeEvent>(acct),
+                change_voting_power_events: account::new_event_handle<DAOReqiredVotingPowerChangeEvent>(acct),
                 extension: option::none<Any>(),
             });
         };
@@ -209,6 +237,58 @@ module dao_platform::nft_dao_events {
 
         event::emit_event<AdminOfferCancelEvent>(
             &mut dao_event_store.admin_offer_cancel_events,
+            event,
+        );
+    }
+
+    public(friend) fun emit_change_name_event(old_name: String, new_name: String, nft_dao: address) acquires DAOEventStoreV1 {
+        let event = DAONameChangeEvent {
+            old_name,
+            new_name,
+        };
+        let dao_event_store = borrow_global_mut<DAOEventStoreV1>(nft_dao);
+
+        event::emit_event<DAONameChangeEvent>(
+            &mut dao_event_store.change_name_events,
+            event,
+        );
+    }
+
+    public(friend) fun emit_change_threshold_event(old_threshold: u64, new_threshold: u64, nft_dao: address) acquires DAOEventStoreV1 {
+        let event = DAOThresholdChangeEvent {
+            old_threshold,
+            new_threshold,
+        };
+        let dao_event_store = borrow_global_mut<DAOEventStoreV1>(nft_dao);
+
+        event::emit_event<DAOThresholdChangeEvent>(
+            &mut dao_event_store.change_threshold_events,
+            event,
+        );
+    }
+
+    public(friend) fun emit_change_duration_event(old_duration: u64, new_duration: u64, nft_dao: address) acquires DAOEventStoreV1 {
+        let event = DAOVoteDurationChangeEvent {
+            old_duration,
+            new_duration,
+        };
+        let dao_event_store = borrow_global_mut<DAOEventStoreV1>(nft_dao);
+
+        event::emit_event<DAOVoteDurationChangeEvent>(
+            &mut dao_event_store.change_duration_events,
+            event,
+        );
+    }
+
+    public(friend) fun emit_change_voting_power_event(old_power: u64, new_power: u64, nft_dao: address) acquires DAOEventStoreV1 {
+        let event = DAOReqiredVotingPowerChangeEvent {
+            old_power,
+            new_power,
+        };
+        let dao_event_store = borrow_global_mut<DAOEventStoreV1>(nft_dao);
+
+        event::emit_event<DAOReqiredVotingPowerChangeEvent>(
+            &mut dao_event_store.change_voting_power_events,
             event,
         );
     }
