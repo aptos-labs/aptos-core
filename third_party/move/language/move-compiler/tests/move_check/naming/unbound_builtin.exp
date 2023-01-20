@@ -1,0 +1,18 @@
+error[E03009]: unbound variable
+  ┌─ tests/move_check/naming/unbound_builtin.move:3:9
+  │
+3 │         global_borrow();
+  │         ^^^^^^^^^^^^^ Invalid function usage. Unbound variable 'global_borrow'
+
+error[E03009]: unbound variable
+  ┌─ tests/move_check/naming/unbound_builtin.move:4:9
+  │
+4 │         release<u64>();
+  │         ^^^^^^^ Invalid function usage. Unbound variable 'release'
+
+error[E03009]: unbound variable
+  ┌─ tests/move_check/naming/unbound_builtin.move:5:9
+  │
+5 │         sudo(false);
+  │         ^^^^ Invalid function usage. Unbound variable 'sudo'
+
