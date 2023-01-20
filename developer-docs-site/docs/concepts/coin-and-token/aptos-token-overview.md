@@ -5,7 +5,7 @@ id: "aptos-token-comparison"
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Aptos Token Comparison
+# Compare Aptos Tokens
 
 :::tip Aptos token standard
 For details, see the official [Aptos Token](./aptos-token.md) standard.
