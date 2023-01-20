@@ -3,10 +3,11 @@ are pushed upstream or pulled from upstream, using the [copybara](https://github
 
 ## Usage
 
+### Pulling
+
 Assuming `copybara` is available from the command line, to pull from the
 Move repo (for example), use:
 
-### Pulling
 
 ```shell
 copybara copy.bar.sky pull_move
