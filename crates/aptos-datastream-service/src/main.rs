@@ -6,6 +6,7 @@ use aptos_protos::datastream::v1::indexer_stream_server::IndexerStreamServer;
 use deadpool_redis::{Config, Runtime};
 use std::{net::ToSocketAddrs, sync::Arc};
 use tonic::transport::Server;
+use warp::Filter;
 
 pub fn get_redis_address() -> String {
     std::env::var("REDIS_ADDRESS").expect("REDIS_ADDRESS is required.")

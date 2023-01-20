@@ -1,0 +1,18 @@
+[package]
+name = "aptos-datastream-cold-store"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { workspace = true }
+aptos-logger = { workspace = true }
+deadpool-redis = { workspace = true }
+redis = { workspace = true }
+warp = { workspace = true }
+cloud-storage = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+aptos-datastream-common = { workspace = true }

@@ -41,6 +41,8 @@ members = [
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
+    "crates/aptos-datastream-common",
+    "crates/aptos-datastream-cold-store",
     "crates/aptos-datastream-indexer",
     "crates/aptos-datastream-service",
     "crates/aptos-datastream-worker",
@@ -217,6 +219,8 @@ aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc = { path = "crates/indexer-grpc" }
+aptos-datastream-cold-store = { path = "crates/aptos-datastream-cold-store" }
+aptos-datastream-common = { path = "crates/aptos-datastream-common" }
 aptos-datastream-worker = { path = "crates/aptos-datastream-worker" }
 aptos-datastream-service = { path = "crates/aptos-datastream-service" }
 aptos-datastream-indexer = { path = "crates/aptos-datastream-indexer" }
@@ -318,6 +322,7 @@ clap_complete = "3.2.3"
 codespan-reporting = "0.11.1"
 console-subscriber = "0.1.6"
 const_format = "0.2.26"
+cloud-storage = { version = "0.11.1", features = ["global-client"] }
 criterion = "0.3.5"
 criterion-cpu-time = "0.1.0"
 crossbeam = "0.8.1"
