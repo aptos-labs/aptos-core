@@ -44,7 +44,7 @@ impl Default for QuorumStoreConfig {
             mempool_pulling_interval: 100,
             end_batch_ms: 500,
             max_batch_counts: 1400,
-            max_batch_bytes: 1000000,
+            max_batch_bytes: 5000000,
             batch_request_timeout_ms: 10000,
             batch_expiry_round_gap_when_init: 100,
             batch_expiry_round_gap_behind_latest_certified: 500,
