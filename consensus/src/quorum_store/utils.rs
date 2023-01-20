@@ -8,7 +8,6 @@ use crate::{
         types::{BatchId, SerializedTransaction},
     },
 };
-// use claims::assert_some;
 use aptos_consensus_types::common::{Round, TransactionSummary};
 use aptos_consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
 use aptos_crypto::HashValue;
