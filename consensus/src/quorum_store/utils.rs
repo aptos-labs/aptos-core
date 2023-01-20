@@ -306,7 +306,7 @@ impl ProofQueue {
                             Some(txns) => {
                                 let mut unexpired = 0;
                                 txns.iter().for_each(|txn| {
-                                    if txn.expiration_timestamp_secs() < curr_time.as_secs() {
+                                    if txn.expiration_timestamp_secs() > curr_time.as_secs() {
                                         unexpired += 1;
                                     }
                                 });

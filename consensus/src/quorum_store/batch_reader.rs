@@ -357,9 +357,9 @@ impl BatchReader {
         &self,
         proof: ProofOfStore,
     ) -> Option<Vec<SignedTransaction>> {
-        let (tx, rx) = oneshot::channel();
         match self.db_cache.get(proof.digest()) {
             Some(value) => {
+                let (tx, rx) = oneshot::channel();
                 if payload_storage_mode(&value) == StorageMode::PersistedOnly {
                     assert!(
                         value.maybe_payload.is_none(),
@@ -373,23 +373,10 @@ impl BatchReader {
                         ))
                         .await
                         .expect("Failed to send to BatchStore");
+                    rx.await.ok().and_then(|res| res.ok())
                 } else {
-                    // Available in memory.
-                    if tx
-                        .send(Ok(value
-                            .maybe_payload
-                            .clone()
-                            .expect("BatchReader payload and storage kind mismatch")))
-                        .is_err()
-                    {
-                        debug!(
-                            "Receiver of requested batch is not available for digest {}",
-                            proof.digest()
-                        );
-                    }
+                    value.maybe_payload.clone()
                 }
-
-                rx.await.ok().and_then(|res| res.ok())
             },
             None => None,
         }
