@@ -1,23 +1,70 @@
 /**
- * Allow delegators to participate in the same stake pool in order to collect the minimum
- * validator stake and be rewarded proportionally to their contribution out of validator's rewards.
+ * Allow multiple delegators to participate in the same stake pool in order to collect the minimum
+ * stake required to join the validator set. Delegators are rewarded out of the validator rewards
+ * proportionally to their stake and provided the same stake-management API as the stake owner.
+ *
  * The main accounting logic in the delegation pool contract handles the following:
- * 1. Tracks how much stake each delegator owns, initially deposited as well as earned.
- * Accounting individual delegator and aggregated stakes is achieved through the shares-based
- * pool data structure defined at `aptos_std::pool_u64`. Therefore, delegators own shares into
- * the delegation pool rather than absolute stake amounts.
- * 2. Tracks how many rewards have been earned by the stake pool, implicitly by the delegation one,
- * in the meantime and distribute them accordingly.
- * 3. Tracks lockup cycles on the stake pool in order to separate inactive stake (not rewarded)
- * from pending_inactive stake (earning rewards) and allow delegators to withdraw it
+ * 1. Tracks how much stake each delegator owns, privately deposited and earned too.
+ * Accounting individual delegator stakes is achieved through the shares-based pool defined at
+ * `aptos_std::pool_u64`, hence delegators own shares rather than absolute stakes into the delegation pool.
+ * 2. Tracks rewards earned by the stake pool, implicitly by the delegation one, in the meantime
+ * and distribute them accordingly.
+ * 3. Tracks lockup cycles on the stake pool in order to separate inactive stake (not earning rewards)
+ * from pending_inactive stake (earning rewards) and allow its delegators to withdraw it
  * 4. Tracks how much commission fee has to be paid to the operator out of incoming rewards before
- * distributing them to internal pool_u64 pools.
+ * distributing them to the internal pool_u64 pools.
  *
  * In order to distinguish between stakes in different states and route rewards accordingly,
  * separate pool_u64 pools are used for individual stake states:
  *      1. one of `active` + `pending_active` stake
- *      2. one of `inactive` stake FOR each past observed(detected) lockup cycle (OLC)
- *      3. one of `pending_inactive` stake scheduled during this ongoing lockup cycle
+ *      2. one of `inactive` stake FOR each past observed lockup cycle (OLC) detected on the stake pool
+ *      3. one of `pending_inactive` stake scheduled during this ongoing OLC
+ *
+ * As stake-state transitions and rewards are computed only at the stake pool level, the delegation pool
+ * gets outdated. To mitigate this, at any interaction with the delegation pool, a process of synchronization
+ * to the underlying stake pool is executed before the requested operation itself.
+ *
+ * At synchronization:
+ *  - stake deviations between the two pools are actually the rewards produced in the meantime.
+ *  - the commission fee is extracted from the rewards, the remaining stake is distributed to the internal
+ * pool_u64 pools and then commission stake used to buy shares for operator
+ *  - if detecting that the lockup expired on the stake pool, the delegation pool will isolate its
+ * pending_inactive stake (now inactive) and create a new pool_u64 to host future pending_inactive stake
+ * at the newly started lockup.
+ * Detecting a lockup expiration on the stake pool resumes to detecting new inactive stake.
+ *
+ * Example flow:
+ * 1. A node operator creates a delegation pool by calling `initialize_delegation_pool` and sets
+ * its commission fee to 0% (for simplicity). A stake pool is created with no initial stake and owned by
+ * a resource account controlled by the delegation pool.
+ * 2. Delegator A adds 100 stake which is converted to 100 shares into the active pool_u64
+ * 3. Operator joins the validator set as the stake pool has now the minimum stake
+ * 4. The stake pool earned rewards and now has 200 active stake. A's active shares are worth 200 coins as
+ * the commission fee is 0%.
+ * 5a. A requests `unlock` for 100 stake
+ * 5b. Synchronization detects 200 - 100 active rewards which are entirely (0% commission) added to the active pool.
+ * 5c. 100 coins = (100 * 100) / 200 = 50 shares are redeemed from the active pool and exchanged for 100 shares
+ * into the pending_inactive one on A's behalf
+ * 6. Delegator B adds 200 stake which is converted to (200 * 50) / 100 = 100 shares into the active pool
+ * 7. The stake pool earned rewards and now has 600 active and 200 pending_inactive stake.
+ * 8a. A requests `reactivate_stake` for 100 stake
+ * 8b. Synchronization detects 600 - 300 active and 200 - 100 pending_inactive rewards which are both entirely
+ * distributed to their corresponding pools
+ * 8c. 100 coins = (100 * 100) / 200 = 50 shares are redeemed from the pending_inactive pool and exchanged for
+ * (100 * 150) / 600 = 25 shares into the active one on A's behalf
+ * 9. The lockup expires on the stake pool, inactivating the entire pending_inactive stake
+ * 10a. B requests `unlock` for 100 stake
+ * 10b. Synchronization detects no active or pending_inactive rewards, but 0 -> 100 inactive stake
+ * on the stake pool, so it advances the observed lockup cycle and creates a pool_u64 for the new lockup,
+ * hence allowing previous pending_inactive shares to be redeemed
+ * 10c. 100 coins = (100 * 175) / 700 = 25 shares are redeemed from the active pool and exchanged for
+ * 100 shares into the new pending_inactive one on B's behalf
+ * 11. The stake pool earned rewards and now has some pending_inactive rewards.
+ * 12a. A requests `withdraw` for its entire inactive stake
+ * 12b. Synchronization detects no new inactive stake, but some pending_inactive rewards which are
+ * distributed to the (2nd) pending_inactive pool
+ * 12c. A's 50 shares = (50 * 100) / 50 = 100 coins are redeemed from the (1st) inactive pool and 100 stake
+ * is transferred to A
  */
 module aptos_framework::delegation_pool {
     use std::error;
@@ -664,15 +711,19 @@ module aptos_framework::delegation_pool {
             commission_pending_inactive
         ) = calculate_stake_pool_drift(pool);
 
+        // distribute remaining rewards after commission to delegators (to already existing shares)
+        // before buying shares for the operator for its entire commission fee
+        // otherwise, operator's new shares would additionally appreciate from rewards it does not own
+
+        // update total coins accumulated by `active` + `pending_active` shares
+        pool_u64::update_total_coins(&mut pool.active_shares, active - commission_active);
+        // update total coins accumulated by `pending_inactive` shares at current lockup cycle on delegation pool
+        pool_u64::update_total_coins(pending_inactive_shares_pool(pool), pending_inactive - commission_pending_inactive);
+
         // reward operator its commission out of uncommitted active rewards (`add_stake` fees already excluded)
         buy_in_active_shares(pool, stake::get_operator(pool_address), commission_active);
         // reward operator its commission out of uncommitted pending_inactive rewards
         buy_in_inactive_shares(pool, stake::get_operator(pool_address), commission_pending_inactive);
-
-        // update total coins accumulated by `active` + `pending_active` shares
-        pool_u64::update_total_coins(&mut pool.active_shares, active);
-        // update total coins accumulated by `pending_inactive` shares at current lockup cycle on delegation pool
-        pool_u64::update_total_coins(pending_inactive_shares_pool(pool), pending_inactive);
 
         // advance lockup cycle on delegation pool if already ended on stake pool (AND stake explicitly inactivated)
         if (lockup_cycle_ended) {
@@ -1631,9 +1682,9 @@ module aptos_framework::delegation_pool {
         end_aptos_epoch();
         stake::assert_stake_pool(pool_address, 20504, 0, 0, 10098);
         // 203 active * 20% and 99 pending_inactive * 20% rewards
-        assert_delegation(validator_address, pool_address, 100, 0, 19);
+        assert_delegation(validator_address, pool_address, 99, 0, 19);
         // 100 active * 80% rewards
-        assert_delegation(delegator1_address, pool_address, 10160, 0, 0);
+        assert_delegation(delegator1_address, pool_address, 10161, 0, 0);
         // 100 active * 80% and 100 pending_inactive * 80% rewards
         assert_delegation(delegator2_address, pool_address, 10242, 0, 10079);
 
@@ -1643,29 +1694,29 @@ module aptos_framework::delegation_pool {
         stake::assert_stake_pool(pool_address, 10610, 20297, 0, 0);
         // 105 active * 20% and 200 pending_inactive * 20% rewards
         // operator's accumulated rewards from pending_inactive stake have been also inactivated
-        assert_delegation(validator_address, pool_address, 122, 59, 0);
+        assert_delegation(validator_address, pool_address, 121, 58, 0);
         // 2 active * 80% and 200 pending_inactive * 80% rewards
-        assert_delegation(delegator2_address, pool_address, 244, 20237, 0);
+        assert_delegation(delegator2_address, pool_address, 244, 20238, 0);
 
         withdraw(delegator2, pool_address, MAX_U64);
         // operator rewards have been persisted and it can be noticed there is a small imprecision
         // in computing real-time stake using `get_stake` in the operator case
-        assert_delegation(validator_address, pool_address, 121, 59, 0);
+        assert_delegation(validator_address, pool_address, 120, 58, 0);
 
         stake::mint(delegator1, 10000);
         assert!(get_add_stake_fee(pool_address, 10000) == 99, 0);
         add_stake(delegator1, pool_address, 10000);
         end_aptos_epoch();
-        stake::assert_stake_pool(pool_address, 20716, 59, 0, 0);
+        stake::assert_stake_pool(pool_address, 20716, 58, 0, 0);
 
         // 106 active * 20% and 121 active stake * 1% rewards and no commission from 99 `add_stake` fees
-        assert_delegation(validator_address, pool_address, 143, 59, 0);
+        assert_delegation(validator_address, pool_address, 142, 58, 0);
         set_operator(validator, delegator2_address);
 
         end_aptos_epoch();
         // old operator stopped being rewarded starting from previous epoch
         // 147 active stake * 1% rewards
-        assert_delegation(validator_address, pool_address, 144, 59, 0);
+        assert_delegation(validator_address, pool_address, 143, 58, 0);
     }
 
     #[test_only]
