@@ -487,14 +487,16 @@ module aptos_framework::account {
         option::swap_or_fill(&mut account_resource.signer_capability_offer.for, recipient_address);
     }
 
+    #[view]
     /// Returns true if the account at `account_addr` has a signer capability offer.
     public fun is_signer_capability_offered(account_addr: address): bool acquires Account {
         let account_resource = borrow_global<Account>(account_addr);
         option::is_some(&account_resource.signer_capability_offer.for)
     }
 
+    #[view]
     /// Returns the address of the account that has a signer capability offer from the account at `account_addr`.
-    public fun get_signer_capability_offer_for(account_addr: address): address acquires Account{
+    public fun get_signer_capability_offer_for(account_addr: address): address acquires Account {
         let account_resource = borrow_global<Account>(account_addr);
         assert!(option::is_some(&account_resource.signer_capability_offer.for), error::not_found(ENO_SIGNER_CAPABILITY_OFFERED));
         *option::borrow(&account_resource.signer_capability_offer.for)
@@ -947,7 +949,7 @@ module aptos_framework::account {
         assert!(is_signer_capability_offered(alice_addr), 0);
         assert!(get_signer_capability_offer_for(alice_addr) == bob_addr, 0);
     }
-    
+
 
     #[test(bob = @0x345, charlie = @0x567)]
     #[expected_failure(abort_code = 393230, location = Self)]
@@ -1102,7 +1104,7 @@ module aptos_framework::account {
     }
 
     #[test(bob = @0x345, charlie = @0x567, framework = @aptos_framework)]
-    #[expected_failure(abort_code = 393235, location = Self)]
+    #[expected_failure(abort_code = 393234, location = Self)]
     public entry fun test_invalid_revoke_rotation_capability(bob: signer, charlie: signer, framework: signer) acquires Account {
         chain_id::initialize_for_test(&framework, 4);
         let (alice_sk, alice_pk) = ed25519::generate_keys();
