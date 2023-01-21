@@ -11,7 +11,7 @@ use crate::{
         },
         utils::prompt_yes_with_override,
     },
-    move_tool::{FrameworkPackageArgs, IncludedArtifacts},
+    move_tool::{FrameworkPackageArgs, IncludedArtifactsArgs},
     CliCommand, CliResult,
 };
 use aptos_cached_packages::aptos_stdlib;
@@ -760,16 +760,6 @@ pub struct GenerateUpgradeProposal {
     #[clap(long, parse(from_os_str), default_value = "proposal.move")]
     pub(crate) output: PathBuf,
 
-    /// What artifacts to include in the package. This can be one of `none`, `sparse`, and
-    /// `all`. `none` is the most compact form and does not allow to reconstruct a source
-    /// package from chain; `sparse` is the minimal set of artifacts needed to reconstruct
-    /// a source package; `all` includes all available artifacts. The choice of included
-    /// artifacts heavily influences the size and therefore gas cost of publishing: `none`
-    /// is the size of bytecode alone; `sparse` is roughly 2 times as much; and `all` 3-4
-    /// as much.
-    #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
-    pub(crate) included_artifacts: IncludedArtifacts,
-
     /// Generate the script for mainnet governance proposal by default or generate the upgrade script for testnet.
     #[clap(long)]
     pub(crate) testnet: bool,
@@ -779,6 +769,9 @@ pub struct GenerateUpgradeProposal {
 
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
+
+    #[clap(flatten)]
+    pub(crate) included_artifacts: IncludedArtifactsArgs,
 }
 
 #[async_trait]
@@ -797,13 +790,13 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             next_execution_hash,
         } = self;
         let package_path = move_options.get_package_path()?;
-        let options = included_artifacts.build_options(
+        let options = included_artifacts.included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
             move_options.bytecode_version_or_detault(),
         );
         let package = BuiltPackage::build(package_path, options)?;
-        let release = ReleasePackage::new(package)?;
+        let release = ReleasePackage::new(package, included_artifacts.sort_modules)?;
 
         // If we're generating a single-step proposal on testnet
         if testnet && next_execution_hash.is_empty() {

@@ -299,13 +299,17 @@ impl CliCommand<Vec<String>> for CompilePackage {
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         if self.save_metadata {
-            pack.extract_metadata_and_save()?;
+            pack.extract_metadata_and_save(self.included_artifacts_args.sort_modules)?;
         }
-        let ids = pack
+        let mut ids = pack
             .modules()
             .into_iter()
             .map(|m| m.self_id().to_string())
             .collect::<Vec<_>>();
+
+        if self.included_artifacts_args.sort_modules {
+            ids.sort();
+        }
         Ok(ids)
     }
 }
@@ -496,6 +500,9 @@ pub struct IncludedArtifactsArgs {
     /// as much.
     #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
     pub(crate) included_artifacts: IncludedArtifacts,
+    /// Sort modules for compilation and uploading to have a consistent order
+    #[clap(long)]
+    pub sort_modules: bool,
 }
 
 /// Publishes the modules in a Move package to the Aptos blockchain
@@ -615,7 +622,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         let compiled_units = package.extract_code();
 
         // Send the compiled module and metadata using the code::publish_package_txn.
-        let metadata = package.extract_metadata()?;
+        let metadata = package.extract_metadata(included_artifacts_args.sort_modules)?;
         let payload = aptos_cached_packages::aptos_stdlib::code_publish_package_txn(
             bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
             compiled_units,
@@ -702,7 +709,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         let compiled_units = package.extract_code();
 
         // Send the compiled module and metadata using the code::publish_package_txn.
-        let metadata = package.extract_metadata()?;
+        let metadata = package.extract_metadata(included_artifacts_args.sort_modules)?;
 
         let message = format!(
             "Do you want to publish this package under the resource account's address {}?",
@@ -798,16 +805,14 @@ pub struct VerifyPackage {
     #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
-    /// Artifacts to be generated when building this package.
-    #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
-    pub(crate) included_artifacts: IncludedArtifacts,
-
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
+    #[clap(flatten)]
+    pub(crate) included_artifacts: IncludedArtifactsArgs,
 }
 
 #[async_trait]
@@ -822,7 +827,7 @@ impl CliCommand<&'static str> for VerifyPackage {
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
             bytecode_version: Some(self.move_options.bytecode_version_or_detault()),
-            ..self.included_artifacts.build_options(
+            ..self.included_artifacts.included_artifacts.build_options(
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version_or_detault(),
@@ -830,7 +835,7 @@ impl CliCommand<&'static str> for VerifyPackage {
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
-        let compiled_metadata = pack.extract_metadata()?;
+        let compiled_metadata = pack.extract_metadata(self.included_artifacts.sort_modules)?;
 
         // Now pull the compiled package
         let url = self.rest_options.url(&self.profile_options)?;

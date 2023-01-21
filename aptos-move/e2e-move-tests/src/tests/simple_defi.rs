@@ -44,7 +44,7 @@ fn exchange_e2e_test() {
     .expect("building package must succeed");
     let code = package.extract_code();
     let metadata = package
-        .extract_metadata()
+        .extract_metadata(true)
         .expect("extracting package metadata must succeed");
 
     // create the resource account and publish the code under the resource account's address

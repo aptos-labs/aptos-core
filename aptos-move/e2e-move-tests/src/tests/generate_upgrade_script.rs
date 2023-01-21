@@ -38,6 +38,7 @@ module 0x{}::test {{
 
     let upgrade_release = ReleasePackage::new(
         BuiltPackage::build(upgrade_dir.path().to_path_buf(), BuildOptions::default()).unwrap(),
+        true,
     )
     .unwrap();
 

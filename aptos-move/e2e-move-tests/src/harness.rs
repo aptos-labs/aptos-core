@@ -274,7 +274,7 @@ impl MoveHarness {
             .expect("building package must succeed");
         let code = package.extract_code();
         let mut metadata = package
-            .extract_metadata()
+            .extract_metadata(true)
             .expect("extracting package metadata must succeed");
         patch_metadata(&mut metadata);
         self.create_transaction_payload(

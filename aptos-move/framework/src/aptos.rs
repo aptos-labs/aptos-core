@@ -131,6 +131,7 @@ impl ReleaseTarget {
                 // Place in current directory
                 PathBuf::from(self.file_name())
             },
+            sort_modules: false,
         }
     }
 

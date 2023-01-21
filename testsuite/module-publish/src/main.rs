@@ -102,7 +102,7 @@ fn write_pacakge_simple(file: &mut File) {
     let package =
         BuiltPackage::build(path, BuildOptions::default()).expect("building package must succeed");
     let code = package.extract_code();
-    let package_metadata = package.extract_metadata().expect("Metadata must exist");
+    let package_metadata = package.extract_metadata(true).expect("Metadata must exist");
     let metadata = bcs::to_bytes(&package_metadata).expect("Metadata must serialize");
 
     // write out package metadata

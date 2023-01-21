@@ -119,7 +119,7 @@ fn test_bad_fun_attribute_in_compiled_module() {
     compiled_module.metadata = vec![metadata];
     compiled_module.serialize(&mut code).unwrap();
     let metadata = package
-        .extract_metadata()
+        .extract_metadata(true)
         .expect("extracting package metadata must succeed");
     let result = h.run_transaction_payload(
         &account,
@@ -179,7 +179,7 @@ fn test_bad_view_attribute_in_compiled_module() {
     let mut code = vec![];
     compiled_module.serialize(&mut code).unwrap();
     let metadata = package
-        .extract_metadata()
+        .extract_metadata(true)
         .expect("extracting package metadata must succeed");
     let result = h.run_transaction_payload(
         &account,

@@ -810,6 +810,7 @@ impl CliTestFramework {
             save_metadata: false,
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
+                sort_modules: true,
             },
         }
         .execute()
@@ -844,6 +845,7 @@ impl CliTestFramework {
             override_size_check: false,
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
+                sort_modules: true,
             },
         }
         .execute()

@@ -28,6 +28,7 @@ use move_package::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
     io::stderr,
     path::{Path, PathBuf},
@@ -255,7 +256,7 @@ impl BuiltPackage {
     }
 
     /// Extracts metadata, as needed for releasing a package, from the built package.
-    pub fn extract_metadata(&self) -> anyhow::Result<PackageMetadata> {
+    pub fn extract_metadata(&self, sort_modules: bool) -> anyhow::Result<PackageMetadata> {
         let source_digest = self
             .package
             .compiled_package_info
@@ -291,7 +292,7 @@ impl BuiltPackage {
                 extension: MoveOption::default(),
             })
         }
-        let deps = self
+        let mut deps: Vec<PackageDep> = self
             .package
             .deps_compiled_units
             .iter()
@@ -309,6 +310,20 @@ impl BuiltPackage {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
+
+        // Sort modules and dependencies
+        if sort_modules {
+            modules.sort_by(|m1, m2| m1.name.cmp(&m2.name));
+            deps.sort_by(|d1, d2| {
+                let account_cmp = d1.account.cmp(&d2.account);
+                if account_cmp == Ordering::Equal {
+                    d1.package_name.cmp(&d2.package_name)
+                } else {
+                    account_cmp
+                }
+            });
+        }
+
         Ok(PackageMetadata {
             name: self.name().to_string(),
             upgrade_policy,
@@ -321,8 +336,8 @@ impl BuiltPackage {
         })
     }
 
-    pub fn extract_metadata_and_save(&self) -> anyhow::Result<()> {
-        let data = self.extract_metadata()?;
+    pub fn extract_metadata_and_save(&self, sort_modules: bool) -> anyhow::Result<()> {
+        let data = self.extract_metadata(sort_modules)?;
         let path = self.package_artifacts_path();
         std::fs::create_dir_all(&path)?;
         std::fs::write(path.join(METADATA_FILE_NAME), bcs::to_bytes(&data)?)?;

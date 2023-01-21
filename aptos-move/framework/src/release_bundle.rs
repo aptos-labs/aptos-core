@@ -104,9 +104,9 @@ impl ReleaseBundle {
 
 impl ReleasePackage {
     /// Creates a new released package.
-    pub fn new(package: BuiltPackage) -> anyhow::Result<Self> {
+    pub fn new(package: BuiltPackage, sort_modules: bool) -> anyhow::Result<Self> {
         // TODO: remove poliocy and put it into toml
-        let metadata = package.extract_metadata()?;
+        let metadata = package.extract_metadata(sort_modules)?;
         Ok(ReleasePackage {
             metadata,
             code: package.extract_code(),

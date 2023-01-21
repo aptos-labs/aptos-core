@@ -31,6 +31,9 @@ pub struct ReleaseOptions {
     /// The path to the file where to place the release bundle.
     #[clap(long, default_value = "head.mrb", parse(from_os_str))]
     pub output: PathBuf,
+    /// Sort the modules by name
+    #[clap(long)]
+    pub sort_modules: bool,
 }
 
 impl ReleaseOptions {
@@ -42,6 +45,7 @@ impl ReleaseOptions {
             packages,
             rust_bindings,
             output,
+            sort_modules,
         } = self;
         let mut released_packages = vec![];
         let mut source_paths = vec![];
@@ -54,7 +58,7 @@ impl ReleaseOptions {
                     .ok_or_else(|| anyhow!("abis not available, can't generate sdk"))?;
                 Self::generate_rust_bindings(&abis, &PathBuf::from(rust_binding_path))?;
             }
-            let released = ReleasePackage::new(built)?;
+            let released = ReleasePackage::new(built, sort_modules)?;
             let size = bcs::to_bytes(&released)?.len();
             println!(
                 "Including package `{}` size {}k",

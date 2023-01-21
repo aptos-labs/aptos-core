@@ -69,7 +69,7 @@ fn mint_nft_e2e() {
 
     let code = package.extract_code();
     let metadata = package
-        .extract_metadata()
+        .extract_metadata(true)
         .expect("extracting package metadata must succeed");
 
     // create the resource account and publish the module under the resource account's address

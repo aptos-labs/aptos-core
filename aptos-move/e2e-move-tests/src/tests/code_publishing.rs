@@ -229,7 +229,7 @@ fn code_publishing_using_resource_account() {
 
     let code = package.extract_code();
     let metadata = package
-        .extract_metadata()
+        .extract_metadata(true)
         .expect("extracting package metadata must succeed");
     let bcs_metadata = bcs::to_bytes(&metadata).expect("PackageMetadata has BCS");
 
