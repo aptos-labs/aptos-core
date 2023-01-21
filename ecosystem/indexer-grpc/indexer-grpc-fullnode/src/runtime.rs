@@ -132,12 +132,12 @@ impl IndexerStream for IndexerStreamService {
                 if is_error {
                     break;
                 }
-                let init_status = Self::get_status(
+                let batch_end_status = Self::get_status(
                     StatusType::BatchEnd,
                     coordinator.current_version,
                     Some(max_version),
                 );
-                match tx.send(Result::<_, Status>::Ok(init_status)).await {
+                match tx.send(Result::<_, Status>::Ok(batch_end_status)).await {
                     Ok(_) => {
                         let new_base: u64 = ma.sum() / (DEFAULT_EMIT_SIZE as u64);
                         ma.tick_now(max_version - coordinator.current_version + 1);
