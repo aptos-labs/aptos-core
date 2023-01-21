@@ -55,13 +55,13 @@ where
         }
     }
 
-    fn execute<'a>(
+    fn execute(
         &self,
         version: Version,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_data_cache: &MVHashMap<T::Key, T::Value>,
-        scheduler: &'a Scheduler,
+        scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
     ) -> SchedulerTask {
@@ -130,13 +130,13 @@ where
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
-    fn validate<'a>(
+    fn validate(
         &self,
         version_to_validate: Version,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_data_cache: &MVHashMap<T::Key, T::Value>,
-        scheduler: &'a Scheduler,
+        scheduler: &Scheduler,
     ) -> SchedulerTask {
         use MVHashMapError::*;
         use MVHashMapOutput::*;
