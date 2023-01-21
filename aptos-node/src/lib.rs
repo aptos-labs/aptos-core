@@ -137,6 +137,7 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
     _network_runtimes: Vec<Runtime>,
+    _indexer_grpc: Option<Runtime>,
     _index_runtime: Option<Runtime>,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
@@ -394,7 +395,7 @@ pub fn setup_environment_and_start_node(
         )?;
 
     // Bootstrap the API and indexer
-    let (mempool_client_receiver, api_runtime, index_runtime) =
+    let (mempool_client_receiver, api_runtime, index_runtime, indexer_grpc) =
         services::bootstrap_api_and_indexer(&node_config, aptos_db, chain_id)?;
 
     // Create mempool and get the consensus to mempool sender
@@ -407,7 +408,6 @@ pub fn setup_environment_and_start_node(
             mempool_listener,
             mempool_client_receiver,
         );
-
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
         // Wait until state sync has been initialized
@@ -433,6 +433,7 @@ pub fn setup_environment_and_start_node(
         _mempool_runtime: mempool_runtime,
         _network_runtimes: network_runtimes,
         _index_runtime: index_runtime,
+        _indexer_grpc: indexer_grpc,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })
