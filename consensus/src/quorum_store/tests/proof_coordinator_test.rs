@@ -4,6 +4,7 @@
 use crate::quorum_store::{
     batch_generator::ProofError,
     proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
+    proof_manager::ProofManagerCommand,
     tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
 };
 use aptos_consensus_types::proof_of_store::{LogicalTime, SignedDigest, SignedDigestInfo};
@@ -12,7 +13,7 @@ use aptos_types::{
 };
 use futures::channel::oneshot;
 use std::sync::Arc;
-use tokio::sync::mpsc::channel;
+use tokio::sync::mpsc::{channel, error::TryRecvError};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_proof_coordinator_basic() {
@@ -21,8 +22,7 @@ async fn test_proof_coordinator_basic() {
         signers.clone().into_iter().map(Arc::new).collect();
     let proof_coordinator = ProofCoordinator::new(100, signers[0].author());
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
-    // TODO: check proof_manager_rx
-    let (proof_manager_tx, _proof_manager_rx) = channel(100);
+    let (proof_manager_tx, mut proof_manager_rx) = channel(100);
     tokio::spawn(proof_coordinator.start(proof_coordinator_rx, proof_manager_tx, verifier.clone()));
 
     let digest = compute_digest_from_signed_transaction(create_vec_signed_transactions(100));
@@ -52,6 +52,10 @@ async fn test_proof_coordinator_basic() {
     assert_eq!(batch_id, 0);
     assert_eq!(proof.digest().clone(), digest);
     assert!(proof.verify(&verifier).is_ok());
+    match proof_manager_rx.recv().await.expect("channel dropped") {
+        ProofManagerCommand::LocalProof(cmd_proof) => assert_eq!(proof, cmd_proof),
+        msg => panic!("Expected LocalProof but received: {:?}", msg),
+    }
 
     // check that error path
     let (proof_tx, proof_rx) = oneshot::channel();
@@ -67,6 +71,10 @@ async fn test_proof_coordinator_basic() {
         proof_rx.await.expect("channel dropped"),
         Err(ProofError::Timeout(4))
     );
+    match proof_manager_rx.try_recv() {
+        Err(TryRecvError::Empty) => {},
+        result => panic!("Expected Empty but instead: {:?}", result),
+    }
 
     // check same digest after expiration
     let (proof_tx, proof_rx) = oneshot::channel();
@@ -91,6 +99,10 @@ async fn test_proof_coordinator_basic() {
     assert_eq!(batch_id, 4);
     assert_eq!(proof.digest().clone(), digest);
     assert!(proof.verify(&verifier).is_ok());
+    match proof_manager_rx.recv().await.expect("channel dropped") {
+        ProofManagerCommand::LocalProof(cmd_proof) => assert_eq!(proof, cmd_proof),
+        msg => panic!("Expected LocalProof but received: {:?}", msg),
+    }
 
     // check wrong signatures
     let (proof_tx, proof_rx) = oneshot::channel();
@@ -121,4 +133,8 @@ async fn test_proof_coordinator_basic() {
         proof_rx.await.expect("channel dropped"),
         Err(ProofError::Timeout(10))
     );
+    match proof_manager_rx.try_recv() {
+        Err(TryRecvError::Empty) => {},
+        result => panic!("Expected Empty but instead: {:?}", result),
+    }
 }
