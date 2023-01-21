@@ -86,6 +86,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
+    "ecosystem/indexer-grpc/indexer-grpc-fullnode",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
@@ -297,6 +298,7 @@ aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
+moving-average = { path = "crates/moving-average" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
