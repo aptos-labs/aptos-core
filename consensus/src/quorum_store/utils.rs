@@ -335,20 +335,15 @@ impl ProofQueue {
         let mut remaining_local_proof_size = 0;
 
         for (digest, expiration) in self.local_digest_queue.iter() {
+            // Not expired. It is possible that the proof entry in digest_proof was already removed
+            // when draining the digest_queue but local_digest_queue is not drained yet.
             if *expiration >= current_time {
-                match self
-                    .digest_proof
-                    .get(digest)
-                {
-                    Some(entry) => {
-                        if let Some(_) = entry {
-                            remaining_local_proof_size += 1;
-                        }
-                        // Otherwise proof was already committed, skip.
-                    },
-                    None => {}, // It is possible that the proof entry in digest_proof was already removed when draining the digest_queue but local_digest_queue is not drained yet.
+                if let Some(entry) = self.digest_proof.get(digest) {
+                    // Not committed
+                    if entry.is_some() {
+                        remaining_local_proof_size += 1;
+                    }
                 }
-
             }
         }
         counters::NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK

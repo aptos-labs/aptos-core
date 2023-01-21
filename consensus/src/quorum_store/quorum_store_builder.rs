@@ -385,16 +385,6 @@ impl InnerBuilder {
         )
         .unwrap();
 
-        let metrics_monitor = tokio_metrics::TaskMonitor::new();
-        {
-            spawn_named!("quorum_store_metrics_monitor", async move {
-                for interval in metrics_monitor.intervals() {
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                }
-            })
-            .unwrap();
-        }
-
         let network_msg_rx = self.quorum_store_msg_rx.take().unwrap();
         let net = NetworkListener::new(
             network_msg_rx,
