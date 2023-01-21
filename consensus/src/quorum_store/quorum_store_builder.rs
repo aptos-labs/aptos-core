@@ -389,7 +389,6 @@ impl InnerBuilder {
         {
             spawn_named!("quorum_store_metrics_monitor", async move {
                 for interval in metrics_monitor.intervals() {
-                    println!("QuorumStoreWrapper:{:?}", interval);
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             })

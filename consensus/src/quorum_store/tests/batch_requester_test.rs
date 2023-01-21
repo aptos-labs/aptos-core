@@ -61,7 +61,6 @@ async fn test_batch_requester() {
     batch_requester
         .add_request(digest, signers, oneshot_tx)
         .await;
-    println!("5");
     batch_requester.handle_timeouts().await;
     assert_some!(rx.recv().await);
     batch_requester.handle_timeouts().await;
