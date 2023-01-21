@@ -4,3 +4,4 @@
 mod consensus_fault_tolerance;
 mod consensus_only;
 mod consensusdb_recovery;
+mod quorum_store_fault_tolerance;

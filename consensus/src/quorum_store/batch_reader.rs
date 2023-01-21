@@ -24,6 +24,7 @@ use dashmap::{
     mapref::entry::Entry::{Occupied, Vacant},
     DashMap,
 };
+use fail::fail_point;
 use once_cell::sync::OnceCell;
 use std::{
     collections::HashMap,
@@ -244,6 +245,11 @@ impl BatchReader {
                     <= self.last_certified_round()
                         + self.batch_expiry_round_gap_beyond_latest_certified
             {
+                fail_point!("quorum_store::save", |_| {
+                    // Skip caching and storing value to the db
+                    Ok(false)
+                });
+
                 if let Some(entry) = self.db_cache.get(&digest) {
                     if entry.expiration.round() >= value.expiration.round() {
                         debug!("QS: already have the digest with higher expiration");
