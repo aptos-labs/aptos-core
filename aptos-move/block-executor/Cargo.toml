@@ -29,10 +29,10 @@ dashmap = { workspace = true }
 move-binary-format = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
+parking_lot = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rayon = { workspace = true }
-parking_lot = { workspace = true }
 
 [dev-dependencies]
 claims = { workspace = true }

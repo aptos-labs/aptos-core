@@ -3,14 +3,15 @@
 
 use aptos_infallible::Mutex;
 use crossbeam::utils::CachePadded;
+use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
     cmp::max,
+    hint,
     sync::{
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
         Arc, Condvar,
-    }, hint,
+    },
 };
-use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 
@@ -187,30 +188,25 @@ impl Scheduler {
 
         if let Some(validation_status) = self.txn_status[idx].1.try_upgradable_read() {
             // Acquired the validation status lock, now try the status lock.
-            match self.txn_status[idx].0.try_upgradable_read() {
-                Some(status) => {
-                    if let ExecutionStatus::Executed(incarnation) = *status {
-                        // Status is executed and we are holding the lock.
+            if let Some(status) = self.txn_status[idx].0.try_upgradable_read() {
+                if let ExecutionStatus::Executed(incarnation) = *status {
+                    // Status is executed and we are holding the lock.
 
-                        // Note we update the wave inside commit_state only with max_triggered_wave,
-                        // since max_triggered_wave records the new wave when validation index is
-                        // decreased thus affecting all later txns as well,
-                        // while required_wave only records the new wave for one single txn.
-                        commit_state.1 = max(commit_state.1, validation_status.max_triggered_wave);
-                        if let Some(validated_wave) = validation_status.max_validated_wave {
-                            if validated_wave
-                                >= max(commit_state.1, validation_status.required_wave)
-                            {
-                                let mut status_write = RwLockUpgradableReadGuard::upgrade(status);
-                                // Can commit.
-                                *status_write = ExecutionStatus::Committed(incarnation);
-                                commit_state.0 += 1;
-                                return Some(idx);
-                            }
+                    // Note we update the wave inside commit_state only with max_triggered_wave,
+                    // since max_triggered_wave records the new wave when validation index is
+                    // decreased thus affecting all later txns as well,
+                    // while required_wave only records the new wave for one single txn.
+                    commit_state.1 = max(commit_state.1, validation_status.max_triggered_wave);
+                    if let Some(validated_wave) = validation_status.max_validated_wave {
+                        if validated_wave >= max(commit_state.1, validation_status.required_wave) {
+                            let mut status_write = RwLockUpgradableReadGuard::upgrade(status);
+                            // Can commit.
+                            *status_write = ExecutionStatus::Committed(incarnation);
+                            commit_state.0 += 1;
+                            return Some(idx);
                         }
                     }
-                },
-                None => {},
+                }
             }
         }
         None
