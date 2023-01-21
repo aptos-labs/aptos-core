@@ -16,6 +16,7 @@ pub enum FeatureFlag {
     //COLLECT_AND_DISTRIBUTE_GAS_FEES = 6,
     MULTI_ED25519_PK_VALIDATE_V2_NATIVES = 7,
     BLAKE2B_256_NATIVE = 8,
+    RESOURCE_GROUPS = 9,
 }
 
 /// Representation of features on chain as a bitset.
@@ -44,6 +45,10 @@ impl Features {
         let byte_index = (val / 8) as usize;
         let bit_mask = 1 << (val % 8);
         byte_index < self.features.len() && (self.features[byte_index] & bit_mask != 0)
+    }
+
+    pub fn are_resource_groups_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::RESOURCE_GROUPS)
     }
 }
 
