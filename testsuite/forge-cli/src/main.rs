@@ -200,7 +200,7 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = Duration::from_secs(900);
     let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
