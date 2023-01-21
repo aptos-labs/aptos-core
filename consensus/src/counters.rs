@@ -74,23 +74,6 @@ pub static PROPOSALS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("aptos_consensus_proposals_count", "Count of the block proposals sent by this validator since last restart (both primary and secondary)").unwrap()
 });
 
-/// documentation
-pub static BLOCK_EXECUTED_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!("aptos_block_executed_count", "Count of the block proposals sent by this validator since last restart (both primary and secondary)").unwrap()
-});
-
-/// block executed
-pub static BLOCK_EXECUTED_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        // metric name
-        "block_executed_seconds",
-        // metric description
-        "The time spent in seconds of vm block execution in Aptos executor",
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
-    )
-        .unwrap()
-});
-
 /// Count the number of times a validator voted for a nil block since last restart.
 pub static VOTE_NIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

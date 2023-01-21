@@ -30,7 +30,6 @@ use fail::fail_point;
 use futures::{SinkExt, StreamExt};
 use std::{boxed::Box, cmp::max, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
-use crate::counters::{BLOCK_EXECUTED_COUNT, BLOCK_EXECUTED_SECONDS};
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -119,8 +118,6 @@ impl StateComputer for ExecutionProxy {
         let compute_result = monitor!(
             "execute_block",
             tokio::task::spawn_blocking(move || {
-                BLOCK_EXECUTED_COUNT.inc();
-                let _timer = BLOCK_EXECUTED_SECONDS.start_timer();
                 executor.execute_block((block_id, transactions_to_execute), parent_block_id)
             })
             .await
