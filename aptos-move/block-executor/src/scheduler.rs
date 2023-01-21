@@ -10,6 +10,7 @@ use std::{
         Arc, Condvar,
     }, hint,
 };
+use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 
@@ -147,7 +148,7 @@ pub struct Scheduler {
     /// should be re-executed once transaction i's next incarnation finishes.
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
     /// An index i maps to the most up-to-date status of transaction i.
-    txn_status: Vec<CachePadded<(Mutex<ExecutionStatus>, Mutex<ValidationStatus>)>>,
+    txn_status: Vec<CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>)>>,
 }
 
 /// Public Interfaces for the Scheduler
@@ -165,8 +166,8 @@ impl Scheduler {
             txn_status: (0..num_txns)
                 .map(|_| {
                     CachePadded::new((
-                        Mutex::new(ExecutionStatus::ReadyToExecute(0, None)),
-                        Mutex::new(ValidationStatus::new()),
+                        RwLock::new(ExecutionStatus::ReadyToExecute(0, None)),
+                        RwLock::new(ValidationStatus::new()),
                     ))
                 })
                 .collect(),
@@ -178,16 +179,16 @@ impl Scheduler {
     pub fn try_commit(&self) -> Option<TxnIndex> {
         let mut commit_state = self.commit_state.lock();
         let idx = commit_state.0;
-        // All txns have been committed, the parallel execution can finish.
         if idx == self.num_txns {
+            // All txns have been committed, the parallel execution can finish.
             self.done_marker.store(true, Ordering::SeqCst);
             return None;
         }
 
-        if let Ok(validation_status) = self.txn_status[idx].1.try_lock() {
+        if let Some(validation_status) = self.txn_status[idx].1.try_upgradable_read() {
             // Acquired the validation status lock, now try the status lock.
-            match self.txn_status[idx].0.try_lock() {
-                Ok(mut status) => {
+            match self.txn_status[idx].0.try_upgradable_read() {
+                Some(status) => {
                     if let ExecutionStatus::Executed(incarnation) = *status {
                         // Status is executed and we are holding the lock.
 
@@ -200,15 +201,16 @@ impl Scheduler {
                             if validated_wave
                                 >= max(commit_state.1, validation_status.required_wave)
                             {
+                                let mut status_write = RwLockUpgradableReadGuard::upgrade(status);
                                 // Can commit.
-                                *status = ExecutionStatus::Committed(incarnation);
+                                *status_write = ExecutionStatus::Committed(incarnation);
                                 commit_state.0 += 1;
                                 return Some(idx);
                             }
                         }
                     }
                 },
-                Err(_) => {},
+                None => {},
             }
         }
         None
@@ -226,7 +228,7 @@ impl Scheduler {
     /// that the same version may not successfully abort more than once.
     pub fn try_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> bool {
         // lock the execution status.
-        let mut status = self.txn_status[txn_idx].0.lock();
+        let mut status = self.txn_status[txn_idx].0.write();
 
         if *status == ExecutionStatus::Executed(incarnation) {
             *status = ExecutionStatus::Aborting(incarnation);
@@ -307,7 +309,7 @@ impl Scheduler {
     }
 
     pub fn finish_validation(&self, txn_idx: TxnIndex, wave: Wave) {
-        let mut validation_status = self.txn_status[txn_idx].1.lock();
+        let mut validation_status = self.txn_status[txn_idx].1.write();
         let max_wave = match validation_status.max_validated_wave {
             Some(prev_wave) => max(prev_wave, wave),
             None => wave,
@@ -325,7 +327,7 @@ impl Scheduler {
         incarnation: Incarnation,
         revalidate_suffix: bool,
     ) -> SchedulerTask {
-        let mut validation_status = self.txn_status[txn_idx].1.lock();
+        let mut validation_status = self.txn_status[txn_idx].1.write();
         self.set_executed_status(txn_idx, incarnation);
 
         let txn_deps: Vec<TxnIndex> = {
@@ -381,7 +383,7 @@ impl Scheduler {
     /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
     /// may return a re-execution task back to the caller (otherwise, NoTask).
     pub fn finish_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> SchedulerTask {
-        let mut validation_status = self.txn_status[txn_idx].1.lock();
+        let mut validation_status = self.txn_status[txn_idx].1.write();
         self.set_aborted_status(txn_idx, incarnation);
 
         // Schedule higher txns for validation, could skip txn_idx itself (needs to be
@@ -449,7 +451,7 @@ impl Scheduler {
             return None;
         }
 
-        let mut status = self.txn_status[txn_idx].0.lock();
+        let mut status = self.txn_status[txn_idx].0.write();
         if let ExecutionStatus::ReadyToExecute(incarnation, maybe_condvar) = &*status {
             let ret = (*incarnation, maybe_condvar.clone());
             *status = ExecutionStatus::Executing(*incarnation);
@@ -471,7 +473,7 @@ impl Scheduler {
             return None;
         }
 
-        let status = self.txn_status[txn_idx].0.lock();
+        let status = self.txn_status[txn_idx].0.write();
         match *status {
             ExecutionStatus::Executed(incarnation) => Some(incarnation),
             ExecutionStatus::Committed(incarnation) => {
@@ -538,7 +540,7 @@ impl Scheduler {
     /// Put a transaction in a suspended state, with a condition variable that can be
     /// used to wake it up after the dependency is resolved.
     fn suspend(&self, txn_idx: TxnIndex, dep_condvar: DependencyCondvar) {
-        let mut status = self.txn_status[txn_idx].0.lock();
+        let mut status = self.txn_status[txn_idx].0.write();
 
         if let ExecutionStatus::Executing(incarnation) = *status {
             *status = ExecutionStatus::Suspended(incarnation, dep_condvar);
@@ -551,7 +553,7 @@ impl Scheduler {
     /// incremented incarnation number.
     /// The caller must ensure that the transaction is in the Suspended state.
     fn resume(&self, txn_idx: TxnIndex) {
-        let mut status = self.txn_status[txn_idx].0.lock();
+        let mut status = self.txn_status[txn_idx].0.write();
 
         if let ExecutionStatus::Suspended(incarnation, dep_condvar) = &*status {
             *status = ExecutionStatus::ReadyToExecute(*incarnation, Some(dep_condvar.clone()));
@@ -562,7 +564,7 @@ impl Scheduler {
 
     /// Set status of the transaction to Executed(incarnation).
     fn set_executed_status(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
-        let mut status = self.txn_status[txn_idx].0.lock();
+        let mut status = self.txn_status[txn_idx].0.write();
 
         // Only makes sense when the current status is 'Executing'.
         debug_assert!(*status == ExecutionStatus::Executing(incarnation));
@@ -573,7 +575,7 @@ impl Scheduler {
     /// After a successful abort, mark the transaction as ready for re-execution with
     /// an incremented incarnation number.
     fn set_aborted_status(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
-        let mut status = self.txn_status[txn_idx].0.lock();
+        let mut status = self.txn_status[txn_idx].0.write();
 
         // Only makes sense when the current status is 'Aborting'.
         debug_assert!(*status == ExecutionStatus::Aborting(incarnation));
