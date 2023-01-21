@@ -21,10 +21,7 @@ use move_core_types::{
 };
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
-use std::{
-    collections::BTreeMap,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,
@@ -45,23 +42,22 @@ impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<
         aptos_framework::get_vm_metadata(self.move_vm, module_id)
     }
 
-    fn get_resource_from_group(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-        resource_group: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
-        self.move_resolver
-            .get_resource_from_group(address, struct_tag, resource_group)
-    }
-
     fn get_resource_group_data(
         &self,
         address: &AccountAddress,
+        resource_group: &StructTag,
+    ) -> Result<Option<Vec<u8>>, VMError> {
+        self.move_resolver
+            .get_resource_group_data(address, resource_group)
+    }
+
+    fn get_standard_resource(
+        &self,
+        address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
         self.move_resolver
-            .get_resource_group_data(address, struct_tag)
+            .get_standard_resource(address, struct_tag)
     }
 }
 
@@ -81,7 +77,7 @@ impl<'a, 'm, S: MoveResolverExt> ResourceResolver for MoveResolverWithVMMetadata
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.move_resolver.get_resource(address, struct_tag)
+        self.get_any_resource(address, struct_tag)
     }
 }
 
@@ -125,31 +121,21 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
         aptos_framework::get_module_metadata(&module)
     }
 
-    fn get_resource_from_group(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-        resource_group: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
-        let group_data = self.get_resource_group_data(address, resource_group)?;
-        if let Some(group_data) = group_data {
-            let mut group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
-                .map_err(|_| {
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .finish(Location::Undefined)
-                })?;
-            Ok(group_data.remove(struct_tag))
-        } else {
-            Ok(None)
-        }
-    }
-
     fn get_resource_group_data(
         &self,
         address: &AccountAddress,
+        resource_group: &StructTag,
+    ) -> Result<Option<Vec<u8>>, VMError> {
+        let ap = AccessPath::resource_group_access_path(*address, resource_group.clone());
+        self.get(ap).map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn get_standard_resource(
+        &self,
+        address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
-        let ap = AccessPath::resource_group_access_path(*address, struct_tag.clone());
+        let ap = AccessPath::resource_access_path(*address, struct_tag.clone());
         self.get(ap).map_err(|e| e.finish(Location::Undefined))
     }
 }
@@ -172,20 +158,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
-        // For our current perf evaluation, the ordering of operations has a substantial impact.
-        // This is interesting because resources groups are already cached in the VM and the query
-        // should be really fast.
-        let ap = AccessPath::resource_access_path(*address, struct_tag.clone());
-        let resource = self.get(ap).map_err(|e| e.finish(Location::Undefined));
-        if let Ok(Some(_)) = resource {
-            resource
-        } else if resource.is_err() {
-            resource
-        } else if let Some(resource_group) = self.get_resource_group(struct_tag)? {
-            self.get_resource_from_group(address, struct_tag, &resource_group)
-        } else {
-            Ok(None)
-        }
+        self.get_any_resource(address, struct_tag)
     }
 }
 
@@ -260,23 +233,22 @@ impl<S: StateView> MoveResolverExt for StorageAdapterOwned<S> {
         self.as_move_resolver().get_module_metadata(module_id)
     }
 
-    fn get_resource_from_group(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-        resource_group: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
-        self.as_move_resolver()
-            .get_resource_from_group(address, struct_tag, resource_group)
-    }
-
     fn get_resource_group_data(
         &self,
         address: &AccountAddress,
+        resource_group: &StructTag,
+    ) -> Result<Option<Vec<u8>>, VMError> {
+        self.as_move_resolver()
+            .get_resource_group_data(address, resource_group)
+    }
+
+    fn get_standard_resource(
+        &self,
+        address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
         self.as_move_resolver()
-            .get_resource_group_data(address, struct_tag)
+            .get_standard_resource(address, struct_tag)
     }
 }
 

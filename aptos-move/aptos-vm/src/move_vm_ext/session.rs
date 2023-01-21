@@ -136,24 +136,24 @@ where
         ctx.requested_module_bundle.take()
     }
 
-    // * Separate the resource groups from the non-resource groups
-    // * non-resource groups are kept as is
-    // * resource groups are merged into the correct format as deltas to the source data
-    //   * Remove resource group data from the deltas
-    //   * Attempt to read the existing resource group data or create a new empty container
-    //   * Apply the deltas to the resource group data
-    // The process for translating Move deltas of resource groups to resources is
-    // * Add -- insert element in container
-    //   * If entry exists, Unreachable
-    //   * If group exists, Modify
-    //   * If group doesn't exist, Add
-    // * Modify -- update element in container
-    //   * If group or data doesn't exist, Unreachable
-    //   * Otherwise modify
-    // * Delete -- remove element from container
-    //   * If group or data does't exist, Unreachable
-    //   * If elements remain, Modify
-    //   * Otherwise delete
+    /// * Separate the resource groups from the non-resource groups
+    /// * non-resource groups are kept as is
+    /// * resource groups are merged into the correct format as deltas to the source data
+    ///   * Remove resource group data from the deltas
+    ///   * Attempt to read the existing resource group data or create a new empty container
+    ///   * Apply the deltas to the resource group data
+    /// The process for translating Move deltas of resource groups to resources is
+    /// * Add -- insert element in container
+    ///   * If entry exists, Unreachable
+    ///   * If group exists, Modify
+    ///   * If group doesn't exist, Add
+    /// * Modify -- update element in container
+    ///   * If group or data doesn't exist, Unreachable
+    ///   * Otherwise modify
+    /// * Delete -- remove element from container
+    ///   * If group or data does't exist, Unreachable
+    ///   * If elements remain, Modify
+    ///   * Otherwise delete
     fn split_and_merge_resource_groups(
         remote: &MoveResolverWithVMMetadata<S>,
         change_set: MoveChangeSet,

@@ -4,7 +4,7 @@
 use crate::{
     access_path_cache::AccessPathCache,
     counters::*,
-    data_cache::StorageAdapter,
+    data_cache::{MoveResolverWithVMMetadata, StorageAdapter},
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
@@ -522,6 +522,13 @@ impl AptosVMImpl {
         } else {
             aptos_framework::get_vm_metadata_v0(&self.move_vm, module.clone())
         }
+    }
+
+    pub fn new_move_resolver<'r, R: MoveResolverExt>(
+        &self,
+        r: &'r R,
+    ) -> MoveResolverWithVMMetadata<'r, '_, R> {
+        MoveResolverWithVMMetadata::new(r, &self.move_vm)
     }
 
     pub fn new_session<'r, R: MoveResolverExt>(
