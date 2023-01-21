@@ -38,10 +38,10 @@ impl DurationHistogram {
 
 #[derive(Clone)]
 pub struct OpMetrics {
-    counters: IntCounterVec,
-    gauges: IntGaugeVec,
-    peer_gauges: IntGaugeVec,
-    duration_histograms: HistogramVec,
+    pub counters: IntCounterVec,
+    pub gauges: IntGaugeVec,
+    pub peer_gauges: IntGaugeVec,
+    pub duration_histograms: HistogramVec,
 }
 
 impl OpMetrics {

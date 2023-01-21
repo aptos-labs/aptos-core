@@ -14,9 +14,11 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-config = { workspace = true }
+aptos-consensus = {workspace = true}
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
 aptos-executor = { workspace = true }
+aptos-block-executor = {workspace = true}
 aptos-executor-types = { workspace = true }
 aptos-genesis = { workspace = true, features = ["testing"] }
 aptos-infallible = { workspace = true }

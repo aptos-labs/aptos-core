@@ -910,7 +910,9 @@ dependencies = [
 name = "aptos-executor-benchmark"
 version = "0.1.0"
 dependencies = [
+ "aptos-block-executor",
  "aptos-config",
+ "aptos-consensus",
  "aptos-crypto",
  "aptos-db",
  "aptos-executor",

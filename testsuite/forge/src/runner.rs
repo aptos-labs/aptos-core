@@ -271,7 +271,8 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             node_helm_config_fn: None,
             emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
                 mempool_backlog: 40000,
-            }).transaction_type(TransactionType::AccountGeneration),
+            }),
+                //.transaction_type(TransactionType::AccountGeneration),
             success_criteria,
             existing_db_tag: None,
         }
