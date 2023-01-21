@@ -6,6 +6,10 @@ pub(crate) mod vm_wrapper;
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     block_executor::vm_wrapper::AptosExecutorTask,
+    counters::{
+        BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS,
+    },
     AptosVM,
 };
 use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
@@ -133,9 +137,12 @@ impl BlockAptosVM {
         state_view: &S,
         concurrency_level: usize,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
+        let signature_verification_timer =
+            BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
         let signature_verified_block: Vec<PreprocessedTransaction> =
             RAYON_EXEC_POOL.install(|| {
                 transactions
@@ -143,7 +150,9 @@ impl BlockAptosVM {
                     .map(preprocess_transaction::<AptosVM>)
                     .collect()
             });
+        drop(signature_verification_timer);
 
+        BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
             concurrency_level,
         );

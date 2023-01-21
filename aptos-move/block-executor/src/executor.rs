@@ -3,6 +3,7 @@
 
 use crate::{
     counters,
+    counters::{TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS},
     errors::*,
     output_delta_resolver::OutputDeltaResolver,
     scheduler::{Scheduler, SchedulerTask, Version, Wave},
@@ -65,6 +66,7 @@ where
         executor: &E,
         base_view: &S,
     ) -> SchedulerTask {
+        let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute];
 
@@ -141,6 +143,7 @@ where
         use MVHashMapError::*;
         use MVHashMapOutput::*;
 
+        let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let (idx_to_validate, incarnation) = version_to_validate;
         let read_set = last_input_output
             .read_set(idx_to_validate)
@@ -191,7 +194,9 @@ where
         commits: bool,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
+        let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
+        drop(init_timer);
 
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {
