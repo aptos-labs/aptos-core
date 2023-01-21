@@ -7,7 +7,8 @@ use crate::{
         CHAIN_HEALTH_REPUTATION_PARTICIPATING_VOTING_POWER_FRACTION,
         CHAIN_HEALTH_TOTAL_NUM_VALIDATORS, CHAIN_HEALTH_TOTAL_VOTING_POWER,
         CHAIN_HEALTH_WINDOW_SIZES, COMMITTED_PROPOSALS_IN_WINDOW, COMMITTED_VOTES_IN_WINDOW,
-        FAILED_PROPOSALS_IN_WINDOW, LEADER_REPUTATION_ROUND_HISTORY_SIZE,
+        CONSENSUS_PARTICIPATION_STATUS, FAILED_PROPOSALS_IN_WINDOW,
+        LEADER_REPUTATION_ROUND_HISTORY_SIZE,
     },
     liveness::proposer_election::{choose_index, ProposerElection},
 };
@@ -24,6 +25,7 @@ use aptos_types::{
     epoch_state::EpochState,
 };
 use std::{
+    cmp::max,
     collections::{HashMap, HashSet},
     convert::TryFrom,
     sync::Arc,
@@ -629,6 +631,21 @@ impl LeaderReputation {
                     .filter(|(c, _vp)| participants.contains(c))
                     .map(|(_c, vp)| *vp as f64)
                     .sum();
+
+                if counter_index == max(CHAIN_HEALTH_WINDOW_SIZES.len() - 2, 0) {
+                    // Only emit this for one window value. Currently defaults to 100
+                    candidates.iter().for_each(|x| {
+                        if participants.contains(x) {
+                            CONSENSUS_PARTICIPATION_STATUS
+                                .with_label_values(&[&x.to_string()])
+                                .set(1_i64)
+                        } else {
+                            CONSENSUS_PARTICIPATION_STATUS
+                                .with_label_values(&[&x.to_string()])
+                                .set(0_i64)
+                        }
+                    });
+                }
 
                 CHAIN_HEALTH_PARTICIPATING_VOTING_POWER[counter_index]
                     .set(participating_voting_power);

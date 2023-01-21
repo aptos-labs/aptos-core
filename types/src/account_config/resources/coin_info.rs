@@ -11,7 +11,7 @@ use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::IdentStr,
-    language_storage::{ResourceKey, TypeTag},
+    language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},
 };
 use serde::{Deserialize, Serialize};
@@ -111,8 +111,8 @@ impl CoinInfoResource {
     /// Returns a writeset corresponding to the creation of CoinInfo in Move.
     /// This can be passed to data store for testing total supply.
     pub fn to_writeset(&self) -> WriteSet {
-        let tag = ResourceKey::new(AccountAddress::ONE, CoinInfoResource::struct_tag());
-        let ap = AccessPath::resource_access_path(tag);
+        let ap =
+            AccessPath::resource_access_path(AccountAddress::ONE, CoinInfoResource::struct_tag());
 
         let value_state_key = self
             .supply

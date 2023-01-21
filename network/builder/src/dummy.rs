@@ -15,7 +15,9 @@ use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
     application::{interface::NetworkClient, storage::PeerMetadataStorage},
     peer_manager::builder::AuthenticationMode,
-    protocols::network::{Event, NetworkApplicationConfig, NetworkEvents},
+    protocols::network::{
+        Event, NetworkApplicationConfig, NetworkClientConfig, NetworkEvents, NetworkServiceConfig,
+    },
     ProtocolId,
 };
 use aptos_time_service::TimeService;
@@ -37,10 +39,17 @@ const TEST_DIRECT_SEND_PROTOCOL: ProtocolId = ProtocolId::ConsensusDirectSendBcs
 pub struct DummyMsg(pub Vec<u8>);
 
 pub fn dummy_network_config() -> NetworkApplicationConfig {
-    NetworkApplicationConfig::client_and_service(
-        [TEST_RPC_PROTOCOL, TEST_DIRECT_SEND_PROTOCOL],
+    let direct_send_protocols = vec![TEST_DIRECT_SEND_PROTOCOL];
+    let rpc_protocls = vec![TEST_RPC_PROTOCOL];
+
+    let network_client_config =
+        NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocls.clone());
+    let network_service_config = NetworkServiceConfig::new(
+        direct_send_protocols,
+        rpc_protocls,
         aptos_channel::Config::new(NETWORK_CHANNEL_SIZE),
-    )
+    );
+    NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
 
 /// TODO(davidiw): In DummyNetwork, replace DummyMsg with a Serde compatible type once migration

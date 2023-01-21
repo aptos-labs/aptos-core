@@ -7,7 +7,7 @@ slug: "node-liveness-criteria"
 
 When you participate in the Aptos network, your validator node and the validator fullnode must pass liveness checks within 24 hours of being selected to participate in the network, and at a regular cadence onwards. This is required to ensure that your nodes contribute to the health of the overall network. 
 
-This document describes how you can verify the status of your deployed validator node in the Aptos network to meet the success criteria.
+This document describes how you can verify the status of your deployed validator node in the Aptos network to meet our success criteria. Once your nodes are up and running, you can also [measure their success](../../measure/index.md) using the [Node Health Checker](../../measure/node-health-checker.md) and [Node Inspection Service](../../measure/node-inspection-service.md).
 
 The liveness of your validator node will be evaluated using both on-chain and off-chain data. On-chain data will be pulled directly from your validator node  syncing to the chain, and off-chain data will be received from your validator node via telemetry. Such data includes:
 

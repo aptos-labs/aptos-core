@@ -1,14 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::components::get_execution_hash;
 use anyhow::Result;
-use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use std::process::Command;
 
 pub fn generate_upgrade_proposals(
     is_testnet: bool,
-    next_execution_hash: String,
+    next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
     let mut package_path_list = vec![
         ("0x1", "aptos-move/framework/move-stdlib"),
@@ -74,16 +74,16 @@ pub fn generate_upgrade_proposals(
         // 1-aptos-stdlib.move	3-aptos-token.move	5-version.move		7-consensus-config.move
         // The first framework file being generated is 3-aptos-token.move. It's using the next_execution_hash being passed in (so in this case, the hash of 4-gas-schedule.move being passed in mod.rs).
         // The second framework file being generated would be 2-aptos-framework.move, and it's using the hash of 3-aptos-token.move (which would be result.last()).
-        let mut _execution_hash: String = "".to_owned();
-        if !next_execution_hash.is_empty() {
+        let mut _next_execution_hash_string = "".to_owned();
+        if !next_execution_hash.clone().is_empty() {
             args.push("--next-execution-hash");
+            // Convert from bytes to string to pass next_execution_hash to the command line
             if result.is_empty() {
-                args.push(&next_execution_hash);
+                _next_execution_hash_string = hex::encode(next_execution_hash.clone());
             } else {
-                _execution_hash =
-                    HashValue::sha3_256_of(result.last().unwrap().1.as_bytes()).to_string();
-                args.push(&_execution_hash);
+                _next_execution_hash_string = hex::encode(get_execution_hash(&result));
             }
+            args.push(&_next_execution_hash_string);
         }
 
         assert!(Command::new("cargo")

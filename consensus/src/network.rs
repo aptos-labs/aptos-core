@@ -11,6 +11,7 @@ use crate::{
 };
 use anyhow::{anyhow, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
+use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
@@ -22,11 +23,8 @@ use aptos_consensus_types::{
 };
 use aptos_logger::prelude::*;
 use aptos_network::{
-    application::interface::NetworkClient,
-    protocols::{
-        network::{Event, NetworkEvents},
-        rpc::error::RpcError,
-    },
+    application::interface::{NetworkClient, NetworkServiceEvents},
+    protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
 use aptos_types::{
@@ -35,7 +33,11 @@ use aptos_types::{
 };
 use bytes::Bytes;
 use fail::fail_point;
-use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
+use futures::{
+    channel::oneshot,
+    stream::{select, select_all},
+    SinkExt, Stream, StreamExt,
+};
 use std::{
     mem::{discriminant, Discriminant},
     time::Duration,
@@ -342,7 +344,7 @@ pub struct NetworkTask {
 impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
-        network_events: NetworkEvents<ConsensusMsg>,
+        network_service_events: NetworkServiceEvents<ConsensusMsg>,
         self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) =
@@ -358,7 +360,20 @@ impl NetworkTask {
             1,
             Some(&counters::BLOCK_RETRIEVAL_CHANNEL_MSGS),
         );
+
+        // Verify the network events have been constructed correctly
+        let network_and_events = network_service_events.into_network_and_events();
+        if (network_and_events.values().len() != 1)
+            || !network_and_events.contains_key(&NetworkId::Validator)
+        {
+            panic!("The network has not been setup correctly for consensus!");
+        }
+
+        // Collect all the network events into a single stream
+        let network_events: Vec<_> = network_and_events.into_values().collect();
+        let network_events = select_all(network_events).fuse();
         let all_events = Box::new(select(network_events, self_receiver));
+
         (
             NetworkTask {
                 consensus_messages_tx,

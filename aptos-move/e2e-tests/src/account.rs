@@ -20,10 +20,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_vm_genesis::GENESIS_KEYPAIR;
-use move_core_types::{
-    language_storage::{ResourceKey, StructTag},
-    move_resource::MoveStructType,
-};
+use move_core_types::move_resource::MoveStructType;
 
 // TTL is 86400s. Initial time was set to 0.
 pub const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;
@@ -121,19 +118,14 @@ impl Account {
     ///
     /// Use this to retrieve or publish the Account blob.
     pub fn make_account_access_path(&self) -> AccessPath {
-        self.make_access_path(AccountResource::struct_tag())
+        AccessPath::resource_access_path(self.addr, AccountResource::struct_tag())
     }
 
     /// Returns the AccessPath that describes the Account's CoinStore resource instance.
     ///
     /// Use this to retrieve or publish the Account CoinStore blob.
     pub fn make_coin_store_access_path(&self) -> AccessPath {
-        self.make_access_path(CoinStoreResource::struct_tag())
-    }
-
-    pub fn make_access_path(&self, tag: StructTag) -> AccessPath {
-        let resource_tag = ResourceKey::new(self.addr, tag);
-        AccessPath::resource_access_path(resource_tag)
+        AccessPath::resource_access_path(self.addr, CoinStoreResource::struct_tag())
     }
 
     /// Changes the keys for this account to the provided ones.

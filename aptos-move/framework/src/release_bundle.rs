@@ -165,7 +165,7 @@ impl ReleasePackage {
         for_address: AccountAddress,
         out: PathBuf,
     ) -> anyhow::Result<()> {
-        self.generate_script_proposal_impl(for_address, out, false, false, "".to_owned())
+        self.generate_script_proposal_impl(for_address, out, false, false, Vec::new())
     }
 
     pub fn generate_script_proposal_testnet(
@@ -173,14 +173,14 @@ impl ReleasePackage {
         for_address: AccountAddress,
         out: PathBuf,
     ) -> anyhow::Result<()> {
-        self.generate_script_proposal_impl(for_address, out, true, false, "".to_owned())
+        self.generate_script_proposal_impl(for_address, out, true, false, Vec::new())
     }
 
     pub fn generate_script_proposal_multi_step(
         &self,
         for_address: AccountAddress,
         out: PathBuf,
-        next_execution_hash: String,
+        next_execution_hash: Vec<u8>,
     ) -> anyhow::Result<()> {
         self.generate_script_proposal_impl(for_address, out, true, true, next_execution_hash)
     }
@@ -191,7 +191,7 @@ impl ReleasePackage {
         out: PathBuf,
         is_testnet: bool,
         is_multi_step: bool,
-        next_execution_hash: String,
+        next_execution_hash: Vec<u8>,
     ) -> anyhow::Result<()> {
         let writer = CodeWriter::new(Loc::default());
         emitln!(
@@ -290,17 +290,16 @@ impl ReleasePackage {
     fn generate_next_execution_hash_blob(
         writer: &CodeWriter,
         for_address: AccountAddress,
-        next_execution_hash: String,
+        next_execution_hash: Vec<u8>,
     ) {
-        if next_execution_hash == "vector::empty<u8>()" {
+        if next_execution_hash == "vector::empty<u8>()".as_bytes() {
             emitln!(
                 writer,
                 "let framework_signer = aptos_governance::resolve_multi_step_proposal(proposal_id, @{}, {});\n",
                 for_address,
-                next_execution_hash,
+                "vector::empty<u8>()",
             );
         } else {
-            let next_execution_hash_bytes = next_execution_hash.as_bytes();
             emitln!(
                 writer,
                 "let framework_signer = aptos_governance::resolve_multi_step_proposal("
@@ -309,15 +308,12 @@ impl ReleasePackage {
             emitln!(writer, "proposal_id,");
             emitln!(writer, "@{},", for_address);
             emit!(writer, "vector[");
-            for (i, b) in next_execution_hash_bytes.iter().enumerate() {
-                if (i + 1) % 20 == 0 {
-                    emitln!(writer);
-                }
+            for (_, b) in next_execution_hash.iter().enumerate() {
                 emit!(writer, "{}u8,", b);
             }
             emitln!(writer, "],");
             writer.unindent();
-            emitln!(writer, "};");
+            emitln!(writer, ");");
         }
     }
 }

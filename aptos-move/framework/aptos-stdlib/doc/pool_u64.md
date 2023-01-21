@@ -866,6 +866,12 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 ## Specification
 
 
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
 <a name="@Specification_1_Pool"></a>
 
 ### Struct `Pool`
