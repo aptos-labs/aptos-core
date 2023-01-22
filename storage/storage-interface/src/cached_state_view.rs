@@ -151,24 +151,11 @@ impl CachedStateView {
             StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => {
                 match self.snapshot {
                     Some((version, root_hash)) => {
-                        let (value, proof) = self.proof_fetcher.fetch_state_value_and_proof(
+                        let (value, _proof) = self.proof_fetcher.fetch_state_value_and_proof(
                             state_key,
                             version,
                             Some(root_hash),
                         )?;
-                        // TODO: proof verification can be opted out, for performance
-                        if let Some(proof) = proof {
-                            proof
-                                .verify(root_hash, key_hash, value.as_ref())
-                                .map_err(|err| {
-                                    format_err!(
-                                    "Proof is invalid for key {:?} with state root hash {:?}: {}",
-                                    state_key,
-                                    root_hash,
-                                    err
-                                )
-                                })?;
-                        }
                         value
                     },
                     None => None,

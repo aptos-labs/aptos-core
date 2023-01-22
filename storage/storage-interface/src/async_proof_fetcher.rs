@@ -94,20 +94,6 @@ impl AsyncProofFetcher {
             let proof = reader
                 .get_state_proof_by_version_ext(&state_key, version)
                 .expect("Proof reading should succeed.");
-            if let Some(root_hash) = root_hash {
-                proof
-                    .verify_by_hash(root_hash, state_key.hash(), value_hash)
-                    .map_err(|err| {
-                        anyhow!(
-                            "Proof is invalid for key {:?} with state root hash {:?}, at version {}: {}.",
-                            state_key,
-                            root_hash,
-                            version,
-                            err
-                        )
-                    })
-                    .expect("Failed to verify proof.");
-            }
             match data_sender.send(Proof {
                 state_key_hash: state_key.hash(),
                 proof,
