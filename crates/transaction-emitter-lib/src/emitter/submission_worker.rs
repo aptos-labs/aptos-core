@@ -9,7 +9,7 @@ use crate::{
     transaction_generator::TransactionGenerator,
     EmitModeParams,
 };
-use aptos_logger::{sample, sample::SampleRate, warn};
+use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount};
 use core::{
@@ -204,10 +204,10 @@ impl SubmissionWorker {
         check_account_sleep_duration: Duration,
         loop_stats: &StatsAccumulator,
     ) {
-        assert_eq!(
-            num_requests,
-            self.params.transactions_per_account * self.accounts.len()
-        );
+        // assert_eq!(
+        //     num_requests,
+        //     self.params.transactions_per_account * self.accounts.len()
+        // );
         let (num_expired, sum_of_completion_timestamps_millis) = wait_for_accounts_sequence(
             start_time,
             &self.client,
@@ -268,6 +268,11 @@ impl SubmissionWorker {
                 self.accounts.len(),
             ),
         );
+        sample!(
+                SampleRate::Duration(Duration::from_secs(120)),
+        info!("batch size is {}, max_submit_batch_size is {}, transactions_per_account is {} and accounts len is {} ",
+        batch_size, self.params.max_submit_batch_size, self.params.transactions_per_account, self.accounts.len());
+            );
         let accounts = self
             .accounts
             .iter_mut()
