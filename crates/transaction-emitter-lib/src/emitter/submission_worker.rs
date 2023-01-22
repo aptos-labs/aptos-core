@@ -273,12 +273,13 @@ impl SubmissionWorker {
         info!("batch size is {}, max_submit_batch_size is {}, transactions_per_account is {} and accounts len is {} ",
         batch_size, self.params.max_submit_batch_size, self.params.transactions_per_account, self.accounts.len());
             );
+        let batch_size = 20;
         let accounts = self
             .accounts
             .iter_mut()
             .choose_multiple(&mut self.rng, batch_size);
         self.txn_generator
-            .generate_transactions(accounts, self.params.transactions_per_account)
+            .generate_transactions(accounts, 1)
     }
 }
 
