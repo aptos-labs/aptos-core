@@ -263,8 +263,8 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            //(optimize_payload(payload), timestamp.as_micros() as u64)
-                (payload, timestamp.as_micros() as u64)
+            (optimize_payload(payload), timestamp.as_micros() as u64)
+             //   (payload, timestamp.as_micros() as u64)
         };
 
         let quorum_cert = hqc.as_ref().clone();
