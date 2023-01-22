@@ -18,10 +18,12 @@ use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
 use std::ops::Deref;
+use aptos_types::on_chain_config::Features;
 
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
+    features: Features,
 }
 
 impl MoveVmExt {
@@ -32,6 +34,7 @@ impl MoveVmExt {
         treat_friend_as_private: bool,
         allow_binary_format_v6: bool,
         chain_id: u8,
+        features: Features,
     ) -> VMResult<Self> {
         // Note: binary format v6 adds a few new integer types and their corresponding instructions.
         //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
@@ -56,6 +59,7 @@ impl MoveVmExt {
                 },
             )?,
             chain_id,
+            features,
         })
     }
 

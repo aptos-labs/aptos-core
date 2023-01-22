@@ -117,6 +117,7 @@ where
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
         Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         chain_id,
+        Features::default(),
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);

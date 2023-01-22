@@ -124,6 +124,7 @@ impl AptosVMImpl {
             features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             chain_id.id(),
+            features.clone(),
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 

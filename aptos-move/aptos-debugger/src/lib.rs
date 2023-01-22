@@ -23,6 +23,7 @@ use aptos_vm::{
 };
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 
 pub struct AptosDebugger {
     debugger: Arc<dyn AptosValidatorInterface + Send>,
@@ -154,6 +155,8 @@ impl AptosDebugger {
     where
         F: FnOnce(&mut SessionExt<StorageAdapter<DebuggerStateView>>) -> VMResult<()>,
     {
+        let mut features = Features::default();
+        features.update(FeatureFlag::TREAT_FRIEND_AS_PRIVATE, true);
         let move_vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
@@ -161,6 +164,7 @@ impl AptosDebugger {
             true,
             true,
             ChainId::test().id(),
+            features,
         )
         .unwrap();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
