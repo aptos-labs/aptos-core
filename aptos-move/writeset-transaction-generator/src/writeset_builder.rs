@@ -11,7 +11,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
-    on_chain_config::{FeatureFlag, Features},
+    on_chain_config::Features,
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{

@@ -11,7 +11,7 @@ use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    on_chain_config::{FeatureFlag, Features, OnChainConfig},
+    on_chain_config::{Features, OnChainConfig},
     transaction::{ChangeSet, Transaction, TransactionOutput, Version},
 };
 use aptos_validator_interface::{

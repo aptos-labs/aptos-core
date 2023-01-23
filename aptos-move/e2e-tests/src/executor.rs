@@ -28,7 +28,7 @@ use aptos_types::{
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    on_chain_config::{FeatureFlag, Features, OnChainConfig, ValidatorSet, Version},
+    on_chain_config::{Features, OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
