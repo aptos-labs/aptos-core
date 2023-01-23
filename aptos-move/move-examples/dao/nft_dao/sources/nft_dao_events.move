@@ -1,13 +1,13 @@
 module dao_platform::nft_dao_events {
+    use aptos_framework::account;
     use aptos_framework::event::EventHandle;
-    use std::string::String;
+    use aptos_framework::event;
+    use aptos_std::any::Any;
     use aptos_token::property_map::PropertyMap;
     use std::option::Option;
-    use aptos_std::any::Any;
-    use std::signer;
-    use aptos_framework::account;
     use std::option;
-    use aptos_framework::event;
+    use std::signer;
+    use std::string::String;
     friend dao_platform::nft_dao;
 
     struct CreateDAOEvent has drop, store {
@@ -22,6 +22,7 @@ module dao_platform::nft_dao_events {
 
     struct CreateProposalEvent has drop, store {
         proposer: address,
+        proposal_id: u64,
         name: String,
         description: String,
         function_name: String,
@@ -42,6 +43,18 @@ module dao_platform::nft_dao_events {
     struct ResolveEvent has drop, store {
         proposal_id: u64,
         result: u8,
+    }
+
+    struct AdminResolveEvent has drop, store {
+        proposal_id: u64,
+        admin: address,
+        reason: String,
+    }
+
+    struct AdminVetoEvent has drop, store {
+        proposal_id: u64,
+        admin: address,
+        reason: String,
     }
 
     struct AdminOfferEvent has drop, store {
@@ -90,10 +103,12 @@ module dao_platform::nft_dao_events {
         change_threshold_events: EventHandle<DAOThresholdChangeEvent>,
         change_duration_events: EventHandle<DAOVoteDurationChangeEvent>,
         change_voting_power_events: EventHandle<DAOReqiredVotingPowerChangeEvent>,
+        admin_resolve_events: EventHandle<AdminResolveEvent>,
+        admin_veto_events: EventHandle<AdminVetoEvent>,
         extension: Option<Any>,
     }
 
-    public(friend) fun initialize_dao_event_store(acct: &signer) {
+    fun initialize_dao_event_store(acct: &signer) {
         if (!exists<DAOEventStoreV1>(signer::address_of(acct))) {
             move_to(acct, DAOEventStoreV1 {
                 create_dao_events: account::new_event_handle<CreateDAOEvent>(acct),
@@ -107,6 +122,8 @@ module dao_platform::nft_dao_events {
                 change_threshold_events: account::new_event_handle<DAOThresholdChangeEvent>(acct),
                 change_duration_events: account::new_event_handle<DAOVoteDurationChangeEvent>(acct),
                 change_voting_power_events: account::new_event_handle<DAOReqiredVotingPowerChangeEvent>(acct),
+                admin_resolve_events: account::new_event_handle<AdminResolveEvent>(acct),
+                admin_veto_events: account::new_event_handle<AdminVetoEvent>(acct),
                 extension: option::none<Any>(),
             });
         };
@@ -142,6 +159,7 @@ module dao_platform::nft_dao_events {
     public(friend) fun emit_create_proposal_event(
         proposer: address,
         nft_dao: address,
+        proposal_id: u64,
         name: String,
         description: String,
         function_name: String,
@@ -152,6 +170,7 @@ module dao_platform::nft_dao_events {
     ) acquires DAOEventStoreV1 {
         let event = CreateProposalEvent {
             proposer,
+            proposal_id,
             name,
             description,
             function_name,
@@ -289,6 +308,34 @@ module dao_platform::nft_dao_events {
 
         event::emit_event<DAOReqiredVotingPowerChangeEvent>(
             &mut dao_event_store.change_voting_power_events,
+            event,
+        );
+    }
+
+    public(friend) fun emit_admin_veto_event(proposal_id: u64, admin: address, nft_dao: address, reason: String) acquires DAOEventStoreV1 {
+        let event = AdminVetoEvent {
+            proposal_id,
+            admin,
+            reason,
+        };
+        let dao_event_store = borrow_global_mut<DAOEventStoreV1>(nft_dao);
+
+        event::emit_event<AdminVetoEvent>(
+            &mut dao_event_store.admin_veto_events,
+            event,
+        );
+    }
+
+    public(friend) fun emit_admin_resolve_event(proposal_id: u64, admin: address, nft_dao: address, reason: String) acquires DAOEventStoreV1 {
+        let event = AdminResolveEvent {
+            proposal_id,
+            admin,
+            reason,
+        };
+        let dao_event_store = borrow_global_mut<DAOEventStoreV1>(nft_dao);
+
+        event::emit_event<AdminResolveEvent>(
+            &mut dao_event_store.admin_resolve_events,
             event,
         );
     }
