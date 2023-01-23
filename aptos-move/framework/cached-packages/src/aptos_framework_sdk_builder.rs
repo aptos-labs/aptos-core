@@ -319,6 +319,7 @@ pub enum EntryFunctionCall {
     /// In order to ensure a malicious module cannot obtain backdoor control over an existing account, a signed message
     /// with a valid signature from the account's auth key is required.
     MultisigAccountCreateWithExistingAccount {
+        multisig_address: AccountAddress,
         owners: Vec<AccountAddress>,
         signatures_required: u64,
         account_scheme: u8,
@@ -848,12 +849,14 @@ impl EntryFunctionCall {
                 payload_hash,
             } => multisig_account_create_transaction_with_hash(multisig_account, payload_hash),
             MultisigAccountCreateWithExistingAccount {
+                multisig_address,
                 owners,
                 signatures_required,
                 account_scheme,
                 account_public_key,
                 create_multisig_account_signed_message,
             } => multisig_account_create_with_existing_account(
+                multisig_address,
                 owners,
                 signatures_required,
                 account_scheme,
@@ -1842,6 +1845,7 @@ pub fn multisig_account_create_transaction_with_hash(
 /// In order to ensure a malicious module cannot obtain backdoor control over an existing account, a signed message
 /// with a valid signature from the account's auth key is required.
 pub fn multisig_account_create_with_existing_account(
+    multisig_address: AccountAddress,
     owners: Vec<AccountAddress>,
     signatures_required: u64,
     account_scheme: u8,
@@ -1859,6 +1863,7 @@ pub fn multisig_account_create_with_existing_account(
         ident_str!("create_with_existing_account").to_owned(),
         vec![],
         vec![
+            bcs::to_bytes(&multisig_address).unwrap(),
             bcs::to_bytes(&owners).unwrap(),
             bcs::to_bytes(&signatures_required).unwrap(),
             bcs::to_bytes(&account_scheme).unwrap(),
@@ -3472,11 +3477,12 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::MultisigAccountCreateWithExistingAccount {
-                    owners: bcs::from_bytes(script.args().get(0)?).ok()?,
-                    signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
-                    account_scheme: bcs::from_bytes(script.args().get(2)?).ok()?,
-                    account_public_key: bcs::from_bytes(script.args().get(3)?).ok()?,
-                    create_multisig_account_signed_message: bcs::from_bytes(script.args().get(4)?)
+                    multisig_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    owners: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    signatures_required: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    account_scheme: bcs::from_bytes(script.args().get(3)?).ok()?,
+                    account_public_key: bcs::from_bytes(script.args().get(4)?).ok()?,
+                    create_multisig_account_signed_message: bcs::from_bytes(script.args().get(5)?)
                         .ok()?,
                 },
             )

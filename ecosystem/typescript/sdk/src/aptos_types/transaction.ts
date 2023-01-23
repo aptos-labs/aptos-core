@@ -225,6 +225,10 @@ export class MultiSig {
       serializer.serializeBool(false);
     } else {
       serializer.serializeBool(true);
+      // We can support multiple types of inner transaction payload in the future.
+      // For now it's only EntryFunction but if we support more types, we need to serialize with the right enum values
+      // here
+      serializer.serializeU32AsUleb128(0);
       this.transaction_payload.serialize(serializer);
     }
   }

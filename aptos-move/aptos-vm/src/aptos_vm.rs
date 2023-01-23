@@ -35,8 +35,9 @@ use aptos_types::{
     on_chain_config::{new_epoch_event_key, FeatureFlag},
     transaction::{
         ChangeSet, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, WriteSetPayload,
+        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
+        WriteSetPayload,
     },
     vm_status::{AbortLocation, DiscardedVMStatus, StatusCode, VMStatus},
     write_set::WriteSet,
@@ -417,10 +418,10 @@ impl AptosVM {
     // failure object. In case of success, keep the session and also do any necessary module publish
     // cleanup.
     // 3. Call post transaction cleanup function in multisig account module with the result from (2)
-    fn execute_multisig_transaction<S: MoveResolverExt + StateView>(
+    fn execute_multisig_transaction<S: MoveResolverExt + StateView, SS: MoveResolverExt>(
         &self,
         storage: &S,
-        mut session: SessionExt<S>,
+        mut session: SessionExt<SS>,
         gas_meter: &mut AptosGasMeter,
         txn_data: &TransactionMetadata,
         txn_payload: &Multisig,
@@ -441,13 +442,15 @@ impl AptosVM {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .finish(Location::Undefined);
         let provided_payload = if txn_payload.transaction_payload.is_some() {
-            bcs::to_bytes(
-                txn_payload
-                    .transaction_payload
-                    .as_ref()
-                    .ok_or_else(|| invariant_violation_error.clone())?,
-            )
-            .map_err(|_| invariant_violation_error.clone())?
+            let payload = txn_payload
+                .transaction_payload
+                .as_ref()
+                .ok_or_else(|| invariant_violation_error.clone())?;
+            match payload {
+                MultisigTransactionPayload::EntryFunction(entry_function) => {
+                    bcs::to_bytes(&entry_function).map_err(|_| invariant_violation_error.clone())?
+                },
+            }
         } else {
             // Default to empty bytes if payload is not provided.
             bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| invariant_violation_error.clone())?
@@ -505,7 +508,6 @@ impl AptosVM {
         // from Step 2.
         // Note that we don't charge execution or writeset gas for cleanup routines. This is
         // consistent with the high-level success/failure cleanup routines for user transactions.
-        let mut cleanup_session = self.0.new_session(storage, SessionId::txn_meta(txn_data));
         let mut cleanup_args = serialize_values(&vec![
             MoveValue::Address(txn_data.sender),
             MoveValue::Address(txn_payload.multisig_address),
@@ -513,6 +515,9 @@ impl AptosVM {
         ]);
 
         let final_change_set_ext = if let Err(execution_error) = execution_result {
+            // Start a fresh session for running cleanup that does not contain any changes from
+            // the inner function call earlier (since it failed).
+            let mut cleanup_session = self.0.new_session(storage, SessionId::txn_meta(txn_data));
             let execution_error = Self::convert_to_execution_error(execution_error)?;
             cleanup_args
                 .push(bcs::to_bytes(&execution_error).map_err(|_| invariant_violation_error)?);
@@ -523,18 +528,35 @@ impl AptosVM {
                 cleanup_args,
                 &mut UnmeteredGasMeter,
             )?;
-            // We only include the cleanup writeset and not the inner function call.
-            let cleanup_session_output =
-                cleanup_session.finish().map_err(|e| e.into_vm_status())?;
-            cleanup_session_output.into_change_set(&mut (), gas_meter.change_set_configs())?
+            cleanup_session
+                .finish()
+                .map_err(|e| e.into_vm_status())?
+                .into_change_set(&mut (), gas_meter.change_set_configs())?
         } else {
             // Charge gas for writeset before we do cleanup. This ensures we don't charge gas for
             // cleanup writeset changes, which is consistent with outer-level success cleanup
             // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
-            let inner_function_session_output = session.finish().map_err(|e| e.into_vm_status())?;
-            let inner_function_change_set_ext = inner_function_session_output
-                .into_change_set(&mut (), gas_meter.change_set_configs())?;
+            let inner_function_change_set_ext =
+                session
+                    .finish()
+                    .map_err(|e| e.into_vm_status())?
+                    .into_change_set(&mut (), gas_meter.change_set_configs())?;
             gas_meter.charge_write_set_gas(inner_function_change_set_ext.write_set().iter())?;
+
+            let storage_with_changes =
+                DeltaStateView::new(storage, inner_function_change_set_ext.write_set());
+            let delta_write_set_mut = inner_function_change_set_ext
+                .delta_change_set()
+                .clone()
+                .try_into_write_set_mut(storage)
+                .expect("something terrible happened when applying aggregator deltas");
+            let delta_write_set = delta_write_set_mut
+                .freeze()
+                .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
+            let storage_with_changes =
+                DeltaStateView::new(&storage_with_changes, &delta_write_set).into_move_resolver();
+            let resolver = self.0.new_move_resolver(&storage_with_changes);
+            let mut cleanup_session = self.0.new_session(&resolver, SessionId::txn_meta(txn_data));
 
             cleanup_session.execute_function_bypass_visibility(
                 &MULTISIG_ACCOUNT_MODULE,
@@ -543,10 +565,10 @@ impl AptosVM {
                 cleanup_args,
                 &mut UnmeteredGasMeter,
             )?;
-            let cleanup_session_output =
-                cleanup_session.finish().map_err(|e| e.into_vm_status())?;
-            let cleanup_change_set_ext =
-                cleanup_session_output.into_change_set(&mut (), gas_meter.change_set_configs())?;
+            let cleanup_change_set_ext = cleanup_session
+                .finish()
+                .map_err(|e| e.into_vm_status())?
+                .into_change_set(&mut (), gas_meter.change_set_configs())?;
             // Merge the inner function writeset with cleanup writeset.
             inner_function_change_set_ext
                 .squash(cleanup_change_set_ext)
@@ -563,9 +585,9 @@ impl AptosVM {
         )
     }
 
-    fn execute_multisig_entry_function<S: MoveResolverExt + StateView>(
+    fn execute_multisig_entry_function<SS: MoveResolverExt>(
         &self,
-        session: &mut SessionExt<S>,
+        session: &mut SessionExt<SS>,
         gas_meter: &mut AptosGasMeter,
         multisig_address: AccountAddress,
         payload: &EntryFunction,
@@ -1574,18 +1596,24 @@ impl AptosSimulationVM {
             },
             TransactionPayload::Multisig(multisig) => {
                 if let Some(payload) = multisig.transaction_payload.clone() {
-                    // Simulate executing the inner (underlying) entry function transaction in the
-                    // multisig tx payload as if it's coming from the multisig account signer.
-                    let modified_txn_data =
-                        TransactionMetadata::new_with_sender(txn, multisig.multisig_address);
-                    self.0.execute_script_or_entry_function(
-                        storage,
-                        session,
-                        &mut gas_meter,
-                        &modified_txn_data,
-                        &TransactionPayload::EntryFunction(payload),
-                        log_context,
-                    )
+                    match payload {
+                        MultisigTransactionPayload::EntryFunction(entry_function) => {
+                            // Simulate executing the inner (underlying) entry function transaction in the
+                            // multisig tx payload as if it's coming from the multisig account signer.
+                            let modified_txn_data = TransactionMetadata::new_with_sender(
+                                txn,
+                                multisig.multisig_address,
+                            );
+                            self.0.execute_script_or_entry_function(
+                                storage,
+                                session,
+                                &mut gas_meter,
+                                &modified_txn_data,
+                                &TransactionPayload::EntryFunction(entry_function),
+                                log_context,
+                            )
+                        },
+                    }
                 } else {
                     Err(VMStatus::Error(StatusCode::MISSING_DATA))
                 }

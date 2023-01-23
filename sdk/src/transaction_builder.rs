@@ -190,6 +190,28 @@ impl TransactionFactory {
         ))
     }
 
+    pub fn approve_multisig_transaction(
+        &self,
+        multisig_account: AccountAddress,
+        transaction_id: u64,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_approve_transaction(
+            multisig_account,
+            transaction_id,
+        ))
+    }
+
+    pub fn reject_multisig_transaction(
+        &self,
+        multisig_account: AccountAddress,
+        transaction_id: u64,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_reject_transaction(
+            multisig_account,
+            transaction_id,
+        ))
+    }
+
     pub fn create_multisig_transaction_with_payload_hash(
         &self,
         multisig_account: AccountAddress,

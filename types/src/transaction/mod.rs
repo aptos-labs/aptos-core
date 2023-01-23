@@ -48,7 +48,7 @@ pub use change_set::NoOpChangeSetChecker;
 pub use change_set::{ChangeSet, CheckChangeSet};
 pub use module::{Module, ModuleBundle};
 use move_core_types::vm_status::AbortLocation;
-pub use multisig::{ExecutionError, Multisig};
+pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
 use once_cell::sync::OnceCell;
 pub use script::{
     ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,

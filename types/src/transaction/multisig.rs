@@ -12,7 +12,14 @@ pub struct Multisig {
     pub multisig_address: AccountAddress,
 
     // Transaction payload is optional if already stored on chain.
-    pub transaction_payload: Option<EntryFunction>,
+    pub transaction_payload: Option<MultisigTransactionPayload>,
+}
+
+// We use an enum here for extensibility so we can add Script payload support
+// in the future for example.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum MultisigTransactionPayload {
+    EntryFunction(EntryFunction),
 }
 
 /// Contains information about execution failure.

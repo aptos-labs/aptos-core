@@ -322,6 +322,7 @@ impl TestContext {
         LocalAccount::generate(self.rng())
     }
 
+<<<<<<< HEAD
     pub async fn create_account(&mut self) -> LocalAccount {
         let mut root = self.root_account().await;
         let account = self.gen_account();
@@ -340,6 +341,8 @@ impl TestContext {
         account
     }
 
+=======
+>>>>>>> fa43fea42e ([API][VM] Make the inner payload of multisig tx extensible)
     pub async fn create_user_account(&self, account: &LocalAccount) -> SignedTransaction {
         let mut tc = self.root_account().await;
         self.create_user_account_by(&mut tc, account)
@@ -357,7 +360,7 @@ impl TestContext {
 
     pub async fn create_and_fund_account(&mut self) -> LocalAccount {
         let account = self.gen_account();
-        self.commit_block(&vec![self.mint_user_account(&account)])
+        self.commit_block(&vec![self.mint_user_account(&account).await])
             .await;
         account
     }
@@ -437,6 +440,36 @@ impl TestContext {
         let txn = owner.sign_with_transaction_builder(
             factory
                 .create_multisig_transaction(multisig_account, payload)
+                .expiration_timestamp_secs(u64::MAX),
+        );
+        self.commit_block(&vec![txn]).await;
+    }
+
+    pub async fn approve_multisig_transaction(
+        &mut self,
+        owner: &mut LocalAccount,
+        multisig_account: AccountAddress,
+        transaction_id: u64,
+    ) {
+        let factory = self.transaction_factory();
+        let txn = owner.sign_with_transaction_builder(
+            factory
+                .approve_multisig_transaction(multisig_account, transaction_id)
+                .expiration_timestamp_secs(u64::MAX),
+        );
+        self.commit_block(&vec![txn]).await;
+    }
+
+    pub async fn reject_multisig_transaction(
+        &mut self,
+        owner: &mut LocalAccount,
+        multisig_account: AccountAddress,
+        transaction_id: u64,
+    ) {
+        let factory = self.transaction_factory();
+        let txn = owner.sign_with_transaction_builder(
+            factory
+                .reject_multisig_transaction(multisig_account, transaction_id)
                 .expiration_timestamp_secs(u64::MAX),
         );
         self.commit_block(&vec![txn]).await;
@@ -634,6 +667,7 @@ impl TestContext {
             .unwrap()
     }
 
+<<<<<<< HEAD
     // return a specific resource for an account. None if not found.
     pub async fn gen_resource(
         &self,
@@ -654,6 +688,17 @@ impl TestContext {
     pub async fn gen_all_resources(&self, account_address: &AccountAddress) -> Value {
         let request = format!("/accounts/{}/resources", account_address);
         self.get(&request).await
+=======
+    pub async fn get_sequence_number(&self, account: AccountAddress) -> u64 {
+        let account_resource = self
+            .api_get_account_resource(account, "0x1", "account", "Account")
+            .await;
+        account_resource["data"]["sequence_number"]
+            .as_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+>>>>>>> fa43fea42e ([API][VM] Make the inner payload of multisig tx extensible)
     }
 
     // TODO: Add support for generic_type_params if necessary.

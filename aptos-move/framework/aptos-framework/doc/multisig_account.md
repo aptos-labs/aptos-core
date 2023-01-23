@@ -1095,7 +1095,7 @@ In order to ensure a malicious module cannot obtain backdoor control over an exi
 with a valid signature from the account's auth key is required.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_existing_account">create_with_existing_account</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, signatures_required: u64, account_scheme: u8, account_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, create_multisig_account_signed_message: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_existing_account">create_with_existing_account</a>(multisig_address: <b>address</b>, owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, signatures_required: u64, account_scheme: u8, account_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, create_multisig_account_signed_message: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -1105,14 +1105,13 @@ with a valid signature from the account's auth key is required.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_existing_account">create_with_existing_account</a>(
-    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    multisig_address: <b>address</b>,
     owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
     signatures_required: u64,
     account_scheme: u8,
     account_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     create_multisig_account_signed_message: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
-    <b>let</b> multisig_address = address_of(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
     // Verify that the `<a href="multisig_account.md#0x1_multisig_account_MultisigAccountCreationMessage">MultisigAccountCreationMessage</a>` <b>has</b> the right information and is signed by the <a href="account.md#0x1_account">account</a>
     // owner's key.
     <b>let</b> proof_challenge = <a href="multisig_account.md#0x1_multisig_account_MultisigAccountCreationMessage">MultisigAccountCreationMessage</a> {
@@ -1128,6 +1127,10 @@ with a valid signature from the account's auth key is required.
         proof_challenge,
     );
 
+    // We create the <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> for the multisig <a href="account.md#0x1_account">account</a> here since this is required <b>to</b> add the <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> resource
+    // This should be safe and authorized because we have verified the signed message from the existing <a href="account.md#0x1_account">account</a>
+    // that authorizes creating a multisig <a href="account.md#0x1_account">account</a> <b>with</b> the specified owners and signature threshold.
+    <b>let</b> <a href="multisig_account.md#0x1_multisig_account">multisig_account</a> = &<a href="account.md#0x1_account_create_signer">account::create_signer</a>(multisig_address);
     <a href="multisig_account.md#0x1_multisig_account_create_with_owners_internal">create_with_owners_internal</a>(
         <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>,
         owners,

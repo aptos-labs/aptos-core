@@ -79,7 +79,7 @@ pub fn convert_prologue_error(
                     StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
                 },
                 (INVALID_ARGUMENT, EMULTISIG_PAYLOAD_DOES_NOT_MATCH_HASH) => {
-                    StatusCode::SEQUENCE_NUMBER_TOO_OLD
+                    StatusCode::SECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH
                 },
                 (category, reason) => {
                     log_context.alert();

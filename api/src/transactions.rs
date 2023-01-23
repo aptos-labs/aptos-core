@@ -32,8 +32,8 @@ use aptos_types::{
     account_view::AccountView,
     mempool_status::MempoolStatusCode,
     transaction::{
-        EntryFunction, ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction,
-        TransactionPayload, TransactionStatus,
+        EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
+        RawTransactionWithData, SignedTransaction, TransactionPayload, TransactionStatus,
     },
     vm_status::StatusCode,
 };
@@ -872,10 +872,14 @@ impl TransactionsApi {
                     },
                     TransactionPayload::Multisig(multisig) => {
                         if let Some(payload) = &multisig.transaction_payload {
-                            TransactionsApi::validate_entry_function_payload_format(
-                                ledger_info,
-                                payload,
-                            )?;
+                            match payload {
+                                MultisigTransactionPayload::EntryFunction(entry_function) => {
+                                    TransactionsApi::validate_entry_function_payload_format(
+                                        ledger_info,
+                                        entry_function,
+                                    )?;
+                                },
+                            }
                         }
                     },
 

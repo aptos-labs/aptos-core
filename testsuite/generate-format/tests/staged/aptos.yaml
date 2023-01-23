@@ -112,6 +112,12 @@ Multisig:
         TYPENAME: AccountAddress
     - transaction_payload:
         OPTION:
+          TYPENAME: MultisigTransactionPayload
+MultisigTransactionPayload:
+  ENUM:
+    0:
+      EntryFunction:
+        NEWTYPE:
           TYPENAME: EntryFunction
 RawTransaction:
   STRUCT:
