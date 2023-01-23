@@ -5,7 +5,7 @@ use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
-use aptos_framework::natives::cryptography::groups::Bls12381Context;
+use aptos_framework::natives::cryptography::groups::GroupContext;
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     cryptography::ristretto255_point::NativeRistrettoPointContext,
@@ -19,7 +19,7 @@ use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
 use std::ops::Deref;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::Features;
 
 pub struct MoveVmExt {
     inner: MoveVM,
@@ -78,7 +78,7 @@ impl MoveVmExt {
 
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
-        extensions.add(Bls12381Context::new(self.features.clone()));
+        extensions.add(GroupContext::new(self.features.clone()));
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
         let script_hash = match session_id {
