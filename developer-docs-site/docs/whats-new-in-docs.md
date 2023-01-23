@@ -7,7 +7,7 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
-## 15 December 2022
+## 23 January 2023
 
 - Added [Mint NFT with Aptos CLI](guides/move-guides/mint-nft-cli.md) Move guide describing the updated [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutorial) and [`minting.move`](https://github.com/aptos-labs/nft-tutorial/blob/main/sources/minting.move).
 

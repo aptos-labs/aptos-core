@@ -1,11 +1,11 @@
 ---
-title: "Mint an NFT with Aptos CLI"
+title: "Mint NFTs with Aptos CLI"
 slug: "mint-nft-cli"
 ---
 
-# Mint an NFT with Aptos CLI
+# Mint NFTs with Aptos CLI
 
-This codelab lets you use the Aptos CLI to mint non-fungible tokens (NFTs) in Aptos so you can see how the process works and employ related functions in your code. Although this codelab assumes use of the testnet network, you could follow the same steps in devnet or even mainnet, assuming you have the necessary funds in your account.
+This codelab lets you use the Aptos CLI to mint non-fungible tokens (NFTs) in Aptos so you can see how the process works and employ related functions in your code. Although this codelab assumes use of the devnet network, you could follow the same steps in devnet or even mainnet, assuming you have the necessary funds in your account.
 
 ## Prerequisites
 
@@ -40,7 +40,7 @@ In this tutorial, we describe how to create and mint event ticket NFTs.
 
 ## 1. Create a collection and token
 
-Now that you have an understanding of the Aptos minting process and are starting to write smart contracts with Move, you are ready to create your first testnet NFT with the Aptos CLI.
+Now that you have an understanding of the Aptos minting process and are starting to write smart contracts with Move, you are ready to create your first devnet NFT with the Aptos CLI.
 
 In this section, we create a collection and token. This work maps to the demonstration in [create_nft.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/1-Create-NFT/sources/create_nft.move).
 
@@ -48,7 +48,7 @@ In this section, we create a collection and token. This work maps to the demonst
 
 1. [Install the Aptos CLI](../../cli-tools/aptos-cli-tool/install-aptos-cli.md) and note its [many uses](../../cli-tools/aptos-cli-tool/use-aptos-cli.md) for later if you haven't experienced its goodness already.
 
-2. Create a default (typical) account on Aptos testnet to receive the NFT by running the following command and selecting `testnet`:
+2. Create a default (typical) account on Aptos devnet to receive the NFT by running the following command and selecting `devnet`:
   ```shell
   aptos init
   ```
@@ -62,7 +62,7 @@ In this section, we create a collection and token. This work maps to the demonst
   ```shell
   Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]
   ```
-  Select `testnet` by entering it and hitting return.
+  Select `devnet` by entering it and hitting return.
 
 4. When prompted for your private key:
   ```shell
@@ -138,7 +138,7 @@ aptos move publish --named-addresses mint_nft=a911e7374107ad434bbc5369289cf5855c
 ### See the module on Aptos Explorer
 
 1. Go to the [Aptos Explorer](https://explorer.aptoslabs.com/) in a web browser>
-2. Select the network you used: testnet
+2. Select the network you used: devnet
 3. Search for the transaction by `transaction_hash` in the search field, using your own unique transaction hash.
 4. View the changes made in publishing this module under the *Changes* tab.
 
@@ -148,17 +148,25 @@ See [create_nft.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-m
 
 ## 2. Use resource account for automation
 
+This part maps to the demonstration in [create_nft_with_resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move).
+
 Since the Move model often requires knowing the signer of a transaction, Aptos provides resource accounts for assigning signer capability. Creating resource accounts enables access to the signer capability for automated use. With this ability, resource accounts can publish Move modules and automatically sign for transactions and minting. The signer capability can be assigned to the resource account or placed in storage locally within the module.
 
-When you create a resource account you also grant that account the signer capability. If we don't use a resource account for this module, we would need to manually sign for all transactions. The only field inside the signer capability is the `address` of the signer. A native function converts the signer capability to the signer.
+When you create a resource account you also grant that account the signer capability. If we don't use a resource account for this module, we would need to manually sign for all transactions. The only field inside the signer capability is the `address` of the signer.
 
-This work maps to the demonstration in [create_nft_with_resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move).
+A native function converts the signer capability to the signer.
+
+```shell
+let resource_signer = account::create_signer_with_capability(&module_data.signer_cap);
+```
+
+This function creates the signer from the signer capability. See the corresponding entry in [`create_nft_with_resource_account.move`](https://github.com/aptos-labs/aptos-core/blob/6d4303f404b3c49d25f163047c84f668a71d9756/aptos-move/move-examples/mint_nft/2-Using-Resource-Account/sources/create_nft_with_resource_account.move#L156) to see how we create a signer from the signer capability.
 
 ### Create a resource account
 
-Just as you created a default account on Aptos testnet, you will now create another user account to receive the NFT. To create that account, once again issue `aptos init` but this time use the `--profile` argument to create a specific account, in this case `nft-receiver`.
+Just as you created a default account on Aptos devnet, you will now create another user account to receive the NFT. To create that account, once again issue `aptos init` but this time use the `--profile` argument to create a specific account, in this case `nft-receiver`.
 
-1. Create an `nft-receiver` account on Aptos testnet by running the following command.
+1. Create an `nft-receiver` account on Aptos devnet by running the following command.
   ```shell
   aptos init --profile nft-receiver
   ```
@@ -168,7 +176,7 @@ Just as you created a default account on Aptos testnet, you will now create anot
   Configuring for profile nft-receiver
   ```
 
-3. Follow the same steps as for the default account to select the `testnet` network and generate a new private key.
+3. Follow the same steps as for the default account to select the `devnet` network and generate a new private key.
 
 ### Publish the module under the resource account
 
@@ -450,7 +458,7 @@ TODO: Integrate above or remove the original Workshop #1 text below. Ask Chloe f
 
 1. Open the Petra Wallet Chrome extension.
 
-2. Go to *Petra > Settings > Network > Testnet*.
+2. Go to *Petra > Settings > Network > Devnet*.
 
 3. Click **Library** at bottom.
 
@@ -462,11 +470,11 @@ Now you can add this smart contract to the Aptos network.
 
 ### Create and fund admin and source account
 
-Create two accounts on testnet for deploying and managing this contract:
+Create two accounts on devnet for deploying and managing this contract:
   * The source account will be used to create the resource account that will deploy this smart contract.
   * The admin account is in charge of updating the config of the module (e.g. whether or not we enable minting for this collection).
 
-1. Run these commands to create the accounts, selecting `testnet` when prompted:
+1. Run these commands to create the accounts, selecting `devnet` when prompted:
   ```shell
   aptos init --profile source-account
   ```
@@ -475,11 +483,11 @@ Create two accounts on testnet for deploying and managing this contract:
   ```
 2. Open `.aptos/config.yaml` to find the private keys for the `admin-account` and `source-account` profiles and copy them.
 
-3. Fund these accounts by adding them to your wallet via importing their private keys into testnet and using the **Faucet** function as you did for the `nft-receiver` profile.
+3. Fund these accounts by adding them to your wallet via importing their private keys into devnet and using the **Faucet** function as you did for the `nft-receiver` profile.
 
 ### Prepare resource account from source account
 
-In this section, we will create a [resource account](../resource-accounts.md) from the `source-account` and publish the module on testnet under the resource account’s address. A resource account is used here to programmatically signed for transactions and avoids the need for multiple signatures.
+In this section, we will create a [resource account](../resource-accounts.md) from the `source-account` and publish the module on devnet under the resource account’s address. A resource account is used here to programmatically signed for transactions and avoids the need for multiple signatures.
 
 In the [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutorial) smart contract, we store the resource account’s signer capability in the `ModuleData` resource so that it can automatically sign for transactions in the contract. If we don’t store the signer capability within the module, we’d need to provide the resource account’s signer; but we no longer have access to the resource account’s signer because the resource account is meant to be autonomous, and the contracts published under a resource account are immutable. Once the contract is published, the resource account no longer has access to the signer.
 

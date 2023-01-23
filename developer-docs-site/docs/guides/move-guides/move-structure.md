@@ -80,7 +80,7 @@ For example:
 
 ## Signing
 
-The only argument taken by `mint_nft_ticket()` is `receiver`. Any `entry fun` will take as the first parameter the type `&signer`. In both Move and Aptos, whenever you submit a transaction, the private key you sign the transaction with automatically makes the associated account the first parameter of the signer.
+Any `entry fun` will take as the first parameter the type `&signer`. In both Move and Aptos, whenever you submit a transaction, the private key you sign the transaction with automatically makes the associated account the first parameter of the signer.
 
 You can go from the signer to an address but normally not the reverse. So when claiming an NFT, both the private keys of the minter and receiver are needed, as shown in the instructions below.
 
@@ -90,7 +90,7 @@ In the `init_module`, the signer is always the account uploading the contract. T
         token::create_collection(&resource_signer, collection, description, collection_uri, maximum_supply, mutate_setting);
 
 ```
-Where the `&resource_signer` is the first parameter, defined previously as a new address that has all of the attributes of the original account plus signer capability. See:
+Then:
 
 ```shell
         signer_cap: account::SignerCapability,
