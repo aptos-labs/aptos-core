@@ -53,6 +53,9 @@ pub fn generate_upgrade_proposals(
             "--",
             "governance",
             "generate-upgrade-proposal",
+            // TODO: 6 should be the default across the system
+            "--bytecode-version",
+            "6",
             "--account",
             publish_addr,
             "--output",
