@@ -23,8 +23,6 @@ use aptos_types::on_chain_config::{FeatureFlag, Features};
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
-    #[allow(unused)]
-    features: Features,
 }
 
 impl MoveVmExt {
@@ -58,7 +56,6 @@ impl MoveVmExt {
                 },
             )?,
             chain_id,
-            features,
         })
     }
 
