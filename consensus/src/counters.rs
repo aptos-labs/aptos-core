@@ -177,6 +177,15 @@ pub static LEADER_REPUTATION_ROUND_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// The number of distinct senders in block
+pub static DISTINCT_SENDERS_IN_BLOCK: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_distinct_senders_in_block",
+        "Total number of new block events in the current reputation window"
+    )
+        .unwrap()
+});
+
 /// Number of rounds we were collecting votes for proposer
 /// (similar to PROPOSALS_COUNT, but can be larger, if we failed in creating/sending of the proposal)
 pub static CHAIN_HEALTH_BACKOFF_TRIGGERED: Lazy<IntCounter> = Lazy::new(|| {

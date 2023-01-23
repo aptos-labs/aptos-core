@@ -20,6 +20,7 @@ use aptos_logger::{error, sample, sample::SampleRate, warn};
 use futures::future::BoxFuture;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use std::collections::{HashMap, VecDeque};
+use crate::counters::DISTINCT_SENDERS_IN_BLOCK;
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
@@ -338,6 +339,9 @@ fn optimize_payload(payload: Payload) -> Payload {
             });
             txns_by_sender[index].push_back(txn);
         }
+
+
+        DISTINCT_SENDERS_IN_BLOCK.set(txns_by_sender.len() as i64);
 
         let mut optimized_txns = Vec::new();
         while !txns_by_sender.is_empty() {
