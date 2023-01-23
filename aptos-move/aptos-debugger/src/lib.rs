@@ -23,7 +23,7 @@ use aptos_vm::{
 };
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::{FeatureFlag, Features, OnChainConfig};
 
 pub struct AptosDebugger {
     debugger: Arc<dyn AptosValidatorInterface + Send>,
@@ -155,8 +155,9 @@ impl AptosDebugger {
     where
         F: FnOnce(&mut SessionExt<StorageAdapter<DebuggerStateView>>) -> VMResult<()>,
     {
-        let mut features = Features::default();
-        features.update(FeatureFlag::TREAT_FRIEND_AS_PRIVATE, true);
+        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
+        let state_view_storage = StorageAdapter::new(&state_view);
+        let features = Features::fetch_config(&storage).unwrap_or_default();
         let move_vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
@@ -164,9 +165,7 @@ impl AptosDebugger {
             ChainId::test().id(),
             features,
         )
-        .unwrap();
-        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let state_view_storage = StorageAdapter::new(&state_view);
+            .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         session

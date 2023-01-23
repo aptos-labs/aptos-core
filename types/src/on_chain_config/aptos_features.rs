@@ -47,20 +47,6 @@ impl Features {
         byte_index < self.features.len() && (self.features[byte_index] & bit_mask != 0)
     }
 
-    pub fn update(&mut self, flag: FeatureFlag, enabled: bool) {
-        let bit_idx = flag as usize;
-        let byte_idx = bit_idx / 8;
-        if self.features.len() < byte_idx + 1 {
-            self.features.resize(byte_idx + 1, 0);
-        }
-        let mask = 1_u8 << (bit_idx % 8);
-        if enabled {
-            self.features[byte_idx] |= mask;
-        } else {
-            self.features[byte_idx] &= !mask;
-        }
-    }
-
     pub fn are_resource_groups_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS)
     }
