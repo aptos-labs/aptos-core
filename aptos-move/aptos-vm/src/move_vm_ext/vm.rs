@@ -11,6 +11,7 @@ use aptos_framework::natives::{
     state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_table_extension::NativeTableContext;
@@ -18,7 +19,6 @@ use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
 use std::ops::Deref;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
 
 pub struct MoveVmExt {
     inner: MoveVM,
@@ -36,11 +36,12 @@ impl MoveVmExt {
         // Note: binary format v6 adds a few new integer types and their corresponding instructions.
         //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
         //       the gas schedule hasn't been updated yet.
-        let max_binary_format_version = if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) && gas_feature_version >= 5 {
-            6
-        } else {
-            5
-        };
+        let max_binary_format_version =
+            if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) && gas_feature_version >= 5 {
+                6
+            } else {
+                5
+            };
 
         Ok(Self {
             inner: MoveVM::new_with_config(
@@ -50,7 +51,9 @@ impl MoveVmExt {
                     gas_feature_version,
                 ),
                 VMConfig {
-                    verifier: verifier_config(features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE)),
+                    verifier: verifier_config(
+                        features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                    ),
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                 },

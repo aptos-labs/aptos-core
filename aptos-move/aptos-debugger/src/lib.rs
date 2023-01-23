@@ -11,6 +11,7 @@ use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
+    on_chain_config::{FeatureFlag, Features, OnChainConfig},
     transaction::{ChangeSet, Transaction, TransactionOutput, Version},
 };
 use aptos_validator_interface::{
@@ -23,7 +24,6 @@ use aptos_vm::{
 };
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
-use aptos_types::on_chain_config::{FeatureFlag, Features, OnChainConfig};
 
 pub struct AptosDebugger {
     debugger: Arc<dyn AptosValidatorInterface + Send>,
@@ -165,7 +165,7 @@ impl AptosDebugger {
             ChainId::test().id(),
             features,
         )
-            .unwrap();
+        .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         session
