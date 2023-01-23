@@ -148,6 +148,7 @@ const sidebars = {
         "tutorials/your-first-nft",
         "guides/move-guides/mint-nft-cli",
         "concepts/coin-and-token/onchain-data",
+        "concepts/coin-and-token/mint-minting-tool",
       ],
     },
     {

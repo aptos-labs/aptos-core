@@ -205,6 +205,11 @@ const config = {
                 label: "Mint FTs with On-Chain Data",
                 docId: "concepts/coin-and-token/onchain-data",
               },
+              {
+                type: "doc",
+                label: "Mint NFTs with NFT CLI Mint Tool",
+                docId: "concepts/coin-and-token/mint-minting-tool",
+              },
             ],
           },
           {

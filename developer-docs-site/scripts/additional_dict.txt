@@ -28,6 +28,7 @@ Bitwise
 BlockMetadata
 BlockMetadataTransaction
 BlockQuote
+Bundlr
 CANCELLED
 CDN
 CLI
@@ -305,6 +306,7 @@ ip
 ips
 IPFS
 isConnected
+json
 jsx
 kickstart
 korean
