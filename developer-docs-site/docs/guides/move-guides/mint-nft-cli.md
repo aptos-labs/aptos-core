@@ -305,8 +305,6 @@ Running this command fails because minting is disabled in `init_module()`.
 aptos move run --function-id <resource-account-address>::create_nft_with_resource_and_admin_accounts::set_minting_enabled --args bool:true --profile admin
 ```
 
-TODO: Ask Chloe to help make these `<resource-account-address>` placeholders more clear. Is this the `nft-receiver` profile address? Can we say that instead?
-
 3. As usual, receive output asking you to accept a gas fee for the transaction and enter: `yes`.
 
 4. Receive output contaning:
@@ -395,8 +393,6 @@ more output.key
 
 2. Find and copy the `receiver_account_sequence_number` by looking up the NFT receiver's address on the [Aptos Explorer](https://explorer.aptoslabs.com/) *Info* tab.
 
-TODO: Find out where this tab is and link directly to it if possible. I don't see it from the home page.
-
 3. Open the file `aptos-core/aptos/move-e2e-tests/src/tests/mint_nft.rs` for editing.
 
 4. In function `generate_nft_tutorial_part4_signature`, replace the `resource_address`, `nft_receiver`, `admin_private_key`, and `receiver_account_sequence_number` variables with the actual values from your temporary copies above.
@@ -417,13 +413,9 @@ aptos move run --function-id <resource-account-address>::create_nft_getting_prod
 
 This completes the Mint NFT via CLI codelab. Congratulations on your completion.
 
-TODO: Ask for some visual evidence of completion, such as the certificate Chloe proposed to Kevin in the issue.
+## 5. Mint with admin and source accounts
 
------
-
-# Workshop #1
-
-TODO: Integrate above or remove the original Workshop #1 text below. Ask Chloe for guidance.
+Here is an alternative flow using admin and source accounts.
 
 ### Mint the NFT
 
@@ -454,7 +446,7 @@ TODO: Integrate above or remove the original Workshop #1 text below. Ask Chloe f
 */
 ```
 
-## Find the NFT in your Petra wallet
+### Find the NFT in your Petra wallet
 
 1. Open the Petra Wallet Chrome extension.
 
