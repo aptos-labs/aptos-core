@@ -4,9 +4,9 @@ module aptos_std::groups {
     struct BLS12_381_G1 {}
     struct BLS12_381_G2 {}
     struct BLS12_381_Gt {}
-    struct Ristretto255 {}
 
-    // More groups coming...
+    // Ristretto255 group on Curve25519.
+    struct Ristretto255 {}
 
     /// Check if `P == Q` for group elements `P` and `Q`.
     public fun add<G>(element_p: &Element<G>, element_q: &Element<G>): bool {

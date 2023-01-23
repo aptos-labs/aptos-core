@@ -25,7 +25,6 @@ use sha2::Sha256;
 use smallvec::smallvec;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::on_chain_config::FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS;
-use crate::natives::cryptography::groups::abort_codes::{NOT_IMPLEMENTED, NUM_G1_ELEMENTS_SHOULD_MATCH_NUM_G2_ELEMENTS};
 use crate::natives::util::make_native_from_func;
 
 
@@ -104,12 +103,7 @@ macro_rules! group_from_ty_arg {
     }}
 }
 
-pub mod abort_codes {
-    pub const NOT_IMPLEMENTED: u64 = 2;
-    pub const E_UNKNOWN_PAIRING: u64 = 3;
-    pub const NUM_ELEMENTS_SHOULD_MATCH_NUM_SCALARS: u64 = 4;
-    pub const NUM_G1_ELEMENTS_SHOULD_MATCH_NUM_G2_ELEMENTS: u64 = 5;
-}
+pub const NOT_IMPLEMENTED: u64 = 2; //TODO: update it to be aligned with `error.move`.
 
 #[derive(Debug, Clone)]
 pub struct GasParameters {
