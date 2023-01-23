@@ -30,7 +30,7 @@ use crate::natives::util::make_native_from_func;
 
 macro_rules! abort_if_feature_disabled {
     ($context:expr, $feature:expr) => {
-        if !$context.extensions().get::<GroupContext>().features.is_enabled($feature) {
+        if !$context.extensions().get::<EllipticCurveGroupContext>().features.is_enabled($feature) {
             return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
         }
     };
@@ -38,31 +38,31 @@ macro_rules! abort_if_feature_disabled {
 
 macro_rules! borrow_bls12_381_g1 {
     ($context:expr, $handle:expr) => {
-        $context.extensions().get::<GroupContext>().bls12_381_g1_elements.get($handle).unwrap()
+        $context.extensions().get::<EllipticCurveGroupContext>().bls12_381_g1_elements.get($handle).unwrap()
     }
 }
 
 macro_rules! borrow_bls12_381_g2 {
     ($context:expr, $handle:expr) => {
-        $context.extensions().get::<GroupContext>().bls12_381_g2_elements.get($handle).unwrap()
+        $context.extensions().get::<EllipticCurveGroupContext>().bls12_381_g2_elements.get($handle).unwrap()
     }
 }
 
 macro_rules! borrow_bls12_381_gt {
     ($context:expr, $handle:expr) => {
-        $context.extensions().get::<GroupContext>().bls12_381_fq12_elements.get($handle).unwrap()
+        $context.extensions().get::<EllipticCurveGroupContext>().bls12_381_fq12_elements.get($handle).unwrap()
     }
 }
 
 macro_rules! borrow_ristretto255 {
     ($context:expr, $handle:expr) => {
-        $context.extensions().get::<GroupContext>().ristretto255_elements.get($handle).unwrap()
+        $context.extensions().get::<EllipticCurveGroupContext>().ristretto255_elements.get($handle).unwrap()
     }
 }
 
 macro_rules! store_bls12_381_g1 {
     ($context:expr, $new_point:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
+        let inner_ctxt = $context.extensions_mut().get_mut::<EllipticCurveGroupContext>();
         let ret = inner_ctxt.bls12_381_g1_elements.len();
         inner_ctxt.bls12_381_g1_elements.push($new_point);
         ret
@@ -71,7 +71,7 @@ macro_rules! store_bls12_381_g1 {
 
 macro_rules! store_bls12_381_g2 {
     ($context:expr, $new_point:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
+        let inner_ctxt = $context.extensions_mut().get_mut::<EllipticCurveGroupContext>();
         let ret = inner_ctxt.bls12_381_g2_elements.len();
         inner_ctxt.bls12_381_g2_elements.push($new_point);
         ret
@@ -80,7 +80,7 @@ macro_rules! store_bls12_381_g2 {
 
 macro_rules! store_bls12_381_gt {
     ($context:expr, $new_element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
+        let inner_ctxt = $context.extensions_mut().get_mut::<EllipticCurveGroupContext>();
         let ret = inner_ctxt.bls12_381_fq12_elements.len();
         inner_ctxt.bls12_381_fq12_elements.push($new_element);
         ret
@@ -89,14 +89,14 @@ macro_rules! store_bls12_381_gt {
 
 macro_rules! store_ristretto255 {
     ($context:expr, $new_point:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
+        let inner_ctxt = $context.extensions_mut().get_mut::<EllipticCurveGroupContext>();
         let ret = inner_ctxt.ristretto255_elements.len();
         inner_ctxt.ristretto255_elements.push($new_point);
         ret
     }}
 }
 
-macro_rules! group_from_ty_arg {
+macro_rules! structure_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ).unwrap();
         structure_from_type_tag(&type_tag)
@@ -111,7 +111,7 @@ pub struct GasParameters {
 }
 
 #[derive(Tid)]
-pub struct GroupContext {
+pub struct EllipticCurveGroupContext {
     features: Features,
     bls12_381_g1_elements: Vec<ark_bls12_381::G1Projective>,
     bls12_381_g2_elements: Vec<ark_bls12_381::G2Projective>,
@@ -119,7 +119,7 @@ pub struct GroupContext {
     ristretto255_elements: Vec<curve25519_dalek::ristretto::RistrettoPoint>,
 }
 
-impl GroupContext {
+impl EllipticCurveGroupContext {
     pub fn new(features: Features) -> Self {
         Self {
             features,
@@ -144,31 +144,31 @@ fn generator_internal(
 ) -> PartialVMResult<NativeResult> {
     abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
-    let group_opt: Option<Structure> = group_from_ty_arg!(context, &ty_args[0]);
+    let group_opt: Option<AlgebraicStructure> = structure_from_ty_arg!(context, &ty_args[0]);
     match group_opt {
-        Some(Structure::BLS12_381_G1) => {
+        Some(AlgebraicStructure::BLS12_381_G1) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
             let point = ark_bls12_381::G1Projective::prime_subgroup_generator();
             let handle = store_bls12_381_g1!(context, point);
             Ok(NativeResult::ok(gas_params.base, smallvec![Value::u64(handle as u64)]))
         }
-        Some(Structure::BLS12_381_G2) => {
+        Some(AlgebraicStructure::BLS12_381_G2) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
             let point = ark_bls12_381::G2Projective::prime_subgroup_generator();
             let handle = store_bls12_381_g2!(context, point);
             Ok(NativeResult::ok(gas_params.base, smallvec![Value::u64(handle as u64)]))
         }
-        Some(Structure::BLS12_381_Gt) => {
+        Some(AlgebraicStructure::BLS12_381_Gt) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
             let element = BLS12381_GT_GENERATOR.clone();
             let handle = store_bls12_381_gt!(context, element);
             Ok(NativeResult::ok(gas_params.base, smallvec![Value::u64(handle as u64)]))
         }
-        Some(Structure::Ristretto255) => {
+        Some(AlgebraicStructure::Ristretto255) => {
             abort_if_feature_disabled!(context, FeatureFlag::RISTRETTO255_GROUP);
             let point = curve25519_dalek::ristretto::RistrettoPoint::default();
             let handle = store_ristretto255!(context, point);
-            context.extensions_mut().get_mut::<GroupContext>().ristretto255_elements.push(point);
+            context.extensions_mut().get_mut::<EllipticCurveGroupContext>().ristretto255_elements.push(point);
             Ok(NativeResult::ok(gas_params.base, smallvec![Value::u64(handle as u64)]))
         }
         _ => {
@@ -190,27 +190,27 @@ fn eq_internal(
     assert_eq!(1, ty_args.len());
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
-    let group_opt: Option<Structure> = group_from_ty_arg!(context, &ty_args[0]);
+    let group_opt: Option<AlgebraicStructure> = structure_from_ty_arg!(context, &ty_args[0]);
     match group_opt {
-        Some(Structure::BLS12_381_G1) => {
+        Some(AlgebraicStructure::BLS12_381_G1) => {
             let point_1 = borrow_bls12_381_g1!(context, handle_1);
             let point_2 = borrow_bls12_381_g1!(context, handle_2);
             let result = point_1.eq(point_2);
             Ok(NativeResult::ok(gas_params.base, smallvec![Value::bool(result)]))
         }
-        Some(Structure::BLS12_381_G2) => {
+        Some(AlgebraicStructure::BLS12_381_G2) => {
             let point_1 = borrow_bls12_381_g2!(context, handle_1);
             let point_2 = borrow_bls12_381_g2!(context, handle_2);
             let result = point_1.eq(point_2);
             Ok(NativeResult::ok(gas_params.base, smallvec![Value::bool(result)]))
         }
-        Some(Structure::BLS12_381_Gt) => {
+        Some(AlgebraicStructure::BLS12_381_Gt) => {
             let element_1 = borrow_bls12_381_gt!(context, handle_1);
             let element_2 = borrow_bls12_381_gt!(context, handle_2);
             let result = element_1.eq(element_2);
             Ok(NativeResult::ok(gas_params.base, smallvec![Value::bool(result)]))
         }
-        Some(Structure::Ristretto255) => {
+        Some(AlgebraicStructure::Ristretto255) => {
             let point_1 = borrow_ristretto255!(context, handle_1);
             let point_2 = borrow_ristretto255!(context, handle_2);
             let result = point_1.eq(point_2);
@@ -235,30 +235,30 @@ fn add_internal(
     assert_eq!(1, ty_args.len());
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
-    let group_opt: Option<Structure> = group_from_ty_arg!(context, &ty_args[0]);
+    let group_opt: Option<AlgebraicStructure> = structure_from_ty_arg!(context, &ty_args[0]);
     match group_opt {
-        Some(Structure::BLS12_381_G1) => {
+        Some(AlgebraicStructure::BLS12_381_G1) => {
             let point_1 = borrow_bls12_381_g1!(context, handle_1);
             let point_2 = borrow_bls12_381_g1!(context, handle_2);
             let new_point = point_1.add(point_2);
             let new_handle = store_bls12_381_g1!(context, new_point);
             Ok(NativeResult::ok(gas_params.base, smallvec![Value::u64(new_handle as u64)]))
         }
-        Some(Structure::BLS12_381_G2) => {
+        Some(AlgebraicStructure::BLS12_381_G2) => {
             let point_1 = borrow_bls12_381_g2!(context, handle_1);
             let point_2 = borrow_bls12_381_g2!(context, handle_2);
             let new_point = point_1.add(point_2);
             let new_handle = store_bls12_381_g2!(context, new_point);
             Ok(NativeResult::ok(gas_params.base, smallvec![Value::u64(new_handle as u64)]))
         }
-        Some(Structure::BLS12_381_Gt) => {
+        Some(AlgebraicStructure::BLS12_381_Gt) => {
             let element_1 = borrow_bls12_381_gt!(context, handle_1);
             let element_2 = borrow_bls12_381_gt!(context, handle_2);
             let new_element = element_1.add(element_2);
             let new_handle = store_bls12_381_gt!(context, new_element);
             Ok(NativeResult::ok(gas_params.base, smallvec![Value::u64(new_handle as u64)]))
         }
-        Some(Structure::Ristretto255) => {
+        Some(AlgebraicStructure::Ristretto255) => {
             let element_1 = borrow_ristretto255!(context, handle_1);
             let element_2 = borrow_ristretto255!(context, handle_2);
             let new_element = element_1.add(element_2);
@@ -279,13 +279,13 @@ fn pairing_product_internal(
 ) -> PartialVMResult<NativeResult> {
     abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
     assert_eq!(3, ty_args.len());
-    let g1_opt: Option<Structure> = group_from_ty_arg!(context, &ty_args[0]);
-    let g2_opt: Option<Structure> = group_from_ty_arg!(context, &ty_args[1]);
-    let gt_opt: Option<Structure> = group_from_ty_arg!(context, &ty_args[2]);
+    let g1_opt: Option<AlgebraicStructure> = structure_from_ty_arg!(context, &ty_args[0]);
+    let g2_opt: Option<AlgebraicStructure> = structure_from_ty_arg!(context, &ty_args[1]);
+    let gt_opt: Option<AlgebraicStructure> = structure_from_ty_arg!(context, &ty_args[2]);
     let g2_handles = pop_arg!(args, Vec<u64>);
     let g1_handles = pop_arg!(args, Vec<u64>);
     match (g1_opt, g2_opt, gt_opt) {
-        (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Gt)) => {
+        (Some(AlgebraicStructure::BLS12_381_G1), Some(AlgebraicStructure::BLS12_381_G2), Some(AlgebraicStructure::BLS12_381_Gt)) => {
             let g1_prepared: Vec<ark_ec::models::bls12::g1::G1Prepared<Parameters>> = g1_handles
                 .iter()
                 .map(|&handle| {
@@ -344,19 +344,19 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
 }
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
-pub enum Structure {
+pub enum AlgebraicStructure {
     BLS12_381_G1,
     BLS12_381_G2,
     BLS12_381_Gt,
     Ristretto255,
 }
 
-fn structure_from_type_tag(type_tag: &TypeTag) -> Option<Structure> {
+fn structure_from_type_tag(type_tag: &TypeTag) -> Option<AlgebraicStructure> {
     match type_tag.to_string().as_str() {
-        "0x1::groups::BLS12_381_G1" => Some(Structure::BLS12_381_G1),
-        "0x1::groups::BLS12_381_G2" => Some(Structure::BLS12_381_G2),
-        "0x1::groups::BLS12_381_Gt" => Some(Structure::BLS12_381_Gt),
-        "0x1::groups::Ristretto255" => Some(Structure::Ristretto255),
+        "0x1::groups::BLS12_381_G1" => Some(AlgebraicStructure::BLS12_381_G1),
+        "0x1::groups::BLS12_381_G2" => Some(AlgebraicStructure::BLS12_381_G2),
+        "0x1::groups::BLS12_381_Gt" => Some(AlgebraicStructure::BLS12_381_Gt),
+        "0x1::groups::Ristretto255" => Some(AlgebraicStructure::Ristretto255),
         _ => None
     }
 }
