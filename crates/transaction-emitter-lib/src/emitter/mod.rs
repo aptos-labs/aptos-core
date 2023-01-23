@@ -250,7 +250,7 @@ impl EmitJobRequest {
                     max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
                     start_offset_multiplier_millis: 0.0,
                     start_jitter_millis: 5000,
-                    accounts_per_worker: 50,
+                    accounts_per_worker: 1,
                     workers_per_endpoint: num_workers_per_endpoint,
                     check_account_sequence_only_once_fraction: 0.0,
                     check_account_sequence_sleep_millis: 300,
