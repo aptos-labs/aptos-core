@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
-use aptos_crypto::{ed25519::Ed25519Signature, SigningKey};
+use aptos_crypto::{ed25519::Ed25519Signature, ed25519::Ed25519PrivateKey, SigningKey, ValidCryptoMaterialStringExt};
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     event::EventHandle,
