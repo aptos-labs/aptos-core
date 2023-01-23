@@ -74,7 +74,6 @@ impl MoveVmExt {
             .try_into()
             .expect("HashValue should convert to [u8; 32]");
 
-        // Extensions can now access all feature flags through `self.features`.
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
