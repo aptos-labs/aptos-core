@@ -33,6 +33,15 @@ use crate::natives::util::make_native_from_func;
 #[cfg(feature = "testing")]
 use crate::natives::util::make_test_only_native_from_func;
 
+
+macro_rules! abort_if_feature_disabled {
+    ($context:expr, $feature:expr) => {
+        if !$context.extensions().get::<Bls12381Context>().is_feature_enabled($feature) {
+            return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
+        }
+    };
+}
+
 pub mod abort_codes {
     pub const NOT_IMPLEMENTED: u64 = 2;
     pub const E_UNKNOWN_PAIRING: u64 = 3;
@@ -1847,6 +1856,7 @@ fn hash_to_element_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
     assert_eq!(2, ty_args.len());
     let hasher_type_tag = context
         .type_to_type_tag(ty_args.get(0).unwrap())?
@@ -1949,6 +1959,7 @@ fn uber(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
     if !context.extensions().get::<Bls12381Context>().is_feature_enabled(feature_for_api(api_name)) {
         return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
     }
@@ -3106,7 +3117,7 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         ),
         (
             "hash_to_element_internal",
-            make_native_from_func(gas_params.clone(), |a,b,c,d|uber(API::HashToElement,a,b,c,d)),
+            make_native_from_func(gas_params.clone(), hash_to_element_internal),
         ),
     ]);
 
