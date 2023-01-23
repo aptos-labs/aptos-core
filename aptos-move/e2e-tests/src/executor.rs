@@ -558,9 +558,6 @@ impl FakeExecutor {
                 NativeGasParameters::zeros(),
                 AbstractValueSizeGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
-                self.features
-                    .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
                 self.chain_id,
                 self.features.clone(),
             )
@@ -610,9 +607,6 @@ impl FakeExecutor {
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
-            self.features
-                .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-            self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             self.chain_id,
             self.features.clone(),
         )

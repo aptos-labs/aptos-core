@@ -114,8 +114,6 @@ where
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         chain_id,
         Features::default(),
     )
