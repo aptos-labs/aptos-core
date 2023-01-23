@@ -39,7 +39,7 @@ Use these tools to enhance your Move development experience.
 
 ### Aptos CLI
 
-The [Aptos command line interface](https://aptos.dev/cli-tools/aptos-cli-tool/) (CLI) helps you test development iteratively, as many of the functions in our SDKs have corresponding commands.
+The [Aptos command line interface](https://aptos.dev/cli-tools/aptos-cli-tool/) (CLI) helps you test development, as many of the functions in our SDKs have corresponding commands.
 
 
 ### Petra Wallet
@@ -60,8 +60,6 @@ Install the [Move Prover](https://aptos.dev/cli-tools/install-move-prover) depen
 ### IDEs for Move
 
 Install the [IDE plugins for the Move language](https://aptos.dev/guides/getting-started#ide-plugins-for-move-language) for even more handy features.
-
-TODO: Consider moving from Getting Started to here and instead link from there.
 
 ## Supporting Move resources
 

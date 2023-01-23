@@ -5,7 +5,7 @@ slug: "mint-nft-cli"
 
 # Mint NFTs with Aptos CLI
 
-This codelab lets you use the Aptos CLI to mint non-fungible tokens (NFTs) in Aptos so you can see how the process works and employ related functions in your code. Although this codelab assumes use of the devnet network, you could follow the same steps in devnet or even mainnet, assuming you have the necessary funds in your account.
+This code lab lets you use the Aptos CLI to mint non-fungible tokens (NFTs) in Aptos so you can see how the process works and employ related functions in your code. Although this code lab assumes use of the devnet network, you could follow the same steps in devnet or even mainnet, assuming you have the necessary funds in your account.
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ Then:
 
 ## NFT types
 
-The two most common types of NFT are Event ticket / certificates and PFP NFTs.
+The two most common types of NFT are event ticket / certificates and profile picture NFTs.
 
 ### Event tickets and certificates
 
@@ -32,9 +32,9 @@ This kind of NFT has a base token, and every new NFT generated from this base to
 
 You might use this type of NFT for event tickets where each NFT is a ticket and has properties representing expiration date and if the ticket has been used. When you mint the NFT, you may set an expiration time for the event ticket and `is_ticket_used` to `false`. When the ticket is used, you update `is_ticket_used` to `true`.
 
-### Profile picture (PFP) NFTs
+### Profile picture NFTs
 
-A PFP NFT has a unique token data ID and picture for each token. There are generally no printing editions of this NFT. Most NFT collections on NFT marketplaces are of this kind. They are generally proofs of ownership of an art piece.
+A profile picture NFT has a unique token data ID and picture for each token. There are generally no printing editions of this NFT. Most NFT collections on NFT marketplaces are of this kind. They are generally proofs of ownership of an art piece.
 
 In this tutorial, we describe how to create and mint event ticket NFTs.
 
@@ -307,7 +307,7 @@ aptos move run --function-id <resource-account-address>::create_nft_with_resourc
 
 3. As usual, receive output asking you to accept a gas fee for the transaction and enter: `yes`.
 
-4. Receive output contaning:
+4. Receive output containing:
 
 ```shell
 "vm_status": "Executed successfully"
@@ -360,7 +360,7 @@ aptos move create-resource-account-and-publish-package --seed <seed> --address-n
 
 ### Mint a token with `mint_event_ticket()`
 
-1. Generate a keypair to validate the signature against:
+1. Generate a key pair to validate the signature against:
 
 ```shell
 aptos key generate --key-type ed25519 --output-file output.key
@@ -411,7 +411,7 @@ aptos move run --function-id <resource-account-address>::create_nft_getting_prod
 
 7. Accept the gas fee for the transaction and receive results indicating success.
 
-This completes the Mint NFT via CLI codelab. Congratulations on your completion.
+This completes the Mint NFT via CLI code lab. Congratulations on your completion.
 
 ## 5. Mint with admin and source accounts
 

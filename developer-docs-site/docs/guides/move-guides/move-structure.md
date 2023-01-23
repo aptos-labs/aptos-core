@@ -15,13 +15,10 @@ Once published, the definition of a struct in Move is immutable. Structs themsel
 
 [Structures](https://move-language.github.io/move/structs-and-resources.html) in Move can be given different [abilities](https://move-language.github.io/move/abilities.html) that describe what can be done with that type. There are four different abilities that allow:
 
-* copy: values of types with this ability to be copied. A geo ID would be a good use case. NFTs should not have this ability.
+* copy: values of types with this ability to be copied. A geographic ID would be a good use case. NFTs should not have this ability.
 * drop: values of types with this ability to be popped/dropped.
 * store: values of types with this ability to be saved or stored inside a struct in global storage.
 * key: the type to serve as a key for global storage operations. With this ability, a value can be stored as a top-level item inside an account.
-
-TODO: Ask the team to help rewrite and better expose here as hidden now in the move-lang docs under an *Advanced* collapsed menu:
-[https://github.com/move-language/move/tree/main/language/documentation/tutorial#step-1-writing-my-first-move-module](https://github.com/move-language/move/tree/main/language/documentation/tutorial#step-1-writing-my-first-move-module)
 
 ## Global storage
 
@@ -32,8 +29,6 @@ Aptos employs [Merkle trees](https://aptos.dev/reference/glossary/#merkle-trees)
 ## Signers
 
 In Aptos, signers are incredibly powerful. Structs are published under the signer address. Signers are generated when you sign and submit a transaction. When submitting the transaction, the signer is the first parameter by default. The signer has given consent to have their struct on chain. Signer does not have the Store or Key abilities, only the copy ability.
-
-TODO: Confirm the signer’s abilities and include drop.
 
 ## key
 
@@ -46,8 +41,6 @@ Aptos does not store the signer but rather the signer capability. Only restricte
 Anytime you need to use any global resources, such as a struct, you should acquire it first. For example, both depositing and withdrawing an NFT acquire `TokenStore`. If you have a function in a different module that calls a function inside the module that acquires the resource, you don’t have to label the first function as `acquires()`.
 
 This makes ownership clear since a resource is stored inside of an account. An account can decide if a resource may be created there. The module that defines that resource has power over reading and modifying that struct. So code inside that module needs to explicitly acquire that struct.
-
-TODO: Have Kevin review the above as confusing and contradictory. Did I get the “don’t have to label” reference wrong? He said he was posting a related question in the #move channel. Include the answer here.
 
 Still, anywhere you borrow or move in Move, you are automatically acquiring the resource. Use acquire for explicit inclusion for clarity. Similarly, the `exists()` function does not require the `acquires()` function.
 
