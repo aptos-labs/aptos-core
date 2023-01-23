@@ -2,24 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::types::{PeerError, PeerInfo},
+    application::types::{PeerInfo, PeerState},
     transport::ConnectionMetadata,
 };
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_infallible::{RwLock, RwLockWriteGuard};
+use aptos_config::{
+    config::Error,
+    network_id::{NetworkId, PeerNetworkId},
+};
+use aptos_infallible::RwLock;
 use aptos_types::{account_address::AccountAddress, PeerId};
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::Debug,
-    hash::Hash,
     sync::Arc,
 };
+
+// TODO: refactor and clean up this interface.
 
 /// Metadata storage for peers across all of networking.  Splits storage of information across
 /// networks to prevent different networks from affecting each other
 #[derive(Debug)]
 pub struct PeerMetadataStorage {
-    storage: HashMap<NetworkId, LockingHashMap<PeerId, PeerInfo>>,
+    storage: HashMap<NetworkId, RwLock<HashMap<PeerId, PeerInfo>>>,
 }
 
 impl PeerMetadataStorage {
@@ -36,7 +40,7 @@ impl PeerMetadataStorage {
         network_ids.iter().for_each(|network_id| {
             peer_metadata_storage
                 .storage
-                .insert(*network_id, LockingHashMap::new());
+                .insert(*network_id, RwLock::new(HashMap::new()));
         });
         Arc::new(peer_metadata_storage)
     }
@@ -46,7 +50,7 @@ impl PeerMetadataStorage {
     }
 
     /// Handle common logic of getting a network
-    fn get_network(&self, network_id: NetworkId) -> &LockingHashMap<AccountAddress, PeerInfo> {
+    fn get_network(&self, network_id: NetworkId) -> &RwLock<HashMap<AccountAddress, PeerInfo>> {
         self.storage
             .get(&network_id)
             .unwrap_or_else(|| panic!("Unexpected network requested: {}", network_id))
@@ -54,7 +58,7 @@ impl PeerMetadataStorage {
 
     pub fn read(&self, peer_network_id: PeerNetworkId) -> Option<PeerInfo> {
         let network = self.get_network(peer_network_id.network_id());
-        network.read(&peer_network_id.peer_id())
+        network.read().get(&peer_network_id.peer_id()).cloned()
     }
 
     pub fn read_filtered<F: FnMut(&(&PeerId, &PeerInfo)) -> bool>(
@@ -62,55 +66,57 @@ impl PeerMetadataStorage {
         network_id: NetworkId,
         filter: F,
     ) -> HashMap<PeerNetworkId, PeerInfo> {
-        to_peer_network_ids(
-            network_id,
-            self.get_network(network_id).read_filtered(filter),
-        )
+        let network = self.get_network(network_id);
+        let filtered_results: HashMap<PeerId, PeerInfo> = network
+            .read()
+            .iter()
+            .filter(filter)
+            .map(|(key, value)| (*key, value.clone()))
+            .collect();
+        filtered_results
+            .iter()
+            .map(|(peer_id, peer_info)| {
+                (PeerNetworkId::new(network_id, *peer_id), peer_info.clone())
+            })
+            .collect()
     }
 
     pub fn keys(&self, network_id: NetworkId) -> Vec<PeerNetworkId> {
-        self.get_network(network_id)
+        let network = self.get_network(network_id);
+        network
+            .read()
             .keys()
             .into_iter()
-            .map(|peer_id| PeerNetworkId::new(network_id, peer_id))
+            .map(|peer_id| PeerNetworkId::new(network_id, *peer_id))
             .collect()
     }
 
     /// Read a clone of the entire state
     pub fn read_all(&self, network_id: NetworkId) -> HashMap<PeerNetworkId, PeerInfo> {
-        to_peer_network_ids(network_id, self.get_network(network_id).read_all())
+        let network = self.get_network(network_id);
+        network
+            .read()
+            .iter()
+            .map(|(peer_id, peer_info)| {
+                (PeerNetworkId::new(network_id, *peer_id), peer_info.clone())
+            })
+            .collect()
     }
 
     /// Insert new entry
     pub fn insert(&self, peer_network_id: PeerNetworkId, new_value: PeerInfo) {
-        self.get_network(peer_network_id.network_id())
-            .insert(peer_network_id.peer_id(), new_value)
+        let _ = self
+            .get_network(peer_network_id.network_id())
+            .write()
+            .insert(peer_network_id.peer_id(), new_value);
     }
 
     /// Remove old entries
     pub fn remove(&self, peer_network_id: &PeerNetworkId) {
-        self.get_network(peer_network_id.network_id())
-            .remove(&peer_network_id.peer_id())
-    }
-
-    /// Take in a function to modify the data, must handle concurrency control with the input function
-    pub fn write<F: FnOnce(&mut Entry<PeerId, PeerInfo>) -> Result<(), PeerError>>(
-        &self,
-        peer_network_id: PeerNetworkId,
-        modifier: F,
-    ) -> Result<(), PeerError> {
-        self.get_network(peer_network_id.network_id())
-            .write(peer_network_id.peer_id(), modifier)
-    }
-
-    /// Get the underlying `RwLock` of the map.  Usage is discouraged as it leads to the possiblity of
-    /// leaving the lock held for a long period of time.  However, not everything fits into the `write`
-    /// model.
-    pub fn write_lock(
-        &self,
-        network_id: NetworkId,
-    ) -> RwLockWriteGuard<'_, HashMap<PeerId, PeerInfo>> {
-        self.get_network(network_id).write_lock()
+        let _ = self
+            .get_network(peer_network_id.network_id())
+            .write()
+            .remove(&peer_network_id.peer_id());
     }
 
     pub fn insert_connection(
@@ -118,7 +124,9 @@ impl PeerMetadataStorage {
         network_id: NetworkId,
         connection_metadata: ConnectionMetadata,
     ) {
-        self.write_lock(network_id)
+        let network = self.get_network(network_id);
+        network
+            .write()
             .entry(connection_metadata.remote_peer_id)
             .and_modify(|entry| entry.active_connection = connection_metadata.clone())
             .or_insert_with(|| PeerInfo::new(connection_metadata));
@@ -129,110 +137,31 @@ impl PeerMetadataStorage {
         network_id: NetworkId,
         connection_metadata: &ConnectionMetadata,
     ) {
-        let mut map = self.write_lock(network_id);
+        let network = self.get_network(network_id);
 
         // Don't remove the peer if the connection doesn't match!
-        if let Entry::Occupied(entry) = map.entry(connection_metadata.remote_peer_id) {
+        if let Entry::Occupied(entry) = network.write().entry(connection_metadata.remote_peer_id) {
             // For now, remove the peer entirely, we could in the future have multiple connections for a peer
             if entry.get().active_connection.connection_id == connection_metadata.connection_id {
                 entry.remove();
             }
         }
     }
-}
 
-fn to_peer_network_ids(
-    network_id: NetworkId,
-    map: HashMap<PeerId, PeerInfo>,
-) -> HashMap<PeerNetworkId, PeerInfo> {
-    map.into_iter()
-        .map(|(peer_id, peer_info)| (PeerNetworkId::new(network_id, peer_id), peer_info))
-        .collect()
-}
-
-/// A generic locking hash map with ability to read before write consistency
-#[derive(Debug)]
-pub struct LockingHashMap<Key: Clone + Debug + Eq + Hash, Value: Clone + Debug> {
-    map: RwLock<HashMap<Key, Value>>,
-}
-
-impl<Key, Value> LockingHashMap<Key, Value>
-where
-    Key: Clone + Debug + Eq + Hash,
-    Value: Clone + Debug,
-{
-    pub fn new() -> Self {
-        Self {
-            map: RwLock::new(HashMap::new()),
+    pub fn update_peer_state(
+        &self,
+        peer_network_id: PeerNetworkId,
+        peer_state: PeerState,
+    ) -> Result<(), Error> {
+        let network = self.get_network(peer_network_id.network_id());
+        if let Entry::Occupied(mut entry) = network.write().entry(peer_network_id.peer_id()) {
+            entry.get_mut().status = peer_state;
+            Ok(())
+        } else {
+            Err(Error::Unexpected(format!(
+                "Peer not found in storage! Peer: {:?}",
+                peer_network_id
+            )))
         }
-    }
-
-    /// Get a clone of the value
-    pub fn read(&self, key: &Key) -> Option<Value> {
-        self.map.read().get(key).cloned()
-    }
-
-    /// Filtered read clone based on keys or values
-    pub fn read_filtered<F: FnMut(&(&Key, &Value)) -> bool>(
-        &self,
-        filter: F,
-    ) -> HashMap<Key, Value> {
-        self.map
-            .read()
-            .iter()
-            .filter(filter)
-            .map(|(key, value)| (key.clone(), value.clone()))
-            .collect()
-    }
-
-    /// All keys of the hash map
-    pub fn keys(&self) -> Vec<Key> {
-        self.map.read().keys().cloned().collect()
-    }
-
-    /// Read a clone of the entire state
-    pub fn read_all(&self) -> HashMap<Key, Value> {
-        self.map.read().clone()
-    }
-
-    /// Insert new entry
-    pub fn insert(&self, key: Key, new_value: Value) {
-        let mut map = self.map.write();
-        map.entry(key)
-            .and_modify(|value| *value = new_value.clone())
-            .or_insert_with(|| new_value);
-    }
-
-    /// Remove old entries
-    pub fn remove(&self, key: &Key) {
-        let mut map = self.map.write();
-        map.remove(key);
-    }
-
-    /// Take in a function to modify the data, must handle concurrency control with the input function
-    pub fn write<F: FnOnce(&mut Entry<Key, Value>) -> Result<(), PeerError>>(
-        &self,
-        key: Key,
-        modifier: F,
-    ) -> Result<(), PeerError> {
-        let mut map = self.map.write();
-        modifier(&mut map.entry(key))
-    }
-
-    /// Get the underlying `RwLock` of the map.  Usage is discouraged as it leads to the possiblity of
-    /// leaving the lock held for a long period of time.  However, not everything fits into the `write`
-    /// model.
-    pub fn write_lock(&self) -> RwLockWriteGuard<'_, HashMap<Key, Value>> {
-        self.map.write()
-    }
-}
-
-impl<Key, Value> Default for LockingHashMap<Key, Value>
-where
-    Key: Clone + Debug + Eq + Hash,
-    Value: Clone + Debug,
-{
-    fn default() -> Self {
-        Self::new()
     }
 }

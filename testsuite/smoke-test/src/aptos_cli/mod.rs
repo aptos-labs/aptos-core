@@ -4,4 +4,4 @@
 mod account;
 #[cfg(feature = "cli-framework-test-move")]
 mod r#move;
-mod validator;
+pub mod validator;

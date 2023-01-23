@@ -488,8 +488,8 @@ module aptos_framework::voting {
     }
 
     public fun is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         can_be_resolved_early(proposal) || is_voting_period_over(proposal)
     }
 
@@ -1021,5 +1021,32 @@ module aptos_framework::voting {
         governance: &signer,
     ) acquires VotingForum {
         test_cannot_set_min_threshold_higher_than_early_resolution_generic(aptos_framework, governance, true);
+    }
+
+    #[test(aptos_framework = @aptos_framework, governance = @0x123)]
+    public entry fun test_replace_execution_hash(aptos_framework: &signer, governance: &signer) acquires VotingForum {
+        account::create_account_for_test(@aptos_framework);
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+
+        // Register voting forum and create a proposal.
+        let governance_address = signer::address_of(governance);
+        account::create_account_for_test(governance_address);
+        let proposal_id = create_test_proposal_generic(governance, option::none<u128>(), true);
+        assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
+
+        // Vote.
+        let proof = TestProposal {};
+        vote<TestProposal>(&proof, governance_address, proposal_id, 10, true);
+        let TestProposal {} = proof;
+
+        // Resolve.
+        timestamp::fast_forward_seconds(VOTING_DURATION_SECS + 1);
+        assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_SUCCEEDED, 1);
+
+        resolve_proposal_v2<TestProposal>(governance_address, proposal_id, vector[10u8]);
+        let voting_forum = borrow_global<VotingForum<TestProposal>>(governance_address);
+        let proposal = table::borrow(&voting_forum.proposals, 0);
+        assert!(proposal.execution_hash == vector[10u8], 2);
+        assert!(!table::borrow(&voting_forum.proposals, proposal_id).is_resolved, 3);
     }
 }

@@ -182,6 +182,33 @@ const config = {
           },
           {
             type: "dropdown",
+            label: "Create NFTs",
+            position: "left",
+            items: [
+              {
+                type: "doc",
+                label: "Compare Aptos Tokens",
+                docId: "concepts/coin-and-token/aptos-token-comparison",
+              },
+              {
+                type: "doc",
+                label: "Mint NFTs with Aptos SDKs",
+                docId: "tutorials/your-first-nft",
+              },
+              {
+                type: "doc",
+                label: "Mint NFTs with Aptos CLI",
+                docId: "guides/move-guides/mint-nft-cli",
+              },
+              {
+                type: "doc",
+                label: "Mint FTs with On-Chain Data",
+                docId: "concepts/coin-and-token/onchain-data",
+              },
+            ],
+          },
+          {
+            type: "dropdown",
             label: "Run Nodes",
             position: "left",
             items: [
