@@ -831,12 +831,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-gas",
+ "aptos-logger",
  "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-state-view",
  "aptos-types",
  "aptos-validator-interface",
  "aptos-vm",
+ "clap 3.2.23",
  "move-binary-format",
  "move-cli",
  "move-compiler",
@@ -845,6 +847,8 @@ dependencies = [
  "move-table-extension",
  "move-vm-runtime",
  "move-vm-test-utils",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -2651,6 +2655,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "async-trait",
+ "lru",
  "move-binary-format",
  "tokio",
 ]
