@@ -95,7 +95,8 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
     let mut features = Features::default();
-    features.enable(FeatureFlag::BLS12_381_GROUPS);
-    features.enable(FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    features.update(FeatureFlag::BLS12_381_GROUPS, true);
+    features.update(FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS, true);
+    features.update(FeatureFlag::RISTRETTO255_GROUP, false);
     exts.add(GroupContext::new(features));
 }

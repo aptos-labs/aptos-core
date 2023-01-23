@@ -47,7 +47,7 @@ fn move_framework_unit_tests() {
     run_tests_for_pkg("aptos-framework");
 }
 
-#[test]
+#[test]aptos-move/aptos-vm/src/aptos_vm_impl.rs
 fn move_stdlib_unit_tests() {
     run_tests_for_pkg("aptos-stdlib");
 }

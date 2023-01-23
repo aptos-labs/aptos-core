@@ -44,13 +44,18 @@ impl Features {
         byte_index < self.features.len() && (self.features[byte_index] & bit_mask != 0)
     }
 
-    pub fn enable(&mut self, flag: FeatureFlag) {
-        let bit_id = flag as usize;
-        let byte_id = bit_id / 8;
-        if self.features.len() < byte_id + 1 {
-            self.features.resize(byte_id + 1, 0);
+    pub fn update(&mut self, flag: FeatureFlag, enabled: bool) {
+        let bit_idx = flag as usize;
+        let byte_idx = bit_idx / 8;
+        if self.features.len() < byte_idx + 1 {
+            self.features.resize(byte_idx + 1, 0);
         }
-        self.features[byte_id] |= 1 << (bit_id % 8);
+        let mask = 1 << (bit_idx % 8);
+        if enabled {
+            self.features[byte_idx] |= mask;
+        } else {
+            self.features[byte_idx] &= !mask;
+        }
 
     }
 }
