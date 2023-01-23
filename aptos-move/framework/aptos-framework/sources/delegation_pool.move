@@ -110,9 +110,6 @@ module aptos_framework::delegation_pool {
 
     const MAX_U64: u64 = 18446744073709551615;
 
-    /// Conversion factor between seconds and microseconds
-    const MICRO_CONVERSION_FACTOR: u64 = 1000000;
-
     /// Maximum operator percentage fee(of double digit precision): 22.85% is represented as 2285
     const MAX_FEE: u64 = 10000;
 
@@ -138,7 +135,7 @@ module aptos_framework::delegation_pool {
         // Commission fee paid to the node operator out of pool rewards
         operator_commission_percentage: u64,
 
-        // The events emitted for delegation operations on the pool
+        // The events emitted by stake-management operations on the pool
         add_stake_events: EventHandle<AddStakeEvent>,
         reactivate_stake_events: EventHandle<ReactivateStakeEvent>,
         unlock_stake_events: EventHandle<UnlockStakeEvent>,
@@ -149,6 +146,7 @@ module aptos_framework::delegation_pool {
         pool_address: address,
         delegator_address: address,
         amount_added: u64,
+        add_stake_fee: u64,
     }
 
     struct ReactivateStakeEvent has drop, store {
@@ -188,7 +186,7 @@ module aptos_framework::delegation_pool {
         let (stake_pool_signer, stake_pool_signer_cap) = account::create_resource_account(owner, seed);
         coin::register<AptosCoin>(&stake_pool_signer);
 
-        // stake_pool_signer is owner account of stake pool and has `OwnerCapability`
+        // stake_pool_signer will be owner of the stake pool and have its `stake::OwnerCapability`
         let pool_address = signer::address_of(&stake_pool_signer);
         stake::initialize_stake_owner(&stake_pool_signer, 0, owner_address, owner_address);
 
@@ -209,7 +207,7 @@ module aptos_framework::delegation_pool {
             withdraw_stake_events: account::new_event_handle<WithdrawStakeEvent>(&stake_pool_signer),
         });
 
-        // save resource-account address (inner pool address) + outer pool ownership on `owner`
+        // save delegation pool ownership and resource account address (inner stake pool address) on `owner`
         move_to(owner, DelegationPoolOwnership { pool_address });
     }
 
@@ -233,13 +231,12 @@ module aptos_framework::delegation_pool {
         exists<DelegationPool>(addr)
     }
 
-    /// there are stake pools proxied by no delegation pool
-    public fun assert_delegation_pool_exists(pool_address: address) {
+    fun assert_delegation_pool_exists(pool_address: address) {
         assert!(delegation_pool_exists(pool_address), error::invalid_argument(EDELEGATION_POOL_DOES_NOT_EXIST));
     }
 
     /// Retrieves the shared resource account owning the stake pool in order
-    /// to forward a stake-management operation to the underlying pool.
+    /// to forward a stake-management operation to this underlying pool.
     fun retrieve_stake_pool_signer(pool: &DelegationPool): signer {
         account::create_signer_with_capability(&pool.stake_pool_signer_cap)
     }
@@ -250,7 +247,7 @@ module aptos_framework::delegation_pool {
     }
 
     #[view]
-    /// Return the index of the current lockup cycle on delegation pool `pool_address`.
+    /// Return the index of current observed lockup cycle on delegation pool `pool_address`.
     /// This represents the key into `inactive_shares` of the `pending_inactive` shares pool.
     public fun observed_lockup_cycle(pool_address: address): u64 acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
@@ -273,6 +270,22 @@ module aptos_framework::delegation_pool {
         stake::set_delegated_voter(&retrieve_stake_pool_signer(borrow_global<DelegationPool>(pool_address)), new_voter);
     }
 
+    #[view]
+    /// Return the fee to be charged for an `add_stake` operation of `amount` on pool at `pool_address`.
+    /// If the validator produces rewards this epoch, added stake goes directly to `pending_active` and
+    /// does not earn rewards. However, all shares within a pool_u64 appreciate uniformly, when this epoch ends:
+    /// - either added shares are still `pending_active` and steal from rewards of existing `active` stake
+    /// - or have moved to `pending_inactive` and get full rewards (they displaced `active` stake at `unlock`)
+    /// Therefore, should charge delegator the maximum amount it would unfairly earn only this epoch.
+    public fun get_add_stake_fee(pool_address: address, amount: u64): u64 {
+        if (stake::is_current_epoch_validator(pool_address)) {
+            let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(&staking_config::get());
+            if (rewards_rate_denominator > 0) {
+                ((((amount as u128) * (rewards_rate as u128)) / (rewards_rate_denominator as u128)) as u64)
+            } else { 0 }
+        } else { 0 }
+    }
+
     /// Add `amount` of coins to the delegation pool `pool_address`.
     public entry fun add_stake(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
         // synchronize delegation and stake pools before any user operation
@@ -283,14 +296,14 @@ module aptos_framework::delegation_pool {
         let pool = borrow_global_mut<DelegationPool>(pool_address);
         let delegator_address = signer::address_of(delegator);
 
-        // extract from absolute added stake the maximum amount the delegator would unfairly earn this epoch
-        let amount_added = charge_add_stake_fee(pool, amount);
+        // fee to be charged for adding `amount` stake on this delegation pool at this epoch
+        let add_stake_fee = get_add_stake_fee(pool_address, amount);
 
         // stake the entire amount to the stake pool
         coin::transfer<AptosCoin>(delegator, pool_address, amount);
         stake::add_stake(&retrieve_stake_pool_signer(pool), amount);
         // but buy shares for delegator just for the remaining amount after fee
-        buy_in_active_shares(pool, delegator_address, amount_added);
+        buy_in_active_shares(pool, delegator_address, amount - add_stake_fee);
 
         // commit coins from `add_stake` fee to the active shares pool
         // in order to not mistake them for epoch active rewards
@@ -302,7 +315,8 @@ module aptos_framework::delegation_pool {
             AddStakeEvent {
                 pool_address,
                 delegator_address,
-                amount_added,
+                amount_added: amount,
+                add_stake_fee,
             },
         );
     }
@@ -362,6 +376,7 @@ module aptos_framework::delegation_pool {
         );
     }
 
+    /// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
     public entry fun withdraw(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
         // synchronize delegation and stake pools before any user operation
         synchronize_delegation_pool(pool_address);
@@ -369,6 +384,9 @@ module aptos_framework::delegation_pool {
     }
 
     #[view]
+    /// Return whether `pending_inactive` stake can be directly withdrawn from
+    /// the delegation pool, implicitly its stake pool, in the special case
+    /// the validator had gone inactive before its lockup expired.
     public fun can_withdraw_pending_inactive(pool_address: address): bool {
         stake::get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE &&
         timestamp::now_seconds() >= stake::get_lockup_secs(pool_address)
@@ -380,7 +398,7 @@ module aptos_framework::delegation_pool {
 
         let pool_address = get_pool_address(pool);
         let (withdrawal_exists, withdrawal_lockup_cycle) = pending_withdrawal_exists(pool, delegator_address);
-        // exit if no pending withdrawal or cannot withdraw pending_inactive stake from stake pool
+        // exit if no withdrawal or is not inactive and cannot withdraw pending_inactive stake from stake pool
         if (!(
             withdrawal_exists &&
             (withdrawal_lockup_cycle < pool.observed_lockup_cycle || can_withdraw_pending_inactive(pool_address))
@@ -483,28 +501,14 @@ module aptos_framework::delegation_pool {
     }
 
     #[view]
-    /// Return the unique lockup cycle where delegator `delegator_address` owns
-    /// unlocking (or already unlocked) stake to be withdrawn from delegation pool at address `pool_address`.
+    /// Return the unique observed lockup cycle where delegator `delegator_address` may have
+    /// unlocking (or already unlocked) stake to be withdrawn from delegation pool at `pool_address`.
     public fun get_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64) acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         pending_withdrawal_exists(borrow_global<DelegationPool>(pool_address), delegator_address)
     }
 
-    #[view]
-    /// Compute the fee paid out of `coins_amount` stake if adding it to delegation pool `pool_address` now.
-    public fun get_add_stake_fee(pool_address: address, coins_amount: u64): u64 acquires DelegationPool {
-        assert_delegation_pool_exists(pool_address);
-        coins_amount - charge_add_stake_fee(borrow_global<DelegationPool>(pool_address), coins_amount)
-    }
-
-    /// Return a mutable reference to the share pool of `pending_inactive` stake on the
-    /// delegation pool, always the last item in `inactive_shares`.
-    fun pending_inactive_shares_pool(pool: &mut DelegationPool): &mut pool_u64::Pool {
-        let observed_lockup_cycle = pool.observed_lockup_cycle;
-        table::borrow_mut(&mut pool.inactive_shares, observed_lockup_cycle)
-    }
-
-    /// Return the unique lockup cycle where delegator `delegator_address` owns
+    /// Return the unique observed lockup cycle where delegator `delegator_address` may have
     /// unlocking (or already unlocked) stake to be withdrawn from delegation pool `pool`.
     /// A bool is returned to signal if a pending withdrawal exists at all.
     fun pending_withdrawal_exists(pool: &DelegationPool, delegator_address: address): (bool, u64) {
@@ -515,33 +519,11 @@ module aptos_framework::delegation_pool {
         }
     }
 
-    fun charge_add_stake_fee(pool: &DelegationPool, coins_amount: u64): u64 {
-        let pool_address = get_pool_address(pool);
-        // if the underlying stake pool earns rewards this epoch, charge delegator
-        // the maximum amount it would earn from new added stake in `pending_active` state
-        if (stake::is_current_epoch_validator(pool_address)) {
-            let (active, _, pending_active, _) = stake::get_stake(pool_address);
-
-            let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(&staking_config::get());
-            let max_epoch_active_rewards = if (rewards_rate_denominator > 0) {
-                pool_u64::multiply_then_divide(&pool.active_shares, active, rewards_rate, rewards_rate_denominator)
-            } else {
-                return coins_amount
-            };
-            // 1. calculate shares received if buying in active pool with its pending epoch rewards added
-            // 2. calculate coins required to buy this amount of shares in current active pool
-            // (((coins_amount * total_shares) / (total_coins + max_epoch_active_rewards)) * total_coins) / total_shares
-            // == (coins_amount * total_coins) / (total_coins + max_epoch_active_rewards)
-            pool_u64::multiply_then_divide(
-                &pool.active_shares,
-                coins_amount,
-                // synchronized total_coins on `active_shares`
-                active + pending_active,
-                active + pending_active + max_epoch_active_rewards
-            )
-        } else {
-            coins_amount
-        }
+    /// Return a mutable reference to the shares pool of `pending_inactive` stake on the
+    /// delegation pool, always the last item in `inactive_shares`.
+    fun pending_inactive_shares_pool(pool: &mut DelegationPool): &mut pool_u64::Pool {
+        let observed_lockup_cycle = pool.observed_lockup_cycle;
+        table::borrow_mut(&mut pool.inactive_shares, observed_lockup_cycle)
     }
 
     /// Buy shares into active pool on behalf of delegator `shareholder` who
@@ -634,9 +616,7 @@ module aptos_framework::delegation_pool {
         coins_amount: u64,
         lockup_cycle: u64,
     ): u64 {
-        let observed_lockup_cycle = pool.observed_lockup_cycle;
         let inactive_shares = table::borrow_mut(&mut pool.inactive_shares, lockup_cycle);
-
         let shares_to_redeem = amount_to_shares_to_redeem(inactive_shares, shareholder, coins_amount);
         if (shares_to_redeem == 0) return 0;
         let redeemed_coins = pool_u64::redeem_shares(inactive_shares, shareholder, shares_to_redeem);
@@ -647,13 +627,16 @@ module aptos_framework::delegation_pool {
             table::remove(&mut pool.pending_withdrawals, shareholder);
         };
         // destroy inactive-shares pool of past OLC if all its stake has been withdrawn
-        if (lockup_cycle < observed_lockup_cycle && total_coins(inactive_shares) == 0) {
+        if (lockup_cycle < pool.observed_lockup_cycle && total_coins(inactive_shares) == 0) {
             pool_u64::destroy_empty(table::remove<u64, pool_u64::Pool>(&mut pool.inactive_shares, lockup_cycle));
         };
 
         redeemed_coins
     }
 
+    /// Calculate stake deviations between the delegation and stake pools in order to
+    /// capture the rewards earned in the meantime, resulting operator commission and
+    /// whether the lockup expired on the stake pool.
     fun calculate_stake_pool_drift(pool: &DelegationPool): (bool, u64, u64, u64, u64) {
         let (active, inactive, pending_active, pending_inactive) = stake::get_stake(get_pool_address(pool));
         assert!(
@@ -682,7 +665,7 @@ module aptos_framework::delegation_pool {
 
         // operator `active` rewards not persisted yet to the `active_shares` pool
         let commission_active = total_coins(&pool.active_shares);
-        commission_active = if (active >= commission_active) {
+        commission_active = if (active > commission_active) {
             ((active - commission_active) * pool.operator_commission_percentage) / MAX_FEE
         } else {
             // handle any slashing applied to `active` stake
@@ -690,7 +673,7 @@ module aptos_framework::delegation_pool {
         };
         // operator `pending_inactive` rewards not persisted yet to the shares pool of `pending_inactive` stake
         let commission_pending_inactive = total_coins(table::borrow(&pool.inactive_shares, pool.observed_lockup_cycle));
-        commission_pending_inactive = if (pending_inactive >= commission_pending_inactive) {
+        commission_pending_inactive = if (pending_inactive > commission_pending_inactive) {
             ((pending_inactive - commission_pending_inactive) * pool.operator_commission_percentage) / MAX_FEE
         } else {
             // handle any slashing applied to `pending_inactive` stake
@@ -700,6 +683,8 @@ module aptos_framework::delegation_pool {
         (lockup_cycle_ended, active, pending_inactive, commission_active, commission_pending_inactive)
     }
 
+    /// Syncs delegation and stake pools: distribute yet-undetected rewards to corresponding internal
+    /// shares pools, assign commission to operator and eventually prepare delegation pool for a new lockup cycle.
     public entry fun synchronize_delegation_pool(pool_address: address) acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         let pool = borrow_global_mut<DelegationPool>(pool_address);
@@ -711,13 +696,13 @@ module aptos_framework::delegation_pool {
             commission_pending_inactive
         ) = calculate_stake_pool_drift(pool);
 
-        // distribute remaining rewards after commission to delegators (to already existing shares)
+        // distribute rewards remaining after commission, to delegators (to already existing shares)
         // before buying shares for the operator for its entire commission fee
         // otherwise, operator's new shares would additionally appreciate from rewards it does not own
 
         // update total coins accumulated by `active` + `pending_active` shares
         pool_u64::update_total_coins(&mut pool.active_shares, active - commission_active);
-        // update total coins accumulated by `pending_inactive` shares at current lockup cycle on delegation pool
+        // update total coins accumulated by `pending_inactive` shares at current observed lockup cycle
         pool_u64::update_total_coins(pending_inactive_shares_pool(pool), pending_inactive - commission_pending_inactive);
 
         // reward operator its commission out of uncommitted active rewards (`add_stake` fees already excluded)
@@ -930,7 +915,7 @@ module aptos_framework::delegation_pool {
 
         // entire stake on delegation pool is active
         let previous_add_stake_fee = get_add_stake_fee(pool_address, 1000);
-        // after `add_stake` fee: 1000 * 1000 / (1000 + 1000 * 1%) = 990
+        // `add_stake` fee: 1000 * 1%
         assert!(previous_add_stake_fee == 10, 0);
         end_aptos_epoch();
         // still entire stake on delegation pool is active
@@ -940,8 +925,8 @@ module aptos_framework::delegation_pool {
         stake::mint(delegator, 1000);
         add_stake(delegator, pool_address, 1000);
         stake::assert_stake_pool(pool_address, 1010, 0, 1000, 0);
-        // after `add_stake` fee: 1000 * (1010 + 1000) / (1010 + 1010 * 1% + 1000) = 995
-        assert!(get_add_stake_fee(pool_address, 1000) == 5, 0);
+        // `add_stake` fee: 1000 * 1%
+        assert!(get_add_stake_fee(pool_address, 1000) == 10, 0);
         end_aptos_epoch();
         // after epoch ends should receive at most what initially deposited
         let (delegator_active, _, _) = get_stake(pool_address, delegator_address);
@@ -955,8 +940,8 @@ module aptos_framework::delegation_pool {
         stake::mint(delegator, 1000);
         add_stake(delegator, pool_address, 1000);
         stake::assert_stake_pool(pool_address, 2020, 0, 2000, 0);
-        // after `add_stake` fee: 1000 * (2020 + 2000) / (2020 + 2020 * 1% + 2000) = 995
-        assert!(get_add_stake_fee(pool_address, 1000) == 5, 0);
+        // `add_stake` fee: 1000 * 1%
+        assert!(get_add_stake_fee(pool_address, 1000) == 10, 0);
         end_aptos_epoch();
         // after epoch ends should receive at most what initially deposited
         (delegator_active, _, _) = get_stake(pool_address, delegator_address);
@@ -1028,8 +1013,8 @@ module aptos_framework::delegation_pool {
 
         // add 250 coins being pending active until next epoch
         stake::mint(validator, 250);
-        // after `add_stake` fee: 250 * 1250 / (1250 + 1250 active * 1%) = 247
-        assert!(get_add_stake_fee(pool_address, 250) == 3, 0);
+        // `add_stake` fee: 250 * 1%
+        assert!(get_add_stake_fee(pool_address, 250) == 2, 0);
         add_stake(validator, pool_address, 250);
         // zero `add_stake` fee as there is only one delegator which gets back the paid fee
         // as entire active stake is owned by itself
@@ -1060,7 +1045,7 @@ module aptos_framework::delegation_pool {
         add_stake_events = add_stake_events_counter(pool_address);
         add_stake(validator, pool_address, 1);
 
-        assert!(get_add_stake_fee(pool_address, 1) == 1, 0);
+        assert!(get_add_stake_fee(pool_address, 1) == 0, 0);
         // event is emitted as initial added stake still reaches the stake pool
         assert!(add_stake_events_counter(pool_address) == add_stake_events + 1, 0);
         assert_delegation(validator_address, pool_address, 1829, 0, 0);
@@ -1084,37 +1069,36 @@ module aptos_framework::delegation_pool {
 
         // add 250 coins from another account
         stake::mint(delegator, 250);
-        // after `add_stake` fee: 250 * 1000 / (1000 + 1000 active * 1%) = 247
-        assert!(get_add_stake_fee(pool_address, 250) == 3, 0);
+        // `add_stake` fee: 250 * 1%
+        assert!(get_add_stake_fee(pool_address, 250) == 2, 0);
         add_stake(delegator, pool_address, 250);
-        assert_delegation(delegator_address, pool_address, 247, 0, 0);
+        assert_delegation(delegator_address, pool_address, 248, 0, 0);
         stake::assert_stake_pool(pool_address, 1000, 0, 250, 0);
 
         end_aptos_epoch();
         // 1000 active stake * 1% rewards
         stake::assert_stake_pool(pool_address, 1260, 0, 0, 0);
 
-        // 3 `add_stake` fee + 1000 active stake * 1% = 13 total rewards
-        // 13 * 247 / (1000 + 247) = 2
-        assert_delegation(delegator_address, pool_address, 249, 0, 0);
-        // 13 * 1000 / (1000 + 247) = 10
-        assert_delegation(validator_address, pool_address, 1010, 0, 0);
+        // 2 `add_stake` fee + 1000 active stake * 1% = 12 total rewards
+        // 12 * 248 / (1000 + 248) = 2
+        assert_delegation(delegator_address, pool_address, 250, 0, 0);
+        // 12 * 1000 / (1000 + 248) = 9
+        assert_delegation(validator_address, pool_address, 1009, 0, 0);
 
         stake::mint(validator, 250);
-        // after `add_stake` fee: 250 * 1260 / (1260 + 1260 active * 1%) = 247
-        assert!(get_add_stake_fee(pool_address, 250) == 3, 0);
+        // `add_stake` fee: 250 * 1%
+        assert!(get_add_stake_fee(pool_address, 250) == 2, 0);
         add_stake(validator, pool_address, 250);
-        // from 3 `add_stake` fee 2 distributed to `validator` and 1 to `delegator`
         assert_delegation(validator_address, pool_address, 1259, 0, 0);
         assert_delegation(delegator_address, pool_address, 250, 0, 0);
         stake::assert_stake_pool(pool_address, 1260, 0, 250, 0);
 
         stake::mint(delegator, 100);
-        // after `add_stake` fee: 100 * 1510 / (1510 + 1260 active * 1%) = 99
+        // `add_stake` fee: 100 * 1%
         assert!(get_add_stake_fee(pool_address, 100) == 1, 0);
         add_stake(delegator, pool_address, 100);
-        assert_delegation(delegator_address, pool_address, 348, 0, 0);
-        assert_delegation(validator_address, pool_address, 1261, 0, 0);
+        assert_delegation(delegator_address, pool_address, 349, 0, 0);
+        assert_delegation(validator_address, pool_address, 1260, 0, 0);
         stake::assert_stake_pool(pool_address, 1260, 0, 350, 0);
 
         end_aptos_epoch();
@@ -1197,9 +1181,9 @@ module aptos_framework::delegation_pool {
         // lockup cycle on delegation pool should have changed on `add_stake` operation
         assert!(observed_lockup_cycle(pool_address) == 1, 0);
 
-        // after `add_stake` fee: 50 * 153 / (153 + 153 active * 1%) = 49
-        assert_delegation(delegator_address, pool_address, 48, 0, 0);
-        assert_delegation(validator_address, pool_address, 155, 151, 0);
+        // `add_stake` fee: 50 * 1% = 0, but there is some imprecision when buying shares
+        assert_delegation(delegator_address, pool_address, 49, 0, 0);
+        assert_delegation(validator_address, pool_address, 154, 151, 0);
         stake::assert_stake_pool(pool_address, 154, 151, 50, 0);
 
         // try to withdraw stake unlocked by others
@@ -1209,7 +1193,7 @@ module aptos_framework::delegation_pool {
         // withdraw own unlocked stake
         withdraw(validator, pool_address, 151);
         assert!(coin::balance<AptosCoin>(validator_address) == 151, 2);
-        assert_delegation(validator_address, pool_address, 155, 0, 0);
+        assert_delegation(validator_address, pool_address, 154, 0, 0);
         // pending withdrawal has been executed and deleted
         (withdrawal_exists, _) = get_pending_withdrawal(pool_address, validator_address);
         assert!(!withdrawal_exists, 0);
@@ -1218,19 +1202,19 @@ module aptos_framework::delegation_pool {
 
         // new pending withdrawal can be created on lockup cycle 1
         unlock(validator, pool_address, 55);
-        assert_delegation(validator_address, pool_address, 101, 0, 54);
+        assert_delegation(validator_address, pool_address, 100, 0, 54);
         (withdrawal_exists, withdrawal_lockup_cycle) = get_pending_withdrawal(pool_address, validator_address);
         assert!(withdrawal_exists && withdrawal_lockup_cycle == 1, 0);
 
         // end lockup cycle 1
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS - EPOCH_DURATION);
         end_aptos_epoch();
-        assert_delegation(validator_address, pool_address, 101, 54, 0);
+        assert_delegation(validator_address, pool_address, 100, 54, 0);
 
         // try to unlock when there is already a pending withdrawal which is automatically executed
-        unlock(validator, pool_address, 101);
+        unlock(validator, pool_address, 100);
         assert!(coin::balance<AptosCoin>(validator_address) == 205, 2);
-        assert_delegation(validator_address, pool_address, 0, 0, 101);
+        assert_delegation(validator_address, pool_address, 0, 0, 100);
         // this is the new pending withdrawal replacing the old unlocked one
         (withdrawal_exists, withdrawal_lockup_cycle) = get_pending_withdrawal(pool_address, validator_address);
         assert!(withdrawal_exists && withdrawal_lockup_cycle == 2, 0);
@@ -1247,14 +1231,14 @@ module aptos_framework::delegation_pool {
         end_aptos_epoch();
 
         // stake remains pending inactive as it has not been explicitly inactivated
-        stake::assert_stake_pool(pool_address, 50, 0, 0, 103);
-        assert_delegation(validator_address, pool_address, 0, 0, 103);
+        stake::assert_stake_pool(pool_address, 51, 0, 0, 102);
+        assert_delegation(validator_address, pool_address, 0, 0, 102);
 
         // however, as validator is inactive and lockup expired, this stake is withdrawable
-        withdraw(validator, pool_address, 103);
-        assert!(coin::balance<AptosCoin>(validator_address) == 308, 2);
+        withdraw(validator, pool_address, 102);
+        assert!(coin::balance<AptosCoin>(validator_address) == 307, 2);
         assert_delegation(validator_address, pool_address, 0, 0, 0);
-        stake::assert_stake_pool(pool_address, 50, 0, 0, 0);
+        stake::assert_stake_pool(pool_address, 51, 0, 0, 0);
         (withdrawal_exists, _) = get_pending_withdrawal(pool_address, validator_address);
         assert!(!withdrawal_exists, 0);
 
@@ -1704,7 +1688,7 @@ module aptos_framework::delegation_pool {
         assert_delegation(validator_address, pool_address, 120, 58, 0);
 
         stake::mint(delegator1, 10000);
-        assert!(get_add_stake_fee(pool_address, 10000) == 99, 0);
+        assert!(get_add_stake_fee(pool_address, 10000) == 100, 0);
         add_stake(delegator1, pool_address, 10000);
         end_aptos_epoch();
         stake::assert_stake_pool(pool_address, 20716, 58, 0, 0);
