@@ -89,6 +89,8 @@ FAQ
 FLAC
 Failover
 failover
+FT
+FTs
 FullNode
 Fullnodes
 GB
@@ -147,6 +149,8 @@ ORM
 Octa
 Octas
 Ohlone
+onchain
+on-chain
 OpenAPI
 OptionalAggregator
 PFN

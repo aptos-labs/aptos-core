@@ -1,16 +1,16 @@
 ---
-title: "Silver Coin"
-id: "silver-coin"
+title: "Mint FTs with On-Chain Data"
+id: "onchain-data"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Mint fungible tokens with on-chain data
+# Mint Fungible Tokens with On-Chain Data
 
 You, as a developer, maybe also a game fancier, recently starts to develop a game and hope to
 integrate it with some web3 experience. You spontaneously think Aptos supports fungible tokens
 with abundant APIs in the token standard. So you wanna give a try to issue an in-game currency
-called "silver coin" by using Aptos CLI. There is only two requirements:
+called *silver coin* by using the [Aptos command line interface (CLI)](../../cli-tools/aptos-cli-tool/index.md). There is only two requirements:
 - The token is fungible
 - The token is associated with a URL that points to the coin image.
 
