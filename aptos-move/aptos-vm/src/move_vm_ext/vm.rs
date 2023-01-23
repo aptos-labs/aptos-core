@@ -23,6 +23,7 @@ use aptos_types::on_chain_config::{FeatureFlag, Features};
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
+    #[allow(unused)]
     features: Features,
 }
 
@@ -32,7 +33,6 @@ impl MoveVmExt {
         abs_val_size_gas_params: AbstractValueSizeGasParameters,
         gas_feature_version: u64,
         chain_id: u8,
-        #[allow(unused)]
         features: Features,
     ) -> VMResult<Self> {
         // Note: binary format v6 adds a few new integer types and their corresponding instructions.
