@@ -42,6 +42,21 @@ macro_rules! abort_if_feature_disabled {
     };
 }
 
+macro_rules! borrow_bls12_381_g1 {
+    ($context:expr, $handle:expr) => {{
+        $context.extensions().get::<Bls12381Context>().g1_point_store.get($handle).unwrap()
+    }}
+}
+
+macro_rules! store_bls12_381_g1 {
+    ($context:expr, $new_point:expr) => {{
+        let inner_ctxt = $context.extensions_mut().get_mut::<Bls12381Context>();
+        let ret = inner_ctxt.g1_point_store.len();
+        inner_ctxt.g1_point_store.push($new_point);
+        ret
+    }}
+}
+
 pub mod abort_codes {
     pub const NOT_IMPLEMENTED: u64 = 2;
     pub const E_UNKNOWN_PAIRING: u64 = 3;
@@ -1871,7 +1886,7 @@ fn hash_to_element_internal(
             let blst_g1_affine = blst_g1_proj_to_affine(&blst_g1_proj);
             let ark_g1_affine = blst_g1_affine_to_ark_g1_affine(&blst_g1_affine);
             let ark_g1_proj = ark_g1_affine.into_projective();
-            let handle = context.extensions_mut().get_mut::<Bls12381Context>().add_g1_point(ark_g1_proj);
+            let handle = store_bls12_381_g1!(context, ark_g1_proj);
             Ok(NativeResult::ok(
                 gas_params.bls12_381.blst_hash_to_g1_proj(bytes.len())
                     + (
