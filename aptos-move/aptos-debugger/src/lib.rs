@@ -157,7 +157,7 @@ impl AptosDebugger {
     {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let state_view_storage = StorageAdapter::new(&state_view);
-        let features = Features::fetch_config(&storage).unwrap_or_default();
+        let features = Features::fetch_config(&state_view_storage).unwrap_or_default();
         let move_vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
