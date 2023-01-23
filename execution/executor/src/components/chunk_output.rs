@@ -6,7 +6,7 @@
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_executor_types::ExecutedChunk;
-use aptos_logger::{trace, warn};
+use aptos_logger::{error, sample, trace, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     ExecutedTrees,
@@ -182,15 +182,18 @@ pub fn update_counters_for_processed_chunk(
                     },
                 ),
             },
-            TransactionStatus::Discard(discard_status_code) => (
-                "discard",
-                "error_code",
-                if detailed_counters {
-                    format!("{:?}", discard_status_code).to_lowercase()
-                } else {
-                    "error".to_string()
-                },
-            ),
+            TransactionStatus::Discard(discard_status_code) => {
+                sample!(SampleRate::Duration(Duration::from_secs(60)), warn!("Txn being discarded is {:?}", txn));
+                (
+                    "discard",
+                    "error_code",
+                    if detailed_counters {
+                        format!("{:?}", discard_status_code).to_lowercase()
+                    } else {
+                        "error".to_string()
+                    },
+                )
+            },
             TransactionStatus::Retry => ("retry", "", "".to_string()),
         };
 
