@@ -7,12 +7,14 @@ spec aptos_framework::aggregator {
         // TODO: temporary mockup.
         pragma opaque;
         aborts_if false;
+        ensures aggregator.limit == old(aggregator.limit);
     }
 
     spec sub(aggregator: &mut Aggregator, value: u128) {
         // TODO: temporary mockup.
         pragma opaque;
         aborts_if false;
+        ensures aggregator.limit == old(aggregator.limit);
     }
 
     spec read(aggregator: &Aggregator): u128 {

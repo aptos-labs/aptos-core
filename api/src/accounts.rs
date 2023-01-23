@@ -24,9 +24,7 @@ use aptos_types::{
     state_store::state_key::StateKey,
 };
 use move_core_types::{
-    identifier::Identifier,
-    language_storage::{ResourceKey, StructTag},
-    move_resource::MoveStructType,
+    identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
     value::MoveValue,
 };
 use poem_openapi::{
@@ -249,10 +247,10 @@ impl Account {
     }
 
     pub fn get_account_resource(&self) -> Result<Vec<u8>, BasicErrorWith404> {
-        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
+        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(
             self.address.into(),
             AccountResource::struct_tag(),
-        )));
+        ));
 
         let state_value = self.context.get_state_value_poem(
             &state_key,
@@ -476,10 +474,10 @@ impl Account {
         &self,
         struct_tag: &StructTag,
     ) -> Result<Vec<(Identifier, MoveValue)>, BasicErrorWith404> {
-        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
+        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(
             self.address.into(),
             struct_tag.clone(),
-        )));
+        ));
         let state_value_bytes = self
             .context
             .db

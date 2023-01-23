@@ -23,7 +23,7 @@ use aptos_types::{
     },
 };
 use move_core_types::{
-    language_storage::{ResourceKey, StructTag, TypeTag},
+    language_storage::{StructTag, TypeTag},
     move_resource::MoveStructType,
     value::MoveValue,
 };
@@ -120,9 +120,9 @@ impl MoveHarness {
         let privkey = Ed25519PrivateKey::generate(&mut rng);
         let pubkey = privkey.public_key();
         let acc = Account::with_keypair(privkey, pubkey);
-        let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 10);
+        let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 0);
         self.executor.add_account_data(&data);
-        self.txn_seq_no.insert(*acc.address(), 10);
+        self.txn_seq_no.insert(*acc.address(), 0);
         data.account().clone()
     }
 
@@ -358,7 +358,7 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<Vec<u8>> {
-        let path = AccessPath::resource_access_path(ResourceKey::new(*addr, struct_tag));
+        let path = AccessPath::resource_access_path(*addr, struct_tag);
         self.read_state_value(&StateKey::AccessPath(path))
     }
 
@@ -375,6 +375,30 @@ impl MoveHarness {
         )
     }
 
+    pub fn read_resource_group(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
+        let path = AccessPath::resource_group_access_path(*addr, struct_tag);
+        self.read_state_value(&StateKey::AccessPath(path))
+            .map(|data| bcs::from_bytes(&data).unwrap())
+    }
+
+    pub fn read_resource_from_resource_group<T: DeserializeOwned>(
+        &self,
+        addr: &AccountAddress,
+        resource_group: StructTag,
+        struct_tag: StructTag,
+    ) -> Option<T> {
+        if let Some(group) = self.read_resource_group(addr, resource_group) {
+            if let Some(data) = group.get(&struct_tag) {
+                return Some(bcs::from_bytes::<T>(data).unwrap());
+            }
+        }
+        None
+    }
+
     /// Checks whether resource exists.
     pub fn exists_resource(&self, addr: &AccountAddress, struct_tag: StructTag) -> bool {
         self.read_resource_raw(addr, struct_tag).is_some()
@@ -387,7 +411,7 @@ impl MoveHarness {
         struct_tag: StructTag,
         data: &T,
     ) {
-        let path = AccessPath::resource_access_path(ResourceKey::new(addr, struct_tag));
+        let path = AccessPath::resource_access_path(addr, struct_tag);
         let state_key = StateKey::AccessPath(path);
         self.executor
             .write_state_value(state_key, bcs::to_bytes(data).unwrap());

@@ -57,8 +57,6 @@ module std::vector {
         v
     }
     spec singleton {
-        // TODO: when using opaque here, we get verification errors.
-        // pragma opaque;
         aborts_if false;
         ensures result == vec(e);
     }

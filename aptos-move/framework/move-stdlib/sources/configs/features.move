@@ -111,16 +111,35 @@ module std::features {
         is_enabled(BLAKE2B_256_NATIVE)
     }
 
-    const GENERIC_GROUP_BASIC_OPERATIONS: u64 = 9;
+    /// Whether resource groups are enabled.
+    /// This is needed because of new attributes for structs and a change in storage representation.
+    const RESOURCE_GROUPS: u64 = 9;
+
+    public fun get_resource_groups_feature(): u64 { RESOURCE_GROUPS }
+
+    public fun resource_groups_enabled(): bool acquires Features {
+        is_enabled(RESOURCE_GROUPS)
+    }
+
+    /// Whether basic elliptic curve-based group operations are enabled.
+    const GENERIC_GROUP_BASIC_OPERATIONS: u64 = 10;
     public fun get_generic_group_basic_operations_feature(): u64 { GENERIC_GROUP_BASIC_OPERATIONS }
     public fun generic_group_basic_operations_enabled(): bool acquires Features {
         is_enabled(GENERIC_GROUP_BASIC_OPERATIONS)
     }
 
-    const BLS12_381_GROUPS: u64 = 10;
+    /// Whether BLS12-381 groups are enabled in `groups.move`.
+    const BLS12_381_GROUPS: u64 = 11;
     public fun get_bls12_381_groups_feature(): u64 { BLS12_381_GROUPS }
     public fun bls12_381_groups_enabled(): bool acquires Features {
         is_enabled(BLS12_381_GROUPS)
+    }
+
+    /// Whether Ristretto255 group is enabled in `groups.move`.
+    const RISTRETTO255_GROUP: u64 = 12;
+    public fun get_ristretto255_group_feature(): u64 { RISTRETTO255_GROUP }
+    public fun ristretto255_group_enabled(): bool acquires Features {
+        is_enabled(RISTRETTO255_GROUP)
     }
 
     // ============================================================================================

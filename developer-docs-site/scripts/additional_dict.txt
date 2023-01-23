@@ -37,6 +37,7 @@ CPUs
 ChainID
 CoinStore
 CoinType
+Concat
 Ctrl
 DAO
 DApps
@@ -87,6 +88,9 @@ Ethereum
 FAQ
 FLAC
 Failover
+failover
+FT
+FTs
 FullNode
 Fullnodes
 GB
@@ -115,6 +119,7 @@ JPG
 JSON
 Jetbrains
 Kubernetes
+kubernetes
 LLVM
 Labs's
 Leaderboard
@@ -131,6 +136,7 @@ MoonCoin
 MoveVM
 MultiEd
 Multinode
+multinode
 Multisignature
 Multisigner
 NFT
@@ -143,6 +149,8 @@ ORM
 Octa
 Octas
 Ohlone
+onchain
+on-chain
 OpenAPI
 OptionalAggregator
 PFN
@@ -157,6 +165,7 @@ PropertyMap
 Prover
 PyPi
 Quickstart
+RawTransaction
 README
 READMEs
 RPC
@@ -173,6 +182,7 @@ STM
 SYNACK
 Scalable
 SeaLevel
+SignedTransaction
 SignMessagePayload
 SignerCap
 Skylake
@@ -199,6 +209,7 @@ UB
 UI
 UIs
 URI
+uri
 Upgradeable
 Uptime
 VFN
@@ -292,6 +303,7 @@ invariants
 io
 ip
 ips
+IPFS
 isConnected
 jsx
 kickstart
@@ -357,6 +369,7 @@ schema
 schemas
 sdk
 sdks
+sft
 sharded
 sharding
 signAndSubmitTransaction

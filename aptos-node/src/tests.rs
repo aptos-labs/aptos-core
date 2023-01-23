@@ -37,7 +37,7 @@ fn test_mutual_authentication_validators() {
     );
 
     // Set up the networks and gather the application network handles. This should panic.
-    let _ = network::setup_networks_and_get_handles(
+    let _ = network::setup_networks_and_get_interfaces(
         &node_config,
         ChainId::test(),
         &mut event_subscription_service,

@@ -11,6 +11,10 @@ This document describes how to perform staking pool operations. Note that you ca
 The current required minimum for staking is 1M APT tokens.
 :::
 
+## Connect to Aptos network
+
+[Connect to the Aptos](./connect-to-aptos-network.md) and start your node has with `validator-identity` and `validator-fullnode-identity` addresses using your staking pool address.
+
 ## Initializing the stake pool
 
 Make sure that this initializing the stake pool step was performed by the owner. See [Initialize staking pool](/nodes/validator-node/owner/index#initialize-staking-pool) in the owner documentation section.

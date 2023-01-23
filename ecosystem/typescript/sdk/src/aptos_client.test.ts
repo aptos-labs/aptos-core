@@ -534,3 +534,61 @@ test(
   },
   longTestTimeout,
 );
+
+test(
+  "view function",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+
+    const alice = new AptosAccount();
+    await faucetClient.fundAccount(alice.address(), 100_000_000);
+
+    const payload: Gen.ViewRequest = {
+      function: "0x1::coin::balance",
+      type_arguments: ["0x1::aptos_coin::AptosCoin"],
+      arguments: [alice.address().hex()],
+    };
+
+    const balance = await client.view(payload);
+
+    expect(balance[0]).toBe("100000000");
+  },
+  longTestTimeout,
+);
+
+test(
+  "view function with a struct return type",
+  async () => {
+    // This test is just to show that the view function supports a struct return type.
+    // We test against get_collection_mutability_config although
+    // b/c at the time of writing this is the only view function on the move side
+    // that can easily test a struct return type.
+
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+    const tokenClient = new TokenClient(client);
+
+    const alice = new AptosAccount();
+    // Fund Alice's Account
+    await faucetClient.fundAccount(alice.address(), 100000000);
+
+    const collectionName = "AliceCollection";
+
+    // Create collection on Alice's account
+    await client.waitForTransaction(
+      await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+      { checkSuccess: true },
+    );
+
+    const payload: Gen.ViewRequest = {
+      function: "0x3::token::get_collection_mutability_config",
+      type_arguments: [],
+      arguments: [alice.address().hex(), collectionName],
+    };
+
+    const collection = await client.view(payload);
+    expect(collection[0]).toMatchObject({ description: false, maximum: false, uri: false });
+  },
+  longTestTimeout,
+);

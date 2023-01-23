@@ -1,9 +1,9 @@
 ---
-title: "Mint an NFT with Aptos CLI"
+title: "Mint NFTs with Aptos CLI"
 slug: "mint-nft-cli"
 ---
 
-# Mint an NFT
+# Mint NFTs with Aptos CLI
 
 ## Prerequisites
 

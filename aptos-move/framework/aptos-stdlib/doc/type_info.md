@@ -367,7 +367,8 @@ analysis of vector size dynamism.
 
 
 
-<pre><code><b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>();
+<pre><code><b>aborts_if</b> !<a href="../../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../move-stdlib/doc/features.md#0x1_features_APTOS_STD_CHAIN_ID_NATIVES">features::APTOS_STD_CHAIN_ID_NATIVES</a>);
+<b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>();
 </code></pre>
 
 

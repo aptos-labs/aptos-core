@@ -56,7 +56,7 @@ impl AccountState {
         self.data.iter().filter_map(|(k, v)| {
             match Path::try_from(k).expect("Invalid access path") {
                 Path::Code(_) => Some(v),
-                Path::Resource(_) => None,
+                Path::Resource(_) | Path::ResourceGroup(_) => None,
             }
         })
     }
@@ -66,7 +66,7 @@ impl AccountState {
         self.data.into_iter().filter_map(|(k, v)| {
             match Path::try_from(&k).expect("Invalid access path") {
                 Path::Code(module) => Some((module, v)),
-                Path::Resource(_) => None,
+                Path::Resource(_) | Path::ResourceGroup(_) => None,
             }
         })
     }
@@ -81,6 +81,8 @@ impl AccountState {
             .filter_map(|(k, v)| match Path::try_from(k) {
                 Ok(Path::Resource(struct_tag)) => Some((struct_tag, v.as_ref())),
                 Ok(Path::Code(_)) | Err(_) => None,
+                // TODO: consider flattening into resources, but this isn't currently used
+                Ok(Path::ResourceGroup(struct_tag)) => Some((struct_tag, v.as_ref())),
             })
     }
 
