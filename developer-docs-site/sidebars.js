@@ -73,14 +73,6 @@ const sidebars = {
         "guides/get-test-funds",
       ],
     },
-    {
-      type: "category",
-      label: "Implement Wallet Adapter",
-      link: { type: "doc", id: "concepts/wallet-adapter-concept" },
-      collapsible: true,
-      collapsed: true,
-      items: ["guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
-    },
     "guides/system-integrators-guide",
   ],
   appSidebar: [
@@ -122,16 +114,11 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Develop Locally",
-      link: { type: "doc", id: "nodes/local-testnet/index" },
+      label: "Implement Wallet Adapter",
+      link: { type: "doc", id: "concepts/wallet-adapter-concept" },
       collapsible: true,
       collapsed: true,
-      items: [
-        "guides/local-testnet-dev-flow",
-        "nodes/local-testnet/run-a-local-testnet",
-        "nodes/local-testnet/using-cli-to-run-a-local-testnet",
-        "guides/running-a-local-multi-node-network",
-      ],
+      items: ["guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
     },
   ],
   moveSidebar: [
@@ -199,6 +186,19 @@ const sidebars = {
 
       ],
     },  */
+    {
+      type: "category",
+      label: "Develop Locally",
+      link: { type: "doc", id: "nodes/local-testnet/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "guides/local-testnet-dev-flow",
+        "nodes/local-testnet/run-a-local-testnet",
+        "nodes/local-testnet/using-cli-to-run-a-local-testnet",
+        "guides/running-a-local-multi-node-network",
+      ],
+    },
     {
       type: "category",
       label: "Install Validators",
