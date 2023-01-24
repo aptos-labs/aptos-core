@@ -218,7 +218,7 @@ const config = {
               {
                 type: "doc",
                 label: "Mint NFTs with NFT CLI Mint Tool",
-                docId: "concepts/coin-and-token/mint-minting-tool",
+                docId: "concepts/coin-and-token/nft-minting-tool",
               },
             ],
           },

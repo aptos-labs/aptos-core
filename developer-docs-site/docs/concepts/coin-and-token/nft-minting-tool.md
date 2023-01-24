@@ -1,12 +1,12 @@
 ---
-title: "Aptos NFT Minting Tool"
-slug: "mint-tool-cli"
+title: "Set up Aptos NFT Minting Tool"
+slug: "nft-minting-tool"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Setting up NFT Minting Tool
+# Set up Aptos NFT Minting Tool
 
 The Aptos Non-Fungible Token (NFT) Minting Tool allows you to mint NFTs via a locally running website. This document explains how to get that site up and running.
 
