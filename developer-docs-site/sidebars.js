@@ -144,11 +144,11 @@ const sidebars = {
       collapsible: false,
       collapsed: false,
       link: {
-        type: 'generated-index',
-        title: 'Create NFTs on Aptos',
-        description: 'Learn the various ways to mint and exchange tokens.',
-        slug: '/category/nft',
-        keywords: ['nft'],
+        type: "generated-index",
+        title: "Create NFTs on Aptos",
+        description: "Learn the various ways to mint and exchange tokens.",
+        slug: "/category/nft",
+        keywords: ["nft"],
       },
       items: [
         "concepts/coin-and-token/aptos-token-comparison",
