@@ -121,12 +121,7 @@ impl ProofCoordinator {
         }
     }
 
-    fn init_proof(
-        &mut self,
-        info: SignedDigestInfo,
-        batch_id: BatchId,
-        tx: ProofReturnChannel,
-    ) -> Result<(), SignedDigestError> {
+    fn init_proof(&mut self, info: SignedDigestInfo, batch_id: BatchId, tx: ProofReturnChannel) {
         self.timeouts.add_digest(info.digest, self.proof_timeout_ms);
         self.digest_to_proof.insert(
             info.digest,
@@ -135,7 +130,6 @@ impl ProofCoordinator {
         self.digest_to_time
             .entry(info.digest)
             .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
-        Ok(())
     }
 
     fn add_signature(
@@ -210,8 +204,7 @@ impl ProofCoordinator {
                             break;
                         },
                         ProofCoordinatorCommand::InitProof(info, batch_id, tx) => {
-                            self.init_proof(info, batch_id, tx)
-                                .expect("Error initializing proof of store");
+                            self.init_proof(info, batch_id, tx);
                         },
                         ProofCoordinatorCommand::AppendSignature(signed_digest) => {
                             let peer_id = signed_digest.peer_id();
