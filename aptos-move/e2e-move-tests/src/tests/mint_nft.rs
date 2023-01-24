@@ -219,20 +219,17 @@ fn generate_nft_tutorial_part4_signature() {
     let mut h = MoveHarness::new();
 
     // When running this test to generate a valid signature, supply the actual resource_address to line 217.
-    // Uncomment line 217 and comment out line 218 (it's just a placeholder).
+    // Uncomment line 223 and comment out line 224 (it's just a placeholder).
     // let resource_address = h.new_account_at(AccountAddress::from_hex_literal("0x[resource account's address]").unwrap());
     let resource_address = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // When running this test to generate a valid signature, supply the actual nft_receiver's address to line 222.
-    // Uncomment line 222 and comment out line 223.
+    // Uncomment line 228 and comment out line 229.
     // let nft_receiver = h.new_account_at(AccountAddress::from_hex_literal("0x[nft-receiver's address]").unwrap());
     let nft_receiver = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    // When running this test to generate a valid signature, supply the actual private key to line 227.
-    // Uncomment line 227 and comment out line 228 - 229: they are just placeholders.
-    // let admin_private_key = Ed25519PrivateKey::from_encoded_string(value_of_private_key).unwrap();
-    let admin_account = h.new_account_with_key_pair();
-    let admin_private_key = admin_account.privkey;
+    // When running this test to generate a valid signature, supply the actual private key to replace the (0000...) in line 232.
+    let admin_private_key = Ed25519PrivateKey::from_encoded_string("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
 
     // construct the token_data_id and mint_proof, which are required to mint the nft
     let token_data_id = TokenDataId {
