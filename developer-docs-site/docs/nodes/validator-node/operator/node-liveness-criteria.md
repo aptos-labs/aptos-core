@@ -18,7 +18,7 @@ The liveness of your validator node will be evaluated using both on-chain and of
 
 ## Verifying the liveness of your node
 
-### Locally
+### Monitoring Tools
 
 If you are a node operator, then several tools are available to you (provided by the Aptos team and the community) to verify the status of your own node locally. This local status will act as a good proxy for overall node health as seen from the network level and as reported by the remote analytics system operated by Aptos Labs. 
 
@@ -34,7 +34,7 @@ The above two monitoring methods rely on your node’s reported Prometheus Metri
 - `aptos_state_sync_version{type="synced"}`
 - `aptos_connections`
 
-### Remotely
+### Monitor via Telemetry
 
 Remotely, the Aptos team can verify the state of your node via [telemetry](/reference/telemetry.md). When you enable telemetry on your node, the Aptos node binary will send telemetry data in the background to the Aptos team.
 
