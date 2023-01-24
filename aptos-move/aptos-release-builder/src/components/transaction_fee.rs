@@ -9,7 +9,7 @@ pub fn generate_fee_distribution_proposal(
     function_name: String,
     burn_percentage: u8,
     is_testnet: bool,
-    next_execution_hash: String,
+    next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
     let mut result = vec![];
 
@@ -18,7 +18,7 @@ pub fn generate_fee_distribution_proposal(
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
-        &next_execution_hash,
+        next_execution_hash,
         "aptos_framework::transaction_fee",
         |writer| {
             emitln!(
@@ -37,7 +37,7 @@ pub fn generate_fee_distribution_proposal(
 pub fn generate_proposal_to_initialize_fee_collection_and_distribution(
     burn_percentage: u8,
     is_testnet: bool,
-    next_execution_hash: String,
+    next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
     generate_fee_distribution_proposal(
         "initialize_fee_collection_and_distribution".to_string(),
@@ -50,7 +50,7 @@ pub fn generate_proposal_to_initialize_fee_collection_and_distribution(
 pub fn generate_proposal_to_upgrade_burn_percentage(
     burn_percentage: u8,
     is_testnet: bool,
-    next_execution_hash: String,
+    next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
     generate_fee_distribution_proposal(
         "upgrade_burn_percentage".to_string(),

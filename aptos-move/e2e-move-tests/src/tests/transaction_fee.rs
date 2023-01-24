@@ -52,7 +52,7 @@ fn create_script(
     )
     .expect("building packages with scripts must succeed");
     let script = package.extract_script_code()[0].clone();
-    harness.create_script(&sender, script, vec![], args)
+    harness.create_script(sender, script, vec![], args)
 }
 
 fn test_fee_collection_and_distribution(burn_percentage: u8) {

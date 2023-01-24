@@ -2681,8 +2681,8 @@ module aptos_framework::stake {
         assert_no_fees_for_validator(validator_1_address);
         assert_no_fees_for_validator(validator_2_address);
         assert_no_fees_for_validator(validator_3_address);
-        assert_validator_state(validator_1_address, 404, 0, 0, 0, 2);
-        assert_validator_state(validator_2_address, 606, 0, 0, 0, 1);
+        assert_validator_state(validator_1_address, 401, 0, 0, 0, 2);
+        assert_validator_state(validator_2_address, 601, 0, 0, 0, 1);
         assert_validator_state(validator_3_address, 101, 0, 0, 0, 0);
     }
 }
