@@ -67,6 +67,7 @@ const sidebars = {
           items: [
             "cli-tools/aptos-cli-tool/install-aptos-cli",
             "cli-tools/build-aptos-cli",
+            "cli-tools/build-aptos-cli-brew",
             "cli-tools/aptos-cli-tool/use-aptos-cli",
           ],
         },
