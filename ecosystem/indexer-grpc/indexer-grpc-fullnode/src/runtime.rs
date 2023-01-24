@@ -35,6 +35,9 @@ type ResponseStream = Pin<Box<dyn Stream<Item = Result<RawDatastreamResponse, St
 // The GRPC server
 pub struct IndexerStreamService {
     pub context: Arc<Context>,
+    pub processor_task_count: u16,
+    pub processor_batch_size: u16,
+    pub output_batch_size: u16,
 }
 
 /// Creates a runtime which creates a thread pool which pushes firehose of block protobuf to SF endpoint
@@ -57,18 +60,27 @@ pub fn bootstrap(
         .expect("[indexer-grpc] failed to create runtime");
 
     let node_config = config.clone();
+    let processor_task_count = node_config.indexer_grpc.processor_task_count;
+    let processor_batch_size = node_config.indexer_grpc.processor_batch_size;
+    let output_batch_size = node_config.indexer_grpc.output_batch_size;
+    let address = node_config.indexer_grpc.address.clone();
 
     runtime.spawn(async move {
         let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
-        let server = IndexerStreamService { context };
+        let server = IndexerStreamService {
+            context,
+            processor_task_count,
+            processor_batch_size,
+            output_batch_size,
+        };
 
         Server::builder()
             .add_service(IndexerStreamServer::new(server))
             // Make port into a config
-            .serve("0.0.0.0:50051".to_socket_addrs().unwrap().next().unwrap())
+            .serve(address.to_socket_addrs().unwrap().next().unwrap())
             .await
             .unwrap();
-        info!("[indexer-grpc] Started GRPC server at 50051");
+        info!(address = address, "[indexer-grpc] Started GRPC server");
     });
     Some(Ok(runtime))
 }
@@ -83,19 +95,26 @@ impl IndexerStream for IndexerStreamService {
     ) -> Result<Response<Self::RawDatastreamStream>, Status> {
         let r = req.into_inner();
         let starting_version = r.starting_version;
-        let processor_task_count = r.processor_task_count as u16;
-        let processor_batch_size = r.processor_batch_size as u16;
-        let output_batch_size = r.output_batch_size as u16;
-        let chain_id = r.chain_id as u8;
+        let processor_task_count = self.processor_task_count;
+        let processor_batch_size = self.processor_batch_size;
+        let output_batch_size = self.output_batch_size;
 
         let (tx, rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
         let context = self.context.clone();
         let mut ma = MovingAverage::new(10_000);
 
+        let chain_id = r.chain_id as u8;
+        // Make sure that the request is going to the correct fullnode
+        if context.chain_id().id() != chain_id {
+            return Err(Status::invalid_argument(format!(
+                "Chain ID mismatch: expected {}, got {}",
+                context.chain_id().id(),
+                chain_id
+            )));
+        }
         tokio::spawn(async move {
             let mut coordinator = IndexerStreamCoordinator::new(
                 context,
-                chain_id,
                 starting_version,
                 processor_task_count,
                 processor_batch_size,
@@ -154,7 +173,8 @@ impl IndexerStream for IndexerStreamService {
                         }
                     },
                     Err(_) => {
-                        panic!("[indexer-grpc] Unable to initialize stream");
+                        aptos_logger::warn!("[indexer-grpc] Unable to initialize stream");
+                        break;
                     },
                 }
                 coordinator.current_version = max_version + 1;

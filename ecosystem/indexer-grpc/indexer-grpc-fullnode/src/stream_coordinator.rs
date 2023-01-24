@@ -28,7 +28,6 @@ pub struct IndexerStreamCoordinator {
     pub processor_task_count: u16,
     pub processor_batch_size: u16,
     pub output_batch_size: u16,
-    pub chain_id: u8,
     pub highest_known_version: u64,
     pub context: Arc<Context>,
     pub transactions_sender: mpsc::Sender<Result<RawDatastreamResponse, tonic::Status>>,
@@ -43,22 +42,17 @@ pub struct TransactionBatchInfo {
 impl IndexerStreamCoordinator {
     pub fn new(
         context: Arc<Context>,
-        chain_id: u8,
         request_start_version: u64,
         processor_task_count: u16,
         processor_batch_size: u16,
         output_batch_size: u16,
         transactions_sender: mpsc::Sender<Result<RawDatastreamResponse, tonic::Status>>,
     ) -> Self {
-        // Make sure that the request is going to the correct fullnode
-        // TODO: do not panic but instead return error
-        assert_eq!(context.chain_id().id(), chain_id, "Chain ID mismatch");
         Self {
             current_version: request_start_version,
             processor_task_count,
             processor_batch_size,
             output_batch_size,
-            chain_id,
             highest_known_version: 0,
             context,
             transactions_sender,

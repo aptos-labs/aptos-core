@@ -39,12 +39,8 @@ message StreamStatus {
 message RawDatastreamRequest {
   // Required; start version of current stream.
   uint64 starting_version = 1;
-  uint64 processor_task_count = 3;
-  uint64 processor_batch_size = 2;
-  // Required; batch size in the response.
-  uint64 output_batch_size = 4;
   // Required; for validation purpose.
-  uint32 chain_id = 5;
+  uint32 chain_id = 2;
 }
 
 message RawDatastreamResponse {

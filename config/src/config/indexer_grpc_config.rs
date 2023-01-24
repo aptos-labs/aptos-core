@@ -7,4 +7,8 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct IndexerGrpcConfig {
     pub enabled: bool,
+    pub address: String,
+    pub processor_task_count: u16,
+    pub processor_batch_size: u16,
+    pub output_batch_size: u16,
 }
