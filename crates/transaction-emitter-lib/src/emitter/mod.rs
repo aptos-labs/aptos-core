@@ -34,8 +34,8 @@ use aptos_sdk::{
 use futures::future::{try_join_all, FutureExt};
 use itertools::zip;
 use once_cell::sync::Lazy;
-use rand::{rngs::StdRng, seq::IteratorRandom};
-use rand_core::SeedableRng;
+use rand::{Rng, rngs::StdRng, seq::IteratorRandom};
+use rand_core::{OsRng, SeedableRng};
 use std::{
     cmp::{max, min},
     collections::{HashMap, HashSet},
@@ -433,7 +433,8 @@ impl TxnEmitter {
             let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
             {
                 TransactionType::P2P => Box::new(P2PTransactionGeneratorCreator::new(
-                    self.from_rng(),
+                    StdRng::from_seed(OsRng.gen()),
+                    //self.from_rng(),
                     txn_factory.clone(),
                     SEND_AMOUNT,
                     all_addresses.clone(),
@@ -449,7 +450,7 @@ impl TxnEmitter {
                 )),
                 TransactionType::NftMintAndTransfer => Box::new(
                     NFTMintAndTransferGeneratorCreator::new(
-                        self.from_rng(),
+                        StdRng::from_seed(OsRng.gen()),
                         txn_factory.clone(),
                         root_account,
                         req.rest_clients[0].clone(),
@@ -457,7 +458,7 @@ impl TxnEmitter {
                     .await,
                 ),
                 TransactionType::PublishPackage => Box::new(PublishPackageCreator::new(
-                    self.from_rng(),
+                    StdRng::from_seed(OsRng.gen()),
                     txn_factory.clone(),
                     req.gas_price,
                 )),
