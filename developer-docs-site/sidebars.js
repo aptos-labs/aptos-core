@@ -113,25 +113,13 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Develop Locally",
-      link: { type: "doc", id: "nodes/local-testnet/index" },
-      collapsible: true,
-      collapsed: true,
-      items: [
-        "guides/local-testnet-dev-flow",
-        "nodes/local-testnet/run-a-local-testnet",
-        "nodes/local-testnet/using-cli-to-run-a-local-testnet",
-        "guides/running-a-local-multi-node-network",
-      ],
-    },
-    {
-      type: "category",
       label: "Write Move Smart Contracts",
       link: { type: "doc", id: "guides/move-guides/index" },
       collapsible: true,
       collapsed: true,
       items: [
         "guides/move-guides/move-on-aptos",
+        "guides/move-guides/move-structure",
         "concepts/base-gas",
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",
@@ -185,6 +173,19 @@ const sidebars = {
 
       ],
     },  */
+    {
+      type: "category",
+      label: "Develop Locally",
+      link: { type: "doc", id: "nodes/local-testnet/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "guides/local-testnet-dev-flow",
+        "nodes/local-testnet/run-a-local-testnet",
+        "nodes/local-testnet/using-cli-to-run-a-local-testnet",
+        "guides/running-a-local-multi-node-network",
+      ],
+    },
     {
       type: "category",
       label: "Install Validators",

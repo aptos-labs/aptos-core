@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 24 January 2023
+
+- Added [Mint NFT with Aptos CLI](guides/move-guides/mint-nft-cli.md) Move code lab describing the completely revised [Mint NFT](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) Move examples.
+
 ## 18 January 2023
 
 - Added a section explaining the nuances of [batch signing](guides/sign-a-transaction.md#batch-signing) to Create a Signed Transaction.

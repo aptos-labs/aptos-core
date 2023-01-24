@@ -164,6 +164,21 @@ const config = {
                 docId: "guides/move-guides/move-on-aptos",
               },
               {
+                label: "Move Structure",
+                type: "doc",
+                docId: "guides/move-guides/move-structure",
+              },
+              {
+                label: "How Base Gas Works",
+                type: "doc",
+                docId: "concepts/base-gas",
+              },
+              {
+                label: "Interact with Move VM",
+                type: "doc",
+                docId: "guides/interacting-with-the-blockchain",
+              },
+              {
                 label: "Your First Move Module",
                 type: "doc",
                 docId: "tutorials/first-move-module",
@@ -172,11 +187,6 @@ const config = {
                 label: "Upgrade Move Code",
                 type: "doc",
                 docId: "guides/move-guides/upgrading-move-code",
-              },
-              {
-                label: "Move References",
-                type: "doc",
-                docId: "reference/move",
               },
             ],
           },

@@ -82,6 +82,7 @@ EWITHDRAW
 EWRONG
 EZERO
 Eg
+entrancy
 EntryFunction
 EntryFunctionPayload
 EpochChangeProof
