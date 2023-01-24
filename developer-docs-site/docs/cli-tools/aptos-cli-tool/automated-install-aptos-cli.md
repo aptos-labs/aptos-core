@@ -14,19 +14,19 @@ Python 3.9.13
 ```
 
 <details>
-<summary>MacOS / Linux / Windows Subsystem for Linux (WSL)</summary>
+<summary>macOS / Linux / Windows Subsystem for Linux (WSL)</summary>
 
 :::tip
-These instructions have been tested on Ubuntu 20.04, Ubuntu 22.04, Arch Linux, MacOS (ARM), and WSL.
+These instructions have been tested on Ubuntu 20.04, Ubuntu 22.04, Arch Linux, MacOS (ARM), and WSL and assume you have either `curl` or `wget` installed to download the script.
 :::
 
-In your terminal:
+In your terminal, run the following `curl` command:
 
 ```
 curl -fsSL "https://aptos.dev/scripts/install_cli.py" | python3
 ```
 
-If you don't have curl installed, try using wget:
+Or with `wget`:
 ```
 wget -qO- "https://aptos.dev/scripts/install_cli.py" | python3
 ```
