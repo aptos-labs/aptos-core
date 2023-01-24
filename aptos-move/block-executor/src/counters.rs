@@ -65,3 +65,12 @@ pub static DEPENDENCY_WAIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static GET_STATE_VALUE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_execution_get_state_val",
+        "The time spent in waiting for dependency in Block STM",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+        .unwrap()
+});

@@ -18,6 +18,7 @@ use aptos_types::{
 };
 use move_binary_format::errors::Location;
 use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
+use crate::counters::GET_STATE_VALUE_SECONDS;
 
 /// Resolved and serialized data for WriteOps, None means deletion.
 pub type ResolvedData = Option<Vec<u8>>;
@@ -183,6 +184,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
     type Key = T::Key;
 
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        let _timer = GET_STATE_VALUE_SECONDS.start_timer();
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => match map.read(state_key, self.txn_idx) {
                 ReadResult::Value(v) => Ok(v.extract_raw_bytes()),
