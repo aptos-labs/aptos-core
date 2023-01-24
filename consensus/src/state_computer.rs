@@ -25,6 +25,7 @@ use aptos_types::{
 };
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
+use itertools::Itertools;
 use std::{boxed::Box, cmp::max, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
 
@@ -108,8 +109,20 @@ impl StateComputer for ExecutionProxy {
         // TODO: figure out error handling for the prologue txn
         let executor = self.executor.clone();
 
+        let unexpired_txns = txns
+            .clone()
+            .into_iter()
+            .filter(|txn| {
+                block.block_data().timestamp_usecs() < txn.expiration_timestamp_secs() * 1_000_000
+            })
+            // .sorted_by(|a, b| a.max_gas_amount().cmp(&b.max_gas_amount()))
+            // .rev()
+            .collect::<Vec<_>>();
+
+        debug!("unexpired_txns: {}", unexpired_txns.len());
+
         let transactions_to_execute =
-            block.transactions_to_execute(&self.validators.lock(), txns.clone());
+            block.transactions_to_execute(&self.validators.lock(), unexpired_txns);
 
         let compute_result = monitor!(
             "execute_block",
@@ -162,7 +175,22 @@ impl StateComputer for ExecutionProxy {
 
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
 
-            txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
+            let unexpired_signed_txns = signed_txns
+                .clone()
+                .into_iter()
+                .filter(|txn| {
+                    block.block_info().timestamp_usecs()
+                        < txn.expiration_timestamp_secs() * 1_000_000
+                })
+                // .sorted_by(|a, b| a.max_gas_amount().cmp(&b.max_gas_amount()))
+                // .rev()
+                .collect::<Vec<_>>();
+
+            debug!("unexpired_signed_txns: {}", unexpired_signed_txns.len());
+
+            txns.extend(
+                block.transactions_to_commit(&self.validators.lock(), unexpired_signed_txns),
+            );
             reconfig_events.extend(block.reconfig_event());
 
             latest_epoch = max(latest_epoch, block.epoch());
