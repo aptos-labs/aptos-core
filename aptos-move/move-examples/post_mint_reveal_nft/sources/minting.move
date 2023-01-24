@@ -556,9 +556,9 @@ module post_mint_reveal_nft::minting {
                 name,
                 0,
                 1,
-                vector<String>[utf8(BURNABLE_BY_OWNER)],
-                vector<vector<u8>>[bcs::to_bytes<bool>(&true)],
-                vector<String>[utf8(b"bool")],
+                vector<String>[],
+                vector<vector<u8>>[],
+                vector<String>[],
             );
             amount = amount - 1;
         };
