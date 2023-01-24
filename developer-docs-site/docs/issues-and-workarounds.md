@@ -1,6 +1,6 @@
 ---
 title: "Troubleshooting Issues and Workarounds"
-slug: "troubleshooting-issues-and-workarounds"
+slug: "issues-and-workarounds"
 ---
 
 # Troubleshooting Issues and Workarounds
