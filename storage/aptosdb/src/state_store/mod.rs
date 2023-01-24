@@ -601,13 +601,11 @@ impl StateStore {
     pub fn merklize_value_set(
         &self,
         value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
-        node_hashes: Option<&HashMap<aptos_types::nibble::nibble_path::NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
         let (batch, hash) = self.state_merkle_db.merklize_value_set(
             value_set,
-            node_hashes,
             version,
             base_version,
             None, // previous epoch ending version

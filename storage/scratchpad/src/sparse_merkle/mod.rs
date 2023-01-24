@@ -519,67 +519,6 @@ where
         self.smt.root_hash()
     }
 
-    /// Compares an old and a new SMTs and return the newly created node hashes in between.
-    pub fn new_node_hashes_since(&self, since_smt: &Self) -> HashMap<NibblePath, HashValue> {
-        let _timer = TIMER
-            .with_label_values(&["new_node_hashes_since"])
-            .start_timer();
-
-        assert!(self.base_smt.is_the_same(&since_smt.base_smt));
-        let mut node_hashes = HashMap::new();
-        Self::new_node_hashes_since_impl(
-            self.smt.root_weak(),
-            since_smt.smt.generation() + 1,
-            &mut NodePosition::with_capacity(HashValue::LENGTH_IN_BITS),
-            &mut node_hashes,
-        );
-        node_hashes
-    }
-
-    /// Recursively generate the partial node update batch of jellyfish merkle
-    fn new_node_hashes_since_impl(
-        subtree: SubTree<V>,
-        since_generation: u64,
-        pos: &mut NodePosition,
-        node_hashes: &mut HashMap<NibblePath, HashValue>,
-    ) {
-        if let Some(node) = subtree.get_node_if_in_mem(since_generation) {
-            let is_nibble = if let Some(path) = Self::maybe_to_nibble_path(pos) {
-                node_hashes.insert(path, subtree.hash());
-                true
-            } else {
-                false
-            };
-            match node.inner().borrow() {
-                NodeInner::Internal(internal_node) => {
-                    let depth = pos.len();
-                    pos.push(false);
-                    Self::new_node_hashes_since_impl(
-                        internal_node.left.weak(),
-                        since_generation,
-                        pos,
-                        node_hashes,
-                    );
-                    *pos.get_mut(depth).unwrap() = true;
-                    Self::new_node_hashes_since_impl(
-                        internal_node.right.weak(),
-                        since_generation,
-                        pos,
-                        node_hashes,
-                    );
-                    pos.pop();
-                },
-                NodeInner::Leaf(leaf_node) => {
-                    let mut path = NibblePath::new_even(leaf_node.key.to_vec());
-                    if !is_nibble {
-                        path.truncate(pos.len() / BITS_IN_NIBBLE + 1);
-                    }
-                    node_hashes.insert(path, subtree.hash());
-                },
-            }
-        }
-    }
-
     fn maybe_to_nibble_path(pos: &NodePosition) -> Option<NibblePath> {
         assert!(pos.len() <= HashValue::LENGTH_IN_BITS);
 

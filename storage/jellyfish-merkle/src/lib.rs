@@ -389,7 +389,6 @@ where
     pub fn batch_put_value_set(
         &self,
         value_set: Vec<(HashValue, Option<&(HashValue, K)>)>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         persisted_version: Option<Version>,
         version: Version,
     ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
@@ -407,7 +406,6 @@ where
                     version,
                     deduped_and_sorted_kvs.as_slice(),
                     0,
-                    &node_hashes,
                     &mut batch,
                 )
             })?
@@ -417,7 +415,6 @@ where
                 version,
                 deduped_and_sorted_kvs.as_slice(),
                 0,
-                &node_hashes,
                 &mut batch,
             )?
         };
@@ -443,7 +440,6 @@ where
         version: Version,
         kvs: &[(HashValue, Option<&(HashValue, K)>)],
         depth: usize,
-        hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         batch: &mut TreeUpdateBatch<K>,
     ) -> Result<Option<Node<K>>> {
         let node = self.reader.get_node(node_key)?;
@@ -469,7 +465,6 @@ where
                                     *left,
                                     *right,
                                     depth,
-                                    hash_cache,
                                     &mut sub_batch,
                                 )?,
                                 sub_batch,
@@ -493,7 +488,6 @@ where
                                 left,
                                 right,
                                 depth,
-                                hash_cache,
                                 batch,
                             )
                         })
@@ -541,7 +535,7 @@ where
                     new_children.insert(
                         child_index,
                         Child::new(
-                            get_hash(&new_child_node_key, &new_child_node, hash_cache),
+                            new_child_node.hash(),
                             version,
                             new_child_node.node_type(),
                         ),
@@ -552,11 +546,11 @@ where
                 Ok(Some(new_internal_node.into()))
             },
             Node::Leaf(leaf_node) => batch_update_subtree_with_existing_leaf(
-                node_key, version, leaf_node, kvs, depth, hash_cache, batch,
+                node_key, version, leaf_node, kvs, depth, batch,
             ),
             Node::Null => {
                 ensure!(depth == 0, "Null node can only exist at depth 0");
-                batch_update_subtree(node_key, version, kvs, 0, hash_cache, batch)
+                batch_update_subtree(node_key, version, kvs, 0, batch)
             },
         }
     }
@@ -570,7 +564,6 @@ where
         left: usize,
         right: usize,
         depth: usize,
-        hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         batch: &mut TreeUpdateBatch<K>,
     ) -> Result<(Nibble, Option<Node<K>>)> {
         let child_index = kvs[left].0.get_nibble(depth);
@@ -582,7 +575,6 @@ where
                 version,
                 &kvs[left..=right],
                 depth + 1,
-                hash_cache,
                 batch,
             )?,
             None => batch_update_subtree(
@@ -590,7 +582,6 @@ where
                 version,
                 &kvs[left..=right],
                 depth + 1,
-                hash_cache,
                 batch,
             )?,
         };
@@ -610,7 +601,6 @@ where
     ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
         self.batch_put_value_set(
             value_set.into_iter().map(|(k, v)| (k, v)).collect(),
-            None,
             version.checked_sub(1),
             version,
         )
@@ -775,31 +765,11 @@ where
     }
 }
 
-/// Get the node hash from the cache if cache is provided, otherwise (for test only) compute it.
-fn get_hash<K>(
-    node_key: &NodeKey,
-    node: &Node<K>,
-    hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
-) -> HashValue
-where
-    K: Key,
-{
-    if let Some(cache) = hash_cache {
-        match cache.get(node_key.nibble_path()) {
-            Some(hash) => *hash,
-            None => unreachable!("{:?} can not be found in hash cache", node_key),
-        }
-    } else {
-        node.hash()
-    }
-}
-
 fn batch_update_subtree<K>(
     node_key: &NodeKey,
     version: Version,
     kvs: &[(HashValue, Option<&(HashValue, K)>)],
     depth: usize,
-    hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
     batch: &mut TreeUpdateBatch<K>,
 ) -> Result<Option<Node<K>>>
 where
@@ -822,7 +792,6 @@ where
                 version,
                 &kvs[left..=right],
                 depth + 1,
-                hash_cache,
                 batch,
             )? {
                 children.push((child_index, new_child_node))
@@ -842,7 +811,7 @@ where
                         let result = (
                             child_index,
                             Child::new(
-                                get_hash(&new_child_node_key, &new_child_node, hash_cache),
+                                new_child_node.hash(),
                                 version,
                                 new_child_node.node_type(),
                             ),
@@ -863,7 +832,6 @@ fn batch_update_subtree_with_existing_leaf<K>(
     existing_leaf_node: LeafNode<K>,
     kvs: &[(HashValue, Option<&(HashValue, K)>)],
     depth: usize,
-    hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
     batch: &mut TreeUpdateBatch<K>,
 ) -> Result<Option<Node<K>>>
 where
@@ -894,7 +862,6 @@ where
                     existing_leaf_node.clone(),
                     &kvs[left..=right],
                     depth + 1,
-                    hash_cache,
                     batch,
                 )?
             } else {
@@ -903,7 +870,6 @@ where
                     version,
                     &kvs[left..=right],
                     depth + 1,
-                    hash_cache,
                     batch,
                 )?
             } {
@@ -928,7 +894,7 @@ where
                         let result = (
                             child_index,
                             Child::new(
-                                get_hash(&new_child_node_key, &new_child_node, hash_cache),
+                                new_child_node.hash(),
                                 version,
                                 new_child_node.node_type(),
                             ),

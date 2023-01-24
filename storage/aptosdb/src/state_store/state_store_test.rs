@@ -30,7 +30,7 @@ fn put_value_set(
     let jmt_updates = jmt_updates(&value_set);
 
     let root = state_store
-        .merklize_value_set(jmt_update_refs(&jmt_updates), None, version, base_version)
+        .merklize_value_set(jmt_update_refs(&jmt_updates), version, base_version)
         .unwrap();
     let batch = SchemaBatch::new();
     state_store
@@ -425,7 +425,7 @@ proptest! {
             StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */).unwrap();
 
         let dummy_state_key = StateKey::Raw(vec![]);
-        let (batch, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], None, 0, None, None).unwrap();
+        let (batch, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], 0, None, None).unwrap();
         store2.state_merkle_db.db.write_schemas(batch).unwrap();
         assert!(store2.state_merkle_db.get_rightmost_leaf(version).unwrap().is_none());
 

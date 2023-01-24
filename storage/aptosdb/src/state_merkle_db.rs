@@ -86,13 +86,11 @@ impl StateMerkleDb {
     pub fn batch_put_value_set(
         &self,
         value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         persisted_version: Option<Version>,
         version: Version,
     ) -> Result<(HashValue, TreeUpdateBatch<StateKey>)> {
         JellyfishMerkleTree::new(self).batch_put_value_set(
             value_set,
-            node_hashes,
             persisted_version,
             version,
         )
@@ -121,7 +119,6 @@ impl StateMerkleDb {
     pub fn merklize_value_set(
         &self,
         value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
         previous_epoch_ending_version: Option<Version>,
@@ -131,7 +128,7 @@ impl StateMerkleDb {
                 .with_label_values(&["jmt_update"])
                 .start_timer();
 
-            self.batch_put_value_set(value_set, node_hashes, base_version, version)
+            self.batch_put_value_set(value_set, base_version, version)
         }?;
 
         if self.cache_enabled() {
