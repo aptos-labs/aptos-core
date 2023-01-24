@@ -13,7 +13,11 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 23 January 2023
 
-- Published installation instructions for the new web-based [Aptos NFT Minting Tool](concepts/coin-and-token/nft-minting-tool.md).
+- Introduced a *Create NFTs* section in navigation that includes:
+
+  * a [comparison of Aptos tokens](concepts/coin-and-token/aptos-token-overview.md) with other blockchains
+  * instructions for [minting fungible tokens with on-chain data](concepts/coin-and-token/mint-onchain-data.md)
+  * installation instructions for a new web-based [Aptos NFT Minting Tool](concepts/coin-and-token/nft-minting-tool.md)
 
 ## 18 January 2023
 
