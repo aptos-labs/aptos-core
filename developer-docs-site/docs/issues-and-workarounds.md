@@ -1,9 +1,9 @@
 ---
-title: "Issues and Workarounds"
-slug: "issues-and-workarounds"
+title: "Troubleshooting Issues and Workarounds"
+slug: "troubleshooting-issues-and-workarounds"
 ---
 
-# Issues and Workarounds
+# Troubleshooting Issues and Workarounds
 
 This page provides workarounds and answers for issues and questions that frequently come up. 
 
@@ -228,21 +228,6 @@ full_node_networks:
             - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/handshake/0"
             role: "Upstream"
 ```
-
-### Node liveness issues
-
-#### Workaround
-
-If your validator node is facing persistent issues, for example, it is unable to propose or fails to synchronize, open an [aptos-ait2](https://github.com/aptos-labs/aptos-ait2/issues) GitHub issue and provide the following:
-- Your node setup, i.e., if you're running it from source, Docker or Terraform. Include the source code version, i.e., the image tag or branch).
-- A description of the issues you are facing and how long they have been occurring.
-- **Important**: The logs for your node (going as far back as possible). Without the detailed logs, the Aptos team will likely be unable to debug the issue.
-- We may also ask you to enable the debug logs for the node. You can do this by updating your node configuration file (e.g., `validator.yaml`) by adding:
-```yaml
- logger:
-   level: DEBUG
-```
-- Make sure to also include any other information you think might be useful and whether or not restarting your validator helps.
 
 
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
