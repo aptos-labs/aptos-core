@@ -116,6 +116,22 @@ fn test_resource_account() {
 }
 
 #[test]
+fn test_resource_groups() {
+    let named_address = BTreeMap::from([
+        (
+            String::from("resource_groups_primary"),
+            AccountAddress::from_hex_literal("0xf00d").unwrap(),
+        ),
+        (
+            String::from("resource_groups_secondary"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
+    run_tests_for_pkg("resource_groups/primary", named_address.clone());
+    run_tests_for_pkg("resource_groups/secondary", named_address);
+}
+
+#[test]
 fn test_shared_account() {
     test_common("shared_account");
 }

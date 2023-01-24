@@ -20,6 +20,7 @@ mod mint_nft;
 mod new_integer_types;
 mod offer_rotation_capability;
 mod offer_signer_capability;
+mod resource_groups;
 mod rotate_auth_key;
 mod scripts;
 mod simple_defi;

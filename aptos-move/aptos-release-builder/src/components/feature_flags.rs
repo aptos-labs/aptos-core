@@ -25,6 +25,7 @@ pub enum FeatureFlag {
     VMBinaryFormatV6,
     MultiEd25519PkValidateV2Natives,
     Blake2b256Native,
+    ResourceGroups,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -110,6 +111,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES
             },
             FeatureFlag::Blake2b256Native => AptosFeatureFlag::BLAKE2B_256_NATIVE,
+            FeatureFlag::ResourceGroups => AptosFeatureFlag::RESOURCE_GROUPS,
         }
     }
 }
@@ -132,6 +134,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::MultiEd25519PkValidateV2Natives
             },
             AptosFeatureFlag::BLAKE2B_256_NATIVE => FeatureFlag::Blake2b256Native,
+            AptosFeatureFlag::RESOURCE_GROUPS => FeatureFlag::ResourceGroups,
         }
     }
 }

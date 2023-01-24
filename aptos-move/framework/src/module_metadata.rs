@@ -1,10 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::AbortInfo;
-use move_binary_format::{normalized::Function, CompiledModule};
+use crate::extended_checks::ResourceGroupScope;
+use aptos_types::{on_chain_config::Features, transaction::AbortInfo};
+use move_binary_format::{
+    file_format::{Ability, AbilitySet},
+    normalized::{Function, Struct},
+    CompiledModule,
+};
 use move_core_types::{
-    errmap::ErrorDescription, identifier::Identifier, language_storage::ModuleId,
+    errmap::ErrorDescription,
+    identifier::Identifier,
+    language_storage::{ModuleId, StructTag},
     metadata::Metadata,
 };
 use move_vm_runtime::move_vm::MoveVM;
@@ -57,6 +64,8 @@ pub struct KnownAttribute {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum KnownAttributeKind {
     ViewFunction = 1,
+    ResourceGroup = 2,
+    ResourceGroupMember = 3,
 }
 
 impl KnownAttribute {
@@ -69,6 +78,44 @@ impl KnownAttribute {
 
     pub fn is_view_function(&self) -> bool {
         self.kind == (KnownAttributeKind::ViewFunction as u16)
+    }
+
+    pub fn resource_group(scope: ResourceGroupScope) -> Self {
+        Self {
+            kind: KnownAttributeKind::ResourceGroup as u16,
+            args: vec![scope.as_str().to_string()],
+        }
+    }
+
+    pub fn is_resource_group(&self) -> bool {
+        self.kind == KnownAttributeKind::ResourceGroup as u16
+    }
+
+    pub fn get_resource_group(&self) -> Option<ResourceGroupScope> {
+        if self.kind == KnownAttributeKind::ResourceGroup as u16 {
+            self.args.get(0).and_then(|scope| str::parse(scope).ok())
+        } else {
+            None
+        }
+    }
+
+    pub fn resource_group_member(container: String) -> Self {
+        Self {
+            kind: KnownAttributeKind::ResourceGroupMember as u16,
+            args: vec![container],
+        }
+    }
+
+    pub fn get_resource_group_member(&self) -> Option<StructTag> {
+        if self.kind == KnownAttributeKind::ResourceGroupMember as u16 {
+            self.args.get(0).and_then(|group| str::parse(group).ok())
+        } else {
+            None
+        }
+    }
+
+    pub fn is_resource_group_member(&self) -> bool {
+        self.kind == KnownAttributeKind::ResourceGroupMember as u16
     }
 }
 
@@ -133,7 +180,51 @@ pub fn is_valid_view_function(
     })
 }
 
-pub fn verify_module_metadata(module: &CompiledModule) -> Result<(), MetadataValidationError> {
+pub fn is_valid_resource_group(
+    structs: &BTreeMap<Identifier, Struct>,
+    struct_: &str,
+) -> Result<(), MetadataValidationError> {
+    if let Ok(ident_struct) = Identifier::new(struct_) {
+        if let Some(mod_struct) = structs.get(&ident_struct) {
+            if mod_struct.abilities == AbilitySet::EMPTY
+                && mod_struct.type_parameters.is_empty()
+                && mod_struct.fields.len() == 1
+            {
+                return Ok(());
+            }
+            println!("group {:?}", mod_struct);
+        }
+    }
+
+    Err(MetadataValidationError {
+        key: struct_.to_string(),
+        attribute: KnownAttributeKind::ViewFunction as u16,
+    })
+}
+
+pub fn is_valid_resource_group_member(
+    structs: &BTreeMap<Identifier, Struct>,
+    struct_: &str,
+) -> Result<(), MetadataValidationError> {
+    if let Ok(ident_struct) = Identifier::new(struct_) {
+        if let Some(mod_struct) = structs.get(&ident_struct) {
+            if mod_struct.abilities.has_ability(Ability::Key) {
+                return Ok(());
+            }
+            println!("member {:?}", mod_struct);
+        }
+    }
+
+    Err(MetadataValidationError {
+        key: struct_.to_string(),
+        attribute: KnownAttributeKind::ViewFunction as u16,
+    })
+}
+
+pub fn verify_module_metadata(
+    module: &CompiledModule,
+    features: &Features,
+) -> Result<(), MetadataValidationError> {
     let metadata = if let Some(metadata) = get_module_metadata(module) {
         metadata
     } else {
@@ -145,6 +236,7 @@ pub fn verify_module_metadata(module: &CompiledModule) -> Result<(), MetadataVal
         .iter()
         .map(|func_def| Function::new(module, func_def))
         .collect::<BTreeMap<_, _>>();
+
     for (fun, attrs) in &metadata.fun_attributes {
         for attr in attrs {
             if attr.is_view_function() {
@@ -157,8 +249,26 @@ pub fn verify_module_metadata(module: &CompiledModule) -> Result<(), MetadataVal
             }
         }
     }
+
+    let structs = module
+        .struct_defs
+        .iter()
+        .map(|d| Struct::new(module, d))
+        .collect::<BTreeMap<_, _>>();
+
     for (struct_, attrs) in &metadata.struct_attributes {
-        if let Some(attr) = attrs.iter().next() {
+        for attr in attrs {
+            if features.are_resource_groups_enabled() {
+                if attr.is_resource_group() && attr.get_resource_group().is_some() {
+                    is_valid_resource_group(&structs, struct_)?;
+                    continue;
+                } else if attr.is_resource_group_member()
+                    && attr.get_resource_group_member().is_some()
+                {
+                    is_valid_resource_group_member(&structs, struct_)?;
+                    continue;
+                }
+            }
             return Err(MetadataValidationError {
                 key: struct_.clone(),
                 attribute: attr.kind,

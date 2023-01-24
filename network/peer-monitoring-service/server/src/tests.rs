@@ -16,7 +16,7 @@ use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
     application::{
         storage::PeerMetadataStorage,
-        types::{PeerError, PeerInfo, PeerState},
+        types::{PeerInfo, PeerState},
     },
     peer_manager::PeerManagerNotification,
     protocols::{
@@ -32,11 +32,7 @@ use aptos_peer_monitoring_service_types::{
 };
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::channel::oneshot;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    str::FromStr,
-    sync::Arc,
-};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 #[tokio::test]
 async fn test_get_server_protocol_version() {
@@ -103,13 +99,7 @@ async fn test_get_connected_peers() {
 
     // Disconnect the peer
     peer_metadata_storage
-        .write(peer_network_id, |entry| match entry {
-            Entry::Vacant(..) => Err(PeerError::NotFound),
-            Entry::Occupied(inner) => {
-                inner.get_mut().status = PeerState::Disconnected;
-                Ok(())
-            },
-        })
+        .update_peer_state(peer_network_id, PeerState::Disconnected)
         .unwrap();
 
     // Process a request to fetch the connected peers
