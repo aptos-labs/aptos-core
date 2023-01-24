@@ -6,6 +6,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.6.0 (2022-01-20)
+
 - Add support to Move view functions
 
 ## 1.5.0 (2022-01-05)

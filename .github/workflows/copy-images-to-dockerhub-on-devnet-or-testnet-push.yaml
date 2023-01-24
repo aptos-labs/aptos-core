@@ -5,6 +5,8 @@ on:
       - devnet
       - testnet
       - mainnet
+    tags:
+      - aptos-node-v*
 
 permissions:
   contents: read
