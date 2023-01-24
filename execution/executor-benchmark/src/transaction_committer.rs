@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_block_executor::counters::{TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS};
 use aptos_crypto::hash::HashValue;
 use aptos_db::metrics::API_LATENCY_SECONDS;
 use aptos_executor::{
@@ -10,7 +11,6 @@ use aptos_executor::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use aptos_consensus::counters::{BLOCK_EXECUTED_COUNT, BLOCK_EXECUTED_SECONDS, OP_COUNTERS};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -24,7 +24,6 @@ use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
-use aptos_block_executor::counters::{TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS};
 
 pub(crate) fn gen_li_with_sigs(
     block_id: HashValue,
@@ -123,11 +122,17 @@ fn report_block(
         total_versions / global_start_time.elapsed().as_secs_f64(),
     );
     //let x = &OP_COUNTERS.duration_histograms;
-   // let x =
+    // let x =
     //info!("Op counters {}", OP_COUNTERS.duration_histograms.get_metric_with_label_values(&["consensus_duration", "execute_block"]).expect("must exist").get_sample_sum());
     //info! ("Average block execution time: {:.0} secs, ", CONSENSUS_DU)
-    info!("Total task execution is {}", TASK_EXECUTE_SECONDS.get_sample_count());
-    info!("Total task validation is {}", TASK_VALIDATE_SECONDS.get_sample_count());
+    info!(
+        "Total task execution is {}",
+        TASK_EXECUTE_SECONDS.get_sample_count()
+    );
+    info!(
+        "Total task validation is {}",
+        TASK_VALIDATE_SECONDS.get_sample_count()
+    );
     info!(
 
             "Accumulative total: VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",

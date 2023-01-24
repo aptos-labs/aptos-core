@@ -13,7 +13,7 @@ use rand::{
     prelude::{SliceRandom, StdRng},
     Rng,
 };
-use rand_core::RngCore;
+use rand_core::{OsRng, RngCore, SeedableRng};
 use std::{cmp::max, sync::Arc};
 
 pub struct P2PTransactionGenerator {
@@ -191,7 +191,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
 }
 
 pub struct P2PTransactionGeneratorCreator {
-    rng: StdRng,
+    //rng: StdRng,
     txn_factory: TransactionFactory,
     amount: u64,
     all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
@@ -201,7 +201,7 @@ pub struct P2PTransactionGeneratorCreator {
 
 impl P2PTransactionGeneratorCreator {
     pub fn new(
-        rng: StdRng,
+        //rng: StdRng,
         txn_factory: TransactionFactory,
         amount: u64,
         all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
@@ -209,7 +209,7 @@ impl P2PTransactionGeneratorCreator {
         gas_price: u64,
     ) -> Self {
         Self {
-            rng,
+            //rng,
             txn_factory,
             amount,
             all_addresses,
@@ -223,7 +223,7 @@ impl P2PTransactionGeneratorCreator {
 impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
     async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(P2PTransactionGenerator::new(
-            self.rng.clone(),
+            StdRng::from_seed(OsRng.gen()),
             self.amount,
             self.txn_factory.clone(),
             self.all_addresses.clone(),

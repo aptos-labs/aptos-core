@@ -5,8 +5,10 @@ use super::{
     proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
 };
 use crate::{
-    block_storage::BlockReader, counters::CHAIN_HEALTH_BACKOFF_TRIGGERED,
-    state_replication::PayloadClient, util::time_service::TimeService,
+    block_storage::BlockReader,
+    counters::{CHAIN_HEALTH_BACKOFF_TRIGGERED, DISTINCT_SENDERS_IN_BLOCK},
+    state_replication::PayloadClient,
+    util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::ChainHealthBackoffValues;
@@ -18,9 +20,11 @@ use aptos_consensus_types::{
 };
 use aptos_logger::{error, sample, sample::SampleRate, warn};
 use futures::future::BoxFuture;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
-use std::collections::{HashMap, VecDeque};
-use crate::counters::DISTINCT_SENDERS_IN_BLOCK;
+use std::{
+    collections::{BTreeMap, HashMap, VecDeque},
+    sync::Arc,
+    time::Duration,
+};
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
@@ -286,7 +290,6 @@ impl ProposalGenerator {
         ))
     }
 
-
     fn ensure_highest_quorum_cert(&self, round: Round) -> anyhow::Result<Arc<QuorumCert>> {
         let hqc = self.block_store.highest_quorum_cert();
         ensure!(
@@ -339,7 +342,6 @@ fn optimize_payload(payload: Payload) -> Payload {
             });
             txns_by_sender[index].push_back(txn);
         }
-
 
         DISTINCT_SENDERS_IN_BLOCK.set(txns_by_sender.len() as i64);
 

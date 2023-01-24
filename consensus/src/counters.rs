@@ -7,7 +7,6 @@ use aptos_metrics_core::{
     register_int_gauge_vec, Counter, Gauge, Histogram, HistogramVec, IntCounter, IntCounterVec,
     IntGauge, IntGaugeVec,
 };
-use aptos_metrics_core::exponential_buckets;
 use once_cell::sync::Lazy;
 
 //////////////////////
@@ -183,7 +182,7 @@ pub static DISTINCT_SENDERS_IN_BLOCK: Lazy<IntGauge> = Lazy::new(|| {
         "aptos_distinct_senders_in_block",
         "Total number of new block events in the current reputation window"
     )
-        .unwrap()
+    .unwrap()
 });
 
 /// Number of rounds we were collecting votes for proposer
