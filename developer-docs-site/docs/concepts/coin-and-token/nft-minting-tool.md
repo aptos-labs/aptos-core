@@ -1,12 +1,12 @@
 ---
-title: "Aptos NFT Minting Tool"
-slug: "mint-tool-cli"
+title: "Set up Aptos NFT Minting Tool"
+slug: "nft-minting-tool"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Setting up NFT Minting Tool
+# Set up Aptos NFT Minting Tool
 
 The Aptos Non-Fungible Token (NFT) Minting Tool allows you to mint NFTs via a locally running website. This document explains how to get that site up and running.
 
@@ -66,8 +66,7 @@ Note: Other fields from `HashLips` are ignored.
 
 Each NFT should have a separate metadata file in JSON format. All NFT metadata files need to be placed within a directory (folder) named `json`. All NFT asset files need to be placed within another directory named `images`. The `json` and `images` directories need to be under the same parent directory, like so:
 
-<pre>
-<code>
+```
 nft_assets/
 ├─ images/
 │ ├─ 1.png
@@ -78,8 +77,7 @@ nft_assets/
 │ ├─ 1.json
 │ ├─ 2.json
 │ ├─ ...
-</code>
-</pre>
+```
 
 Each pair of image and metadata files represent an NFT. E.g. `1.png` and `1.json` in the above example are the asset and metadata files of the first NFT.
 
