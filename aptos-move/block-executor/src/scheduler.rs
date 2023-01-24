@@ -186,7 +186,7 @@ impl Scheduler {
             return None;
         }
 
-        if let Some(validation_status) = self.txn_status[idx].1.try_upgradable_read() {
+        if let Some(validation_status) = self.txn_status[idx].1.try_read() {
             // Acquired the validation status lock, now try the status lock.
             if let Some(status) = self.txn_status[idx].0.try_upgradable_read() {
                 if let ExecutionStatus::Executed(incarnation) = *status {
@@ -224,6 +224,9 @@ impl Scheduler {
     /// that the same version may not successfully abort more than once.
     pub fn try_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> bool {
         // lock the execution status.
+        // Note: we could upgradable read, then upgrade and write. Similar for other places.
+        // However, it is likely an overkill (and overhead to actually upgrade),
+        // while unlikely there would be much contention on a specific index lock.
         let mut status = self.txn_status[txn_idx].0.write();
 
         if *status == ExecutionStatus::Executed(incarnation) {
@@ -235,7 +238,7 @@ impl Scheduler {
     }
 
     /// Return the next task for the thread.
-    pub fn next_task(&self) -> SchedulerTask {
+    pub fn next_task(&self, committing: bool) -> SchedulerTask {
         loop {
             if self.done() {
                 // No more tasks.
@@ -247,7 +250,20 @@ impl Scheduler {
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
             if idx_to_execute >= self.num_txns && idx_to_validate >= self.num_txns {
-                return SchedulerTask::NoTask;
+                return if self.done() {
+                    // Check again to avoid commit delay due to a race.
+                    SchedulerTask::Done
+                 } else {
+                    if !committing {
+                        // Avoid pointlessly spinning, and give priority to other threads
+                        // that may be working to finish the remaining tasks.
+                        // We don't want to hint on the thread that is committing
+                        // because it may have work to do (to commit) even if there
+                        // is no more conventional (validation and execution tasks) work.
+                        hint::spin_loop();
+                    }
+                    SchedulerTask::NoTask
+                 };
             }
 
             if idx_to_validate < idx_to_execute {
@@ -306,11 +322,7 @@ impl Scheduler {
 
     pub fn finish_validation(&self, txn_idx: TxnIndex, wave: Wave) {
         let mut validation_status = self.txn_status[txn_idx].1.write();
-        let max_wave = match validation_status.max_validated_wave {
-            Some(prev_wave) => max(prev_wave, wave),
-            None => wave,
-        };
-        validation_status.max_validated_wave = Some(max_wave);
+        validation_status.max_validated_wave = Some(validation_status.max_validated_wave.map_or(wave, |prev_wave| max(prev_wave, wave)));
     }
 
     /// After txn is executed, schedule its dependencies for re-execution.
@@ -323,6 +335,13 @@ impl Scheduler {
         incarnation: Incarnation,
         revalidate_suffix: bool,
     ) -> SchedulerTask {
+        // Note: It is preferable to hold the validation lock throughout the finish_execution,
+        // in particular before updating execution status. The point was that we don't want
+        // any validation to come before the validation status is correspondingly updated.
+        // It may be possible to make work more granularly, but shouldn't make performance
+        // difference and like this correctness argument is much easier to see, in fact also
+        // the reason why we grab write lock directly, and never release it during the whole function.
+        // So even validation status readers have to wait if they somehow end up at the same index.
         let mut validation_status = self.txn_status[txn_idx].1.write();
         self.set_executed_status(txn_idx, incarnation);
 
@@ -379,6 +398,9 @@ impl Scheduler {
     /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
     /// may return a re-execution task back to the caller (otherwise, NoTask).
     pub fn finish_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> SchedulerTask {
+        // Similar reason as in finish_execution to hold the validation lock throughout the
+        // function. Also note that we always lock validation status before execution status
+        // which is good to have a fixed order to avoid potential deadlocks.
         let mut validation_status = self.txn_status[txn_idx].1.write();
         self.set_aborted_status(txn_idx, incarnation);
 
@@ -431,6 +453,7 @@ impl Scheduler {
                 })
         {
             let (_, wave) = Self::unpack_validation_idx(prev_val_idx);
+            // Note that 'wave' is the previous wave value, and we must update it to 'wave + 1'.
             Some(wave + 1)
         } else {
             None
@@ -447,6 +470,9 @@ impl Scheduler {
             return None;
         }
 
+        // Note: we could upgradable read, then upgrade and write. Similar for other places.
+        // However, it is likely an overkill (and overhead to actually upgrade),
+        // while unlikely there would be much contention on a specific index lock.
         let mut status = self.txn_status[txn_idx].0.write();
         if let ExecutionStatus::ReadyToExecute(incarnation, maybe_condvar) = &*status {
             let ret = (*incarnation, maybe_condvar.clone());
@@ -469,7 +495,7 @@ impl Scheduler {
             return None;
         }
 
-        let status = self.txn_status[txn_idx].0.write();
+        let status = self.txn_status[txn_idx].0.read();
         match *status {
             ExecutionStatus::Executed(incarnation) => Some(incarnation),
             ExecutionStatus::Committed(incarnation) => {
@@ -494,11 +520,6 @@ impl Scheduler {
             Self::unpack_validation_idx(self.validation_idx.fetch_add(1, Ordering::SeqCst));
 
         if idx_to_validate >= self.num_txns {
-            if !self.done() {
-                // Avoid pointlessly spinning, and give priority to other threads that may
-                // be working to finish the remaining tasks.
-                hint::spin_loop();
-            }
             return None;
         }
 
@@ -519,11 +540,6 @@ impl Scheduler {
         let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::SeqCst);
 
         if idx_to_execute >= self.num_txns {
-            if !self.done() {
-                // Avoid pointlessly spinning, and give priority to other threads that may
-                // be working to finish the remaining tasks.
-                hint::spin_loop();
-            }
             return None;
         }
 

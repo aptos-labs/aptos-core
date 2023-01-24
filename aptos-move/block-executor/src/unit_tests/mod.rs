@@ -245,7 +245,7 @@ fn scheduler_tasks() {
     for i in 0..5 {
         // not calling finish execution, so validation tasks not dispatched.
         assert!(matches!(
-            s.next_task(),
+            s.next_task(false),
             SchedulerTask::ExecutionTask((j, 0), None) if i == j
         ));
     }
@@ -270,12 +270,12 @@ fn scheduler_tasks() {
     ));
 
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((2, 0), _)
     ));
     // txn 3 hasn't finished execution, so no validation task for it.
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((4, 0), _)
     ));
 
@@ -286,13 +286,13 @@ fn scheduler_tasks() {
     ));
 
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((3, 0), _)
     ));
     // txn 4 dispatched for validation again because it the previous validation
     // hasn't finished.
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((4, 0), _)
     ));
 
@@ -320,7 +320,7 @@ fn scheduler_tasks() {
 
     // txn 4 is aborted, so there won't be a validation task.
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ExecutionTask((5, 0), None)
     ));
     // Wrap up all outstanding tasks.
@@ -339,7 +339,7 @@ fn scheduler_tasks() {
     ));
 
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((5, 0), 3)
     ));
 
@@ -351,7 +351,7 @@ fn scheduler_tasks() {
 
     while s.try_commit().is_some() {}
 
-    assert!(matches!(s.next_task(), SchedulerTask::Done));
+    assert!(matches!(s.next_task(false), SchedulerTask::Done));
 }
 
 #[test]
@@ -361,7 +361,7 @@ fn scheduler_dependency() {
     for i in 0..5 {
         // not calling finish execution, so validation tasks not dispatched.
         assert!(matches!(
-            s.next_task(),
+            s.next_task(false),
             SchedulerTask::ExecutionTask((j, 0), None) if j == i
         ));
     }
@@ -371,7 +371,7 @@ fn scheduler_dependency() {
         SchedulerTask::ValidationTask((0, 0), _)
     ));
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ExecutionTask((5, 0), None)
     ));
 
@@ -384,7 +384,7 @@ fn scheduler_dependency() {
     ));
     // resumed task doesn't bump incarnation
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ExecutionTask((4, 0), Some(_))
     ));
 }
@@ -396,7 +396,7 @@ fn scheduler_incarnation() {
     for i in 0..5 {
         // not calling finish execution, so validation tasks not dispatched.
         assert!(matches!(
-            s.next_task(),
+            s.next_task(false),
             SchedulerTask::ExecutionTask((j, 0), None) if j == i
         ));
     }
@@ -415,11 +415,11 @@ fn scheduler_incarnation() {
     ));
 
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((2, 0), _)
     ));
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((4, 0), _)
     ));
 
@@ -441,15 +441,15 @@ fn scheduler_incarnation() {
     assert!(matches!(s.finish_abort(4, 0), SchedulerTask::NoTask));
 
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ExecutionTask((1, 0), Some(_))
     ));
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ExecutionTask((3, 0), Some(_))
     ));
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ExecutionTask((4, 1), None)
     ));
     // execution index = 5
@@ -473,7 +473,7 @@ fn scheduler_incarnation() {
         SchedulerTask::NoTask
     ));
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((4, 1), _)
     ));
 }
@@ -485,13 +485,13 @@ fn scheduler_stop_idx() {
     for i in 0..2 {
         // not calling finish execution, so validation tasks not dispatched.
         assert!(matches!(
-            s.next_task(),
+            s.next_task(false),
             SchedulerTask::ExecutionTask((j, 0), None) if j == i
         ));
     }
 
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ExecutionTask((2, 0), None)
     ));
 
@@ -505,11 +505,11 @@ fn scheduler_stop_idx() {
         SchedulerTask::NoTask
     ));
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((0, 0), 1)
     ));
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((1, 0), 1)
     ));
     assert!(matches!(
@@ -517,7 +517,7 @@ fn scheduler_stop_idx() {
         SchedulerTask::NoTask
     ));
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((2, 0), 1)
     ));
 
@@ -527,7 +527,7 @@ fn scheduler_stop_idx() {
 
     while s.try_commit().is_some() {}
 
-    assert!(matches!(s.next_task(), SchedulerTask::Done));
+    assert!(matches!(s.next_task(false), SchedulerTask::Done));
 }
 
 #[test]
@@ -537,7 +537,7 @@ fn scheduler_drain_idx() {
     for i in 0..3 {
         // not calling finish execution, so validation tasks not dispatched.
         assert!(matches!(
-            s.next_task(),
+            s.next_task(false),
             SchedulerTask::ExecutionTask((j, 0), None) if j == i
         ));
     }
@@ -552,11 +552,11 @@ fn scheduler_drain_idx() {
         SchedulerTask::NoTask
     ));
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((0, 0), 1)
     ));
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((1, 0), 1)
     ));
     assert!(matches!(
@@ -564,7 +564,7 @@ fn scheduler_drain_idx() {
         SchedulerTask::NoTask
     ));
     assert!(matches!(
-        s.next_task(),
+        s.next_task(false),
         SchedulerTask::ValidationTask((2, 0), 1)
     ));
 
@@ -574,5 +574,5 @@ fn scheduler_drain_idx() {
 
     while s.try_commit().is_some() {}
 
-    assert!(matches!(s.next_task(), SchedulerTask::Done));
+    assert!(matches!(s.next_task(false), SchedulerTask::Done));
 }

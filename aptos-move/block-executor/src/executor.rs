@@ -191,7 +191,7 @@ where
         versioned_data_cache: &MVHashMap<T::Key, T::Value>,
         scheduler: &Scheduler,
         base_view: &S,
-        commits: bool,
+        committing: bool,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -201,7 +201,7 @@ where
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {
             // Only one thread try_commit to avoid contention.
-            if commits {
+            if committing {
                 // Keep committing txns until there is no more that can be committed now.
                 loop {
                     if scheduler.try_commit().is_none() {
@@ -235,7 +235,7 @@ where
 
                     SchedulerTask::NoTask
                 },
-                SchedulerTask::NoTask => scheduler.next_task(),
+                SchedulerTask::NoTask => scheduler.next_task(committing),
                 SchedulerTask::Done => {
                     break;
                 },
@@ -259,7 +259,7 @@ where
 
         let num_txns = signature_verified_block.len();
         let last_input_output = TxnLastInputOutput::new(num_txns);
-        let commits = AtomicBool::new(true);
+        let committing = AtomicBool::new(true);
         let scheduler = Scheduler::new(num_txns);
 
         RAYON_EXEC_POOL.scope(|s| {
@@ -272,7 +272,7 @@ where
                         &versioned_data_cache,
                         &scheduler,
                         base_view,
-                        commits.swap(false, Ordering::SeqCst),
+                        committing.swap(false, Ordering::SeqCst),
                     );
                 });
             }
