@@ -4,6 +4,10 @@
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
+use aptos_executor::block_executor::TransactionBlockExecutor;
+use aptos_executor_benchmark::{
+    benchmark_transaction::BenchmarkTransaction, fake_executor::FakeExecutor,
+};
 use aptos_push_metrics::MetricsPusher;
 use aptos_vm::AptosVM;
 use std::path::PathBuf;
@@ -68,7 +72,7 @@ impl PrunerOpt {
 
 #[derive(Debug, StructOpt)]
 struct Opt {
-    #[structopt(long, default_value = "500")]
+    #[structopt(long, default_value = "10000")]
     block_size: usize,
 
     #[structopt(long)]
@@ -85,6 +89,9 @@ struct Opt {
         about = "Verify sequence number of all the accounts after execution finishes"
     )]
     verify_sequence_numbers: bool,
+
+    #[structopt(long)]
+    use_fake_executor: bool,
 }
 
 impl Opt {
@@ -144,26 +151,17 @@ enum Command {
     },
 }
 
-fn main() {
-    #[allow(deprecated)]
-    let _mp = MetricsPusher::start();
-    let opt = Opt::from_args();
-
-    aptos_logger::Logger::new().init();
-
-    rayon::ThreadPoolBuilder::new()
-        .thread_name(|index| format!("rayon-global-{}", index))
-        .build_global()
-        .expect("Failed to build rayon global thread pool.");
-    AptosVM::set_concurrency_level_once(opt.concurrency_level());
-
+fn run<E>(opt: Opt)
+where
+    E: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+{
     match opt.cmd {
         Command::CreateDb {
             data_dir,
             num_accounts,
             init_account_balance,
         } => {
-            aptos_executor_benchmark::db_generator::run(
+            aptos_executor_benchmark::db_generator::run::<E>(
                 num_accounts,
                 init_account_balance,
                 opt.block_size,
@@ -177,7 +175,7 @@ fn main() {
             data_dir,
             checkpoint_dir,
         } => {
-            aptos_executor_benchmark::run_benchmark(
+            aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
                 data_dir,
@@ -192,7 +190,7 @@ fn main() {
             num_new_accounts,
             init_account_balance,
         } => {
-            aptos_executor_benchmark::add_accounts(
+            aptos_executor_benchmark::add_accounts::<E>(
                 num_new_accounts,
                 init_account_balance,
                 opt.block_size,
@@ -202,5 +200,26 @@ fn main() {
                 opt.verify_sequence_numbers,
             );
         },
+    }
+}
+
+fn main() {
+    #[allow(deprecated)]
+    let _mp = MetricsPusher::start();
+    let opt = Opt::from_args();
+
+    aptos_logger::Logger::new().init();
+
+    rayon::ThreadPoolBuilder::new()
+        .thread_name(|index| format!("rayon-global-{}", index))
+        .build_global()
+        .expect("Failed to build rayon global thread pool.");
+    AptosVM::set_concurrency_level_once(opt.concurrency_level());
+    FakeExecutor::set_concurrency_level_once(opt.concurrency_level());
+
+    if opt.use_fake_executor {
+        run::<FakeExecutor>(opt);
+    } else {
+        run::<AptosVM>(opt);
     }
 }
