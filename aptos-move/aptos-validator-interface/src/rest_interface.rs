@@ -57,7 +57,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                         .into_inner()
                         .to_vec(),
                 ))),
-                Path::Resource(tag) => Ok(self
+                Path::Resource(tag) | Path::ResourceGroup(tag) => Ok(self
                     .0
                     .get_account_resource_at_version_bytes(
                         path.address,
