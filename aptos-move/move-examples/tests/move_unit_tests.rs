@@ -164,7 +164,6 @@ fn test_nft_dao_test() {
     let named_address = BTreeMap::from([(
         String::from("dao_platform"),
         AccountAddress::from_hex_literal("0xcafe").unwrap(),
-
     )]);
     run_tests_for_pkg("dao/nft_dao", named_address);
 }
