@@ -56,7 +56,7 @@ A view function request may look like this in the Typescript SDK:
     expect(balance[0]).toBe("100000000");
 ```
 
-The view function is instead a list of return values as a vector. The computation results are returned in a JSON file, as with all other Move value queries. Or you can receive the output as in a Binary Canonical Serialization (BCS) encoded format.
+The view function instead returns a list of values as a vector. The computation results are returned in a JSON file, as with all other Move value queries. Or you can receive the output as in a Binary Canonical Serialization (BCS) encoded format.
 
 The user sends a payload containing the address, module, and function name of the Move view function on chain along with serialized arguments.  We execute it and get the execution result back to the user. For example, a function may reveal the balance of an account with a return value in the form of an integer. The View function requires being able to query the on-chain state in Aptos.
 
