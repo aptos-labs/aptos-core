@@ -52,7 +52,7 @@ use std::{
 };
 use tokio::io::BufReader;
 
-const BATCH_SIZE: usize = if cfg!(test) { 2 } else { 10000 };
+const BATCH_SIZE: usize = if cfg!(test) { 2 } else { 1000 };
 
 #[derive(Parser)]
 pub struct TransactionRestoreOpt {
