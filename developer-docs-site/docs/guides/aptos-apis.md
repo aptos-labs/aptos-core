@@ -41,7 +41,7 @@ View functions do not modify blockchain state. The [View](https://github.com/apt
 The View function operates much like the [Aptos Simulation API](./system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), but it does not generate side effects. The function is immutable if tagged as `#[view]`, the compiler will confirm it is so and if not fail. The View endpoint is: \
 `/view`
 
-The View function operates much like the Aptos Simulation API, with similar input and output. You call the module and function with the same input type parameters and input Move value parameters. Using the Aptos View function API, the results are read values on the blockchain, and the Aptos Simulation API is expected write output on the blockchain.
+The View function operates much like the Aptos Simulation API, with similar input and output. You call the module and function with the same input type parameters and input Move value parameters. Using the Aptos View function API, the results are read values on the blockchain, and the Aptos Simulation API is expected to write output on the blockchain.
 
 A view function request may look like this in the Typescript SDK:
 ```
