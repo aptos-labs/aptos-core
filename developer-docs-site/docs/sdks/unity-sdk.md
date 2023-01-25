@@ -20,6 +20,15 @@ The Aptos Unity SDK is a .NET implementation of the [Aptos SDK](./index.md), com
 - Native BCS Support
 - Faucet Client for Devnet
 
+## User flows
+
+The Aptos Unity SDK supports these use cases:
+
+- *Progressive onboarding flow* in which users can log into a game by email. In this flow, transactions are proxied, and Aptos uses a distributed key system. The users can then onboard to a full custodial wallet if desired.
+- *In-game non-custodial wallet integration* in which game developers have the option to allow users to create full non-custodial wallets in the games.
+- *Off-game non-custodial wallet integration* in which game developers may allow users to connect to a desktop wallet or a mobile wallet within the game or create burner wallets from the parent wallet seamlessly.
+
+
 ## Prerequisites
 
 ### Unity versions
