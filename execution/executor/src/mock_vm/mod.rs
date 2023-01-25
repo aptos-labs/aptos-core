@@ -4,8 +4,11 @@
 #[cfg(test)]
 mod mock_vm_test;
 
+use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
+use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_state_view::StateView;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -52,6 +55,15 @@ pub static DISCARD_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE));
 
 pub struct MockVM;
+
+impl TransactionBlockExecutor<Transaction> for MockVM {
+    fn execute_transaction_block(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+    ) -> Result<ChunkOutput> {
+        ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view)
+    }
+}
 
 impl VMExecutor for MockVM {
     fn execute_block(
