@@ -6,6 +6,7 @@ module aptos_framework::account {
     use std::signer;
     use std::vector;
     use aptos_framework::chain_id;
+    use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
     use aptos_framework::system_addresses;
@@ -152,8 +153,6 @@ module aptos_framework::account {
     const EOFFERER_ADDRESS_DOES_NOT_EXIST: u64 = 17;
     /// The specified rotation capablity offer does not exist at the specified offerer address
     const ENO_SUCH_ROTATION_CAPABILITY_OFFER: u64 = 18;
-
-    public(friend) native fun create_signer(addr: address): signer;
 
     #[test_only]
     /// Create signer for testing, independently of an Aptos-style `Account`.
