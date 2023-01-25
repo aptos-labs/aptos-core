@@ -460,15 +460,53 @@ module aptos_framework::delegation_pool {
     }
 
     #[view]
+    /// Return the stake amount on the pending withdrawal of `delegator_address` on `pool_address`
+    /// and whether it can be executed (is inactive) or not.
+    public fun get_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64) acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        let pool = borrow_global<DelegationPool>(pool_address);
+        let (
+            lockup_cycle_ended,
+            _,
+            pending_inactive,
+            _,
+            commission_pending_inactive
+        ) = calculate_stake_pool_drift(pool);
+
+        let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
+        if (!withdrawal_exists) {
+            // if no pending withdrawal, there is neither inactive nor pending_inactive stake
+            // however, report it as pending in case there is uncommitted pending_inactive commission
+            (false, 0)
+        } else {
+            // delegator has either inactive or pending_inactive stake due to automatic withdrawals
+            let inactive_shares = table::borrow(&pool.inactive_shares, withdrawal_olc);
+            if (withdrawal_olc.index < pool.observed_lockup_cycle.index) {
+                // if withdrawal's lockup cycle ended on delegation pool then it is inactive
+                (true, pool_u64::balance(inactive_shares, delegator_address))
+            } else {
+                pending_inactive = pool_u64::shares_to_amount_with_total_coins(
+                    inactive_shares,
+                    pool_u64::shares(inactive_shares, delegator_address),
+                    // exclude operator pending_inactive rewards not converted to shares yet
+                    pending_inactive - commission_pending_inactive
+                );
+                // if withdrawal's lockup cycle ended ONLY on stake pool then it is also inactive
+                (lockup_cycle_ended, pending_inactive)
+            }
+        }
+    }
+
+    #[view]
     /// Return total stake owned by `delegator_address` within delegation pool `pool_address`
     /// in each of its individual states.
     public fun get_stake(pool_address: address, delegator_address: address): (u64, u64, u64) acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         let pool = borrow_global<DelegationPool>(pool_address);
         let (
-            lockup_cycle_ended,
+            _,
             active,
-            pending_inactive,
+            _,
             commission_active,
             commission_pending_inactive
         ) = calculate_stake_pool_drift(pool);
@@ -479,27 +517,8 @@ module aptos_framework::delegation_pool {
             // exclude operator active rewards not converted to shares yet
             active - commission_active
         );
-
-        // if no pending withdrawal, there is neither inactive nor pending_inactive stake
-        let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
-        let inactive;
-        (inactive, pending_inactive) = if (withdrawal_exists) {
-            // delegator has either inactive or pending_inactive stake due to automatic withdrawals
-            let inactive_shares = table::borrow(&pool.inactive_shares, withdrawal_olc);
-            if (withdrawal_olc.index < pool.observed_lockup_cycle.index) {
-                // if withdrawal's lockup cycle was ended on delegation pool then its stake is inactive
-                (pool_u64::balance(inactive_shares, delegator_address), 0)
-            } else {
-                pending_inactive = pool_u64::shares_to_amount_with_total_coins(
-                    inactive_shares,
-                    pool_u64::shares(inactive_shares, delegator_address),
-                    // exclude operator pending_inactive rewards not converted to shares yet
-                    pending_inactive - commission_pending_inactive
-                );
-                // if withdrawal's lockup cycle was ended ONLY on stake pool then its stake is inactive
-                if (lockup_cycle_ended) { (pending_inactive, 0) } else { (0, pending_inactive) }
-            }
-        } else { (0, 0) };
+        // get state and stake (0 if there is none) of the pending withdrawal
+        let (withdrawal_inactive, withdrawal_stake) = get_pending_withdrawal(pool_address, delegator_address);
 
         // should also include commission rewards in case of the operator account
         // operator rewards are actually used to buy shares which is introducing
@@ -507,13 +526,11 @@ module aptos_framework::delegation_pool {
         // but adding rewards onto the existing stake is still a good approximation
         if (delegator_address == stake::get_operator(pool_address)) {
             active = active + commission_active;
-            if (lockup_cycle_ended) {
-                inactive = inactive + commission_pending_inactive;
-            } else {
-                pending_inactive = pending_inactive + commission_pending_inactive;
-            }
+            withdrawal_stake = withdrawal_stake + commission_pending_inactive;
         };
-        (active, inactive, pending_inactive)
+
+        // report `inactive` stake accordingly to the state of pending withdrawal
+        if (withdrawal_inactive) (active, withdrawal_stake, 0) else (active, 0, withdrawal_stake)
     }
 
     #[view]
