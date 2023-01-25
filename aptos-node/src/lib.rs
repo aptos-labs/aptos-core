@@ -408,6 +408,7 @@ pub fn setup_environment_and_start_node(
             mempool_listener,
             mempool_client_receiver,
         );
+
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
         // Wait until state sync has been initialized
@@ -430,10 +431,10 @@ pub fn setup_environment_and_start_node(
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
         _consensus_runtime: consensus_runtime,
-        _mempool_runtime: mempool_runtime,
-        _network_runtimes: network_runtimes,
         _index_runtime: index_runtime,
         _indexer_grpc: indexer_grpc,
+        _mempool_runtime: mempool_runtime,
+        _network_runtimes: network_runtimes,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })

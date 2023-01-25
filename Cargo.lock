@@ -1368,8 +1368,10 @@ dependencies = [
  "aptos-mempool",
  "aptos-mempool-notifications",
  "aptos-metrics-core",
+ "aptos-moving-average",
  "aptos-proptest-helpers",
  "aptos-protos",
+ "aptos-runtimes",
  "aptos-sdk",
  "aptos-secure-storage",
  "aptos-storage-interface",
@@ -1388,7 +1390,6 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-package",
- "moving-average",
  "once_cell",
  "prost",
  "rand 0.7.3",
@@ -1620,6 +1621,13 @@ dependencies = [
  "move-unit-test",
  "move-vm-runtime",
  "tempfile",
+]
+
+[[package]]
+name = "aptos-moving-average"
+version = "0.1.0"
+dependencies = [
+ "chrono",
 ]
 
 [[package]]
@@ -7107,13 +7115,6 @@ dependencies = [
  "proptest",
  "serde 1.0.149",
  "smallvec",
-]
-
-[[package]]
-name = "moving-average"
-version = "0.1.0"
-dependencies = [
- "chrono",
 ]
 
 [[package]]

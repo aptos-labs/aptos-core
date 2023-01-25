@@ -226,6 +226,7 @@ aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notif
 aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
+aptos-moving-average = { path = "crates/moving-average" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-netcore = { path = "network/netcore" }
 aptos-network = { path = "network" }
@@ -280,7 +281,6 @@ aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
-moving-average = { path = "crates/moving-average" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.

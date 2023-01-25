@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 
 pub static TRANSACTIONS_SENT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "aptos_fh_stream_transactions_sent_count",
+        "aptos_grpc_stream_transactions_sent_count",
         "Transactions converted and printed out to stdout, picked up by the StreamingFast Firehose indexer",
     )
     .unwrap()

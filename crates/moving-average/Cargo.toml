@@ -1,5 +1,5 @@
 [package]
-name = "moving-average"
+name = "aptos-moving-average"
 description = "Utility to calculate moving average such as TPS"
 version = "0.1.0"
 

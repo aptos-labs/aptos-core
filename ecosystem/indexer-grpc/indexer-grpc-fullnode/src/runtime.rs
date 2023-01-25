@@ -6,6 +6,7 @@ use aptos_api::context::Context;
 use aptos_config::config::NodeConfig;
 use aptos_logger::{error, info};
 use aptos_mempool::MempoolClientSender;
+use aptos_moving_average::MovingAverage;
 use aptos_protos::datastream::v1::{
     indexer_stream_server::{IndexerStream, IndexerStreamServer},
     raw_datastream_response,
@@ -15,12 +16,8 @@ use aptos_protos::datastream::v1::{
 use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
 use futures::Stream;
-use moving_average::MovingAverage;
 use std::{net::ToSocketAddrs, pin::Pin, sync::Arc};
-use tokio::{
-    runtime::{Builder, Runtime},
-    sync::mpsc,
-};
+use tokio::{runtime::Runtime, sync::mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -40,24 +37,19 @@ pub struct IndexerStreamService {
     pub output_batch_size: u16,
 }
 
-/// Creates a runtime which creates a thread pool which pushes firehose of block protobuf to SF endpoint
+/// Creates a runtime which creates a thread pool which sets up the grpc streaming service
 /// Returns corresponding Tokio runtime
 pub fn bootstrap(
     config: &NodeConfig,
     chain_id: ChainId,
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
-) -> Option<anyhow::Result<Runtime>> {
+) -> Option<Runtime> {
     if !config.indexer_grpc.enabled {
         return None;
     }
 
-    let runtime = Builder::new_multi_thread()
-        .thread_name("indexer-grpc")
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[indexer-grpc] failed to create runtime");
+    let runtime = aptos_runtimes::spawn_named_runtime("indexer-grpc".to_string(), None);
 
     let node_config = config.clone();
     let processor_task_count = node_config.indexer_grpc.processor_task_count;
@@ -82,7 +74,7 @@ pub fn bootstrap(
             .unwrap();
         info!(address = address, "[indexer-grpc] Started GRPC server");
     });
-    Some(Ok(runtime))
+    Some(runtime)
 }
 
 #[tonic::async_trait]
