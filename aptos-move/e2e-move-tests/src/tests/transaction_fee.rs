@@ -5,7 +5,7 @@ use crate::{
     assert_success, get_stake_pool, setup_staking, tests::common, transaction_fee, MoveHarness,
 };
 use aptos_cached_packages::aptos_stdlib;
-use aptos_language_e2e_tests::{account::Account, executor};
+use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_address::AccountAddress,
     on_chain_config::FeatureFlag,
@@ -13,11 +13,13 @@ use aptos_types::{
 };
 use once_cell::sync::Lazy;
 
+/// Estimates the cost of simple p2p transactions in order to calculate the gas prices
+/// of proposals.
 static P2P_TXN_GAS_COST: Lazy<u64> = Lazy::new(|| {
     let mut harness = MoveHarness::new();
-    let alice = harness.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
-    let bob = harness.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-    harness.evaluate_gas(&alice, aptos_stdlib::aptos_coin_transfer(*bob.address(), 10))
+    let p1 = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
+    let p2 = harness.new_account_at(AccountAddress::from_hex_literal("0x456").unwrap());
+    harness.evaluate_gas(&p1, aptos_stdlib::aptos_coin_transfer(*p2.address(), 10))
 });
 
 /// Creates transactions that send transfers between 2 accounts.
@@ -63,6 +65,7 @@ fn create_script(
     harness.create_script(sender, script, vec![], args)
 }
 
+/// Tests a standard flow of collecting fees without any edge cases.
 fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
     let mut harness = MoveHarness::new();
     let alice = harness.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
@@ -90,10 +93,11 @@ fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
     // Simply calling `new_epoch` will not work because we fast-forward without
     // draining!
     harness.new_block_with_metadata(*validator.address(), vec![]);
+    let supply_after = harness.executor.read_coin_supply().unwrap();
 
     // Check that the right fraction was burnt.
-    let supply_after = harness.executor.read_coin_supply().unwrap();
     let burnt_amount = (burn_percentage as u64) * gas_used / 100;
+    let collected_amount = gas_used - burnt_amount;
     assert_eq!(
         supply_after.abs_diff(supply_before - burnt_amount as u128),
         0
@@ -102,7 +106,6 @@ fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
     // On the new epoch, the collected fees are processed and added to the stake
     // pool.
     harness.new_epoch();
-    let collected_amount = gas_used - burnt_amount;
     stake_amount += rewards_per_epoch + collected_amount;
     assert_eq!(
         get_stake_pool(&harness, validator.address()).active,
@@ -110,13 +113,12 @@ fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
     );
 }
 
+/// Tests if fees collection can be enabled by the governance proposal and how
+/// fees are collected on the block boundary.
 fn test_initialize_and_enable_fee_collection_and_distribution(burn_percentage: u8) {
     let mut harness = MoveHarness::new();
     let alice = harness.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
     let bob = harness.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-
-    // Create a core resources account so that we can send imitations of
-    // accepted proposal scripts.
     let core_resources =
         harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
 
@@ -173,35 +175,21 @@ fn test_initialize_and_enable_fee_collection_and_distribution(burn_percentage: u
         get_stake_pool(&harness, validator.address()).active,
         stake_amount
     );
-
-    // While fees collection is enabled...
-    let supply_before = harness.executor.read_coin_supply().unwrap();
-    let txns = p2p_txns_for_test(&mut harness, &alice, &bob, 100);
-    let gas_used = harness.run_block_with_metadata(*validator.address(), vec![], txns);
-
-    // Run an empty block to drain the aggregatable coin. Fees are assigned to
-    // validators and therefore the total supply changes only becoase some
-    // percentage was burnt.
-    harness.new_block_with_metadata(*validator.address(), vec![]);
-    let supply_after = harness.executor.read_coin_supply().unwrap();
-    let burnt_amount = (burn_percentage as u64) * gas_used / 100;
-    assert_eq!(
-        supply_after.abs_diff(supply_before - burnt_amount as u128),
-        0
-    );
 }
 
+/// Tests fee collection can be safely disabled. The corner case here is that by disabling
+/// the flag, we cannot distribute fees anymore unless it is done beforehand.
 fn test_disable_fee_collection(burn_percentage: u8) {
     let mut harness = MoveHarness::new();
-    let alice = harness.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
-    let bob = harness.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-
     transaction_fee::initialize_fee_collection_and_distribution(&mut harness, burn_percentage);
     harness.enable_features(vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES], vec![]);
 
+    let alice = harness.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let bob = harness.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
     let core_resources =
         harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
-    
+
+    // Initialize a validator.
     let rewards_per_epoch = 285;
     let mut stake_amount = 25_000_000;
     let validator = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
@@ -220,12 +208,14 @@ fn test_disable_fee_collection(burn_percentage: u8) {
     // Simulate block execution.
     let supply_before = harness.executor.read_coin_supply().unwrap();
     let gas_used = harness.run_block_with_metadata(*validator.address(), vec![], txns);
-    let gas_used_for_proposal = gas_used - *P2P_TXN_GAS_COST * 10;
 
+    // Calculate the fees taht are supposed to be collected before the feature
+    // is disabled.
+    let gas_used_for_proposal = gas_used - *P2P_TXN_GAS_COST * 10;
     let burnt_amount = (burn_percentage as u64) * (gas_used - gas_used_for_proposal) / 100;
     let collected_amount = gas_used - gas_used_for_proposal - burnt_amount;
 
-    // Reconfiguration triggers distributing rewards and fees.
+    // Reconfiguration triggers distribution of both rewards and fees.
     stake_amount += rewards_per_epoch + collected_amount;
     assert_eq!(
         get_stake_pool(&harness, validator.address()).active,
@@ -235,40 +225,47 @@ fn test_disable_fee_collection(burn_percentage: u8) {
     harness.new_block_with_metadata(*validator.address(), vec![]);
     let supply_after = harness.executor.read_coin_supply().unwrap();
 
-    // Gas for the proposal should is burnt together with fraction of fees.
+    // Gas for the proposal should be burnt together with the fraction of the
+    // fees.
     assert_eq!(
-        supply_after.abs_diff(supply_before - gas_used_for_proposal as u128 - burnt_amount as u128 + rewards_per_epoch as u128),
+        supply_after.abs_diff(
+            supply_before - (gas_used_for_proposal + burnt_amount - rewards_per_epoch) as u128
+        ),
         0
     );
 }
 
+/// Tests that the fees collected prior to the upgrade use the right burn
+/// percentage for calculations.
 fn test_upgrade_burn_percentage(burn_percentage: u8) {
     let mut harness = MoveHarness::new();
-    let alice = harness.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
-    let bob = harness.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-
     transaction_fee::initialize_fee_collection_and_distribution(&mut harness, burn_percentage);
     harness.enable_features(vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES], vec![]);
 
+    let alice = harness.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let bob = harness.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
     let core_resources =
         harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
-    
+
+    // Initialize a validator.
     let rewards_per_epoch = 285;
     let mut stake_amount = 25_000_000;
     let validator = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
     assert_success!(setup_staking(&mut harness, &validator, stake_amount));
     harness.new_epoch();
 
+    // Upgrade to the opposite value.
+    let new_burn_percentage = 100 - burn_percentage;
     let upgrade_script = create_script(
-        &mut harness, 
+        &mut harness,
         "upgrade_burn_percentage",
         &core_resources,
-        vec![TransactionArgument::U8(100 - burn_percentage)]
+        vec![TransactionArgument::U8(new_burn_percentage)],
     );
 
     // Create a block of transactions such that:
     //   1. First 10 transactions are p2p.
-    //   2. A single transaction upgrading burn percentage.
+    //   2. A single transaction upgrading the burn percentage.
     //   3. Remaining transactions are p2p (should end up being Retry).
     let mut txns = p2p_txns_for_test(&mut harness, &alice, &bob, 10);
     txns.insert(10, upgrade_script);
@@ -276,12 +273,12 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
     // Simulate block execution.
     let supply_before = harness.executor.read_coin_supply().unwrap();
     let gas_used = harness.run_block_with_metadata(*validator.address(), vec![], txns);
-    let gas_used_for_proposal = gas_used - *P2P_TXN_GAS_COST * 10;
 
+    let gas_used_for_proposal = gas_used - *P2P_TXN_GAS_COST * 10;
     let burnt_amount = (burn_percentage as u64) * (gas_used - gas_used_for_proposal) / 100;
     let collected_amount = gas_used - gas_used_for_proposal - burnt_amount;
 
-    // Reconfiguration triggers distributing rewards and fees.
+    // Reconfiguration triggers distribution of rewards and fees.
     stake_amount += rewards_per_epoch + collected_amount;
     assert_eq!(
         get_stake_pool(&harness, validator.address()).active,
@@ -291,31 +288,33 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
     harness.new_block_with_metadata(*validator.address(), vec![]);
     let supply_after = harness.executor.read_coin_supply().unwrap();
 
-    // Gas for the proposal should is burnt together with fraction of fees.
+    // Gas for the proposal should be burnt together with fraction of fees.
     assert_eq!(
-        supply_after.abs_diff(supply_before - gas_used_for_proposal as u128 - burnt_amount as u128 + rewards_per_epoch as u128),
+        supply_after.abs_diff(
+            supply_before - (gas_used_for_proposal + burnt_amount - rewards_per_epoch) as u128
+        ),
         0
     );
 
-    // While fees collection is enabled...
+    // Now check that the new burn percentage works correctly.
     let carol = harness.new_account_at(AccountAddress::from_hex_literal("0xc0101").unwrap());
     let david = harness.new_account_at(AccountAddress::from_hex_literal("0xda51d").unwrap());
-    let supply_before = harness.executor.read_coin_supply().unwrap();
-    let txns = p2p_txns_for_test(&mut harness, &carol, &david, 10);
-    let gas_used = harness.run_block_with_metadata(*validator.address(), vec![], txns);
 
-    // Run an empty block to drain the aggregatable coin. Fees are assigned to
-    // validators and therefore the total supply changes only because some
-    // percentage was burnt.
+    let supply_before = harness.executor.read_coin_supply().unwrap();
+    let txns = p2p_txns_for_test(&mut harness, &carol, &david, 20);
+    let gas_used = harness.run_block_with_metadata(*validator.address(), vec![], txns);
     harness.new_block_with_metadata(*validator.address(), vec![]);
+
+    // Check that the new fraction of fees is burnt.
     let supply_after = harness.executor.read_coin_supply().unwrap();
-    let burnt_amount = ((100 - burn_percentage) as u64) * gas_used / 100;
+    let burnt_amount = (new_burn_percentage as u64) * gas_used / 100;
     let collected_amount = gas_used - burnt_amount;
     assert_eq!(
         supply_after.abs_diff(supply_before - burnt_amount as u128),
         0
     );
 
+    // Check fees are distributed on new epoch.
     harness.new_epoch();
     stake_amount += rewards_per_epoch + collected_amount;
     assert_eq!(
@@ -324,61 +323,66 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
     );
 }
 
+/// Tests that if validator running the block is removed, it still receives
+/// previously collected fees.
 fn test_leaving_validator_is_rewarded(burn_percentage: u8) {
     let mut harness = MoveHarness::new();
-    let alice = harness.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
-    let bob = harness.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-
     transaction_fee::initialize_fee_collection_and_distribution(&mut harness, burn_percentage);
     harness.enable_features(vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES], vec![]);
 
+    let alice = harness.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let bob = harness.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
     let core_resources =
         harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
-    
+
     let rewards_per_epoch = 285;
-    let mut stake_amount_1 = 25_000_000;
-    let mut stake_amount_2 = 25_000_000;
-    let validator_1 = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
-    let validator_2 = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap());
-    assert_success!(setup_staking(&mut harness, &validator_1, stake_amount_1));
-    assert_success!(setup_staking(&mut harness, &validator_2, stake_amount_2));
+    let mut stake_amount = 25_000_000;
+    let validator = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
+    let other_validator = harness.new_account_at(AccountAddress::from_hex_literal("0x234").unwrap());
+    assert_success!(setup_staking(&mut harness, &validator, stake_amount));
+    assert_success!(setup_staking(&mut harness, &other_validator, stake_amount));
     harness.new_epoch();
 
+    // This script will simulate a proposal which removes validator from the
+    // set.
     let remove_script = create_script(
-        &mut harness, 
+        &mut harness,
         "remove_validator",
         &core_resources,
-        vec![TransactionArgument::Address(*validator_1.address())]
+        vec![TransactionArgument::Address(*validator.address())],
     );
 
     // Create a block of transactions such that:
     //   1. First 10 transactions are p2p.
-    //   2. A single transaction upgrading burn percentage.
+    //   2. A single transaction removing the validator.
     //   3. Remaining transactions are p2p (should end up being Retry).
     let mut txns = p2p_txns_for_test(&mut harness, &alice, &bob, 10);
     txns.insert(10, remove_script);
 
     // Simulate block execution.
     let supply_before = harness.executor.read_coin_supply().unwrap();
-    let gas_used = harness.run_block_with_metadata(*validator_1.address(), vec![], txns);
+    let gas_used = harness.run_block_with_metadata(*validator.address(), vec![], txns);
     let gas_used_for_proposal = gas_used - *P2P_TXN_GAS_COST * 10;
 
     let burnt_amount = (burn_percentage as u64) * (gas_used - gas_used_for_proposal) / 100;
     let collected_amount = gas_used - gas_used_for_proposal - burnt_amount;
+    println!("collected: {}", collected_amount);
 
     // Reconfiguration triggers distributing rewards and fees.
-    stake_amount_1 += rewards_per_epoch + collected_amount;
+    stake_amount += rewards_per_epoch + collected_amount;
     assert_eq!(
-        get_stake_pool(&harness, validator_1.address()).active,
-        stake_amount_1
+        get_stake_pool(&harness, validator.address()).active,
+        stake_amount
     );
 
-    harness.new_block_with_metadata(*validator_2.address(), vec![]);
+    harness.new_block_with_metadata(*other_validator.address(), vec![]);
     let supply_after = harness.executor.read_coin_supply().unwrap();
 
-    // Gas for the proposal should is burnt together with fraction of fees.
+    // Again, check the total supply.
     assert_eq!(
-        supply_after.abs_diff(supply_before - gas_used_for_proposal as u128 - burnt_amount as u128 + rewards_per_epoch as u128),
+        supply_after.abs_diff(
+            supply_before - (gas_used_for_proposal + burnt_amount - rewards_per_epoch) as u128
+        ),
         0
     );
 }
