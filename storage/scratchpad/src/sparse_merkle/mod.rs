@@ -413,8 +413,8 @@ where
         }
     }
 
-    fn root_weak(&self) -> SubTree<V> {
-        self.inner.root.weak()
+    fn root(&self) -> SubTree<V> {
+        self.inner.root.clone()
     }
 
     /// Returns the root hash of this tree.
@@ -561,7 +561,7 @@ where
             assert_eq!(self.smt.inner.usage, usage);
             Ok(self.clone())
         } else {
-            let current_root = self.smt.root_weak();
+            let current_root = self.smt.root();
             let root = SubTreeUpdater::update(
                 current_root,
                 &kvs[..],
@@ -574,7 +574,7 @@ where
 
     /// Queries a `key` in this `SparseMerkleTree`.
     pub fn get(&self, key: HashValue) -> StateStoreStatus<V> {
-        let mut subtree = self.smt.root_weak();
+        let mut subtree = self.smt.root();
         let mut bits = key.iter_bits();
 
         loop {
@@ -586,9 +586,9 @@ where
                         Some(node) => match node.inner() {
                             NodeInner::Internal(internal_node) => {
                                 subtree = if bits.next().expect("Tree is too deep.") {
-                                    internal_node.right.weak()
+                                    internal_node.right.clone()
                                 } else {
-                                    internal_node.left.weak()
+                                    internal_node.left.clone()
                                 };
                                 continue;
                             }, // end NodeInner::Internal
