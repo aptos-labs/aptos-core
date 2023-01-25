@@ -28,7 +28,7 @@ use aptos_types::{
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    on_chain_config::{FeatureFlag, Features, OnChainConfig, ValidatorSet, Version},
+    on_chain_config::{Features, OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
@@ -578,10 +578,8 @@ impl FakeExecutor {
                 NativeGasParameters::zeros(),
                 AbstractValueSizeGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
-                self.features
-                    .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
                 self.chain_id,
+                self.features.clone(),
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -629,10 +627,8 @@ impl FakeExecutor {
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
-            self.features
-                .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-            self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             self.chain_id,
+            self.features.clone(),
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
