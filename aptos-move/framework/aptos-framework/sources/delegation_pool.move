@@ -174,6 +174,142 @@ module aptos_framework::delegation_pool {
         amount_withdrawn: u64,
     }
 
+    #[view]
+    // Return whether supplied address `addr` is owner of a delegation pool
+    public fun owner_cap_exists(addr: address): bool {
+        exists<DelegationPoolOwnership>(addr)
+    }
+
+    #[view]
+    // Return address of the delegation pool owned by `owner` or fail if there is none
+    public fun get_owned_pool_address(owner: address): address acquires DelegationPoolOwnership {
+        assert_owner_cap_exists(owner);
+        borrow_global<DelegationPoolOwnership>(owner).pool_address
+    }
+
+    #[view]
+    // Return whether a delegation pool exists at supplied address `addr`
+    public fun delegation_pool_exists(addr: address): bool {
+        exists<DelegationPool>(addr)
+    }
+
+    #[view]
+    /// Return the index of current observed lockup cycle on delegation pool `pool_address`.
+    /// This represents the key into `inactive_shares` of the `pending_inactive` shares pool.
+    public fun observed_lockup_cycle(pool_address: address): u64 acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        borrow_global<DelegationPool>(pool_address).observed_lockup_cycle.index
+    }
+
+    #[view]
+    /// Return the unique observed lockup cycle where delegator `delegator_address` may have
+    /// unlocking (or already unlocked) stake to be withdrawn from delegation pool at `pool_address`.
+    public fun has_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64) acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        let pool = borrow_global<DelegationPool>(pool_address);
+        let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
+        (withdrawal_exists, withdrawal_olc.index)
+    }
+
+    #[view]
+    /// Return the stake amount on the pending withdrawal of `delegator_address` on `pool_address`
+    /// and whether it can be executed (is inactive) or not.
+    public fun get_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64) acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        let pool = borrow_global<DelegationPool>(pool_address);
+        let (
+            lockup_cycle_ended,
+            _,
+            pending_inactive,
+            _,
+            commission_pending_inactive
+        ) = calculate_stake_pool_drift(pool);
+
+        let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
+        if (!withdrawal_exists) {
+            // if no pending withdrawal, there is neither inactive nor pending_inactive stake
+            // however, report it as pending in case there is uncommitted pending_inactive commission
+            (false, 0)
+        } else {
+            // delegator has either inactive or pending_inactive stake due to automatic withdrawals
+            let inactive_shares = table::borrow(&pool.inactive_shares, withdrawal_olc);
+            if (withdrawal_olc.index < pool.observed_lockup_cycle.index) {
+                // if withdrawal's lockup cycle ended on delegation pool then it is inactive
+                (true, pool_u64::balance(inactive_shares, delegator_address))
+            } else {
+                pending_inactive = pool_u64::shares_to_amount_with_total_coins(
+                    inactive_shares,
+                    pool_u64::shares(inactive_shares, delegator_address),
+                    // exclude operator pending_inactive rewards not converted to shares yet
+                    pending_inactive - commission_pending_inactive
+                );
+                // if withdrawal's lockup cycle ended ONLY on stake pool then it is also inactive
+                (lockup_cycle_ended, pending_inactive)
+            }
+        }
+    }
+
+    #[view]
+    /// Return total stake owned by `delegator_address` within delegation pool `pool_address`
+    /// in each of its individual states.
+    public fun get_stake(pool_address: address, delegator_address: address): (u64, u64, u64) acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        let pool = borrow_global<DelegationPool>(pool_address);
+        let (
+            _,
+            active,
+            _,
+            commission_active,
+            commission_pending_inactive
+        ) = calculate_stake_pool_drift(pool);
+
+        active = pool_u64::shares_to_amount_with_total_coins(
+            &pool.active_shares,
+            pool_u64::shares(&pool.active_shares, delegator_address),
+            // exclude operator active rewards not converted to shares yet
+            active - commission_active
+        );
+        // get state and stake (0 if there is none) of the pending withdrawal
+        let (withdrawal_inactive, withdrawal_stake) = get_pending_withdrawal(pool_address, delegator_address);
+
+        // should also include commission rewards in case of the operator account
+        // operator rewards are actually used to buy shares which is introducing
+        // some imprecision (received stake would be slightly less)
+        // but adding rewards onto the existing stake is still a good approximation
+        if (delegator_address == stake::get_operator(pool_address)) {
+            active = active + commission_active;
+            withdrawal_stake = withdrawal_stake + commission_pending_inactive;
+        };
+
+        // report `inactive` stake accordingly to the state of pending withdrawal
+        if (withdrawal_inactive) (active, withdrawal_stake, 0) else (active, 0, withdrawal_stake)
+    }
+
+    #[view]
+    /// Return the fee to be charged for an `add_stake` operation of `amount` on pool at `pool_address`.
+    /// If the validator produces rewards this epoch, added stake goes directly to `pending_active` and
+    /// does not earn rewards. However, all shares within a pool_u64 appreciate uniformly, when this epoch ends:
+    /// - either added shares are still `pending_active` and steal from rewards of existing `active` stake
+    /// - or have moved to `pending_inactive` and get full rewards (they displaced `active` stake at `unlock`)
+    /// Therefore, should charge delegator the maximum amount it would unfairly earn only this epoch.
+    public fun get_add_stake_fee(pool_address: address, amount: u64): u64 {
+        if (stake::is_current_epoch_validator(pool_address)) {
+            let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(&staking_config::get());
+            if (rewards_rate_denominator > 0) {
+                ((((amount as u128) * (rewards_rate as u128)) / (rewards_rate_denominator as u128)) as u64)
+            } else { 0 }
+        } else { 0 }
+    }
+
+    #[view]
+    /// Return whether `pending_inactive` stake can be directly withdrawn from
+    /// the delegation pool, implicitly its stake pool, in the special case
+    /// the validator had gone inactive before its lockup expired.
+    public fun can_withdraw_pending_inactive(pool_address: address): bool {
+        stake::get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE &&
+        timestamp::now_seconds() >= stake::get_lockup_secs(pool_address)
+    }
+
     public entry fun initialize_delegation_pool(
         owner: &signer,
         operator_commission_percentage: u64,
@@ -218,27 +354,8 @@ module aptos_framework::delegation_pool {
         move_to(owner, DelegationPoolOwnership { pool_address });
     }
 
-    #[view]
-    // Return whether supplied address `addr` is owner of a delegation pool
-    public fun owner_cap_exists(addr: address): bool {
-        exists<DelegationPoolOwnership>(addr)
-    }
-
     fun assert_owner_cap_exists(owner: address) {
         assert!(owner_cap_exists(owner), error::not_found(EOWNER_CAP_NOT_FOUND));
-    }
-
-    #[view]
-    // Return address of the delegation pool owned by `owner` or fail if there is none
-    public fun get_owned_pool_address(owner: address): address acquires DelegationPoolOwnership {
-        assert_owner_cap_exists(owner);
-        borrow_global<DelegationPoolOwnership>(owner).pool_address
-    }
-
-    #[view]
-    // Return whether a delegation pool exists at supplied address `addr`
-    public fun delegation_pool_exists(addr: address): bool {
-        exists<DelegationPool>(addr)
     }
 
     fun assert_delegation_pool_exists(pool_address: address) {
@@ -260,14 +377,6 @@ module aptos_framework::delegation_pool {
         ObservedLockupCycle { index }
     }
 
-    #[view]
-    /// Return the index of current observed lockup cycle on delegation pool `pool_address`.
-    /// This represents the key into `inactive_shares` of the `pending_inactive` shares pool.
-    public fun observed_lockup_cycle(pool_address: address): u64 acquires DelegationPool {
-        assert_delegation_pool_exists(pool_address);
-        borrow_global<DelegationPool>(pool_address).observed_lockup_cycle.index
-    }
-
     /// Allows an owner to change the operator of the underlying stake pool.
     public entry fun set_operator(owner: &signer, new_operator: address) acquires DelegationPoolOwnership, DelegationPool {
         let pool_address = get_owned_pool_address(signer::address_of(owner));
@@ -283,22 +392,6 @@ module aptos_framework::delegation_pool {
         // synchronize delegation and stake pools before any user operation
         synchronize_delegation_pool(pool_address);
         stake::set_delegated_voter(&retrieve_stake_pool_signer(borrow_global<DelegationPool>(pool_address)), new_voter);
-    }
-
-    #[view]
-    /// Return the fee to be charged for an `add_stake` operation of `amount` on pool at `pool_address`.
-    /// If the validator produces rewards this epoch, added stake goes directly to `pending_active` and
-    /// does not earn rewards. However, all shares within a pool_u64 appreciate uniformly, when this epoch ends:
-    /// - either added shares are still `pending_active` and steal from rewards of existing `active` stake
-    /// - or have moved to `pending_inactive` and get full rewards (they displaced `active` stake at `unlock`)
-    /// Therefore, should charge delegator the maximum amount it would unfairly earn only this epoch.
-    public fun get_add_stake_fee(pool_address: address, amount: u64): u64 {
-        if (stake::is_current_epoch_validator(pool_address)) {
-            let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(&staking_config::get());
-            if (rewards_rate_denominator > 0) {
-                ((((amount as u128) * (rewards_rate as u128)) / (rewards_rate_denominator as u128)) as u64)
-            } else { 0 }
-        } else { 0 }
     }
 
     /// Add `amount` of coins to the delegation pool `pool_address`.
@@ -399,15 +492,6 @@ module aptos_framework::delegation_pool {
         withdraw_internal(borrow_global_mut<DelegationPool>(pool_address), signer::address_of(delegator), amount);
     }
 
-    #[view]
-    /// Return whether `pending_inactive` stake can be directly withdrawn from
-    /// the delegation pool, implicitly its stake pool, in the special case
-    /// the validator had gone inactive before its lockup expired.
-    public fun can_withdraw_pending_inactive(pool_address: address): bool {
-        stake::get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE &&
-        timestamp::now_seconds() >= stake::get_lockup_secs(pool_address)
-    }
-
     fun withdraw_internal(pool: &mut DelegationPool, delegator_address: address, amount: u64) {
         // short-circuit if amount to withdraw is 0 so no event is emitted
         if (amount == 0) { return };
@@ -457,90 +541,6 @@ module aptos_framework::delegation_pool {
                 amount_withdrawn: amount,
             },
         );
-    }
-
-    #[view]
-    /// Return the stake amount on the pending withdrawal of `delegator_address` on `pool_address`
-    /// and whether it can be executed (is inactive) or not.
-    public fun get_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64) acquires DelegationPool {
-        assert_delegation_pool_exists(pool_address);
-        let pool = borrow_global<DelegationPool>(pool_address);
-        let (
-            lockup_cycle_ended,
-            _,
-            pending_inactive,
-            _,
-            commission_pending_inactive
-        ) = calculate_stake_pool_drift(pool);
-
-        let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
-        if (!withdrawal_exists) {
-            // if no pending withdrawal, there is neither inactive nor pending_inactive stake
-            // however, report it as pending in case there is uncommitted pending_inactive commission
-            (false, 0)
-        } else {
-            // delegator has either inactive or pending_inactive stake due to automatic withdrawals
-            let inactive_shares = table::borrow(&pool.inactive_shares, withdrawal_olc);
-            if (withdrawal_olc.index < pool.observed_lockup_cycle.index) {
-                // if withdrawal's lockup cycle ended on delegation pool then it is inactive
-                (true, pool_u64::balance(inactive_shares, delegator_address))
-            } else {
-                pending_inactive = pool_u64::shares_to_amount_with_total_coins(
-                    inactive_shares,
-                    pool_u64::shares(inactive_shares, delegator_address),
-                    // exclude operator pending_inactive rewards not converted to shares yet
-                    pending_inactive - commission_pending_inactive
-                );
-                // if withdrawal's lockup cycle ended ONLY on stake pool then it is also inactive
-                (lockup_cycle_ended, pending_inactive)
-            }
-        }
-    }
-
-    #[view]
-    /// Return total stake owned by `delegator_address` within delegation pool `pool_address`
-    /// in each of its individual states.
-    public fun get_stake(pool_address: address, delegator_address: address): (u64, u64, u64) acquires DelegationPool {
-        assert_delegation_pool_exists(pool_address);
-        let pool = borrow_global<DelegationPool>(pool_address);
-        let (
-            _,
-            active,
-            _,
-            commission_active,
-            commission_pending_inactive
-        ) = calculate_stake_pool_drift(pool);
-
-        active = pool_u64::shares_to_amount_with_total_coins(
-            &pool.active_shares,
-            pool_u64::shares(&pool.active_shares, delegator_address),
-            // exclude operator active rewards not converted to shares yet
-            active - commission_active
-        );
-        // get state and stake (0 if there is none) of the pending withdrawal
-        let (withdrawal_inactive, withdrawal_stake) = get_pending_withdrawal(pool_address, delegator_address);
-
-        // should also include commission rewards in case of the operator account
-        // operator rewards are actually used to buy shares which is introducing
-        // some imprecision (received stake would be slightly less)
-        // but adding rewards onto the existing stake is still a good approximation
-        if (delegator_address == stake::get_operator(pool_address)) {
-            active = active + commission_active;
-            withdrawal_stake = withdrawal_stake + commission_pending_inactive;
-        };
-
-        // report `inactive` stake accordingly to the state of pending withdrawal
-        if (withdrawal_inactive) (active, withdrawal_stake, 0) else (active, 0, withdrawal_stake)
-    }
-
-    #[view]
-    /// Return the unique observed lockup cycle where delegator `delegator_address` may have
-    /// unlocking (or already unlocked) stake to be withdrawn from delegation pool at `pool_address`.
-    public fun has_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64) acquires DelegationPool {
-        assert_delegation_pool_exists(pool_address);
-        let pool = borrow_global<DelegationPool>(pool_address);
-        let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
-        (withdrawal_exists, withdrawal_olc.index)
     }
 
     /// Return the unique observed lockup cycle where delegator `delegator_address` may have
