@@ -7,6 +7,16 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site.
 
+## 25 January 2023
+
+- Split up the sidebars of Aptos.dev into one left navigation menu per topic to ease use. As part of this:
+
+  * Added top-level menu for *Create NFTs* section
+  * Renamed *Measure Nodes* section to *Monitor Nodes*
+  * Moved [Node Liveness Criteria](nodes/validator-node/operator/node-liveness-criteria.md) to the *Monitor Nodes* section
+
+- Added a new section [Reading state with the View function](guides/aptos-apis.md#reading-state-with-the-view-function) explaining how to use the [View](https://github.com/aptos-labs/aptos-core/blob/main/api/src/view_function.rs) function now available in devnet to test transactions without modifying blockchain state.
+
 ## 24 January 2023
 
 - Added [Mint NFT with Aptos CLI](guides/move-guides/mint-nft-cli.md) Move code lab describing the completely revised [Mint NFT](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) Move examples.
