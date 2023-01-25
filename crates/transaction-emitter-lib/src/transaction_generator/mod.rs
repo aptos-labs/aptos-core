@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use aptos_sdk::{
+    move_types::account_address::AccountAddress,
+    types::{transaction::SignedTransaction, LocalAccount},
+};
 use async_trait::async_trait;
+use std::sync::atomic::AtomicUsize;
 
 pub mod account_generator;
 pub mod call_custom_modules;
@@ -29,5 +33,15 @@ pub trait TransactionGeneratorCreator: Sync + Send {
 
 #[async_trait]
 pub trait TransactionExecutor: Sync + Send {
+    async fn get_account_balance(&self, account_address: AccountAddress) -> Result<u64>;
+
+    async fn query_sequence_number(&self, account_address: AccountAddress) -> Result<u64>;
+
     async fn execute_transactions(&self, txns: &[SignedTransaction]) -> Result<()>;
+
+    async fn execute_transactions_with_counter(
+        &self,
+        txns: &[SignedTransaction],
+        failure_counter: &AtomicUsize,
+    ) -> Result<()>;
 }
