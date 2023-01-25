@@ -340,7 +340,7 @@ async fn test_onchain_config_change() {
     assert!(first_elected_new.unwrap() < 40);
 }
 
-fn generate_blob(data: &[u8]) -> String {
+pub(crate) fn generate_blob(data: &[u8]) -> String {
     let mut buf = String::new();
 
     write!(buf, "vector[").unwrap();

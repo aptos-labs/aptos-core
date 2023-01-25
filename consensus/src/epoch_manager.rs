@@ -626,6 +626,7 @@ impl EpochManager {
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
 
         let mut quorum_store_builder = if self.quorum_store_enabled {
+            info!("Building QuorumStore");
             QuorumStoreBuilder::InQuorumStore(InnerBuilder::new(
                 self.epoch(),
                 self.author,
@@ -640,6 +641,7 @@ impl EpochManager {
                 self.quorum_store_storage_path.clone(),
             ))
         } else {
+            info!("Building DirectMempool");
             QuorumStoreBuilder::DirectMempool(DirectMempoolInnerBuilder::new(
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
