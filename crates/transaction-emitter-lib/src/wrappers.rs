@@ -9,8 +9,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
-use rand::{rngs::StdRng, Rng};
-use rand_core::{OsRng, SeedableRng};
+use rand::{rngs::StdRng, SeedableRng};
 use std::time::Duration;
 
 pub async fn emit_transactions(
@@ -37,7 +36,7 @@ pub async fn emit_transactions_with_cluster(
         TransactionFactory::new(cluster.chain_id)
             .with_transaction_expiration_time(args.txn_expiration_time_secs)
             .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
-        StdRng::from_seed(OsRng.gen()),
+        StdRng::from_entropy(),
     );
 
     let transaction_mix = if args.transaction_type_weights.is_empty() {

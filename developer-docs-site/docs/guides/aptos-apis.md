@@ -34,6 +34,35 @@ The REST API offers querying transactions and events in these ways:
 * [Transactions by version](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
 * [Events by event handle](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle)
 
+## Reading state with the View function
+
+View functions do not modify blockchain state. The [View](https://github.com/aptos-labs/aptos-core/blob/main/api/src/view_function.rs) function and its [input](https://github.com/aptos-labs/aptos-core/blob/main/api/types/src/view.rs) help read on-chain state using Move. For example, you can preview who would be the winner of a bidding contract currently. See the [test](https://github.com/aptos-labs/aptos-core/blob/main/api/src/tests/view_function.rs) file for an example, related [Move](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/aptos-move/framework/aptos-framework/sources/coin.move#L226) code, and [specification](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/api/doc/spec.yaml#L8513).
+
+The View function operates much like the [Aptos Simulation API](./system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), but it does not generate side effects. The function is immutable if tagged as `#[view]`, the compiler will confirm it is so and if not fail. The View endpoint is: \
+`/view`
+
+The View function operates much like the Aptos Simulation API, with similar input and output. You call the module and function with the same input type parameters and input Move value parameters. Using the Aptos View function API, the results are read values on the blockchain, and the Aptos Simulation API is expected write output on the blockchain.
+
+A view function request may look like this in the Typescript SDK:
+```
+    const payload: Gen.ViewRequest = {
+      function: "0x1::coin::balance",
+      type_arguments: ["0x1::aptos_coin::AptosCoin"],
+      arguments: [alice.address().hex()],
+    };
+
+    const balance = await client.view(payload);
+
+    expect(balance[0]).toBe("100000000");
+```
+
+The view function is instead a list of return values as a vector. The computation results are returned in a JSON file, as with all other Move value queries. Or you can receive the output as in a Binary Canonical Serialization (BCS) encoded format.
+
+The user sends a payload containing the address, module, and function name of the Move view function on chain along with serialized arguments.  We execute it and get the execution result back to the user. For example, a function may reveal the balance of an account with a return value in the form of an integer. The View function requires being able to query the on-chain state in Aptos.
+
+There are no restrictions on the View function’s use, as the data generated will not be persisted. No global states will be mutated. Move developers must mark the functions that want to be viewable with the `#[view]` annotation. View functions do not work without the View attribute.
+
+
 ## Exchanging and tracking coins
 
 Aptos has a standard *Coin type* define in [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that symbolize the type parameter or use generic for `Coin<T>`. 

@@ -9,8 +9,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
-use rand::{prelude::StdRng, Rng};
-use rand_core::{OsRng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{sync::Arc, time::Duration};
 
 pub struct AccountGenerator {
@@ -129,9 +128,9 @@ impl AccountGeneratorCreator {
 
 #[async_trait]
 impl TransactionGeneratorCreator for AccountGeneratorCreator {
-    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         Box::new(AccountGenerator::new(
-            StdRng::from_seed(OsRng.gen()),
+            StdRng::from_entropy(),
             self.txn_factory.clone(),
             self.all_addresses.clone(),
             self.add_created_accounts_to_pool,
