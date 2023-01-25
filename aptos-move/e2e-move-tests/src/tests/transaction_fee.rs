@@ -145,15 +145,10 @@ fn calculate_gas_used(outputs: Vec<(TransactionStatus, u64)>) -> (u64, u64) {
 fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
     let num_validators = 1;
     let num_users = 20;
-
     let mut universe = TestUniverse::new(num_validators, num_users);
-    transaction_fee::initialize_fee_collection_and_distribution(
-        &mut universe.harness,
-        burn_percentage,
-    );
-    universe
-        .harness
-        .enable_features(vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES], vec![]);
+
+    // Set burn percentage for testing.
+    transaction_fee::upgrade_burn_percentage(&mut universe.harness, burn_percentage);
 
     let rewards_per_epoch = 285;
     let mut stake_amount = 25_000_000;
@@ -199,6 +194,11 @@ fn test_initialize_and_enable_fee_collection_and_distribution(burn_percentage: u
     let num_validators = 1;
     let num_users = 10;
     let mut universe = TestUniverse::new(num_validators, num_users);
+
+    // Make sure the feature is disabled for this test.
+    universe
+        .harness
+        .enable_features(vec![], vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES]);
 
     let rewards_per_epoch = 285;
     let mut stake_amount = 25_000_000;
@@ -255,15 +255,10 @@ fn test_initialize_and_enable_fee_collection_and_distribution(burn_percentage: u
 fn test_disable_fee_collection(burn_percentage: u8) {
     let num_validators = 1;
     let num_users = 10;
-
     let mut universe = TestUniverse::new(num_validators, num_users);
-    transaction_fee::initialize_fee_collection_and_distribution(
-        &mut universe.harness,
-        burn_percentage,
-    );
-    universe
-        .harness
-        .enable_features(vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES], vec![]);
+
+    // Set burn percentage for testing.
+    transaction_fee::upgrade_burn_percentage(&mut universe.harness, burn_percentage);
 
     let rewards_per_epoch = 285;
     let mut stake_amount = 25_000_000;
@@ -312,15 +307,10 @@ fn test_disable_fee_collection(burn_percentage: u8) {
 fn test_upgrade_burn_percentage(burn_percentage: u8) {
     let num_validators = 1;
     let num_users = 10;
-
     let mut universe = TestUniverse::new(num_validators, num_users);
-    transaction_fee::initialize_fee_collection_and_distribution(
-        &mut universe.harness,
-        burn_percentage,
-    );
-    universe
-        .harness
-        .enable_features(vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES], vec![]);
+
+    // Set burn percentage for testing.
+    transaction_fee::upgrade_burn_percentage(&mut universe.harness, burn_percentage);
 
     let rewards_per_epoch = 285;
     let mut stake_amount = 25_000_000;
@@ -398,15 +388,10 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
 fn test_leaving_validator_is_rewarded(burn_percentage: u8) {
     let num_validators = 2;
     let num_users = 10;
-
     let mut universe = TestUniverse::new(num_validators, num_users);
-    transaction_fee::initialize_fee_collection_and_distribution(
-        &mut universe.harness,
-        burn_percentage,
-    );
-    universe
-        .harness
-        .enable_features(vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES], vec![]);
+
+    // Set burn percentage for testing.
+    transaction_fee::upgrade_burn_percentage(&mut universe.harness, burn_percentage);
 
     let rewards_per_epoch = 285;
     let mut stake_amount = 25_000_000;
@@ -469,7 +454,12 @@ fn test_block_single_proposal() {
     let num_validators = 1;
     let num_users = 5;
     let mut universe = TestUniverse::new(num_validators, num_users);
-    transaction_fee::initialize_fee_collection_and_distribution(&mut universe.harness, 100);
+
+    // Reset burn percentage and feature flag for testing.
+    transaction_fee::upgrade_burn_percentage(&mut universe.harness, 100);
+    universe
+        .harness
+        .enable_features(vec![], vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES]);
 
     let rewards_per_epoch = 285;
     let stake_amount = 25_000_000;
