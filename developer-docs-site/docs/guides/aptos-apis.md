@@ -58,7 +58,7 @@ A view function request may look like this in the Typescript SDK:
 
 The view function instead returns a list of values as a vector. The computation results are returned in a JSON file, as with all other Move value queries. Or you can receive the output as in a Binary Canonical Serialization (BCS) encoded format.
 
-The user sends a payload containing the address, module, and function name of the Move view function on chain along with serialized arguments.  We execute it and get the execution result back to the user. For example, a function may reveal the balance of an account with a return value in the form of an integer. The View function requires being able to query the on-chain state in Aptos.
+The user sends a payload containing the address, module, and function name of the Move view function on chain along with serialized arguments. Aptos executes the transaction and returns the execution result to the user. For example, a function may reveal the balance of an account with a return value in the form of an integer. The View function requires being able to query the on-chain state in Aptos.
 
 There are no restrictions on the View function’s use, as the data generated will not be persisted. No global states will be mutated. Move developers must mark the functions that want to be viewable with the `#[view]` annotation. View functions do not work without the View attribute.
 
