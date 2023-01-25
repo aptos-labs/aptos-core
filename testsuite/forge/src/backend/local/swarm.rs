@@ -394,10 +394,6 @@ impl LocalSwarm {
         Ok(peer_id)
     }
 
-    pub fn root_key(&self) -> Ed25519PrivateKey {
-        self.root_key.private_key()
-    }
-
     pub fn chain_id(&self) -> ChainId {
         self.chain_id
     }
@@ -611,6 +607,10 @@ impl Swarm for LocalSwarm {
             .to_string();
 
         ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
+    }
+
+    fn root_key(&self) -> Ed25519PrivateKey {
+        self.root_key.private_key()
     }
 }
 

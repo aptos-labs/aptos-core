@@ -6,11 +6,11 @@ use crate::{
     txn_emitter::generate_traffic,
 };
 use aptos_forge::{NodeExt, Swarm, SwarmExt, TransactionType};
+use aptos_sdk::types::account_config::CORE_CODE_ADDRESS;
 use aptos_types::{
     on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
     PeerId,
 };
-use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use std::{sync::Arc, time::Duration};
 
 const MAX_WAIT_SECS: u64 = 60;

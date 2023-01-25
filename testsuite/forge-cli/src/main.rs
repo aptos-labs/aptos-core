@@ -14,6 +14,7 @@ use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
     consensus_reliability_tests::ChangingWorkingQuorumTest,
+    enable_quorum_store_test::EnableQuorumStoreTest,
     forge_setup_test::ForgeSetupTest,
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
@@ -397,7 +398,6 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
-        "land_blocking" => Ok(land_blocking_test_suite(duration)),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
         "run_forever" => Ok(run_forever()),
@@ -483,9 +483,21 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "consensus_only_three_region_simulation" => {
             run_consensus_only_three_region_simulation(config)
         },
+        "land_blocking" => enable_quorum_store_test(config),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
+}
+
+fn enable_quorum_store_test(config: ForgeConfig) -> ForgeConfig {
+    config
+        .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 10 })
+                .txn_expiration_time_secs(5 * 60),
+        )
+        .with_network_tests(vec![&EnableQuorumStoreTest])
 }
 
 fn run_consensus_only_three_region_simulation(config: ForgeConfig) -> ForgeConfig {

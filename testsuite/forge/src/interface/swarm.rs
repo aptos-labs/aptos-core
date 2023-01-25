@@ -9,7 +9,7 @@ use anyhow::{anyhow, bail};
 use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::types::PeerId;
+use aptos_sdk::{crypto::ed25519::Ed25519PrivateKey, types::PeerId};
 use futures::future::{join_all, try_join_all};
 use prometheus_http_query::response::PromqlResult;
 use std::time::{Duration, Instant};
@@ -108,6 +108,8 @@ pub trait Swarm: Sync {
     fn aptos_public_info_for_node(&mut self, idx: usize) -> AptosPublicInfo<'_> {
         self.chain_info_for_node(idx).into_aptos_public_info()
     }
+
+    fn root_key(&self) -> Ed25519PrivateKey;
 }
 
 impl<T: ?Sized> SwarmExt for T where T: Swarm {}

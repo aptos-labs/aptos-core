@@ -13,7 +13,7 @@ use crate::{
 };
 use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
-use aptos_config::config::NodeConfig;
+use aptos_config::{config::NodeConfig, keys::ConfigKey};
 use aptos_retrier::ExponentWithLimitDelay;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
@@ -46,6 +46,7 @@ pub struct K8sSwarm {
     keep: bool,
     chaoses: HashSet<SwarmChaos>,
     prom_client: Option<PrometheusClient>,
+    root_key: ConfigKey<Ed25519PrivateKey>,
 }
 
 impl K8sSwarm {
@@ -62,7 +63,8 @@ impl K8sSwarm {
 
         let client = validators.values().next().unwrap().rest_client();
         let key = load_root_key(root_key);
-        let account_key = AccountKey::from_private_key(key);
+        let root_key = ConfigKey::new(key);
+        let account_key = AccountKey::from_private_key(root_key.private_key());
         let address = aptos_sdk::types::account_config::aptos_test_root_address();
         let sequence_number = query_sequence_number(&client, address).await.map_err(|e| {
             format_err!(
@@ -98,6 +100,7 @@ impl K8sSwarm {
             keep,
             chaoses: HashSet::new(),
             prom_client,
+            root_key,
         };
 
         // test hitting the configured prometheus endpoint
@@ -351,6 +354,10 @@ impl Swarm for K8sSwarm {
     fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
         let rest_api_url = self.get_rest_api_url(idx);
         ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
+    }
+
+    fn root_key(&self) -> Ed25519PrivateKey {
+        self.root_key.private_key()
     }
 }
 

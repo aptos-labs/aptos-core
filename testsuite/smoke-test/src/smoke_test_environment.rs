@@ -5,7 +5,7 @@ use aptos::test::CliTestFramework;
 use aptos_config::{config::NodeConfig, keys::ConfigKey, utils::get_available_port};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet::FaucetArgs;
-use aptos_forge::{ActiveNodesGuard, Factory, LocalFactory, LocalSwarm, Node};
+use aptos_forge::{ActiveNodesGuard, Factory, LocalFactory, LocalSwarm, Node, Swarm};
 use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
