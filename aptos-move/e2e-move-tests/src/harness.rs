@@ -425,6 +425,11 @@ impl MoveHarness {
         None
     }
 
+    /// Returns the total supply of AptosCoin currently in the system.
+    pub fn read_total_supply(&self) -> u128 {
+        self.executor.read_coin_supply().unwrap()
+    }
+
     /// Checks whether resource exists.
     pub fn exists_resource(&self, addr: &AccountAddress, struct_tag: StructTag) -> bool {
         self.read_resource_raw(addr, struct_tag).is_some()
