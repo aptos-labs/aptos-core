@@ -272,7 +272,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Measure Nodes",
+      label: "Monitor Nodes",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/measure/index" },
