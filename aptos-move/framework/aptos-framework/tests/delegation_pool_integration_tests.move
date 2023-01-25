@@ -442,6 +442,7 @@ module aptos_framework::delegation_pool_integration_tests {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x10006, location = aptos_framework::delegation_pool)]
     public entry fun test_active_validator_unlocking_more_than_available_stake_should_cap(
         aptos_framework: &signer,
         validator: &signer,
