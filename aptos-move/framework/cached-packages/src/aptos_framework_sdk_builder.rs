@@ -271,6 +271,11 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
+    /// Similar to add_owners, but only allow adding one owner.
+    MultisigAccountAddOwner {
+        new_owner: AccountAddress,
+    },
+
     /// Add new owners to the multisig account. This can only be invoked by the multisig account itself, through the
     /// proposal flow.
     ///
@@ -284,12 +289,12 @@ pub enum EntryFunctionCall {
     /// Approve a multisig transaction.
     MultisigAccountApproveTransaction {
         multisig_account: AccountAddress,
-        transaction_id: u64,
+        sequence_number: u64,
     },
 
     /// Creates a new multisig account and add the signer as a single owner.
     MultisigAccountCreate {
-        signatures_required: u64,
+        num_signatures_required: u64,
     },
 
     /// Create a multisig transaction, which will have one approval initially (from the creator).
@@ -321,7 +326,7 @@ pub enum EntryFunctionCall {
     MultisigAccountCreateWithExistingAccount {
         multisig_address: AccountAddress,
         owners: Vec<AccountAddress>,
-        signatures_required: u64,
+        num_signatures_required: u64,
         account_scheme: u8,
         account_public_key: Vec<u8>,
         create_multisig_account_signed_message: Vec<u8>,
@@ -331,11 +336,11 @@ pub enum EntryFunctionCall {
     ///
     /// @param additional_owners The owner account who calls this function cannot be in the additional_owners and there
     /// cannot be any duplicate owners in the list.
-    /// @param signatures_require The number of signatures required to execute a transaction. Must be at least 1 and
+    /// @param num_signatures_required The number of signatures required to execute a transaction. Must be at least 1 and
     /// at most the total number of owners.
     MultisigAccountCreateWithOwners {
         additional_owners: Vec<AccountAddress>,
-        signatures_required: u64,
+        num_signatures_required: u64,
     },
 
     /// Remove the next transaction if it has sufficient owner rejections.
@@ -346,7 +351,12 @@ pub enum EntryFunctionCall {
     /// Reject a multisig transaction.
     MultisigAccountRejectTransaction {
         multisig_account: AccountAddress,
-        transaction_id: u64,
+        sequence_number: u64,
+    },
+
+    /// Similar to remove_owners, but only allow removing one owner.
+    MultisigAccountRemoveOwner {
+        owner_to_remove: AccountAddress,
     },
 
     /// Remove owners from the multisig account. This can only be invoked by the multisig account itself, through the
@@ -360,6 +370,18 @@ pub enum EntryFunctionCall {
         owners_to_remove: Vec<AccountAddress>,
     },
 
+    /// Allow the multisig account to update its own metadata. Note that this overrides the entire existing metadata.
+    /// If any attributes are not specified in the metadata, they will be removed!
+    ///
+    /// This can only be invoked by the multisig account itself, through the proposal flow.
+    /// Note that this function is not public so it can only be invoked directly instead of via a module or script. This
+    /// ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
+    /// maliciously alter the number of signatures required.
+    MultisigAccountUpdateMetadata {
+        keys: Vec<Vec<u8>>,
+        values: Vec<Vec<u8>>,
+    },
+
     /// Update the number of signatures required to execute transaction in the specified multisig account.
     ///
     /// This can only be invoked by the multisig account itself, through the proposal flow.
@@ -367,13 +389,13 @@ pub enum EntryFunctionCall {
     /// ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
     /// maliciously alter the number of signatures required.
     MultisigAccountUpdateSignaturesRequired {
-        new_signatures_required: u64,
+        new_num_signatures_required: u64,
     },
 
     /// Generic function that can be used to either approve or reject a multisig transaction
     MultisigAccountVoteTransanction {
         multisig_account: AccountAddress,
-        transaction_id: u64,
+        sequence_number: u64,
         approved: bool,
     },
 
@@ -832,14 +854,15 @@ impl EntryFunctionCall {
                 amount,
             } => managed_coin_mint(coin_type, dst_addr, amount),
             ManagedCoinRegister { coin_type } => managed_coin_register(coin_type),
+            MultisigAccountAddOwner { new_owner } => multisig_account_add_owner(new_owner),
             MultisigAccountAddOwners { new_owners } => multisig_account_add_owners(new_owners),
             MultisigAccountApproveTransaction {
                 multisig_account,
-                transaction_id,
-            } => multisig_account_approve_transaction(multisig_account, transaction_id),
+                sequence_number,
+            } => multisig_account_approve_transaction(multisig_account, sequence_number),
             MultisigAccountCreate {
-                signatures_required,
-            } => multisig_account_create(signatures_required),
+                num_signatures_required,
+            } => multisig_account_create(num_signatures_required),
             MultisigAccountCreateTransaction {
                 multisig_account,
                 payload,
@@ -851,40 +874,46 @@ impl EntryFunctionCall {
             MultisigAccountCreateWithExistingAccount {
                 multisig_address,
                 owners,
-                signatures_required,
+                num_signatures_required,
                 account_scheme,
                 account_public_key,
                 create_multisig_account_signed_message,
             } => multisig_account_create_with_existing_account(
                 multisig_address,
                 owners,
-                signatures_required,
+                num_signatures_required,
                 account_scheme,
                 account_public_key,
                 create_multisig_account_signed_message,
             ),
             MultisigAccountCreateWithOwners {
                 additional_owners,
-                signatures_required,
-            } => multisig_account_create_with_owners(additional_owners, signatures_required),
+                num_signatures_required,
+            } => multisig_account_create_with_owners(additional_owners, num_signatures_required),
             MultisigAccountExecuteRejectedTransaction { multisig_account } => {
                 multisig_account_execute_rejected_transaction(multisig_account)
             },
             MultisigAccountRejectTransaction {
                 multisig_account,
-                transaction_id,
-            } => multisig_account_reject_transaction(multisig_account, transaction_id),
+                sequence_number,
+            } => multisig_account_reject_transaction(multisig_account, sequence_number),
+            MultisigAccountRemoveOwner { owner_to_remove } => {
+                multisig_account_remove_owner(owner_to_remove)
+            },
             MultisigAccountRemoveOwners { owners_to_remove } => {
                 multisig_account_remove_owners(owners_to_remove)
             },
+            MultisigAccountUpdateMetadata { keys, values } => {
+                multisig_account_update_metadata(keys, values)
+            },
             MultisigAccountUpdateSignaturesRequired {
-                new_signatures_required,
-            } => multisig_account_update_signatures_required(new_signatures_required),
+                new_num_signatures_required,
+            } => multisig_account_update_signatures_required(new_num_signatures_required),
             MultisigAccountVoteTransanction {
                 multisig_account,
-                transaction_id,
+                sequence_number,
                 approved,
-            } => multisig_account_vote_transanction(multisig_account, transaction_id, approved),
+            } => multisig_account_vote_transanction(multisig_account, sequence_number, approved),
             ObjectTransferCall { object, to } => object_transfer_call(object, to),
             ResourceAccountCreateResourceAccount {
                 seed,
@@ -1727,6 +1756,22 @@ pub fn managed_coin_register(coin_type: TypeTag) -> TransactionPayload {
     ))
 }
 
+/// Similar to add_owners, but only allow adding one owner.
+pub fn multisig_account_add_owner(new_owner: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("add_owner").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_owner).unwrap()],
+    ))
+}
+
 /// Add new owners to the multisig account. This can only be invoked by the multisig account itself, through the
 /// proposal flow.
 ///
@@ -1751,7 +1796,7 @@ pub fn multisig_account_add_owners(new_owners: Vec<AccountAddress>) -> Transacti
 /// Approve a multisig transaction.
 pub fn multisig_account_approve_transaction(
     multisig_account: AccountAddress,
-    transaction_id: u64,
+    sequence_number: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -1765,13 +1810,13 @@ pub fn multisig_account_approve_transaction(
         vec![],
         vec![
             bcs::to_bytes(&multisig_account).unwrap(),
-            bcs::to_bytes(&transaction_id).unwrap(),
+            bcs::to_bytes(&sequence_number).unwrap(),
         ],
     ))
 }
 
 /// Creates a new multisig account and add the signer as a single owner.
-pub fn multisig_account_create(signatures_required: u64) -> TransactionPayload {
+pub fn multisig_account_create(num_signatures_required: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -1782,7 +1827,7 @@ pub fn multisig_account_create(signatures_required: u64) -> TransactionPayload {
         ),
         ident_str!("create").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&signatures_required).unwrap()],
+        vec![bcs::to_bytes(&num_signatures_required).unwrap()],
     ))
 }
 
@@ -1847,7 +1892,7 @@ pub fn multisig_account_create_transaction_with_hash(
 pub fn multisig_account_create_with_existing_account(
     multisig_address: AccountAddress,
     owners: Vec<AccountAddress>,
-    signatures_required: u64,
+    num_signatures_required: u64,
     account_scheme: u8,
     account_public_key: Vec<u8>,
     create_multisig_account_signed_message: Vec<u8>,
@@ -1865,7 +1910,7 @@ pub fn multisig_account_create_with_existing_account(
         vec![
             bcs::to_bytes(&multisig_address).unwrap(),
             bcs::to_bytes(&owners).unwrap(),
-            bcs::to_bytes(&signatures_required).unwrap(),
+            bcs::to_bytes(&num_signatures_required).unwrap(),
             bcs::to_bytes(&account_scheme).unwrap(),
             bcs::to_bytes(&account_public_key).unwrap(),
             bcs::to_bytes(&create_multisig_account_signed_message).unwrap(),
@@ -1877,11 +1922,11 @@ pub fn multisig_account_create_with_existing_account(
 ///
 /// @param additional_owners The owner account who calls this function cannot be in the additional_owners and there
 /// cannot be any duplicate owners in the list.
-/// @param signatures_require The number of signatures required to execute a transaction. Must be at least 1 and
+/// @param num_signatures_required The number of signatures required to execute a transaction. Must be at least 1 and
 /// at most the total number of owners.
 pub fn multisig_account_create_with_owners(
     additional_owners: Vec<AccountAddress>,
-    signatures_required: u64,
+    num_signatures_required: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -1895,7 +1940,7 @@ pub fn multisig_account_create_with_owners(
         vec![],
         vec![
             bcs::to_bytes(&additional_owners).unwrap(),
-            bcs::to_bytes(&signatures_required).unwrap(),
+            bcs::to_bytes(&num_signatures_required).unwrap(),
         ],
     ))
 }
@@ -1921,7 +1966,7 @@ pub fn multisig_account_execute_rejected_transaction(
 /// Reject a multisig transaction.
 pub fn multisig_account_reject_transaction(
     multisig_account: AccountAddress,
-    transaction_id: u64,
+    sequence_number: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -1935,8 +1980,24 @@ pub fn multisig_account_reject_transaction(
         vec![],
         vec![
             bcs::to_bytes(&multisig_account).unwrap(),
-            bcs::to_bytes(&transaction_id).unwrap(),
+            bcs::to_bytes(&sequence_number).unwrap(),
         ],
+    ))
+}
+
+/// Similar to remove_owners, but only allow removing one owner.
+pub fn multisig_account_remove_owner(owner_to_remove: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("remove_owner").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&owner_to_remove).unwrap()],
     ))
 }
 
@@ -1962,6 +2023,34 @@ pub fn multisig_account_remove_owners(owners_to_remove: Vec<AccountAddress>) -> 
     ))
 }
 
+/// Allow the multisig account to update its own metadata. Note that this overrides the entire existing metadata.
+/// If any attributes are not specified in the metadata, they will be removed!
+///
+/// This can only be invoked by the multisig account itself, through the proposal flow.
+/// Note that this function is not public so it can only be invoked directly instead of via a module or script. This
+/// ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
+/// maliciously alter the number of signatures required.
+pub fn multisig_account_update_metadata(
+    keys: Vec<Vec<u8>>,
+    values: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("update_metadata").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&keys).unwrap(),
+            bcs::to_bytes(&values).unwrap(),
+        ],
+    ))
+}
+
 /// Update the number of signatures required to execute transaction in the specified multisig account.
 ///
 /// This can only be invoked by the multisig account itself, through the proposal flow.
@@ -1969,7 +2058,7 @@ pub fn multisig_account_remove_owners(owners_to_remove: Vec<AccountAddress>) -> 
 /// ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
 /// maliciously alter the number of signatures required.
 pub fn multisig_account_update_signatures_required(
-    new_signatures_required: u64,
+    new_num_signatures_required: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -1981,14 +2070,14 @@ pub fn multisig_account_update_signatures_required(
         ),
         ident_str!("update_signatures_required").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&new_signatures_required).unwrap()],
+        vec![bcs::to_bytes(&new_num_signatures_required).unwrap()],
     ))
 }
 
 /// Generic function that can be used to either approve or reject a multisig transaction
 pub fn multisig_account_vote_transanction(
     multisig_account: AccountAddress,
-    transaction_id: u64,
+    sequence_number: u64,
     approved: bool,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -2003,7 +2092,7 @@ pub fn multisig_account_vote_transanction(
         vec![],
         vec![
             bcs::to_bytes(&multisig_account).unwrap(),
-            bcs::to_bytes(&transaction_id).unwrap(),
+            bcs::to_bytes(&sequence_number).unwrap(),
             bcs::to_bytes(&approved).unwrap(),
         ],
     ))
@@ -3410,6 +3499,16 @@ mod decoder {
         }
     }
 
+    pub fn multisig_account_add_owner(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountAddOwner {
+                new_owner: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn multisig_account_add_owners(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountAddOwners {
@@ -3426,7 +3525,7 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountApproveTransaction {
                 multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
-                transaction_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
             None
@@ -3436,7 +3535,7 @@ mod decoder {
     pub fn multisig_account_create(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountCreate {
-                signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
+                num_signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -3479,7 +3578,7 @@ mod decoder {
                 EntryFunctionCall::MultisigAccountCreateWithExistingAccount {
                     multisig_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                     owners: bcs::from_bytes(script.args().get(1)?).ok()?,
-                    signatures_required: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    num_signatures_required: bcs::from_bytes(script.args().get(2)?).ok()?,
                     account_scheme: bcs::from_bytes(script.args().get(3)?).ok()?,
                     account_public_key: bcs::from_bytes(script.args().get(4)?).ok()?,
                     create_multisig_account_signed_message: bcs::from_bytes(script.args().get(5)?)
@@ -3497,7 +3596,7 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountCreateWithOwners {
                 additional_owners: bcs::from_bytes(script.args().get(0)?).ok()?,
-                signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
+                num_signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
             None
@@ -3524,7 +3623,19 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountRejectTransaction {
                 multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
-                transaction_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_remove_owner(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountRemoveOwner {
+                owner_to_remove: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -3543,12 +3654,25 @@ mod decoder {
         }
     }
 
+    pub fn multisig_account_update_metadata(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountUpdateMetadata {
+                keys: bcs::from_bytes(script.args().get(0)?).ok()?,
+                values: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn multisig_account_update_signatures_required(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountUpdateSignaturesRequired {
-                new_signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_num_signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -3561,7 +3685,7 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountVoteTransanction {
                 multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
-                transaction_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
                 approved: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
@@ -4317,6 +4441,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::managed_coin_register),
         );
         map.insert(
+            "multisig_account_add_owner".to_string(),
+            Box::new(decoder::multisig_account_add_owner),
+        );
+        map.insert(
             "multisig_account_add_owners".to_string(),
             Box::new(decoder::multisig_account_add_owners),
         );
@@ -4353,8 +4481,16 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::multisig_account_reject_transaction),
         );
         map.insert(
+            "multisig_account_remove_owner".to_string(),
+            Box::new(decoder::multisig_account_remove_owner),
+        );
+        map.insert(
             "multisig_account_remove_owners".to_string(),
             Box::new(decoder::multisig_account_remove_owners),
+        );
+        map.insert(
+            "multisig_account_update_metadata".to_string(),
+            Box::new(decoder::multisig_account_update_metadata),
         );
         map.insert(
             "multisig_account_update_signatures_required".to_string(),

@@ -798,6 +798,73 @@ impl TestContext {
         *account.sequence_number_mut() += 1;
     }
 
+    pub async fn simulate_multisig_transaction(
+        &mut self,
+        owner: &LocalAccount,
+        multisig_account: AccountAddress,
+        function: &str,
+        type_args: &[&str],
+        args: &[&str],
+        expected_status_code: u16,
+    ) -> Value {
+        self.simulate_transaction(
+            owner,
+            json!({
+                "type": "multisig_payload",
+                "multisig_address": multisig_account.to_hex_literal(),
+                "transaction_payload": {
+                    "function": function,
+                    "type_arguments": type_args,
+                    "arguments": args
+                }
+            }),
+            expected_status_code,
+        )
+        .await
+    }
+
+    pub async fn simulate_transaction(
+        &mut self,
+        sender: &LocalAccount,
+        payload: Value,
+        status_code: u16,
+    ) -> Value {
+        let mut request = json!({
+            "sender": sender.address(),
+            "sequence_number": sender.sequence_number().to_string(),
+            "gas_unit_price": "0",
+            "max_gas_amount": "1000000",
+            "expiration_timestamp_secs": "16373698888888",
+            "payload": payload,
+        });
+
+        // We're intentionally using invalid signatures since simulation API rejects valid ones.
+        let random_account = self.gen_account();
+        let resp = self
+            .post(
+                self.api_specific_config.signing_message_endpoint(),
+                request.clone(),
+            )
+            .await;
+
+        let signing_msg = self
+            .api_specific_config
+            .unwrap_signing_message_response(resp);
+
+        let sig = random_account
+            .private_key()
+            .sign_arbitrary_message(signing_msg.inner());
+        request["signature"] = json!({
+            "type": "ed25519_signature",
+            "public_key": HexEncodedBytes::from(sender.public_key().to_bytes().to_vec()),
+            "signature": HexEncodedBytes::from(sig.to_bytes().to_vec()),
+        });
+
+        self.expect_status_code(status_code)
+            .post("/transactions/simulate", request)
+            .await
+    }
+
     pub fn prepend_path(&self, path: &str) -> String {
         format!("{}{}", self.api_specific_config.get_api_base_path(), path)
     }

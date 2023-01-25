@@ -373,6 +373,7 @@ pub mod transaction_payload {
         EntryFunctionPayload = 0,
         ScriptPayload = 1,
         ModuleBundlePayload = 2,
+        MultisigPayload = 3,
     }
     impl Type {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -384,6 +385,7 @@ pub mod transaction_payload {
                 Type::EntryFunctionPayload => "ENTRY_FUNCTION_PAYLOAD",
                 Type::ScriptPayload => "SCRIPT_PAYLOAD",
                 Type::ModuleBundlePayload => "MODULE_BUNDLE_PAYLOAD",
+                Type::MultisigPayload => "MULTISIG_PAYLOAD",
             }
         }
     }
@@ -397,6 +399,8 @@ pub mod transaction_payload {
         ModuleBundlePayload(super::ModuleBundlePayload),
         #[prost(message, tag="5")]
         WriteSetPayload(super::WriteSetPayload),
+        #[prost(message, tag="6")]
+        MultisigPayload(super::MultisigPayload),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -423,6 +427,22 @@ pub struct ScriptPayload {
     pub type_arguments: ::prost::alloc::vec::Vec<MoveType>,
     #[prost(string, repeated, tag="3")]
     pub arguments: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MultisigPayload {
+    #[prost(string, tag="1")]
+    pub multisig_address: ::prost::alloc::string::String,
+
+    // Transaction payload is optional if already stored on chain.
+    #[prost(oneof="multisig_payload::MultisigTransactionPayload", tags="2")]
+    pub transaction_payload: ::core::option::Option<multisig_payload::MultisigTransactionPayload>,
+}
+pub mod multisig_payload {
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum MultisigTransactionPayload {
+        #[prost(message, tag = "2")]
+        EntryFunctionPayload(super::EntryFunctionPayload),
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModuleBundlePayload {

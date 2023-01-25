@@ -426,6 +426,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         txn_payload: &Multisig,
         log_context: &AdapterLogSchema,
+        new_published_modules_loaded: &mut bool,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_multisig_transaction", |_| {
             Err(VMStatus::Error(
@@ -441,16 +442,8 @@ impl AptosVM {
         let invariant_violation_error =
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .finish(Location::Undefined);
-        let provided_payload = if txn_payload.transaction_payload.is_some() {
-            let payload = txn_payload
-                .transaction_payload
-                .as_ref()
-                .ok_or_else(|| invariant_violation_error.clone())?;
-            match payload {
-                MultisigTransactionPayload::EntryFunction(entry_function) => {
-                    bcs::to_bytes(&entry_function).map_err(|_| invariant_violation_error.clone())?
-                },
-            }
+        let provided_payload = if let Some(payload) = &txn_payload.transaction_payload {
+            bcs::to_bytes(&payload).map_err(|_| invariant_violation_error.clone())?
         } else {
             // Default to empty bytes if payload is not provided.
             bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| invariant_violation_error.clone())?
@@ -463,7 +456,7 @@ impl AptosVM {
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Address(txn_payload.multisig_address),
-                    MoveValue::vector_u8(provided_payload.clone()),
+                    MoveValue::vector_u8(provided_payload),
                 ]),
                 gas_meter,
             )?
@@ -471,6 +464,14 @@ impl AptosVM {
             .into_iter()
             .map(|(bytes, _ty)| bytes)
             .collect::<Vec<_>>();
+        let payload_bytes = payload_bytes
+            .first()
+            // We expect the payload to either exists on chain or be passed along with the
+            // transaction.
+            .ok_or_else(|| {
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .finish(Location::Undefined)
+            })?;
         // We have to deserialize twice as the first time returns the actual return type of the
         // function, which is vec<u8>. The second time deserializes it into the correct
         // EntryFunction payload type.
@@ -478,101 +479,51 @@ impl AptosVM {
         // payload data either during transaction creation or execution.
         let deserialization_error = PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
             .finish(Location::Undefined);
-        let payload = bcs::from_bytes::<Vec<u8>>(
-            payload_bytes
-                .first()
-                // We expect the payload to either exists on chain or be passed along with the
-                // transaction.
-                .ok_or_else(|| {
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .finish(Location::Undefined)
-                })?,
-        )
-        .map(|payload| bcs::from_bytes::<EntryFunction>(&payload))
-        // Have to do map_err twice because flatten() is an unstable feature and not allowed.
-        .map_err(|_| deserialization_error.clone())?
-        .map_err(|_| deserialization_error)?;
+        let payload_bytes =
+            bcs::from_bytes::<Vec<u8>>(payload_bytes).map_err(|_| deserialization_error.clone())?;
+        let payload = bcs::from_bytes::<MultisigTransactionPayload>(&payload_bytes)
+            .map_err(|_| deserialization_error)?;
 
         // Step 2: Execute the target payload. Transaction failure here is tolerated. In case of any
         // failures, we'll discard the session and start a new one. This ensures that any data
         // changes are not persisted.
         // The multisig transaction would still be considered executed even if execution fails.
-        let execution_result = self.execute_multisig_entry_function(
-            &mut session,
-            gas_meter,
-            txn_payload.multisig_address,
-            &payload,
-        );
+        let execution_result = match payload {
+            MultisigTransactionPayload::EntryFunction(entry_function) => self
+                .execute_multisig_entry_function(
+                    &mut session,
+                    gas_meter,
+                    txn_payload.multisig_address,
+                    &entry_function,
+                    new_published_modules_loaded,
+                ),
+        };
 
         // Step 3: Call post transaction cleanup function in multisig account module with the result
         // from Step 2.
         // Note that we don't charge execution or writeset gas for cleanup routines. This is
         // consistent with the high-level success/failure cleanup routines for user transactions.
-        let mut cleanup_args = serialize_values(&vec![
+        let cleanup_args = serialize_values(&vec![
             MoveValue::Address(txn_data.sender),
             MoveValue::Address(txn_payload.multisig_address),
-            MoveValue::vector_u8(provided_payload),
+            MoveValue::vector_u8(payload_bytes),
         ]);
-
         let final_change_set_ext = if let Err(execution_error) = execution_result {
-            // Start a fresh session for running cleanup that does not contain any changes from
-            // the inner function call earlier (since it failed).
-            let mut cleanup_session = self.0.new_session(storage, SessionId::txn_meta(txn_data));
-            let execution_error = Self::convert_to_execution_error(execution_error)?;
-            cleanup_args
-                .push(bcs::to_bytes(&execution_error).map_err(|_| invariant_violation_error)?);
-            cleanup_session.execute_function_bypass_visibility(
-                &MULTISIG_ACCOUNT_MODULE,
-                FAILED_TRANSACTION_EXECUTION_CLEANUP,
-                vec![],
+            self.failure_multisig_payload_cleanup(
+                storage,
+                gas_meter,
+                execution_error,
+                txn_data,
                 cleanup_args,
-                &mut UnmeteredGasMeter,
-            )?;
-            cleanup_session
-                .finish()
-                .map_err(|e| e.into_vm_status())?
-                .into_change_set(&mut (), gas_meter.change_set_configs())?
+            )?
         } else {
-            // Charge gas for writeset before we do cleanup. This ensures we don't charge gas for
-            // cleanup writeset changes, which is consistent with outer-level success cleanup
-            // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
-            let inner_function_change_set_ext =
-                session
-                    .finish()
-                    .map_err(|e| e.into_vm_status())?
-                    .into_change_set(&mut (), gas_meter.change_set_configs())?;
-            gas_meter.charge_write_set_gas(inner_function_change_set_ext.write_set().iter())?;
-
-            let storage_with_changes =
-                DeltaStateView::new(storage, inner_function_change_set_ext.write_set());
-            let delta_write_set_mut = inner_function_change_set_ext
-                .delta_change_set()
-                .clone()
-                .try_into_write_set_mut(storage)
-                .expect("something terrible happened when applying aggregator deltas");
-            let delta_write_set = delta_write_set_mut
-                .freeze()
-                .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
-            let storage_with_changes =
-                DeltaStateView::new(&storage_with_changes, &delta_write_set).into_move_resolver();
-            let resolver = self.0.new_move_resolver(&storage_with_changes);
-            let mut cleanup_session = self.0.new_session(&resolver, SessionId::txn_meta(txn_data));
-
-            cleanup_session.execute_function_bypass_visibility(
-                &MULTISIG_ACCOUNT_MODULE,
-                SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP,
-                vec![],
+            self.success_multisig_payload_cleanup(
+                storage,
+                session,
+                gas_meter,
+                txn_data,
                 cleanup_args,
-                &mut UnmeteredGasMeter,
-            )?;
-            let cleanup_change_set_ext = cleanup_session
-                .finish()
-                .map_err(|e| e.into_vm_status())?
-                .into_change_set(&mut (), gas_meter.change_set_configs())?;
-            // Merge the inner function writeset with cleanup writeset.
-            inner_function_change_set_ext
-                .squash(cleanup_change_set_ext)
-                .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?
+            )?
         };
 
         // TODO(Gas): Charge for aggregator writes
@@ -591,6 +542,7 @@ impl AptosVM {
         gas_meter: &mut AptosGasMeter,
         multisig_address: AccountAddress,
         payload: &EntryFunction,
+        new_published_modules_loaded: &mut bool,
     ) -> Result<(), VMStatus> {
         let function =
             session.load_function(payload.module(), payload.function(), payload.ty_args())?;
@@ -611,39 +563,91 @@ impl AptosVM {
                 args,
                 gas_meter,
             )
-            // TODO: Handle partial failure from executing the target payload.
             .map_err(|e| e.into_vm_status())?;
 
         // Resolve any pending module publishes in case the multisig transaction is deploying
         // modules.
-        self.resolve_pending_code_publish(session, gas_meter)?;
+        self.resolve_pending_code_publish(session, gas_meter, new_published_modules_loaded)?;
         Ok(())
     }
 
-    fn convert_to_execution_error(status: VMStatus) -> Result<ExecutionError, VMStatus> {
-        match status {
-            VMStatus::Error(error) => Ok(ExecutionError {
-                error_type: String::from("VMError"),
-                abort_location: String::from(""),
-                error_code: error as u64,
-            }),
-            VMStatus::MoveAbort(abort_location, error_code) => Ok(ExecutionError {
-                error_type: String::from("MoveAbort"),
-                abort_location: format!("{:?}", abort_location),
-                error_code,
-            }),
-            VMStatus::ExecutionFailure {
-                status_code,
-                location,
-                function: _,
-                code_offset: _,
-            } => Ok(ExecutionError {
-                error_type: String::from("MoveExecutionFailure"),
-                abort_location: format!("{:?}", location),
-                error_code: status_code as u64,
-            }),
-            _ => Err(VMStatus::Error(StatusCode::UNREACHABLE)),
-        }
+    fn success_multisig_payload_cleanup<S: MoveResolverExt + StateView, SS: MoveResolverExt>(
+        &self,
+        storage: &S,
+        session: SessionExt<SS>,
+        gas_meter: &mut AptosGasMeter,
+        txn_data: &TransactionMetadata,
+        cleanup_args: Vec<Vec<u8>>,
+    ) -> Result<ChangeSetExt, VMStatus> {
+        // Charge gas for writeset before we do cleanup. This ensures we don't charge gas for
+        // cleanup writeset changes, which is consistent with outer-level success cleanup
+        // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
+        let inner_function_change_set_ext = session
+            .finish()
+            .map_err(|e| e.into_vm_status())?
+            .into_change_set(&mut (), gas_meter.change_set_configs())?;
+        gas_meter.charge_write_set_gas(inner_function_change_set_ext.write_set().iter())?;
+
+        let storage_with_changes =
+            DeltaStateView::new(storage, inner_function_change_set_ext.write_set());
+        let delta_write_set_mut = inner_function_change_set_ext
+            .delta_change_set()
+            .clone()
+            .try_into_write_set_mut(storage)
+            .expect("something terrible happened when applying aggregator deltas");
+        let delta_write_set = delta_write_set_mut
+            .freeze()
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
+        let storage_with_changes =
+            DeltaStateView::new(&storage_with_changes, &delta_write_set).into_move_resolver();
+        let resolver = self.0.new_move_resolver(&storage_with_changes);
+        let mut cleanup_session = self.0.new_session(&resolver, SessionId::txn_meta(txn_data));
+        cleanup_session.execute_function_bypass_visibility(
+            &MULTISIG_ACCOUNT_MODULE,
+            SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP,
+            vec![],
+            cleanup_args,
+            &mut UnmeteredGasMeter,
+        )?;
+        let cleanup_change_set_ext = cleanup_session
+            .finish()
+            .map_err(|e| e.into_vm_status())?
+            .into_change_set(&mut (), gas_meter.change_set_configs())?;
+        // Merge the inner function writeset with cleanup writeset.
+        inner_function_change_set_ext
+            .squash(cleanup_change_set_ext)
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
+    }
+
+    fn failure_multisig_payload_cleanup<S: MoveResolverExt + StateView>(
+        &self,
+        storage: &S,
+        gas_meter: &mut AptosGasMeter,
+        execution_error: VMStatus,
+        txn_data: &TransactionMetadata,
+        mut cleanup_args: Vec<Vec<u8>>,
+    ) -> Result<ChangeSetExt, VMStatus> {
+        // Start a fresh session for running cleanup that does not contain any changes from
+        // the inner function call earlier (since it failed).
+        let mut cleanup_session = self.0.new_session(storage, SessionId::txn_meta(txn_data));
+        let execution_error = ExecutionError::try_from(execution_error)
+            .map_err(|_| VMStatus::Error(StatusCode::UNREACHABLE))?;
+        // Serialization is not expected to fail so we're using invariant_violation error here.
+        cleanup_args.push(bcs::to_bytes(&execution_error).map_err(|_| {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .finish(Location::Undefined)
+        })?);
+        cleanup_session.execute_function_bypass_visibility(
+            &MULTISIG_ACCOUNT_MODULE,
+            FAILED_TRANSACTION_EXECUTION_CLEANUP,
+            vec![],
+            cleanup_args,
+            &mut UnmeteredGasMeter,
+        )?;
+        cleanup_session
+            .finish()
+            .map_err(|e| e.into_vm_status())?
+            .into_change_set(&mut (), gas_meter.change_set_configs())
     }
 
     fn verify_module_bundle<S: MoveResolverExt>(
@@ -985,6 +989,7 @@ impl AptosVM {
                 &txn_data,
                 payload,
                 log_context,
+                &mut new_published_modules_loaded,
             ),
 
             // Deprecated. Will be removed in the future.
@@ -1266,6 +1271,8 @@ impl AptosVM {
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
+        // Whether the prologue is run as part of tx simulation.
+        is_simulation: bool,
     ) -> Result<(), VMStatus> {
         match payload {
             TransactionPayload::Script(_) => {
@@ -1279,8 +1286,19 @@ impl AptosVM {
             },
             TransactionPayload::Multisig(multisig_payload) => {
                 self.0.check_gas(storage, txn_data, log_context)?;
-                self.0
-                    .run_multisig_prologue(session, txn_data, multisig_payload, log_context)
+                // Still run script prologue for multisig transaction to ensure the same tx
+                // validations are still run for this multisig execution tx, which is submitted by
+                // one of the owners.
+                self.0.run_script_prologue(session, txn_data, log_context)?;
+                // Skip validation if this is part of tx simulation.
+                // This allows simulating multisig txs without having to first create the multisig
+                // tx.
+                if !is_simulation {
+                    self.0
+                        .run_multisig_prologue(session, txn_data, multisig_payload, log_context)
+                } else {
+                    Ok(())
+                }
             },
 
             // Deprecated. Will be removed in the future.
@@ -1423,6 +1441,7 @@ impl VMAdapter for AptosVM {
             transaction.payload(),
             &txn_data,
             log_context,
+            false,
         )
     }
 
@@ -1534,6 +1553,7 @@ impl AptosSimulationVM {
             transaction.payload(),
             txn_data,
             log_context,
+            true,
         )
     }
 
@@ -1611,6 +1631,7 @@ impl AptosSimulationVM {
                                 &modified_txn_data,
                                 &TransactionPayload::EntryFunction(entry_function),
                                 log_context,
+                                &mut new_published_modules_loaded,
                             )
                         },
                     }

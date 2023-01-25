@@ -208,6 +208,27 @@ export class EntryFunction {
   }
 }
 
+export class MultiSigTransactionPayload {
+  /**
+   * Contains the payload to run a multisig account transaction.
+   * @param transaction_payload The payload of the multisig transaction. This can only be EntryFunction for now but
+   * Script might be supported in the future.
+   */
+  constructor(public readonly transaction_payload: EntryFunction) {}
+
+  serialize(serializer: Serializer): void {
+    // We can support multiple types of inner transaction payload in the future.
+    // For now it's only EntryFunction but if we support more types, we need to serialize with the right enum values
+    // here
+    serializer.serializeU32AsUleb128(0);
+    this.transaction_payload.serialize(serializer);
+  }
+
+  static deserialize(deserializer: Deserializer): MultiSigTransactionPayload {
+    return new MultiSigTransactionPayload(EntryFunction.deserialize(deserializer));
+  }
+}
+
 export class MultiSig {
   /**
    * Contains the payload to run a multisig account transaction.
@@ -215,7 +236,10 @@ export class MultiSig {
    * @param transaction_payload The payload of the multisig transaction. This is optional when executing a multisig
    *  transaction whose payload is already stored on chain.
    */
-  constructor(public readonly multisig_address: AccountAddress, public readonly transaction_payload?: EntryFunction) {}
+  constructor(
+    public readonly multisig_address: AccountAddress,
+    public readonly transaction_payload?: MultiSigTransactionPayload,
+  ) {}
 
   serialize(serializer: Serializer): void {
     this.multisig_address.serialize(serializer);
@@ -225,10 +249,6 @@ export class MultiSig {
       serializer.serializeBool(false);
     } else {
       serializer.serializeBool(true);
-      // We can support multiple types of inner transaction payload in the future.
-      // For now it's only EntryFunction but if we support more types, we need to serialize with the right enum values
-      // here
-      serializer.serializeU32AsUleb128(0);
       this.transaction_payload.serialize(serializer);
     }
   }
@@ -238,7 +258,7 @@ export class MultiSig {
     const payloadPresent = deserializer.deserializeBool();
     let transaction_payload;
     if (payloadPresent) {
-      transaction_payload = EntryFunction.deserialize(deserializer);
+      transaction_payload = MultiSigTransactionPayload.deserialize(deserializer);
     }
     return new MultiSig(multisig_address, transaction_payload);
   }
