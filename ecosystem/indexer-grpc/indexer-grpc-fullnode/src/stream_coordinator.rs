@@ -314,6 +314,7 @@ impl IndexerStreamCoordinator {
                 TransactionOutput {
                     encoded_proto_data,
                     version: txn.version,
+                    timestamp: txn.timestamp.clone(),
                 }
             })
             .collect()
