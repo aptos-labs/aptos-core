@@ -502,7 +502,7 @@ impl FakeExecutor {
         proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
         txns: Vec<SignedTransaction>,
-    ) -> u64 {
+    ) -> Vec<(TransactionStatus, u64)> {
         let mut txn_block: Vec<Transaction> =
             txns.into_iter().map(Transaction::UserTransaction).collect();
         let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
@@ -527,14 +527,14 @@ impl FakeExecutor {
         assert_eq!(event.key(), &new_block_event_key());
         assert!(bcs::from_bytes::<NewBlockEvent>(event.event_data()).is_ok());
 
-        let mut total_gas_used = 0;
+        let mut results = vec![];
         for output in outputs {
             if !output.status().is_discarded() {
                 self.apply_write_set(output.write_set());
             }
-            total_gas_used += output.gas_used();
+            results.push((output.status().clone(), output.gas_used()));
         }
-        total_gas_used
+        results
     }
 
     pub fn new_block_with_metadata(

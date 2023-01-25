@@ -356,13 +356,14 @@ impl MoveHarness {
             .new_block_with_metadata(proposer, failed_proposer_indices);
     }
 
-    // Executes the block of transactions inserting metadata at the start of the block. Returns the gas used.
+    // Executes the block of transactions inserting metadata at the start of the
+    // block. Returns a vector of transaction statuses and the gas they used.
     pub fn run_block_with_metadata(
         &mut self,
         proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
         txns: Vec<SignedTransaction>,
-    ) -> u64 {
+    ) -> Vec<(TransactionStatus, u64)> {
         self.fast_forward(1);
         self.executor
             .run_block_with_metadata(proposer, failed_proposer_indices, txns)
@@ -423,11 +424,6 @@ impl MoveHarness {
             }
         }
         None
-    }
-
-    /// Returns the total supply of AptosCoin currently in the system.
-    pub fn read_total_supply(&self) -> u128 {
-        self.executor.read_coin_supply().unwrap()
     }
 
     /// Checks whether resource exists.
