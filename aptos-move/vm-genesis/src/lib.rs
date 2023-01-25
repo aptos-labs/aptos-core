@@ -126,6 +126,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     );
     initialize_features(&mut session);
     initialize_aptos_coin(&mut session);
+    initialize_fee_collection_and_distribution(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_accounts(&mut session, accounts);
     create_employee_validators(&mut session, employees, genesis_config);
@@ -237,6 +238,7 @@ pub fn encode_genesis_change_set(
     } else {
         initialize_aptos_coin(&mut session);
     }
+    initialize_fee_collection_and_distribution(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_and_initialize_validators(&mut session, validators);
     if genesis_config.is_test {
@@ -405,6 +407,7 @@ fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
         FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES as u64,
         FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES as u64,
         FeatureFlag::VM_BINARY_FORMAT_V6 as u64,
+        FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES as u64,
         FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES as u64,
         FeatureFlag::BLAKE2B_256_NATIVE as u64,
         FeatureFlag::RESOURCE_GROUPS as u64,
@@ -430,6 +433,19 @@ fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
         "initialize_aptos_coin",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_fee_collection_and_distribution(session: &mut SessionExt<impl MoveResolver>) {
+    exec_function(
+        session,
+        "transaction_fee",
+        "initialize_fee_collection_and_distribution",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::U8(100),
+        ]),
     );
 }
 
