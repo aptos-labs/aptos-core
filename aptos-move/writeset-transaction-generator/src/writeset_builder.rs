@@ -11,7 +11,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
-    on_chain_config::{FeatureFlag, Features},
+    on_chain_config::Features,
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
@@ -114,9 +114,8 @@ where
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         chain_id,
+        Features::default(),
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);

@@ -5,7 +5,7 @@ id: "move"
 
 # Aptos Move References
 
-Use the Move language reference files below to develop smart contracts on the Aptos blockchain. Note, the `mainnet` versions of the documents below are not yet available. The `main` branch shows the latest development upstream and likely contains functionality not yet available in a *net release.
+Use the [Move language](../guides/move-guides/index.md) reference files below to develop smart contracts on the Aptos blockchain. The `main` branch shows the latest development upstream and likely contains functionality not yet available in a *net release.
 
 | Package | Latest | Mainnet | Testnet | Devnet |
 |-|-|-|-|-|
