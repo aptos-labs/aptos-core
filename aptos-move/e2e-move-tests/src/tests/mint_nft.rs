@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
-use aptos_crypto::{ed25519::Ed25519Signature, ed25519::Ed25519PrivateKey, SigningKey, ValidCryptoMaterialStringExt};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519Signature},
+    SigningKey, ValidCryptoMaterialStringExt,
+};
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     event::EventHandle,
@@ -229,7 +232,10 @@ fn generate_nft_tutorial_part4_signature() {
     let nft_receiver = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // When running this test to generate a valid signature, supply the actual private key to replace the (0000...) in line 232.
-    let admin_private_key = Ed25519PrivateKey::from_encoded_string("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let admin_private_key = Ed25519PrivateKey::from_encoded_string(
+        "0000000000000000000000000000000000000000000000000000000000000000",
+    )
+    .unwrap();
 
     // construct the token_data_id and mint_proof, which are required to mint the nft
     let token_data_id = TokenDataId {
