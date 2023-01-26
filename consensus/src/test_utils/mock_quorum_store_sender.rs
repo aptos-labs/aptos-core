@@ -12,6 +12,7 @@ use aptos_consensus_types::{
 };
 use tokio::sync::mpsc::Sender;
 
+#[derive(Clone)]
 pub struct MockQuorumStoreSender {
     tx: Sender<(ConsensusMsg, Vec<Author>)>,
 }
