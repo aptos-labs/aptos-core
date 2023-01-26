@@ -179,6 +179,8 @@ POST_MESSAGE_CONFIGURE_UNIX = """
 Add the following to your shell configuration file (e.g. .bashrc):
 
 export PATH="{aptos_home_bin}:$PATH"
+
+After this, restart your terminal.
 """
 
 POST_MESSAGE_CONFIGURE_FISH = """
@@ -186,10 +188,11 @@ You can execute `set -U fish_user_paths {aptos_home_bin} $fish_user_paths`
 """
 
 POST_MESSAGE_CONFIGURE_WINDOWS = """
-You can execute the follow commands to update your PATH and refresh your terminal:
+Execute the following command to update your PATH:
 
 setx PATH "%PATH%;{aptos_home_bin}"
-refreshenv
+
+After this, restart your terminal.
 """
 
 
