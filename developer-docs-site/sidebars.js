@@ -50,7 +50,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Set Environment",
+      label: "Prepare Environment",
       link: { type: "doc", id: "guides/getting-started" },
       collapsible: true,
       collapsed: true,
