@@ -12,6 +12,8 @@ Welcome! Aptos is a Layer 1 for everyone. In the [Ohlone language](https://en.wi
 
 This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
 
+> Please note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
+
 ## Set up the Aptos environment and start with the tutorials
 
 <div class="docs-card-container">
