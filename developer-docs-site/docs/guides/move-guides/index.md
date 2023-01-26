@@ -25,11 +25,40 @@ Start here to learn how the Move language works on the Aptos blockchain.
 - ### [Mint NFT with Aptos CLI](./mint-nft-cli.md)
 - ### [Upgrading Move Code](upgrading-move-code.md)
 - ### [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
+- ### [End-to-End Aptos Move Tests](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/e2e-move-tests/src/tests)
 - ### [Move language channel](https://discord.com/channels/945856774056083548/955573698868432896) in [Aptos Discord](https://discord.gg/aptoslabs).
 
 ## Aptos Move reference
 
 Then review our auto-generated contents for more [Move References](../../reference/move.md).
+
+## Move tools
+
+Use these tools to enhance your Move development experience.
+
+### Aptos CLI
+
+The [Aptos command line interface](../../cli-tools/aptos-cli-tool/index.md) (CLI) helps you test development, as many of the functions in our SDKs have corresponding commands.
+
+
+### Petra Wallet
+
+Although you may use any wallet developed for Aptos, the documents here reflect Petra Wallet. We recommend [installing](../../guides/install-petra-wallet.md) and [using](https://petra.app/docs/petra-intro) it.
+
+
+### Aptos Simulation API
+
+Use the [Aptos Simulation API](../../concepts/gas-txn-fee.md#estimating-the-gas-units-via-simulation) to test your apps, understanding the blockchain is in an ever-changing state. For example, an auction where people are selling, bidding, and buying will return varying results second by second. Gambling apps may generate wildly different results in a short time. So depending upon your application, you should expect some randomness. So guard your users by keeping simulations realistic.
+
+
+### Move Prover
+
+Install the [Move Prover](../../cli-tools/install-move-prover.md) dependencies after installing the Aptos CLI If you want to use the Move Prover to validate your Move code.
+
+
+### IDEs for Move
+
+Install the [IDE plugins for the Move language](../../guides/getting-started.md#ide-plugins-for-move-language) for even more handy features.
 
 ## Supporting Move resources
 

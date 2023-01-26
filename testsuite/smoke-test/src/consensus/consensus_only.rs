@@ -18,10 +18,10 @@ async fn test_consensus_only_with_txn_emitter() {
         &all_validators,
         Duration::from_secs(10),
         1,
-        vec![
-            (TransactionType::P2P, 70),
-            (TransactionType::AccountGeneration, 20),
-        ],
+        vec![vec![
+            (TransactionType::default_coin_transfer(), 70),
+            (TransactionType::default_account_generation(), 20),
+        ]],
     )
     .await
     .unwrap();

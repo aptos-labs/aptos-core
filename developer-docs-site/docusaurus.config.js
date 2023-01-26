@@ -164,6 +164,21 @@ const config = {
                 docId: "guides/move-guides/move-on-aptos",
               },
               {
+                label: "Move Structure",
+                type: "doc",
+                docId: "guides/move-guides/move-structure",
+              },
+              {
+                label: "How Base Gas Works",
+                type: "doc",
+                docId: "concepts/base-gas",
+              },
+              {
+                label: "Interact with Move VM",
+                type: "doc",
+                docId: "guides/interacting-with-the-blockchain",
+              },
+              {
                 label: "Your First Move Module",
                 type: "doc",
                 docId: "tutorials/first-move-module",
@@ -173,10 +188,37 @@ const config = {
                 type: "doc",
                 docId: "guides/move-guides/upgrading-move-code",
               },
+            ],
+          },
+          {
+            type: "dropdown",
+            label: "Create NFTs",
+            position: "left",
+            items: [
               {
-                label: "Move References",
                 type: "doc",
-                docId: "reference/move",
+                label: "Compare Aptos Tokens",
+                docId: "concepts/coin-and-token/aptos-token-comparison",
+              },
+              {
+                type: "doc",
+                label: "Mint NFTs with Aptos SDKs",
+                docId: "tutorials/your-first-nft",
+              },
+              {
+                type: "doc",
+                label: "Mint NFTs with Aptos CLI",
+                docId: "guides/move-guides/mint-nft-cli",
+              },
+              {
+                type: "doc",
+                label: "Mint FTs with On-Chain Data",
+                docId: "concepts/coin-and-token/onchain-data",
+              },
+              {
+                type: "doc",
+                label: "Mint NFTs with NFT CLI Mint Tool",
+                docId: "concepts/coin-and-token/nft-minting-tool",
               },
             ],
           },

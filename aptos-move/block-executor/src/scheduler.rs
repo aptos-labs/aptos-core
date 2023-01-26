@@ -156,11 +156,6 @@ impl Scheduler {
         }
     }
 
-    /// Return the number of transactions to be executed from the block.
-    pub fn num_txn_to_execute(&self) -> usize {
-        self.num_txns
-    }
-
     /// Try to abort version = (txn_idx, incarnation), called upon validation failure.
     /// When the invocation manages to update the status of the transaction, it changes
     /// Executed(incarnation) => Aborting(incarnation), it returns true. Otherwise,
