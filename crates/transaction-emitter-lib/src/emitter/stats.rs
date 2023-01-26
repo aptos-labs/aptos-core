@@ -3,7 +3,7 @@
 
 use std::{
     fmt,
-    ops::Sub,
+    ops::{Add, Sub},
     sync::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
@@ -11,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TxnStats {
     pub submitted: u64,
     pub committed: u64,
@@ -22,7 +22,7 @@ pub struct TxnStats {
     pub latency_buckets: AtomicHistogramSnapshot,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TxnStatsRate {
     pub submitted: u64,
     pub committed: u64,
@@ -91,6 +91,22 @@ impl Sub for &TxnStats {
             latency: self.latency - other.latency,
             latency_samples: self.latency_samples - other.latency_samples,
             latency_buckets: &self.latency_buckets - &other.latency_buckets,
+        }
+    }
+}
+
+impl Add for &TxnStats {
+    type Output = TxnStats;
+
+    fn add(self, other: &TxnStats) -> TxnStats {
+        TxnStats {
+            submitted: self.submitted + other.submitted,
+            committed: self.committed + other.committed,
+            expired: self.expired + other.expired,
+            failed_submission: self.failed_submission + other.failed_submission,
+            latency: self.latency + other.latency,
+            latency_samples: self.latency_samples + other.latency_samples,
+            latency_buckets: &self.latency_buckets + &other.latency_buckets,
         }
     }
 }
@@ -177,7 +193,7 @@ impl AtomicHistogramAccumulator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AtomicHistogramSnapshot {
     capacity: usize,
     step_width: u64,
@@ -204,6 +220,29 @@ impl Sub for &AtomicHistogramSnapshot {
         let mut buf = Vec::with_capacity(self.capacity);
         for i in 0..self.buckets.len() {
             buf.push(self.buckets[i] - other.buckets[i]);
+        }
+        AtomicHistogramSnapshot {
+            capacity: self.capacity,
+            step_width: self.step_width,
+            buckets: buf,
+        }
+    }
+}
+
+impl Add for &AtomicHistogramSnapshot {
+    type Output = AtomicHistogramSnapshot;
+
+    fn add(self, other: &AtomicHistogramSnapshot) -> AtomicHistogramSnapshot {
+        assert_eq!(
+            self.buckets.len(),
+            other.buckets.len(),
+            "Histogram snapshots must have same size, prev: {}, cur: {}",
+            self.buckets.len(),
+            other.buckets.len()
+        );
+        let mut buf = Vec::with_capacity(self.capacity);
+        for i in 0..self.buckets.len() {
+            buf.push(self.buckets[i] + other.buckets[i]);
         }
         AtomicHistogramSnapshot {
             capacity: self.capacity,

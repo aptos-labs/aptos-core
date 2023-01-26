@@ -73,7 +73,7 @@ pub struct StateSnapshotDelta {
     pub jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
 }
 
-pub trait BlockExecutorTrait: Send + Sync {
+pub trait BlockExecutorTrait<T>: Send + Sync {
     /// Get the latest committed block id
     fn committed_block_id(&self) -> HashValue;
 
@@ -83,7 +83,7 @@ pub trait BlockExecutorTrait: Send + Sync {
     /// Executes a block.
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: (HashValue, Vec<T>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error>;
 

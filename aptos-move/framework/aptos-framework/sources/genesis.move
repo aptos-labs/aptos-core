@@ -14,6 +14,7 @@ module aptos_framework::genesis {
     use aptos_framework::chain_status;
     use aptos_framework::coin;
     use aptos_framework::consensus_config;
+    use aptos_framework::create_signer::create_signer;
     use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
@@ -389,8 +390,6 @@ module aptos_framework::genesis {
     fun set_genesis_end(aptos_framework: &signer) {
         chain_status::set_genesis_end(aptos_framework);
     }
-
-    native fun create_signer(addr: address): signer;
 
     #[verify_only]
     use std::features;

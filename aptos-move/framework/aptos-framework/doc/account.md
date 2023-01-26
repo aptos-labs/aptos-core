@@ -18,7 +18,6 @@
 -  [Struct `RotationCapabilityOfferProofChallengeV2`](#0x1_account_RotationCapabilityOfferProofChallengeV2)
 -  [Struct `SignerCapabilityOfferProofChallengeV2`](#0x1_account_SignerCapabilityOfferProofChallengeV2)
 -  [Constants](#@Constants_0)
--  [Function `create_signer`](#0x1_account_create_signer)
 -  [Function `initialize`](#0x1_account_initialize)
 -  [Function `create_account`](#0x1_account_create_account)
 -  [Function `create_account_unchecked`](#0x1_account_create_account_unchecked)
@@ -48,7 +47,6 @@
 -  [Function `create_signer_with_capability`](#0x1_account_create_signer_with_capability)
 -  [Function `get_signer_capability_address`](#0x1_account_get_signer_capability_address)
 -  [Specification](#@Specification_1)
-    -  [Function `create_signer`](#@Specification_1_create_signer)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `create_account`](#@Specification_1_create_account)
     -  [Function `create_account_unchecked`](#@Specification_1_create_account_unchecked)
@@ -73,6 +71,7 @@
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
+<b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519">0x1::ed25519</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
@@ -775,28 +774,6 @@ Scheme identifier for MultiEd25519 signatures used to derive authentication keys
 
 
 
-<a name="0x1_account_create_signer"></a>
-
-## Function `create_signer`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_create_signer">create_signer</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>native</b> <b>fun</b> <a href="account.md#0x1_account_create_signer">create_signer</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_account_initialize"></a>
 
 ## Function `initialize`
@@ -877,7 +854,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 <pre><code><b>fun</b> <a href="account.md#0x1_account_create_account_unchecked">create_account_unchecked</a>(new_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    <b>let</b> new_account = <a href="account.md#0x1_account_create_signer">create_signer</a>(new_address);
+    <b>let</b> new_account = <a href="create_signer.md#0x1_create_signer">create_signer</a>(new_address);
     <b>let</b> authentication_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&new_address);
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&authentication_key) == 32,
@@ -1500,7 +1477,7 @@ at the offerer's address.
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_contains">option::contains</a>(&account_resource.signer_capability_offer.for, &addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY">ENO_SUCH_SIGNER_CAPABILITY</a>));
 
-    <a href="account.md#0x1_account_create_signer">create_signer</a>(offerer_address)
+    <a href="create_signer.md#0x1_create_signer">create_signer</a>(offerer_address)
 }
 </code></pre>
 
@@ -1673,7 +1650,7 @@ than <code>(1/2)^(256)</code>.
             <a href="account.md#0x1_account">account</a>.sequence_number == 0,
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account.md#0x1_account_EACCOUNT_ALREADY_USED">EACCOUNT_ALREADY_USED</a>),
         );
-        <a href="account.md#0x1_account_create_signer">create_signer</a>(resource_addr)
+        <a href="create_signer.md#0x1_create_signer">create_signer</a>(resource_addr)
     } <b>else</b> {
         <a href="account.md#0x1_account_create_account_unchecked">create_account_unchecked</a>(resource_addr)
     };
@@ -1835,7 +1812,7 @@ Capability based functions for efficient use.
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_signer_with_capability">create_signer_with_capability</a>(capability: &<a href="account.md#0x1_account_SignerCapability">SignerCapability</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <b>let</b> addr = &capability.<a href="account.md#0x1_account">account</a>;
-    <a href="account.md#0x1_account_create_signer">create_signer</a>(*addr)
+    <a href="create_signer.md#0x1_create_signer">create_signer</a>(*addr)
 }
 </code></pre>
 
@@ -1875,25 +1852,6 @@ Capability based functions for efficient use.
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
-</code></pre>
-
-
-
-<a name="@Specification_1_create_signer"></a>
-
-### Function `create_signer`
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_create_signer">create_signer</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
-</code></pre>
-
-
-Convert address to singer and return.
-
-
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> [abstract] <b>false</b>;
-<b>ensures</b> [abstract] <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == addr;
 </code></pre>
 
 

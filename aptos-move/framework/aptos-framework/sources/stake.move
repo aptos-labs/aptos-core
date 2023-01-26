@@ -1141,16 +1141,6 @@ module aptos_framework::stake {
         staking_config: &StakingConfig,
     ) acquires StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorFees {
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-
-        // First, distribute transaction fees.
-        if (features::collect_and_distribute_gas_fees()) {
-            let fees_table = &mut borrow_global_mut<ValidatorFees>(@aptos_framework).fees_table;
-            if (table::contains(fees_table, pool_address)) {
-                let coin = table::remove(fees_table, pool_address);
-                coin::merge(&mut stake_pool.active, coin);
-            };
-        };
-
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
         let cur_validator_perf = vector::borrow(&validator_perf.validators, validator_config.validator_index);
         let num_successful_proposals = cur_validator_perf.successful_proposals;
@@ -1182,6 +1172,15 @@ module aptos_framework::stake {
         let rewards_amount = rewards_active + rewards_pending_inactive;
         // Pending active stake can now be active.
         coin::merge(&mut stake_pool.active, coin::extract_all(&mut stake_pool.pending_active));
+
+        // Additionally, distribute transaction fees.
+        if (features::collect_and_distribute_gas_fees()) {
+            let fees_table = &mut borrow_global_mut<ValidatorFees>(@aptos_framework).fees_table;
+            if (table::contains(fees_table, pool_address)) {
+                let coin = table::remove(fees_table, pool_address);
+                coin::merge(&mut stake_pool.active, coin);
+            };
+        };
 
         // Pending inactive stake is only fully unlocked and moved into inactive if the current lockup cycle has expired
         let current_lockup_expiration = stake_pool.locked_until_secs;
@@ -2682,8 +2681,8 @@ module aptos_framework::stake {
         assert_no_fees_for_validator(validator_1_address);
         assert_no_fees_for_validator(validator_2_address);
         assert_no_fees_for_validator(validator_3_address);
-        assert_validator_state(validator_1_address, 404, 0, 0, 0, 2);
-        assert_validator_state(validator_2_address, 606, 0, 0, 0, 1);
+        assert_validator_state(validator_1_address, 401, 0, 0, 0, 2);
+        assert_validator_state(validator_2_address, 601, 0, 0, 0, 1);
         assert_validator_state(validator_3_address, 101, 0, 0, 0, 0);
     }
 }

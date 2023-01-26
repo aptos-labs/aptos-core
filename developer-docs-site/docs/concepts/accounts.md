@@ -118,14 +118,13 @@ identifiers for this account, i.e., whether the account is a single signature or
 
 To generate an authentication key and the account address for a single signature account:
 
-1. **Generate a key-pair**: Generate a fresh key-pair (`privkey_A`, `pubkey_A`). The Aptos blockchain uses the PureEdDSA
-2. scheme over the Ed25519 curve, as defined in RFC 8032.
-3. **Derive a 32-byte authentication key**: Derive a 32-byte authentication key from the `pubkey_A`:
+1. **Generate a key-pair**: Generate a fresh key-pair (`privkey_A`, `pubkey_A`). The Aptos blockchain uses the PureEdDSA scheme over the Ed25519 curve, as defined in RFC 8032.
+2. **Derive a 32-byte authentication key**: Derive a 32-byte authentication key from the `pubkey_A`:
      ```
      auth_key = sha3-256(pubkey_A | 0x00)
      ```
      where `|` denotes concatenation. The `0x00` is the 1-byte single-signature scheme identifier. 
-4. Use this initial authentication key as the permanent account address.
+3. Use this initial authentication key as the permanent account address.
 
 ## Multisigner authentication
 
