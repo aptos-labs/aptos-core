@@ -51,7 +51,11 @@ impl AptosValidatorInterface for RestDebuggerInterface {
             StateKey::AccessPath(path) => match path.get_path() {
                 Path::Code(module_id) => Ok(Some(StateValue::new(
                     self.0
-                        .get_account_module_bcs(*module_id.address(), module_id.name().as_str())
+                        .get_account_module_bcs_at_version(
+                            *module_id.address(),
+                            module_id.name().as_str(),
+                            version,
+                        )
                         .await
                         .map_err(|err| anyhow!("Failed to get account states: {:?}", err))?
                         .into_inner()
@@ -84,14 +88,24 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         start: Version,
         limit: u64,
     ) -> Result<Vec<Transaction>> {
-        Ok(self
-            .0
-            .get_transactions_bcs(Some(start), Some(limit as u16))
-            .await?
-            .into_inner()
-            .into_iter()
-            .map(|txn| txn.transaction)
-            .collect())
+        let mut ret = vec![];
+
+        while ret.len() < limit as usize {
+            ret.extend(
+                self.0
+                    .get_transactions_bcs(
+                        Some(start + ret.len() as u64),
+                        Some(limit as u16 - ret.len() as u16),
+                    )
+                    .await?
+                    .into_inner()
+                    .into_iter()
+                    .map(|txn| txn.transaction),
+            );
+            println!("Got {}/{} txns from RestApi.", ret.len(), limit);
+        }
+
+        Ok(ret)
     }
 
     async fn get_latest_version(&self) -> Result<Version> {

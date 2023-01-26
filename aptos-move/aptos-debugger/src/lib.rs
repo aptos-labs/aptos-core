@@ -62,6 +62,7 @@ impl AptosDebugger {
             .debugger
             .get_committed_transactions(begin, limit)
             .await?;
+
         let mut ret = vec![];
         while limit != 0 {
             println!(
