@@ -45,8 +45,9 @@ const addNewList = async () => {
 };
 ```
 
-4. Since our new function also uses `moduleAddress` - let’s get it out of the `fetchList` function scope so it can be used globally. Let’s get this const out of the local function scope to the global scope so we can use it in our new function.
-   In our `fetchList` function, find the line
+4. Since our new function also uses `moduleAddress` - let’s get it out of the `fetchList` function scope to the global scope so it can be used globally.
+
+In our `fetchList` function, find the line
 
 ```js
 // replace with your own address
@@ -54,6 +55,13 @@ const moduleAddress = "0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67a
 ```
 
 and move it to outside of the main `App` function - right beneath our const `NODE_URL` and const `client` declarations.
+
+```js
+export const NODE_URL = "https://fullnode.devnet.aptoslabs.com";
+export const client = new AptosClient(NODE_URL);
+// change this to be your module account address
+export const moduleAddress = "0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018";
+```
 
 **Let’s go over the `addNewList` function code.**
 
@@ -77,11 +85,11 @@ const payload = {
 
 Next, we submit the transaction payload and wait for its response. The response returned from the `signAndSubmitTransaction` function holds the transaction hash. Since it can take a bit for the transaction to fully submitted to chain and we also want to make sure it submitted successfully, we `waitForTransaction` and only then we can set our local `accountHasList` state to true.
 
-5. Before testing it on our App, let’s tweak our UI a bit add a Spinner component to show up while we are waiting for the transaction.
+5. Before testing our App, let’s tweak our UI a bit and add a Spinner component to show up while we are waiting for the transaction.
    Add a local state to keep track whether a transaction is in progress
 
-```js
-const [transactionInProgress, setTransactionInProgress] = useState < boolean > false;
+```ts
+const [transactionInProgress, setTransactionInProgress] = useState<boolean>(false);
 ```
 
 6. Update our `addNewList` function to update the local state
@@ -113,7 +121,7 @@ const addNewList = async () => {
 
 7. Update our UI with the following
 
-```js
+```jsx
 return (
   <>
     ...

@@ -5,11 +5,11 @@ id: "create-a-smart-contract"
 
 # Create a smart contract
 
-If you haven’t done it, you would want to Install Aptos CLI now. You can follow the instructions [here](../../cli-tools/aptos-cli-tool/automated-install-aptos-cli.md) - just make sure you use CLI version 1.0.4 as this what we use in this tutorial.
+If you haven’t done it, you would want to `install Aptos CLI` now. You can follow the instructions [here](../../cli-tools/aptos-cli-tool/automated-install-aptos-cli.md) - just make sure you use CLI version 1.0.4 as this what we use in this tutorial.
 
 1.  `cd` into `my-first-dapp` root folder, and create a new `move` folder
 2.  `cd` into the new `move` folder and run
-    `aptos move init --name myTodolist`
+    `aptos move init --name my_todo_list`
     That would create a `sources/` folder and `Move.toml` file inside the `move` folder.
 3.  Your new `move` folder should look like that
 
@@ -19,11 +19,11 @@ If you haven’t done it, you would want to Install Aptos CLI now. You can follo
 
 `Move.toml` file is a manifest file that contains metadata such as name, version, and dependencies for the package.
 
-Take a look at the new `Move.toml` file, you should see your package info (pay attention that the `name` prop is the same `--name` attribute we pass to the `aptos move init` command before) and an `AptosFramework` dependency. The AptosFramework dependency points to `aptos-core/aptos-move/framework/aptos-framework` github repo main branch.
+Take a look at the new `Move.toml` file, you should see your package info (pay attention that the `name` prop is the same `--name` attribute we pass to the `aptos move init` command before) and an `AptosFramework` dependency. The `AptosFramework` dependency points to `aptos-core/aptos-move/framework/aptos-framework` github repo main branch.
 
 ### Why `sources` folder?
 
-sources folder holds a collection of `.move` modules files and later when we would want to compile the package using the CLI, it will look for that `sources` file (and for the Move.toml file).
+sources folder holds a collection of `.move` modules files and later when we would want to compile the package using the CLI, it will look for that `sources` file (and for the `Move.toml` file).
 
 ### Create a Move module
 
@@ -31,15 +31,29 @@ An account is needed to publish a Move module. So first we need to create an acc
 
 1. On our `move` folder, run `aptos config init --network devnet`. Press enter when the prompt pops up.
 
-   This creates for us a `.aptos` folder with a `config.yaml` file that holds our profile info. On the `config` file we know have our profiles list that holds a `default` profile.
+   This creates for us a `.aptos` folder with a `config.yaml` file that holds our profiles info. On the `config` file we now have our profiles list that holds a `default` profile. You should see something like that
+
+   ```yaml
+   profiles:
+     default:
+       private_key: "0xee8f387ef0b4bb0018c4b91d1c0f71776a9b85935b4c6ec2823d6c0022fbf5cb"
+       public_key: "0xc6c07218d79a806380ca67761905063ec7a78d41f79619f4562462a0f8b6be11"
+       account: cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018
+       rest_url: "https://fullnode.devnet.aptoslabs.com"
+       faucet_url: "https://faucet.devnet.aptoslabs.com"
+   ```
 
    From now on, whenever we run a CLI command in this `move` folder, it will run with that default profile.
    We use the `devnet` network flag so eventually when we publish our package it would get published to the `devnet` network.
 
+   :::tip
+   You just created a new account on the Aptos (dev)netowrk! Yay! You can check it by going to [Explorer](https://explorer.aptoslabs.com/?network=devnet) past the `account value` from above into the search input and click on the dropdown option!
+   :::
+
 As mentioned, our `sources` folder holds our `.move` module files, so let’s add our first move file.
 
-1. Open the `Move.toml` file
-2. Add the following code into that file
+2. Open the `Move.toml` file
+3. Add the following code into that file
 
 ```toml
 [addresses]
@@ -53,7 +67,7 @@ If the default profile account address is `cbddf398841353776903dbab2fdaefc54f181
 myaddr='cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018'
 ```
 
-3. Create a new `main.move` file under the sources folder and add the following
+4. Create a new `main.move` file under the sources folder and add the following
 
 ```rust
 module myaddr::main {
@@ -61,7 +75,17 @@ module myaddr::main {
 }
 ```
 
-we are declaring a move module with the myaddr prop from our Move.toml file, so we can use that prop name as the address that holds that move module.
+:::tip
+A Move module is stored under an address (so when it published anyone can access it using that address), the syntax for a Move module is
+
+```rust
+module <account_address>::<module_name> {
+
+}
+```
+
+In our module, the `account_address` is `myaddr` (a variable we just declared on the `Move.toml` file in the previous step that holds an `address`), and the `module_name` is `main` (a random name we decided on).
+:::
 
 ### Our contract logic
 
@@ -76,7 +100,7 @@ Before jumping into writing code, let’s first understand what we want our prog
 creating an event is not a mandatory thing to do, but is more for in case dapps/users want to monitor data, such as how many people create a new task, using [Indexer](https://aptos.dev/guides/indexing)
 :::
 
-We can start with defining a `TaskHolder` struct, that holds the
+We can start with defining a `TodoList` struct, that holds the
 
 - tasks array
 - new task event
@@ -84,7 +108,7 @@ We can start with defining a `TaskHolder` struct, that holds the
 
 And can also create a `Task` struct that holds
 
-- the task id - derived from the task counter
+- the task id - derived from the TodoList task counter
 - address - the account address who created that task
 - content - the task content
 - completed - a boolean that marks whether that task is completed or not
@@ -93,7 +117,7 @@ On the `main.move` file, update the content in the module with
 
 ```rust
 ...
-struct TasksHolder has key {
+struct TodoList has key {
     tasks: Table<u64, Task>,
     set_task_event: event::EventHandle<Task>,
     task_counter: u64
@@ -110,12 +134,12 @@ struct Task has store, drop, copy {
 
 **What did we just add?**
 
-**TaskHolder**
+**TodoList**
 
 A struct that has the `key` and `store` abilities
 
 - `Key` ability allows struct to be used as a storage identifier. In other words, `key`
-   is an ability to be stored as at top-level and be a storage. We need it here to have `TasksHolder` be a resource stored in our user account
+   is an ability to be stored as at top-level and be a storage. We need it here to have `TodoList` be a resource stored in our user account
 
 When a struct has the `key` ability, it turns this struct into a `resource`
 
@@ -125,7 +149,7 @@ When a struct has the `key` ability, it turns this struct into a `resource`
 
 A struct that has the `store`, `drop` and `copy`abilities.
 
-• `Store` - Task needs Store as it’s stored inside another struct (TasksHolder)
+• `Store` - Task needs Store as it’s stored inside another struct (TodoList)
 
 • `Copy` - value can be *copied* (or cloned by value).
 
@@ -190,27 +214,27 @@ public entry fun create_list(account: &signer){
 
 `&signer` - This argument injected by the Move VM as the address who signed that transaction.
 
-Our code has a `TaskHolder` resource. Resource is stored under account - therefore it *exists* only when assigned to account; and can only be *accessed* through this account.
+Our code has a `TodoList` resource. Resource is stored under account - therefore it *exists* only when assigned to account; and can only be *accessed* through this account.
 
-That means, to create the `TaskHolder` resource we need to assign it to an account that only this account can have access to it.
+That means, to create the `TodoList` resource we need to assign it to an account that only this account can have access to it.
 
-The `create_list` function can handle that `TaskHolder` resource creation.
+The `create_list` function can handle that `TodoList` resource creation.
 
 2. Add the following to the `create_list` function
 
 ```rust
 public entry fun create_list(account: &signer){
-  let tasks_holder = TasksHolder {
+  let tasks_holder = TodoList {
     tasks: table::new(),
     set_task_event: account::new_event_handle<Task>(account),
     task_counter: 0
   };
-  // move the TasksHolder resource under the signer account
+  // move the TodoList resource under the signer account
   move_to(account, tasks_holder);
 }
 ```
 
-This function takes in a signer, creates a new TaskHolder resource, and move_to to be stored in the provided signer account.
+This function takes in a `signer`, creates a new `TodoList` resource, and `move_to` to be stored in the provided signer account.
 
 ### Create task function
 
@@ -219,11 +243,11 @@ As mentioned before, our contract has a create task function that lets an accoun
 1. Add a `create_task` function that accepts a `signer` and task `content` and the function logic.
 
 ```rust
-public entry fun create_task(account: &signer, content: String) acquires TasksHolder {
+public entry fun create_task(account: &signer, content: String) acquires TodoList {
     // gets the signer address
     let signer_address = signer::address_of(account);
-    // gets the TaskHolder resource
-    let todo_list = borrow_global_mut<TasksHolder>(signer_address);
+    // gets the TodoList resource
+    let todo_list = borrow_global_mut<TodoList>(signer_address);
     // increment task counter
     let counter = todo_list.task_counter + 1;
     // creates a new Task
@@ -239,7 +263,7 @@ public entry fun create_task(account: &signer, content: String) acquires TasksHo
     todo_list.task_counter = counter;
     // fires a new task created event
     event::emit_event<Task>(
-      &mut borrow_global_mut<TasksHolder>(signer_address).set_task_event,
+      &mut borrow_global_mut<TodoList>(signer_address).set_task_event,
       new_task,
     );
   }
@@ -250,31 +274,31 @@ public entry fun create_task(account: &signer, content: String) acquires TasksHo
 
 ```rust
 use std::signer;
-use aptos_std::table::{Self, Table}; // This one we already had, need to modify it
+use aptos_std::table::{Self, Table}; // This one we already have, need to modify it
 ```
 
 **Back to the code, what is happening here?**
 
-First, we want to get the signer address so we can get this account’s `TaskHolder` resource.
-Then, we retrieve the `TaskHolder` resource with the `signer_address` , with that we have access to the `TaskHolder` properties.
-We can now increment the `task_counter` prop, and create a new `Task` with the `signer_address`, `counter` and the provided `content`.
-We will push it to the `todo_list.tasks` table that holds all of our tasks along with the new `counter` (which is the table key) and the new created Task.
-Then we assign the global `task_counter` to be the new incremented counter.
-Finally, we emit the task created event that holds the new Task data.
+- First, we want to get the signer address so we can get this account’s `TodoList` resource.
+- Then, we retrieve the `TodoList` resource with the `signer_address` , with that we have access to the `TodoList` properties.
+- We can now increment the `task_counter` prop, and create a new `Task` with the `signer_address`, `counter` and the provided `content`.
+- We push it to the `todo_list.tasks` table that holds all of our tasks along with the new `counter` (which is the table key) and the new created Task.
+- Then we assign the global `task_counter` to be the new incremented counter.
+- Finally, we emit the task created event that holds the new Task data. emit_event is an aptos-framework function that accepts a reference to the event handle and a message. In our case, we are passing the function a reference (using the sign &) to the account’s TodoListresource set_task_event property (remember we have a set_task_event prop in our TodoList struct?) as the first argument and a second message argument which is the new Task we just created.
 
-### Toggle completed function
+### Complete task function
 
 Another function we want our contract to hold, is the option to toggle a task as completed.
 
-1. Add a `toggle_completed` function that accepts a signer and a task_id
+1. Add a `complete_task` function that accepts a `signer` and a `task_id`
 
 ```rust
-public entry fun toggle_completed(account: &signer, task_id: u64) acquires TasksHolder {
+public entry fun complete_task(account: &signer, task_id: u64) acquires TodoList {
   // gets the signer address
   let signer_address = signer::address_of(account);
-  // gets the TaskHolder resource
-  let todo_list = borrow_global_mut<TasksHolder>(signer_address);
-  // gets the task matched the task_id
+  // gets the TodoList resource
+  let todo_list = borrow_global_mut<TodoList>(signer_address);
+  // gets the task matches the task_id
   let task_record = table::borrow_mut(&mut todo_list.tasks, task_id);
   // update task as completed
   task_record.completed = true;
@@ -282,12 +306,15 @@ public entry fun toggle_completed(account: &signer, task_id: u64) acquires Tasks
 ```
 
 **Let’s understand the code.**
-As before in our create task function, we retrieve the TaskHolder struct by the signer address so we can have access to the tasks table that holds all of the account tasks. Then, we look for the task with the provided task_id on the todo_list.tasks table. Finally, we update that task completed prop to be true.
+
+- As before in our create task function, we retrieve the TodoList struct by the signer address so we can have access to the tasks table that holds all of the account tasks.
+- Then, we look for the task with the provided task_id on the todo_list.tasks table.
+- Finally, we update that task completed prop to be true.
 
 Let’s try to compile the code.
 
 2. run `aptos move compile`
-3. Another Unbound error? Let’s add a use statement to use the `account` module.
+3. Another `Unbound` error? Let’s add a use statement to use the `account` module.
 
 ```rust
 use aptos_framework::account;
@@ -297,35 +324,35 @@ use aptos_framework::account;
 
 ### Add validations
 
-As this code now compiles, we want to have some validations and checks before creating a new task or updating task as completed.
+As this code now compiles, we want to have some validations and checks before creating a new task or updating task as completed so we can be sure our functions function as expected.
 
 1. Add a check to the `create_task` function to make sure the signer account has a list
 
 ```rust
-public entry fun create_task(account: &signer, content: String) acquires TasksHolder {
+public entry fun create_task(account: &signer, content: String) acquires TodoList {
   // gets the signer address
   let signer_address = signer::address_of(account);
 
   // assert signer has created a list
-  assert!(exists<TasksHolder>(signer_address), 1);
+  assert!(exists<TodoList>(signer_address), 1);
 
   ...
 }
 ```
 
-1. Add check to the `toggle_completed` function to make sure
-   a. signer has created a list
-   b. task exists
-   c. task is not completed
+1. Add check to the `complete_task` function to make sure
+   - signer has created a list
+   - task exists
+   - task is not completed
 
 ```rust
-public entry fun toggle_completed(account: &signer, task_id: u64) acquires TasksHolder {
+public entry fun complete_task(account: &signer, task_id: u64) acquires TodoList {
   // gets the signer address
   let signer_address = signer::address_of(account);
   // assert signer has created a list
-  assert!(exists<TasksHolder>(signer_address), 1);
-  // gets the TaskHolder resource
-  let todo_list = borrow_global_mut<TasksHolder>(signer_address);
+  assert!(exists<TodoList>(signer_address), 1);
+  // gets the TodoList resource
+  let todo_list = borrow_global_mut<TodoList>(signer_address);
   // assert task exists
   assert!(table::contains(&todo_list.tasks, task_id), 2);
   // gets the task matched the task_id
@@ -353,24 +380,24 @@ const ETASK_IS_COMPLETED: u64 = 3;
 Now we can update our asserts with these constants
 
 ```rust
-public entry fun create_task(account: &signer, content: String) acquires TasksHolder {
+public entry fun create_task(account: &signer, content: String) acquires TodoList {
   // gets the signer address
   let signer_address = signer::address_of(account);
 
   // assert signer has created a list
-  assert!(exists<TasksHolder>(signer_address), E_NOT_INITIALIZED);
+  assert!(exists<TodoList>(signer_address), E_NOT_INITIALIZED);
 
   ...
 }
 
 
 
-public entry fun toggle_completed(account: &signer, task_id: u64) acquires TasksHolder {
+public entry fun complete_task(account: &signer, task_id: u64) acquires TodoList {
   // gets the signer address
   let signer_address = signer::address_of(account);
-  assert!(exists<TasksHolder>(signer_address), E_NOT_INITIALIZED);
-  // gets the TaskHolder resource
-  let todo_list = borrow_global_mut<TasksHolder>(signer_address);
+  assert!(exists<TodoList>(signer_address), E_NOT_INITIALIZED);
+  // gets the TodoList resource
+  let todo_list = borrow_global_mut<TodoList>(signer_address);
   // assert task exists
   assert!(table::contains(&todo_list.tasks, task_id), ETASK_DOESNT_EXIST);
   // gets the task matched the task_id
@@ -432,7 +459,7 @@ Update the test function to be
 
 ```rust
 #[test(admin = @0x123)]
-public entry fun test_flow(admin: signer) acquires TasksHolder {
+public entry fun test_flow(admin: signer) acquires TodoList {
   // creates an admin @myaddr account for test
   account::create_account_for_test(signer::address_of(&admin));
   // initialize contract with admin account
@@ -440,9 +467,9 @@ public entry fun test_flow(admin: signer) acquires TasksHolder {
 
   // creates a task by the admin account
   create_task(&admin, string::utf8(b"New Task"));
-  let task_count = event::counter(&borrow_global<TasksHolder>(signer::address_of(&admin)).set_task_event);
+  let task_count = event::counter(&borrow_global<TodoList>(signer::address_of(&admin)).set_task_event);
   assert!(task_count == 1, 4);
-  let todo_list = borrow_global<TasksHolder>(signer::address_of(&admin));
+  let todo_list = borrow_global<TodoList>(signer::address_of(&admin));
   assert!(todo_list.task_counter == 1, 5);
   let task_record = table::borrow(&todo_list.tasks, todo_list.task_counter);
   assert!(task_record.task_id == 1, 6);
@@ -451,8 +478,8 @@ public entry fun test_flow(admin: signer) acquires TasksHolder {
   assert!(task_record.address == signer::address_of(&admin), 9);
 
   // updates task as completed
-  toggle_completed(&admin, 1);
-  let todo_list = borrow_global<TasksHolder>(signer::address_of(&admin));
+  complete_task(&admin, 1);
+  let todo_list = borrow_global<TodoList>(signer::address_of(&admin));
   let task_record = table::borrow(&todo_list.tasks, 1);
   assert!(task_record.task_id == 1, 10);
   assert!(task_record.completed == true, 11);
@@ -496,16 +523,16 @@ Test result: OK. Total tests: 1; passed: 1; failed: 0
 }
 ```
 
-5. Let’s add one more test to make sure our `toggle_completed` function works as expected. Add another test function like that
+5. Let’s add one more test to make sure our `complete_task` function works as expected. Add another test function like that
 
 ```rust
 #[test(admin = @0x123)]
 #[expected_failure(abort_code = E_NOT_INITIALIZED)]
-public entry fun account_can_not_update_task(admin: signer) acquires TasksHolder {
+public entry fun account_can_not_update_task(admin: signer) acquires TodoList {
   // creates an admin @myaddr account for test
   account::create_account_for_test(signer::address_of(&admin));
   // account can not toggle task as no list was created
-  toggle_completed(&admin, 2);
+  complete_task(&admin, 2);
 }
 ```
 
@@ -545,7 +572,7 @@ Add the following `use statement` where we have all of our use statements.
 use std::string::String; // change to this
 ...
 #[test_only]
-use std::string;
+use std::string; // add this
 ```
 
 2. run `aptos move test` and `aptos move compile` - all should work without errors.
@@ -569,4 +596,4 @@ use std::string;
 }
 ```
 
-6. You can now head to https://explorer.aptoslabs.com/ , change the dropdown on the top right to devnet and look for that `transaction_hash` - that would show you the transaction details.
+6. You can now head to [Explorer](https://explorer.aptoslabs.com/) , change the dropdown on the top right to devnet and look for that `transaction_hash` - that would show you the transaction details.

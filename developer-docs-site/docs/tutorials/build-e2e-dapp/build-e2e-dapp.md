@@ -9,9 +9,9 @@ A common way to learn a new framework or a new language is to build a simple tod
 
 What we use:
 
-1. Aptos `CLI@1.0.4`
-2. Aptos `TS SDK@1.6.0`
-3. Aptos Wallet `Adapter@0.2.2`
+1. Aptos CLI `@1.0.4`
+2. Aptos TS SDK `@1.6.0`
+3. Aptos Wallet Adapter `@0.2.2`
 4. create react app
 
 ### Set up the project

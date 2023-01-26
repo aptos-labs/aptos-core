@@ -7,7 +7,7 @@ id: "add-wallet-support"
 
 Wallet is a program that used to submit a transaction to chain.
 
-Aptos provides a [wallet adapter](https://github.com/aptos-labs/aptos-wallet-adapter) that saves us time and work in implementing wallets logic and a UI package we can use to add a wallet connect button and a wallet select modal.
+Aptos provides a [wallet adapter](https://github.com/aptos-labs/aptos-wallet-adapter) that saves us time and work in implementing wallets logic and a UI package we can use to add a wallet connect button and a wallet selector modal.
 
 You can read about it more in the [Wallet Adapter Concept](../../concepts/wallet-adapter-concept) page.
 

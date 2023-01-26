@@ -5,9 +5,9 @@ id: "fetch-data-from-chain"
 
 # Fetch data from chain
 
-Our UI logic relies on whether the connected account has created a list or not. If they have, we should display their todo list, if they haven’t we should display a button letting them the option to create a new list.
+Our UI logic relies on whether the connected account has created a todo list or not. If they have, we should display their todo list, if they haven’t we should display a button letting them the option to create a new list.
 
-For that, we first need to fetch the connected account’s `TaskHolder` resource. this is because, in our smart contract, whenever someone creates a todo list we create and assign a `TaskHolder` resource to their account.
+For that, we first need to check if the connected account’s has a `TodoList` resource. this is because, in our smart contract, whenever someone creates a todo list we create and assign a `TodoList` resource to their account.
 
 To fetch data from chain, we can use Aptos TS SDK. The SDK provides classes and functions for us to easily interact and query the Aptos chain
 
@@ -30,7 +30,7 @@ const client = new AptosClient(NODE_URL);
 
 That would initialize an AptosClient instance for us with the devnet node url.
 
-Our app displays different UIs based on a user resource (i.e if a user has a list ⇒ if a user has a `TaskHolder` resource). For that, we need to know the current account connected to our app.
+Our app displays different UIs based on a user resource (i.e if a user has a list ⇒ if a user has a `TodoList` resource). For that, we need to know the current account connected to our app.
 
 1. Import Wallet from the wallet adapter react provider
 
@@ -49,10 +49,10 @@ function App (
 
 The `account` object is `null` if there is no account connected and holds the account info, like the account address, when account is connected
 
-3. Next thing we want to do is to fetch the account’s TaskHolder resource.
+3. Next thing we want to do is to fetch the account’s TodoList resource.
    Let’s add a useEffect hook to our file that would call a function to fetch the resource whenever our account address changes.
 
-```js
+```jsx
 function App() {
   ...
   useEffect(() => {
@@ -74,15 +74,15 @@ function App (
 
 5. Our `useEffect` hook is calling a `fetchList` function, let’s create it.
 
-```js
+```jsx
 const fetchList = async () => {
   if (!account) return [];
   // change this to be your module account address
   const moduleAddress = "0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018";
   try {
-    const taskHolderResource = await client.getAccountResource(
+    const TodoListResource = await client.getAccountResource(
       account.address,
-      `${moduleAddress}::main::TasksHolder`
+      `${moduleAddress}::main::TodoList`
     );
     setAccountHasList(true);
   } catch (e: any) {
@@ -99,13 +99,13 @@ The `client.getAccountResource()`expects an `account address` that holds the res
 - Move struct type string syntax
   - The account address who holds the move module = our profile account address (You might want to change the `moduleAddress` const to be your own account address)
   - The module name the resource lives in = `main`
-  - The resource name = `TaskHolder`
+  - The resource name = `TodoList`
 
 If the request succeed and there is a resource for that account, we want to set our local state to true, otherwise we would set it to false.
 
 6. Let’s update our UI based on the `accountHasList` state
 
-```js
+```jsx
 return (
   <>
     <Layout>
@@ -133,4 +133,6 @@ return (
 
 We now have a “add new list” button that only shows up if the account doesn’t have a list.
 
-Start the local server with `npm start` , you should see the “Add new list” button. Let’s understand how we create a new list which is submit a transaction to chain.
+Start the local server with `npm start` , you should see the “Add new list” button.
+
+Let’s understand how we create a new list which is submit a transaction to chain.

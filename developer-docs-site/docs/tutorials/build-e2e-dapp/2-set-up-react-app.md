@@ -5,11 +5,15 @@ id: "set-up-react-app"
 
 # Set up a React app
 
-We will use `react` library to build the client side with `[create react app](https://create-react-app.dev/docs/getting-started#creating-an-app)` (although we will explain some react decisions, we are not going to explain how react works, so we assume you have a previous experience with react).
+We will use `react` library to build the client side with [create react app](https://create-react-app.dev/docs/getting-started#creating-an-app) (although we will explain some react decisions, we are not going to have deep dive on how react works, so we assume you have a previous experience with react).
 
 For the UI design, we will use [Ant Design](https://ant.design/) (this is just a personal decision, you are free to use a different UI library/framework as you wish).
 
-1. On the root folder of that project run
+:::tip
+Make sure you have [node and npm installed](https://nodejs.org/en/)
+:::
+
+1. On the root folder of the `my-first-dapp` project run
 
 ```js
 npx create-react-app client --template typescript
