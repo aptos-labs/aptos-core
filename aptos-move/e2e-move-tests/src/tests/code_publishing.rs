@@ -21,6 +21,13 @@ struct State {
     value: u64,
 }
 
+/// Mimics `0xcafe::test::State`
+#[derive(Serialize, Deserialize)]
+struct StateWithCoins {
+    important_value: u64,
+    value: u64,
+}
+
 /// Runs the basic publishing test for all legacy flag combinations. Otherwise we will only
 /// run tests which are expected to make a difference for legacy flag combinations.
 #[rstest(enabled, disabled,
@@ -241,6 +248,44 @@ fn code_publishing_using_resource_account() {
         ),
     );
     assert_success!(result);
+}
+
+#[test]
+fn code_publishing_with_two_attempts_and_verify_loader_is_invalidated() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    // First module publish attempt failed when executing the init_module.
+    // Second attempt should pass.
+    // We expect the correct logic in init_module to be executed from the second attempt so the
+    // value stored is from the second code, and not the first (which would be the case if the
+    // VM's loader cache is not properly cleared after the first attempt).
+    //
+    // Depending on how the loader cache is flushed, the second attempt might even fail if the
+    // entire init_module from the first attempt still lingers around and will fail if invoked.
+    let failed_module_publish = h.create_publish_package(
+        &acc,
+        &common::test_dir_path("code_publishing.data/pack_init_module_failed"),
+        None,
+        |_| {},
+    );
+    let module_publish_second_attempt = h.create_publish_package(
+        &acc,
+        &common::test_dir_path("code_publishing.data/pack_init_module_second_attempt"),
+        None,
+        |_| {},
+    );
+    let results = h.run_block(vec![failed_module_publish, module_publish_second_attempt]);
+    assert_abort!(results[0], _);
+    assert_success!(results[1]);
+
+    let value_resource = h
+        .read_resource::<StateWithCoins>(
+            acc.address(),
+            parse_struct_tag("0xcafe::test::State").unwrap(),
+        )
+        .unwrap();
+    assert_eq!(2, value_resource.important_value);
 }
 
 #[rstest(enabled, disabled,
