@@ -233,6 +233,16 @@ impl<V: CryptoHash> SubTree<V> {
         }
     }
 
+    pub fn weak(&self) -> Self {
+        match self {
+            Self::Empty => Self::Empty,
+            Self::NonEmpty { hash, root } => Self::NonEmpty {
+                hash: *hash,
+                root: root.weak(),
+            },
+        }
+    }
+
     pub fn get_node_if_in_mem(&self, min_generation: u64) -> Option<Arc<Node<V>>> {
         match self {
             Self::Empty => None,

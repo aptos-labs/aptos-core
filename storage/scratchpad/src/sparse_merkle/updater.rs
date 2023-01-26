@@ -122,7 +122,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
                     NodeInner::Internal(internal_node) => {
                         SubTreeInfo::InMem(InMemSubTreeInfo::Internal {
                             node: internal_node.clone(),
-                            subtree: subtree.clone(),
+                            subtree: subtree.weak(),
                         })
                     },
                     NodeInner::Leaf(leaf_node) => {
@@ -148,7 +148,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
                     },
                 },
                 None => SubTreeInfo::InMem(InMemSubTreeInfo::Unknown {
-                    subtree: subtree.clone(),
+                    subtree: subtree.weak(),
                 }),
             },
         }
