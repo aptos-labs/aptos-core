@@ -1,0 +1,46 @@
+# This workflow runs a public fullnode using the `main` branch,
+# connects the public fullnode to `devnet` and synchronizes the
+# node using execution or output syncing to verify that nothing
+# has been broken.
+
+name: "fullnode-intelligent-devnet-main"
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 9/12 * * *"
+  pull_request:
+    paths:
+      - ".github/workflows/fullnode-intelligent-devnet-main.yaml"
+
+jobs:
+  fullnode-intelligent-devnet-main:
+    timeout-minutes: 300 # Run for at most 5 hours
+    runs-on: high-perf-docker-with-local-ssd
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+
+      - uses: ./.github/actions/fullnode-sync
+        with:
+          TIMEOUT_MINUTES: 300 # Run for at most 5 hours
+          BRANCH: main
+          NETWORK: devnet
+          BOOTSTRAPPING_MODE: ExecuteOrApplyFromGenesis
+          CONTINUOUS_SYNCING_MODE: ExecuteTransactionsOrApplyOutputs
+          DATA_DIR_FILE_PATH: /tmp/
+          NODE_LOG_FILE_PATH: /tmp/node_log
+
+      - name: Upload node logs as an artifact
+        uses: actions/upload-artifact@v3
+        if: ${{ always() }}
+        with:
+          name: node_log
+          path: |
+            /tmp/node_log
+          retention-days: 14
+
+      # Because we have to checkout the actions and then check out a different
+      # branch, it's possible the actions directory will be modified. So, we
+      # need to check it out again for the Post Run actions/checkout to succeed.
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          path: actions
