@@ -106,8 +106,6 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         ChainId::test().id(),
         Features::default(),
     )
@@ -216,8 +214,6 @@ pub fn encode_genesis_change_set(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         ChainId::test().id(),
         Features::default(),
     )
@@ -874,8 +870,6 @@ pub fn test_genesis_module_publishing() {
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        false,
-        true,
         ChainId::test().id(),
         Features::default(),
     )

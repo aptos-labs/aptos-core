@@ -462,7 +462,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "single_vfn_perf" => single_vfn_perf(config),
         "validator_reboot_stress_test" => validator_reboot_stress_test(config),
         "fullnode_reboot_stress_test" => fullnode_reboot_stress_test(config),
-        "account_creation" | "nft_mint" => account_creation_or_nft_mint(test_name.into(), config),
+        "account_creation" | "nft_mint" | "publishing" | "module_loading"
+        | "write_new_resource" => individual_workload_tests(test_name.into(), config),
         "graceful_overload" => graceful_overload(config),
         // not scheduled on continuous
         "load_vs_perf_benchmark" => load_vs_perf_benchmark(config),
@@ -792,7 +793,10 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
         )
 }
 
-fn account_creation_or_nft_mint(test_name: String, config: ForgeConfig) -> ForgeConfig {
+fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeConfig {
+    let job = EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+        mempool_backlog: 30000,
+    });
     config
         .with_network_tests(vec![&PerformanceBenchmarkWithFN])
         .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
@@ -800,18 +804,46 @@ fn account_creation_or_nft_mint(test_name: String, config: ForgeConfig) -> Forge
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["validator"]["config"]["execution"]
+                ["processed_transactions_detailed_counters"] = true.into();
+        }))
         .with_emit_job(
-            EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 30000,
-                })
-                .transaction_type(
-                    if test_name == "account_creation" {
-                        TransactionType::AccountGeneration
-                    } else {
-                        TransactionType::NftMintAndTransfer
+            if test_name == "write_new_resource" {
+                let account_creation_type = TransactionType::AccountGeneration {
+                    add_created_accounts_to_pool: true,
+                    max_account_working_set: 20_000_000,
+                    creation_balance: 200_000_000,
+                };
+                let write_type = TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::MakeOrChange {
+                        string_length: Some(0),
+                        data_length: Some(64),
                     },
-                ),
+                    num_modules: 1,
+                    use_account_pool: true,
+                };
+                job.transaction_mix_per_phase(vec![
+                    // warmup
+                    vec![(account_creation_type, 1)],
+                    vec![(account_creation_type, 1)],
+                    vec![(write_type, 1)],
+                    // cooldown
+                    vec![(write_type, 1)],
+                ])
+            } else {
+                job.transaction_type(match test_name.as_str() {
+                    "account_creation" => TransactionType::default_account_generation(),
+                    "nft_mint" => TransactionType::NftMintAndTransfer,
+                    "publishing" => TransactionType::PublishPackage,
+                    "module_loading" => TransactionType::CallCustomModules {
+                        entry_point: EntryPoints::Nop,
+                        num_modules: 1000,
+                        use_account_pool: false,
+                    },
+                    _ => unreachable!("{}", test_name),
+                })
+            },
         )
         .with_success_criteria(
             SuccessCriteria::new(4000)
@@ -1011,7 +1043,7 @@ fn state_sync_perf_fullnodes_fast_sync(forge_config: ForgeConfig<'static>) -> Fo
                 .mode(EmitJobMode::MaxLoad {
                     mempool_backlog: 30000,
                 })
-                .transaction_type(TransactionType::AccountGeneration), // Create many state values
+                .transaction_type(TransactionType::default_account_generation()), // Create many state values
         )
         .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
@@ -1208,8 +1240,8 @@ fn changing_working_quorum_test_helper(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionType::P2P, 80),
-                    (TransactionType::AccountGeneration, 20),
+                    (TransactionType::default_coin_transfer(), 80),
+                    (TransactionType::default_account_generation(), 20),
                 ]),
         )
         .with_success_criteria(
@@ -1259,8 +1291,8 @@ fn large_db_test(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionType::P2P, 75),
-                    (TransactionType::AccountGeneration, 20),
+                    (TransactionType::default_coin_transfer(), 75),
+                    (TransactionType::default_account_generation(), 20),
                     (TransactionType::NftMintAndTransfer, 5),
                 ]),
         )

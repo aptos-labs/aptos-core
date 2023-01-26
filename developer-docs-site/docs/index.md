@@ -12,6 +12,8 @@ Welcome! Aptos is a Layer 1 for everyone. In the [Ohlone language](https://en.wi
 
 This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
 
+> Please note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
+
 ## Set up the Aptos environment and start with the tutorials
 
 <div class="docs-card-container">
@@ -138,9 +140,11 @@ Please remember, community managers will never message or DM you first, and they
 
 Want to join a great team working on amazing world-scale problems? Take a look at [active roles](https://aptoslabs.com/careers) on [AptosLabs.com](https://www.aptoslabs.com/) and come build with us! Or [create a pull request](https://github.com/aptos-labs/aptos-core/pulls) to make updates and [file issues](https://github.com/aptos-labs/aptos-core/issues) to report problems.
 
-We welcome your own [contributions](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) to the Aptos blockchain and this site! In fact, every contributor to Aptos.dev is listed as an *author* on the pages they edit and update. See the *Authors* list at the bottom for an example. See the [Aptos Docs](https://github.com/orgs/aptos-labs/projects/14/views/1) project for open issues by status.
+We welcome your own [contributions](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) to the Aptos blockchain and this site! In fact, every contributor to Aptos.dev is listed as an *author* on the pages they edit and update. See the *Authors* list at the bottom of any page other than this for example. See the [Aptos Docs](https://github.com/orgs/aptos-labs/projects/14/views/1) project for open issues by status.
 
 Simply click *Edit this page* at the bottom of any location to go to the source and trigger editing there. The contents are in [Markdown](https://www.markdownguide.org/basic-syntax/) format. When ready, [start a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request) with your changes. We will get back to you shortly.
+
+Finally, you may report problems and supply other input in the [#docs-feedback](https://discord.com/channels/945856774056083548/1034215378299133974) channel of [Aptos Discord](https://discord.gg/aptoslabs).
 
 ## Find the ecosystem
 

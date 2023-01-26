@@ -121,8 +121,6 @@ impl AptosVMImpl {
             native_gas_params,
             abs_val_size_gas_params,
             gas_feature_version,
-            features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-            features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             chain_id.id(),
             features.clone(),
         )

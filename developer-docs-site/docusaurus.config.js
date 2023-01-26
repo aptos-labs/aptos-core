@@ -105,12 +105,17 @@ const config = {
                 docId: "whats-new-in-docs",
               },
               {
+                label: "Read White Paper",
+                type: "doc",
+                docId: "aptos-white-paper/index",
+              },
+              {
                 label: "Learn Aptos Concepts",
                 type: "doc",
                 docId: "concepts/index",
               },
               {
-                label: "Set Environment",
+                label: "Prepare Environment",
                 type: "doc",
                 docId: "guides/getting-started",
               },
@@ -133,18 +138,23 @@ const config = {
               },
               {
                 type: "doc",
-                label: "Develop with SDKs",
-                docId: "tutorials/index",
-              },
-              {
-                type: "doc",
-                label: "Develop Locally",
-                docId: "nodes/local-testnet/index",
+                label: "Read Blockchain Data",
+                docId: "/category/data",
               },
               {
                 type: "doc",
                 label: "Interact with Blockchain",
                 docId: "guides/index",
+              },
+              {
+                type: "doc",
+                label: "Develop with SDKs",
+                docId: "tutorials/index",
+              },
+              {
+                type: "doc",
+                label: "Implement Wallet Adapter",
+                docId: "concepts/wallet-adapter-concept",
               },
             ],
           },
@@ -154,7 +164,7 @@ const config = {
             position: "left",
             items: [
               {
-                label: "Write Smart Contracts with Move",
+                label: "Write Move Smart Contracts",
                 type: "doc",
                 docId: "guides/move-guides/index",
               },
@@ -162,6 +172,21 @@ const config = {
                 label: "Move on Aptos",
                 type: "doc",
                 docId: "guides/move-guides/move-on-aptos",
+              },
+              {
+                label: "Move Structure",
+                type: "doc",
+                docId: "guides/move-guides/move-structure",
+              },
+              {
+                label: "How Base Gas Works",
+                type: "doc",
+                docId: "concepts/base-gas",
+              },
+              {
+                label: "Interact with Move VM",
+                type: "doc",
+                docId: "guides/interacting-with-the-blockchain",
               },
               {
                 label: "Your First Move Module",
@@ -173,11 +198,6 @@ const config = {
                 type: "doc",
                 docId: "guides/move-guides/upgrading-move-code",
               },
-              {
-                label: "Move References",
-                type: "doc",
-                docId: "reference/move",
-              },
             ],
           },
           {
@@ -185,6 +205,11 @@ const config = {
             label: "Create NFTs",
             position: "left",
             items: [
+              {
+                type: "doc",
+                label: "Create NFTs on Aptos",
+                docId: "/category/nft",
+              },
               {
                 type: "doc",
                 label: "Compare Aptos Tokens",
@@ -205,6 +230,11 @@ const config = {
                 label: "Mint FTs with On-Chain Data",
                 docId: "concepts/coin-and-token/onchain-data",
               },
+              {
+                type: "doc",
+                label: "Mint NFTs with NFT CLI Mint Tool",
+                docId: "concepts/coin-and-token/nft-minting-tool",
+              },
             ],
           },
           {
@@ -218,6 +248,11 @@ const config = {
                 docId: "nodes/nodes-landing",
               },
               {
+                type: "doc",
+                label: "Develop Locally",
+                docId: "nodes/local-testnet/index",
+              },
+              {
                 label: "Install Validators",
                 type: "doc",
                 docId: "nodes/validator-node/index",
@@ -228,7 +263,7 @@ const config = {
                 docId: "nodes/full-node/index",
               },
               {
-                label: "Measure Nodes",
+                label: "Monitor Nodes",
                 type: "doc",
                 docId: "nodes/measure/index",
               },
@@ -244,6 +279,11 @@ const config = {
             label: "Reference",
             position: "left",
             items: [
+              {
+                label: "Aptos References",
+                type: "doc",
+                docId: "reference/index",
+              },
               {
                 label: "REST API",
                 type: "doc",

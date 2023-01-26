@@ -28,6 +28,7 @@ Bitwise
 BlockMetadata
 BlockMetadataTransaction
 BlockQuote
+Bundlr
 CANCELLED
 CDN
 CLI
@@ -81,6 +82,7 @@ EWITHDRAW
 EWRONG
 EZERO
 Eg
+entrancy
 EntryFunction
 EntryFunctionPayload
 EpochChangeProof
@@ -305,6 +307,7 @@ ip
 ips
 IPFS
 isConnected
+json
 jsx
 kickstart
 korean
