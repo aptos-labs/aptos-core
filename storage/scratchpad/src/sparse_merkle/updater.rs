@@ -15,6 +15,7 @@ use aptos_crypto::{
 };
 use aptos_types::proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt};
 use std::cmp::Ordering;
+use crate::sparse_merkle::node::SubTree;
 
 type Result<T> = std::result::Result<T, UpdateError>;
 
@@ -113,52 +114,6 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
         Self::InMem(InMemSubTreeInfo::Empty)
     }
 
-    fn new_proof_leaf(leaf: SparseMerkleLeafNode) -> Self {
-        Self::Persisted(PersistedSubTreeInfo::Leaf { leaf })
-    }
-
-    fn new_proof_sibling(node_in_proof: &NodeInProof) -> Self {
-        match node_in_proof {
-            NodeInProof::Leaf(leaf) => Self::new_proof_leaf(*leaf),
-            NodeInProof::Other(hash) => {
-                if *hash == *SPARSE_MERKLE_PLACEHOLDER_HASH {
-                    Self::InMem(InMemSubTreeInfo::Empty)
-                } else {
-                    Self::Persisted(PersistedSubTreeInfo::ProofSibling { hash: *hash })
-                }
-            },
-        }
-    }
-
-    fn new_on_proof_path(proof: &'a SparseMerkleProofExt, depth: usize) -> Self {
-        match proof.siblings().len().cmp(&depth) {
-            Ordering::Greater => Self::Persisted(PersistedSubTreeInfo::ProofPathInternal { proof }),
-            Ordering::Equal => match proof.leaf() {
-                Some(leaf) => Self::new_proof_leaf(leaf),
-                None => Self::new_empty(),
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    fn from_persisted(
-        a_descendant_key: HashValue,
-        depth: usize,
-        proof_reader: &'a impl ProofRead,
-    ) -> Result<Self> {
-        let proof = proof_reader
-            .get_proof(a_descendant_key)
-            .ok_or(UpdateError::MissingProof)?;
-        if depth > proof.siblings().len() {
-            return Err(UpdateError::ShortProof {
-                key: a_descendant_key,
-                num_siblings: proof.siblings().len(),
-                depth,
-            });
-        }
-        Ok(Self::new_on_proof_path(proof, depth))
-    }
-
     fn from_in_mem(subtree: &InMemSubTree<V>, generation: u64) -> Self {
         match &subtree {
             InMemSubTree::Empty => SubTreeInfo::new_empty(),
@@ -214,11 +169,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
         proof_reader: &'a impl ProofRead,
         generation: u64,
     ) -> Result<(Self, Self)> {
-        let myself = if self.is_unknown() {
-            SubTreeInfo::from_persisted(a_descendent_key, depth, proof_reader)?
-        } else {
-            self
-        };
+        let myself = self;
 
         Ok(match &myself {
             SubTreeInfo::InMem(info) => match info {
@@ -234,22 +185,14 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
                     SubTreeInfo::from_in_mem(&node.left, generation),
                     SubTreeInfo::from_in_mem(&node.right, generation),
                 ),
-                InMemSubTreeInfo::Unknown { .. } => unreachable!(),
+                InMemSubTreeInfo::Unknown { .. } => {
+                    let left_child = SubTreeInfo::InMem(InMemSubTreeInfo::Unknown { subtree: SubTree::new_empty() });
+                    let right_child = SubTreeInfo::InMem(InMemSubTreeInfo::Unknown { subtree: SubTree::new_empty()});
+                    (left_child, right_child)
+                },
             },
-            SubTreeInfo::Persisted(info) => match info {
-                PersistedSubTreeInfo::Leaf { leaf } => {
-                    let key = leaf.key();
-                    swap_if(myself, SubTreeInfo::new_empty(), key.bit(depth))
-                },
-                PersistedSubTreeInfo::ProofPathInternal { proof } => {
-                    let siblings = proof.siblings();
-                    assert!(siblings.len() > depth);
-                    let sibling_child =
-                        SubTreeInfo::new_proof_sibling(&siblings[siblings.len() - depth - 1]);
-                    let on_path_child = SubTreeInfo::new_on_proof_path(proof, depth + 1);
-                    swap_if(on_path_child, sibling_child, a_descendent_key.bit(depth))
-                },
-                PersistedSubTreeInfo::ProofSibling { .. } => unreachable!(),
+            SubTreeInfo::Persisted(info) => {
+                unreachable!()
             },
         })
     }
@@ -257,16 +200,8 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
     fn materialize(self, generation: u64) -> InMemSubTreeInfo<V> {
         match self {
             Self::InMem(info) => info,
-            Self::Persisted(info) => match info {
-                PersistedSubTreeInfo::Leaf { leaf } => {
-                    InMemSubTreeInfo::create_leaf_with_proof(&leaf, generation)
-                },
-                PersistedSubTreeInfo::ProofSibling { hash } => {
-                    InMemSubTreeInfo::create_unknown(hash)
-                },
-                PersistedSubTreeInfo::ProofPathInternal { .. } => {
-                    unreachable!()
-                },
+            Self::Persisted(info) => {
+                unreachable!()
             },
         }
     }
@@ -348,32 +283,26 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                             ),
                             None => {
                                 if key == key_to_update {
-                                    MaybeEndRecursion::End(InMemSubTreeInfo::Empty)
+                                    MaybeEndRecursion::End(InMemSubTreeInfo::create_unknown(HashValue::default()))
                                 } else {
                                     MaybeEndRecursion::End(self.info.materialize(self.generation))
                                 }
                             },
                         },
-                        _ => MaybeEndRecursion::Continue(self),
-                    },
-                    SubTreeInfo::Persisted(PersistedSubTreeInfo::Leaf { leaf }) => match update {
-                        Some(value) => MaybeEndRecursion::or(
-                            leaf.key() == *key_to_update,
-                            InMemSubTreeInfo::create_leaf_with_update(
-                                (*key_to_update, value),
-                                self.generation,
-                            ),
-                            self,
-                        ),
-                        None => {
-                            if leaf.key() == *key_to_update {
-                                MaybeEndRecursion::End(InMemSubTreeInfo::Empty)
-                            } else {
-                                MaybeEndRecursion::End(self.info.materialize(self.generation))
+                        InMemSubTreeInfo::Internal { .. } => MaybeEndRecursion::Continue(self),
+                        InMemSubTreeInfo::Unknown { .. } => {
+                            match update {
+                                Some(value) => {
+                                    MaybeEndRecursion::End(InMemSubTreeInfo::create_leaf_with_update(
+                                        (*key_to_update, value),
+                                        self.generation,
+                                    ))
+                                },
+                                None => todo!(),
                             }
                         },
                     },
-                    _ => MaybeEndRecursion::Continue(self),
+                    _ => unreachable!(),
                 }
             },
             _ => MaybeEndRecursion::Continue(self),
