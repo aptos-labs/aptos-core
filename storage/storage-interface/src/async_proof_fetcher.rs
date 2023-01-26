@@ -121,12 +121,6 @@ impl ProofFetcher for AsyncProofFetcher {
             .with_label_values(&["async_proof_fetcher_fetch"])
             .start_timer();
         let value = self.reader.get_state_value_by_version(state_key, version)?;
-        self.schedule_proof_read(
-            state_key.clone(),
-            version,
-            root_hash,
-            value.as_ref().map(|v| v.hash()),
-        );
         Ok((value, None))
     }
 
