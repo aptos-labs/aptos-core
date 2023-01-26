@@ -1,5 +1,5 @@
 ---
-title: "Adhere to Wallet Standard"
+title: "Aptos Wallet Standard"
 slug: "wallet-standard"
 ---
 import Tabs from '@theme/Tabs';
@@ -7,22 +7,21 @@ import TabItem from '@theme/TabItem';
 
 # Aptos Wallet Standard
 
-The wallet standard provides guidelines to have interoperability between multiple wallets.  This ensures that dapp developers do not need to change
-their applications to handle different wallets.  A single interface for all of them together, allowing easy additions of new wallets and more users
-to each application.  This allows users to choose which wallet they want without worrying about whether apps support them.
+The wallet standard provides guidelines to have interoperability between multiple wallets.  This ensures dapp developers do not need to change
+their applications to handle different wallets. This standard offers a single interface for all dapp developers, allowing easy additions of new wallets and more users to each application. This interoperability allows users to choose which wallet they want without worrying about whether apps support their use cases.
 
 In order to allow for Aptos' wallet interoperability, the following is required:
 1. Mnemonics - a set of words that can derive account private keys
 2. dApp API - entry points into the wallet to support access to identity managed by the wallet
 3. Key rotation - handling both the relationship around mnemonics and the recovery of accounts in different wallets
 
-## Mnemonics Phrases
+## Mnemonics phrases
 
 A mnemonic phrase is a multiple word phrase that can be used to generate account addresses.
 We recommend 1 mnemonic per account, in order to handle key rotation better.  For example, [Petra wallet](../guides/install-petra-wallet.md) uses a 1 to 1 mnemonic to account system.
 However, some wallets may want to support 1 mnemonic to many accounts coming from other chains. To support both of these use cases the Aptos wallet standard uses a [BIP44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki) derive path for mnemonics to accounts.
 
-### Creating an Aptos Account
+### Creating an Aptos account
 
 Aptos account creation can be supported across wallets in the following manner:
 
@@ -58,7 +57,7 @@ Aptos account creation can be supported across wallets in the following manner:
   }
 ```
 
-### Supporting 1 Mnemonic per Multiple Account Wallets
+### Supporting one mnemonic per multiple account wallets
 
 This is not recommended because the 1 mnemonic to many accounts paradigm makes it harder to handle rotated keys (mnemonic changes for one account but not others).
 However, many wallets from other ecosystems use this paradigm, and take these steps to generate accounts
