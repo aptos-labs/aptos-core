@@ -9,8 +9,8 @@ The Aptos command line interface (CLI) helps you develop apps, debug issues, and
 
 You may install the Aptos CLI in any of these ways:
 
-* [Install Aptos CLI with Homebrew](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md) - Recommended for macOS.
-* [Use the automated installation script](./automated-install-aptos-cli.md) - Recommended for Linux, Windows (NT), and Windows (WSL), and can be used for macOS.
+* [Install Aptos CLI with Homebrew](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md) - Recommended for MacOS.
+* [Use the automated installation script](./automated-install-aptos-cli.md) - Recommended for Linux, Windows (NT), and Windows (WSL). MacOS is also supported.
 
 These methods are recommended only if you have issues with the above methods:
 
