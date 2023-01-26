@@ -64,6 +64,7 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
+            "cli-tools/aptos-cli-tool/automated-install-aptos-cli",
             "cli-tools/aptos-cli-tool/install-aptos-cli",
             "cli-tools/build-aptos-cli",
             "cli-tools/aptos-cli-tool/use-aptos-cli",
