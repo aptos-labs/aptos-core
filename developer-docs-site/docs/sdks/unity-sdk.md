@@ -9,16 +9,18 @@ slug: "unity-sdk"
 The Aptos Unity SDK is a .NET implementation of the [Aptos SDK](./index.md), compatible with .NET Standard 2.0 and .NET 4.x for Unity. The goal of this SDK is to provide a set of tools for developers to build multi-platform applications (mobile, desktop, web, VR) using the Unity game engine and the Aptos blockchain infrastructure.
 
 ## Core features
-- HD Wallet Creation & Recovery
-- Account Management
-    - Account Recovery
-    - Message Signing
-    - Message Verification
-    - Transaction Management
+
+
+- HD wallet creation and recovery
+- Account management
+    - Account recovery
+    - Message signing
+    - Message verification
+    - Transaction management
     - Single / Multi-signer Authentication
-    - Authentication Key Rotation
-- Native BCS Support
-- Faucet Client for Devnet
+    - Authentication key rotation
+- Native Binary Canonical Serialization (BCS) support
+- Faucet client for devnet
 
 ## User flows
 
@@ -52,8 +54,6 @@ The Aptos Unity SDK supports these use cases:
 - [Portable.BouncyCastle](https://www.nuget.org/packages/Portable.BouncyCastle)
 - Zxing
 
-TODO: Do we ned to guide them on finding these packages or specify verions supported?
-
 ## Install the Unity SDK
 
 You may install the Unity SDK either through our `unitypackage` or the [Unity Package Manager](https://docs.unity3d.com/Manual/Packages.html).
@@ -70,5 +70,3 @@ You may install the Unity SDK either through our `unitypackage` or the [Unity Pa
 2. Click the add **+** button in the top status bar.
 3. Select *Add package from git URL* from the dropdown menu.
 4. Enter the `https://github.com/xxxxxxxxxx.git` and click **Add**.
-
-TODO: Explain what the GitHub URL should be above or include it directly.
