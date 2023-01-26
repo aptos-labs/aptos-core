@@ -5,10 +5,9 @@ use anyhow::Result;
 use aptos_debugger::AptosDebugger;
 use aptos_rest_client::Client;
 use aptos_vm::AptosVM;
-use clap::{Subcommand, Parser};
-use url::Url;
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
-
+use url::Url;
 
 #[derive(Subcommand)]
 pub enum Target {
@@ -39,8 +38,10 @@ async fn main() -> Result<()> {
     AptosVM::set_concurrency_level_once(args.concurrency_level);
 
     let debugger = match args.target {
-         Target::Rest { endpoint } => AptosDebugger::rest_client(Client::new(Url::parse(&endpoint)?))?,
-         Target::DB { path } => AptosDebugger::db(path)?,
+        Target::Rest { endpoint } => {
+            AptosDebugger::rest_client(Client::new(Url::parse(&endpoint)?))?
+        },
+        Target::DB { path } => AptosDebugger::db(path)?,
     };
 
     println!(
